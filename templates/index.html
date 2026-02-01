@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Tutor - TEVETA</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
+        
+        header { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; padding: 15px 24px; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .status { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        
+        main { flex: 1; display: flex; overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { width: 340px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow: hidden; }
+        .sidebar-header { padding: 16px; border-bottom: 1px solid #e0e0e0; background: #f8f9fa; }
+        .sidebar-header h2 { font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+        .sidebar-content { flex: 1; overflow-y: auto; }
+        
+        .area { border-bottom: 1px solid #e0e0e0; }
+        .area-header { padding: 12px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; background: #fafafa; transition: background 0.2s; }
+        .area-header:hover { background: #f0f0f0; }
+        .area-header .icon { font-size: 20px; }
+        .area-header h3 { flex: 1; font-size: 14px; font-weight: 600; }
+        .area-header .badge { font-size: 11px; background: #e0e0e0; padding: 2px 8px; border-radius: 10px; color: #666; }
+        .area-header .arrow { color: #999; transition: transform 0.2s; font-size: 12px; }
+        .area.open .area-header .arrow { transform: rotate(90deg); }
+        .area-programs { display: none; background: white; }
+        .area.open .area-programs { display: block; }
+        
+        .program { border-top: 1px solid #f0f0f0; }
+        .program-header { padding: 10px 16px 10px 44px; cursor: pointer; font-size: 13px; color: #333; display: flex; align-items: center; gap: 8px; transition: background 0.2s; }
+        .program-header:hover { background: #f5f5f5; }
+        .program-header .arrow { color: #999; font-size: 10px; transition: transform 0.2s; }
+        .program.open .program-header .arrow { transform: rotate(90deg); }
+        .program-modules { display: none; }
+        .program.open .program-modules { display: block; }
+        
+        .module { padding: 8px 16px 8px 64px; cursor: pointer; font-size: 12px; color: #666; border-top: 1px solid #f5f5f5; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+        .module:hover { background: #e8f4fc; color: #1e3a5f; }
+        .module.active { background: #1e3a5f; color: white; }
+        .module-code { font-weight: 600; color: #1e3a5f; min-width: 45px; font-size: 11px; }
+        .module.active .module-code { color: #8cc4ff; }
+        
+        /* Chat */
+        .chat { flex: 1; display: flex; flex-direction: column; }
+        .chat-header { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .chat-header-left h2 { font-size: 16px; margin-bottom: 4px; }
+        .chat-context { font-size: 12px; opacity: 0.85; line-height: 1.4; }
+        .clear-btn { background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+        .clear-btn:hover { background: rgba(255,255,255,0.3); }
+        
+        .messages { flex: 1; overflow-y: auto; padding: 20px; background: #f5f7f9; }
+        .message { display: flex; gap: 12px; max-width: 85%; margin-bottom: 16px; }
+        .message.user { margin-left: auto; flex-direction: row-reverse; }
+        .avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+        .message.assistant .avatar { background: linear-gradient(135deg, #1e3a5f, #2d5a87); }
+        .message.user .avatar { background: #e5e7eb; }
+        
+        .bubble { padding: 14px 18px; border-radius: 16px; line-height: 1.7; font-size: 14px; }
+        .message.assistant .bubble { background: white; border: 1px solid #e0e0e0; border-bottom-left-radius: 4px; color: #333; }
+        .message.user .bubble { background: #1e3a5f; color: white; border-bottom-right-radius: 4px; }
+        
+        /* Markdown styling in bubbles */
+        .bubble strong, .bubble b { font-weight: 600; color: #1e3a5f; }
+        .message.user .bubble strong { color: #8cc4ff; }
+        .bubble em, .bubble i { font-style: italic; }
+        .bubble ul, .bubble ol { margin: 10px 0 10px 20px; }
+        .bubble li { margin-bottom: 6px; }
+        .bubble p { margin-bottom: 10px; }
+        .bubble p:last-child { margin-bottom: 0; }
+        .bubble code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; }
+        .message.user .bubble code { background: rgba(255,255,255,0.2); }
+        .bubble pre { background: #f5f5f5; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 10px 0; }
+        .bubble pre code { background: none; padding: 0; }
+        .bubble h3, .bubble h4 { margin: 12px 0 8px 0; color: #1e3a5f; }
+        .bubble blockquote { border-left: 3px solid #1e3a5f; padding-left: 12px; margin: 10px 0; color: #666; font-style: italic; }
+        
+        .typing { display: flex; gap: 5px; padding: 12px 16px; }
+        .typing span { width: 8px; height: 8px; background: #999; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
+        .typing span:nth-child(1) { animation-delay: -0.32s; }
+        .typing span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        
+        .input-area { padding: 16px 20px; background: white; border-top: 1px solid #e0e0e0; display: flex; gap: 12px; }
+        .input-area input { flex: 1; padding: 14px 18px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 14px; outline: none; }
+        .input-area input:focus { border-color: #1e3a5f; }
+        .input-area input:disabled { background: #f5f5f5; }
+        .input-area button { background: linear-gradient(135deg, #1e3a5f, #2d5a87); color: white; border: none; padding: 14px 24px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .input-area button:hover:not(:disabled) { opacity: 0.9; }
+        .input-area button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .welcome { text-align: center; padding: 60px 40px; color: #666; }
+        .welcome h3 { font-size: 24px; color: #1e3a5f; margin-bottom: 16px; }
+        .welcome p { font-size: 15px; line-height: 1.6; max-width: 500px; margin: 0 auto; }
+        .welcome .stats { display: flex; justify-content: center; gap: 30px; margin-top: 24px; }
+        .welcome .stat { text-align: center; }
+        .welcome .stat-num { font-size: 28px; font-weight: 700; color: #1e3a5f; }
+        .welcome .stat-label { font-size: 12px; color: #888; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎓 AI Tutor - TEVETA</h1>
+        <div class="status">✓ Claude Ready</div>
+    </header>
+    
+    <main>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>📚 TEVETA Curriculum</h2>
+            </div>
+            <div class="sidebar-content" id="curriculum">
+                <div style="padding: 20px; text-align: center; color: #888;">Loading...</div>
+            </div>
+        </aside>
+        
+        <div class="chat">
+            <div class="chat-header">
+                <div class="chat-header-left">
+                    <h2>🤖 AI Tutor Chat</h2>
+                    <div class="chat-context" id="context">Select a module to start learning</div>
+                </div>
+                <button class="clear-btn" onclick="clearChat()">🗑️ Clear</button>
+            </div>
+            
+            <div class="messages" id="messages">
+                <div class="welcome" id="welcome">
+                    <h3>Welcome to AI Tutor! 🇿🇲</h3>
+                    <p>Your personal AI tutor for TEVETA vocational training. Select a program area and module from the sidebar to begin your learning journey.</p>
+                    <div class="stats" id="stats"></div>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <input type="text" id="input" placeholder="Select a module to start chatting..." onkeypress="if(event.key==='Enter')sendMessage()" disabled>
+                <button onclick="sendMessage()" id="sendBtn" disabled>Send →</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentModule = null;
+        let currentModuleInfo = null;
+        let sessionId = 'session-' + Date.now();
+        let isLoading = false;
+        let curriculum = [];
+        let moduleHistories = {}; // Track history per module
+
+        async function loadCurriculum() {
+            try {
+                const res = await fetch('/api/curriculum');
+                curriculum = await res.json();
+                renderCurriculum();
+                updateStats();
+            } catch (e) {
+                document.getElementById('curriculum').innerHTML = '<div style="padding:20px;color:#c00;">Failed to load curriculum</div>';
+            }
+        }
+
+        function updateStats() {
+            let totalPrograms = 0;
+            let totalModules = 0;
+            curriculum.forEach(area => {
+                totalPrograms += area.programs.length;
+                area.programs.forEach(prog => {
+                    totalModules += prog.modules.length;
+                });
+            });
+            document.getElementById('stats').innerHTML = `
+                <div class="stat"><div class="stat-num">${curriculum.length}</div><div class="stat-label">Program Areas</div></div>
+                <div class="stat"><div class="stat-num">${totalPrograms}</div><div class="stat-label">Programs</div></div>
+                <div class="stat"><div class="stat-num">${totalModules}</div><div class="stat-label">Modules</div></div>
+            `;
+        }
+
+        function renderCurriculum() {
+            const container = document.getElementById('curriculum');
+            container.innerHTML = curriculum.map(area => `
+                <div class="area" data-area="${area.id}">
+                    <div class="area-header" onclick="toggleArea('${area.id}')">
+                        <span class="icon">${area.icon}</span>
+                        <h3>${area.name}</h3>
+                        <span class="badge">${area.programs.length}</span>
+                        <span class="arrow">▶</span>
+                    </div>
+                    <div class="area-programs">
+                        ${area.programs.map(prog => `
+                            <div class="program" data-program="${prog.id}">
+                                <div class="program-header" onclick="toggleProgram(event, '${prog.id}')">
+                                    <span class="arrow">▶</span>
+                                    📖 ${prog.name}
+                                </div>
+                                <div class="program-modules">
+                                    ${prog.modules.map(mod => `
+                                        <div class="module ${currentModule === mod.id ? 'active' : ''}" 
+                                             data-module="${mod.id}" 
+                                             onclick="selectModule('${mod.id}', '${escapeHtml(mod.code)}', '${escapeHtml(mod.name)}', '${escapeHtml(mod.description)}', '${escapeHtml(area.name)}', '${escapeHtml(prog.name)}', '${escapeHtml(prog.level)}')">
+                                            <span class="module-code">${mod.code}</span>
+                                            ${mod.name}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        function toggleArea(areaId) {
+            const area = document.querySelector(`.area[data-area="${areaId}"]`);
+            area.classList.toggle('open');
+        }
+
+        function toggleProgram(event, progId) {
+            event.stopPropagation();
+            const prog = document.querySelector(`.program[data-program="${progId}"]`);
+            prog.classList.toggle('open');
+        }
+
+        function selectModule(moduleId, code, name, description, area, program, level) {
+            // Update selection UI
+            document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+            document.querySelector(`.module[data-module="${moduleId}"]`)?.classList.add('active');
+            
+            // Check if module changed
+            const moduleChanged = currentModule !== moduleId;
+            
+            currentModule = moduleId;
+            currentModuleInfo = { code, name, description, area, program, level };
+            
+            // Update context display
+            document.getElementById('context').innerHTML = `
+                <strong>${area}</strong> → ${program}<br>
+                ${code}: ${name}
+            `;
+            
+            // Enable input
+            document.getElementById('input').disabled = false;
+            document.getElementById('input').placeholder = `Ask about ${name}...`;
+            document.getElementById('sendBtn').disabled = false;
+            
+            // Load or initialize chat for this module
+            if (moduleChanged) {
+                loadModuleChat(moduleId, code, name, description, program);
+            }
+        }
+
+        function loadModuleChat(moduleId, code, name, description, program) {
+            // Check if we have cached history for this module
+            if (moduleHistories[moduleId] && moduleHistories[moduleId].length > 0) {
+                renderMessages(moduleHistories[moduleId]);
+            } else {
+                // Start fresh for this module
+                const welcomeMsg = {
+                    role: 'assistant',
+                    content: `Great choice! You're now studying **${code} - ${name}** in the ${program} program.\n\n**Module Topics:** ${description}\n\nWhat would you like to learn about? I can:\n- **Explain** key concepts with Zambian examples\n- **Quiz** you to test your understanding\n- **Clarify** anything you find confusing\n- **Give practical tips** for the workplace\n\nJust ask me anything! 😊`
+                };
+                moduleHistories[moduleId] = [welcomeMsg];
+                renderMessages(moduleHistories[moduleId]);
+            }
+            
+            document.getElementById('input').focus();
+        }
+
+        function renderMessages(messages) {
+            const container = document.getElementById('messages');
+            container.innerHTML = messages.map(msg => `
+                <div class="message ${msg.role}">
+                    <div class="avatar">${msg.role === 'user' ? '👤' : '🤖'}</div>
+                    <div class="bubble">${formatMarkdown(msg.content)}</div>
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function formatMarkdown(text) {
+            if (!text) return '';
+            
+            // Escape HTML first
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            
+            // Code blocks (must be before inline code)
+            html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+            
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Bold
+            html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+            
+            // Italic
+            html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+            
+            // Headers
+            html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+            html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+            
+            // Bullet lists
+            html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+            
+            // Numbered lists
+            html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+            
+            // Blockquotes
+            html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+            
+            // Paragraphs (double newlines)
+            html = html.replace(/\n\n/g, '</p><p>');
+            
+            // Single newlines to <br> (but not inside lists)
+            html = html.replace(/\n(?!<)/g, '<br>');
+            
+            // Wrap in paragraph
+            if (!html.startsWith('<')) {
+                html = '<p>' + html + '</p>';
+            }
+            
+            // Clean up empty paragraphs
+            html = html.replace(/<p><\/p>/g, '');
+            html = html.replace(/<p>(<[uo]l>)/g, '$1');
+            html = html.replace(/(<\/[uo]l>)<\/p>/g, '$1');
+            
+            return html;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('input');
+            const msg = input.value.trim();
+            if (!msg || isLoading || !currentModule) return;
+            
+            // Add user message
+            const userMsg = { role: 'user', content: msg };
+            moduleHistories[currentModule].push(userMsg);
+            renderMessages(moduleHistories[currentModule]);
+            
+            input.value = '';
+            isLoading = true;
+            document.getElementById('sendBtn').disabled = true;
+            showTyping();
+            
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        message: msg, 
+                        module_id: currentModule, 
+                        session_id: sessionId 
+                    })
+                });
+                const data = await res.json();
+                hideTyping();
+                
+                const assistantMsg = { 
+                    role: 'assistant', 
+                    content: data.error ? `⚠️ Error: ${data.error}` : data.response 
+                };
+                moduleHistories[currentModule].push(assistantMsg);
+                renderMessages(moduleHistories[currentModule]);
+                
+            } catch (e) {
+                hideTyping();
+                const errorMsg = { role: 'assistant', content: '⚠️ Connection error. Please check if the server is running.' };
+                moduleHistories[currentModule].push(errorMsg);
+                renderMessages(moduleHistories[currentModule]);
+            }
+            
+            isLoading = false;
+            document.getElementById('sendBtn').disabled = false;
+            document.getElementById('input').focus();
+        }
+
+        function showTyping() {
+            const container = document.getElementById('messages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message assistant';
+            typingDiv.id = 'typing';
+            typingDiv.innerHTML = '<div class="avatar">🤖</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+            container.appendChild(typingDiv);
+            typingDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function hideTyping() {
+            document.getElementById('typing')?.remove();
+        }
+
+        async function clearChat() {
+            if (!currentModule) return;
+            
+            if (!confirm(`Clear chat history for ${currentModuleInfo?.name}?`)) return;
+            
+            try {
+                await fetch(`/api/clear/${sessionId}`, { 
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ module_id: currentModule })
+                });
+                
+                // Reset this module's history
+                moduleHistories[currentModule] = [];
+                loadModuleChat(currentModule, currentModuleInfo.code, currentModuleInfo.name, currentModuleInfo.description, currentModuleInfo.program);
+                
+            } catch (e) {
+                console.error('Failed to clear chat:', e);
+            }
+        }
+
+        // Initialize
+        loadCurriculum();
+    </script>
+</body>
+</html>
