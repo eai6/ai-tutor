@@ -10,7 +10,9 @@
         
         header { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; padding: 15px 24px; display: flex; justify-content: space-between; align-items: center; }
         header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
         .status { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        .tools-badge { background: #10b981; padding: 6px 14px; border-radius: 20px; font-size: 13px; }
         
         main { flex: 1; display: flex; overflow: hidden; }
         
@@ -79,6 +81,25 @@
         .bubble h3, .bubble h4 { margin: 12px 0 8px 0; color: #1e3a5f; }
         .bubble blockquote { border-left: 3px solid #1e3a5f; padding-left: 12px; margin: 10px 0; color: #666; font-style: italic; }
         
+        /* Quiz styling */
+        .bubble .quiz-question { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin: 10px 0; }
+        .bubble .quiz-question strong { color: #1e3a5f; }
+        .bubble .quiz-options { margin-left: 16px; margin-top: 8px; }
+        .bubble .quiz-option { padding: 4px 0; }
+        .bubble .correct-answer { color: #059669; font-weight: 600; }
+        .bubble .explanation { font-size: 13px; color: #64748b; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0; }
+        
+        /* Career pathway styling */
+        .bubble .career-box { background: linear-gradient(135deg, #f0fdf4, #ecfdf5); border: 1px solid #86efac; border-radius: 8px; padding: 12px; margin: 10px 0; }
+        .bubble .salary { color: #059669; font-weight: 600; }
+        
+        /* Scenario styling */
+        .bubble .scenario-box { background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 1px solid #93c5fd; border-radius: 8px; padding: 12px; margin: 10px 0; }
+        .bubble .scenario-title { font-weight: 600; color: #1e40af; margin-bottom: 8px; }
+        
+        /* Tool indicator */
+        .tool-used { display: inline-block; background: #10b981; color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+        
         .typing { display: flex; gap: 5px; padding: 12px 16px; }
         .typing span { width: 8px; height: 8px; background: #999; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
         .typing span:nth-child(1) { animation-delay: -0.32s; }
@@ -105,7 +126,10 @@
 <body>
     <header>
         <h1>🎓 AI Tutor - TEVETA</h1>
-        <div class="status">✓ Claude Ready</div>
+        <div class="header-right">
+            <div class="tools-badge">🔧 6 Tools</div>
+            <div class="status">✓ Claude Ready</div>
+        </div>
     </header>
     
     <main>
@@ -130,7 +154,16 @@
             <div class="messages" id="messages">
                 <div class="welcome" id="welcome">
                     <h3>Welcome to AI Tutor! 🇿🇲</h3>
-                    <p>Your personal AI tutor for TEVETA vocational training. Select a program area and module from the sidebar to begin your learning journey.</p>
+                    <p>Your personal AI tutor for TEVETA vocational training with <strong>special tools</strong> to help you learn.</p>
+                    <div style="margin-top: 20px; text-align: left; display: inline-block; background: #f8fafc; padding: 16px 24px; border-radius: 12px;">
+                        <strong>🔧 My Tools:</strong><br>
+                        • <strong>Quiz Generator</strong> - Test your knowledge<br>
+                        • <strong>Answer Checker</strong> - Get instant feedback<br>
+                        • <strong>Zambian Examples</strong> - Real workplace scenarios<br>
+                        • <strong>Progress Tracker</strong> - Track your learning<br>
+                        • <strong>Career Pathways</strong> - See job opportunities<br>
+                        • <strong>Practice Scenarios</strong> - Hands-on problems
+                    </div>
                     <div class="stats" id="stats"></div>
                 </div>
             </div>
@@ -262,7 +295,7 @@
                 // Start fresh for this module
                 const welcomeMsg = {
                     role: 'assistant',
-                    content: `Great choice! You're now studying **${code} - ${name}** in the ${program} program.\n\n**Module Topics:** ${description}\n\nWhat would you like to learn about? I can:\n- **Explain** key concepts with Zambian examples\n- **Quiz** you to test your understanding\n- **Clarify** anything you find confusing\n- **Give practical tips** for the workplace\n\nJust ask me anything! 😊`
+                    content: `Great choice! You're now studying **${code} - ${name}** in the ${program} program.\n\n**Module Topics:** ${description}\n\nI have **special tools** to help you learn:\n\n• 📝 **"Give me a quiz"** - Test your knowledge\n• 🏭 **"Show me a real example"** - Zambian workplace scenarios\n• 💼 **"What jobs can I get?"** - Career pathways\n• 🔧 **"Give me a problem to solve"** - Hands-on practice\n\nOr just ask me anything about ${name}! 😊`
                 };
                 moduleHistories[moduleId] = [welcomeMsg];
                 renderMessages(moduleHistories[moduleId]);
