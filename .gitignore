@@ -4,3 +4,5 @@ azure
 notes.txt
 azure_app.py
 __Pycache__*
+dist
+build
