@@ -6,455 +6,1802 @@
     <title>AI Tutor - TEVETA</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; height: 100vh; display: flex; flex-direction: column; }
         
-        header { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; padding: 15px 24px; display: flex; justify-content: space-between; align-items: center; }
-        header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
-        .header-right { display: flex; align-items: center; gap: 12px; }
-        .status { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; }
-        .tools-badge { background: #10b981; padding: 6px 14px; border-radius: 20px; font-size: 13px; }
+        /* Header */
+        .header { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header-left h1 { font-size: 1.4rem; display: flex; align-items: center; gap: 10px; margin: 0; }
+        .header-right { display: flex; align-items: center; gap: 15px; }
+        .dashboard-link { background: rgba(255,255,255,0.15); color: white; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        .dashboard-link:hover { background: rgba(255,255,255,0.25); }
+        .user-menu { display: flex; align-items: center; gap: 10px; }
+        .user-name { color: white; font-weight: 500; font-size: 0.9rem; }
+        .login-btn, .logout-btn { background: rgba(255,255,255,0.15); color: white; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; transition: all 0.2s; }
+        .login-btn:hover, .logout-btn:hover { background: rgba(255,255,255,0.25); }
         
-        main { flex: 1; display: flex; overflow: hidden; }
+        /* Main Layout */
+        .main-container { display: flex; flex: 1; overflow: hidden; }
         
         /* Sidebar */
-        .sidebar { width: 340px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow: hidden; }
-        .sidebar-header { padding: 16px; border-bottom: 1px solid #e0e0e0; background: #f8f9fa; }
-        .sidebar-header h2 { font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
-        .sidebar-content { flex: 1; overflow-y: auto; }
+        .sidebar { width: 280px; background: white; border-right: 1px solid #e0e0e0; overflow-y: auto; flex-shrink: 0; }
+        .sidebar-header { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #e0e0e0; font-weight: 600; color: #1e3a5f; display: flex; align-items: center; gap: 8px; }
+        .program-area { border-bottom: 1px solid #eee; }
+        .program-header { padding: 12px 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+        .program-header:hover { background: #f0f4f8; }
+        .program-header.active { background: #e3f2fd; }
+        .program-icon { font-size: 1.2rem; }
+        .program-title { flex: 1; margin-left: 10px; font-weight: 500; }
+        .program-count { background: #e0e0e0; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; }
+        .subprogram-list { display: none; background: #fafafa; }
+        .subprogram-list.expanded { display: block; }
+        .subprogram { padding: 8px 15px 8px 25px; cursor: pointer; font-size: 0.9rem; color: #555; border-left: 3px solid transparent; }
+        .subprogram:hover { background: #f0f4f8; }
+        .module-list { display: none; }
+        .module-list.expanded { display: block; }
+        .module { padding: 8px 15px 8px 40px; cursor: pointer; font-size: 0.85rem; color: #666; display: flex; align-items: center; gap: 8px; }
+        .module:hover { background: #e8f4fc; }
+        .module.selected { background: #1e3a5f; color: white; }
+        .module-code { font-weight: 600; color: #2874a6; font-size: 0.8rem; }
+        .module.selected .module-code { color: #90caf9; }
         
-        .area { border-bottom: 1px solid #e0e0e0; }
-        .area-header { padding: 12px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; background: #fafafa; transition: background 0.2s; }
-        .area-header:hover { background: #f0f0f0; }
-        .area-header .icon { font-size: 20px; }
-        .area-header h3 { flex: 1; font-size: 14px; font-weight: 600; }
-        .area-header .badge { font-size: 11px; background: #e0e0e0; padding: 2px 8px; border-radius: 10px; color: #666; }
-        .area-header .arrow { color: #999; transition: transform 0.2s; font-size: 12px; }
-        .area.open .area-header .arrow { transform: rotate(90deg); }
-        .area-programs { display: none; background: white; }
-        .area.open .area-programs { display: block; }
+        /* Content Area - Split View */
+        .content-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         
-        .program { border-top: 1px solid #f0f0f0; }
-        .program-header { padding: 10px 16px 10px 44px; cursor: pointer; font-size: 13px; color: #333; display: flex; align-items: center; gap: 8px; transition: background 0.2s; }
-        .program-header:hover { background: #f5f5f5; }
-        .program-header .arrow { color: #999; font-size: 10px; transition: transform 0.2s; }
-        .program.open .program-header .arrow { transform: rotate(90deg); }
-        .program-modules { display: none; }
-        .program.open .program-modules { display: block; }
+        /* Split Pane Container */
+        .split-container { flex: 1; display: flex; overflow: hidden; }
         
-        .module { padding: 8px 16px 8px 64px; cursor: pointer; font-size: 12px; color: #666; border-top: 1px solid #f5f5f5; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
-        .module:hover { background: #e8f4fc; color: #1e3a5f; }
-        .module.active { background: #1e3a5f; color: white; }
-        .module-code { font-weight: 600; color: #1e3a5f; min-width: 45px; font-size: 11px; }
-        .module.active .module-code { color: #8cc4ff; }
+        /* Chat Panel */
+        .chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 400px; border-right: 1px solid #e0e0e0; }
+        .chat-header { padding: 15px 20px; background: white; border-bottom: 1px solid #e0e0e0; }
+        .chat-title { font-size: 1.1rem; font-weight: 600; color: #1e3a5f; display: flex; align-items: center; gap: 8px; }
+        .chat-subtitle { font-size: 0.85rem; color: #666; margin-top: 4px; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; }
+        .message { margin-bottom: 16px; display: flex; gap: 12px; }
+        .message.user { flex-direction: row-reverse; }
+        .message-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+        .message.assistant .message-avatar { background: linear-gradient(135deg, #1e3a5f, #2d5a87); color: white; }
+        .message.user .message-avatar { background: linear-gradient(135deg, #3498db, #2980b9); color: white; }
+        .message-content { max-width: 75%; padding: 12px 16px; border-radius: 16px; line-height: 1.5; }
+        .message.assistant .message-content { background: white; border: 1px solid #e0e0e0; border-radius: 16px 16px 16px 4px; }
+        .message.user .message-content { background: linear-gradient(135deg, #3498db, #2980b9); color: white; border-radius: 16px 16px 4px 16px; }
+        .clear-btn { position: absolute; top: 12px; right: 15px; padding: 6px 12px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
         
-        /* Chat */
-        .chat { flex: 1; display: flex; flex-direction: column; }
-        .chat-header { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .chat-header-left h2 { font-size: 16px; margin-bottom: 4px; }
-        .chat-context { font-size: 12px; opacity: 0.85; line-height: 1.4; }
-        .clear-btn { background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; white-space: nowrap; }
-        .clear-btn:hover { background: rgba(255,255,255,0.3); }
+        /* Interactive Panel */
+        .interactive-panel { width: 0; background: white; display: flex; flex-direction: column; transition: width 0.3s ease; overflow: hidden; }
+        .interactive-panel.open { width: 50%; min-width: 450px; border-left: 1px solid #e0e0e0; }
+        .interactive-header { padding: 12px 20px; background: linear-gradient(135deg, #9b59b6, #8e44ad); color: white; display: flex; justify-content: space-between; align-items: center; }
+        .interactive-title { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .interactive-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; }
+        .interactive-close:hover { background: rgba(255,255,255,0.3); }
+        .interactive-content { flex: 1; overflow-y: auto; padding: 20px; }
         
-        .messages { flex: 1; overflow-y: auto; padding: 20px; background: #f5f7f9; }
-        .message { display: flex; gap: 12px; max-width: 85%; margin-bottom: 16px; }
-        .message.user { margin-left: auto; flex-direction: row-reverse; }
-        .avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-        .message.assistant .avatar { background: linear-gradient(135deg, #1e3a5f, #2d5a87); }
-        .message.user .avatar { background: #e5e7eb; }
+        /* Quiz Styles */
+        .quiz-container { max-width: 600px; margin: 0 auto; }
+        .quiz-progress { margin-bottom: 20px; }
+        .quiz-progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+        .quiz-progress-fill { height: 100%; background: linear-gradient(135deg, #27ae60, #2ecc71); transition: width 0.3s; }
+        .quiz-progress-text { text-align: center; margin-top: 8px; font-size: 0.85rem; color: #666; }
+        .quiz-question { background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        .quiz-question-number { font-size: 0.85rem; color: #9b59b6; font-weight: 600; margin-bottom: 8px; }
+        .quiz-question-text { font-size: 1.1rem; font-weight: 500; color: #333; }
+        .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+        .quiz-option { padding: 14px 18px; background: white; border: 2px solid #e0e0e0; border-radius: 10px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; }
+        .quiz-option:hover { border-color: #9b59b6; background: #faf5ff; }
+        .quiz-option.selected { border-color: #9b59b6; background: #f3e8ff; }
+        .quiz-option.correct { border-color: #27ae60; background: #e8f8f0; }
+        .quiz-option.incorrect { border-color: #e74c3c; background: #fdeaea; }
+        .quiz-option-letter { width: 28px; height: 28px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.9rem; }
+        .quiz-option.selected .quiz-option-letter { background: #9b59b6; color: white; }
+        .quiz-option.correct .quiz-option-letter { background: #27ae60; color: white; }
+        .quiz-option.incorrect .quiz-option-letter { background: #e74c3c; color: white; }
+        .quiz-feedback { margin-top: 15px; padding: 15px; border-radius: 10px; display: none; font-size: 0.95rem; line-height: 1.5; }
+        .quiz-feedback.show { display: block; }
+        .quiz-feedback.correct { background: #e8f8f0; border-left: 4px solid #27ae60; }
+        .quiz-feedback.incorrect { background: #fdeaea; border-left: 4px solid #e74c3c; }
+        .quiz-feedback-title { font-weight: 600; margin-bottom: 10px; font-size: 1.1rem; }
+        .quiz-feedback.correct .quiz-feedback-title { color: #27ae60; }
+        .quiz-feedback.incorrect .quiz-feedback-title { color: #e74c3c; }
+        .quiz-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
+        .quiz-btn { padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .quiz-btn-primary { background: linear-gradient(135deg, #9b59b6, #8e44ad); color: white; }
+        .quiz-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(155,89,182,0.3); }
+        .quiz-btn-secondary { background: #e0e0e0; color: #333; }
         
-        .bubble { padding: 14px 18px; border-radius: 16px; line-height: 1.7; font-size: 14px; }
-        .message.assistant .bubble { background: white; border: 1px solid #e0e0e0; border-bottom-left-radius: 4px; color: #333; }
-        .message.user .bubble { background: #1e3a5f; color: white; border-bottom-right-radius: 4px; }
+        /* Quiz Results */
+        .quiz-results { text-align: center; padding: 30px; }
+        .quiz-results-score { font-size: 3rem; font-weight: 700; color: #9b59b6; }
+        .quiz-results-label { font-size: 1.1rem; color: #666; margin-bottom: 20px; }
+        .quiz-results-message { font-size: 1.2rem; margin-bottom: 30px; }
+        .quiz-results-breakdown { background: #f8f9fa; padding: 20px; border-radius: 12px; text-align: left; }
+        .quiz-results-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }
+        .quiz-results-item:last-child { border-bottom: none; }
         
-        /* Markdown styling in bubbles */
-        .bubble strong, .bubble b { font-weight: 600; color: #1e3a5f; }
-        .message.user .bubble strong { color: #8cc4ff; }
-        .bubble em, .bubble i { font-style: italic; }
-        .bubble ul, .bubble ol { margin: 10px 0 10px 20px; }
-        .bubble li { margin-bottom: 6px; }
-        .bubble p { margin-bottom: 10px; }
-        .bubble p:last-child { margin-bottom: 0; }
-        .bubble code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; }
-        .message.user .bubble code { background: rgba(255,255,255,0.2); }
-        .bubble pre { background: #f5f5f5; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 10px 0; }
-        .bubble pre code { background: none; padding: 0; }
-        .bubble h3, .bubble h4 { margin: 12px 0 8px 0; color: #1e3a5f; }
-        .bubble blockquote { border-left: 3px solid #1e3a5f; padding-left: 12px; margin: 10px 0; color: #666; font-style: italic; }
+        /* Diagram Viewer */
+        .diagram-viewer { text-align: center; }
+        .diagram-viewer img { max-width: 100%; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .diagram-caption { margin-top: 12px; font-size: 0.9rem; color: #666; }
+        .diagram-controls { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
+        .diagram-btn { padding: 8px 16px; background: #f0f0f0; border: none; border-radius: 6px; cursor: pointer; }
+        .diagram-btn:hover { background: #e0e0e0; }
         
-        /* Quiz styling */
-        .bubble .quiz-question { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin: 10px 0; }
-        .bubble .quiz-question strong { color: #1e3a5f; }
-        .bubble .quiz-options { margin-left: 16px; margin-top: 8px; }
-        .bubble .quiz-option { padding: 4px 0; }
-        .bubble .correct-answer { color: #059669; font-weight: 600; }
-        .bubble .explanation { font-size: 13px; color: #64748b; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0; }
+        /* Video Player */
+        .video-container { padding: 10px; }
+        .video-player { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 12px; background: #000; }
+        .video-player iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .video-info { margin-top: 15px; }
+        .video-title { font-weight: 600; font-size: 1.1rem; }
+        .video-description { color: #666; margin-top: 5px; }
         
-        /* Career pathway styling */
-        .bubble .career-box { background: linear-gradient(135deg, #f0fdf4, #ecfdf5); border: 1px solid #86efac; border-radius: 8px; padding: 12px; margin: 10px 0; }
-        .bubble .salary { color: #059669; font-weight: 600; }
+        /* Scenario Styles */
+        .scenario-container { padding: 10px; }
+        .scenario-header { margin-bottom: 15px; }
+        .scenario-location { background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; padding: 8px 16px; border-radius: 20px; display: inline-block; font-weight: 600; }
+        .scenario-image { margin-bottom: 20px; border-radius: 12px; overflow: hidden; }
+        .scenario-image img { width: 100%; height: 200px; object-fit: cover; }
+        .scenario-situation, .scenario-challenge, .scenario-questions, .scenario-success { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .scenario-situation h4, .scenario-challenge h4, .scenario-questions h4, .scenario-success h4 { color: #1e3a5f; margin-bottom: 10px; }
+        .scenario-challenge { background: #fff3e0; border-left: 4px solid #ff9800; }
+        .scenario-success { background: #e8f5e9; border-left: 4px solid #4caf50; }
+        .scenario-questions ol { margin-left: 20px; }
+        .scenario-questions li { margin-bottom: 8px; }
+        .scenario-hints { margin-bottom: 15px; }
+        .hint-toggle { padding: 10px 20px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .hints-content { background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 10px; }
+        .scenario-actions { text-align: center; margin-top: 20px; }
         
-        /* Scenario styling */
-        .bubble .scenario-box { background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 1px solid #93c5fd; border-radius: 8px; padding: 12px; margin: 10px 0; }
-        .bubble .scenario-title { font-weight: 600; color: #1e40af; margin-bottom: 8px; }
+        /* Career Styles */
+        .career-container { padding: 10px; }
+        .career-header { margin-bottom: 20px; }
+        .sector-badge { background: linear-gradient(135deg, #1e3a5f, #2d5a87); color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.9rem; font-weight: 600; margin-right: 10px; }
+        .strive-badge { background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.9rem; font-weight: 600; }
+        .career-progression, .career-occupations, .career-training, .career-entrepreneur { margin-bottom: 20px; }
+        .career-progression h4, .career-occupations h4, .career-training h4, .career-entrepreneur h4 { color: #1e3a5f; margin-bottom: 12px; }
+        .progression-steps { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .progression-step { background: #e3f2fd; padding: 10px 15px; border-radius: 8px; display: flex; align-items: center; gap: 8px; }
+        .step-number { background: #1e3a5f; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600; }
+        .step-arrow { color: #1e3a5f; font-weight: bold; }
+        .occupation-card { background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; margin-bottom: 12px; }
+        .occ-title { font-weight: 600; font-size: 1.1rem; color: #1e3a5f; margin-bottom: 10px; }
+        .occ-details { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 12px; font-size: 0.9rem; }
+        .occ-demand.demand-high { color: #27ae60; font-weight: 600; }
+        .occ-demand.demand-medium { color: #f39c12; font-weight: 600; }
+        .occ-demand.demand-low { color: #e74c3c; font-weight: 600; }
+        .occ-skills { display: flex; flex-wrap: wrap; gap: 6px; }
+        .skill-tag { background: #f0f4f8; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; color: #555; }
+        .career-training ul { margin-left: 20px; }
+        .career-training li { margin-bottom: 6px; }
+        .entrepreneur-card { background: #e8f5e9; padding: 15px; border-radius: 10px; border-left: 4px solid #27ae60; }
+        .entrepreneur-cost { font-weight: 600; color: #27ae60; margin-bottom: 8px; }
         
-        /* Tool indicator */
-        .tool-used { display: inline-block; background: #10b981; color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+        /* Chat Input */
+        .chat-input-area { padding: 15px 20px; background: white; border-top: 1px solid #e0e0e0; }
+        .quick-actions { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .quick-action { padding: 8px 14px; background: #f0f4f8; border: 1px solid #e0e0e0; border-radius: 20px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        .quick-action:hover { background: #e3f2fd; border-color: #90caf9; }
+        .chat-input-row { display: flex; gap: 10px; }
+        .chat-input { flex: 1; padding: 12px 16px; border: 1px solid #e0e0e0; border-radius: 24px; font-size: 0.95rem; outline: none; }
+        .chat-input:focus { border-color: #3498db; box-shadow: 0 0 0 3px rgba(52,152,219,0.1); }
+        .send-btn { padding: 12px 24px; background: linear-gradient(135deg, #1e3a5f, #2d5a87); color: white; border: none; border-radius: 24px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(30,58,95,0.3); }
         
-        .typing { display: flex; gap: 5px; padding: 12px 16px; }
-        .typing span { width: 8px; height: 8px; background: #999; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
-        .typing span:nth-child(1) { animation-delay: -0.32s; }
-        .typing span:nth-child(2) { animation-delay: -0.16s; }
+        /* Welcome State */
+        .welcome-message { text-align: center; padding: 40px 20px; }
+        .welcome-icon { font-size: 4rem; margin-bottom: 20px; }
+        .welcome-title { font-size: 1.5rem; font-weight: 600; color: #1e3a5f; margin-bottom: 10px; }
+        .welcome-subtitle { color: #666; max-width: 500px; margin: 0 auto 30px; line-height: 1.6; }
+        .welcome-features { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+        .welcome-feature { background: white; padding: 20px; border-radius: 12px; width: 150px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .welcome-feature-icon { font-size: 2rem; margin-bottom: 10px; }
+        .welcome-feature-title { font-weight: 600; font-size: 0.9rem; }
+        
+        /* Loading */
+        .loading { display: flex; align-items: center; gap: 8px; color: #666; }
+        .loading-dots { display: flex; gap: 4px; }
+        .loading-dot { width: 8px; height: 8px; background: #1e3a5f; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
         
-        .input-area { padding: 16px 20px; background: white; border-top: 1px solid #e0e0e0; display: flex; gap: 12px; }
-        .input-area input { flex: 1; padding: 14px 18px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 14px; outline: none; }
-        .input-area input:focus { border-color: #1e3a5f; }
-        .input-area input:disabled { background: #f5f5f5; }
-        .input-area button { background: linear-gradient(135deg, #1e3a5f, #2d5a87); color: white; border: none; padding: 14px 24px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
-        .input-area button:hover:not(:disabled) { opacity: 0.9; }
-        .input-area button:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        .welcome { text-align: center; padding: 60px 40px; color: #666; }
-        .welcome h3 { font-size: 24px; color: #1e3a5f; margin-bottom: 16px; }
-        .welcome p { font-size: 15px; line-height: 1.6; max-width: 500px; margin: 0 auto; }
-        .welcome .stats { display: flex; justify-content: center; gap: 30px; margin-top: 24px; }
-        .welcome .stat { text-align: center; }
-        .welcome .stat-num { font-size: 28px; font-weight: 700; color: #1e3a5f; }
-        .welcome .stat-label { font-size: 12px; color: #888; }
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .interactive-panel.open { width: 100%; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 100; }
+        }
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .chat-panel { min-width: 100%; }
+        }
     </style>
 </head>
 <body>
-    <header>
-        <h1>🎓 AI Tutor - TEVETA</h1>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1>🎓 TEVETA AI Tutor</h1>
+        </div>
         <div class="header-right">
-            <div class="tools-badge">🔧 6 Tools</div>
-            <div class="status">✓ Claude Ready</div>
+            <a href="#" onclick="goToProgress()" class="dashboard-link">📊 My Progress</a>
+            <div class="user-menu" id="userMenu">
+                <!-- Will be populated by JS -->
+            </div>
         </div>
     </header>
     
-    <main>
+    <div class="main-container">
+        <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <h2>📚 TEVETA Curriculum</h2>
-            </div>
-            <div class="sidebar-content" id="curriculum">
-                <div style="padding: 20px; text-align: center; color: #888;">Loading...</div>
-            </div>
+            <div class="sidebar-header">📚 TEVETA CURRICULUM</div>
+            <div id="curriculumTree"></div>
         </aside>
         
-        <div class="chat">
-            <div class="chat-header">
-                <div class="chat-header-left">
-                    <h2>🤖 AI Tutor Chat</h2>
-                    <div class="chat-context" id="context">Select a module to start learning</div>
-                </div>
-                <button class="clear-btn" onclick="clearChat()">🗑️ Clear</button>
-            </div>
-            
-            <div class="messages" id="messages">
-                <div class="welcome" id="welcome">
-                    <h3>Welcome to AI Tutor! 🇿🇲</h3>
-                    <p>Your personal AI tutor for TEVETA vocational training with <strong>special tools</strong> to help you learn.</p>
-                    <div style="margin-top: 20px; text-align: left; display: inline-block; background: #f8fafc; padding: 16px 24px; border-radius: 12px;">
-                        <strong>🔧 My Tools:</strong><br>
-                        • <strong>Quiz Generator</strong> - Test your knowledge<br>
-                        • <strong>Answer Checker</strong> - Get instant feedback<br>
-                        • <strong>Zambian Examples</strong> - Real workplace scenarios<br>
-                        • <strong>Progress Tracker</strong> - Track your learning<br>
-                        • <strong>Career Pathways</strong> - See job opportunities<br>
-                        • <strong>Practice Scenarios</strong> - Hands-on problems
+        <!-- Content Area -->
+        <main class="content-area">
+            <div class="split-container">
+                <!-- Chat Panel -->
+                <div class="chat-panel">
+                    <div class="chat-header" style="position: relative;">
+                        <div>
+                            <div class="chat-title">🤖 AI Tutor Chat</div>
+                            <div class="chat-subtitle" id="chatContext">Select a module to begin learning</div>
+                        </div>
+                        <button class="clear-btn" onclick="clearChat()">🗑️ Clear</button>
                     </div>
-                    <div class="stats" id="stats"></div>
+                    
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="welcome-message">
+                            <div class="welcome-icon">🎓</div>
+                            <h2 class="welcome-title">Welcome to TEVETA AI Tutor!</h2>
+                            <p class="welcome-subtitle">
+                                Your intelligent learning companion for technical and vocational education. 
+                                Select a module from the curriculum to start learning with interactive quizzes, 
+                                diagrams, and personalized guidance.
+                            </p>
+                            <div class="welcome-features">
+                                <div class="welcome-feature">
+                                    <div class="welcome-feature-icon">📝</div>
+                                    <div class="welcome-feature-title">Interactive Quizzes</div>
+                                </div>
+                                <div class="welcome-feature">
+                                    <div class="welcome-feature-icon">📊</div>
+                                    <div class="welcome-feature-title">Visual Diagrams</div>
+                                </div>
+                                <div class="welcome-feature">
+                                    <div class="welcome-feature-icon">🎬</div>
+                                    <div class="welcome-feature-title">Video Tutorials</div>
+                                </div>
+                                <div class="welcome-feature">
+                                    <div class="welcome-feature-icon">💼</div>
+                                    <div class="welcome-feature-title">Career Guidance</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-area">
+                        <div class="quick-actions" id="quickActions" style="display: none;">
+                            <button class="quick-action" onclick="sendQuickAction('quiz')">📝 Quiz Me</button>
+                            <button class="quick-action" onclick="sendQuickAction('diagram')">📊 Show Diagram</button>
+                            <button class="quick-action" onclick="sendQuickAction('video')">🎬 Video</button>
+                            <button class="quick-action" onclick="sendQuickAction('scenario')">🔧 Scenario</button>
+                            <button class="quick-action" onclick="sendQuickAction('career')">💼 Careers</button>
+                        </div>
+                        <div class="chat-input-row">
+                            <input type="text" class="chat-input" id="userInput" placeholder="Ask about the module..." onkeypress="handleKeyPress(event)">
+                            <button class="send-btn" onclick="sendMessage()">Send →</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Interactive Panel (Hidden by default) -->
+                <div class="interactive-panel" id="interactivePanel">
+                    <div class="interactive-header">
+                        <div class="interactive-title">
+                            <span id="interactiveTitleIcon">📝</span>
+                            <span id="interactiveTitleText">Interactive Content</span>
+                        </div>
+                        <button class="interactive-close" onclick="closeInteractivePanel()">×</button>
+                    </div>
+                    <div class="interactive-content" id="interactiveContent">
+                        <!-- Dynamic content rendered here -->
+                    </div>
                 </div>
             </div>
-            
-            <div class="input-area">
-                <input type="text" id="input" placeholder="Select a module to start chatting..." onkeypress="if(event.key==='Enter')sendMessage()" disabled>
-                <button onclick="sendMessage()" id="sendBtn" disabled>Send →</button>
-            </div>
-        </div>
-    </main>
+        </main>
+    </div>
 
     <script>
+        // State
         let currentModule = null;
-        let currentModuleInfo = null;
-        let sessionId = 'session-' + Date.now();
-        let isLoading = false;
-        let curriculum = [];
-        let moduleHistories = {}; // Track history per module
-
-        async function loadCurriculum() {
+        let conversationHistory = [];
+        let currentQuiz = null;
+        let currentQuestionIndex = 0;
+        let quizAnswers = [];
+        
+        // Curriculum data
+        const curriculum = {
+            "Agriculture": {
+                icon: "🌾",
+                subprograms: {
+                    "General Agriculture": ["GA-01:Farm Safety", "GA-02:Soil Science", "GA-03:Crop Production", "GA-04:Irrigation", "GA-05:Farm Machinery", "GA-06:Pest Management", "GA-07:Post-Harvest", "GA-08:Farm Business"],
+                    "Animal Husbandry": ["AH-01:Animal Health", "AH-02:Livestock Nutrition", "AH-03:Breeding"],
+                    "Horticulture": ["HO-01:Vegetable Production", "HO-02:Fruit Production", "HO-03:Landscaping"],
+                    "Agri-Processing": ["AP-01:Food Processing", "AP-02:Storage", "AP-03:Quality Control"]
+                }
+            },
+            "Business": {
+                icon: "📊",
+                subprograms: {
+                    "Business Studies": ["BS-01:Entrepreneurship", "BS-02:Accounting", "BS-03:Marketing", "BS-04:Business Law", "BS-05:Management"]
+                }
+            },
+            "Construction": {
+                icon: "🏗️",
+                subprograms: {
+                    "Carpentry": ["CT-01:Carpentry Safety", "CT-02:Hand Tools", "CT-03:Wood Joints", "CT-04:Roof Construction"],
+                    "Masonry": ["MS-01:Bricklaying", "MS-02:Plastering"],
+                    "Plumbing": ["PL-01:Pipe Fitting", "PL-02:Fixtures"]
+                }
+            },
+            "Engineering": {
+                icon: "⚡",
+                subprograms: {
+                    "Electrical": ["EE-01:Electrical Safety", "EE-02:Electrical Theory", "EE-03:Domestic Wiring", "EE-04:Motors", "EE-05:Solar PV", "EE-06:Industrial Wiring"],
+                    "Welding": ["WE-01:Welding Safety", "WE-02:Arc Welding", "WE-03:MIG Welding", "WE-04:TIG Welding"],
+                    "Mechanical": ["ME-01:Workshop Safety", "ME-02:Hand Tools", "ME-03:Machine Tools"]
+                }
+            },
+            "Garments": {
+                icon: "👔",
+                subprograms: {
+                    "Tailoring": ["GT-01:Sewing Basics", "GT-02:Pattern Making"]
+                }
+            },
+            "Health": {
+                icon: "🏥",
+                subprograms: {
+                    "Health Sciences": ["HS-01:First Aid", "HS-02:Patient Care"]
+                }
+            },
+            "Hospitality": {
+                icon: "🍽️",
+                subprograms: {
+                    "Food Production": ["HT-01:Food Safety", "HT-02:Kitchen Equipment", "HT-03:Knife Skills", "HT-04:Cooking Methods"],
+                    "Food Service": ["FS-01:Customer Service", "FS-02:Beverage Service"]
+                }
+            },
+            "IT": {
+                icon: "💻",
+                subprograms: {
+                    "Computer Systems": ["IT-01:Computer Basics", "IT-02:Hardware", "IT-03:Networking", "IT-04:Troubleshooting"],
+                    "Software": ["SW-01:Office Applications", "SW-02:Programming"]
+                }
+            },
+            "Mining": {
+                icon: "⛏️",
+                subprograms: {
+                    "Mining Operations": ["MN-01:Mining Safety", "MN-02:Drilling", "MN-03:Blasting"]
+                }
+            }
+        };
+        
+        // Initialize curriculum tree
+        function initCurriculum() {
+            const tree = document.getElementById('curriculumTree');
+            let html = '';
+            
+            for (const [program, data] of Object.entries(curriculum)) {
+                const moduleCount = Object.values(data.subprograms).flat().length;
+                html += `
+                    <div class="program-area">
+                        <div class="program-header" onclick="toggleProgram('${program}')">
+                            <span class="program-icon">${data.icon}</span>
+                            <span class="program-title">${program}</span>
+                            <span class="program-count">${moduleCount}</span>
+                            <span>▸</span>
+                        </div>
+                        <div class="subprogram-list" id="program-${program}">
+                `;
+                
+                for (const [subprogram, modules] of Object.entries(data.subprograms)) {
+                    html += `
+                        <div class="subprogram" onclick="toggleSubprogram('${program}-${subprogram}', event)">
+                            📁 ${subprogram}
+                        </div>
+                        <div class="module-list" id="subprogram-${program}-${subprogram}">
+                    `;
+                    
+                    for (const module of modules) {
+                        const [code, name] = module.split(':');
+                        html += `
+                            <div class="module" onclick="selectModule('${code}', '${name}', '${program}', '${subprogram}', event)">
+                                <span class="module-code">${code}</span>
+                                <span>${name}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    html += '</div>';
+                }
+                
+                html += '</div></div>';
+            }
+            
+            tree.innerHTML = html;
+        }
+        
+        function toggleProgram(program) {
+            const list = document.getElementById(`program-${program}`);
+            list.classList.toggle('expanded');
+        }
+        
+        function toggleSubprogram(id, event) {
+            event.stopPropagation();
+            const list = document.getElementById(`subprogram-${id}`);
+            list.classList.toggle('expanded');
+        }
+        
+        function selectModule(code, name, program, subprogram, event) {
+            event.stopPropagation();
+            
+            // Update selection UI
+            document.querySelectorAll('.module').forEach(m => m.classList.remove('selected'));
+            event.target.closest('.module').classList.add('selected');
+            
+            // Update state
+            currentModule = { code, name, program, subprogram };
+            document.getElementById('chatContext').textContent = `${program} → ${subprogram} → ${code}: ${name}`;
+            document.getElementById('quickActions').style.display = 'flex';
+            document.getElementById('userInput').placeholder = `Ask about ${name}...`;
+            
+            // Clear chat and start fresh
+            clearChat();
+            
+            // Send welcome message for this module
+            const welcomeMsg = `I've selected the **${name}** module (${code}). I'm ready to help you master this topic with interactive quizzes, diagrams, and practical scenarios. What would you like to do first?`;
+            addMessage('assistant', welcomeMsg);
+        }
+        
+        function sendQuickAction(action) {
+            if (!currentModule) {
+                alert('Please select a module first!');
+                return;
+            }
+            
+            const prompts = {
+                'quiz': `Give me an interactive competency check quiz for ${currentModule.name}. Include 5 multiple choice questions.`,
+                'diagram': `Show me a helpful diagram or image related to ${currentModule.name}.`,
+                'video': `Find me a video tutorial about ${currentModule.name}.`,
+                'scenario': `Give me a practical workplace scenario to practice my ${currentModule.name} skills.`,
+                'career': `What careers can I pursue with skills in ${currentModule.name}?`
+            };
+            
+            document.getElementById('userInput').value = prompts[action];
+            sendMessage();
+        }
+        
+        async function sendMessage(messageOverride = null) {
+            const input = document.getElementById('userInput');
+            const message = messageOverride || input.value.trim();
+            if (!message) return;
+            
+            if (!messageOverride) input.value = '';
+            addMessage('user', message);
+            
+            // Show loading
+            const loadingId = addLoading();
+            
             try {
-                const res = await fetch('/api/curriculum');
-                curriculum = await res.json();
-                renderCurriculum();
-                updateStats();
-            } catch (e) {
-                document.getElementById('curriculum').innerHTML = '<div style="padding:20px;color:#c00;">Failed to load curriculum</div>';
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        module: currentModule,
+                        history: conversationHistory.slice(-10),
+                        learning_session_id: window.currentLearningSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                removeLoading(loadingId);
+                
+                // Track learning session ID from backend
+                if (data.learning_session_id) {
+                    window.currentLearningSessionId = data.learning_session_id;
+                    console.log('Learning session:', data.learning_session_id);
+                }
+                
+                // Check if response contains interactive content
+                processResponse(data.response);
+                
+            } catch (error) {
+                removeLoading(loadingId);
+                addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+                console.error(error);
             }
         }
-
-        function updateStats() {
-            let totalPrograms = 0;
-            let totalModules = 0;
-            curriculum.forEach(area => {
-                totalPrograms += area.programs.length;
-                area.programs.forEach(prog => {
-                    totalModules += prog.modules.length;
-                });
+        
+        function processResponse(response) {
+            let cleanResponse = response;
+            let hasInteractiveContent = false;
+            let hasQuiz = false;
+            
+            // Process all QUIZ blocks
+            const quizMatches = response.matchAll(/\[QUIZ_START\]([\s\S]*?)\[QUIZ_END\]/g);
+            for (const match of quizMatches) {
+                try {
+                    const quizData = JSON.parse(match[1].trim());
+                    openQuiz(quizData);
+                    hasInteractiveContent = true;
+                    hasQuiz = true;
+                } catch (e) {
+                    console.error('Failed to parse quiz:', e, match[1]);
+                }
+                // Always remove the marker from display
+                cleanResponse = cleanResponse.replace(match[0], '');
+            }
+            
+            // Process all DIAGRAM blocks
+            const diagramMatches = response.matchAll(/\[DIAGRAM_START\]([\s\S]*?)\[DIAGRAM_END\]/g);
+            for (const match of diagramMatches) {
+                try {
+                    const diagramData = JSON.parse(match[1].trim());
+                    openDiagram(diagramData);
+                    hasInteractiveContent = true;
+                } catch (e) {
+                    console.error('Failed to parse diagram:', e, match[1]);
+                }
+                cleanResponse = cleanResponse.replace(match[0], '');
+            }
+            
+            // Process all VIDEO blocks
+            const videoMatches = response.matchAll(/\[VIDEO_START\]([\s\S]*?)\[VIDEO_END\]/g);
+            for (const match of videoMatches) {
+                try {
+                    const videoData = JSON.parse(match[1].trim());
+                    openVideo(videoData);
+                    hasInteractiveContent = true;
+                } catch (e) {
+                    console.error('Failed to parse video:', e, match[1]);
+                }
+                cleanResponse = cleanResponse.replace(match[0], '');
+            }
+            
+            // Process all SCENARIO blocks
+            const scenarioMatches = response.matchAll(/\[SCENARIO_START\]([\s\S]*?)\[SCENARIO_END\]/g);
+            for (const match of scenarioMatches) {
+                try {
+                    const scenarioData = JSON.parse(match[1].trim());
+                    openScenario(scenarioData);
+                    hasInteractiveContent = true;
+                } catch (e) {
+                    console.error('Failed to parse scenario:', e, match[1]);
+                }
+                cleanResponse = cleanResponse.replace(match[0], '');
+            }
+            
+            // Process all CAREER blocks
+            const careerMatches = response.matchAll(/\[CAREER_START\]([\s\S]*?)\[CAREER_END\]/g);
+            for (const match of careerMatches) {
+                try {
+                    const careerData = JSON.parse(match[1].trim());
+                    openCareer(careerData);
+                    hasInteractiveContent = true;
+                } catch (e) {
+                    console.error('Failed to parse career:', e, match[1]);
+                }
+                cleanResponse = cleanResponse.replace(match[0], '');
+            }
+            
+            // Also strip any unparsed/broken markers that might remain
+            cleanResponse = cleanResponse
+                .replace(/\[QUIZ_START\][\s\S]*?(\[QUIZ_END\])?/g, '')
+                .replace(/\[DIAGRAM_START\][\s\S]*?(\[DIAGRAM_END\])?/g, '')
+                .replace(/\[VIDEO_START\][\s\S]*?(\[VIDEO_END\])?/g, '')
+                .replace(/\[SCENARIO_START\][\s\S]*?(\[SCENARIO_END\])?/g, '')
+                .replace(/\[CAREER_START\][\s\S]*?(\[CAREER_END\])?/g, '')
+                .replace(/\[(QUIZ|DIAGRAM|VIDEO|SCENARIO|CAREER)_(START|END)\]/g, '')
+                .trim();
+            
+            // If we have a quiz, only show text BEFORE the quiz marker, not after
+            // This prevents showing "Based on your results..." before the quiz is taken
+            if (hasQuiz) {
+                // Find the original position of the quiz in the response
+                const quizStartPos = response.indexOf('[QUIZ_START]');
+                if (quizStartPos > 0) {
+                    // Only keep text before the quiz
+                    const preQuizText = response.substring(0, quizStartPos)
+                        .replace(/\[.*?_(START|END)\]/g, '')
+                        .trim();
+                    
+                    if (preQuizText) {
+                        addMessage('assistant', preQuizText);
+                    } else {
+                        // Default intro message for quiz
+                        const quizType = currentQuiz?.assessment_type || 'practice';
+                        if (quizType === 'formative' || quizType === 'diagnostic' || quizType === 'pre_assessment') {
+                            addMessage('assistant', "📋 Let's start with a quick formative assessment to see what you already know. This helps me personalize your learning!");
+                        } else if (quizType === 'summative' || quizType === 'competency_check' || quizType === 'post_assessment') {
+                            addMessage('assistant', "🎯 Time for your summative assessment! This will evaluate your mastery of the topic. You need 80% to earn your certificate. Good luck!");
+                        } else {
+                            addMessage('assistant', "📝 Here's a practice quiz for you!");
+                        }
+                    }
+                } else {
+                    // Quiz was at the start, just show intro
+                    addMessage('assistant', "I've prepared an assessment for you! 👉");
+                }
+                return; // Don't show any post-quiz text
+            }
+            
+            // Show the clean text response (no quiz case)
+            if (cleanResponse) {
+                addMessage('assistant', cleanResponse);
+            } else if (hasInteractiveContent) {
+                addMessage('assistant', "I've prepared some interactive content for you! Check the panel on the right. 👉");
+            }
+        }
+        
+        // Quiz Functions
+        function openQuiz(quizData) {
+            currentQuiz = quizData;
+            currentQuestionIndex = 0;
+            quizAnswers = [];
+            
+            // Validate and fix quiz questions
+            validateQuizQuestions(currentQuiz);
+            
+            // Smart detection of assessment type if not specified
+            if (!currentQuiz.assessment_type) {
+                const title = (currentQuiz.title || '').toLowerCase();
+                const numQuestions = currentQuiz.questions?.length || 0;
+                
+                // Check title for assessment type indicators
+                if (title.includes('formative') || title.includes('diagnostic') || title.includes('pre-assessment') || title.includes('pre assessment')) {
+                    currentQuiz.assessment_type = 'formative';
+                } else if (title.includes('summative') || title.includes('competency') || title.includes('final') || title.includes('post-assessment') || title.includes('post assessment')) {
+                    currentQuiz.assessment_type = 'summative';
+                } else if (numQuestions >= 10) {
+                    // 10+ questions = summative assessment
+                    currentQuiz.assessment_type = 'summative';
+                } else if (numQuestions === 5) {
+                    // 5 questions = formative assessment
+                    currentQuiz.assessment_type = 'formative';
+                } else {
+                    currentQuiz.assessment_type = 'practice';
+                }
+                console.log('Auto-detected assessment type:', currentQuiz.assessment_type);
+            }
+            
+            // Normalize legacy assessment types
+            if (currentQuiz.assessment_type === 'diagnostic' || currentQuiz.assessment_type === 'pre_assessment') {
+                currentQuiz.assessment_type = 'formative';
+            }
+            if (currentQuiz.assessment_type === 'competency_check' || currentQuiz.assessment_type === 'post_assessment') {
+                currentQuiz.assessment_type = 'summative';
+            }
+            
+            // Set title based on type
+            let panelTitle = 'Quiz';
+            let panelIcon = '📝';
+            if (currentQuiz.assessment_type === 'formative') {
+                panelTitle = 'Formative Assessment';
+                panelIcon = '📋';
+            } else if (currentQuiz.assessment_type === 'summative') {
+                panelTitle = 'Summative Assessment';
+                panelIcon = '🎯';
+            } else {
+                panelTitle = 'Practice Quiz';
+                panelIcon = '📝';
+            }
+            
+            document.getElementById('interactiveTitleIcon').textContent = panelIcon;
+            document.getElementById('interactiveTitleText').textContent = panelTitle;
+            document.getElementById('interactivePanel').classList.add('open');
+            
+            renderQuizQuestion();
+        }
+        
+        // Validate quiz questions and try to fix misaligned correct answers
+        function validateQuizQuestions(quiz) {
+            if (!quiz || !quiz.questions) return;
+            
+            quiz.questions.forEach((q, idx) => {
+                // Ensure correct is a number
+                if (typeof q.correct === 'string') {
+                    // Convert letter to index if needed
+                    if (q.correct.match(/^[A-Da-d]$/)) {
+                        q.correct = q.correct.toUpperCase().charCodeAt(0) - 65;
+                        console.log(`Q${idx+1}: Converted letter to index ${q.correct}`);
+                    } else {
+                        q.correct = parseInt(q.correct) || 0;
+                    }
+                }
+                
+                // Validate correct is in range
+                if (q.correct < 0 || q.correct >= q.options.length) {
+                    console.warn(`Q${idx+1}: Invalid correct index ${q.correct}, defaulting to 0`);
+                    q.correct = 0;
+                }
+                
+                // Try to detect misalignment by checking if explanation mentions a different option
+                if (q.explanation && q.options) {
+                    const correctText = q.options[q.correct].toLowerCase();
+                    const explanation = q.explanation.toLowerCase();
+                    
+                    // Check if explanation mentions a different option more prominently
+                    let bestMatch = q.correct;
+                    let bestMatchScore = 0;
+                    
+                    q.options.forEach((opt, optIdx) => {
+                        const optLower = opt.toLowerCase();
+                        // Count how many words from the option appear in the explanation
+                        const optWords = optLower.split(/\s+/).filter(w => w.length > 3);
+                        let matchScore = 0;
+                        optWords.forEach(word => {
+                            if (explanation.includes(word)) matchScore++;
+                        });
+                        
+                        // Also check for exact phrase match
+                        if (explanation.includes(optLower.substring(0, 15))) {
+                            matchScore += 5;
+                        }
+                        
+                        if (matchScore > bestMatchScore) {
+                            bestMatchScore = matchScore;
+                            bestMatch = optIdx;
+                        }
+                    });
+                    
+                    // If we found a better match and it's different from current correct
+                    if (bestMatch !== q.correct && bestMatchScore > 2) {
+                        console.warn(`Q${idx+1}: Possible misalignment detected!`);
+                        console.warn(`  Current correct: "${q.options[q.correct]}"`);
+                        console.warn(`  Better match: "${q.options[bestMatch]}"`);
+                        console.warn(`  Explanation: "${q.explanation}"`);
+                        // Auto-fix the misalignment
+                        q.correct = bestMatch;
+                        console.log(`  Auto-fixed correct to index ${bestMatch}`);
+                    }
+                }
             });
-            document.getElementById('stats').innerHTML = `
-                <div class="stat"><div class="stat-num">${curriculum.length}</div><div class="stat-label">Program Areas</div></div>
-                <div class="stat"><div class="stat-num">${totalPrograms}</div><div class="stat-label">Programs</div></div>
-                <div class="stat"><div class="stat-num">${totalModules}</div><div class="stat-label">Modules</div></div>
+        }
+        
+        function renderQuizQuestion() {
+            const container = document.getElementById('interactiveContent');
+            const quiz = currentQuiz;
+            const question = quiz.questions[currentQuestionIndex];
+            const progress = ((currentQuestionIndex) / quiz.questions.length) * 100;
+            
+            container.innerHTML = `
+                <div class="quiz-container">
+                    <div class="quiz-progress">
+                        <div class="quiz-progress-bar">
+                            <div class="quiz-progress-fill" style="width: ${progress}%"></div>
+                        </div>
+                        <div class="quiz-progress-text">Question ${currentQuestionIndex + 1} of ${quiz.questions.length}</div>
+                    </div>
+                    
+                    <div class="quiz-question">
+                        <div class="quiz-question-number">Question ${currentQuestionIndex + 1}</div>
+                        <div class="quiz-question-text">${question.question}</div>
+                    </div>
+                    
+                    <div class="quiz-options">
+                        ${question.options.map((opt, i) => `
+                            <div class="quiz-option" onclick="selectAnswer(${i})" data-index="${i}">
+                                <div class="quiz-option-letter">${String.fromCharCode(65 + i)}</div>
+                                <div class="quiz-option-text">${opt}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="quiz-feedback" id="quizFeedback"></div>
+                    
+                    <div class="quiz-actions">
+                        <button class="quiz-btn quiz-btn-primary" id="submitBtn" onclick="submitAnswer()" disabled>Submit Answer</button>
+                        <button class="quiz-btn quiz-btn-primary" id="nextBtn" onclick="nextQuestion()" style="display: none;">Next Question →</button>
+                    </div>
+                </div>
             `;
         }
-
-        function renderCurriculum() {
-            const container = document.getElementById('curriculum');
-            container.innerHTML = curriculum.map(area => `
-                <div class="area" data-area="${area.id}">
-                    <div class="area-header" onclick="toggleArea('${area.id}')">
-                        <span class="icon">${area.icon}</span>
-                        <h3>${area.name}</h3>
-                        <span class="badge">${area.programs.length}</span>
-                        <span class="arrow">▶</span>
+        
+        let selectedAnswer = null;
+        
+        function selectAnswer(index) {
+            selectedAnswer = index;
+            document.querySelectorAll('.quiz-option').forEach((opt, i) => {
+                opt.classList.toggle('selected', i === index);
+            });
+            document.getElementById('submitBtn').disabled = false;
+        }
+        
+        function submitAnswer() {
+            if (selectedAnswer === null) return;
+            
+            const question = currentQuiz.questions[currentQuestionIndex];
+            const correct = selectedAnswer === question.correct;
+            
+            quizAnswers.push({
+                question: question.question,
+                selected: selectedAnswer,
+                correct: question.correct,
+                isCorrect: correct
+            });
+            
+            // Show feedback
+            const options = document.querySelectorAll('.quiz-option');
+            options.forEach((opt, i) => {
+                opt.style.pointerEvents = 'none';
+                if (i === question.correct) opt.classList.add('correct');
+                if (i === selectedAnswer && !correct) opt.classList.add('incorrect');
+            });
+            
+            const feedback = document.getElementById('quizFeedback');
+            feedback.className = `quiz-feedback show ${correct ? 'correct' : 'incorrect'}`;
+            
+            // Build helpful feedback message
+            let feedbackHtml = '';
+            if (correct) {
+                feedbackHtml = `
+                    <div class="quiz-feedback-title">✓ Correct!</div>
+                    <div>${question.explanation || 'Great job!'}</div>
+                `;
+            } else {
+                // Get the text of selected and correct answers
+                const selectedLetter = String.fromCharCode(65 + selectedAnswer);
+                const selectedText = question.options[selectedAnswer];
+                const correctLetter = String.fromCharCode(65 + question.correct);
+                const correctText = question.options[question.correct];
+                
+                // Build explanation that clearly references the correct answer
+                let explanationText = question.explanation || '';
+                
+                // Check if explanation mentions the correct answer - if not, prepend it
+                const correctAnswerMentioned = explanationText.toLowerCase().includes(correctText.toLowerCase().substring(0, 10));
+                
+                feedbackHtml = `
+                    <div class="quiz-feedback-title">✗ Incorrect</div>
+                    <div style="margin-bottom: 10px; padding: 10px; background: rgba(231,76,60,0.1); border-radius: 6px;">
+                        <strong>Your answer (${selectedLetter}):</strong> ${selectedText}
                     </div>
-                    <div class="area-programs">
-                        ${area.programs.map(prog => `
-                            <div class="program" data-program="${prog.id}">
-                                <div class="program-header" onclick="toggleProgram(event, '${prog.id}')">
-                                    <span class="arrow">▶</span>
-                                    📖 ${prog.name}
+                    <div style="margin-bottom: 10px; padding: 10px; background: rgba(39,174,96,0.1); border-radius: 6px;">
+                        <strong>Correct answer (${correctLetter}):</strong> ${correctText}
+                    </div>
+                    ${explanationText ? `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #ddd;">
+                            <strong>Why "${correctText}" is correct:</strong><br>
+                            ${explanationText}
+                        </div>
+                    ` : ''}
+                `;
+            }
+            
+            feedback.innerHTML = feedbackHtml;
+            
+            document.getElementById('submitBtn').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'inline-block';
+            document.getElementById('nextBtn').textContent = currentQuestionIndex < currentQuiz.questions.length - 1 ? 'Next Question →' : 'See Results';
+        }
+        
+        function nextQuestion() {
+            selectedAnswer = null;
+            currentQuestionIndex++;
+            
+            if (currentQuestionIndex >= currentQuiz.questions.length) {
+                showQuizResults();
+            } else {
+                renderQuizQuestion();
+            }
+        }
+        
+        function showQuizResults() {
+            const container = document.getElementById('interactiveContent');
+            const correctCount = quizAnswers.filter(a => a.isCorrect).length;
+            const totalQuestions = quizAnswers.length;
+            const percentage = Math.round((correctCount / totalQuestions) * 100);
+            
+            // Determine assessment type and thresholds
+            let assessmentType = currentQuiz.assessment_type || 'practice';
+            const passThreshold = currentQuiz.pass_threshold || 80;
+            const passed = percentage >= passThreshold;
+            
+            // Normalize legacy types
+            if (assessmentType === 'diagnostic' || assessmentType === 'pre_assessment') {
+                assessmentType = 'formative';
+            }
+            if (assessmentType === 'competency_check' || assessmentType === 'post_assessment') {
+                assessmentType = 'summative';
+            }
+            
+            // FORCE summative if 10+ questions
+            if (totalQuestions >= 10) {
+                assessmentType = 'summative';
+            }
+            // FORCE formative if exactly 5 questions and not explicitly summative
+            if (totalQuestions === 5 && assessmentType !== 'summative') {
+                assessmentType = 'formative';
+            }
+            
+            // Identify knowledge gaps (topics answered incorrectly)
+            const gaps = quizAnswers
+                .filter(a => !a.isCorrect)
+                .map(a => currentQuiz.questions.find(q => q.question === a.question)?.topic_tag || 'General')
+                .filter((v, i, a) => a.indexOf(v) === i); // Unique
+            
+            // Get topics answered correctly
+            const strengths = quizAnswers
+                .filter(a => a.isCorrect)
+                .map(a => currentQuiz.questions.find(q => q.question === a.question)?.topic_tag || 'General')
+                .filter((v, i, a) => a.indexOf(v) === i); // Unique
+            
+            // Extract skills from quiz
+            const skills = extractSkillsFromQuiz();
+            
+            // Store formative score for comparison with summative
+            if (assessmentType === 'formative') {
+                window.formativeScore = percentage;
+                window.formativeGaps = gaps;
+            }
+            
+            // Close the interactive panel
+            closeInteractivePanel();
+            
+            // SUMMATIVE ASSESSMENT - Show certificate if passed!
+            if (assessmentType === 'summative' && passed) {
+                const improvement = percentage - (window.formativeScore || 60);
+                
+                // Save to backend first to get real certificate ID
+                saveQuizResultsToBackend(assessmentType, correctCount, totalQuestions, percentage, gaps, passed)
+                    .then(result => {
+                        const certId = result?.certificate_id || ('CERT-' + Date.now().toString(36).toUpperCase());
+                        showCertificateInChat(certId, percentage, correctCount, totalQuestions, improvement, skills, !!result?.certificate_id);
+                        
+                        if (result?.certificate_id) {
+                            console.log('✅ Certificate saved to database:', result.certificate_id);
+                        }
+                    });
+                return;
+            }
+            
+            // FORMATIVE ASSESSMENT - Show personalized learning path
+            if (assessmentType === 'formative') {
+                let feedbackHtml = `## 📊 Formative Assessment Results\n\n**Score: ${percentage}%** (${correctCount}/${totalQuestions})\n\n`;
+                
+                if (strengths.length > 0) {
+                    feedbackHtml += `### ✅ You already understand:\n${strengths.map(s => `- ${s}`).join('\n')}\n\n`;
+                }
+                
+                if (gaps.length > 0) {
+                    feedbackHtml += `### 📚 We'll focus on:\n${gaps.map(g => `- **${g}**`).join('\n')}\n\n`;
+                    feedbackHtml += `Let me teach you about ${gaps[0]} first...`;
+                } else {
+                    feedbackHtml += `### 🌟 Excellent foundation!\nYou're ready for enrichment or the summative assessment.`;
+                }
+                
+                addMessage('assistant', feedbackHtml);
+                saveQuizResultsToBackend(assessmentType, correctCount, totalQuestions, percentage, gaps, passed);
+                return;
+            }
+            
+            // SUMMATIVE - NOT PASSED
+            if (assessmentType === 'summative' && !passed) {
+                const improvement = percentage - (window.formativeScore || 0);
+                let feedbackHtml = `## 📚 Summative Assessment - Not Yet Passed\n\n`;
+                feedbackHtml += `**Score: ${percentage}%** (${correctCount}/${totalQuestions}) | **Required: ${passThreshold}%**\n\n`;
+                
+                if (window.formativeScore) {
+                    feedbackHtml += `📈 **Progress:** Formative ${window.formativeScore}% → Summative ${percentage}% `;
+                    feedbackHtml += improvement > 0 ? `(+${improvement}% improvement!)\n\n` : `\n\n`;
+                }
+                
+                feedbackHtml += `### Areas to Review:\n${gaps.map(g => `- ${g}`).join('\n')}\n\n`;
+                feedbackHtml += `Don't worry! Would you like me to:\n1. Review the topics you missed?\n2. Try another practice session?\n3. Retake the summative assessment?`;
+                
+                addMessage('assistant', feedbackHtml);
+                saveQuizResultsToBackend(assessmentType, correctCount, totalQuestions, percentage, gaps, passed);
+                return;
+            }
+            
+            // PRACTICE QUIZ - Simple feedback
+            let message = '';
+            if (percentage >= 80) message = '🎉 Excellent work!';
+            else if (percentage >= 60) message = '👍 Good effort! Keep practicing.';
+            else message = '📚 Keep studying and try again.';
+            
+            addMessage('assistant', `**Practice Quiz Complete!** Score: ${percentage}% (${correctCount}/${totalQuestions}). ${message}`);
+            saveQuizResultsToBackend(assessmentType, correctCount, totalQuestions, percentage, gaps, passed);
+        }
+        
+        // Show certificate as a visual card in the chat
+        function showCertificateInChat(certId, percent, score, total, improvement, skills, savedToDb = false) {
+            const level = percent >= 95 ? 'EXPERT' : percent >= 85 ? 'PROFICIENT' : 'COMPETENT';
+            const levelIcon = percent >= 95 ? '⭐' : percent >= 85 ? '🌟' : '✓';
+            const levelColor = percent >= 95 ? '#ffd700' : percent >= 85 ? '#4CAF50' : '#2196F3';
+            const studentName = window.studentName || currentStudent?.first_name + ' ' + currentStudent?.last_name || 'Student';
+            const moduleName = currentModule?.name || 'Module';
+            const moduleCode = currentModule?.code || '';
+            const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            const formativeScore = window.formativeScore || (percent - improvement);
+            
+            const skillBadges = skills.length > 0 
+                ? skills.slice(0, 5).map(s => `<span style="display:inline-block;padding:4px 12px;background:#e8f5e9;color:#2e7d32;border-radius:12px;font-size:0.8rem;margin:3px;">${s}</span>`).join(' ')
+                : `<span style="display:inline-block;padding:4px 12px;background:#e8f5e9;color:#2e7d32;border-radius:12px;font-size:0.8rem;">${moduleName}</span>`;
+            
+            // Status message
+            const statusMessage = savedToDb 
+                ? `✅ <strong>Saved!</strong> View in <a href="/dashboard" style="color:#3498db;">Dashboard</a>`
+                : `<span style="color:#e67e22;">⚠️ Login to save certificate</span>`;
+            
+            // Create certificate HTML card
+            const certificateHtml = `
+<div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:6px;border-radius:16px;margin:10px 0;">
+<div style="background:linear-gradient(to bottom,#fffef8,#fff9e6);border-radius:12px;padding:30px;text-align:center;">
+    <div style="font-size:2.5rem;margin-bottom:5px;">🏆</div>
+    <div style="font-size:0.75rem;color:#666;letter-spacing:2px;text-transform:uppercase;">TEVETA ZAMBIA</div>
+    <div style="font-size:1.5rem;font-weight:700;color:#2c3e50;margin:15px 0;font-family:Georgia,serif;">Certificate of Competency</div>
+    
+    <div style="display:inline-block;padding:8px 20px;background:${levelColor};color:white;border-radius:20px;font-weight:700;margin:10px 0;">
+        ${levelIcon} ${level}
+    </div>
+    
+    <div style="margin:20px 0;">
+        <div style="font-size:0.9rem;color:#666;">This certifies that</div>
+        <div style="font-size:1.4rem;font-weight:700;color:#2c3e50;margin:8px 0;">${studentName}</div>
+        <div style="font-size:0.95rem;color:#555;">has demonstrated competency in</div>
+        <div style="font-size:1.1rem;font-weight:600;color:#667eea;margin-top:8px;">${moduleCode ? moduleCode + ': ' : ''}${moduleName}</div>
+    </div>
+    
+    <div style="background:#f0f4ff;padding:15px;border-radius:10px;margin:15px 0;">
+        <div style="font-size:0.8rem;font-weight:600;color:#555;margin-bottom:10px;">📈 Learning Journey</div>
+        <div style="display:flex;justify-content:center;align-items:center;gap:15px;">
+            <div style="text-align:center;">
+                <div style="font-size:1.4rem;font-weight:700;color:#666;">${formativeScore}%</div>
+                <div style="font-size:0.7rem;color:#888;">Formative</div>
+            </div>
+            <div style="font-size:1.5rem;color:#27ae60;">→</div>
+            <div style="text-align:center;">
+                <div style="font-size:1.8rem;font-weight:700;color:#27ae60;">${percent}%</div>
+                <div style="font-size:0.7rem;color:#888;">Summative</div>
+            </div>
+            <div style="text-align:center;padding-left:15px;border-left:1px solid #ddd;">
+                <div style="font-size:1.4rem;font-weight:700;color:#27ae60;">+${improvement}%</div>
+                <div style="font-size:0.7rem;color:#888;">Growth</div>
+            </div>
+        </div>
+    </div>
+    
+    <div style="display:flex;justify-content:center;gap:25px;margin:15px 0;">
+        <div style="text-align:center;">
+            <div style="font-size:1.5rem;font-weight:700;color:#27ae60;">${score}/${total}</div>
+            <div style="font-size:0.7rem;color:#666;">Questions Correct</div>
+        </div>
+    </div>
+    
+    <div style="background:#f5f5f5;padding:12px;border-radius:10px;margin:15px 0;">
+        <div style="font-size:0.8rem;font-weight:600;color:#333;margin-bottom:8px;">🛠️ Skills Demonstrated</div>
+        ${skillBadges}
+    </div>
+    
+    <div style="margin-top:20px;padding-top:15px;border-top:1px solid #eee;">
+        <div style="font-family:monospace;font-size:0.8rem;color:#888;">Certificate ID: ${certId}</div>
+        <div style="font-size:0.8rem;color:#666;">Issued: ${today}</div>
+        <div style="margin-top:8px;font-size:0.85rem;">${statusMessage}</div>
+    </div>
+</div>
+</div>
+
+🎉 **Congratulations!** ${savedToDb ? 'Your certificate and skills have been saved to your profile.' : 'Login to save your certificate.'}
+`;
+            
+            // Add to chat as HTML message
+            addHtmlMessage('assistant', certificateHtml);
+        }
+        
+        // Add HTML message to chat (for certificate display)
+        function addHtmlMessage(role, htmlContent) {
+            const container = document.getElementById('chatMessages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}`;
+            msgDiv.innerHTML = `<div class="message-content">${htmlContent}</div>`;
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+            
+            // Store in history
+            conversationHistory.push({ role, content: '[Certificate Awarded]' });
+        }
+        
+        // Extract skills from quiz questions
+        function extractSkillsFromQuiz() {
+            const skills = new Set();
+            
+            // Get skills from topic_tags and competency fields
+            if (currentQuiz && currentQuiz.questions) {
+                currentQuiz.questions.forEach(q => {
+                    if (q.topic_tag) {
+                        skills.add(q.topic_tag.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+                    }
+                    if (q.competency) {
+                        skills.add(q.competency);
+                    }
+                });
+            }
+            
+            // Add module-based skill
+            if (currentModule?.name) {
+                skills.add(currentModule.name + ' - Competent');
+            }
+            
+            return Array.from(skills).slice(0, 5); // Max 5 skills
+        }
+        
+        // Save quiz results to backend API
+        async function saveQuizResultsToBackend(assessmentType, correct, total, percentage, gaps, passed) {
+            // Must be logged in
+            if (!isAuthenticated || !currentStudent) {
+                console.log('Not authenticated - results not persisted to database');
+                return null;
+            }
+            
+            let sessionId = window.currentLearningSessionId;
+            
+            // Create learning session if we don't have one
+            if (!sessionId && currentModule) {
+                try {
+                    const createRes = await fetch('/api/learning/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            module_id: currentModule.id || currentModule.code,
+                            module_code: currentModule.code,
+                            module_name: currentModule.name
+                        })
+                    });
+                    const createData = await createRes.json();
+                    if (createData.session_id) {
+                        sessionId = createData.session_id;
+                        window.currentLearningSessionId = sessionId;
+                        console.log('Created learning session:', sessionId);
+                    }
+                } catch (e) {
+                    console.error('Failed to create learning session:', e);
+                }
+            }
+            
+            if (!sessionId) {
+                console.log('No learning session - results not persisted');
+                return null;
+            }
+            
+            try {
+                // FORMATIVE ASSESSMENT (diagnostic) - 5 questions
+                if (assessmentType === 'formative' || assessmentType === 'diagnostic' || assessmentType === 'pre_assessment') {
+                    const response = await fetch(`/api/learning/session/${sessionId}/diagnostic`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            questions: currentQuiz.questions,
+                            answers: quizAnswers,
+                            score: correct,
+                            gaps: gaps,
+                            assessment_type: 'formative'
+                        })
+                    });
+                    const result = await response.json();
+                    console.log('Formative assessment saved:', result);
+                    return result;
+                    
+                // SUMMATIVE ASSESSMENT (competency check) - 10 questions
+                } else if (assessmentType === 'summative' || assessmentType === 'competency_check' || assessmentType === 'post_assessment') {
+                    const response = await fetch(`/api/learning/session/${sessionId}/competency`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            questions: currentQuiz.questions,
+                            answers: quizAnswers,
+                            score: correct,
+                            assessment_type: 'summative'
+                        })
+                    });
+                    const result = await response.json();
+                    console.log('Summative assessment saved:', result);
+                    return result;
+                }
+            } catch (error) {
+                console.error('Failed to save quiz results:', error);
+                return null;
+            }
+        }
+        
+        // Display visual certificate artifact
+        function showCertificateArtifact(result, module) {
+            const level = result.percent >= 95 ? 'Expert' : result.percent >= 85 ? 'Proficient' : 'Competent';
+            const levelIcon = result.percent >= 95 ? '⭐' : result.percent >= 85 ? '🌟' : '✓';
+            const levelColor = result.percent >= 95 ? '#ffd700' : result.percent >= 85 ? '#c0c0c0' : '#cd7f32';
+            
+            const moduleName = module?.name || 'Module';
+            const moduleCode = module?.code || '';
+            const studentName = window.studentName || 'Student';
+            const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            
+            // Skills from the assessment
+            const skills = result.skills_recorded || [];
+            const skillsHtml = skills.length > 0 
+                ? skills.map(s => `<span class="skill-badge">${s}</span>`).join(' ')
+                : `<span class="skill-badge">${moduleName} - Competent</span>`;
+            
+            document.getElementById('interactiveTitleIcon').textContent = '🏆';
+            document.getElementById('interactiveTitleText').textContent = 'Certificate of Competency';
+            document.getElementById('interactivePanel').classList.add('open');
+            
+            const container = document.getElementById('interactiveContent');
+            container.innerHTML = `
+                <style>
+                    .certificate-artifact {
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        padding: 8px;
+                        border-radius: 16px;
+                    }
+                    .certificate-inner {
+                        background: linear-gradient(to bottom, #fffef8 0%, #fff9e6 100%);
+                        border-radius: 12px;
+                        padding: 40px;
+                        text-align: center;
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    .certificate-inner::before {
+                        content: '';
+                        position: absolute;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+                        opacity: 0.5;
+                    }
+                    .cert-header {
+                        position: relative;
+                        z-index: 1;
+                    }
+                    .cert-logo {
+                        font-size: 3rem;
+                        margin-bottom: 10px;
+                    }
+                    .cert-authority {
+                        font-size: 0.9rem;
+                        color: #666;
+                        letter-spacing: 2px;
+                        text-transform: uppercase;
+                        margin-bottom: 5px;
+                    }
+                    .cert-title {
+                        font-size: 2rem;
+                        font-weight: 700;
+                        color: #2c3e50;
+                        margin: 20px 0;
+                        font-family: Georgia, serif;
+                    }
+                    .cert-level-badge {
+                        display: inline-block;
+                        padding: 8px 24px;
+                        background: ${levelColor};
+                        color: ${result.percent >= 95 ? '#333' : '#fff'};
+                        border-radius: 20px;
+                        font-weight: 700;
+                        font-size: 1.1rem;
+                        margin: 15px 0;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                    }
+                    .cert-recipient {
+                        font-size: 1.8rem;
+                        color: #2c3e50;
+                        font-weight: 700;
+                        margin: 25px 0 10px;
+                        font-family: Georgia, serif;
+                    }
+                    .cert-module {
+                        font-size: 1.2rem;
+                        color: #555;
+                        margin: 15px 0;
+                    }
+                    .cert-module strong {
+                        color: #667eea;
+                    }
+                    .cert-score-box {
+                        display: inline-flex;
+                        gap: 30px;
+                        background: #f8f9fa;
+                        padding: 20px 40px;
+                        border-radius: 12px;
+                        margin: 20px 0;
+                    }
+                    .cert-score-item {
+                        text-align: center;
+                    }
+                    .cert-score-value {
+                        font-size: 2rem;
+                        font-weight: 700;
+                        color: #27ae60;
+                    }
+                    .cert-score-label {
+                        font-size: 0.85rem;
+                        color: #666;
+                    }
+                    .cert-improvement {
+                        color: #27ae60;
+                        font-weight: 600;
+                    }
+                    .cert-skills {
+                        margin: 25px 0;
+                        padding: 15px;
+                        background: #e8f5e9;
+                        border-radius: 12px;
+                    }
+                    .cert-skills-title {
+                        font-weight: 600;
+                        color: #2e7d32;
+                        margin-bottom: 10px;
+                    }
+                    .skill-badge {
+                        display: inline-block;
+                        padding: 6px 14px;
+                        background: #fff;
+                        color: #2e7d32;
+                        border-radius: 15px;
+                        font-size: 0.85rem;
+                        margin: 4px;
+                        border: 1px solid #a5d6a7;
+                    }
+                    .cert-footer {
+                        margin-top: 30px;
+                        padding-top: 20px;
+                        border-top: 2px solid #eee;
+                    }
+                    .cert-id {
+                        font-family: monospace;
+                        font-size: 0.9rem;
+                        color: #888;
+                        margin-bottom: 5px;
+                    }
+                    .cert-date {
+                        font-size: 0.9rem;
+                        color: #666;
+                    }
+                    .cert-actions {
+                        margin-top: 25px;
+                        display: flex;
+                        gap: 15px;
+                        justify-content: center;
+                    }
+                    .cert-btn {
+                        padding: 12px 24px;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .cert-btn-primary {
+                        background: linear-gradient(135deg, #667eea, #764ba2);
+                        color: white;
+                    }
+                    .cert-btn-primary:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                    }
+                    .cert-btn-secondary {
+                        background: #f0f0f0;
+                        color: #333;
+                    }
+                </style>
+                
+                <div class="certificate-artifact">
+                    <div class="certificate-inner">
+                        <div class="cert-header">
+                            <div class="cert-logo">🎓</div>
+                            <div class="cert-authority">Technical Education, Vocational and Entrepreneurship Training Authority</div>
+                            <div class="cert-authority" style="font-weight: 700; color: #333;">TEVETA ZAMBIA</div>
+                        </div>
+                        
+                        <div class="cert-title">Certificate of Competency</div>
+                        
+                        <div class="cert-level-badge">${levelIcon} ${level.toUpperCase()} LEVEL</div>
+                        
+                        <div style="font-size: 1rem; color: #666; margin-top: 15px;">This is to certify that</div>
+                        <div class="cert-recipient">${studentName}</div>
+                        
+                        <div class="cert-module">
+                            has successfully demonstrated competency in<br>
+                            <strong>${moduleCode ? moduleCode + ': ' : ''}${moduleName}</strong>
+                        </div>
+                        
+                        <div class="cert-score-box">
+                            <div class="cert-score-item">
+                                <div class="cert-score-value">${result.percent}%</div>
+                                <div class="cert-score-label">Final Score</div>
+                            </div>
+                            <div class="cert-score-item">
+                                <div class="cert-score-value cert-improvement">+${Math.round(result.improvement)}%</div>
+                                <div class="cert-score-label">Improvement</div>
+                            </div>
+                            <div class="cert-score-item">
+                                <div class="cert-score-value">${result.score}/10</div>
+                                <div class="cert-score-label">Questions</div>
+                            </div>
+                        </div>
+                        
+                        <div class="cert-skills">
+                            <div class="cert-skills-title">🛠️ Skills Demonstrated</div>
+                            ${skillsHtml}
+                        </div>
+                        
+                        <div class="cert-footer">
+                            <div class="cert-id">Certificate ID: ${result.certificate_id}</div>
+                            <div class="cert-date">Issued: ${today}</div>
+                        </div>
+                        
+                        <div class="cert-actions">
+                            <button class="cert-btn cert-btn-secondary" onclick="window.location.href='/dashboard'">View All Certificates</button>
+                            <button class="cert-btn cert-btn-primary" onclick="closeInteractivePanel()">Continue Learning</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Also add message to chat
+            addMessage('assistant', `🏆 **Congratulations!** You earned a **${level}** certificate!\n\nCertificate ID: \`${result.certificate_id}\`\nScore: ${result.percent}% (improved by ${Math.round(result.improvement)}%)\n\nYour certificate and skills have been saved to your profile.`);
+        }
+        
+        // Report quiz results back to AI for contextual response
+        function reportQuizResults() {
+            const correctCount = quizAnswers.filter(a => a.isCorrect).length;
+            const percentage = Math.round((correctCount / quizAnswers.length) * 100);
+            const assessmentType = currentQuiz.assessment_type || 'practice';
+            
+            // Only send automatic follow-up for assessments, not practice quizzes
+            if (assessmentType === 'diagnostic' || assessmentType === 'pre_assessment') {
+                // AI should now teach based on gaps
+                const gaps = quizAnswers
+                    .filter(a => !a.isCorrect)
+                    .map(a => currentQuiz.questions.find(q => q.question === a.question)?.topic_tag || 'Unknown');
+                
+                if (gaps.length > 0) {
+                    sendMessage(`I completed the diagnostic and scored ${percentage}%. Please teach me about: ${gaps.join(', ')}`);
+                }
+            }
+        }
+        
+        // Diagram Functions
+        function openDiagram(diagramData) {
+            document.getElementById('interactiveTitleIcon').textContent = '📊';
+            document.getElementById('interactiveTitleText').textContent = diagramData.title || 'Diagram';
+            document.getElementById('interactivePanel').classList.add('open');
+            
+            const container = document.getElementById('interactiveContent');
+            container.innerHTML = `
+                <div class="diagram-viewer">
+                    <img src="${diagramData.url}" alt="${diagramData.alt || diagramData.title}" onerror="this.src='https://via.placeholder.com/600x400?text=Image+Not+Available'">
+                    <div class="diagram-caption">${diagramData.caption || diagramData.title}</div>
+                    <div class="diagram-controls">
+                        <button class="diagram-btn" onclick="window.open('${diagramData.url}', '_blank')">🔍 View Full Size</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Video Functions - Embedded YouTube
+        function openVideo(videoData) {
+            document.getElementById('interactiveTitleIcon').textContent = '🎬';
+            document.getElementById('interactiveTitleText').textContent = videoData.title || 'Video Tutorial';
+            document.getElementById('interactivePanel').classList.add('open');
+            
+            const container = document.getElementById('interactiveContent');
+            
+            if (videoData.videoId) {
+                // Embed YouTube video directly
+                container.innerHTML = `
+                    <div class="video-container">
+                        <div class="video-player">
+                            <iframe 
+                                src="https://www.youtube.com/embed/${videoData.videoId}?rel=0" 
+                                frameborder="0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowfullscreen>
+                            </iframe>
+                        </div>
+                        <div class="video-info">
+                            <div class="video-title">${videoData.title}</div>
+                            <div class="video-description">${videoData.description || ''}</div>
+                        </div>
+                    </div>
+                `;
+            } else if (videoData.searchQuery) {
+                // Fallback to search link
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 4rem; margin-bottom: 20px;">🎬</div>
+                        <h3 style="margin-bottom: 15px;">${videoData.title}</h3>
+                        <p style="color: #666; margin-bottom: 25px;">${videoData.description || 'Find video tutorials on YouTube'}</p>
+                        <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(videoData.searchQuery)}" 
+                           target="_blank" 
+                           style="display: inline-block; padding: 14px 28px; background: #ff0000; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+                            🔍 Search on YouTube
+                        </a>
+                    </div>
+                `;
+            }
+        }
+        
+        // Scenario Functions - Zambian Workplace Scenarios
+        function openScenario(scenarioData) {
+            document.getElementById('interactiveTitleIcon').textContent = '🔧';
+            document.getElementById('interactiveTitleText').textContent = scenarioData.title || 'Workplace Scenario';
+            document.getElementById('interactivePanel').classList.add('open');
+            
+            const container = document.getElementById('interactiveContent');
+            container.innerHTML = `
+                <div class="scenario-container">
+                    <div class="scenario-header">
+                        <div class="scenario-location">📍 ${scenarioData.location}</div>
+                    </div>
+                    
+                    ${scenarioData.image ? `
+                        <div class="scenario-image">
+                            <img src="${scenarioData.image}" alt="${scenarioData.title}" onerror="this.style.display='none'">
+                        </div>
+                    ` : ''}
+                    
+                    <div class="scenario-situation">
+                        <h4>📋 The Situation</h4>
+                        <p>${scenarioData.situation}</p>
+                    </div>
+                    
+                    <div class="scenario-challenge">
+                        <h4>⚠️ The Challenge</h4>
+                        <p>${scenarioData.challenge}</p>
+                    </div>
+                    
+                    <div class="scenario-questions">
+                        <h4>🤔 Consider These Questions</h4>
+                        <ol>
+                            ${scenarioData.questions.map(q => `<li>${q}</li>`).join('')}
+                        </ol>
+                    </div>
+                    
+                    ${scenarioData.hints ? `
+                        <div class="scenario-hints">
+                            <button class="hint-toggle" onclick="toggleHints()">💡 Show Hints</button>
+                            <div class="hints-content" id="hintsContent" style="display: none;">
+                                <ul>
+                                    ${scenarioData.hints.map(h => `<li>${h}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="scenario-success">
+                        <h4>✅ Success Criteria</h4>
+                        <p>${scenarioData.successCriteria}</p>
+                    </div>
+                    
+                    <div class="scenario-actions">
+                        <button class="quiz-btn quiz-btn-primary" onclick="closeInteractivePanel()">
+                            I've Analyzed This Scenario
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function toggleHints() {
+            const hints = document.getElementById('hintsContent');
+            hints.style.display = hints.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // Career Functions - Tabiya/STRIVE Integration
+        function openCareer(careerData) {
+            document.getElementById('interactiveTitleIcon').textContent = '💼';
+            document.getElementById('interactiveTitleText').textContent = careerData.title || 'Career Pathways';
+            document.getElementById('interactivePanel').classList.add('open');
+            
+            const container = document.getElementById('interactiveContent');
+            container.innerHTML = `
+                <div class="career-container">
+                    <div class="career-header">
+                        <div class="career-sector">
+                            <span class="sector-badge">${careerData.sector}</span>
+                            ${careerData.striveComponent ? `<span class="strive-badge">STRIVE ${careerData.striveComponent}</span>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="career-progression">
+                        <h4>📈 Career Progression Path</h4>
+                        <div class="progression-steps">
+                            ${careerData.progression.map((step, i) => `
+                                <div class="progression-step">
+                                    <div class="step-number">${i + 1}</div>
+                                    <div class="step-title">${step}</div>
                                 </div>
-                                <div class="program-modules">
-                                    ${prog.modules.map(mod => `
-                                        <div class="module ${currentModule === mod.id ? 'active' : ''}" 
-                                             data-module="${mod.id}" 
-                                             onclick="selectModule('${mod.id}', '${escapeHtml(mod.code)}', '${escapeHtml(mod.name)}', '${escapeHtml(mod.description)}', '${escapeHtml(area.name)}', '${escapeHtml(prog.name)}', '${escapeHtml(prog.level)}')">
-                                            <span class="module-code">${mod.code}</span>
-                                            ${mod.name}
-                                        </div>
-                                    `).join('')}
+                            `).join('<div class="step-arrow">→</div>')}
+                        </div>
+                    </div>
+                    
+                    <div class="career-occupations">
+                        <h4>👔 Job Opportunities</h4>
+                        ${careerData.occupations.map(occ => `
+                            <div class="occupation-card">
+                                <div class="occ-title">${occ.title}</div>
+                                <div class="occ-details">
+                                    <div class="occ-employer">🏢 ${occ.employer}</div>
+                                    <div class="occ-salary">💰 ${occ.salary}</div>
+                                    <div class="occ-demand demand-${occ.demand.toLowerCase()}">📊 ${occ.demand} Demand</div>
+                                </div>
+                                <div class="occ-skills">
+                                    ${occ.skills.map(s => `<span class="skill-tag">${s}</span>`).join('')}
                                 </div>
                             </div>
                         `).join('')}
                     </div>
+                    
+                    ${careerData.training ? `
+                        <div class="career-training">
+                            <h4>🎓 Training & Certifications</h4>
+                            <ul>
+                                ${careerData.training.map(t => `<li>${t}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    
+                    ${careerData.entrepreneurship && careerData.entrepreneurship.viable ? `
+                        <div class="career-entrepreneur">
+                            <h4>🚀 Entrepreneurship Opportunity</h4>
+                            <div class="entrepreneur-card">
+                                <div class="entrepreneur-cost">Startup Cost: ${careerData.entrepreneurship.startupCost}</div>
+                                <p>${careerData.entrepreneurship.description}</p>
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
-            `).join('');
+            `;
         }
-
-        function escapeHtml(text) {
-            return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        
+        function closeInteractivePanel() {
+            document.getElementById('interactivePanel').classList.remove('open');
         }
-
-        function toggleArea(areaId) {
-            const area = document.querySelector(`.area[data-area="${areaId}"]`);
-            area.classList.toggle('open');
-        }
-
-        function toggleProgram(event, progId) {
-            event.stopPropagation();
-            const prog = document.querySelector(`.program[data-program="${progId}"]`);
-            prog.classList.toggle('open');
-        }
-
-        function selectModule(moduleId, code, name, description, area, program, level) {
-            // Update selection UI
-            document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
-            document.querySelector(`.module[data-module="${moduleId}"]`)?.classList.add('active');
+        
+        // Chat Functions
+        function addMessage(role, content) {
+            const container = document.getElementById('chatMessages');
             
-            // Check if module changed
-            const moduleChanged = currentModule !== moduleId;
+            // Remove welcome message if present
+            const welcome = container.querySelector('.welcome-message');
+            if (welcome) welcome.remove();
             
-            currentModule = moduleId;
-            currentModuleInfo = { code, name, description, area, program, level };
+            // Strip any remaining content markers
+            let cleanContent = content
+                .replace(/\[(QUIZ|DIAGRAM|VIDEO|SCENARIO|CAREER)_(START|END)\]/g, '')
+                .replace(/\[QUIZ_START\][\s\S]*?\[QUIZ_END\]/g, '')
+                .replace(/\[DIAGRAM_START\][\s\S]*?\[DIAGRAM_END\]/g, '')
+                .replace(/\[VIDEO_START\][\s\S]*?\[VIDEO_END\]/g, '')
+                .replace(/\[SCENARIO_START\][\s\S]*?\[SCENARIO_END\]/g, '')
+                .replace(/\[CAREER_START\][\s\S]*?\[CAREER_END\]/g, '');
             
-            // Update context display
-            document.getElementById('context').innerHTML = `
-                <strong>${area}</strong> → ${program}<br>
-                ${code}: ${name}
+            // Format content
+            let formattedContent = cleanContent
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+            
+            const avatar = role === 'assistant' ? '🤖' : '👤';
+            const html = `
+                <div class="message ${role}">
+                    <div class="message-avatar">${avatar}</div>
+                    <div class="message-content">${formattedContent}</div>
+                </div>
             `;
             
-            // Enable input
-            document.getElementById('input').disabled = false;
-            document.getElementById('input').placeholder = `Ask about ${name}...`;
-            document.getElementById('sendBtn').disabled = false;
-            
-            // Load or initialize chat for this module
-            if (moduleChanged) {
-                loadModuleChat(moduleId, code, name, description, program);
-            }
-        }
-
-        function loadModuleChat(moduleId, code, name, description, program) {
-            // Check if we have cached history for this module
-            if (moduleHistories[moduleId] && moduleHistories[moduleId].length > 0) {
-                renderMessages(moduleHistories[moduleId]);
-            } else {
-                // Start fresh for this module
-                const welcomeMsg = {
-                    role: 'assistant',
-                    content: `Great choice! You're now studying **${code} - ${name}** in the ${program} program.\n\n**Module Topics:** ${description}\n\nI have **special tools** to help you learn:\n\n• 📝 **"Give me a quiz"** - Test your knowledge\n• 🏭 **"Show me a real example"** - Zambian workplace scenarios\n• 💼 **"What jobs can I get?"** - Career pathways\n• 🔧 **"Give me a problem to solve"** - Hands-on practice\n\nOr just ask me anything about ${name}! 😊`
-                };
-                moduleHistories[moduleId] = [welcomeMsg];
-                renderMessages(moduleHistories[moduleId]);
-            }
-            
-            document.getElementById('input').focus();
-        }
-
-        function renderMessages(messages) {
-            const container = document.getElementById('messages');
-            container.innerHTML = messages.map(msg => `
-                <div class="message ${msg.role}">
-                    <div class="avatar">${msg.role === 'user' ? '👤' : '🤖'}</div>
-                    <div class="bubble">${formatMarkdown(msg.content)}</div>
-                </div>
-            `).join('');
+            container.insertAdjacentHTML('beforeend', html);
             container.scrollTop = container.scrollHeight;
+            
+            // Update history
+            conversationHistory.push({ role, content: cleanContent });
         }
-
-        function formatMarkdown(text) {
-            if (!text) return '';
-            
-            // Escape HTML first
-            let html = text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-            
-            // Code blocks (must be before inline code)
-            html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-            
-            // Inline code
-            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-            
-            // Bold
-            html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-            html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
-            
-            // Italic
-            html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-            html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
-            
-            // Headers
-            html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
-            html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
-            
-            // Bullet lists
-            html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
-            html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-            
-            // Numbered lists
-            html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-            
-            // Blockquotes
-            html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
-            
-            // Paragraphs (double newlines)
-            html = html.replace(/\n\n/g, '</p><p>');
-            
-            // Single newlines to <br> (but not inside lists)
-            html = html.replace(/\n(?!<)/g, '<br>');
-            
-            // Wrap in paragraph
-            if (!html.startsWith('<')) {
-                html = '<p>' + html + '</p>';
+        
+        function addLoading() {
+            const container = document.getElementById('chatMessages');
+            const id = 'loading-' + Date.now();
+            const html = `
+                <div class="message assistant" id="${id}">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        <div class="loading">
+                            <div class="loading-dots">
+                                <div class="loading-dot"></div>
+                                <div class="loading-dot"></div>
+                                <div class="loading-dot"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+            container.scrollTop = container.scrollHeight;
+            return id;
+        }
+        
+        function removeLoading(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+        
+        function clearChat() {
+            document.getElementById('chatMessages').innerHTML = '';
+            conversationHistory = [];
+            closeInteractivePanel();
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') sendMessage();
+        }
+        
+        // Authentication state
+        let isAuthenticated = false;
+        let currentStudent = null;
+        
+        // Go to progress - requires login
+        function goToProgress() {
+            if (isAuthenticated) {
+                window.location.href = '/dashboard';
+            } else {
+                if (confirm('You need to log in to track your progress. Go to login page?')) {
+                    window.location.href = '/login';
+                }
             }
-            
-            // Clean up empty paragraphs
-            html = html.replace(/<p><\/p>/g, '');
-            html = html.replace(/<p>(<[uo]l>)/g, '$1');
-            html = html.replace(/(<\/[uo]l>)<\/p>/g, '$1');
-            
-            return html;
         }
-
-        async function sendMessage() {
-            const input = document.getElementById('input');
-            const msg = input.value.trim();
-            if (!msg || isLoading || !currentModule) return;
-            
-            // Add user message
-            const userMsg = { role: 'user', content: msg };
-            moduleHistories[currentModule].push(userMsg);
-            renderMessages(moduleHistories[currentModule]);
-            
-            input.value = '';
-            isLoading = true;
-            document.getElementById('sendBtn').disabled = true;
-            showTyping();
-            
+        
+        // Authentication - check if user is logged in
+        async function checkAuth() {
             try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        message: msg, 
-                        module_id: currentModule, 
-                        session_id: sessionId 
-                    })
-                });
+                const res = await fetch('/api/auth/session');
                 const data = await res.json();
-                hideTyping();
+                const userMenu = document.getElementById('userMenu');
                 
-                const assistantMsg = { 
-                    role: 'assistant', 
-                    content: data.error ? `⚠️ Error: ${data.error}` : data.response 
-                };
-                moduleHistories[currentModule].push(assistantMsg);
-                renderMessages(moduleHistories[currentModule]);
-                
-            } catch (e) {
-                hideTyping();
-                const errorMsg = { role: 'assistant', content: '⚠️ Connection error. Please check if the server is running.' };
-                moduleHistories[currentModule].push(errorMsg);
-                renderMessages(moduleHistories[currentModule]);
+                if (data.authenticated && data.student) {
+                    isAuthenticated = true;
+                    currentStudent = data.student;
+                    // Store globally for certificate display
+                    window.studentName = data.student.first_name + ' ' + data.student.last_name;
+                    window.studentId = data.student.student_id;
+                    
+                    userMenu.innerHTML = `
+                        <span class="user-name">👤 ${data.student.first_name}</span>
+                        <button class="logout-btn" onclick="handleLogout()">Logout</button>
+                    `;
+                } else {
+                    isAuthenticated = false;
+                    currentStudent = null;
+                    window.studentName = 'Student';
+                    userMenu.innerHTML = `
+                        <a href="/login" class="login-btn">Login</a>
+                    `;
+                }
+            } catch (err) {
+                isAuthenticated = false;
+                window.studentName = 'Student';
+                document.getElementById('userMenu').innerHTML = `
+                    <a href="/login" class="login-btn">Login</a>
+                `;
             }
-            
-            isLoading = false;
-            document.getElementById('sendBtn').disabled = false;
-            document.getElementById('input').focus();
         }
-
-        function showTyping() {
-            const container = document.getElementById('messages');
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message assistant';
-            typingDiv.id = 'typing';
-            typingDiv.innerHTML = '<div class="avatar">🤖</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
-            container.appendChild(typingDiv);
-            typingDiv.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function hideTyping() {
-            document.getElementById('typing')?.remove();
-        }
-
-        async function clearChat() {
-            if (!currentModule) return;
-            
-            if (!confirm(`Clear chat history for ${currentModuleInfo?.name}?`)) return;
-            
+        
+        async function handleLogout() {
             try {
-                await fetch(`/api/clear/${sessionId}`, { 
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ module_id: currentModule })
-                });
-                
-                // Reset this module's history
-                moduleHistories[currentModule] = [];
-                loadModuleChat(currentModule, currentModuleInfo.code, currentModuleInfo.name, currentModuleInfo.description, currentModuleInfo.program);
-                
-            } catch (e) {
-                console.error('Failed to clear chat:', e);
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.reload();
+            } catch (err) {
+                console.error('Logout error:', err);
             }
         }
-
+        
         // Initialize
-        loadCurriculum();
+        initCurriculum();
+        checkAuth();
     </script>
 </body>
 </html>

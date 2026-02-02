@@ -1,16 +1,38 @@
 """
 AI Tutor TEVETA - Agentic System with Claude Tools
+Aligned with Official TEVETA Curriculum Charts
 """
 
 import os
 import json
 import sqlite3
 import random
+import secrets
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect, g
 from flask_cors import CORS
 from dotenv import load_dotenv
 import anthropic
+
+# Import detailed curriculum content
+from curriculum_content import (
+    CURRICULUM_CONTENT, 
+    get_module_content, 
+    get_learning_outcomes, 
+    get_units, 
+    get_competencies
+)
+
+# Import multimedia learning resources
+from multimedia_resources import (
+    get_resources_for_topic,
+    get_youtube_search_url,
+    YOUTUBE_SEARCHES,
+    IMAGE_RESOURCES
+)
+
+# Import robust database module
+from database import Database, init_app as init_db_routes
 
 load_dotenv()
 
@@ -19,7 +41,15 @@ CORS(app)
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
-DB_PATH = "ai_tutor.db"
+DB_PATH = os.getenv("DATABASE_PATH", "ai_tutor.db")
+
+# Initialize database
+db = Database(DB_PATH)
+
+# Backward compatibility alias
+def init_db():
+    """Legacy function - database is auto-initialized by Database class."""
+    pass
 
 # =============================================================================
 # TOOL DEFINITIONS
@@ -64,6 +94,18 @@ TOOLS = [
                 "industry": {"type": "string", "description": "Industry context (mining, hospitality, etc.)"}
             },
             "required": ["concept"]
+        }
+    },
+    {
+        "name": "get_learning_resources",
+        "description": "Get educational videos and images/diagrams to help explain a topic visually. Use this to show YouTube tutorials, technical diagrams, and photos. ALWAYS use this when explaining technical concepts, procedures, equipment, or when student asks to 'show me' something.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "topic": {"type": "string", "description": "Topic to find resources for (e.g., 'Ohm's law', 'knife cuts', 'solar PV', 'mortise and tenon')"},
+                "resource_type": {"type": "string", "enum": ["all", "videos", "images"], "description": "Type of resources to fetch", "default": "all"}
+            },
+            "required": ["topic"]
         }
     },
     {
@@ -121,6 +163,8 @@ def execute_tool(tool_name: str, tool_input: dict, context: dict) -> str:
         return check_answer(tool_input)
     elif tool_name == "get_practical_example":
         return get_practical_example(tool_input, context)
+    elif tool_name == "get_learning_resources":
+        return get_learning_resources(tool_input, context)
     elif tool_name == "track_progress":
         return track_progress(tool_input, context)
     elif tool_name == "get_career_pathway":
@@ -133,30 +177,54 @@ def execute_tool(tool_name: str, tool_input: dict, context: dict) -> str:
 
 def generate_quiz(inputs: dict, context: dict) -> str:
     topic = inputs.get("topic", "general")
-    num = min(inputs.get("num_questions", 3), 5)
+    num = min(inputs.get("num_questions", 5), 5)  # CBET standard: 5 questions
     difficulty = inputs.get("difficulty", "medium")
     
     questions = []
     
-    # Question banks by topic keywords
+    # CBET-aligned question banks by topic keywords
     q_bank = {
         "safety": [
-            {"q": "What does PPE stand for?", "options": ["A) Personal Protective Equipment", "B) Professional Protection Essentials", "C) Proper Protective Elements", "D) Personal Protection Elements"], "answer": "A", "explanation": "PPE = Personal Protective Equipment"},
-            {"q": "What should you do FIRST when entering a workshop?", "options": ["A) Start working", "B) Check for hazards", "C) Talk to colleagues", "D) Check your phone"], "answer": "B", "explanation": "Always assess hazards before starting work"},
-            {"q": "Fire extinguishers should be checked:", "options": ["A) Never", "B) Monthly", "C) Yearly", "D) Only when used"], "answer": "B", "explanation": "Monthly checks ensure readiness"},
+            {"q": "What does PPE stand for?", "options": ["A) Personal Protective Equipment", "B) Professional Protection Essentials", "C) Proper Protective Elements", "D) Personal Protection Elements"], "answer": "A", "explanation": "PPE = Personal Protective Equipment - essential for all vocational work", "competency": "Identify safety equipment"},
+            {"q": "What should you do FIRST when entering a workshop?", "options": ["A) Start working", "B) Check for hazards and put on PPE", "C) Talk to colleagues", "D) Check your phone"], "answer": "B", "explanation": "Always assess hazards and wear PPE before starting any work", "competency": "Apply safety procedures"},
+            {"q": "Fire extinguishers should be checked:", "options": ["A) Never", "B) Monthly", "C) Yearly", "D) Only when used"], "answer": "B", "explanation": "Monthly checks ensure fire safety equipment is ready", "competency": "Maintain safety equipment"},
+            {"q": "What is the correct action if you see a hazard?", "options": ["A) Ignore it", "B) Report it immediately", "C) Wait for someone else", "D) Fix it yourself without training"], "answer": "B", "explanation": "Always report hazards to supervisors immediately", "competency": "Demonstrate safety awareness"},
+            {"q": "Which color safety sign indicates a mandatory action?", "options": ["A) Red", "B) Yellow", "C) Blue", "D) Green"], "answer": "C", "explanation": "Blue signs indicate mandatory actions like 'Wear Safety Glasses'", "competency": "Interpret safety signage"},
         ],
         "engine": [
-            {"q": "How many strokes in a typical car engine cycle?", "options": ["A) 2", "B) 4", "C) 6", "D) 8"], "answer": "B", "explanation": "Most cars use 4-stroke engines: intake, compression, power, exhaust"},
-            {"q": "What does the cooling system do?", "options": ["A) Makes the car faster", "B) Keeps engine at optimal temperature", "C) Cleans the engine", "D) Reduces noise"], "answer": "B", "explanation": "Cooling system maintains ~90°C operating temperature"},
-            {"q": "What component pumps fuel in modern vehicles?", "options": ["A) Carburetor", "B) Electric fuel pump", "C) Radiator", "D) Alternator"], "answer": "B", "explanation": "Modern vehicles use electric fuel pumps with fuel injection"},
+            {"q": "How many strokes in a typical car engine cycle?", "options": ["A) 2", "B) 4", "C) 6", "D) 8"], "answer": "B", "explanation": "Most cars use 4-stroke engines: intake, compression, power, exhaust", "competency": "Explain engine operation"},
+            {"q": "What does the cooling system do?", "options": ["A) Makes the car faster", "B) Keeps engine at optimal temperature", "C) Cleans the engine", "D) Reduces noise"], "answer": "B", "explanation": "Cooling system maintains ~90°C operating temperature", "competency": "Identify system functions"},
+            {"q": "What component pumps fuel in modern vehicles?", "options": ["A) Carburetor", "B) Electric fuel pump", "C) Radiator", "D) Alternator"], "answer": "B", "explanation": "Modern vehicles use electric fuel pumps with fuel injection", "competency": "Identify engine components"},
+            {"q": "What causes engine overheating?", "options": ["A) Too much oil", "B) Low coolant or faulty thermostat", "C) New spark plugs", "D) Clean air filter"], "answer": "B", "explanation": "Low coolant level or stuck thermostat are common causes", "competency": "Diagnose engine problems"},
+            {"q": "The ignition system's main function is to:", "options": ["A) Cool the engine", "B) Provide spark to ignite fuel", "C) Pump fuel", "D) Filter air"], "answer": "B", "explanation": "Ignition system creates spark at the right time to ignite the air-fuel mixture", "competency": "Explain ignition operation"},
         ],
         "electrical": [
-            {"q": "What is Ohm's Law formula?", "options": ["A) V = I × R", "B) V = I + R", "C) V = I / R", "D) V = I - R"], "answer": "A", "explanation": "V (Voltage) = I (Current) × R (Resistance)"},
-            {"q": "What color is the earth wire in Zambia?", "options": ["A) Red", "B) Blue", "C) Green/Yellow", "D) Black"], "answer": "C", "explanation": "Green/Yellow striped wire is earth (ground)"},
-            {"q": "A multimeter measures:", "options": ["A) Only voltage", "B) Only current", "C) Voltage, current, and resistance", "D) Only resistance"], "answer": "C", "explanation": "Multimeters measure V, I, and R"},
+            {"q": "What is Ohm's Law formula?", "options": ["A) V = I × R", "B) V = I + R", "C) V = I / R", "D) V = I - R"], "answer": "A", "explanation": "V (Voltage) = I (Current) × R (Resistance)", "competency": "Apply electrical theory"},
+            {"q": "What color is the earth wire in Zambia?", "options": ["A) Red", "B) Blue", "C) Green/Yellow", "D) Black"], "answer": "C", "explanation": "Green/Yellow striped wire is earth (ground) per ZESCO standards", "competency": "Identify wiring standards"},
+            {"q": "A multimeter measures:", "options": ["A) Only voltage", "B) Only current", "C) Voltage, current, and resistance", "D) Only resistance"], "answer": "C", "explanation": "Multimeters measure V, I, and R - essential diagnostic tool", "competency": "Use measuring instruments"},
+            {"q": "What must be done before working on electrical equipment?", "options": ["A) Nothing special", "B) Lockout/Tagout the power source", "C) Wear rubber shoes only", "D) Tell a friend"], "answer": "B", "explanation": "Lockout/Tagout (LOTO) prevents accidental energization - critical safety", "competency": "Apply electrical safety"},
+            {"q": "A circuit breaker's purpose is to:", "options": ["A) Increase power", "B) Protect against overload", "C) Store electricity", "D) Generate power"], "answer": "B", "explanation": "Circuit breakers protect wiring from damage due to excess current", "competency": "Explain circuit protection"},
+        ],
+        "food": [
+            {"q": "What does HACCP stand for?", "options": ["A) Hazard Analysis Critical Control Points", "B) Health And Cooking Control Plan", "C) Hotel And Catering Control Points", "D) Hygiene And Cleanliness Control Plan"], "answer": "A", "explanation": "HACCP is the international food safety management system", "competency": "Apply food safety systems"},
+            {"q": "The danger zone for food temperature is:", "options": ["A) 0-5°C", "B) 5-63°C", "C) 63-75°C", "D) Above 75°C"], "answer": "B", "explanation": "Bacteria multiply rapidly between 5-63°C - keep food out of this zone", "competency": "Control food temperatures"},
+            {"q": "How often should you wash hands when preparing food?", "options": ["A) Once at the start", "B) Every hour", "C) Before and after each task", "D) Only when visibly dirty"], "answer": "C", "explanation": "Frequent handwashing prevents cross-contamination", "competency": "Demonstrate personal hygiene"},
+            {"q": "What is mise en place?", "options": ["A) A French dish", "B) Everything in its place - preparation before cooking", "C) A cooking method", "D) A type of knife"], "answer": "B", "explanation": "Mise en place means having all ingredients and tools ready before cooking", "competency": "Apply kitchen organization"},
+            {"q": "Raw meat should be stored:", "options": ["A) On the top shelf", "B) Next to cooked food", "C) On the bottom shelf", "D) At room temperature"], "answer": "C", "explanation": "Store raw meat on bottom shelf to prevent drips contaminating other food", "competency": "Apply food storage principles"},
+        ],
+        "computer": [
+            {"q": "What does CPU stand for?", "options": ["A) Central Processing Unit", "B) Computer Personal Unit", "C) Central Power Unit", "D) Computer Processing Utility"], "answer": "A", "explanation": "The CPU is the 'brain' of the computer that processes instructions", "competency": "Identify computer components"},
+            {"q": "What is the purpose of RAM?", "options": ["A) Permanent storage", "B) Temporary working memory", "C) Display graphics", "D) Connect to internet"], "answer": "B", "explanation": "RAM provides fast temporary storage for running programs", "competency": "Explain hardware functions"},
+            {"q": "An IP address is used to:", "options": ["A) Store files", "B) Identify devices on a network", "C) Display images", "D) Print documents"], "answer": "B", "explanation": "IP addresses uniquely identify each device on a network", "competency": "Understand networking basics"},
+            {"q": "What is the first step in troubleshooting a PC that won't start?", "options": ["A) Replace the motherboard", "B) Check power connections", "C) Format the hard drive", "D) Install new software"], "answer": "B", "explanation": "Always check the simplest solutions first - power connections", "competency": "Apply troubleshooting methodology"},
+            {"q": "Which command opens Command Prompt in Windows?", "options": ["A) cmd", "B) run", "C) start", "D) open"], "answer": "A", "explanation": "Type 'cmd' in Run dialog or search to open Command Prompt", "competency": "Use operating system tools"},
         ],
         "default": [
-            {"q": f"What is a key skill in {topic}?", "options": ["A) Attention to detail", "B) Guessing", "C) Skipping steps", "D) Working alone"], "answer": "A", "explanation": "Attention to detail is essential in all vocational work"},
+            {"q": f"What is a key competency in {topic}?", "options": ["A) Attention to detail", "B) Guessing", "C) Skipping steps", "D) Working alone"], "answer": "A", "explanation": "Attention to detail is essential in all vocational work", "competency": "Demonstrate professionalism"},
+            {"q": "Why is continuous learning important in your trade?", "options": ["A) It's not important", "B) Technology and methods change", "C) To impress others", "D) To avoid work"], "answer": "B", "explanation": "Industries evolve - skilled workers must keep learning", "competency": "Commit to professional development"},
+            {"q": "What should you do if you don't understand an instruction?", "options": ["A) Guess", "B) Ignore it", "C) Ask for clarification", "D) Pretend you understand"], "answer": "C", "explanation": "Always ask when unsure - it's safer and more professional", "competency": "Communicate effectively"},
+            {"q": "Why is teamwork important in the workplace?", "options": ["A) It's not important", "B) Complex tasks need collaboration", "C) To avoid responsibility", "D) To socialize"], "answer": "B", "explanation": "Most workplace tasks require collaboration for success", "competency": "Work effectively in teams"},
+            {"q": "What is the first step before starting any practical task?", "options": ["A) Start immediately", "B) Plan and assess risks", "C) Wait for others", "D) Skip the boring parts"], "answer": "B", "explanation": "Planning and risk assessment prevent mistakes and accidents", "competency": "Apply work planning"},
         ]
     }
     
@@ -174,10 +242,12 @@ def generate_quiz(inputs: dict, context: dict) -> str:
     
     return json.dumps({
         "quiz": {
+            "type": "CBET Competency Check",
             "topic": topic,
             "difficulty": difficulty,
+            "pass_requirement": "4 out of 5 correct (80%) to demonstrate competency",
             "questions": questions,
-            "instructions": f"Answer these {len(questions)} questions about {topic}:"
+            "instructions": f"Answer these {len(questions)} questions to demonstrate your competency in {topic}. You need 4/5 (80%) to pass."
         }
     }, indent=2)
 
@@ -188,16 +258,40 @@ def check_answer(inputs: dict) -> str:
     
     is_correct = student == correct or student in correct
     
+    # CBET-aligned feedback
+    if is_correct:
+        feedback_options = [
+            "🎉 Correct! You've demonstrated this competency well!",
+            "✅ Excellent! You understand this concept clearly!",
+            "👏 Well done! This shows good comprehension!",
+            "🌟 Perfect! You're building solid vocational skills!"
+        ]
+        encouragement_options = [
+            "Keep building on this foundation - you're progressing well!",
+            "This competency will serve you well in the workplace!",
+            "You're one step closer to mastery. Let's continue!",
+            "TEVETA would be proud - great vocational knowledge!"
+        ]
+    else:
+        feedback_options = [
+            f"Not quite right. The correct answer is: {inputs.get('correct_answer')}",
+            f"Let's review this. The answer should be: {inputs.get('correct_answer')}",
+            f"Good attempt! The correct response is: {inputs.get('correct_answer')}"
+        ]
+        encouragement_options = [
+            "Don't worry - competency comes with practice. Let's try another!",
+            "Remember: 4/5 needed to pass. You can do this!",
+            "Review this concept and try again - every skilled worker started here!",
+            "Learning from mistakes is part of becoming competent. Keep going!"
+        ]
+    
     feedback = {
         "correct": is_correct,
         "student_answer": inputs.get("student_answer"),
         "correct_answer": inputs.get("correct_answer"),
-        "feedback": "🎉 Correct! Well done!" if is_correct else f"Not quite. The answer is: {inputs.get('correct_answer')}",
-        "encouragement": random.choice([
-            "Keep up the great work!" if is_correct else "Don't give up - learning takes practice!",
-            "You're making progress!" if is_correct else "Every mistake is a learning opportunity!",
-            "Excellent understanding!" if is_correct else "Review this concept and try again!"
-        ])
+        "feedback": random.choice(feedback_options),
+        "encouragement": random.choice(encouragement_options),
+        "cbet_note": "Remember: CBET means demonstrating competency through practical application. Understanding 'why' is as important as knowing 'what'."
     }
     return json.dumps(feedback, indent=2)
 
@@ -281,6 +375,67 @@ def get_practical_example(inputs: dict, context: dict) -> str:
     return json.dumps({"concept": concept, "example": industry_examples.get("default", "Your skills are valuable!"), "industry": industry})
 
 
+def get_learning_resources(inputs: dict, context: dict) -> str:
+    """Get multimedia learning resources (videos and images) for a topic."""
+    topic = inputs.get("topic", "")
+    resource_type = inputs.get("resource_type", "all")
+    
+    if not topic:
+        return json.dumps({"error": "No topic provided"})
+    
+    # Get resources from multimedia library
+    resources = get_resources_for_topic(topic)
+    
+    result = {
+        "topic": topic,
+        "has_resources": resources["has_resources"]
+    }
+    
+    if resource_type in ["all", "videos"]:
+        videos = []
+        for v in resources.get("videos", []):
+            # Use search queries instead of video IDs
+            videos.append({
+                "query": v["query"],
+                "title": v["title"],
+                "description": v.get("topic", ""),
+                "search_url": f"https://www.youtube.com/results?search_query={v['query']}"
+            })
+        result["videos"] = videos
+    
+    if resource_type in ["all", "images"]:
+        images = []
+        for img in resources.get("images", []):
+            images.append({
+                "url": img["url"],
+                "title": img["title"],
+                "alt": img.get("alt", img["title"]),
+                "is_diagram": img.get("diagram", False)
+            })
+        result["images"] = images
+    
+    # Format for display
+    if resources["has_resources"]:
+        result["display_message"] = f"Found learning resources for '{topic}':"
+        if result.get("videos"):
+            result["display_message"] += f"\n📹 {len(result['videos'])} video tutorial search(es)"
+        if result.get("images"):
+            result["display_message"] += f"\n🖼️ {len(result['images'])} diagram(s)/image(s)"
+    else:
+        result["display_message"] = f"No pre-loaded resources for '{topic}', but you can search YouTube directly."
+        result["fallback_search"] = True
+        # Create a fallback search
+        search_query = topic.replace(" ", "+").replace("'", "")
+        result["videos"] = [{
+            "query": f"{search_query}+tutorial",
+            "title": f"{topic} Tutorial",
+            "description": f"Search YouTube for {topic} tutorials",
+            "search_url": f"https://www.youtube.com/results?search_query={search_query}+tutorial"
+        }]
+    
+    return json.dumps(result, indent=2)
+
+
 def track_progress(inputs: dict, context: dict) -> str:
     action = inputs.get("action", "get_summary")
     session_id = inputs.get("session_id", context.get("session_id", "default"))
@@ -291,28 +446,69 @@ def track_progress(inputs: dict, context: dict) -> str:
     
     c.execute('''CREATE TABLE IF NOT EXISTS student_progress (
         id INTEGER PRIMARY KEY, session_id TEXT, module_id TEXT, 
-        competency TEXT, score INTEGER, timestamp TEXT
+        competency TEXT, score INTEGER, passed INTEGER, timestamp TEXT
     )''')
     
     if action == "record":
         competency = inputs.get("competency", "General")
         score = inputs.get("score", 0)
-        c.execute("INSERT INTO student_progress (session_id, module_id, competency, score, timestamp) VALUES (?, ?, ?, ?, ?)",
-            (session_id, module_id, competency, score, datetime.now().isoformat()))
+        passed = 1 if score >= 80 else 0  # CBET: 4/5 (80%) to pass
+        
+        c.execute("INSERT INTO student_progress (session_id, module_id, competency, score, passed, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+            (session_id, module_id, competency, score, passed, datetime.now().isoformat()))
         conn.commit()
-        result = {"recorded": True, "competency": competency, "score": score}
+        
+        result = {
+            "recorded": True, 
+            "competency": competency, 
+            "score": score,
+            "competency_achieved": passed == 1,
+            "cbet_standard": "80% (4/5) required to demonstrate competency",
+            "message": f"🎉 Competency ACHIEVED in {competency}!" if passed else f"📚 More practice needed in {competency}. You need 80% to pass."
+        }
     
     elif action == "get_summary":
-        c.execute("""SELECT competency, AVG(score) as avg, COUNT(*) as attempts 
-                     FROM student_progress WHERE session_id = ? GROUP BY competency""", (session_id,))
-        progress = [{"competency": r[0], "average": round(r[1], 1), "attempts": r[2]} for r in c.fetchall()]
-        result = {"progress": progress, "total_activities": len(progress)}
+        c.execute("""
+            SELECT competency, AVG(score) as avg, COUNT(*) as attempts, MAX(passed) as ever_passed
+            FROM student_progress WHERE session_id = ? GROUP BY competency
+        """, (session_id,))
+        
+        progress = []
+        achieved = 0
+        for r in c.fetchall():
+            comp_achieved = r[3] == 1
+            if comp_achieved:
+                achieved += 1
+            progress.append({
+                "competency": r[0], 
+                "average_score": round(r[1], 1), 
+                "attempts": r[2],
+                "competency_achieved": comp_achieved,
+                "status": "✅ Achieved" if comp_achieved else "📚 In Progress"
+            })
+        
+        result = {
+            "cbet_summary": True,
+            "total_competencies": len(progress),
+            "competencies_achieved": achieved,
+            "progress": progress,
+            "encouragement": f"You've demonstrated competency in {achieved}/{len(progress)} areas!" if progress else "Start your competency assessments to track progress!"
+        }
     
     else:  # get_recommendations
-        c.execute("""SELECT competency FROM student_progress WHERE session_id = ? 
-                     GROUP BY competency HAVING AVG(score) < 70 ORDER BY AVG(score) LIMIT 3""", (session_id,))
-        weak = [r[0] for r in c.fetchall()]
-        result = {"areas_to_improve": weak, "message": "Focus on these areas" if weak else "Great progress!"}
+        c.execute("""
+            SELECT competency, AVG(score) as avg FROM student_progress WHERE session_id = ? 
+            GROUP BY competency HAVING MAX(passed) = 0 ORDER BY avg ASC LIMIT 3
+        """, (session_id,))
+        
+        weak = [{"competency": r[0], "avg_score": round(r[1], 1)} for r in c.fetchall()]
+        
+        result = {
+            "recommendations": weak,
+            "focus_areas": [w["competency"] for w in weak],
+            "message": "Focus on these areas to achieve competency:" if weak else "Great progress! You're demonstrating competency across all areas!",
+            "cbet_reminder": "Remember: CBET focuses on demonstrating practical competency, not just theoretical knowledge."
+        }
     
     conn.close()
     return json.dumps(result, indent=2)
@@ -1085,34 +1281,9 @@ CURRICULUM = {
 }
 
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    
-    for table in ['program_areas', 'programs', 'modules', 'chat_history', 'student_progress']:
-        c.execute(f'DROP TABLE IF EXISTS {table}')
-    
-    c.execute('CREATE TABLE program_areas (id TEXT PRIMARY KEY, name TEXT, icon TEXT, strive TEXT)')
-    c.execute('CREATE TABLE programs (id TEXT PRIMARY KEY, area_id TEXT, name TEXT, level TEXT)')
-    c.execute('CREATE TABLE modules (id TEXT PRIMARY KEY, program_id TEXT, code TEXT, name TEXT, description TEXT, hours INTEGER)')
-    c.execute('CREATE TABLE chat_history (id INTEGER PRIMARY KEY, session_id TEXT, module_id TEXT, role TEXT, content TEXT, timestamp TEXT)')
-    c.execute('CREATE TABLE student_progress (id INTEGER PRIMARY KEY, session_id TEXT, module_id TEXT, competency TEXT, score INTEGER, timestamp TEXT)')
-    
-    for area_id, area in CURRICULUM.items():
-        c.execute("INSERT INTO program_areas VALUES (?, ?, ?, ?)", (area_id, area_id.title(), area["icon"], area["strive"]))
-        for prog_id, prog in area["programs"].items():
-            full_id = f"{area_id.lower()}_{prog_id}"
-            c.execute("INSERT INTO programs VALUES (?, ?, ?, ?)", (full_id, area_id, prog["name"], prog["level"]))
-            for code, name, desc, hours in prog["modules"]:
-                mod_id = code.lower().replace("-", "_")
-                c.execute("INSERT INTO modules VALUES (?, ?, ?, ?, ?, ?)", (mod_id, full_id, code, name, desc, hours))
-    
-    conn.commit()
-    conn.close()
-    print("✅ Database initialized with agentic tools support!")
-
-
-def get_db():
+# Legacy helper for any remaining direct DB access
+def get_db_conn():
+    """Get database connection (legacy compatibility)."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -1122,37 +1293,358 @@ def get_db():
 # SYSTEM PROMPT
 # =============================================================================
 
-SYSTEM_PROMPT = """You are an AI tutor for TEVETA Zambia with special tools to enhance learning.
+SYSTEM_PROMPT = """You are an AI tutor for TEVETA (Technical Education, Vocational and Entrepreneurship Training Authority) in Zambia. You support learners across 460+ national curricula aligned with the TEVET Qualifications Framework (TQF).
 
-## Your Tools:
-1. **generate_quiz** - Create practice questions
-2. **check_answer** - Evaluate student answers  
-3. **get_practical_example** - Real Zambian workplace examples
-4. **track_progress** - Track learning progress
-5. **get_career_pathway** - Show job opportunities
-6. **generate_scenario** - Hands-on practice problems
+## TEVETA's Mission:
+"To regulate, monitor and coordinate Technical Education, Vocational and Entrepreneurship Training to ensure sustainable supply of quality skilled labour force."
 
-## When to Use Tools:
-- Student asks to practice/quiz → generate_quiz
-- Student answers a question → check_answer
-- Explaining a concept → get_practical_example
-- Student asks about jobs → get_career_pathway
-- Student wants real problems → generate_scenario
+## PERSONALIZED LEARNING APPROACH (CRITICAL!):
+You implement a research-based personalized learning approach using:
+- **Formative Assessment** = Assessment FOR Learning (diagnose gaps, guide teaching)
+- **Summative Assessment** = Assessment OF Learning (evaluate mastery, certify competency)
+
+This approach tailors instruction to each student's unique needs.
+
+## LEARNING SESSION FLOW:
+
+### PHASE 1: FORMATIVE ASSESSMENT (5 questions)
+Purpose: Diagnose individual knowledge gaps to personalize teaching
+When starting a new topic, ALWAYS begin with formative assessment:
+
+1. Generate exactly 5 multiple-choice questions covering key learning objectives
+2. Questions should span the topic's core concepts
+3. Use assessment_type: "formative"
+4. This is NOT for grading - it's to understand what the student already knows
+5. After completion, analyze results to create a personalized learning path
+
+Output format:
+[QUIZ_START]
+{{
+  "title": "Formative Assessment: [Topic Name]",
+  "assessment_type": "formative",
+  "questions": [
+    {{
+      "question": "...",
+      "options": ["...", "...", "...", "..."],
+      "correct": 0,
+      "topic_tag": "specific_subtopic",
+      "learning_objective": "LO1: Identify...",
+      "explanation": "..."
+    }}
+  ]
+}}
+[QUIZ_END]
+
+After formative assessment, provide personalized feedback:
+"📊 **Formative Assessment Results** (Score: X/5)
+
+✅ **You already understand:**
+- [Topics answered correctly]
+
+📚 **We'll focus on:**
+- [Topic from Q2] - [Brief description of gap]
+- [Topic from Q4] - [Brief description of gap]
+
+Let's start with [most foundational gap]..."
+
+### PHASE 2: PERSONALIZED TEACHING
+Based on formative assessment, deliver INDIVIDUALIZED instruction:
+
+**If student scored 0-40% (0-2 correct):**
+- Start with foundational concepts
+- Use simple language and concrete examples
+- More scaffolding and step-by-step explanations
+- Include visual aids (diagrams, videos)
+- Check understanding frequently with single practice questions
+
+**If student scored 60% (3 correct):**
+- Focus only on the 2 gap areas
+- Moderate depth explanations
+- Connect new concepts to what they already know
+- Practice questions for each gap area
+
+**If student scored 80%+ (4-5 correct):**
+- Brief review of any gap areas
+- Offer enrichment or advanced application
+- Move quickly to summative assessment
+
+**For each knowledge gap, follow this sequence:**
+1. **Explain** - Clear explanation with Zambian workplace context
+2. **Show** - Diagram or video demonstration [DIAGRAM_START] or [VIDEO_START]
+3. **Practice** - One practice question to check understanding
+4. **Confirm** - Ensure understanding before moving to next gap
+
+### PHASE 3: SUMMATIVE ASSESSMENT (10 questions)
+Purpose: Evaluate overall mastery and certify competency
+When student has covered all gaps (or requests final test):
+
+1. Generate 10 questions covering ALL learning objectives for the topic
+2. Include questions from different difficulty levels (easy, medium, challenging)
+3. Use assessment_type: "summative"
+4. CBET Standard: 80% (8/10) required for competency certification
+
+Output format:
+[QUIZ_START]
+{{
+  "title": "Summative Assessment: [Topic Name]",
+  "assessment_type": "summative",
+  "pass_threshold": 80,
+  "questions": [
+    {{
+      "question": "...",
+      "options": ["...", "...", "...", "..."],
+      "correct": 0,
+      "topic_tag": "specific_subtopic",
+      "difficulty": "easy|medium|challenging",
+      "explanation": "..."
+    }}
+  ]
+}}
+[QUIZ_END]
+
+### PHASE 4: COMPLETION & CERTIFICATION
+After summative assessment:
+
+**If score >= 80% (PASSED):**
+"🎉 **Congratulations!** You've demonstrated competency!
+
+📈 **Your Learning Journey:**
+- Formative: X/5 → Summative: Y/10
+- Improvement: +Z%
+
+🏆 **Certificate Awarded:** [Level based on score]
+- 95-100%: Expert ⭐
+- 85-94%: Proficient 🌟  
+- 80-84%: Competent ✓
+
+🛠️ **Skills Demonstrated:**
+- [Skill 1]
+- [Skill 2]"
+
+**If score < 80% (NOT YET):**
+"📚 **Almost there!** Score: X/10 (Need 80%)
+
+**Gaps remaining:**
+- [Topic] - needs more practice
+
+Would you like me to:
+1. Review the areas you missed?
+2. Try another practice session?
+3. Retake the summative assessment?"
+
+## KEY PRINCIPLES:
+1. **Formative assessment is low-stakes** - Encourage students, don't judge
+2. **Personalize based on gaps** - Don't teach what they already know
+3. **Summative measures mastery** - Fair evaluation of all objectives
+4. **Growth mindset** - Celebrate improvement, not just final scores
+5. **Zambian context** - Use local examples, ZESCO standards, local industries
+
+## INTERACTIVE CONTENT OUTPUT FORMAT (CRITICAL!):
+The interface has an interactive panel. Output content using these JSON formats:
+
+### For QUIZZES:
+[QUIZ_START]
+{{
+  "title": "Competency Check: Topic Name",
+  "questions": [
+    {{
+      "question": "What does PPE stand for?",
+      "options": ["Personal Protective Equipment", "Private Protection Essentials", "Professional Protective Elements", "Personal Protection Extras"],
+      "correct": 0,
+      "explanation": "PPE stands for Personal Protective Equipment - essential for workplace safety."
+    }}
+  ]
+}}
+[QUIZ_END]
+
+CRITICAL QUIZ RULES:
+1. "correct" is the INDEX (0, 1, 2, or 3) - NOT a letter!
+2. The "correct" index MUST point to the right answer in "options" array:
+   - correct: 0 means options[0] is the answer
+   - correct: 1 means options[1] is the answer
+   - correct: 2 means options[2] is the answer
+   - correct: 3 means options[3] is the answer
+3. The "explanation" MUST explain why the option at that index is correct
+4. ALWAYS put the correct answer at index 0, then shuffle mentally - but make sure "correct" matches!
+5. Double-check: If explanation says "The answer is X", then options[correct] MUST be "X"
+
+EXAMPLE - CORRECT:
+{{
+  "question": "What color is the earth wire in Zambia?",
+  "options": ["Red", "Blue", "Green/Yellow", "Black"],
+  "correct": 2,
+  "explanation": "The earth wire is Green/Yellow striped per ZESCO standards."
+}}
+Here correct=2 points to "Green/Yellow" which matches the explanation. ✓
+
+EXAMPLE - WRONG (DO NOT DO THIS):
+{{
+  "question": "What color is the earth wire?",
+  "options": ["Red", "Green/Yellow", "Blue", "Black"],
+  "correct": 0,
+  "explanation": "The earth wire is Green/Yellow striped."
+}}
+Here correct=0 points to "Red" but explanation says "Green/Yellow". ✗
+
+### For DIAGRAMS (use these verified Wikimedia Commons URLs):
+[DIAGRAM_START]
+{{
+  "title": "Diagram Title",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/...",
+  "alt": "Description of diagram",
+  "caption": "Explanation of what the diagram shows"
+}}
+[DIAGRAM_END]
+
+VERIFIED DIAGRAM URLs by topic:
+- Ohm's Law: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Ohm%27s_law_triangle.svg/480px-Ohm%27s_law_triangle.svg.png
+- Electric Motor: https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Electric_motor_cycle_3.png/400px-Electric_motor_cycle_3.png
+- DC Motor parts: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Electric_motor_parts.png/500px-Electric_motor_parts.png
+- Series Circuit: https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Series_circuit.svg/400px-Series_circuit.svg.png
+- Parallel Circuit: https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Parallel_circuit.svg/400px-Parallel_circuit.svg.png
+- Three-phase power: https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/3-phase_flow.gif/400px-3-phase_flow.gif
+- Solar PV system: https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Simple_photovoltaic_cell.svg/400px-Simple_photovoltaic_cell.svg.png
+- Welding types: https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/SMAW_area_diagram.svg/400px-SMAW_area_diagram.svg.png
+- Kitchen knife cuts: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Cuts_of_an_onion.jpg/400px-Cuts_of_an_onion.jpg
+- Food safety temps: https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Food_Safety_Temperatures.svg/300px-Food_Safety_Temperatures.svg.png
+- Carpentry joints: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Woodworking-joint-mortise-and-tenon.gif/300px-Woodworking-joint-mortise-and-tenon.gif
+- Computer parts: https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Personal_computer_exploded_4.svg/400px-Personal_computer_exploded_4.svg.png
+- Network topology: https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/NetworkTopologies.svg/400px-NetworkTopologies.svg.png
+- Tractor parts: https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/John_Deere_3350_tractor_cut_in_Technikmuseum_Speyer.jpg/500px-John_Deere_3350_tractor_cut_in_Technikmuseum_Speyer.jpg
+
+### For VIDEOS (embed YouTube - use these verified video IDs):
+[VIDEO_START]
+{{
+  "title": "Video Title",
+  "videoId": "VIDEO_ID_HERE",
+  "description": "What the video teaches"
+}}
+[VIDEO_END]
+
+VERIFIED VIDEO IDs by topic:
+- Ohm's Law: "8jB6hDUqN0Y"
+- How motors work: "CWulQ1ZSE3c"
+- Electrical safety: "RsmcSZxU5Iw"
+- Multimeter basics: "bF3OyQ3HwfU"
+- Solar PV installation: "fPJ7i5-yTow"
+- Arc welding basics: "Vvt5k8zGJ7c"
+- Kitchen knife skills: "20gwf7YttQM"
+- HACCP food safety: "mMXPbDiPxSY"
+- Carpentry joints: "q_NXq7_TILA"
+- Computer assembly: "IhX0fOUYd8Q"
+
+### For SCENARIOS (Zambian workplace situations):
+[SCENARIO_START]
+{{
+  "title": "Scenario Title",
+  "location": "KCM Mine Kitwe / Radisson Blu Lusaka / Toyota Zambia / etc",
+  "image": "https://images.unsplash.com/photo-...",
+  "situation": "Detailed description of the workplace situation in Zambia",
+  "challenge": "The specific problem the learner must solve",
+  "questions": [
+    "What is the first thing you should do?",
+    "What safety precautions apply here?",
+    "How would you solve this problem?"
+  ],
+  "hints": ["Hint 1", "Hint 2"],
+  "successCriteria": "What demonstrates competency in this scenario"
+}}
+[SCENARIO_END]
+
+SCENARIO IMAGES (use these Unsplash URLs):
+- Mining/industrial: "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=600"
+- Kitchen/hospitality: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600"
+- Automotive garage: "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=600"
+- Electrical work: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=600"
+- Construction site: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600"
+- Solar installation: "https://images.unsplash.com/photo-1509391366360-2e959784a276?w=600"
+- Computer lab: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600"
+- Farm/agriculture: "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=600"
+- Hotel reception: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600"
+- Welding workshop: "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=600"
+
+### For CAREER GUIDANCE (integrated with Tabiya taxonomy and STRIVE sectors):
+[CAREER_START]
+{{
+  "title": "Career Pathways: Skill Area",
+  "sector": "STRIVE sector name",
+  "striveComponent": "Component 1/2/3/4",
+  "occupations": [
+    {{
+      "title": "Job Title",
+      "escoCode": "ESCO occupation code if known",
+      "employer": "Example Zambian employers",
+      "salary": "K3,000 - K15,000/month",
+      "demand": "High/Medium/Low",
+      "skills": ["Skill 1", "Skill 2", "Skill 3"]
+    }}
+  ],
+  "progression": ["Entry Level Job", "Mid-Level Position", "Senior Role", "Management/Own Business"],
+  "training": ["TEVETA programs", "Additional certifications"],
+  "entrepreneurship": {{
+    "viable": true,
+    "startupCost": "K5,000 - K25,000",
+    "description": "How to start your own business in this field"
+  }}
+}}
+[CAREER_END]
+
+ZAMBIAN EMPLOYERS BY SECTOR:
+- Mining: KCM, FQM, Mopani, Barrick, First Quantum, Lumwana
+- Energy/Electrical: ZESCO, CEC, Solar companies, Rural Electrification Authority
+- Hospitality: Radisson Blu, Protea Hotels, Sun International, Taj Pamodzi, Safari lodges
+- Automotive: Toyota Zambia, Mercedes-Benz, CFAO Motors, Bus companies
+- Agriculture: Zambeef, FRA, Commercial farms, Zambia Sugar
+- Construction: China Jiangxi, AVIC, Road Development Agency, local contractors
+- IT: Airtel, MTN, Banks (Stanbic, Zanaco), Tech startups
+- Manufacturing: Trade Kings, Zambia Breweries, Metal Fabricators of Zambia
 
 ## Teaching Style:
-- Warm, encouraging, celebrate progress 🎉
-- Simple language, practical focus
-- Zambian examples (Toyota Zambia, ZESCO, mines)
-- Socratic method - guide with questions
-- Keep responses concise (2-3 paragraphs)
+- Warm, encouraging, celebrate progress
+- Simple language appropriate for vocational learners
+- Always relate content to Zambian workplace application
+- Emphasize SAFETY in all practical topics
+- Use interactive formats whenever possible
 
-## Current Context:
-- Area: {area}
-- Program: {program} ({level})
-- Module: {module_code} - {module_name}
-- Topics: {module_desc}
+Remember: You're preparing learners for real jobs in Zambia's priority sectors aligned with STRIVE and the 8th National Development Plan!"""
 
-Use tools proactively to make learning engaging and practical!"""
+
+def build_system_prompt(context):
+    """Build system prompt with detailed curriculum content"""
+    module_code = context.get("module_code", "")
+    
+    # Try to get detailed content from curriculum
+    detailed_content = get_module_content(module_code.upper().replace("_", "-"))
+    
+    if detailed_content:
+        purpose = detailed_content.get("purpose", "To develop practical skills and knowledge")
+        learning_outcomes = "\n".join([f"- {lo}" for lo in detailed_content.get("learning_outcomes", [])])
+        
+        # Format units
+        units_text = ""
+        for unit_id, unit_data in detailed_content.get("units", {}).items():
+            units_text += f"\n**{unit_id}: {unit_data['title']}**\n"
+            for topic in unit_data.get("topics", []):
+                units_text += f"  - {topic}\n"
+        
+        competencies = "\n".join([f"- {c}" for c in detailed_content.get("competencies", [])])
+    else:
+        purpose = f"To develop skills in {context.get('module_name', 'this module')}"
+        learning_outcomes = "- Apply knowledge and skills in the workplace\n- Demonstrate competency in practical tasks"
+        units_text = f"Topics: {context.get('module_desc', 'Various topics')}"
+        competencies = "- Demonstrate practical competency\n- Apply safety procedures"
+    
+    return SYSTEM_PROMPT.format(
+        area=context.get("area_name", ""),
+        program=context.get("program_name", ""),
+        level=context.get("level", "Certificate Level 3"),
+        module_code=context.get("module_code", ""),
+        module_name=context.get("module_name", ""),
+        module_purpose=purpose,
+        learning_outcomes=learning_outcomes,
+        module_units=units_text,
+        competencies=competencies
+    )
 
 
 # =============================================================================
@@ -1161,11 +1653,24 @@ Use tools proactively to make learning engaging and practical!"""
 
 @app.route('/')
 def index():
+    # Allow access to tutor but show login prompt if not authenticated
     return render_template('index.html')
+
+@app.route('/login')
+def login_page():
+    """Login and registration page."""
+    return render_template('login.html')
+
+@app.route('/dashboard')
+def student_dashboard():
+    # Check if user is logged in
+    if 'student_id' not in session:
+        return redirect('/login')
+    return render_template('student_dashboard.html')
 
 @app.route('/api/curriculum')
 def get_curriculum():
-    conn = get_db()
+    conn = get_db_conn()
     result = []
     for area in conn.execute("SELECT * FROM program_areas ORDER BY name"):
         programs = []
@@ -1176,17 +1681,228 @@ def get_curriculum():
     conn.close()
     return jsonify(result)
 
+
+@app.route('/api/module/<module_code>')
+def get_module_detail(module_code):
+    """Get detailed TEVETA curriculum content for a module"""
+    # Try to find in detailed content
+    detailed = get_module_content(module_code.upper().replace("_", "-"))
+    
+    if detailed:
+        return jsonify({
+            "found": True,
+            "code": detailed.get("code", module_code),
+            "name": detailed.get("name", ""),
+            "hours": detailed.get("hours", 0),
+            "credits": detailed.get("credits", 0),
+            "purpose": detailed.get("purpose", ""),
+            "learning_outcomes": detailed.get("learning_outcomes", []),
+            "units": detailed.get("units", {}),
+            "competencies": detailed.get("competencies", [])
+        })
+    
+    # Fallback to database
+    conn = get_db_conn()
+    module = conn.execute("SELECT * FROM modules WHERE id = ? OR code = ?", (module_code, module_code)).fetchone()
+    conn.close()
+    
+    if module:
+        return jsonify({
+            "found": True,
+            "code": module['code'],
+            "name": module['name'],
+            "hours": module['hours'],
+            "credits": module['hours'] // 10,
+            "purpose": f"To develop skills in {module['name']}",
+            "learning_outcomes": [f"Apply knowledge of {module['description']}"],
+            "units": {},
+            "competencies": ["Demonstrate practical competency"]
+        })
+    
+    return jsonify({"found": False})
+
+
+@app.route('/api/resources/<topic>')
+def get_topic_resources(topic):
+    """Get multimedia resources for a topic"""
+    resources = get_resources_for_topic(topic)
+    
+    # Format videos with embed URLs
+    videos = []
+    for v in resources.get("videos", []):
+        videos.append({
+            "id": v["id"],
+            "title": v["title"],
+            "duration": v.get("duration", ""),
+            "description": v.get("topic", ""),
+            "embed_url": f"https://www.youtube.com/embed/{v['id']}",
+            "watch_url": f"https://www.youtube.com/watch?v={v['id']}",
+            "thumbnail": f"https://img.youtube.com/vi/{v['id']}/mqdefault.jpg"
+        })
+    
+    # Format images
+    images = []
+    for img in resources.get("images", []):
+        images.append({
+            "url": img["url"],
+            "title": img["title"],
+            "alt": img.get("alt", img["title"]),
+            "is_diagram": img.get("diagram", False)
+        })
+    
+    return jsonify({
+        "topic": topic,
+        "has_resources": resources["has_resources"],
+        "videos": videos,
+        "images": images
+    })
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
+    """Main chat endpoint with learning session support"""
     data = request.json
     user_msg = data.get('message', '')
+    
+    if not user_msg:
+        return jsonify({'error': 'No message'}), 400
+    
+    # Get student_id from session (for learning session tracking)
+    student_id = session.get('student_id')
+    learning_session_id = data.get('learning_session_id')
+    
+    # Check if this is the new frontend format (direct module info)
+    module_info = data.get('module')
+    history = data.get('history', [])
+    
+    if module_info:
+        # New frontend format - module info passed directly
+        context = {
+            "module_code": module_info.get('code', ''),
+            "module_name": module_info.get('name', ''),
+            "module_id": module_info.get('id', ''),
+            "program_name": module_info.get('subprogram', ''),
+            "area_name": module_info.get('program', ''),
+            "level": "Certificate Level 3"
+        }
+        
+        # If student is logged in, create/resume learning session
+        session_context = ""
+        if student_id and context.get('module_id'):
+            session_result = db.sessions.create(
+                student_id, 
+                context['module_id'],
+                context['module_code'],
+                context['module_name']
+            )
+            learning_session_id = session_result['session_id']
+            
+            # Get session state for context
+            sess_state = db.sessions.get(learning_session_id)
+            if sess_state:
+                phase = sess_state.get('phase', 'diagnostic')
+                gaps = sess_state.get('knowledge_gaps', [])
+                diag_score = sess_state.get('diagnostic_score', 0)
+                
+                session_context = f"""
+## CURRENT LEARNING SESSION
+- Session ID: {learning_session_id}
+- Phase: {phase.upper()}
+- Student logged in: Yes
+
+"""
+                if phase == 'diagnostic':
+                    session_context += """### DIAGNOSTIC PHASE INSTRUCTIONS:
+You MUST start this session with a 5-question diagnostic assessment.
+Generate exactly 5 multiple-choice questions to assess the student's current knowledge.
+Use the [QUIZ_START]...[QUIZ_END] format with "assessment_type": "diagnostic".
+After they complete it, identify their knowledge gaps and transition to teaching phase.
+"""
+                elif phase == 'teaching':
+                    session_context += f"""### TEACHING PHASE INSTRUCTIONS:
+Student completed diagnostic with score: {diag_score}/5 ({(diag_score/5)*100:.0f}%)
+Knowledge gaps to address: {', '.join(gaps) if gaps else 'None identified'}
+
+Focus your teaching on these gap areas. Use:
+- Clear explanations with Zambian workplace examples
+- Diagrams and videos to illustrate concepts
+- Practice questions to check understanding
+
+When the student has learned the material (or asks for final test), transition to competency check.
+"""
+                elif phase == 'competency_check':
+                    session_context += """### COMPETENCY CHECK PHASE:
+Student is ready for the final 10-question competency check.
+Generate 10 questions: the same 5 from diagnostic + 5 NEW questions.
+Use [QUIZ_START]...[QUIZ_END] format with "assessment_type": "competency_check".
+Pass threshold is 80% (8/10).
+"""
+        
+        # Build system prompt with session context
+        system = session_context + SYSTEM_PROMPT.format(
+            area=context.get("area_name", ""),
+            program=context.get("program_name", ""),
+            level=context.get("level", "Certificate Level 3"),
+            module_code=context.get("module_code", ""),
+            module_name=context.get("module_name", ""),
+            module_purpose=f"To develop skills in {context.get('module_name', 'this module')}",
+            learning_outcomes="- Apply knowledge and skills in the workplace\n- Demonstrate competency in practical tasks",
+            module_units=f"Topics related to {context.get('module_name', 'the selected module')}",
+            competencies="- Demonstrate practical competency\n- Apply safety procedures"
+        )
+        
+        # Build messages from history
+        messages = []
+        
+        # If we have a learning session, load chat history from DB
+        if learning_session_id and student_id:
+            db_history = db.sessions.get_messages(learning_session_id)
+            for h in db_history:
+                messages.append({"role": h['role'], "content": h['content']})
+        else:
+            # Use provided history
+            for h in history:
+                if isinstance(h, dict) and 'role' in h and 'content' in h:
+                    messages.append({"role": h['role'], "content": h['content']})
+        
+        messages.append({"role": "user", "content": user_msg})
+        
+        # Save user message to session
+        if learning_session_id and student_id:
+            db.sessions.save_message(learning_session_id, 'user', user_msg)
+        
+        try:
+            response = client.messages.create(
+                model=MODEL, 
+                max_tokens=2048, 
+                temperature=0.7, 
+                system=system, 
+                tools=TOOLS, 
+                messages=messages
+            )
+            final_response = process_response(response, messages, system, context)
+            
+            # Save assistant response to session
+            if learning_session_id and student_id:
+                db.sessions.save_message(learning_session_id, 'assistant', final_response)
+            
+            return jsonify({
+                'response': final_response, 
+                'model': MODEL,
+                'learning_session_id': learning_session_id
+            })
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+    
+    # Legacy format - use database lookup
     module_id = data.get('module_id', '')
     session_id = data.get('session_id', 'default')
     
     if not user_msg:
         return jsonify({'error': 'No message'}), 400
     
-    conn = get_db()
+    conn = get_db_conn()
     
     module = conn.execute("""
         SELECT m.*, p.name as program_name, p.level as program_level, a.name as area_name 
@@ -1204,20 +1920,18 @@ def chat():
     conn.commit()
     
     context = {
-        "session_id": session_id, "module_id": module_id,
+        "session_id": session_id, 
+        "module_id": module_id,
+        "module_code": module['code'] if module else "",
         "module_name": module['name'] if module else "",
+        "module_desc": module['description'] if module else "",
         "program_name": module['program_name'] if module else "",
-        "area_name": module['area_name'] if module else ""
+        "area_name": module['area_name'] if module else "",
+        "level": module['program_level'] if module else "Certificate Level 3"
     }
     
-    system = SYSTEM_PROMPT.format(
-        area=module['area_name'] if module else "General",
-        program=module['program_name'] if module else "General",
-        level=module['program_level'] if module else "",
-        module_code=module['code'] if module else "",
-        module_name=module['name'] if module else "",
-        module_desc=module['description'] if module else ""
-    ) if module else "You are a helpful TEVETA tutor."
+    # Use detailed curriculum content if available
+    system = build_system_prompt(context) if module else "You are a helpful TEVETA tutor."
     
     messages = [{"role": h['role'], "content": h['content']} for h in history]
     messages.append({"role": "user", "content": user_msg})
@@ -1272,7 +1986,7 @@ def get_tools():
 
 @app.route('/api/clear/<session_id>', methods=['POST'])
 def clear_history(session_id):
-    conn = get_db()
+    conn = get_db_conn()
     module_id = request.json.get('module_id') if request.json else None
     if module_id:
         conn.execute("DELETE FROM chat_history WHERE session_id = ? AND module_id = ?", (session_id, module_id))
@@ -1283,8 +1997,30 @@ def clear_history(session_id):
     return jsonify({'status': 'cleared'})
 
 
+# =============================================================================
+# INITIALIZE DATABASE AND REGISTER ROUTES
+# =============================================================================
+
+# Set secret key for sessions (use env var in production)
+app.secret_key = os.environ.get('SECRET_KEY', 'teveta-ai-tutor-dev-key-change-in-production')
+
+# Load curriculum into database using new DAO
+db.curriculum.load_curriculum(CURRICULUM)
+
+# Count curriculum stats
+total_areas = len(CURRICULUM)
+total_programs = sum(len(a["programs"]) for a in CURRICULUM.values())
+total_modules = sum(len(p["modules"]) for a in CURRICULUM.values() for p in a["programs"].values())
+print(f"✅ TEVETA Curriculum Loaded")
+print(f"   📚 {total_areas} Program Areas")
+print(f"   📖 {total_programs} Programs")
+print(f"   📝 {total_modules} Modules")
+
+# Register database API routes (auth, sessions, certificates, skills, analytics)
+init_db_routes(app, DB_PATH)
+
+
 if __name__ == '__main__':
-    init_db()
     print("\n" + "="*60)
     print("🎓 AI Tutor - TEVETA (Agentic System)")
     print("="*60)
@@ -1292,5 +2028,7 @@ if __name__ == '__main__':
     print(f"Tools: {', '.join(t['name'] for t in TOOLS)}")
     print("="*60)
     print("Open: http://localhost:8080")
+    print("Login: http://localhost:8080/login")
+    print("Dashboard: http://localhost:8080/dashboard")
     print("="*60 + "\n")
     app.run(debug=True, port=8080)

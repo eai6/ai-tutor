@@ -1,2 +1,6 @@
 .env
 venv
+azure
+notes.txt
+azure_app.py
+__Pycache__*

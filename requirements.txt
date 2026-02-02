@@ -1,4 +1,26 @@
-flask
-flask-cors
-anthropic
-python-dotenv
+# AI Tutor - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# ===========================================
+# Web Framework
+# ===========================================
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# ===========================================
+# AI / LLM
+# ===========================================
+anthropic>=0.18.0
+
+# ===========================================
+# Configuration
+# ===========================================
+python-dotenv>=1.0.0
+
+# ===========================================
+# Optional: Enhanced Features
+# ===========================================
+# Uncomment as needed:
+# markdown>=3.5.0        # Markdown rendering
+# pillow>=10.0.0         # Image processing
+# pdfkit>=1.0.0          # PDF generation

@@ -1,0 +1,255 @@
+{
+  "metadata": {
+    "country": "Zambia",
+    "institution": "TEVETA",
+    "framework": "TEVET Qualifications Framework (TQF)",
+    "version": "1.0",
+    "last_updated": "2024-01-01"
+  },
+  "programs": [
+    {
+      "code": "EI",
+      "name": "Electrical Installation",
+      "level": "Craft Certificate",
+      "duration": "2 years",
+      "description": "Train students in electrical installation, maintenance, and safety for residential and commercial buildings.",
+      "modules": [
+        {
+          "code": "EI-101",
+          "name": "Electrical Safety Practices",
+          "credits": 10,
+          "duration_hours": 40,
+          "description": "Fundamental safety practices for working with electrical systems.",
+          "learning_objectives": [
+            "LO1: Identify electrical hazards in the workplace",
+            "LO2: Apply lockout/tagout (LOTO) procedures",
+            "LO3: Select and use appropriate Personal Protective Equipment (PPE)",
+            "LO4: Respond appropriately to electrical emergencies",
+            "LO5: Comply with ZESCO and ZABS safety regulations"
+          ],
+          "topics": [
+            {
+              "name": "Electrical Hazards",
+              "subtopics": [
+                "Electric shock mechanisms",
+                "Arc flash hazards",
+                "Fire risks from electrical faults",
+                "Working at heights near power lines"
+              ]
+            },
+            {
+              "name": "Personal Protective Equipment",
+              "subtopics": [
+                "Insulated gloves and testing",
+                "Safety footwear",
+                "Eye and face protection",
+                "Arc flash suits"
+              ]
+            },
+            {
+              "name": "Safety Procedures",
+              "subtopics": [
+                "Lockout/Tagout (LOTO)",
+                "Permit to work systems",
+                "Risk assessment",
+                "Emergency response"
+              ]
+            }
+          ],
+          "assessments": {
+            "formative": {
+              "questions": 5,
+              "purpose": "Identify knowledge gaps before teaching"
+            },
+            "summative": {
+              "questions": 10,
+              "pass_threshold": 80,
+              "purpose": "Certify competency after teaching"
+            }
+          }
+        },
+        {
+          "code": "EI-102",
+          "name": "Basic Electrical Theory",
+          "credits": 15,
+          "duration_hours": 60,
+          "description": "Fundamental electrical concepts including Ohm's Law, circuits, and measurements.",
+          "learning_objectives": [
+            "LO1: Explain the relationship between voltage, current, and resistance",
+            "LO2: Apply Ohm's Law to calculate electrical values",
+            "LO3: Differentiate between series and parallel circuits",
+            "LO4: Use electrical measuring instruments correctly",
+            "LO5: Interpret electrical symbols and diagrams"
+          ],
+          "topics": [
+            {
+              "name": "Electrical Fundamentals",
+              "subtopics": [
+                "Atoms and electron flow",
+                "Voltage, current, resistance",
+                "Ohm's Law",
+                "Power and energy"
+              ]
+            },
+            {
+              "name": "Circuit Types",
+              "subtopics": [
+                "Series circuits",
+                "Parallel circuits",
+                "Series-parallel combinations",
+                "Circuit analysis"
+              ]
+            },
+            {
+              "name": "Electrical Measurement",
+              "subtopics": [
+                "Multimeter usage",
+                "Measuring voltage",
+                "Measuring current",
+                "Measuring resistance"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "EI-103",
+          "name": "Wiring Regulations",
+          "credits": 12,
+          "duration_hours": 48,
+          "description": "Zambian wiring regulations and standards for electrical installations.",
+          "learning_objectives": [
+            "LO1: Interpret ZABS wiring regulations",
+            "LO2: Select appropriate cable sizes for loads",
+            "LO3: Design circuits with proper protection",
+            "LO4: Apply earthing and bonding requirements",
+            "LO5: Complete installation certificates"
+          ],
+          "topics": [
+            {
+              "name": "ZABS Standards",
+              "subtopics": [
+                "ZS 399: Wiring regulations",
+                "Cable color codes",
+                "Circuit protection requirements",
+                "Installation testing"
+              ]
+            },
+            {
+              "name": "Cable Selection",
+              "subtopics": [
+                "Current carrying capacity",
+                "Voltage drop calculations",
+                "Environmental factors",
+                "Cable types and applications"
+              ]
+            },
+            {
+              "name": "Earthing Systems",
+              "subtopics": [
+                "TN-S, TN-C-S, TT systems",
+                "Earth electrode installation",
+                "Bonding requirements",
+                "RCD protection"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "AU",
+      "name": "Automotive Mechanics",
+      "level": "Craft Certificate",
+      "duration": "2 years",
+      "description": "Train students in vehicle maintenance, repair, and diagnostics.",
+      "modules": [
+        {
+          "code": "AU-101",
+          "name": "Workshop Safety and Tools",
+          "credits": 8,
+          "duration_hours": 32,
+          "description": "Safety practices and tool usage in automotive workshops.",
+          "learning_objectives": [
+            "LO1: Identify hazards in automotive workshops",
+            "LO2: Use hand tools safely and correctly",
+            "LO3: Operate power tools following safety procedures",
+            "LO4: Apply proper lifting techniques",
+            "LO5: Handle automotive fluids safely"
+          ],
+          "topics": [
+            {
+              "name": "Workshop Hazards",
+              "subtopics": [
+                "Chemical hazards (oils, fuels, coolants)",
+                "Fire risks",
+                "Moving machinery",
+                "Lifting hazards"
+              ]
+            },
+            {
+              "name": "Hand Tools",
+              "subtopics": [
+                "Spanners and wrenches",
+                "Screwdrivers",
+                "Pliers and cutters",
+                "Measuring tools"
+              ]
+            },
+            {
+              "name": "Power Tools",
+              "subtopics": [
+                "Impact wrenches",
+                "Grinders",
+                "Drills",
+                "Vehicle lifts"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "CA",
+      "name": "Carpentry and Joinery",
+      "level": "Craft Certificate",
+      "duration": "2 years",
+      "description": "Train students in woodworking, furniture making, and construction carpentry.",
+      "modules": [
+        {
+          "code": "CA-101",
+          "name": "Wood Technology",
+          "credits": 10,
+          "duration_hours": 40,
+          "description": "Understanding wood types, properties, and selection for projects.",
+          "learning_objectives": [
+            "LO1: Identify common Zambian timber species",
+            "LO2: Explain wood properties and defects",
+            "LO3: Select appropriate wood for specific applications",
+            "LO4: Apply wood preservation techniques",
+            "LO5: Calculate timber quantities for projects"
+          ],
+          "topics": [
+            {
+              "name": "Timber Species",
+              "subtopics": [
+                "Mukwa (Zambian Teak)",
+                "Rosewood",
+                "Pine species",
+                "Imported hardwoods"
+              ]
+            },
+            {
+              "name": "Wood Properties",
+              "subtopics": [
+                "Grain patterns",
+                "Moisture content",
+                "Defects identification",
+                "Strength properties"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

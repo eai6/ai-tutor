@@ -1,0 +1,81 @@
+{
+  "country": {
+    "name": "Mozambique",
+    "code": "MZ",
+    "language": "pt",
+    "currency": "MZN",
+    "currency_symbol": "MT"
+  },
+  
+  "institution": {
+    "name": "ANEP",
+    "full_name": "Autoridade Nacional da Educação Profissional",
+    "logo_url": "/static/logo-mz.png",
+    "website": "https://www.anep.gov.mz",
+    "mission": "Promover e regular a educação e formação técnico-profissional em Moçambique."
+  },
+  
+  "branding": {
+    "app_name": "Tutor IA",
+    "primary_color": "#009639",
+    "secondary_color": "#FFD100",
+    "accent_color": "#CE1126"
+  },
+  
+  "window": {
+    "title": "Tutor IA - Educação Técnico-Profissional",
+    "width": 1400,
+    "height": 900,
+    "min_width": 800,
+    "min_height": 600
+  },
+  
+  "learning": {
+    "formative_questions": 5,
+    "summative_questions": 10,
+    "pass_threshold": 80,
+    "certificate_levels": {
+      "expert": { "min_score": 95, "icon": "⭐", "label": "Especialista" },
+      "proficient": { "min_score": 85, "icon": "🌟", "label": "Proficiente" },
+      "competent": { "min_score": 80, "icon": "✓", "label": "Competente" }
+    }
+  },
+  
+  "ai": {
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 4096,
+    "temperature": 0.7,
+    "system_language": "Portuguese"
+  },
+  
+  "localization": {
+    "electricity_provider": "EDM (Electricidade de Moçambique)",
+    "safety_standards": "INNOQ (Instituto Nacional de Normalização e Qualidade)",
+    "example_companies": ["Mozal", "Vale Moçambique", "Cervejas de Moçambique", "Cimentos de Moçambique"],
+    "example_cities": ["Maputo", "Beira", "Nampula", "Quelimane", "Tete"],
+    "industries": ["Mining", "Agriculture", "Fisheries", "Energy", "Tourism"]
+  },
+  
+  "curriculum": {
+    "framework": "Sistema Nacional de Qualificações Profissionais",
+    "levels": [
+      { "code": "N1", "name": "Certificado Nível 1" },
+      { "code": "N2", "name": "Certificado Nível 2" },
+      { "code": "N3", "name": "Certificado Nível 3" },
+      { "code": "N4", "name": "Certificado Nível 4" },
+      { "code": "N5", "name": "Diploma Técnico" }
+    ],
+    "source_file": "curricula/mozambique_anep.json"
+  },
+  
+  "translations": {
+    "formative_assessment": "Avaliação Formativa",
+    "summative_assessment": "Avaliação Sumativa",
+    "certificate": "Certificado de Competência",
+    "skills_demonstrated": "Competências Demonstradas",
+    "learning_journey": "Jornada de Aprendizagem",
+    "congratulations": "Parabéns",
+    "score": "Pontuação",
+    "improvement": "Melhoria"
+  }
+}

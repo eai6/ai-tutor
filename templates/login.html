@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - TEVETA AI Tutor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #3498db 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container { width: 100%; max-width: 420px; }
+        
+        .logo { text-align: center; margin-bottom: 25px; color: white; }
+        .logo h1 { font-size: 1.8rem; margin-bottom: 5px; }
+        .logo p { opacity: 0.9; font-size: 0.95rem; }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 35px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 25px;
+            background: #f0f2f5;
+            border-radius: 10px;
+            padding: 4px;
+        }
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.2s;
+        }
+        .tab.active { background: #1e3a5f; color: white; }
+        .tab:hover:not(.active) { background: #e0e0e0; }
+        
+        .form-section { display: none; }
+        .form-section.active { display: block; }
+        
+        .form-group { margin-bottom: 18px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9rem;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #1e3a5f;
+        }
+        .form-group .hint {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        .form-row { display: flex; gap: 12px; }
+        .form-row .form-group { flex: 1; }
+        
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3a5f, #2d5a87);
+            color: white;
+        }
+        .btn-primary:hover { box-shadow: 0 5px 15px rgba(30, 58, 95, 0.4); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+            font-size: 0.9rem;
+            display: none;
+        }
+        .alert.error { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+        .alert.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        .alert.show { display: block; }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: #999;
+            font-size: 0.85rem;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e0e0e0;
+        }
+        .divider span { padding: 0 12px; }
+        
+        .password-field { position: relative; }
+        .password-field input { padding-right: 45px; }
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            color: #888;
+        }
+        
+        .forgot-link {
+            text-align: center;
+            margin-top: 15px;
+        }
+        .forgot-link a {
+            color: #1e3a5f;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 480px) {
+            .card { padding: 25px 20px; }
+            .form-row { flex-direction: column; gap: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>🎓 TEVETA AI Tutor</h1>
+            <p>Technical Education & Vocational Training</p>
+        </div>
+        
+        <div class="card">
+            <div class="tabs">
+                <div class="tab active" data-tab="login">Sign In</div>
+                <div class="tab" data-tab="register">Register</div>
+            </div>
+            
+            <div class="alert error" id="errorAlert"></div>
+            <div class="alert success" id="successAlert"></div>
+            
+            <!-- LOGIN FORM -->
+            <div class="form-section active" id="loginForm">
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label>Email or Student ID</label>
+                        <input type="text" id="loginEmail" placeholder="Enter email or Student ID" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Password</label>
+                        <div class="password-field">
+                            <input type="password" id="loginPassword" placeholder="Enter password" required>
+                            <button type="button" class="toggle-password" onclick="togglePassword('loginPassword')">👁️</button>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" id="loginBtn">Sign In</button>
+                    
+                    <div class="forgot-link">
+                        <a href="#" onclick="alert('Please contact your institution administrator.')">Forgot password?</a>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- REGISTER FORM -->
+            <div class="form-section" id="registerForm">
+                <form onsubmit="handleRegister(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>First Name *</label>
+                            <input type="text" id="regFirstName" placeholder="First name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Last Name *</label>
+                            <input type="text" id="regLastName" placeholder="Last name" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Email Address *</label>
+                        <input type="email" id="regEmail" placeholder="your.email@example.com" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="tel" id="regPhone" placeholder="0971234567">
+                        <div class="hint">Zambian format: 09X or 07X</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Password *</label>
+                        <div class="password-field">
+                            <input type="password" id="regPassword" placeholder="Min 8 chars, letters & numbers" required>
+                            <button type="button" class="toggle-password" onclick="togglePassword('regPassword')">👁️</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Confirm Password *</label>
+                        <input type="password" id="regPasswordConfirm" placeholder="Confirm password" required>
+                    </div>
+                    
+                    <div class="divider"><span>Optional - Training Info</span></div>
+                    
+                    <div class="form-group">
+                        <label>Institution</label>
+                        <select id="regInstitution">
+                            <option value="">Select institution...</option>
+                            <option value="Evelyn Hone College">Evelyn Hone College</option>
+                            <option value="Northern Technical College">Northern Technical College</option>
+                            <option value="Copperbelt University">Copperbelt University</option>
+                            <option value="Livingstone Institute">Livingstone Institute</option>
+                            <option value="Lusaka Business & Technical College">Lusaka Business & Technical College</option>
+                            <option value="Kitwe Vocational Training Centre">Kitwe Vocational Training Centre</option>
+                            <option value="Ndola Technical Institute">Ndola Technical Institute</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Program</label>
+                        <select id="regProgram">
+                            <option value="">Select program...</option>
+                            <optgroup label="Engineering">
+                                <option value="automotive|Automotive Mechanics">Automotive Mechanics</option>
+                                <option value="electrical|Power Electrical">Power Electrical</option>
+                                <option value="welding|Welding & Fabrication">Welding & Fabrication</option>
+                                <option value="plumbing|Plumbing">Plumbing</option>
+                                <option value="refrigeration|Refrigeration & AC">Refrigeration & AC</option>
+                            </optgroup>
+                            <optgroup label="Agriculture">
+                                <option value="general_agric|General Agriculture">General Agriculture</option>
+                                <option value="animal_husbandry|Animal Husbandry">Animal Husbandry</option>
+                                <option value="horticulture|Horticulture">Horticulture</option>
+                            </optgroup>
+                            <optgroup label="Hospitality">
+                                <option value="food_production|Food Production">Food Production</option>
+                                <option value="hotel_operations|Hotel Operations">Hotel Operations</option>
+                            </optgroup>
+                            <optgroup label="IT">
+                                <option value="computer_systems|Computer Systems">Computer Systems</option>
+                                <option value="software_dev|Software Development">Software Development</option>
+                                <option value="networking|Networking">Computer Networking</option>
+                            </optgroup>
+                            <optgroup label="Construction">
+                                <option value="bricklaying|Bricklaying">Bricklaying</option>
+                                <option value="carpentry|Carpentry">Carpentry</option>
+                            </optgroup>
+                            <optgroup label="Mining">
+                                <option value="mining_ops|Mining Operations">Mining Operations</option>
+                            </optgroup>
+                            <optgroup label="Business">
+                                <option value="accounting|Accounting">Accounting</option>
+                                <option value="marketing|Marketing">Marketing</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" id="registerBtn">Create Account</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab + 'Form').classList.add('active');
+                hideAlerts();
+            });
+        });
+        
+        function togglePassword(id) {
+            const input = document.getElementById(id);
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+        
+        function showError(msg) {
+            document.getElementById('errorAlert').textContent = msg;
+            document.getElementById('errorAlert').classList.add('show');
+            document.getElementById('successAlert').classList.remove('show');
+        }
+        
+        function showSuccess(msg) {
+            document.getElementById('successAlert').textContent = msg;
+            document.getElementById('successAlert').classList.add('show');
+            document.getElementById('errorAlert').classList.remove('show');
+        }
+        
+        function hideAlerts() {
+            document.getElementById('errorAlert').classList.remove('show');
+            document.getElementById('successAlert').classList.remove('show');
+        }
+        
+        async function handleLogin(e) {
+            e.preventDefault();
+            hideAlerts();
+            
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+            
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: document.getElementById('loginEmail').value,
+                        password: document.getElementById('loginPassword').value
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    showSuccess('Login successful! Redirecting...');
+                    setTimeout(() => window.location.href = '/', 1000);
+                } else {
+                    showError(data.error || 'Login failed');
+                    btn.disabled = false;
+                    btn.textContent = 'Sign In';
+                }
+            } catch (err) {
+                showError('Connection error. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        }
+        
+        async function handleRegister(e) {
+            e.preventDefault();
+            hideAlerts();
+            
+            const password = document.getElementById('regPassword').value;
+            const confirm = document.getElementById('regPasswordConfirm').value;
+            
+            if (password !== confirm) {
+                showError('Passwords do not match');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showError('Password must be at least 8 characters');
+                return;
+            }
+            
+            const btn = document.getElementById('registerBtn');
+            btn.disabled = true;
+            btn.textContent = 'Creating account...';
+            
+            const programValue = document.getElementById('regProgram').value;
+            let programId = null, programName = null;
+            if (programValue) {
+                [programId, programName] = programValue.split('|');
+            }
+            
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        first_name: document.getElementById('regFirstName').value,
+                        last_name: document.getElementById('regLastName').value,
+                        email: document.getElementById('regEmail').value,
+                        phone: document.getElementById('regPhone').value || null,
+                        password: password,
+                        institution: document.getElementById('regInstitution').value || null,
+                        program_id: programId,
+                        program_name: programName
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    showSuccess(data.message);
+                    setTimeout(() => {
+                        document.querySelector('[data-tab="login"]').click();
+                        document.getElementById('loginEmail').value = data.student_id;
+                    }, 2000);
+                } else {
+                    showError(data.error || 'Registration failed');
+                }
+            } catch (err) {
+                showError('Connection error. Please try again.');
+            }
+            
+            btn.disabled = false;
+            btn.textContent = 'Create Account';
+        }
+    </script>
+</body>
+</html>
