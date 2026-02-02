@@ -6,7 +6,7 @@
 
 An AI-powered tutor for Technical and Vocational Education and Training (TVET) that delivers **personalized learning** using formative and summative assessments. Originally developed for TEVETA Zambia, this platform is designed to be easily customized for any country's vocational training curriculum.
 
-![AI Tutor Screenshot](docs/images/screenshot.png)
+![alt text](image.png)
 
 ## 🌟 Features
 
