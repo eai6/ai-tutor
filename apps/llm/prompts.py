@@ -1,0 +1,174 @@
+"""
+Prompt Assembler - Constructs the full system prompt and step instructions.
+
+The prompt has two layers:
+1. SYSTEM PROMPT (from PromptPack): Persona, teaching style, safety, formatting
+2. STEP CONTEXT (from LessonStep): What to teach/ask right now
+
+This separation lets institutions customize the "how" (prompts) while
+content editors control the "what" (curriculum).
+"""
+
+from dataclasses import dataclass
+from typing import Optional
+
+from apps.llm.models import PromptPack
+from apps.curriculum.models import Lesson, LessonStep
+
+
+@dataclass
+class AssembledPrompt:
+    """The complete prompt ready to send to LLM."""
+    system_prompt: str
+    step_instruction: str  # Added to the conversation as context
+
+
+def assemble_system_prompt(prompt_pack: PromptPack, lesson: Lesson) -> str:
+    """
+    Build the full system prompt from PromptPack + lesson context.
+    
+    Structure:
+    - Base system prompt (persona)
+    - Teaching style
+    - Safety guidelines  
+    - Format rules
+    - Lesson context (objective)
+    """
+    parts = []
+    
+    # Core persona
+    parts.append(prompt_pack.system_prompt)
+    
+    # Teaching approach
+    if prompt_pack.teaching_style_prompt:
+        parts.append(prompt_pack.teaching_style_prompt)
+    
+    # Safety rules
+    if prompt_pack.safety_prompt:
+        parts.append(prompt_pack.safety_prompt)
+    
+    # Output formatting
+    if prompt_pack.format_rules_prompt:
+        parts.append(prompt_pack.format_rules_prompt)
+    
+    # Lesson context
+    lesson_context = f"""
+CURRENT LESSON: {lesson.title}
+LEARNING OBJECTIVE: {lesson.objective}
+
+You are guiding the student through this lesson step by step. Follow the step instructions provided with each message.
+""".strip()
+    parts.append(lesson_context)
+    
+    return "\n\n".join(parts)
+
+
+def build_step_instruction(
+    step: LessonStep,
+    attempt_number: int = 1,
+    previous_answer: Optional[str] = None,
+    hint_level: int = 0,
+) -> str:
+    """
+    Build the instruction for a specific step.
+    
+    This gets prepended to the tutor's context for each turn.
+    Includes hint ladder logic when student gets answers wrong.
+    
+    Args:
+        step: The current LessonStep
+        attempt_number: Which attempt this is (1-indexed)
+        previous_answer: Student's previous wrong answer (if retrying)
+        hint_level: How many hints to reveal (0 = none, 1 = hint_1, etc.)
+    """
+    parts = []
+    
+    # Step type context
+    step_type_instructions = {
+        LessonStep.StepType.TEACH: "INSTRUCTION: Teach this concept clearly and check for understanding.",
+        LessonStep.StepType.WORKED_EXAMPLE: "INSTRUCTION: Walk through this example step-by-step, then verify the student followed along.",
+        LessonStep.StepType.PRACTICE: "INSTRUCTION: Present this practice problem. Encourage the student and provide feedback on their answer.",
+        LessonStep.StepType.QUIZ: "INSTRUCTION: Present this quiz question. This is an assessment - be encouraging but accurate in grading.",
+        LessonStep.StepType.SUMMARY: "INSTRUCTION: Summarize what the student learned. Celebrate their progress!",
+    }
+    parts.append(step_type_instructions.get(step.step_type, ""))
+    
+    # Teacher script (what to say)
+    parts.append(f"SAY THIS (in your own words):\n{step.teacher_script}")
+    
+    # Question (if applicable)
+    if step.question:
+        parts.append(f"QUESTION TO ASK:\n{step.question}")
+        
+        # For MCQ, include choices
+        if step.answer_type == LessonStep.AnswerType.MULTIPLE_CHOICE and step.choices:
+            choices_str = "\n".join(f"  {chr(65+i)}) {choice}" for i, choice in enumerate(step.choices))
+            parts.append(f"ANSWER CHOICES:\n{choices_str}")
+    
+    # Retry context (if student got it wrong before)
+    if previous_answer and attempt_number > 1:
+        parts.append(f"STUDENT'S PREVIOUS ANSWER: {previous_answer}")
+        parts.append(f"This is attempt {attempt_number} of {step.max_attempts}.")
+        
+        # Reveal hints progressively
+        hints = step.hints
+        if hint_level > 0 and hints:
+            hints_to_show = hints[:hint_level]
+            parts.append("HINTS TO GIVE:\n" + "\n".join(f"- {h}" for h in hints_to_show))
+    
+    # Grading context (for the tutor to know the answer)
+    if step.expected_answer:
+        parts.append(f"CORRECT ANSWER (for your reference only - don't reveal unless max attempts reached): {step.expected_answer}")
+    
+    if step.rubric:
+        parts.append(f"GRADING RUBRIC:\n{step.rubric}")
+    
+    return "\n\n".join(parts)
+
+
+def build_tutor_message(
+    prompt_pack: PromptPack,
+    lesson: Lesson,
+    step: LessonStep,
+    conversation_history: list[dict],
+    attempt_number: int = 1,
+    previous_answer: Optional[str] = None,
+    hint_level: int = 0,
+) -> tuple[str, list[dict]]:
+    """
+    Build the complete prompt package for an LLM call.
+    
+    Returns:
+        Tuple of (system_prompt, messages)
+        
+    The step instruction is injected as a system message in the conversation
+    to give the tutor context for this specific step.
+    """
+    # Build system prompt (persona + lesson context)
+    system_prompt = assemble_system_prompt(prompt_pack, lesson)
+    
+    # Build step instruction
+    step_instruction = build_step_instruction(
+        step=step,
+        attempt_number=attempt_number,
+        previous_answer=previous_answer,
+        hint_level=hint_level,
+    )
+    
+    # Inject step instruction into the conversation
+    # We add it as the most recent context before the LLM responds
+    messages = list(conversation_history)  # Copy
+    
+    # Add step context as a user message with special formatting
+    # (The LLM will understand this is instruction, not student input)
+    if not messages or messages[-1]["role"] != "user":
+        # If no messages yet, or last message was assistant, add step context
+        messages.append({
+            "role": "user",
+            "content": f"[STEP CONTEXT]\n{step_instruction}\n[/STEP CONTEXT]\n\nPlease proceed with this step."
+        })
+    else:
+        # Append step context to the last user message
+        messages[-1]["content"] = f"[STEP CONTEXT]\n{step_instruction}\n[/STEP CONTEXT]\n\n" + messages[-1]["content"]
+    
+    return system_prompt, messages

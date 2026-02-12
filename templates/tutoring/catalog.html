@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block title %}My Lessons - AI Tutor{% endblock %}
+
+{% block content %}
+<div class="catalog-header animate-in">
+    <h1>👋 Welcome back!</h1>
+    <p class="text-muted">Ready to learn something new today?</p>
+</div>
+
+{% if not user.is_authenticated %}
+<div class="card text-center animate-in" style="animation-delay: 0.1s">
+    <div class="empty-state">
+        <div class="empty-icon">🔐</div>
+        <h3>Sign in to get started</h3>
+        <p class="text-muted">Access your personalized lessons and track your progress.</p>
+        <a href="{% url 'accounts:login' %}" class="btn btn-primary mt-2">Sign In</a>
+    </div>
+</div>
+
+{% elif not lessons %}
+<div class="card text-center animate-in" style="animation-delay: 0.1s">
+    <div class="empty-state">
+        <div class="empty-icon">📚</div>
+        <h3>No lessons yet</h3>
+        <p class="text-muted">Contact your teacher to get access to lessons.</p>
+    </div>
+</div>
+
+{% else %}
+<div class="lessons-grid">
+    {% for lesson in lessons %}
+    <div class="lesson-card card animate-in" style="animation-delay: {{ forloop.counter0|divisibleby:1 }}s">
+        <div class="lesson-meta">
+            <span class="course-badge">{{ lesson.unit.course.title }}</span>
+            <span class="time-badge">⏱️ {{ lesson.estimated_minutes }} min</span>
+        </div>
+        <h3 class="lesson-title">{{ lesson.title }}</h3>
+        <p class="lesson-objective">{{ lesson.objective }}</p>
+        <div class="lesson-footer">
+            <div class="unit-name">{{ lesson.unit.title }}</div>
+            <a href="{% url 'tutoring:tutor_interface' lesson.id %}" class="btn btn-primary">
+                Start →
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .catalog-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .catalog-header h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+    }
+    
+    .empty-state {
+        padding: 3rem 1rem;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+    
+    .empty-state h3 {
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .lessons-grid {
+        display: grid;
+        gap: 1.5rem;
+    }
+    
+    @media (min-width: 640px) {
+        .lessons-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    .lesson-card {
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .lesson-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .lesson-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .course-badge {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: var(--radius-full);
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .time-badge {
+        background: var(--bg-warm);
+        color: var(--text-muted);
+        padding: 0.25rem 0.75rem;
+        border-radius: var(--radius-full);
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .lesson-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: var(--text-dark);
+    }
+    
+    .lesson-objective {
+        color: var(--text-muted);
+        font-size: 0.9375rem;
+        flex-grow: 1;
+        margin-bottom: 1.5rem;
+    }
+    
+    .lesson-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .unit-name {
+        font-size: 0.875rem;
+        color: var(--text-light);
+        font-weight: 600;
+    }
+    
+    .lesson-footer .btn {
+        padding: 0.625rem 1.25rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
