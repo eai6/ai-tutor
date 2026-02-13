@@ -69,3 +69,62 @@ class Membership(models.Model):
     def is_staff(self):
         """Returns True if user has admin, teacher, or editor role."""
         return self.role in [self.Role.ADMIN, self.Role.TEACHER, self.Role.EDITOR]
+
+
+class StudentProfile(models.Model):
+    """
+    Extended profile for students with school and grade information.
+    Used for personalization and progress tracking.
+    """
+    class GradeLevel(models.TextChoices):
+        S1 = 'S1', 'Secondary 1'
+        S2 = 'S2', 'Secondary 2'
+        S3 = 'S3', 'Secondary 3'
+        S4 = 'S4', 'Secondary 4'
+        S5 = 'S5', 'Secondary 5'
+    
+    # Seychelles Secondary Schools
+    SCHOOL_CHOICES = [
+        ('anse_boileau', 'Anse Boileau Secondary'),
+        ('anse_royale', 'Anse Royale Secondary'),
+        ('belonie', 'Belonie Secondary'),
+        ('beau_vallon', 'Beau Vallon Secondary'),
+        ('english_river', 'English River Secondary'),
+        ('la_digue', 'La Digue Secondary'),
+        ('mont_fleuri', 'Mont Fleuri Secondary'),
+        ('perseverance', 'Perseverance Secondary'),
+        ('pointe_larue', 'Pointe Larue Secondary'),
+        ('plaisance', 'Plaisance Secondary'),
+        ('praslin', 'Praslin Secondary'),
+        ('other', 'Other'),
+    ]
+    
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='student_profile'
+    )
+    school = models.CharField(
+        max_length=50,
+        choices=SCHOOL_CHOICES,
+        blank=True,
+        help_text="Student's school"
+    )
+    grade_level = models.CharField(
+        max_length=5,
+        choices=GradeLevel.choices,
+        blank=True,
+        help_text="Current grade level"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.get_school_display()} ({self.grade_level})"
+    
+    def get_school_display_name(self):
+        """Return the full school name."""
+        for code, name in self.SCHOOL_CHOICES:
+            if code == self.school:
+                return name
+        return self.school

@@ -108,9 +108,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 
-
-
-
 # Auth settings
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/tutor/'

@@ -6,9 +6,9 @@
 <div class="auth-container">
     <div class="auth-card card animate-in">
         <div class="auth-header">
-            <div class="auth-icon">🚀</div>
-            <h1>Create your account</h1>
-            <p class="text-muted">Start your learning journey today</p>
+            <div class="auth-icon">🎓</div>
+            <h1>Join AI Tutor</h1>
+            <p class="text-muted">Start your learning journey in Seychelles</p>
         </div>
         
         {% if errors %}
@@ -25,15 +25,38 @@
             {% csrf_token %}
             
             <div class="form-group">
-                <label for="first_name">Your Name</label>
+                <label for="first_name">Your Name *</label>
                 <input 
                     type="text" 
                     id="first_name" 
                     name="first_name" 
                     value="{{ first_name|default:'' }}"
                     placeholder="What should we call you?"
+                    required
                     autofocus
                 >
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="school">School *</label>
+                    <select id="school" name="school" required>
+                        <option value="">Select your school</option>
+                        {% for code, name in school_choices %}
+                        <option value="{{ code }}" {% if school == code %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="grade_level">Grade *</label>
+                    <select id="grade_level" name="grade_level" required>
+                        <option value="">Select grade</option>
+                        {% for code, name in grade_choices %}
+                        <option value="{{ code }}" {% if grade_level == code %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             
             <div class="form-group">
@@ -99,7 +122,7 @@
 {% block extra_css %}
 <style>
     .auth-container {
-        max-width: 460px;
+        max-width: 500px;
         margin: 2rem auto;
     }
     
@@ -141,16 +164,19 @@
         color: var(--text-dark);
     }
     
-    .form-group input {
+    .form-group input,
+    .form-group select {
         padding: 0.875rem 1rem;
         border: 2px solid #E8E8E8;
         border-radius: var(--radius-md);
         font-family: inherit;
         font-size: 1rem;
         transition: all 0.2s ease;
+        background: white;
     }
     
-    .form-group input:focus {
+    .form-group input:focus,
+    .form-group select:focus {
         outline: none;
         border-color: var(--primary);
         background: white;
@@ -164,6 +190,12 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
+    }
+    
+    @media (max-width: 500px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
     }
     
     .btn-full {

@@ -1,155 +1,157 @@
-# AI Tutor
+# AI Tutor - Seychelles Secondary Schools
 
-A customizable, open-source AI tutoring platform built with Django.
+An AI-powered tutoring platform designed for secondary school students in Seychelles, covering Geography and Mathematics. Built with Django and powered by LLMs (Claude, GPT, or local Ollama).
 
-## Features
+## 🎓 Features
 
-- **Multi-tenant architecture**: Multiple institutions, each with their own content
-- **Customizable AI behavior**: PromptPacks define tutor persona, teaching style, safety rules
-- **Structured curriculum**: Course → Unit → Lesson → Steps (teaching, practice, quiz)
-- **Intelligent grading**: Automatic grading for MCQ, numeric, true/false; LLM grading for free-text
-- **Hint ladder**: Progressive hints when students struggle
-- **Progress tracking**: Mastery-based advancement with streaks and completion tracking
-- **Media support**: Attach images, videos, PDFs to any lesson step
+- **Science of Learning**: Structured tutoring sessions following research-based pedagogy
+- **Two Operating Modes**: Rich mode (with curriculum content) or Lightweight mode (AI-generated)
+- **Multiple LLM Providers**: Anthropic Claude, OpenAI GPT, or local Ollama
+- **Progress Tracking**: Track student mastery and completion
+- **Local Context**: Examples and names adapted for Seychelles
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Clone and setup
+### 1. Install Dependencies
 
 ```bash
-cd ai_tutor
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure environment
+### 2. Configure Environment
 
-Create a `.env` file:
+Create a `.env` file in the project root:
 
-```env
-SECRET_KEY=your-secret-key-here
+```bash
+# For Anthropic Claude (recommended)
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+
+# For OpenAI (optional)
+OPENAI_API_KEY=sk-xxxxx
+
+# Django settings
 DEBUG=True
-ANTHROPIC_API_KEY=your-anthropic-api-key
+SECRET_KEY=your-secret-key-here
 ```
 
-### 3. Initialize database
+### 3. Initialize Database
 
 ```bash
 python manage.py migrate
 python manage.py createsuperuser
-python manage.py seed_sample_data
+python manage.py seed_seychelles  # Seed curriculum data
 ```
 
-### 4. Run the server
+### 4. Run the Server
 
 ```bash
 python manage.py runserver
 ```
 
-Visit:
-- **Admin**: http://localhost:8000/admin/ (manage curriculum, prompts, users)
-- **Tutor**: http://localhost:8000/tutor/ (student interface)
+Visit http://localhost:8000 to access the tutor.
 
-## Project Structure
+## 📚 Curriculum Structure
+
+### Subjects
+- **Geography** (7 units, 20 lessons)
+  - Map Skills, Weather & Climate, Plate Tectonics, Population, Settlements, Coastal Landforms, Industry & Fishing
+  
+- **Mathematics** (8 units, 27 lessons)
+  - Number, Fractions & Decimals, Percentages, Ratio & Proportion, Algebra, Geometry, Measures, Statistics
+
+### Seychelles Schools Supported
+- Anse Boileau, Anse Royale, Belonie, Beau Vallon, English River
+- La Digue, Mont Fleuri, Perseverance, Pointe Larue, Plaisance, Praslin
+
+## 🧠 Science of Learning Principles
+
+The AI tutor follows research-based pedagogy:
+
+1. **Retrieval Practice** - Start sessions reviewing previous topics
+2. **Explicit Instruction** - Clear explanations with worked examples
+3. **Guided Practice** - Scaffolded hints, never giving direct answers
+4. **Exit Ticket** - 5 MCQ quiz, 4/5 required to pass
+5. **Spaced Repetition** - Review modules periodically
+6. **Local Context** - Seychelles names, places, and examples
+
+## 🔧 LLM Configuration
+
+### Using Anthropic Claude (Default)
+Set `ANTHROPIC_API_KEY` in your `.env` file.
+
+### Using OpenAI GPT
+1. Set `OPENAI_API_KEY` in your `.env` file
+2. In Django Admin, create a new ModelConfig:
+   - Provider: `openai`
+   - Model name: `gpt-4o`
+   - API key env var: `OPENAI_API_KEY`
+
+### Using Local Ollama
+1. Install Ollama: https://ollama.ai
+2. Pull a model: `ollama pull llama3`
+3. Start Ollama: `ollama serve`
+4. In Django Admin, create a new ModelConfig:
+   - Provider: `local_ollama`
+   - Model name: `llama3`
+   - API base: `http://localhost:11434`
+   - API key env var: (leave empty)
+
+## 📁 Project Structure
 
 ```
 ai_tutor/
 ├── apps/
-│   ├── accounts/      # Institution, Membership (multi-tenancy)
+│   ├── accounts/      # User, Institution, StudentProfile
 │   ├── curriculum/    # Course, Unit, Lesson, LessonStep
-│   ├── llm/           # PromptPack, ModelConfig, LLM client
-│   ├── media_library/ # MediaAsset, StepMedia
-│   └── tutoring/      # TutorSession, engine, grading, views
-├── config/            # Django settings, URLs
-├── templates/         # HTML templates
+│   ├── llm/          # PromptPack, ModelConfig, LLM clients
+│   ├── media_library/ # Media assets (future)
+│   └── tutoring/     # TutorSession, Engine, Grader
+├── config/           # Django settings
+├── templates/        # HTML templates
 └── manage.py
 ```
 
-## Key Components
+## 🛣️ URLs
 
-### Tutor Engine (`apps/tutoring/engine.py`)
+| URL | Purpose |
+|-----|---------|
+| `/` | Redirects to `/tutor/` |
+| `/accounts/register/` | Student registration |
+| `/accounts/login/` | Sign in |
+| `/tutor/` | Subject & lesson catalog |
+| `/tutor/lesson/<id>/` | Tutoring session |
+| `/admin/` | Django admin |
 
-The heart of the system. It:
-1. Loads lesson steps in order
-2. Assembles prompts from PromptPack + step content
-3. Calls the LLM to generate tutor responses
-4. Grades student answers
-5. Applies hint ladder when wrong
-6. Tracks progress toward mastery
+## 🧪 Test Accounts
 
-### Prompt Assembly (`apps/llm/prompts.py`)
+After running `seed_seychelles`:
 
-Two-layer prompting:
-- **PromptPack** (institution-controlled): Persona, teaching style, safety
-- **Step instruction** (content-controlled): What to teach/ask right now
+- **Student**: student1 / student123
+- **Teacher**: teacher1 / teacher123
 
-### Grading (`apps/tutoring/grader.py`)
+## 📝 Development
 
-- **Exact match**: MCQ, true/false
-- **Numeric tolerance**: Math answers
-- **LLM-based**: Free-text with rubrics
-
-## Customization
-
-### Creating a PromptPack
-
-In Django Admin, create a PromptPack with:
-- `system_prompt`: Core persona ("You are a friendly tutor named Sage...")
-- `teaching_style_prompt`: Methodology ("Use Socratic questioning...")
-- `safety_prompt`: Boundaries ("Keep content age-appropriate...")
-- `format_rules_prompt`: Output rules ("Keep responses under 3 sentences...")
-
-### Creating Lessons
-
-1. Create a **Course** (e.g., "Grade 3 Math")
-2. Create **Units** within the course (e.g., "Addition")
-3. Create **Lessons** within units (e.g., "Two-Digit Addition")
-4. Create **LessonSteps**:
-   - `teach`: Explanation with no response needed
-   - `worked_example`: Walk through an example, check understanding
-   - `practice`: Problems with hints
-   - `quiz`: Assessment questions
-   - `summary`: Wrap-up
-
-### Step Types & Answer Types
-
-| Step Type | Best Answer Type | Use Case |
-|-----------|------------------|----------|
-| teach | none | Pure instruction |
-| worked_example | short_numeric, multiple_choice | Check they followed |
-| practice | any | Drill with hints |
-| quiz | any | Assessment |
-| summary | none | Celebrate completion |
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/tutor/api/lessons/` | GET | List available lessons |
-| `/tutor/api/session/start/<lesson_id>/` | POST | Start tutoring session |
-| `/tutor/api/session/<id>/answer/` | POST | Submit student answer |
-| `/tutor/api/session/<id>/advance/` | POST | Advance to next step |
-| `/tutor/api/session/<id>/status/` | GET | Get session status |
-
-## Testing
-
+### Running Tests
 ```bash
-# Test with mock LLM (no API key needed)
-python manage.py test_tutor_engine
-
-# Test with real LLM
-python manage.py test_tutor_engine --real-llm
+python manage.py test
 ```
 
-## Next Steps
+### Creating Migrations
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
 
-- [ ] Add WebSocket support for streaming responses
-- [ ] Build React frontend for richer interactions
-- [ ] Add analytics dashboard
-- [ ] Implement OpenAI/Ollama providers
-- [ ] Add Docker Compose for deployment
+### Adding New Curriculum
+Use Django Admin or create a management command similar to `seed_seychelles.py`.
 
-## License
+## 📄 License
 
-MIT
+MIT License
+
+## 🤝 Contributors
+
+- World Bank Education Team
+- Roy & Edward (Development Lead)

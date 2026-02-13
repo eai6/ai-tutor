@@ -148,6 +148,22 @@ class TutorEngine:
         
         return self.llm_client.generate(messages=messages, system_prompt=system_prompt)
     
+    def _is_conversational_mode(self) -> bool:
+        """
+        Check if this lesson uses AI-driven conversational mode.
+        
+        Conversational mode is used when:
+        - There's only 1 step AND it's a TEACH step with no answer required
+        
+        In this mode, the AI drives the entire session dynamically,
+        including generating questions and exit tickets on its own.
+        """
+        if len(self.steps) == 1:
+            step = self.steps[0]
+            return (step.step_type == LessonStep.StepType.TEACH and 
+                    not step.requires_response())
+        return False
+    
     def start(self) -> TutorResponse:
         """
         Start the tutoring session.
@@ -174,14 +190,18 @@ class TutorEngine:
             step=step,
             tokens_in=response.tokens_in,
             tokens_out=response.tokens_out,
-            metadata={"attempt": 1, "hint_level": 0},
+            metadata={"attempt": 1, "hint_level": 0, "conversational_mode": self._is_conversational_mode()},
         )
+        
+        # In conversational mode, always wait for student response
+        # The AI will drive the session and decide when it's complete
+        is_conversational = self._is_conversational_mode()
         
         return TutorResponse(
             message=response.content,
             step_index=self.session.current_step_index,
             step_type=step.step_type,
-            is_waiting_for_answer=step.requires_response(),
+            is_waiting_for_answer=is_conversational or step.requires_response(),
             is_session_complete=False,
             mastery_achieved=False,
             attempts_remaining=step.max_attempts if step.requires_response() else None,
@@ -193,13 +213,25 @@ class TutorEngine:
         """
         Process a student's answer to the current step.
         
-        Grades the answer, applies hint ladder if wrong,
-        updates progress tracking, and generates tutor response.
+        In CONVERSATIONAL MODE (AI-driven sessions):
+        - Simply pass the student's response to the AI
+        - The AI decides whether to ask more questions, give feedback, etc.
+        - Check if AI indicates session is complete
+        
+        In STEP MODE (structured lessons):
+        - Grade the answer against expected answer
+        - Apply hint ladder if wrong
+        - Track progress toward mastery
         """
         step = self.current_step
         if not step:
             return self._session_complete_response()
         
+        # Check if we're in conversational mode
+        if self._is_conversational_mode():
+            return self._process_conversational_answer(answer)
+        
+        # Standard step-based processing
         if not step.requires_response():
             # This step doesn't need an answer - advance
             return self.advance_step()
@@ -256,6 +288,97 @@ class TutorEngine:
                 attempts_remaining=attempts_remaining,
                 previous_answer=answer,
             )
+    
+    def _process_conversational_answer(self, answer: str) -> TutorResponse:
+        """
+        Process student input in conversational (AI-driven) mode.
+        
+        In this mode, the AI controls the entire flow:
+        - Retrieval practice
+        - Instruction
+        - Guided practice with questions
+        - Exit ticket
+        - Session completion
+        
+        We look for special signals in the AI's response to detect:
+        - [SESSION_COMPLETE] - AI indicates the session is done
+        - [EXIT_TICKET_PASSED] - Student passed the exit ticket
+        - [EXIT_TICKET_FAILED] - Student failed, needs to retry
+        """
+        step = self.current_step
+        
+        # Save student's message
+        self._save_turn(
+            role=SessionTurn.Role.STUDENT,
+            content=answer,
+            step=step,
+            metadata={"conversational_mode": True},
+        )
+        
+        # Build conversation for AI - include instruction to check for completion
+        history = self.get_conversation_history()
+        
+        # Call LLM with the full conversation
+        system_prompt, messages = build_tutor_message(
+            prompt_pack=self.prompt_pack,
+            lesson=self.lesson,
+            step=step,
+            conversation_history=history,
+            attempt_number=1,
+            previous_answer=None,
+            hint_level=0,
+        )
+        
+        # Add completion detection instruction to system prompt
+        completion_instruction = """
+
+IMPORTANT SESSION CONTROL:
+- You are running an AI-driven tutoring session
+- Continue the natural flow: retrieval → instruction → practice → exit ticket
+- When the student has completed the exit ticket (5 MCQ, 4/5 correct), include [SESSION_COMPLETE] at the very end of your response
+- Keep track of the exit ticket score internally and let the student know when they pass
+- If they fail the exit ticket (less than 4/5), review and let them retry
+- Be conversational and encouraging throughout
+
+CURRENT STATE: The student just responded. Continue the lesson appropriately."""
+        
+        full_system_prompt = system_prompt + completion_instruction
+        
+        response = self.llm_client.generate(messages=messages, system_prompt=full_system_prompt)
+        
+        # Check if AI signals session complete
+        is_complete = "[SESSION_COMPLETE]" in response.content
+        
+        # Clean the response (remove the marker)
+        clean_content = response.content.replace("[SESSION_COMPLETE]", "").strip()
+        
+        # Save tutor response
+        self._save_turn(
+            role=SessionTurn.Role.TUTOR,
+            content=clean_content,
+            step=step,
+            tokens_in=response.tokens_in,
+            tokens_out=response.tokens_out,
+            metadata={"conversational_mode": True, "session_complete_signal": is_complete},
+        )
+        
+        # If complete, mark session as mastered
+        if is_complete:
+            progress = self._get_or_create_progress()
+            progress.mastery_level = StudentLessonProgress.MasteryLevel.MASTERED
+            progress.save()
+            self._complete_session(mastery=True)
+        
+        return TutorResponse(
+            message=clean_content,
+            step_index=self.session.current_step_index,
+            step_type="conversational",
+            is_waiting_for_answer=not is_complete,  # Keep waiting unless complete
+            is_session_complete=is_complete,
+            mastery_achieved=is_complete,
+            tokens_in=response.tokens_in,
+            tokens_out=response.tokens_out,
+        )
     
     def advance_step(self) -> TutorResponse:
         """Advance to the next step in the lesson."""

@@ -4,14 +4,28 @@
 
 {% block content %}
 <div class="session-container">
-    <!-- Progress bar -->
+    <!-- Progress bar with phases -->
     <div class="progress-container animate-in">
+        <div class="phase-indicators">
+            <div class="phase" id="phase-retrieval" data-phase="1">
+                <span class="phase-icon">🔄</span>
+                <span class="phase-label">Retrieval</span>
+            </div>
+            <div class="phase" id="phase-instruction" data-phase="2">
+                <span class="phase-icon">📖</span>
+                <span class="phase-label">Instruction</span>
+            </div>
+            <div class="phase" id="phase-practice" data-phase="3">
+                <span class="phase-icon">🎯</span>
+                <span class="phase-label">Practice</span>
+            </div>
+            <div class="phase" id="phase-exit" data-phase="4">
+                <span class="phase-icon">📝</span>
+                <span class="phase-label">Exit Ticket</span>
+            </div>
+        </div>
         <div class="progress-bar">
             <div class="progress-fill" id="progress-fill"></div>
-        </div>
-        <div class="progress-label">
-            <span id="step-label">Starting...</span>
-            <span id="step-count"></span>
         </div>
     </div>
     
@@ -85,17 +99,76 @@
         gap: 1.5rem;
     }
     
-    /* Progress */
+    /* Phase indicators */
     .progress-container {
         text-align: center;
     }
     
+    .phase-indicators {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+        padding: 0 0.5rem;
+    }
+    
+    .phase {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        opacity: 0.4;
+        transition: all 0.3s ease;
+    }
+    
+    .phase.active {
+        opacity: 1;
+    }
+    
+    .phase.completed {
+        opacity: 1;
+    }
+    
+    .phase.completed .phase-icon {
+        background: var(--success);
+        color: white;
+    }
+    
+    .phase-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        background: var(--bg-warm);
+        transition: all 0.3s ease;
+    }
+    
+    .phase.active .phase-icon {
+        background: var(--primary);
+        color: white;
+        transform: scale(1.1);
+        box-shadow: 0 2px 8px rgba(255, 107, 53, 0.4);
+    }
+    
+    .phase-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .phase.active .phase-label {
+        color: var(--primary);
+    }
+    
     .progress-bar {
-        height: 8px;
+        height: 6px;
         background: rgba(0,0,0,0.08);
         border-radius: var(--radius-full);
         overflow: hidden;
-        margin-bottom: 0.75rem;
     }
     
     .progress-fill {
@@ -104,14 +177,6 @@
         border-radius: var(--radius-full);
         width: 0%;
         transition: width 0.5s ease;
-    }
-    
-    .progress-label {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.875rem;
-        color: var(--text-muted);
-        font-weight: 600;
     }
     
     /* Lesson info */
@@ -182,7 +247,7 @@
     .message-bubble {
         padding: 0.875rem 1.125rem;
         border-radius: var(--radius-md);
-        line-height: 1.5;
+        line-height: 1.6;
     }
     
     .message.tutor .message-bubble {
@@ -196,6 +261,48 @@
         border-bottom-right-radius: 4px;
     }
     
+    /* Rich text formatting in tutor messages */
+    .message.tutor .message-bubble strong,
+    .message.tutor .message-bubble b {
+        font-weight: 700;
+        color: var(--text-dark);
+    }
+    
+    .message.tutor .message-bubble em,
+    .message.tutor .message-bubble i {
+        font-style: italic;
+    }
+    
+    .message.tutor .message-bubble code {
+        background: rgba(0,0,0,0.08);
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+    
+    .message.tutor .message-bubble ul,
+    .message.tutor .message-bubble ol {
+        margin: 0.5rem 0;
+        padding-left: 1.5rem;
+    }
+    
+    .message.tutor .message-bubble li {
+        margin: 0.25rem 0;
+    }
+    
+    .message.tutor .message-bubble p {
+        margin: 0.5rem 0;
+    }
+    
+    .message.tutor .message-bubble p:first-child {
+        margin-top: 0;
+    }
+    
+    .message.tutor .message-bubble p:last-child {
+        margin-bottom: 0;
+    }
+    
     /* Feedback states */
     .message.correct .message-bubble {
         background: #E8F8F5;
@@ -205,6 +312,58 @@
     .message.incorrect .message-bubble {
         background: #FEF5F5;
         border-left: 3px solid var(--error);
+    }
+    
+    /* Media in messages */
+    .message-media {
+        margin-bottom: 0.75rem;
+    }
+    
+    .media-item {
+        margin-bottom: 0.5rem;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+    }
+    
+    .media-image img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        border-radius: var(--radius-sm);
+    }
+    
+    .media-video video {
+        max-width: 100%;
+        border-radius: var(--radius-sm);
+    }
+    
+    .media-audio audio {
+        width: 100%;
+    }
+    
+    .media-caption {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-style: italic;
+        margin-top: 0.25rem;
+        text-align: center;
+    }
+    
+    .pdf-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: white;
+        border: 1px solid #E0E0E0;
+        border-radius: var(--radius-sm);
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+    }
+    
+    .pdf-link:hover {
+        background: var(--bg-warm);
     }
     
     /* Typing indicator */
@@ -277,28 +436,28 @@
     
     /* Complete state */
     .complete-box {
-        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
         padding: 2rem;
-        box-shadow: var(--shadow-md);
+        text-align: center;
     }
     
     .complete-content {
         display: flex;
         align-items: center;
-        justify-content: center;
         gap: 1rem;
-        margin-bottom: 1.5rem;
     }
     
     .complete-icon {
-        font-size: 3rem;
-        animation: pulse 2s ease-in-out infinite;
+        font-size: 2.5rem;
     }
     
     .complete-text h3 {
         font-size: 1.25rem;
         font-weight: 700;
-        color: var(--success);
+        margin-bottom: 0.25rem;
     }
     
     .complete-text p {
@@ -330,15 +489,45 @@
         background: var(--text-light);
         border-radius: 3px;
     }
+    
+    /* Mobile responsiveness */
+    @media (max-width: 600px) {
+        .phase-label {
+            display: none;
+        }
+        
+        .phase-icon {
+            width: 32px;
+            height: 32px;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block extra_js %}
+<!-- Include a simple markdown parser -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
     const lessonId = {{ lesson.id }};
-    const totalSteps = {{ lesson.steps.count|default:6 }};
     let sessionId = null;
-    let currentStep = 0;
+    let currentPhase = 1;
+    let messageCount = 0;
+    
+    // Phase detection keywords
+    const phaseKeywords = {
+        1: ['warm up', 'retrieval', 'remember', 'recall', 'previous', 'last time', 'before we begin'],
+        2: ['today', 'learn', 'understand', 'concept', 'explain', 'instruction', 'teaching', 'let me show'],
+        3: ['try', 'practice', 'your turn', 'solve', 'calculate', 'answer', 'what is', 'can you'],
+        4: ['exit ticket', 'quiz', 'final', 'check', 'assessment', 'multiple choice', '5 questions', 'question 1', 'question 2']
+    };
+    
+    // Configure marked for safe rendering
+    if (typeof marked !== 'undefined') {
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+    }
     
     // Initialize on page load
     window.onload = () => {
@@ -352,6 +541,58 @@
             }
         });
     };
+    
+    function detectPhase(message) {
+        const lowerMessage = message.toLowerCase();
+        
+        // Check for exit ticket first (most specific)
+        for (const keyword of phaseKeywords[4]) {
+            if (lowerMessage.includes(keyword)) {
+                return 4;
+            }
+        }
+        
+        // Check for practice
+        for (const keyword of phaseKeywords[3]) {
+            if (lowerMessage.includes(keyword)) {
+                return 3;
+            }
+        }
+        
+        // Check for instruction
+        for (const keyword of phaseKeywords[2]) {
+            if (lowerMessage.includes(keyword)) {
+                return 2;
+            }
+        }
+        
+        // Default to retrieval at start
+        if (messageCount <= 2) {
+            return 1;
+        }
+        
+        return currentPhase; // Keep current phase
+    }
+    
+    function updatePhaseIndicators(phase) {
+        currentPhase = phase;
+        
+        // Update all phase indicators
+        for (let i = 1; i <= 4; i++) {
+            const phaseEl = document.querySelector(`.phase[data-phase="${i}"]`);
+            phaseEl.classList.remove('active', 'completed');
+            
+            if (i < phase) {
+                phaseEl.classList.add('completed');
+            } else if (i === phase) {
+                phaseEl.classList.add('active');
+            }
+        }
+        
+        // Update progress bar
+        const progress = ((phase - 1) / 4) * 100 + 12.5; // Center within phase
+        document.getElementById('progress-fill').style.width = `${Math.min(progress, 100)}%`;
+    }
     
     async function startSession() {
         try {
@@ -374,7 +615,11 @@
             
             // Clear loading and show first message
             document.getElementById('messages').innerHTML = '';
-            showMessage('tutor', data.tutor_message);
+            showMessage('tutor', data.tutor_message, '', data.media || []);
+            
+            // Detect and update phase
+            const phase = detectPhase(data.tutor_message);
+            updatePhaseIndicators(phase);
             
             updateUI(data);
             
@@ -413,7 +658,11 @@
             
             const feedbackClass = data.grading?.result === 'correct' ? 'correct' : 
                                   data.grading?.result === 'incorrect' ? 'incorrect' : '';
-            showMessage('tutor', data.tutor_message, feedbackClass);
+            showMessage('tutor', data.tutor_message, feedbackClass, data.media || []);
+            
+            // Detect and update phase
+            const phase = detectPhase(data.tutor_message);
+            updatePhaseIndicators(phase);
             
             updateUI(data);
             
@@ -442,7 +691,12 @@
             const data = await response.json();
             
             removeTyping();
-            showMessage('tutor', data.tutor_message);
+            showMessage('tutor', data.tutor_message, '', data.media || []);
+            
+            // Detect and update phase
+            const phase = detectPhase(data.tutor_message);
+            updatePhaseIndicators(phase);
+            
             updateUI(data);
             
         } catch (error) {
@@ -455,24 +709,6 @@
     }
     
     function updateUI(data) {
-        currentStep = data.step_index;
-        
-        // Update progress
-        const progress = Math.min(((currentStep + 1) / totalSteps) * 100, 100);
-        document.getElementById('progress-fill').style.width = `${progress}%`;
-        
-        const stepTypes = {
-            'teach': '📖 Learning',
-            'worked_example': '✏️ Example',
-            'practice': '🎯 Practice',
-            'quiz': '📝 Quiz',
-            'summary': '🏁 Summary',
-            'complete': '✅ Done'
-        };
-        
-        document.getElementById('step-label').textContent = stepTypes[data.step_type] || 'Step';
-        document.getElementById('step-count').textContent = `${currentStep + 1} / ${totalSteps}`;
-        
         // Show/hide input areas
         const answerBox = document.getElementById('answer-box');
         const continueBox = document.getElementById('continue-box');
@@ -481,7 +717,11 @@
         if (data.is_session_complete) {
             answerBox.style.display = 'none';
             continueBox.style.display = 'none';
-            completeBox.style.display = 'block';
+            completeBox.style.display = 'flex';
+            
+            // Mark all phases as completed
+            updatePhaseIndicators(5);
+            document.getElementById('progress-fill').style.width = '100%';
             
             if (data.mastery_achieved) {
                 document.getElementById('complete-message').textContent = '🏆 Mastery achieved! Amazing work!';
@@ -498,17 +738,94 @@
         }
     }
     
-    function showMessage(role, content, extraClass = '') {
+    function renderMarkdown(text) {
+        if (typeof marked !== 'undefined') {
+            // Use marked to render markdown
+            return marked.parse(text);
+        }
+        // Fallback: basic formatting
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br>');
+    }
+    
+    function renderMedia(mediaList) {
+        if (!mediaList || mediaList.length === 0) return '';
+        
+        let html = '<div class="message-media">';
+        
+        for (const media of mediaList) {
+            if (media.type === 'image') {
+                html += `
+                    <div class="media-item media-image" data-placement="${media.placement}">
+                        <img src="${media.url}" alt="${media.alt_text || media.title}" loading="lazy">
+                        ${media.caption ? `<p class="media-caption">${media.caption}</p>` : ''}
+                    </div>
+                `;
+            } else if (media.type === 'video') {
+                html += `
+                    <div class="media-item media-video" data-placement="${media.placement}">
+                        <video controls>
+                            <source src="${media.url}" type="video/mp4">
+                            Your browser does not support video.
+                        </video>
+                        ${media.caption ? `<p class="media-caption">${media.caption}</p>` : ''}
+                    </div>
+                `;
+            } else if (media.type === 'audio') {
+                html += `
+                    <div class="media-item media-audio" data-placement="${media.placement}">
+                        <audio controls>
+                            <source src="${media.url}" type="audio/mpeg">
+                            Your browser does not support audio.
+                        </audio>
+                        ${media.caption ? `<p class="media-caption">${media.caption}</p>` : ''}
+                    </div>
+                `;
+            } else if (media.type === 'pdf') {
+                html += `
+                    <div class="media-item media-pdf" data-placement="${media.placement}">
+                        <a href="${media.url}" target="_blank" class="pdf-link">
+                            📄 ${media.title}
+                        </a>
+                    </div>
+                `;
+            }
+        }
+        
+        html += '</div>';
+        return html;
+    }
+    
+    function showMessage(role, content, extraClass = '', media = []) {
+        messageCount++;
         const messages = document.getElementById('messages');
         const avatar = role === 'tutor' ? '🤖' : '😊';
         
-        const div = document.createElement('div');
-        div.className = `message ${role} ${extraClass}`;
-        div.innerHTML = `
+        // Render content based on role
+        let renderedContent;
+        if (role === 'tutor') {
+            renderedContent = renderMarkdown(content);
+            // Add media if present
+            if (media && media.length > 0) {
+                renderedContent = renderMedia(media) + renderedContent;
+            }
+        } else {
+            // Escape HTML for student messages
+            const div = document.createElement('div');
+            div.textContent = content;
+            renderedContent = div.innerHTML;
+        }
+        
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${role} ${extraClass}`;
+        msgDiv.innerHTML = `
             <div class="message-avatar">${avatar}</div>
-            <div class="message-bubble">${escapeHtml(content)}</div>
+            <div class="message-bubble">${renderedContent}</div>
         `;
-        messages.appendChild(div);
+        messages.appendChild(msgDiv);
         
         // Scroll to bottom
         const chat = document.querySelector('.chat-container');
@@ -553,12 +870,6 @@
             btn.classList.remove('loading');
             btn.querySelector('.btn-icon').textContent = '→';
         }
-    }
-    
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML.replace(/\n/g, '<br>');
     }
     
     function getCookie(name) {

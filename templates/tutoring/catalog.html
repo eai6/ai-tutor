@@ -1,69 +1,371 @@
 {% extends 'base.html' %}
 
-{% block title %}My Lessons - AI Tutor{% endblock %}
+{% block title %}My Subjects - AI Tutor{% endblock %}
 
 {% block content %}
-<div class="catalog-header animate-in">
-    <h1>👋 Welcome back!</h1>
-    <p class="text-muted">Ready to learn something new today?</p>
-</div>
-
-{% if not user.is_authenticated %}
-<div class="card text-center animate-in" style="animation-delay: 0.1s">
-    <div class="empty-state">
-        <div class="empty-icon">🔐</div>
-        <h3>Sign in to get started</h3>
-        <p class="text-muted">Access your personalized lessons and track your progress.</p>
-        <a href="{% url 'accounts:login' %}" class="btn btn-primary mt-2">Sign In</a>
-    </div>
-</div>
-
-{% elif not lessons %}
-<div class="card text-center animate-in" style="animation-delay: 0.1s">
-    <div class="empty-state">
-        <div class="empty-icon">📚</div>
-        <h3>No lessons yet</h3>
-        <p class="text-muted">Contact your teacher to get access to lessons.</p>
-    </div>
-</div>
-
-{% else %}
-<div class="lessons-grid">
-    {% for lesson in lessons %}
-    <div class="lesson-card card animate-in" style="animation-delay: {{ forloop.counter0|divisibleby:1 }}s">
-        <div class="lesson-meta">
-            <span class="course-badge">{{ lesson.unit.course.title }}</span>
-            <span class="time-badge">⏱️ {{ lesson.estimated_minutes }} min</span>
-        </div>
-        <h3 class="lesson-title">{{ lesson.title }}</h3>
-        <p class="lesson-objective">{{ lesson.objective }}</p>
-        <div class="lesson-footer">
-            <div class="unit-name">{{ lesson.unit.title }}</div>
-            <a href="{% url 'tutoring:tutor_interface' lesson.id %}" class="btn btn-primary">
-                Start →
-            </a>
+<div class="catalog-container">
+    {% if not user.is_authenticated %}
+    <!-- Not logged in -->
+    <div class="welcome-section animate-in">
+        <div class="welcome-card card">
+            <div class="welcome-icon">🎓</div>
+            <h1>Welcome to AI Tutor</h1>
+            <p class="text-muted">Your personal learning companion for Seychelles secondary students</p>
+            <div class="welcome-actions">
+                <a href="{% url 'accounts:register' %}" class="btn btn-primary">Get Started →</a>
+                <a href="{% url 'accounts:login' %}" class="btn btn-secondary">Sign In</a>
+            </div>
         </div>
     </div>
-    {% endfor %}
+    
+    {% elif not subjects %}
+    <!-- No subjects available -->
+    <div class="empty-section animate-in">
+        <div class="empty-card card text-center">
+            <div class="empty-icon">📚</div>
+            <h2>No subjects available yet</h2>
+            <p class="text-muted">Your courses are being set up. Check back soon!</p>
+        </div>
+    </div>
+    
+    {% else %}
+    <!-- Subject Selection -->
+    <div class="catalog-header animate-in">
+        <h1>👋 Hello, {{ user.first_name|default:user.username }}!</h1>
+        <p class="text-muted">Choose a subject to continue learning</p>
+    </div>
+    
+    <!-- Subject Cards -->
+    <div class="subjects-grid animate-in" style="animation-delay: 0.1s">
+        {% for subject in subjects %}
+        <a href="?subject={{ subject.id }}" class="subject-card card {% if selected_subject.id == subject.id %}active{% endif %}">
+            <div class="subject-icon">
+                {% if 'Math' in subject.title %}📐{% elif 'Geography' in subject.title %}🌍{% else %}📖{% endif %}
+            </div>
+            <div class="subject-info">
+                <h3>{{ subject.title }}</h3>
+                <div class="subject-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ subject.progress_percent }}%"></div>
+                    </div>
+                    <span class="progress-text">{{ subject.completed_lessons }}/{{ subject.total_lessons }} completed</span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    
+    {% if selected_subject %}
+    <!-- Selected Subject Topics -->
+    <div class="topics-section animate-in" style="animation-delay: 0.2s">
+        <div class="topics-header">
+            <h2>{{ selected_subject.title }}</h2>
+            <p class="text-muted">{{ selected_subject.description }}</p>
+        </div>
+        
+        {% for unit in selected_subject.units %}
+        <div class="unit-card card">
+            <div class="unit-header">
+                <h3>{{ unit.title }}</h3>
+                <span class="lesson-count">{{ unit.lessons|length }} lessons</span>
+            </div>
+            <div class="lessons-list">
+                {% for lesson in unit.lessons %}
+                <a href="{% url 'tutoring:tutor_interface' lesson.id %}" class="lesson-item status-{{ lesson.status }}">
+                    <div class="lesson-status-icon">
+                        {% if lesson.status == 'completed' %}
+                            <span class="icon-completed">✓</span>
+                        {% elif lesson.status == 'in_progress' %}
+                            <span class="icon-progress">◐</span>
+                        {% else %}
+                            <span class="icon-new">○</span>
+                        {% endif %}
+                    </div>
+                    <div class="lesson-info">
+                        <h4>{{ lesson.title }}</h4>
+                        <p>{{ lesson.objective }}</p>
+                    </div>
+                    <div class="lesson-meta">
+                        <span class="time">⏱️ {{ lesson.estimated_minutes }} min</span>
+                        <span class="arrow">→</span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
 </div>
-{% endif %}
 {% endblock %}
 
 {% block extra_css %}
 <style>
-    .catalog-header {
-        text-align: center;
-        margin-bottom: 2rem;
+    .catalog-container {
+        max-width: 900px;
+        margin: 0 auto;
     }
     
-    .catalog-header h1 {
+    /* Welcome Section */
+    .welcome-section {
+        padding: 3rem 0;
+    }
+    
+    .welcome-card {
+        text-align: center;
+        padding: 3rem 2rem;
+    }
+    
+    .welcome-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+    
+    .welcome-card h1 {
         font-size: 2rem;
         font-weight: 800;
         margin-bottom: 0.5rem;
     }
     
-    .empty-state {
-        padding: 3rem 1rem;
+    .welcome-card p {
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .welcome-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    /* Catalog Header */
+    .catalog-header {
+        margin-bottom: 1.5rem;
+    }
+    
+    .catalog-header h1 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        margin-bottom: 0.25rem;
+    }
+    
+    /* Subject Cards Grid */
+    .subjects-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .subject-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem;
+        text-decoration: none;
+        color: inherit;
+        border: 2px solid transparent;
+        transition: all 0.2s ease;
+    }
+    
+    .subject-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .subject-card.active {
+        border-color: var(--primary);
+        background: #FFF5F0;
+    }
+    
+    .subject-icon {
+        font-size: 2.5rem;
+        flex-shrink: 0;
+    }
+    
+    .subject-info {
+        flex: 1;
+    }
+    
+    .subject-info h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .subject-progress {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .progress-bar {
+        height: 6px;
+        background: rgba(0,0,0,0.08);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--secondary), var(--primary));
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+    
+    .progress-text {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+    
+    /* Topics Section */
+    .topics-section {
+        margin-top: 1rem;
+    }
+    
+    .topics-header {
+        margin-bottom: 1.5rem;
+    }
+    
+    .topics-header h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+    }
+    
+    /* Unit Cards */
+    .unit-card {
+        margin-bottom: 1.5rem;
+        padding: 0;
+        overflow: hidden;
+    }
+    
+    .unit-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: var(--bg-warm);
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .unit-header h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .lesson-count {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+    
+    /* Lesson Items */
+    .lessons-list {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .lesson-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        text-decoration: none;
+        color: inherit;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        transition: background 0.2s ease;
+    }
+    
+    .lesson-item:last-child {
+        border-bottom: none;
+    }
+    
+    .lesson-item:hover {
+        background: var(--bg-warm);
+    }
+    
+    .lesson-status-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 1rem;
+    }
+    
+    .status-completed .lesson-status-icon {
+        background: var(--success);
+        color: white;
+    }
+    
+    .status-in_progress .lesson-status-icon {
+        background: var(--accent);
+        color: var(--text-dark);
+    }
+    
+    .status-not_started .lesson-status-icon {
+        background: #E8E8E8;
+        color: var(--text-muted);
+    }
+    
+    .icon-completed { font-weight: bold; }
+    .icon-progress { font-size: 1.25rem; }
+    .icon-new { font-size: 0.875rem; }
+    
+    .lesson-info {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .lesson-info h4 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+        color: var(--text-dark);
+    }
+    
+    .lesson-info p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .lesson-meta {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-shrink: 0;
+    }
+    
+    .lesson-meta .time {
+        font-size: 0.75rem;
+        color: var(--text-light);
+        font-weight: 600;
+    }
+    
+    .lesson-meta .arrow {
+        color: var(--primary);
+        font-weight: bold;
+        font-size: 1.25rem;
+    }
+    
+    /* Empty state */
+    .empty-section {
+        padding: 3rem 0;
+    }
+    
+    .empty-card {
+        padding: 3rem 2rem;
     }
     
     .empty-icon {
@@ -71,91 +373,20 @@
         margin-bottom: 1rem;
     }
     
-    .empty-state h3 {
-        font-size: 1.25rem;
+    .empty-card h2 {
+        font-size: 1.5rem;
         margin-bottom: 0.5rem;
     }
     
-    .lessons-grid {
-        display: grid;
-        gap: 1.5rem;
-    }
-    
-    @media (min-width: 640px) {
-        .lessons-grid {
-            grid-template-columns: repeat(2, 1fr);
+    /* Mobile adjustments */
+    @media (max-width: 600px) {
+        .lesson-info p {
+            display: none;
         }
-    }
-    
-    .lesson-card {
-        display: flex;
-        flex-direction: column;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    
-    .lesson-card:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-md);
-    }
-    
-    .lesson-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    .course-badge {
-        background: linear-gradient(135deg, var(--primary), var(--secondary));
-        color: white;
-        padding: 0.25rem 0.75rem;
-        border-radius: var(--radius-full);
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .time-badge {
-        background: var(--bg-warm);
-        color: var(--text-muted);
-        padding: 0.25rem 0.75rem;
-        border-radius: var(--radius-full);
-        font-size: 0.75rem;
-        font-weight: 600;
-    }
-    
-    .lesson-title {
-        font-size: 1.25rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-        color: var(--text-dark);
-    }
-    
-    .lesson-objective {
-        color: var(--text-muted);
-        font-size: 0.9375rem;
-        flex-grow: 1;
-        margin-bottom: 1.5rem;
-    }
-    
-    .lesson-footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding-top: 1rem;
-        border-top: 1px solid rgba(0,0,0,0.05);
-    }
-    
-    .unit-name {
-        font-size: 0.875rem;
-        color: var(--text-light);
-        font-weight: 600;
-    }
-    
-    .lesson-footer .btn {
-        padding: 0.625rem 1.25rem;
-        font-size: 0.875rem;
+        
+        .lesson-meta .time {
+            display: none;
+        }
     }
 </style>
 {% endblock %}

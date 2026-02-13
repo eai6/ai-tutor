@@ -6,7 +6,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.models import User
 from django.contrib import messages
-from apps.accounts.models import Institution, Membership
+from apps.accounts.models import Institution, Membership, StudentProfile
 
 
 def register_view(request):
@@ -14,15 +14,24 @@ def register_view(request):
     if request.user.is_authenticated:
         return redirect('tutoring:catalog')
     
+    # Get school choices for the form
+    school_choices = StudentProfile.SCHOOL_CHOICES
+    grade_choices = StudentProfile.GradeLevel.choices
+    
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         email = request.POST.get('email', '').strip()
         password = request.POST.get('password', '')
         password_confirm = request.POST.get('password_confirm', '')
         first_name = request.POST.get('first_name', '').strip()
+        school = request.POST.get('school', '')
+        grade_level = request.POST.get('grade_level', '')
         
         # Validation
         errors = []
+        
+        if not first_name:
+            errors.append("Please enter your name.")
         
         if not username or len(username) < 3:
             errors.append("Username must be at least 3 characters.")
@@ -39,12 +48,22 @@ def register_view(request):
         if password != password_confirm:
             errors.append("Passwords don't match.")
         
+        if not school:
+            errors.append("Please select your school.")
+        
+        if not grade_level:
+            errors.append("Please select your grade level.")
+        
         if errors:
             return render(request, 'accounts/register.html', {
                 'errors': errors,
                 'username': username,
                 'email': email,
                 'first_name': first_name,
+                'school': school,
+                'grade_level': grade_level,
+                'school_choices': school_choices,
+                'grade_choices': grade_choices,
             })
         
         # Create user
@@ -55,8 +74,19 @@ def register_view(request):
             first_name=first_name,
         )
         
-        # Auto-assign to Demo School (or first institution)
-        institution = Institution.objects.filter(is_active=True).first()
+        # Create student profile with school and grade
+        StudentProfile.objects.create(
+            user=user,
+            school=school,
+            grade_level=grade_level,
+        )
+        
+        # Auto-assign to Seychelles institution (or first active institution)
+        institution = Institution.objects.filter(
+            slug='seychelles-secondary',
+            is_active=True
+        ).first() or Institution.objects.filter(is_active=True).first()
+        
         if institution:
             Membership.objects.create(
                 user=user,
@@ -67,10 +97,13 @@ def register_view(request):
         
         # Log them in
         login(request, user)
-        messages.success(request, f"Welcome, {first_name or username}! 🎉")
+        messages.success(request, f"Welcome, {first_name}! 🎉")
         return redirect('tutoring:catalog')
     
-    return render(request, 'accounts/register.html')
+    return render(request, 'accounts/register.html', {
+        'school_choices': school_choices,
+        'grade_choices': grade_choices,
+    })
 
 
 def login_view(request):

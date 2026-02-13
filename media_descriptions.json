@@ -1,0 +1,901 @@
+[
+  {
+    "lesson_id": 1,
+    "lesson_title": "What is Geography?",
+    "subject": "Geography",
+    "unit": "S1: Introduction to Geography",
+    "media": [
+      {
+        "title": "Seychelles from Space - Physical and Human Geography",
+        "description": "Satellite view of the Seychelles islands showing the crystal blue Indian Ocean, coral reefs surrounding granite islands like Mah\u00e9 and Praslin, with visible human settlements, roads, and the airport on Mah\u00e9. The image should show the contrast between natural features (mountains, forests, beaches) and human-made features (buildings, infrastructure). Bright tropical colors with clear distinction between land, water, and developed areas.",
+        "placement": "top",
+        "caption": "Geography studies both physical features (islands, ocean, reefs) and human features (cities, roads, airports) and how they interact in places like Seychelles.",
+        "tags": "geography, seychelles, satellite, physical geography, human geography, islands"
+      },
+      {
+        "title": "Geographic Tools and Seychelles Map",
+        "description": "A detailed topographic map of Seychelles islands spread on a table with geographic tools around it: compass, ruler, GPS device, magnifying glass, and colored pencils. The map should show elevation contours, place names like Victoria, Beau Vallon, and major islands. Include a traditional globe showing the location of Seychelles in the Indian Ocean. Warm lighting with educational classroom setting.",
+        "placement": "inline",
+        "caption": "Geographers use various tools like maps, compasses, and GPS devices to study and understand places like our Seychelles islands.",
+        "tags": "geography, tools, maps, seychelles, compass, GPS, education"
+      },
+      {
+        "title": "Human-Environment Interaction in Seychelles",
+        "description": "Split-screen illustration showing human adaptation to Seychelles environment: left side shows traditional Creole houses built on stilts near mangroves with fishing boats, coconut palms, and sustainable living. Right side shows modern tourism development with hotels, beaches with tourists, and conservation efforts like turtle protection. Bright tropical setting with clear blue skies and turquoise waters.",
+        "placement": "inline",
+        "caption": "Geography examines how people in Seychelles adapt to their island environment and how human activities like tourism and fishing affect the natural surroundings.",
+        "tags": "geography, seychelles, human environment interaction, tourism, fishing, adaptation, culture"
+      }
+    ]
+  },
+  {
+    "lesson_id": 4,
+    "lesson_title": "Types of Maps",
+    "subject": "Geography",
+    "unit": "S1: Map Skills",
+    "media": [
+      {
+        "title": "Map Types Collection Seychelles",
+        "description": "A clean educational layout showing four different types of maps of Seychelles arranged in a 2x2 grid: top left shows a physical/topographical map with green islands, blue ocean, and elevation contours; top right displays a political map with clear boundaries, labeled districts, and capital Victoria marked; bottom left features a climate map with color-coded zones showing tropical climate patterns; bottom right shows a tourist/thematic map with symbols for beaches, hotels, and attractions. Each map is clearly labeled with its type in bold text below. White background, professional educational style.",
+        "placement": "top",
+        "caption": "Different types of maps serve various purposes - from showing physical features to political boundaries and climate patterns",
+        "tags": "geography, seychelles, map types, physical map, political map, climate map, thematic map"
+      },
+      {
+        "title": "Seychelles Topographical Features",
+        "description": "A detailed topographical map of Mah\u00e9 island in Seychelles showing elevation changes through color gradients from deep blue (sea level) to dark green (low elevation) to brown and white (highest peaks). Contour lines are clearly visible, with Morne Seychellois peak prominently marked. The coastline shows detailed bays and beaches. Grid lines and scale bar included. Professional cartographic style with legend showing elevation ranges.",
+        "placement": "inline",
+        "caption": "Topographical maps use contour lines and colors to show the height and shape of land features, like Mah\u00e9's mountainous interior",
+        "tags": "geography, seychelles, topographical map, contour lines, elevation, mahe island, morne seychellois"
+      },
+      {
+        "title": "Seychelles Road and Tourist Map",
+        "description": "A colorful tourist road map of Praslin island in Seychelles showing main roads as red lines, secondary roads as yellow lines, and walking trails as dotted lines. Tourist attractions marked with colorful icons: camera symbols for viewpoints, palm tree icons for beaches like Anse Lazio, building symbols for hotels, and special markers for Vall\u00e9e de Mai UNESCO site. Airport symbol clearly marked. Bright, tourist-friendly colors with easy-to-read labels and a comprehensive legend.",
+        "placement": "inline",
+        "caption": "Road and tourist maps help visitors navigate and locate important destinations, attractions, and services",
+        "tags": "geography, seychelles, road map, tourist map, praslin island, anse lazio, vallee de mai, navigation"
+      }
+    ]
+  },
+  {
+    "lesson_id": 7,
+    "lesson_title": "Weather vs Climate",
+    "subject": "Geography",
+    "unit": "S1: Weather and Climate",
+    "media": [
+      {
+        "title": "Weather vs Climate Comparison in Seychelles",
+        "description": "Split screen illustration showing the same tropical beach scene in Seychelles with palm trees and turquoise water. Left side labeled 'WEATHER' shows daily variations: sunny morning, afternoon rain clouds, and evening clear skies with a thermometer showing 28\u00b0C and wind indicator. Right side labeled 'CLIMATE' shows a graph with long-term temperature and rainfall patterns over 30 years, displaying consistent tropical climate data. Include text boxes explaining 'Daily conditions' vs 'Long-term patterns'.",
+        "placement": "top",
+        "caption": "Weather describes daily conditions while climate shows long-term patterns over 30+ years in the same location",
+        "tags": "geography, weather, climate, seychelles, comparison, tropical"
+      },
+      {
+        "title": "Seychelles Weather Instruments and Measurements",
+        "description": "Realistic illustration of a weather station on a Seychelles beach with granite boulders and tropical vegetation in background. Show various weather instruments: thermometer displaying 29\u00b0C, rain gauge with water level, wind vane pointing direction, barometer, and anemometer measuring wind speed. Include a weather observer in light tropical clothing recording data on a clipboard. Clear blue sky with some cumulus clouds.",
+        "placement": "inline",
+        "caption": "Weather stations in Seychelles measure daily conditions like temperature, rainfall, wind speed and direction",
+        "tags": "geography, weather station, instruments, seychelles, measurement, data"
+      },
+      {
+        "title": "Climate Zones of Seychelles Islands",
+        "description": "Detailed map of the main Seychelles islands (Mah\u00e9, Praslin, La Digue) showing different climate microzones using color coding. Coastal areas in light blue representing maritime tropical climate, inland mountainous areas of Mah\u00e9 in green showing slightly cooler highland climate. Include climate data boxes showing average temperatures (26-30\u00b0C), rainfall patterns (wet/dry seasons), and humidity levels. Add compass rose and scale bar.",
+        "placement": "inline",
+        "caption": "Even small island nations like Seychelles can have different climate zones based on elevation and location",
+        "tags": "geography, climate zones, seychelles, map, tropical climate, islands"
+      }
+    ]
+  },
+  {
+    "lesson_id": 10,
+    "lesson_title": "What is Climate Change?",
+    "subject": "Geography",
+    "unit": "S1: Climate Change",
+    "media": [
+      {
+        "title": "Climate Change Comparison in Seychelles",
+        "description": "Split-screen comparison image showing the same Seychelles beach scene. Left side: pristine coral reef with clear turquoise water, healthy palm trees, white sand beach, and normal sea level. Right side: same location showing effects of climate change - bleached coral reef visible underwater, rising sea levels encroaching on beach, some palm trees tilted or fallen, darker water, and visible coastal erosion. Include subtle temperature indicators and CO2 symbols in the atmosphere.",
+        "placement": "top",
+        "caption": "How climate change affects island nations like Seychelles - comparing past and present environmental conditions",
+        "tags": "climate change, seychelles, coral bleaching, sea level rise, coastal erosion"
+      },
+      {
+        "title": "Greenhouse Effect Diagram",
+        "description": "Educational infographic showing the greenhouse effect process. Earth in center with Seychelles archipelago visible. Sun's rays entering atmosphere (yellow arrows), some reflected back to space (blue arrows), greenhouse gases (CO2, CH4, N2O) shown as colorful molecules trapping heat (red wavy arrows). Include industrial emissions, deforestation, and transportation as sources. Use clear labels and warm color gradient showing trapped heat around Earth.",
+        "placement": "inline",
+        "caption": "The greenhouse effect: how certain gases in our atmosphere trap heat and warm our planet",
+        "tags": "greenhouse effect, carbon dioxide, global warming, atmosphere, heat trapping"
+      },
+      {
+        "title": "Climate Change Causes and Effects Cycle",
+        "description": "Circular infographic centered on a small tropical island (representing Seychelles). Around the circle show causes: factory smokestacks emitting CO2, cars producing exhaust, deforestation, burning fossil fuels. Effects shown: thermometer rising, melting ice caps, extreme weather symbols (hurricanes, droughts), rising sea levels with arrows pointing toward the island, coral bleaching, and displaced wildlife. Use arrows connecting causes to effects in a continuous cycle.",
+        "placement": "inline",
+        "caption": "The cycle of climate change: human activities cause environmental changes that affect island communities",
+        "tags": "climate change causes, environmental cycle, human impact, small island states, global warming effects"
+      }
+    ]
+  },
+  {
+    "lesson_id": 13,
+    "lesson_title": "Population Terminology",
+    "subject": "Geography",
+    "unit": "S1: Population Studies",
+    "media": [
+      {
+        "title": "Population Density Comparison in Seychelles",
+        "description": "Split-screen aerial view showing contrast between densely populated Victoria city center in Seychelles with crowded buildings, streets, and people, versus a sparsely populated outer island with scattered houses, palm trees, and pristine beaches. Clear blue ocean surrounds both areas. Infographic-style overlay showing population density numbers and dots representing people per square kilometer.",
+        "placement": "top",
+        "caption": "Population density varies greatly across Seychelles - from crowded urban areas like Victoria to sparsely populated outer islands",
+        "tags": "geography, seychelles, population density, urban, rural, demographics"
+      },
+      {
+        "title": "Population Pyramid Diagram for Seychelles",
+        "description": "Educational infographic showing a population pyramid chart with Seychelles demographic data. Horizontal bars representing different age groups (0-4, 5-9, 10-14, etc.) split by gender (blue for males, pink for females). Background features subtle Seychelles flag colors and tropical elements. Clear labels and numbers showing population terminology like 'dependent population', 'working age population', and 'elderly population'.",
+        "placement": "inline",
+        "caption": "A population pyramid shows the age and gender structure of Seychelles' population, helping us understand demographic patterns",
+        "tags": "geography, seychelles, population pyramid, demographics, age structure, statistics"
+      },
+      {
+        "title": "Population Terms Visual Dictionary",
+        "description": "Educational poster-style infographic featuring key population terminology with visual examples from Seychelles. Includes illustrated definitions of: birth rate (hospital scene), death rate (cemetery), migration (airport/port scene), natural increase (family with children), population distribution (map with dots), and urbanization (city skyline of Victoria). Bright, educational design with clear typography and Seychelles landmarks in background.",
+        "placement": "inline",
+        "caption": "Key population terms illustrated with examples from Seychelles to help understand demographic concepts",
+        "tags": "geography, seychelles, population terminology, demographics, birth rate, death rate, migration, vocabulary"
+      }
+    ]
+  },
+  {
+    "lesson_id": 16,
+    "lesson_title": "Types of Settlements",
+    "subject": "Geography",
+    "unit": "S2: Settlement Studies",
+    "media": [
+      {
+        "title": "Seychelles Settlement Hierarchy Comparison",
+        "description": "Split-screen aerial view showing three distinct settlement types in Seychelles: Left panel shows a small fishing village with scattered traditional houses among palm trees near a beach, middle panel shows a town with organized streets, shops, schools and a small port facility, right panel shows Victoria city with multi-story buildings, busy harbor, government buildings and dense urban development. Tropical island landscape with turquoise waters visible in background.",
+        "placement": "top",
+        "caption": "Comparison of village, town, and city settlements in Seychelles showing differences in size, buildings, and services",
+        "tags": "geography, seychelles, settlements, villages, towns, cities, aerial view"
+      },
+      {
+        "title": "Traditional Seychellois Village Scene",
+        "description": "Ground-level view of a traditional Seychellois village with colorful Creole-style wooden houses on stilts, coconut palms, a small local shop, fishing boats on the beach, dirt roads, children playing, and mountains in the background. Simple infrastructure with few modern buildings, peaceful rural atmosphere with tropical vegetation.",
+        "placement": "inline",
+        "caption": "A typical village in Seychelles with traditional houses, simple services, and close connection to natural environment",
+        "tags": "geography, seychelles, village, rural, traditional, creole architecture"
+      },
+      {
+        "title": "Victoria City Urban Landscape",
+        "description": "Bustling street scene in Victoria, Seychelles showing the famous Clock Tower, modern shops, banks, government offices, paved roads with cars and buses, street vendors, pedestrians walking on sidewalks, multi-story concrete buildings, and the busy inter-island ferry terminal in the background. Urban infrastructure with traffic lights and modern amenities visible.",
+        "placement": "inline",
+        "caption": "Victoria, the capital city of Seychelles, showing urban features like tall buildings, busy streets, and many services",
+        "tags": "geography, seychelles, victoria, city, urban, capital, clock tower, infrastructure"
+      }
+    ]
+  },
+  {
+    "lesson_id": 19,
+    "lesson_title": "Structure of the Earth",
+    "subject": "Geography",
+    "unit": "S2: Plate Tectonics",
+    "media": [
+      {
+        "title": "Earth's Internal Structure Cross-Section",
+        "description": "A detailed scientific cross-section diagram of Earth showing the four main layers: inner core (solid iron-nickel, bright metallic center), outer core (liquid iron-nickel, glowing orange-red), mantle (thick rocky layer in orange and red tones showing convection currents), and crust (thin outermost layer in brown and green). The diagram should be cut in half like a sliced apple, with clear labels and different colors for each layer. Include temperature and depth measurements. Style should be educational textbook illustration with clean lines and scientific accuracy.",
+        "placement": "top",
+        "caption": "Cross-section of Earth showing the four main layers: crust, mantle, outer core, and inner core. Notice how thin the crust is compared to the other layers.",
+        "tags": "geography, earth structure, layers, crust, mantle, core, cross-section"
+      },
+      {
+        "title": "Seychelles Granite Formation",
+        "description": "A close-up photograph of the famous granite rock formations at Anse Source d'Argent beach in La Digue, Seychelles, with smooth weathered granite boulders against turquoise water and white sand. The image should highlight the texture and composition of the granite rocks, showing the crystalline structure and pink-grey coloration typical of continental crust. Palm trees and tropical vegetation visible in background.",
+        "placement": "inline",
+        "caption": "The granite rocks of Seychelles, like these at Anse Source d'Argent, are part of Earth's continental crust and formed deep underground millions of years ago.",
+        "tags": "seychelles, granite, crust, continental crust, la digue, rock formation"
+      },
+      {
+        "title": "Earth Layers Comparison Scale",
+        "description": "An educational infographic showing Earth's layers drawn to scale as vertical bars or columns, comparing their relative thicknesses. The crust should appear as a very thin line (5-70km), mantle as a thick section (2,900km), outer core (2,300km), and inner core (1,200km). Include a small silhouette of Mah\u00e9 island for scale comparison. Use distinct colors: brown for crust, orange-red for mantle, bright orange for outer core, yellow for inner core. Include distance measurements and temperature readings for each layer.",
+        "placement": "inline",
+        "caption": "This scale diagram shows the true thickness of Earth's layers. The entire island of Mah\u00e9 would fit many times within just the thin crust layer!",
+        "tags": "earth layers, scale, thickness, comparison, mah\u00e9, measurements, temperature"
+      }
+    ]
+  },
+  {
+    "lesson_id": 23,
+    "lesson_title": "Tropical Rainforests",
+    "subject": "Geography",
+    "unit": "S2: Tropical Ecosystems",
+    "media": [
+      {
+        "title": "Tropical Rainforest Layers Structure",
+        "description": "Cross-section illustration of a tropical rainforest showing four distinct layers: emergent layer with tallest trees breaking through canopy, dense canopy layer with interlocking branches and leaves, understory layer with smaller trees and shrubs in filtered light, and forest floor with decomposing leaves and minimal vegetation. Include diverse tropical animals like toucans, monkeys, butterflies, and jaguars positioned in their respective layers. Use vibrant greens and show how sunlight penetrates differently through each layer.",
+        "placement": "top",
+        "caption": "The four distinct layers of a tropical rainforest ecosystem, each supporting different plant and animal species",
+        "tags": "geography, tropical rainforest, ecosystem layers, biodiversity, canopy, understory"
+      },
+      {
+        "title": "Seychelles Morne Seychellois Rainforest",
+        "description": "Lush tropical rainforest scene from Seychelles' Morne Seychellois National Park showing dense green vegetation, large tropical trees with buttress roots, hanging vines and lianas, exotic ferns, and filtered sunlight creating dappled patterns on the forest floor. Include endemic Seychelles plants like coco de mer palms and native hardwood trees. The scene should capture the humid, dense atmosphere typical of Seychelles' mountainous rainforest interior.",
+        "placement": "inline",
+        "caption": "Morne Seychellois National Park in Seychelles contains tropical rainforest similar to larger rainforests worldwide",
+        "tags": "geography, seychelles, morne seychellois, tropical rainforest, endemic species, national park"
+      },
+      {
+        "title": "Tropical Rainforest Climate and Features Diagram",
+        "description": "Educational infographic showing key features of tropical rainforest ecosystems: temperature gauge showing 20-30\u00b0C year-round, rainfall chart displaying 2000-3000mm annual precipitation, humidity indicator at 80-90%, nutrient cycle diagram showing rapid decomposition and recycling, soil profile showing thin fertile topsoil over clay, and biodiversity indicators showing high species richness. Include small illustrations of epiphytes, buttress roots, and climbing vines with labels.",
+        "placement": "inline",
+        "caption": "Key physical and climatic characteristics that define tropical rainforest ecosystems around the world",
+        "tags": "geography, tropical rainforest, climate, temperature, rainfall, humidity, biodiversity, ecosystem features"
+      }
+    ]
+  },
+  {
+    "lesson_id": 26,
+    "lesson_title": "Types of Industry",
+    "subject": "Geography",
+    "unit": "S3: Industry and Fishing",
+    "media": [
+      {
+        "title": "Three Types of Industry Classification",
+        "description": "A clean educational infographic showing three distinct sections representing primary, secondary, and tertiary industries. Left section shows primary industry with images of fishing boats, coconut palms, and mining equipment in tropical setting. Middle section displays secondary industry with a modern factory building, conveyor belts, and manufactured goods like canned fish and processed coconut products. Right section illustrates tertiary industry with a hotel resort, bank building, and people providing services. Each section is labeled clearly with bold headers and connected by arrows showing the flow from raw materials to finished products to services. Use bright, educational colors with a clean white background.",
+        "placement": "top",
+        "caption": "The three main types of industry: Primary (extracting raw materials), Secondary (manufacturing), and Tertiary (providing services)",
+        "tags": "geography, industry, classification, primary, secondary, tertiary, seychelles"
+      },
+      {
+        "title": "Primary Industries in Seychelles",
+        "description": "A vibrant tropical scene showing various primary industries in Seychelles. In the foreground, local fishermen on colorful traditional boats hauling nets full of tuna and other fish from turquoise ocean waters. On the shoreline, workers harvesting coconuts from tall palm trees. In the background, granite quarrying operations on hillsides typical of Seychelles landscape with lush green vegetation. The scene should capture the natural beauty of Seychelles with its characteristic granite boulders, pristine beaches, and tropical vegetation while showing people engaged in extracting natural resources.",
+        "placement": "inline",
+        "caption": "Primary industries in Seychelles include fishing (especially tuna), coconut harvesting, and granite quarrying - all involving the extraction of natural resources",
+        "tags": "geography, primary industry, fishing, seychelles, coconut, quarrying, natural resources"
+      },
+      {
+        "title": "Tourism as Tertiary Industry in Seychelles",
+        "description": "A bustling scene showcasing tertiary industries in Seychelles focused on tourism services. Show a luxury resort with staff members providing various services: hotel receptionists welcoming guests, tour guides leading visitors, restaurant servers at beachside dining, dive instructors with tourists, and taxi drivers. Include the iconic Seychelles backdrop of pristine white sand beaches, crystal clear blue waters, and granite rock formations. Also show a modern bank building and small retail shops. The image should convey the service-oriented nature of tertiary industries with people helping and serving others in a tropical paradise setting.",
+        "placement": "inline",
+        "caption": "Tertiary industries in Seychelles are dominated by tourism services, including hotels, restaurants, tour operators, banks, and retail - all providing services rather than producing goods",
+        "tags": "geography, tertiary industry, tourism, services, seychelles, hospitality, banking"
+      }
+    ]
+  },
+  {
+    "lesson_id": 29,
+    "lesson_title": "Wave Action",
+    "subject": "Geography",
+    "unit": "S3: Coastal Landforms",
+    "media": [
+      {
+        "title": "Wave Formation Process Diagram",
+        "description": "A detailed cross-sectional diagram showing wave formation over the ocean. The image shows wind blowing across the ocean surface creating ripples that develop into waves. Include arrows showing wind direction, wave motion, and water particle movement in circular orbits. Show the progression from small ripples to larger waves. The background should show the tropical blue waters typical of the Indian Ocean around Seychelles, with labels indicating wave height, wavelength, and wave crest and trough.",
+        "placement": "top",
+        "caption": "How waves are formed by wind action over the ocean surface, showing the circular motion of water particles",
+        "tags": "geography, waves, formation, ocean, seychelles, coastal, wind"
+      },
+      {
+        "title": "Wave Characteristics and Anatomy",
+        "description": "A clear scientific diagram showing the anatomy of ocean waves with detailed labels. Display a side view of multiple waves showing wave crest, wave trough, wave height, wavelength, and amplitude. Include arrows showing wave direction and particle motion. Set against the backdrop of Seychelles' crystal-clear turquoise waters with granite coastline visible in the distance. Use clean, educational diagram style with clear measurement indicators and professional labeling.",
+        "placement": "inline",
+        "caption": "Key characteristics and measurements of ocean waves including crest, trough, height, and wavelength",
+        "tags": "geography, wave characteristics, coastal, seychelles, diagram, wavelength, amplitude"
+      },
+      {
+        "title": "Seychelles Coastal Wave Action",
+        "description": "A realistic photograph-style image showing waves approaching the granite coastline of Seychelles, particularly around Praslin or La Digue. Show waves of different sizes demonstrating varying wave energy, with some waves breaking against the distinctive granite boulders and others gently lapping sandy beaches. Include palm trees and the characteristic Seychelles landscape. The image should clearly show wave refraction around headlands and wave energy differences in bays versus exposed coasts.",
+        "placement": "inline",
+        "caption": "Wave action along the granite coastline of Seychelles, showing how waves interact with different coastal features",
+        "tags": "geography, seychelles, coastal landforms, granite, wave action, praslin, la digue, tropical"
+      }
+    ]
+  },
+  {
+    "lesson_id": 2,
+    "lesson_title": "Physical and Human Geography",
+    "subject": "Geography",
+    "unit": "S1: Introduction to Geography",
+    "media": [
+      {
+        "title": "Physical vs Human Geography Split View of Seychelles",
+        "description": "A split-screen comparison image showing Seychelles from two perspectives. Left side: pristine natural landscape showing granite rock formations of La Digue, lush tropical vegetation, coral reefs visible in crystal clear turquoise water, and untouched beaches with no human structures. Right side: the same coastal area but showing human geography elements including traditional Creole houses with corrugated iron roofs, fishing boats, a small port, roads cutting through the landscape, and tourists on the beach. The contrast should clearly illustrate the difference between physical and human geography in the same location.",
+        "placement": "top",
+        "caption": "The same location in Seychelles showing physical geography features (left) and human geography features (right)",
+        "tags": "geography, seychelles, physical geography, human geography, comparison, landscapes"
+      },
+      {
+        "title": "Physical Geography Features Map of Seychelles",
+        "description": "A detailed topographical-style illustration of the main Seychelles islands (Mah\u00e9, Praslin, La Digue) showing only natural physical features. Include elevation contours showing the mountainous terrain, coral reefs surrounding the islands in lighter blue, deep ocean in darker blue, rivers and streams, different vegetation zones from coastal mangroves to highland forests, granite boulder formations, and natural beaches. Use earth tones and natural colors with clear labels for different physical features like 'Morne Seychellois' mountain, 'granite formations', 'coral reefs', and 'tropical rainforest'.",
+        "placement": "inline",
+        "caption": "Physical geography features of the Seychelles islands including landforms, water bodies, and natural vegetation",
+        "tags": "geography, seychelles, physical geography, topography, landforms, natural features"
+      },
+      {
+        "title": "Human Geography Activities in Seychelles",
+        "description": "A comprehensive illustration showing various human geography elements across Seychelles. Include Victoria city with buildings and the clock tower, Seychelles International Airport on Mah\u00e9, fishing villages with colorful boats, tourist resorts along beaches, agricultural areas growing cinnamon and vanilla, roads connecting settlements, the port with cargo ships, markets with local vendors, schools and churches in communities, and wind turbines on hills. Show people engaged in different activities like fishing, farming, tourism, and trading. Use a bird's eye view perspective to show the distribution of human activities across the landscape.",
+        "placement": "inline",
+        "caption": "Human geography in Seychelles showing settlements, economic activities, transportation, and how people interact with their environment",
+        "tags": "geography, seychelles, human geography, settlements, economic activities, transportation, culture"
+      }
+    ]
+  },
+  {
+    "lesson_id": 5,
+    "lesson_title": "Grid References",
+    "subject": "Geography",
+    "unit": "S1: Map Skills",
+    "media": [
+      {
+        "title": "Seychelles Topographic Grid Map",
+        "description": "A detailed topographic map showing part of Mah\u00e9 island in Seychelles with a clear coordinate grid overlay. The map shows coastal areas with beaches, inland hills and forests, small settlements, and roads. The grid lines are clearly marked with numbers along the edges (horizontal: eastings, vertical: northings). Grid squares are prominently displayed with thick black lines. Include recognizable Seychelles features like palm trees symbols, coral reefs around the coast, and elevation contours showing the mountainous interior. The grid reference numbers should be clearly visible, starting from coordinates like 470000E, 950000N.",
+        "placement": "top",
+        "caption": "A topographic map of Mah\u00e9, Seychelles showing the grid reference system with eastings (horizontal) and northings (vertical) coordinates",
+        "tags": "geography, seychelles, map, grid, coordinates, topographic, mahe"
+      },
+      {
+        "title": "Four-Figure vs Six-Figure Grid Reference Comparison",
+        "description": "Split-screen educational diagram showing the same location on a Seychelles map (featuring a small beach with palm trees and a village). Left side demonstrates four-figure grid reference (showing a 1km x 1km grid square highlighted in red) with large numbers like '4795'. Right side shows six-figure grid reference (showing a precise 100m x 100m location marked with a red dot) with coordinates like '473954'. Both sides have clear labels, arrows pointing to the referenced locations, and grid lines with coordinate numbers. Include a legend explaining the difference in precision between the two methods.",
+        "placement": "inline",
+        "caption": "Comparison showing how four-figure references identify a 1km square while six-figure references pinpoint locations to within 100m",
+        "tags": "geography, grid reference, four-figure, six-figure, coordinates, precision, seychelles"
+      },
+      {
+        "title": "Step-by-Step Grid Reference Guide",
+        "description": "Educational infographic showing a close-up section of a Seychelles map with a small island or coastal area. The image shows numbered steps (1, 2, 3, 4) with colorful arrows and annotations demonstrating how to read grid references. Step 1: 'Read eastings first' with a horizontal arrow, Step 2: 'Then northings' with a vertical arrow, Step 3: 'Four-figure gives grid square' showing a highlighted square, Step 4: 'Six-figure gives exact location' showing a precise point. Include the phrase 'Along the corridor, up the stairs' as a memory aid. The map shows typical Seychelles features like small coves, vegetation symbols, and clear grid markings.",
+        "placement": "inline",
+        "caption": "Step-by-step guide to reading grid references: 'Along the corridor (eastings first), up the stairs (northings second)'",
+        "tags": "geography, tutorial, grid reference, eastings, northings, seychelles, map skills, coordinates"
+      }
+    ]
+  },
+  {
+    "lesson_id": 8,
+    "lesson_title": "Weather Instruments",
+    "subject": "Geography",
+    "unit": "S1: Weather and Climate",
+    "media": [
+      {
+        "title": "Weather Station in Seychelles Tropical Setting",
+        "description": "A modern weather monitoring station set up on a hillside overlooking the Indian Ocean in Seychelles, featuring multiple weather instruments including a white Stevenson screen (weather box), wind vane, anemometer, rain gauge, and temperature sensors. The scene shows lush green tropical vegetation, granite rock formations typical of Seychelles, crystal blue ocean in the background, and puffy white clouds in a bright blue sky. The instruments are clearly labeled and positioned to show proper installation methods.",
+        "placement": "top",
+        "caption": "A complete weather station in Seychelles showing various instruments used to measure different weather conditions",
+        "tags": "weather instruments, seychelles, meteorology, geography, tropical climate"
+      },
+      {
+        "title": "Traditional and Digital Weather Instruments Comparison",
+        "description": "Split-screen comparison showing traditional weather instruments on the left (mercury thermometer, mechanical barometer, manual rain gauge, wind vane) and modern digital equivalents on the right (digital thermometer, electronic barometer, automatic rain gauge, digital weather station). The background features a subtle Seychelles landscape with palm trees. Each instrument is clearly labeled with arrows pointing to key components, showing measurement scales and units.",
+        "placement": "inline",
+        "caption": "Comparison between traditional and modern weather instruments used for measuring temperature, pressure, rainfall, and wind",
+        "tags": "weather instruments, thermometer, barometer, rain gauge, technology, measurements"
+      },
+      {
+        "title": "Weather Measurement Data Collection Chart",
+        "description": "An educational infographic showing a weather data recording table with measurements typical for Seychelles climate. The chart displays daily recordings for one week including temperature (\u00b0C), humidity (%), rainfall (mm), wind speed (km/h), wind direction, and air pressure (hPa). Visual icons represent each type of measurement - thermometer for temperature, water droplets for humidity and rainfall, arrows for wind. The background shows a faded map of Seychelles islands with weather symbols.",
+        "placement": "inline",
+        "caption": "Example of how weather data is recorded and organized using measurements from different instruments",
+        "tags": "weather data, measurements, chart, temperature, humidity, rainfall, seychelles"
+      }
+    ]
+  },
+  {
+    "lesson_id": 11,
+    "lesson_title": "Effects of Climate Change",
+    "subject": "Geography",
+    "unit": "S1: Climate Change",
+    "media": [
+      {
+        "title": "Seychelles Coral Bleaching Comparison",
+        "description": "Split-screen underwater photograph showing coral reef in Seychelles waters. Left side: healthy vibrant coral reef with bright colors - orange, pink, purple corals with tropical fish swimming around. Right side: bleached white coral reef in the same location, showing stark white dead corals with fewer fish. Crystal clear turquoise water, sunlight filtering down from above. Scientific documentation style photography.",
+        "placement": "top",
+        "caption": "Coral bleaching in Seychelles waters: healthy reef (left) versus bleached reef (right) due to rising ocean temperatures",
+        "tags": "climate change, seychelles, coral bleaching, ocean warming, marine ecosystems"
+      },
+      {
+        "title": "Rising Sea Levels Impact on Seychelles Coastline",
+        "description": "Aerial view of a typical Seychelles beach showing coastal erosion effects. Before and after style image showing the same stretch of coastline. Pristine white sand beach with palm trees and granite boulders typical of Seychelles, but with visible shoreline retreat. Traditional Creole houses closer to the waterline, some partially flooded. Bright blue Indian Ocean waters, lush green tropical vegetation on hills in background.",
+        "placement": "inline",
+        "caption": "Coastal erosion threatens Seychelles communities as sea levels rise due to climate change",
+        "tags": "sea level rise, coastal erosion, seychelles, climate impacts, island nations"
+      },
+      {
+        "title": "Extreme Weather Events in Seychelles",
+        "description": "Dramatic photograph of intense tropical storm over Seychelles landscape. Dark storm clouds gathering over typical Seychelles scenery with granite mountains, palm trees bending in strong winds. Heavy rainfall visible as sheets across the scene. Traditional Seychelles architecture - colorful Creole houses with corrugated iron roofs. Rough seas with large waves crashing against rocky coastline. Lightning illuminating the dramatic sky.",
+        "placement": "inline",
+        "caption": "Increasingly severe storms and extreme weather events affect daily life in Seychelles",
+        "tags": "extreme weather, storms, seychelles, climate change effects, tropical weather"
+      }
+    ]
+  },
+  {
+    "lesson_id": 14,
+    "lesson_title": "Population Pyramids",
+    "subject": "Geography",
+    "unit": "S1: Population Studies",
+    "media": [
+      {
+        "title": "Population Pyramid Structure Diagram",
+        "description": "A clean, educational diagram showing the basic structure of a population pyramid with clearly labeled axes. The vertical axis shows age groups from 0-4 at bottom to 85+ at top in 5-year intervals. The horizontal axis shows population numbers/percentages with males on left (blue) and females on right (pink). Include labels pointing to key features: 'Age Groups', 'Males', 'Females', 'Population Numbers'. Use a neutral example pyramid with moderate growth pattern. Clean white background with black text and grid lines.",
+        "placement": "top",
+        "caption": "The basic structure of a population pyramid showing how age groups and gender are displayed",
+        "tags": "population pyramid, demographics, age structure, gender, geography, education"
+      },
+      {
+        "title": "Three Types of Population Pyramids",
+        "description": "Three side-by-side population pyramids showing different demographic patterns: 1) Expansive pyramid (wide base, narrow top) labeled 'Young Population - Developing Country', 2) Stationary pyramid (roughly rectangular shape) labeled 'Stable Population - Developed Country', 3) Constrictive pyramid (narrow base, wide middle) labeled 'Aging Population - Very Developed Country'. Each pyramid uses blue for males (left) and pink for females (right). Clean educational style with age groups 0-4 to 85+ on vertical axis. Include small flags or labels suggesting these represent different countries including island nations.",
+        "placement": "inline",
+        "caption": "Three main types of population pyramids showing different demographic patterns found in countries worldwide",
+        "tags": "population types, demographic transition, developing countries, aging population, comparative geography"
+      },
+      {
+        "title": "Seychelles Population Analysis",
+        "description": "Split image showing: Left side - scenic view of Seychelles islands with turquoise waters, palm trees, and modern buildings representing the country's development. Right side - a population pyramid specifically representing Seychelles demographic data, showing a moderately developed country pattern with slightly wider middle sections and narrowing base and top. Include small Seychelles flag icon. The pyramid should reflect a small island nation's demographic characteristics with blue bars for males (left) and pink bars for females (right).",
+        "placement": "inline",
+        "caption": "Seychelles landscape and its population structure, showing characteristics typical of a small island developing state",
+        "tags": "seychelles, island demographics, small island states, indian ocean, population analysis, local geography"
+      }
+    ]
+  },
+  {
+    "lesson_id": 17,
+    "lesson_title": "Settlement Patterns",
+    "subject": "Geography",
+    "unit": "S2: Settlement Studies",
+    "media": [
+      {
+        "title": "Seychelles Settlement Pattern Overview Map",
+        "description": "An aerial view style map illustration of the Seychelles archipelago showing the main islands of Mah\u00e9, Praslin, and La Digue with different settlement patterns clearly marked. Coastal settlements are shown as dense clusters of small buildings along the shorelines, linear settlements following the coastal roads, and scattered inland settlements in valleys between granite hills. The map uses different colors to distinguish settlement types: red dots for coastal settlements, blue lines for linear settlements along roads, and green scattered dots for inland settlements. The turquoise ocean surrounds the islands with coral reefs visible as lighter blue areas.",
+        "placement": "top",
+        "caption": "Settlement patterns across the main islands of Seychelles showing coastal clustering, linear development along roads, and scattered inland communities",
+        "tags": "geography, seychelles, settlement patterns, map, archipelago, coastal, linear"
+      },
+      {
+        "title": "Victoria Urban Settlement Pattern",
+        "description": "An illustrated bird's eye view of Victoria, the capital city of Seychelles on Mah\u00e9 island, showing the concentrated urban settlement pattern. The image displays the compact city center with multi-story buildings, the famous clock tower, market areas, and port facilities along the waterfront. Residential areas spread up the surrounding granite hills in a nucleated pattern. Palm trees and tropical vegetation are scattered throughout, with the harbor showing boats and ships. The settlement shows high building density in the center decreasing toward the hills, typical of nucleated urban settlement patterns.",
+        "placement": "inline",
+        "caption": "Victoria city showing nucleated urban settlement pattern with high density center and decreasing density toward the hills",
+        "tags": "geography, victoria, seychelles, urban settlement, nucleated, city center, capital"
+      },
+      {
+        "title": "Coastal Linear Settlement in Seychelles",
+        "description": "A detailed illustration showing a typical coastal linear settlement pattern along a Seychelles shoreline. The image shows a winding coastal road with traditional Creole houses and modern buildings lined up along one side facing the ocean, and granite hills covered in tropical vegetation on the other side. Coconut palms line the beach, fishing boats are pulled up on the sandy shore, and the clear turquoise water shows coral reefs. The settlement extends in a ribbon-like pattern following the curve of the coastline, demonstrating classic linear settlement development constrained by topography.",
+        "placement": "inline",
+        "caption": "Linear coastal settlement pattern typical of Seychelles outer islands, where development follows the shoreline between hills and sea",
+        "tags": "geography, seychelles, linear settlement, coastal development, creole houses, topography"
+      }
+    ]
+  },
+  {
+    "lesson_id": 20,
+    "lesson_title": "Plate Boundaries",
+    "subject": "Geography",
+    "unit": "S2: Plate Tectonics",
+    "media": [
+      {
+        "title": "Three Types of Plate Boundaries Cross-Section",
+        "description": "A detailed geological cross-section diagram showing three distinct plate boundary types side by side. Left section shows divergent boundary with oceanic plates spreading apart, magma rising from mantle creating new oceanic crust, with red-orange magma visible. Center section shows convergent boundary with one oceanic plate subducting under continental plate, creating mountain formation and volcanic activity. Right section shows transform boundary with two plates sliding past each other horizontally, showing offset rock layers. Include clear labels, arrows showing plate movement directions, and geological layers visible in cross-section. Use educational diagram style with clear colors and scientific accuracy.",
+        "placement": "top",
+        "caption": "The three main types of plate boundaries: divergent (spreading), convergent (colliding), and transform (sliding)",
+        "tags": "plate boundaries, geology, tectonics, divergent, convergent, transform"
+      },
+      {
+        "title": "Seychelles and the Indian Ocean Ridge System",
+        "description": "Satellite view map of the Indian Ocean showing the Seychelles islands positioned on the Seychelles Plateau, with the Mid-Indian Ridge system visible as underwater mountain ranges. Show the Southwest Indian Ridge and Central Indian Ridge as prominent underwater features with different colored depths indicating ocean floor topography. Highlight the Seychelles granitic islands in green and coral islands in lighter colors. Include arrows showing plate movement directions around the ridge systems. Use bathymetric coloring from deep blue for ocean depths to lighter blues and greens for shallow areas and land masses.",
+        "placement": "inline",
+        "caption": "The Seychelles sits on an ancient continental fragment, surrounded by the Mid-Indian Ridge system - a major divergent plate boundary",
+        "tags": "seychelles, indian ocean, mid-ocean ridge, divergent boundary, bathymetric"
+      },
+      {
+        "title": "Transform Boundary Real-World Example",
+        "description": "Aerial photograph style image of a transform fault cutting through landscape, showing a clear linear valley or depression where two tectonic plates slide past each other. Show offset geological features like rock formations or valleys that have been displaced horizontally. Include evidence of fault movement such as fractured rocks, linear valleys, and offset streams. The landscape should show tropical vegetation similar to Seychelles environment with granite rock formations. Add subtle arrows indicating the opposing horizontal movement of the plates on either side of the fault line.",
+        "placement": "inline",
+        "caption": "Transform boundaries create linear fault zones where plates slide horizontally past each other, often visible as valleys or ridges in the landscape",
+        "tags": "transform boundary, fault line, plate movement, geological features, tropical landscape"
+      }
+    ]
+  },
+  {
+    "lesson_id": 24,
+    "lesson_title": "Hot Deserts",
+    "subject": "Geography",
+    "unit": "S2: Tropical Ecosystems",
+    "media": [
+      {
+        "title": "Hot Desert Ecosystem Cross-Section",
+        "description": "A detailed cross-sectional diagram of a hot desert ecosystem showing layers from underground to sky. Include sparse desert vegetation like cacti and thorny shrubs, rocky and sandy terrain with different soil layers visible underground, scattered animal life like lizards and desert beetles, intense sun rays beating down, very few clouds in a bright blue sky, and temperature indicators showing extreme heat. The style should be educational and clear, similar to textbook illustrations.",
+        "placement": "top",
+        "caption": "Cross-section view of a typical hot desert ecosystem showing the harsh environment and specialized life forms that survive there",
+        "tags": "geography, hot desert, ecosystem, cross-section, climate"
+      },
+      {
+        "title": "Desert Adaptations Comparison Chart",
+        "description": "A colorful educational infographic showing desert plant and animal adaptations side by side. Left side shows desert plants: barrel cactus with thick waxy skin and spines, date palm with deep roots, succulent plants storing water. Right side shows desert animals: fennec fox with large ears, camel with hump, desert tortoise, lizard. Each organism has labeled arrows pointing to their specific adaptations with brief explanations. Include a thermometer showing high temperatures and water droplet symbols showing water scarcity.",
+        "placement": "inline",
+        "caption": "How plants and animals adapt to survive in hot desert conditions through specialized features",
+        "tags": "geography, desert adaptations, plants, animals, survival"
+      },
+      {
+        "title": "Global Hot Deserts Map with Seychelles Reference",
+        "description": "A world map highlighting major hot desert regions in orange/tan colors including the Sahara, Arabian Desert, Thar Desert, Great Victoria Desert, and southwestern USA deserts. Include a small inset map showing the location of Seychelles in the Indian Ocean with an arrow and label. Add climate symbols showing hot temperatures and minimal rainfall over desert regions, and contrast with tropical symbols near Seychelles. Use clear country borders and ocean labels.",
+        "placement": "inline",
+        "caption": "Location of the world's major hot deserts compared to Seychelles' tropical location in the Indian Ocean",
+        "tags": "geography, world map, hot deserts, seychelles, global climate"
+      }
+    ]
+  },
+  {
+    "lesson_id": 27,
+    "lesson_title": "Fishing in Seychelles",
+    "subject": "Geography",
+    "unit": "S3: Industry and Fishing",
+    "media": [
+      {
+        "title": "Traditional Seychellois Fishermen at Work",
+        "description": "A vibrant scene showing local Seychellois fishermen working on a pristine turquoise beach with granite boulders typical of Seychelles. Two fishermen are pulling in colorful fishing nets filled with tropical fish, while a traditional wooden pirogue boat sits on the white sandy shore. Palm trees sway in the background under a bright blue sky with puffy white clouds. The crystal-clear water shows coral reefs beneath the surface, and the distinctive granite rock formations of Seychelles are visible along the coastline.",
+        "placement": "top",
+        "caption": "Traditional fishing methods are still widely used by local fishermen in Seychelles, providing fresh fish for both local consumption and tourism.",
+        "tags": "geography, seychelles, fishing, traditional, fishermen, pirogue, beach, indian ocean"
+      },
+      {
+        "title": "Seychelles Fishing Industry Economic Impact",
+        "description": "An infographic-style illustration showing the economic importance of fishing to Seychelles. The image features a circular diagram with the Seychelles flag colors (blue, yellow, red, white, green) showing different sectors: local fishing boats and nets representing artisanal fishing, modern tuna processing facilities, tourists enjoying fresh seafood at beachside restaurants, and export containers with fish symbols. Include small icons of tuna, job symbols, and dollar signs to represent economic value. The background shows a subtle outline map of Seychelles islands.",
+        "placement": "inline",
+        "caption": "Fishing contributes significantly to Seychelles' economy through local food security, tourism, employment, and exports, especially tuna fishing.",
+        "tags": "geography, seychelles, economy, fishing industry, tuna, exports, employment, infographic"
+      },
+      {
+        "title": "Victoria Market Fish Section",
+        "description": "A bustling scene inside the famous Victoria Market in Mah\u00e9, Seychelles, focusing on the fish section. Local vendors, primarily Seychellois women in colorful clothing, are selling various tropical fish species including red snapper, kingfish, and octopus displayed on ice. The market stalls are covered with corrugated iron roofing, and customers are examining the fresh catch. Bright tropical fruits and vegetables are visible in adjacent stalls. The atmosphere is lively with natural lighting filtering through, showing the importance of fresh fish in daily Seychellois life.",
+        "placement": "inline",
+        "caption": "Victoria Market in Mah\u00e9 demonstrates how fishing supports local food security, with fresh fish being a staple in Seychellois cuisine and daily life.",
+        "tags": "geography, seychelles, victoria market, fresh fish, local food, food security, market, mahe"
+      }
+    ]
+  },
+  {
+    "lesson_id": 30,
+    "lesson_title": "Erosional Landforms",
+    "subject": "Geography",
+    "unit": "S3: Coastal Landforms",
+    "media": [
+      {
+        "title": "Seychelles Granite Coast Erosional Features",
+        "description": "Aerial view of a dramatic granite coastline in Seychelles showing multiple coastal erosional landforms. The scene features towering sea cliffs made of pink-grey granite rocks, with visible wave-cut platforms at their base during low tide. Several sea caves are carved into the cliff face, and natural rock arches span across small bays. The turquoise Indian Ocean waves crash against the rocky shore, creating white foam. Palm trees and tropical vegetation crown the clifftops. The image should clearly show the contrast between the dark granite rocks and the bright blue-green ocean water, with some small granite boulders scattered on the wave-cut platform.",
+        "placement": "top",
+        "caption": "Coastal erosion has carved spectacular landforms along Seychelles' granite coastlines, including cliffs, wave-cut platforms, caves, and arches.",
+        "tags": "seychelles, coastal erosion, granite cliffs, wave-cut platform, sea caves, rock arches, indian ocean"
+      },
+      {
+        "title": "Wave Action and Cliff Undercutting Process",
+        "description": "Cross-sectional diagram showing the process of coastal cliff erosion in a tropical setting. The illustration shows a steep coastal cliff with layers of rock, and large ocean waves hitting the base of the cliff. Arrows indicate wave action and hydraulic pressure forcing water into cracks in the rock. The diagram shows the undercutting process at the cliff base, with loose rocks and debris at the foot of the cliff. Include labels for 'hydraulic action', 'abrasion', 'cliff retreat', and 'wave-cut notch'. The style should be educational and clear, with cross-hatching to show different rock layers and blue arrows for wave movement.",
+        "placement": "inline",
+        "caption": "Waves erode cliffs through hydraulic action and abrasion, gradually undercutting the base and causing cliff retreat over time.",
+        "tags": "coastal erosion, wave action, hydraulic action, abrasion, cliff undercutting, erosion processes, diagram"
+      },
+      {
+        "title": "Anse Source d'Argent Erosional Landforms",
+        "description": "Stunning photograph of Anse Source d'Argent beach in La Digue, Seychelles, showcasing iconic weathered granite boulder formations shaped by coastal erosion. The massive pink-grey granite rocks show smooth, rounded surfaces carved by centuries of wave action and weathering. Some boulders form natural tunnels and small caves. Crystal clear shallow water reflects the granite formations, while white sand fills the spaces between rocks. Coconut palms lean over the scene, and the composition should highlight the sculptural quality of these eroded granite landforms against the tropical paradise setting.",
+        "placement": "inline",
+        "caption": "The famous granite boulders at Anse Source d'Argent demonstrate how coastal erosion can create unique sculptural landforms over geological time.",
+        "tags": "seychelles, la digue, anse source d'argent, granite boulders, weathering, coastal erosion, landforms"
+      }
+    ]
+  },
+  {
+    "lesson_id": 3,
+    "lesson_title": "The Earth",
+    "subject": "Geography",
+    "unit": "S1: Introduction to Geography",
+    "media": [
+      {
+        "title": "Earth's Layers Cross-Section",
+        "description": "A detailed cross-sectional diagram of Earth showing its four main layers: the inner core (solid, metallic center in bright yellow-orange), outer core (liquid, flowing molten metal in orange-red), mantle (thick rocky layer in deep red-brown with convection currents), and crust (thin outer shell in brown and green). Include labels for each layer with thickness measurements. Show the relative scale with the crust being very thin compared to other layers. Use clear, educational diagram style with bright colors and clean lines.",
+        "placement": "top",
+        "caption": "The Earth is made up of four main layers: crust, mantle, outer core, and inner core. Each layer has different characteristics and temperatures.",
+        "tags": "earth layers, geology, earth structure, crust, mantle, core"
+      },
+      {
+        "title": "Earth from Space with Seychelles",
+        "description": "A stunning view of Earth from space showing the blue planet with swirling white clouds, green and brown landmasses, and deep blue oceans. Highlight the Indian Ocean region with a small callout or zoom showing the location of Seychelles islands as tiny green dots in the vast blue ocean. Show the curvature of Earth and the thin atmosphere as a delicate blue line around the planet's edge. Include realistic lighting from the sun on one side.",
+        "placement": "inline",
+        "caption": "Earth as seen from space, showing our blue planet with land, water, and atmosphere. The Seychelles islands are located in the Indian Ocean.",
+        "tags": "earth from space, seychelles location, blue planet, atmosphere, indian ocean"
+      },
+      {
+        "title": "Earth's Movements Diagram",
+        "description": "An educational diagram showing Earth's two main movements: rotation on its axis (24 hours) and revolution around the sun (365 days). Show Earth as a blue sphere with continents visible, tilted on its axis with an arrow indicating rotation. Include a circular orbital path around a bright yellow sun with an arrow showing the direction of revolution. Add day/night visualization on Earth and include text labels for 'Rotation = Day and Night' and 'Revolution = Seasons and Year'. Use simple, clear graphics with bright colors.",
+        "placement": "inline",
+        "caption": "Earth rotates on its axis once every 24 hours (creating day and night) and revolves around the sun once every 365 days (creating our year and seasons).",
+        "tags": "earth rotation, earth revolution, day and night, seasons, solar system"
+      }
+    ]
+  },
+  {
+    "lesson_id": 6,
+    "lesson_title": "Direction and Compass",
+    "subject": "Geography",
+    "unit": "S1: Map Skills",
+    "media": [
+      {
+        "title": "Compass Rose with Cardinal and Ordinal Directions",
+        "description": "A large, clear compass rose diagram centered on a white background. The compass shows all 8 main directions: North (N) at the top in bold red, South (S) at the bottom in bold red, East (E) to the right in bold blue, West (W) to the left in bold blue. The ordinal directions Northeast (NE), Southeast (SE), Southwest (SW), and Northwest (NW) are shown in green. Each direction is clearly labeled with both letters and full names. The compass has decorative elements with a traditional nautical design, featuring degree markings around the perimeter (0\u00b0, 90\u00b0, 180\u00b0, 270\u00b0) and a magnetic needle pointing north.",
+        "placement": "top",
+        "caption": "A compass rose showing the eight main directions used for navigation and giving directions",
+        "tags": "geography, compass, directions, navigation, map skills, cardinal points"
+      },
+      {
+        "title": "Seychelles Island Map with Compass Bearings",
+        "description": "An aerial view map of Mah\u00e9 island in Seychelles showing major landmarks and locations with compass bearing lines overlaid. The map includes Victoria (the capital), Beau Vallon beach, Morne Seychellois mountain, and the airport. From a central point marked with a large compass symbol, dotted lines extend to different landmarks showing bearing measurements: 045\u00b0 to Beau Vallon, 120\u00b0 to the airport, 270\u00b0 to Port Launay, etc. Each bearing is clearly labeled with degrees. The map uses bright tropical colors - turquoise water, green vegetation, white sandy beaches, and red building markers. A compass rose is positioned in the top right corner.",
+        "placement": "inline",
+        "caption": "Using compass bearings to locate landmarks on Mah\u00e9 island - bearings are measured in degrees from North (0\u00b0)",
+        "tags": "geography, seychelles, mahe, bearings, compass, degrees, navigation, landmarks"
+      },
+      {
+        "title": "Students Using Compass in Seychelles School Ground",
+        "description": "A bright, educational scene showing diverse Seychellois students aged 12-14 in school uniforms standing in a school courtyard with palm trees and tropical plants in the background. Three students are working together - one holding a magnetic compass, another pointing towards a direction, and a third taking notes on a clipboard. The scene shows them practicing direction-finding activities. In the background, you can see typical Seychelles architecture with colorful buildings and lush green hills. The lighting is natural tropical daylight with clear blue sky. The students appear engaged and focused on their geography lesson.",
+        "placement": "inline",
+        "caption": "Students practicing compass skills and direction-finding in their school grounds",
+        "tags": "geography, seychelles, students, compass, practical learning, navigation, school, education"
+      }
+    ]
+  },
+  {
+    "lesson_id": 9,
+    "lesson_title": "Types of Rainfall",
+    "subject": "Geography",
+    "unit": "S1: Weather and Climate",
+    "media": [
+      {
+        "title": "Three Types of Rainfall Formation Diagram",
+        "description": "A detailed educational diagram showing three side-by-side cross-sections illustrating the formation of convectional, relief, and frontal rainfall. Left panel shows convectional rainfall with sun heating the ground, warm air rising, cooling, and forming cumulonimbus clouds over tropical landscape. Middle panel shows relief rainfall with moist air hitting a mountain slope, rising and cooling to form orographic clouds. Right panel shows frontal rainfall where warm and cold air masses meet, creating a weather front with layered clouds. Each section is clearly labeled with arrows showing air movement, temperature changes, and precipitation. Use bright, educational colors with blue for water/rain, red for warm air, and white for cold air.",
+        "placement": "top",
+        "caption": "The three main types of rainfall formation: convectional, relief (orographic), and frontal rainfall, each with distinct formation processes.",
+        "tags": "geography, rainfall, weather, climate, convectional, relief, frontal, diagram"
+      },
+      {
+        "title": "Convectional Rainfall in Seychelles",
+        "description": "A realistic illustration showing convectional rainfall occurring over the Seychelles islands. Scene depicts intense tropical sun heating the warm turquoise ocean waters around granite islands with lush green vegetation. Rising columns of warm, moist air are visible as heat shimmer, forming towering white cumulonimbus clouds above. Heavy rain is falling from dark cloud bases onto palm trees and tropical vegetation on the islands below. The scene captures the typical afternoon thunderstorm pattern of tropical islands, with bright sunlight in some areas and dramatic rainfall in others.",
+        "placement": "inline",
+        "caption": "Convectional rainfall in Seychelles typically occurs during hot afternoons when intense solar heating causes moist air to rise rapidly, forming thunderstorms.",
+        "tags": "geography, seychelles, convectional rainfall, tropical climate, thunderstorms, islands"
+      },
+      {
+        "title": "Relief Rainfall Formation on Seychelles Mountains",
+        "description": "A cross-sectional view showing relief rainfall formation on one of Seychelles' granite peaks like Morne Seychellois. The image shows moist trade winds approaching from the ocean, hitting the steep mountainous terrain covered in tropical rainforest. Arrows indicate air masses being forced upward along the windward slope, cooling as they rise. Clouds form at the summit with rain falling on the windward side, while the leeward side shows drier conditions with less vegetation. The scene includes characteristic Seychelles features like granite rock formations, cinnamon trees, and palm forests at different elevations.",
+        "placement": "inline",
+        "caption": "Relief rainfall occurs when moist ocean air is forced to rise over Seychelles' mountainous terrain, creating more rainfall on windward slopes.",
+        "tags": "geography, seychelles, relief rainfall, orographic, mountains, morne seychellois, trade winds"
+      }
+    ]
+  },
+  {
+    "lesson_id": 12,
+    "lesson_title": "Solutions to Climate Change",
+    "subject": "Geography",
+    "unit": "S1: Climate Change",
+    "media": [
+      {
+        "title": "Renewable Energy Solutions in Seychelles",
+        "description": "A bright, optimistic illustration showing the Seychelles islands with various renewable energy solutions: solar panels installed on traditional Creole houses with red corrugated roofs, wind turbines on hillsides among lush tropical vegetation, and small wave energy devices near coral reefs in crystal-clear turquoise waters. Palm trees and granite boulders typical of Seychelles landscape are visible. The scene is set during golden hour with clear blue skies, emphasizing clean energy and environmental harmony.",
+        "placement": "top",
+        "caption": "Renewable energy technologies like solar panels and wind turbines can help Seychelles reduce carbon emissions while preserving its beautiful natural environment.",
+        "tags": "climate change, renewable energy, seychelles, solar power, wind energy, sustainability, geography"
+      },
+      {
+        "title": "Coastal Protection and Mangrove Restoration",
+        "description": "A detailed cross-section view of Seychelles coastal area showing climate change adaptation solutions: healthy mangrove forests with their distinctive root systems protecting the shoreline, coral reef restoration with vibrant corals and tropical fish, sea walls made from local granite rocks, and elevated traditional houses on stilts. Local Seychellois people are shown planting mangrove seedlings and maintaining coral nurseries. The Indian Ocean is visible with gentle waves, and native seabirds like fairy terns are flying overhead.",
+        "placement": "inline",
+        "caption": "Natural solutions like mangrove restoration and coral reef protection help Seychelles adapt to rising sea levels while supporting local ecosystems and communities.",
+        "tags": "climate adaptation, mangroves, coral reefs, seychelles, coastal protection, ecosystem restoration, geography"
+      },
+      {
+        "title": "Sustainable Transportation in Victoria",
+        "description": "A vibrant street scene in Victoria, Seychelles showing sustainable transportation solutions: electric buses painted in bright tropical colors traveling past the iconic clock tower, people riding bicycles along palm-lined streets, electric vehicle charging stations near the market, and pedestrians walking on shaded sidewalks. Traditional colonial architecture with modern eco-friendly features is visible, including green roofs and solar panels. Local vendors with sustainable practices and recycling bins are also shown, with the mountainous backdrop of Mah\u00e9 island in the distance.",
+        "placement": "inline",
+        "caption": "Sustainable transportation options like electric vehicles and cycling can significantly reduce carbon emissions in small island states like Seychelles.",
+        "tags": "sustainable transport, electric vehicles, seychelles, victoria, urban planning, climate solutions, geography"
+      }
+    ]
+  },
+  {
+    "lesson_id": 15,
+    "lesson_title": "Population Distribution",
+    "subject": "Geography",
+    "unit": "S1: Population Studies",
+    "media": [
+      {
+        "title": "Seychelles Population Density Map",
+        "description": "A detailed topographic map of the Seychelles islands showing population density through color gradients - dark red for high density areas like Victoria on Mah\u00e9, orange for medium density coastal settlements, and light yellow for sparsely populated mountainous interiors. Include clear labels for major islands (Mah\u00e9, Praslin, La Digue), cities, and a legend showing people per square kilometer. The map should show the contrast between densely populated coastal plains and uninhabited granite peaks.",
+        "placement": "top",
+        "caption": "Population density varies dramatically across the Seychelles islands, with most people concentrated in coastal areas and urban centers like Victoria.",
+        "tags": "geography, seychelles, population density, map, distribution"
+      },
+      {
+        "title": "Factors Affecting Settlement in Seychelles",
+        "description": "A split-screen comparison image showing contrasting landscapes in Seychelles. Left side: a bustling coastal settlement with houses, roads, port facilities, and flat terrain suitable for development near Victoria. Right side: steep granite mountains covered in dense tropical forest with no visible settlements, showing the Morne Seychellois National Park terrain. Include subtle annotations pointing to key geographic features like 'flat coastal plain - suitable for building' and 'steep slopes - difficult access'.",
+        "placement": "inline",
+        "caption": "Geographic factors like terrain, accessibility, and proximity to resources strongly influence where people choose to live in Seychelles.",
+        "tags": "geography, seychelles, settlement factors, terrain, coastal, mountains"
+      },
+      {
+        "title": "Urban vs Rural Population Distribution",
+        "description": "An aerial photograph-style image showing the contrast between Victoria (the capital) with its dense urban development, port facilities, buildings, and infrastructure, compared to a rural village setting on one of the outer islands with scattered traditional houses, coconut palms, and limited infrastructure. Show clear differences in building density, road networks, and available services between the two areas.",
+        "placement": "inline",
+        "caption": "Urban areas like Victoria attract more residents due to better job opportunities, services, and infrastructure compared to rural settlements.",
+        "tags": "geography, seychelles, urban, rural, victoria, population, settlement"
+      }
+    ]
+  },
+  {
+    "lesson_id": 18,
+    "lesson_title": "Urban Land Use",
+    "subject": "Geography",
+    "unit": "S2: Settlement Studies",
+    "media": [
+      {
+        "title": "Burgess Concentric Zone Model Diagram",
+        "description": "A clear, educational diagram showing the Burgess concentric zone model with five distinct colored rings. The center shows the Central Business District (CBD) in dark blue, surrounded by a red transition zone with mixed industrial and residential areas, then a yellow inner city zone with worker housing, followed by a green middle-class residential zone, and finally an outer blue suburban commuter zone. Each zone is clearly labeled with text. The diagram should be clean, professional, and suitable for classroom use with distinct boundaries between zones.",
+        "placement": "top",
+        "caption": "The Burgess Concentric Zone Model shows how cities develop in five distinct rings around the central business district",
+        "tags": "geography, urban, burgess model, concentric zones, city planning"
+      },
+      {
+        "title": "Victoria Seychelles Urban Land Use Map",
+        "description": "An aerial view or satellite image style map of Victoria, Seychelles showing different urban land use zones. The downtown area near the harbor should show commercial buildings and port facilities representing the CBD. Residential areas should be visible spreading outward into the hills, with different housing densities. The image should clearly show the coastline, mountains, and how the city is constrained by geography. Include labels pointing to different zones like 'Commercial District', 'Residential Areas', and 'Port/Industrial'.",
+        "placement": "inline",
+        "caption": "Victoria, Seychelles demonstrates urban land use patterns, though geography constrains the typical concentric model",
+        "tags": "geography, seychelles, victoria, urban planning, land use, settlement"
+      },
+      {
+        "title": "Urban vs Rural Land Use Comparison",
+        "description": "A split-screen image showing contrast between urban and rural land use in Seychelles. Left side shows Victoria's urban center with multi-story buildings, roads, commercial areas, and dense development near the waterfront. Right side shows rural Seychelles with traditional Creole houses scattered among palm trees, agricultural plots, and natural vegetation on hillsides. The contrast should clearly illustrate different settlement patterns and land use intensity.",
+        "placement": "inline",
+        "caption": "Comparing urban land use in Victoria with rural settlement patterns across Seychelles islands",
+        "tags": "geography, seychelles, urban, rural, settlement patterns, land use comparison"
+      }
+    ]
+  },
+  {
+    "lesson_id": 21,
+    "lesson_title": "Volcanoes and Earthquakes",
+    "subject": "Geography",
+    "unit": "S2: Plate Tectonics",
+    "media": [
+      {
+        "title": "Cross-Section of Earth's Tectonic Plates and Volcano Formation",
+        "description": "A detailed educational cross-section diagram showing Earth's interior layers with tectonic plates meeting at a convergent boundary. Show magma rising through the crust to form a volcanic mountain, with labels for crust, mantle, magma chamber, and volcanic cone. Include the Indian Ocean with tropical islands in the background to represent the Seychelles region. Use bright educational colors with clear geological layers - brown and orange for mantle, gray for crust, red for magma, and blue ocean water.",
+        "placement": "top",
+        "caption": "Cross-section showing how tectonic plate movement creates volcanoes, similar to the processes that formed the Seychelles islands millions of years ago",
+        "tags": "geography, plate tectonics, volcanoes, seychelles, earth layers, magma"
+      },
+      {
+        "title": "Earthquake Wave Propagation Diagram",
+        "description": "An educational diagram showing earthquake waves (seismic waves) radiating outward from an underground epicenter focus point. Include concentric circles representing P-waves and S-waves spreading through the Earth's crust. Show a tropical landscape above ground with palm trees and granite rock formations characteristic of the Seychelles, with buildings experiencing shaking motion. Use arrows to indicate wave direction and include a cross-section view of the fault line below ground.",
+        "placement": "inline",
+        "caption": "Seismic waves spread outward from an earthquake's focus, though the Seychelles experiences minimal earthquake activity due to its location on the stable African plate",
+        "tags": "geography, earthquakes, seismic waves, seychelles, plate tectonics, safety"
+      },
+      {
+        "title": "Seychelles Granite Islands Formation",
+        "description": "A beautiful aerial view illustration of the Seychelles granite islands showing Praslin and La Digue with their distinctive pink granite boulder formations. Include a cutaway section showing the ancient volcanic and plutonic rock foundation beneath the islands. Show the crystal-clear turquoise Indian Ocean surrounding the islands with coral reefs visible underwater. Include labels pointing to granite formations and indicate these islands formed from ancient tectonic activity when the supercontinent Gondwana broke apart.",
+        "placement": "inline",
+        "caption": "The Seychelles granite islands formed from ancient tectonic processes when the supercontinent Gondwana separated, creating these unique rock formations",
+        "tags": "geography, seychelles, granite islands, gondwana, tectonic history, indian ocean"
+      }
+    ]
+  },
+  {
+    "lesson_id": 25,
+    "lesson_title": "Managing Ecosystems",
+    "subject": "Geography",
+    "unit": "S2: Tropical Ecosystems",
+    "media": [
+      {
+        "title": "Seychelles Marine Protected Area Management",
+        "description": "Aerial view of a pristine Seychelles coral reef marine protected area showing crystal clear turquoise waters, vibrant coral formations visible beneath the surface, a small research boat with scientists monitoring the ecosystem, floating buoys marking protected zones, and granite islands covered in tropical vegetation in the background. Include sustainable tourism activities like snorkeling in designated areas, with clear zonation showing protected no-take areas versus sustainable use zones.",
+        "placement": "top",
+        "caption": "Marine protected areas in Seychelles demonstrate successful ecosystem management through zoning, monitoring, and sustainable tourism practices.",
+        "tags": "geography, seychelles, marine protection, ecosystem management, coral reefs, conservation"
+      },
+      {
+        "title": "Tropical Forest Management Strategies",
+        "description": "Split-screen comparison showing two sections of Seychelles tropical forest: left side displays unmanaged forest with invasive species, erosion, and degraded areas; right side shows well-managed forest with native Seychelles palms, clear hiking trails, interpretive signs, restoration plantings of endemic species like Coco de Mer palms, and local conservation workers planting seedlings. Include wildlife like Seychelles bulbul birds and fruit bats in the managed section.",
+        "placement": "inline",
+        "caption": "Effective forest management in Seychelles involves controlling invasive species, protecting endemic plants, and engaging local communities in conservation efforts.",
+        "tags": "geography, seychelles, forest management, conservation, endemic species, tropical ecosystems"
+      },
+      {
+        "title": "Community-Based Ecosystem Management",
+        "description": "Seychelles fishing village scene showing sustainable ecosystem management practices: local fishermen using traditional methods alongside modern conservation techniques, fish aggregation devices in the background, a community meeting under palm trees discussing fishing quotas, women processing fish using sustainable methods, children learning about marine conservation at a small coastal education center, and solar panels powering community facilities. Include typical Seychelles architecture with colorful houses and granite boulders.",
+        "placement": "inline",
+        "caption": "Successful ecosystem management in Seychelles relies on community participation, combining traditional knowledge with modern conservation science.",
+        "tags": "geography, seychelles, community management, sustainable fishing, local participation, tropical coastal ecosystems"
+      }
+    ]
+  },
+  {
+    "lesson_id": 28,
+    "lesson_title": "The Blue Economy",
+    "subject": "Geography",
+    "unit": "S3: Industry and Fishing",
+    "media": [
+      {
+        "title": "Seychelles Blue Economy Overview",
+        "description": "A vibrant aerial view of the Seychelles islands showing multiple blue economy activities: sustainable fishing boats with locals fishing in crystal-clear turquoise waters, a modern eco-friendly resort on pristine white sand beaches, solar panels on resort buildings, marine conservation scientists studying coral reefs underwater, and wind turbines in the distance. The scene shows the granite islands of Mah\u00e9 or Praslin with lush green vegetation, surrounded by the Indian Ocean with visible coral reefs beneath the clear water. Include traditional Seychellois fishing vessels alongside modern sustainable aquaculture facilities.",
+        "placement": "top",
+        "caption": "The Blue Economy in Seychelles combines sustainable use of ocean resources with environmental protection and economic growth",
+        "tags": "blue economy, seychelles, sustainability, fishing, tourism, marine conservation"
+      },
+      {
+        "title": "Traditional vs Sustainable Fishing in Seychelles",
+        "description": "A split-screen comparison showing traditional Seychellois fishing methods on the left (colorful traditional pirogues with local fishermen using nets and lines near coral reefs) and modern sustainable fishing practices on the right (larger boats with selective fishing gear, fish aggregating devices, and marine protected area boundaries marked with buoys). The background shows the distinctive Seychelles seascape with granite boulders and palm trees on the shoreline.",
+        "placement": "inline",
+        "caption": "Seychelles balances traditional fishing heritage with modern sustainable practices to protect marine ecosystems",
+        "tags": "sustainable fishing, seychelles, traditional methods, marine protection, blue economy"
+      },
+      {
+        "title": "Blue Economy Sectors in Seychelles",
+        "description": "An infographic-style illustration showing six interconnected circular icons representing different blue economy sectors in Seychelles: 1) Sustainable fisheries (tuna and fish), 2) Marine tourism (diving and snorkeling), 3) Renewable ocean energy (waves and offshore wind), 4) Marine biotechnology (seaweed and coral research), 5) Shipping and ports (container ships), and 6) Marine conservation (protected areas with sea turtles and dolphins). Each sector is connected with flowing blue lines representing ocean currents, set against a backdrop of the Seychelles flag colors.",
+        "placement": "inline",
+        "caption": "The six key sectors of Seychelles' Blue Economy work together to create sustainable ocean-based prosperity",
+        "tags": "blue economy sectors, seychelles, marine tourism, renewable energy, conservation, infographic"
+      }
+    ]
+  },
+  {
+    "lesson_id": 31,
+    "lesson_title": "Depositional Landforms",
+    "subject": "Geography",
+    "unit": "S3: Coastal Landforms",
+    "media": [
+      {
+        "title": "Seychelles Beach Formation Diagram",
+        "description": "Cross-sectional diagram showing coastal deposition process at a tropical Seychelles beach. Show waves approaching the coastline from left, carrying sediment particles (sand, coral fragments). Arrows indicate sediment transport direction. Beach profile shows backshore with coconut palms, foreshore with gentle slope, and offshore zone. Include labels for 'longshore drift', 'sediment deposition', 'wave energy decreases', and 'beach formation'. Use tropical colors - turquoise water, white sand, green vegetation.",
+        "placement": "top",
+        "caption": "How coastal deposition creates beaches in the Seychelles through wave action and sediment transport",
+        "tags": "geography, seychelles, coastal deposition, beach formation, sediment transport"
+      },
+      {
+        "title": "Anse Source d'Argent Tombolo Formation",
+        "description": "Aerial view illustration of La Digue's famous Anse Source d'Argent beach showing tombolo formation. Large granite boulders (distinctive Seychelles pink-grey granite) connected to mainland by white sandy beach deposits. Crystal clear turquoise water on both sides of the sand bar. Include arrows showing how waves deposit sediment behind the rocky obstruction, gradually building up the connecting beach. Palm trees dot the coastline, typical Seychelles tropical vegetation in background.",
+        "placement": "inline",
+        "caption": "Tombolo formation at Anse Source d'Argent, La Digue - sediment deposits connecting granite rocks to the mainland",
+        "tags": "geography, seychelles, tombolo, la digue, anse source d'argent, coastal landforms"
+      },
+      {
+        "title": "Seychelles Coastal Deposition Features Map",
+        "description": "Simplified map of main Seychelles islands (Mah\u00e9, Praslin, La Digue) showing various depositional landforms. Use different colors and symbols to mark: sandy beaches (yellow lines), tombolos (orange connecting bars), small barrier beaches, and coral sand deposits. Include compass rose, scale bar, and legend. Water in tropical blue, islands in green with coastal features clearly marked. Add small illustrations of each landform type in legend boxes.",
+        "placement": "inline",
+        "caption": "Distribution of major depositional coastal landforms across the main Seychelles islands",
+        "tags": "geography, seychelles, coastal landforms, depositional features, mahe, praslin, la digue, map"
+      }
+    ]
+  },
+  {
+    "lesson_id": 22,
+    "lesson_title": "Formation of Seychelles",
+    "subject": "Geography",
+    "unit": "S2: Plate Tectonics",
+    "media": [
+      {
+        "title": "Seychelles Granite Islands Formation",
+        "description": "Cross-sectional geological diagram showing the formation of Seychelles granite islands. Display ancient Gondwana supercontinent breaking apart 165 million years ago, with granite bedrock emerging from ocean waters. Show layers of pink and grey granite beneath turquoise tropical waters, with palm trees on white sand beaches above. Include geological time markers and arrows showing continental drift. Style: educational scientific illustration with realistic colors.",
+        "placement": "top",
+        "caption": "The granite islands of Seychelles are remnants of the ancient supercontinent Gondwana, formed over 650 million years ago",
+        "tags": "geology, seychelles, gondwana, granite, continental drift, plate tectonics"
+      },
+      {
+        "title": "Seychelles Coral Atoll Formation Process",
+        "description": "Step-by-step diagram showing coral atoll formation in Seychelles outer islands. Three-panel sequence: 1) Volcanic seamount with fringing coral reef, 2) Volcano subsiding with barrier reef forming, 3) Final atoll stage with central lagoon surrounded by coral ring. Show tropical Seychelles setting with clear blue waters, white coral sand, and coconut palms. Include labels for each stage and geological processes.",
+        "placement": "inline",
+        "caption": "The outer islands of Seychelles formed as coral atolls through volcanic activity and coral reef growth over millions of years",
+        "tags": "coral atolls, seychelles, volcanic activity, reef formation, outer islands"
+      },
+      {
+        "title": "Indian Ocean Tectonic Plate Movement",
+        "description": "Detailed tectonic map of the Indian Ocean showing plate boundaries and movement directions. Highlight the location of Seychelles on the Indo-Australian Plate, with arrows showing plate movement away from mid-ocean ridges. Show the Mascarene Plateau and other geological features. Use distinct colors for different plates (Indo-Australian, African, Antarctic) with the Seychelles islands marked prominently in red. Include scale and directional indicators.",
+        "placement": "inline",
+        "caption": "Seychelles sits on the Indo-Australian Plate, which separated from Africa during the breakup of Gondwana approximately 165 million years ago",
+        "tags": "tectonic plates, indian ocean, mascarene plateau, gondwana breakup, seychelles location"
+      }
+    ]
+  }
+]

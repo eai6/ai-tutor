@@ -7,10 +7,11 @@ Design decisions:
 - Handles API key lookup from environment variables
 - Returns structured response with content + token usage
 
-Starting with Anthropic, easy to add OpenAI/Ollama later.
+Supports: Anthropic, OpenAI, Ollama (local)
 """
 
 import os
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
@@ -38,11 +39,9 @@ class BaseLLMClient(ABC):
     
     def _get_api_key(self) -> str:
         """Look up API key from environment variable."""
+        if not self.config.api_key_env_var:
+            return ""
         key = os.getenv(self.config.api_key_env_var, '')
-        if not key:
-            raise ValueError(
-                f"API key not found. Set {self.config.api_key_env_var} environment variable."
-            )
         return key
     
     @abstractmethod
@@ -69,6 +68,10 @@ class AnthropicClient(BaseLLMClient):
     
     def __init__(self, config: ModelConfig):
         super().__init__(config)
+        if not self.api_key:
+            raise ValueError(
+                f"API key not found. Set {self.config.api_key_env_var} environment variable."
+            )
         self.client = anthropic.Anthropic(api_key=self.api_key)
     
     def generate(
@@ -92,6 +95,112 @@ class AnthropicClient(BaseLLMClient):
             tokens_out=response.usage.output_tokens,
             model=response.model,
             stop_reason=response.stop_reason,
+        )
+
+
+class OllamaClient(BaseLLMClient):
+    """
+    Client for local Ollama server.
+    
+    Ollama runs locally and doesn't need an API key.
+    Install: https://ollama.ai
+    Pull a model: ollama pull llama3
+    """
+    
+    def _get_api_key(self) -> str:
+        """Ollama doesn't need an API key."""
+        return ""
+    
+    def generate(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+    ) -> LLMResponse:
+        """Call local Ollama API and return standardized response."""
+        import requests
+        
+        # Build Ollama-compatible messages (with system as first message)
+        ollama_messages = [{"role": "system", "content": system_prompt}]
+        ollama_messages.extend(messages)
+        
+        # Ollama API endpoint
+        api_base = self.config.api_base or "http://localhost:11434"
+        url = f"{api_base}/api/chat"
+        
+        try:
+            response = requests.post(
+                url,
+                json={
+                    "model": self.config.model_name,
+                    "messages": ollama_messages,
+                    "stream": False,
+                    "options": {
+                        "temperature": self.config.temperature,
+                        "num_predict": self.config.max_tokens,
+                    }
+                },
+                timeout=120,  # Longer timeout for local models
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            return LLMResponse(
+                content=data["message"]["content"],
+                tokens_in=data.get("prompt_eval_count", 0),
+                tokens_out=data.get("eval_count", 0),
+                model=self.config.model_name,
+                stop_reason="stop",
+            )
+        except requests.exceptions.ConnectionError:
+            raise ConnectionError(
+                f"Could not connect to Ollama at {api_base}. "
+                "Make sure Ollama is running (ollama serve)."
+            )
+        except requests.exceptions.Timeout:
+            raise TimeoutError(
+                "Ollama request timed out. The model may be loading or the request is too complex."
+            )
+
+
+class OpenAIClient(BaseLLMClient):
+    """Client for OpenAI's GPT API."""
+    
+    def __init__(self, config: ModelConfig):
+        super().__init__(config)
+        if not self.api_key:
+            raise ValueError(
+                f"API key not found. Set {self.config.api_key_env_var} environment variable."
+            )
+        try:
+            import openai
+            self.client = openai.OpenAI(api_key=self.api_key)
+        except ImportError:
+            raise ImportError("openai package not installed. Run: pip install openai")
+    
+    def generate(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+    ) -> LLMResponse:
+        """Call OpenAI API and return standardized response."""
+        
+        # OpenAI uses system message in the messages array
+        openai_messages = [{"role": "system", "content": system_prompt}]
+        openai_messages.extend(messages)
+        
+        response = self.client.chat.completions.create(
+            model=self.config.model_name,
+            max_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+            messages=openai_messages,
+        )
+        
+        return LLMResponse(
+            content=response.choices[0].message.content,
+            tokens_in=response.usage.prompt_tokens,
+            tokens_out=response.usage.completion_tokens,
+            model=response.model,
+            stop_reason=response.choices[0].finish_reason,
         )
 
 
@@ -137,11 +246,9 @@ def get_llm_client(config: ModelConfig, use_mock: bool = False) -> BaseLLMClient
     
     if config.provider == ModelConfig.Provider.ANTHROPIC:
         return AnthropicClient(config)
-    
-    # TODO: Add more providers
-    # elif config.provider == ModelConfig.Provider.OPENAI:
-    #     return OpenAIClient(config)
-    # elif config.provider == ModelConfig.Provider.LOCAL_OLLAMA:
-    #     return OllamaClient(config)
+    elif config.provider == ModelConfig.Provider.OPENAI:
+        return OpenAIClient(config)
+    elif config.provider == ModelConfig.Provider.LOCAL_OLLAMA:
+        return OllamaClient(config)
     
     raise ValueError(f"Unsupported provider: {config.provider}")
