@@ -1,6 +1,8 @@
 # Deep Dive: Prompt Assembly, Curriculum Data Model & Content Pipeline
 
 > A detailed analysis of how prompts are constructed, how curriculum is modeled and seeded, and three design proposals for evolving the system toward editorial workflows, dynamic pedagogy, and localized content generation.
+>
+> **Revision 2** — Updated after the `104cebc` merge which introduced the curriculum generator, phase-based engine, exit ticket system, teacher dashboard, and safety module.
 
 ---
 
@@ -8,7 +10,11 @@
 
 ### 1.1 Prompt Assembly Pipeline
 
-The system constructs LLM prompts through a two-layer architecture defined in `apps/llm/prompts.py`. The layers separate *who the tutor is* (stable across a session) from *what the tutor is doing right now* (changes every turn).
+The system now has **two distinct prompt assembly paths** depending on the operating mode. Both start from the same `PromptPack` and `Lesson` data, but diverge significantly in how they construct the final LLM input.
+
+#### Path A: Step-Based Mode (via `prompts.py`)
+
+Used when a lesson has multiple `LessonStep` records (e.g., lessons created by `generator.py` with TEACH + WORKED_EXAMPLE + PRACTICE + QUIZ + SUMMARY steps).
 
 ```mermaid
 flowchart TD
@@ -18,6 +24,7 @@ flowchart TD
         PP_SAFE["PromptPack.safety_prompt\n(age-appropriate guardrails)"]
         PP_FMT["PromptPack.format_rules_prompt\n(output style, conversation rules)"]
         L_CTX["Lesson context\n(title + learning objective)"]
+        L_MEDIA["Lesson media context\n(available images with [SHOW_MEDIA:title] syntax)"]
     end
 
     subgraph "Layer 2 — Step Instruction (per-turn, varies)"
@@ -33,6 +40,7 @@ flowchart TD
     PP_SAFE --> ASSEMBLE_SYS
     PP_FMT --> ASSEMBLE_SYS
     L_CTX --> ASSEMBLE_SYS
+    L_MEDIA --> ASSEMBLE_SYS
 
     SI_TYPE --> BUILD_STEP["build_step_instruction()"]
     SI_SCRIPT --> BUILD_STEP
@@ -47,53 +55,115 @@ flowchart TD
     BUILD_MSG --> LLM_CALL["LLM API Call\n(system_prompt + messages[])"]
 ```
 
-**Key observations:**
+**Key functions** (all in `apps/llm/prompts.py`):
 
-- `assemble_system_prompt()` concatenates four `PromptPack` fields plus a lesson-context block with `"\n\n".join()`. No templating engine is used — it is straight Python string composition (`prompts.py:26-63`).
+- `assemble_system_prompt()` — Concatenates 4 PromptPack fields + lesson context + (new) media availability block via `"\n\n".join()`. The media block tells the AI which images are available and how to reference them with `[SHOW_MEDIA:title]` markers.
 
-- `build_step_instruction()` is the per-turn context injector. It switches on `StepType` to select an instruction prefix, then conditionally appends question, choices, retry/hint context, expected answer, and rubric (`prompts.py:66-126`).
+- `build_step_instruction()` — Switches on `StepType` for an instruction prefix, appends `teacher_script`, question/choices, retry context with progressive hint reveal, and expected answer/rubric.
 
-- `build_tutor_message()` wraps the step instruction in `[STEP CONTEXT]...[/STEP CONTEXT]` delimiters and injects it into the conversation messages array as a user-role message (`prompts.py:129-174`).
+- `build_tutor_message()` — Wraps step instruction in `[STEP CONTEXT]...[/STEP CONTEXT]` delimiters and injects it into the conversation messages array as a user-role message.
 
-- In **conversational mode** (detected by the engine when there is exactly 1 TEACH step with `answer_type=NONE`), the engine appends a `completion_instruction` string directly to the system prompt at runtime, telling the LLM to emit `[SESSION_COMPLETE]` when the exit ticket is passed (`engine.py:333-345`).
+#### Path B: Conversational Mode (via `engine.py`)
 
-#### Prompt flow for the two operating modes
+Used when a lesson has exactly 1 TEACH step with `answer_type=NONE` — all `seed_seychelles` lessons and dashboard-uploaded lessons with thin placeholders.
+
+The engine bypasses `prompts.py` for system prompt construction and builds its own **massive structured system prompt** in `_build_structured_system_prompt()`. This prompt embeds the entire phase protocol, artifact format schemas, and media list directly.
+
+```mermaid
+flowchart TD
+    subgraph "Conversational Mode System Prompt (engine.py)"
+        BASE["PromptPack.get_full_system_prompt()\n(persona + teaching style + safety + format)"]
+        PHASE_PROTOCOL["Phase Protocol\n(RETRIEVAL → INSTRUCTION →\nPRACTICE → EXIT_TICKET)"]
+        ARTIFACT_SCHEMA["Artifact Format Specs\n([ARTIFACT:question]{JSON}[/ARTIFACT]\n[ARTIFACT:instruction]{JSON}[/ARTIFACT])"]
+        MEDIA_LIST["Available Media\n(titles for [SHOW_MEDIA:title])"]
+        EXIT_TICKET["Pre-defined Exit Ticket\n(if ExitTicket model exists)"]
+    end
+
+    BASE --> MEGA_PROMPT["_build_structured_system_prompt()"]
+    PHASE_PROTOCOL --> MEGA_PROMPT
+    ARTIFACT_SCHEMA --> MEGA_PROMPT
+    MEDIA_LIST --> MEGA_PROMPT
+    EXIT_TICKET --> MEGA_PROMPT
+
+    subgraph "Per-Turn Phase Context"
+        CURRENT_PHASE["Current SessionPhase\n(RETRIEVAL / INSTRUCTION /\nPRACTICE / EXIT_TICKET)"]
+        COUNTERS["Question counters\n(retrieval_count, practice_count,\nexit_ticket_count, exit_ticket_score)"]
+        FEEDBACK["Last answer correctness\n+ transition instructions"]
+    end
+
+    CURRENT_PHASE --> PHASE_CTX["_build_phase_context()"]
+    COUNTERS --> PHASE_CTX
+    FEEDBACK --> PHASE_CTX
+
+    MEGA_PROMPT --> LLM["LLM API Call"]
+    PHASE_CTX --> MESSAGES["Injected as user message"]
+    CONV["Conversation history"] --> MESSAGES
+    MESSAGES --> LLM
+```
+
+**Key architectural differences from the original analysis:**
+
+1. **Phase state machine** — The engine now tracks a `SessionPhase` enum (`RETRIEVAL`, `INSTRUCTION`, `PRACTICE`, `EXIT_TICKET`, `COMPLETE`) persisted in `TutorSession.engine_state` (JSONField). Phase transitions are deterministic based on question counters, not on `[SESSION_COMPLETE]` string detection.
+
+2. **Artifact protocol** — The AI communicates structured content (questions, instructions, media references) via `[ARTIFACT:type]{JSON}[/ARTIFACT]` markers. The engine parses these to extract question commands, instruction commands, and media references. For exit tickets, the engine **overrides** AI-generated questions with pre-defined ones from the `ExitTicket` model.
+
+3. **Pre-defined exit tickets** — `_load_exit_ticket()` queries `ExitTicket` and `ExitTicketQuestion` records. If present, the actual question text is injected verbatim into the phase context during the EXIT_TICKET phase. This is a critical shift from fully AI-generated to **database-stored, reviewable** assessment items.
+
+4. **Engine constants** — Phase behavior is governed by class constants: `RETRIEVAL_QUESTIONS = 2`, `PRACTICE_QUESTIONS = 3`, `EXIT_TICKET_QUESTIONS = 10`, `EXIT_TICKET_PASS_THRESHOLD = 8`.
+
+#### Combined flow for both modes
 
 ```mermaid
 sequenceDiagram
     participant S as Student
+    participant V as views.py
+    participant SF as Safety Filter
     participant E as TutorEngine
     participant P as prompts.py
     participant LLM as LLM Provider
+    participant DB as Database
 
-    Note over E: Mode detection: _is_conversational_mode()
+    S->>V: Start lesson
+    V->>E: engine.start()
+    E->>E: _is_conversational_mode()?
 
-    alt Structured Mode (multiple steps)
+    alt Step-Based Mode (multiple steps from generator.py)
         E->>P: build_tutor_message(step[0])
         P-->>E: system_prompt + messages[]
-        E->>LLM: generate(system_prompt, messages)
-        LLM-->>S: Teaching content
-        S->>E: Answer
+        E->>LLM: generate()
+        LLM-->>S: Teaching content + media
+        S->>V: Submit answer
+        V->>SF: ContentSafetyFilter.check_content()
+        SF-->>V: PII-redacted, safety-checked
+        V->>E: process_student_answer(filtered)
         E->>E: grade_answer() — deterministic or LLM
-        E->>E: Hint ladder if wrong
-        E->>P: build_tutor_message(step[1])
+        E->>E: Hint ladder if wrong, advance if correct
         Note right of E: Repeat per step until mastery
+
     else Conversational Mode (single TEACH step)
-        E->>P: build_tutor_message(step[0])
-        E->>E: Append completion_instruction to system_prompt
-        E->>LLM: generate(full_system_prompt, messages)
-        LLM-->>S: AI-driven lesson (retrieval → teach → practice → exit ticket)
-        S->>E: Answer
-        E->>LLM: Full history + completion_instruction
-        Note right of LLM: AI decides pacing, questions, advancement
-        LLM-->>E: Response (possibly with [SESSION_COMPLETE])
-        E->>E: Check for [SESSION_COMPLETE] signal
+        E->>DB: Load ExitTicket (if exists)
+        E->>E: _build_structured_system_prompt()
+        E->>LLM: generate() — RETRIEVAL phase
+        LLM-->>S: Retrieval question
+        loop Phase transitions
+            S->>V: Submit answer
+            V->>SF: Safety check + PII redaction
+            V->>E: _process_conversational_answer()
+            E->>E: Check answer, update counters
+            E->>E: _build_phase_context() for current phase
+            E->>LLM: generate() with phase context
+            E->>E: _parse_ai_response() — extract artifacts
+            Note right of E: Override exit ticket questions<br/>with pre-defined ones if available
+            LLM-->>S: Phase-appropriate response
+        end
+        E->>E: EXIT_TICKET score >= 8/10?
+        E->>DB: Mark mastery, complete session
     end
 ```
 
 ### 1.2 Curriculum Data Model
 
-The curriculum follows a rigid four-level hierarchy. Every model is institution-scoped.
+The model has expanded with exit ticket tables, engine state persistence, and a dashboard upload tracker.
 
 ```mermaid
 erDiagram
@@ -101,28 +171,12 @@ erDiagram
     Course ||--o{ Unit : "contains"
     Unit ||--o{ Lesson : "contains"
     Lesson ||--o{ LessonStep : "contains"
+    Lesson ||--|| ExitTicket : "has (optional)"
+    ExitTicket ||--o{ ExitTicketQuestion : "contains"
+    ExitTicket ||--o{ ExitTicketAttempt : "tracks"
     LessonStep ||--o{ StepMedia : "has"
     MediaAsset ||--o{ StepMedia : "referenced_by"
-
-    Institution {
-        string name
-        string slug
-        string timezone
-        bool is_active
-    }
-
-    Course {
-        string title
-        text description
-        string grade_level
-        bool is_published
-    }
-
-    Unit {
-        string title
-        text description
-        int order_index
-    }
+    Institution ||--o{ CurriculumUpload : "tracks"
 
     Lesson {
         string title
@@ -147,507 +201,479 @@ erDiagram
         int max_attempts
         int order_index
     }
+
+    ExitTicket {
+        int passing_score
+        int time_limit_minutes
+        text instructions
+    }
+
+    ExitTicketQuestion {
+        text question_text
+        string option_a
+        string option_b
+        string option_c
+        string option_d
+        char correct_answer
+        text explanation
+        enum difficulty
+        int order_index
+        file image
+    }
+
+    ExitTicketAttempt {
+        int score
+        bool passed
+        json answers
+        datetime started_at
+        datetime completed_at
+    }
+
+    TutorSession {
+        enum status
+        bool mastery_achieved
+        json engine_state
+        int current_step_index
+    }
+
+    CurriculumUpload {
+        string file_path
+        string subject_name
+        string grade_level
+        enum status
+        text processing_log
+        int lessons_created
+    }
 ```
 
-**The `LessonStep` is the atomic content unit.** It carries everything the prompt assembler needs: what to teach (`teacher_script`), what to ask (`question`, `choices`), how to grade (`expected_answer`, `rubric`), and how to scaffold mistakes (`hint_1/2/3`, `max_attempts`).
+**New model highlights:**
 
-The model *can* support richly-authored structured lessons (see `seed_sample_data` which creates 6 steps per lesson with handcrafted questions, answers, and hints). But for the Seychelles deployment, this capability is deliberately unused.
+- **`ExitTicket` / `ExitTicketQuestion`** — Stores standardized, pre-generated assessment items per lesson. Questions have Bloom's-aligned difficulty tiers (easy/recall, medium/apply, hard/analyze), individual option fields (not JSON), and an optional image. The engine loads these at session start and injects them verbatim during the EXIT_TICKET phase.
 
-### 1.3 The `seed_seychelles` Command — What It Actually Does
+- **`TutorSession.engine_state`** (JSONField) — Persists phase counters, current phase, exit ticket score, and question tracking across turns. Enables the engine to be stateless between requests.
 
-The management command at `apps/curriculum/management/commands/seed_seychelles.py` is the sole mechanism for loading the Seychelles curriculum. It creates the entire content graph programmatically.
+- **`CurriculumUpload`** — Tracks dashboard file uploads with processing status, log, and link to the created Course. Supports the editorial pipeline.
+
+### 1.3 Curriculum Content Pipelines — Three Paths Now Exist
+
+The system has evolved from a single seed command to three distinct curriculum creation paths:
 
 ```mermaid
-flowchart LR
-    subgraph "seed_seychelles command (480 lines of Python)"
-        A["Create Institution\n'Seychelles Secondary Schools'"]
-        B["Create PromptPack\n(4 hardcoded prompt constants)"]
-        C["Create ModelConfig\n(Claude Sonnet)"]
-        D["Create Users\n(teacher1, student1)"]
-        E["Create Geography Course\n(10 units, 31 lessons)"]
-        F["Create Math Course\n(9 units, 28 lessons)"]
+flowchart TD
+    subgraph "Path 1: seed_seychelles (original)"
+        SS_IN["Hardcoded Python dicts\n(480 lines)"]
+        SS_OUT["1 TEACH step per lesson\n(objectives + generic flow)\nNo questions, hints, or media"]
+        SS_IN --> SS_OUT
     end
 
-    A --> B --> C --> D --> E --> F
-
-    subgraph "Per-lesson output"
-        G["1 Lesson record\n(title, objective, mastery_rule=PASS_QUIZ)"]
-        H["1 LessonStep\n(type=TEACH, answer_type=NONE)"]
-        I["teacher_script = objectives +\ngeneric 6-step flow instruction"]
+    subgraph "Path 2: generator.py (CLI pipeline)"
+        GEN_IN["Uploaded PDF/DOCX\n(official syllabus)"]
+        GEN_AI["Claude parses structure\n+ generates rich content"]
+        GEN_OUT["Multi-step lessons\n(TEACH + WORKED_EXAMPLE +\nPRACTICE×3 + QUIZ×5 + SUMMARY)\nWith hints and localized examples"]
+        GEN_MEDIA["DALL-E generates\nlesson images"]
+        GEN_IN --> GEN_AI --> GEN_OUT
+        GEN_AI --> GEN_MEDIA
     end
 
-    E --> G --> H --> I
-    F --> G
+    subgraph "Path 3: Dashboard upload (web pipeline)"
+        DASH_IN["Teacher uploads PDF/DOCX\nvia web UI"]
+        DASH_AI["Claude parses structure\n(tasks.py)"]
+        DASH_OUT["Thin placeholder lessons\n(is_published=False)\n1 TEACH step: 'Teach about: {objective}'"]
+        DASH_REVIEW["Teacher reviews\nin dashboard"]
+        DASH_IN --> DASH_AI --> DASH_OUT --> DASH_REVIEW
+    end
+
+    subgraph "Post-generation enrichment"
+        ET["generate_exit_tickets\nmanagement command"]
+        ET_OUT["ExitTicket + 10 questions\nper lesson"]
+        GEN_OUT --> ET
+        DASH_OUT --> ET
+        SS_OUT --> ET
+        ET --> ET_OUT
+    end
+
+    SS_OUT --> ENGINE["TutorEngine\n(conversational mode)"]
+    GEN_OUT --> ENGINE2["TutorEngine\n(step-based mode)"]
+    DASH_OUT --> ENGINE
+    ET_OUT --> ENGINE
+    ET_OUT --> ENGINE2
 ```
 
-**What is hardcoded in the Python file:**
+#### Path 1: `seed_seychelles` (original, unchanged)
 
-| Data | Location | Form |
-|---|---|---|
-| Tutor persona & Seychelles context | `SYSTEM_PROMPT` constant (lines 18-32) | Prompt string literal |
-| Science-of-learning pedagogy | `TEACHING_STYLE_PROMPT` constant (lines 34-79) | Prompt string literal |
-| Safety guardrails | `SAFETY_PROMPT` constant (lines 81-87) | Prompt string literal |
-| Output format rules | `FORMAT_RULES_PROMPT` constant (lines 89-103) | Prompt string literal |
-| Geography syllabus (10 units, ~31 lessons) | Python list-of-dicts (lines 231-323) | Nested data structures |
-| Math syllabus (9 units, ~28 lessons) | Python list-of-dicts (lines 344-427) | Nested data structures |
-| Lesson terminal objectives | Embedded in each lesson dict | Lists of strings |
+Hardcoded Python data producing thin single-step lessons. As analyzed in the original document — 59 lessons, each with 1 TEACH step containing objectives and a generic 6-step flow instruction. All teaching content, practice, and assessment is AI-generated at runtime.
 
-**What is NOT in the database after seeding:**
+#### Path 2: `generator.py` (new — CLI/management command)
 
-- No practice questions, worked examples, or quiz items
-- No hint content
-- No expected answers or rubrics
-- No MCQ choices
-- No media attachments (unless `generate_media` is run separately)
+A full AI-powered curriculum generation pipeline (`apps/curriculum/generator.py`, 603 lines):
 
-Every Seychelles lesson produces exactly **one `LessonStep`** with `step_type=TEACH` and `answer_type=NONE`. The `teacher_script` is a template that embeds the lesson title, objective, terminal objectives as bullet points, and a generic 6-step flow instruction. This puts the lesson into **conversational mode** where the AI generates all teaching content, practice problems, and the exit ticket dynamically.
+1. **Extract** text from PDF (pypdf + pdftotext fallback) or DOCX (python-docx)
+2. **Analyze** structure with Claude — sends up to 15,000 chars, gets back JSON with units and topics including learning objectives, key concepts, and skills
+3. **Create** DB records via `@transaction.atomic` with `update_or_create` patterns
+4. **Generate** rich content per lesson with a second Claude call — produces teaching script, worked example, retrieval questions, practice problems (with hints), 5-question exit ticket, summary, and image prompts
+5. **Create steps** — maps the JSON to a full set of `LessonStep` records: TEACH, WORKED_EXAMPLE, up to 3 PRACTICE (with `hint_1`/`hint_2`/`hint_3`), up to 5 QUIZ, and SUMMARY
+6. **Generate media** — calls DALL-E 3 per image suggestion, saves as `MediaAsset` linked via `StepMedia`
 
-#### The teacher_script template (assembled per lesson)
+This pipeline produces **richly-authored structured lessons** that run in step-based mode. Localization is injected via a hardcoded `LOCAL_CONTEXT` constant in the Python file.
 
-```
-LESSON: {title}
-LEARNING OBJECTIVE: {objective}
-TERMINAL OBJECTIVES:
-• {objective_1}
-• {objective_2}
-• {objective_3}
-Begin this tutoring session following the structured flow:
-1. Start with a retrieval question from a previous related topic
-2. Introduce today's topic: {title}
-3. Explain concepts clearly with examples using Seychelles context
-4. Guide the student through practice problems (scaffolded hints, no direct answers)
-5. End with a 5-question multiple choice exit ticket (4/5 required to pass)
-6. Praise their effort and summarize key learnings
-```
+#### Path 3: Dashboard upload (new — web UI)
 
-This template is the **only curriculum-specific content** that distinguishes one lesson from another in the LLM's context. The pedagogical behavior, localization, and session structure all come from the PromptPack fields (which are the same for all 59 lessons).
+A lighter web-facing pipeline (`apps/dashboard/tasks.py` + `apps/dashboard/views.py`):
+
+1. Teacher uploads PDF/DOCX via the dashboard
+2. `CurriculumUpload` record created with `status=pending`
+3. `process_curriculum_upload()` extracts text, calls Claude for structure, creates Course/Unit/Lesson records
+4. Lessons are created with `is_published=False` and a thin placeholder TEACH step (`"Teach about: {objective}"`)
+5. Teacher reviews in the dashboard before publishing
+
+This pipeline is intentionally thin — it defers rich content generation. A `generate_lesson_content()` function exists in `tasks.py` but is not yet wired into the upload flow.
+
+#### Post-generation: `generate_exit_tickets` command
+
+A management command (`apps/tutoring/management/commands/generate_exit_tickets.py`) that generates standardized 10-question exit tickets for any lesson:
+
+- Supports `--lesson`, `--course`, or `--all` targeting
+- Uses the active `ModelConfig` from the database (not a hardcoded model)
+- Generates questions with Bloom's-aligned difficulty distribution (Q1-3 easy, Q4-7 medium, Q8-10 hard)
+- Saves to `ExitTicket` + `ExitTicketQuestion` models
+- Questions are **persistent and editable** in Django Admin
+- Supports `--dry-run` for preview and `--overwrite` for regeneration
 
 ---
 
-## Part 2: Three Issues & Design Proposals
+## Part 2: Three Issues — Updated Analysis
 
 ### Issue 1: Curriculum Maintenance Is a Code Change, Not an Editorial Workflow
 
-#### The Problem
+#### What Has Changed
 
-Today, modifying any part of the Seychelles curriculum requires:
-
-1. Editing Python source code in `seed_seychelles.py`
-2. Running the management command (which uses `update_or_create` and therefore overwrites prior edits)
-3. Deploying the updated code
-
-This workflow has several consequences:
+The new code introduces significant movement toward an editorial workflow, but the transformation is incomplete.
 
 ```mermaid
-flowchart LR
-    subgraph "Current: Code-Based Curriculum Pipeline"
-        A["Curriculum designer\nwrites lesson objectives"] --> B["Developer translates\ninto Python dicts"]
-        B --> C["PR review +\ncode merge"]
-        C --> D["Run seed_seychelles\ncommand"]
-        D --> E["Content live\nin database"]
+flowchart TD
+    subgraph "Progress Made"
+        direction TB
+        P1["Dashboard upload UI\n(teachers can upload syllabi)"]
+        P2["is_published=False default\n(editorial gate before students see content)"]
+        P3["CurriculumUpload model\n(audit trail with processing log)"]
+        P4["generate_exit_tickets --dry-run\n(CLI preview before committing)"]
+        P5["Exit tickets editable in Admin\n(post-generation review)"]
     end
 
-    style B fill:#f96,stroke:#333
-    style C fill:#f96,stroke:#333
-```
-
-- **Bottleneck on developers** — every syllabus update, typo fix, or new lesson requires a code change, PR, and deployment.
-- **No separation of concerns** — curriculum content (an editorial artifact) lives in application code (an engineering artifact). This makes it impossible to give curriculum editors autonomy.
-- **Destructive reseeding** — running the command recreates everything. If someone hand-edits a lesson in Django Admin, those edits are overwritten on the next seed.
-- **No versioning of content** — the `PromptPack` has a `version` field, but curriculum records (Course, Unit, Lesson, LessonStep) do not. There is no audit trail of what changed in the syllabus.
-- **Scaling problem** — adding a new country, subject, or grade level means writing another 300+ line seed function.
-
-#### Proposed Solution: Declarative Curriculum Import from Structured Files
-
-Replace the hardcoded Python data with a **file-based curriculum format** (YAML or JSON) and a **generic import command** that reads these files.
-
-```mermaid
-flowchart LR
-    subgraph "Proposed: Editorial Curriculum Pipeline"
-        A["Curriculum designer\nedits YAML/JSON files"] --> B["Validation script\n(schema check, completeness)"]
-        B --> C["Version control\n(git or CMS)"]
-        C --> D["Run import_curriculum\ncommand"]
-        D --> E["Content live\nin database"]
+    subgraph "Still Hardcoded"
+        direction TB
+        H1["LOCAL_CONTEXT in generator.py\n(Seychelles names, currency, industries)"]
+        H2["'Seychelles' in 7 Python files\n(not configurable per institution)"]
+        H3["Phase constants in engine.py\n(RETRIEVAL_QUESTIONS=2, etc.)"]
+        H4["seed_seychelles still the only\nway to load the initial curriculum"]
+        H5["No web UI to edit\nlesson content after generation"]
     end
 
-    subgraph "Alternative: Admin UI"
-        F["Curriculum editor\nuses Django Admin\nor custom CMS"] --> E
-    end
-
-    style A fill:#6f6,stroke:#333
-    style F fill:#6f6,stroke:#333
+    style P1 fill:#6f6,stroke:#333
+    style P2 fill:#6f6,stroke:#333
+    style P3 fill:#6f6,stroke:#333
+    style P4 fill:#6f6,stroke:#333
+    style P5 fill:#6f6,stroke:#333
+    style H1 fill:#f96,stroke:#333
+    style H2 fill:#f96,stroke:#333
+    style H3 fill:#f96,stroke:#333
+    style H4 fill:#f96,stroke:#333
+    style H5 fill:#f96,stroke:#333
 ```
 
-**The curriculum file format** would mirror the existing data hierarchy:
+**Two generation pipelines, neither fully editorial:**
 
-```yaml
-# curriculum/seychelles/geography.yaml
-course:
-  title: Geography
-  grade_level: S1-S3
-  description: >
-    Seychelles Secondary Geography Curriculum (Cycle 4: S1-S3).
+| Concern | `generator.py` (CLI) | `tasks.py` (Dashboard) |
+|---|---|---|
+| Who triggers it | Developer (management command) | Teacher (web upload) |
+| Content richness | Full (multi-step, hints, media) | Thin (placeholder TEACH step) |
+| Published by default | Yes (`is_published=True`) | No (`is_published=False`) |
+| Review gate | None — content goes live immediately | Exists but incomplete (no edit UI) |
+| Localization | Hardcoded `LOCAL_CONTEXT` constant | Hardcoded `"Seychelles"` strings |
+| Model selection | Hardcoded `claude-sonnet-4-20250514` | Uses active `ModelConfig` from DB |
+| Idempotent | Yes (`update_or_create`) | Yes (`update_or_create`) |
 
-units:
-  - title: "S1: Introduction to Geography"
-    lessons:
-      - title: What is Geography?
-        objective: Understand geography as study of earth, inhabitants, and their relationships
-        terminal_objectives:
-          - Define geography
-          - Know fundamental concepts: location, pattern, process
-          - Understand human-environment interaction
-        localization_hints:
-          examples: ["Use Seychelles as primary case study"]
-          place_names: [Victoria, Mahé, Praslin]
-```
+#### Revised Proposal
 
-**The generic import command** would:
+The original proposal (YAML-based declarative import) remains valid as a third, complementary path — particularly valuable for curriculum experts who want to maintain content in version-controlled files. However, given the new dashboard infrastructure, the highest-impact next steps are:
 
-1. Parse the file and validate against a JSON Schema
-2. Use `update_or_create` keyed on `(institution, course_title, unit_title, lesson_title)` — preserving the idempotent behavior
-3. Generate the `teacher_script` from a configurable template (not hardcoded in Python)
-4. Support `--dry-run` to preview changes without writing to the database
-5. Log a changelog of what was created, updated, or left unchanged
+1. **Unify the two AI generation pipelines** — `generator.py` and `tasks.py` duplicate effort. The CLI pipeline produces richer content but hardcodes the model; the dashboard pipeline is more flexible but produces thin placeholders. Merge into a single `CurriculumGenerationService` class that both paths call, with `is_published=False` as the universal default.
 
-**Separation of PromptPack from curriculum data** — the prompt strings (`SYSTEM_PROMPT`, `TEACHING_STYLE_PROMPT`, etc.) should also move out of the seed command into their own file or admin-managed records, since they are independent of the syllabus content.
+2. **Add a content review UI to the dashboard** — The `course_detail` view exists but is read-only. Add edit capabilities for lesson content, step scripts, and exit ticket questions. This completes the editorial loop: upload → generate → review → publish.
 
-**Benefits:**
-- Curriculum designers edit YAML files directly (or through a lightweight CMS that outputs YAML)
-- No Python knowledge required to add a lesson or fix an objective
-- Files can be validated, diffed, and reviewed in version control
-- The same import command works for any country or subject — just point it at a different file
-- Teacher_script template becomes a configurable string, not hardcoded code
+3. **Extract `LOCAL_CONTEXT` to the `Institution` model** — Add a `localization_context` TextField to `Institution` that carries the place names, currency, industries, and local names. Inject this into generation prompts dynamically instead of from a Python constant. This single change eliminates the hardcoded Seychelles references across all seven files.
+
+4. **Wire `generate_lesson_content()` into the dashboard flow** — The function exists in `tasks.py` but is not called. Add a "Generate rich content" button to the dashboard that triggers it for selected lessons, with the result visible for review before publishing.
+
+5. **Add `generate_exit_tickets` to the dashboard** — Currently CLI-only. Add a "Generate exit ticket" action to the lesson detail view so teachers can trigger and review assessment generation from the web UI.
 
 ---
 
 ### Issue 2: Science-of-Learning Principles Are Static in the System Prompt
 
-#### The Problem
+#### What Has Changed
 
-The pedagogical methodology is embedded as a single, monolithic text block in `TEACHING_STYLE_PROMPT` (seed_seychelles.py, lines 34-79). This block is stored in `PromptPack.teaching_style_prompt` and injected into every session identically, regardless of:
-
-- **Subject** — math tutoring benefits from different strategies than geography (worked examples vs. case studies)
-- **Student level** — an S1 student needs more scaffolding than an S5 student
-- **Lesson phase** — retrieval practice and explicit instruction need different principles than guided practice
-- **Student performance** — a struggling student needs different scaffolding than one who's breezing through
+The engine now implements a **real phase state machine** that structures sessions around science-of-learning principles. This is a major advance — but the principles are now hardcoded in *two* places instead of one.
 
 ```mermaid
 flowchart TD
-    subgraph "Current: Static Pedagogy Injection"
-        PP["PromptPack.teaching_style_prompt\n(one monolithic block, ~45 lines)"]
-        PP --> SYS["System prompt\n(identical for all 59 lessons)"]
-        SYS --> LLM["LLM receives same\npedagogical instructions\nregardless of context"]
+    subgraph "Step-Based Mode: SoL via PromptPack (editable)"
+        PP["PromptPack.teaching_style_prompt\n(admin-editable text field)"]
+        PP --> SYS_A["System prompt for step mode"]
+        SYS_A --> LLM_A["LLM follows PromptPack pedagogy"]
     end
 
-    style PP fill:#f96,stroke:#333
+    subgraph "Conversational Mode: SoL via Engine Constants (hardcoded)"
+        CONST["Python constants:\nRETRIEVAL_QUESTIONS = 2\nPRACTICE_QUESTIONS = 3\nEXIT_TICKET_QUESTIONS = 10\nEXIT_TICKET_PASS_THRESHOLD = 8"]
+        PHASE["_build_structured_system_prompt()\n(~120 lines of hardcoded\npedagogical protocol)"]
+        CTX["_build_phase_context()\n(phase-specific instructions\nwith hardcoded Seychelles references)"]
+        CONST --> PHASE
+        PHASE --> SYS_B["System prompt for conversational mode"]
+        CTX --> TURN["Per-turn instructions"]
+        SYS_B --> LLM_B["LLM follows engine protocol"]
+        TURN --> LLM_B
+    end
+
+    style PP fill:#6f6,stroke:#333
+    style CONST fill:#f96,stroke:#333
+    style PHASE fill:#f96,stroke:#333
+    style CTX fill:#f96,stroke:#333
 ```
 
-The teaching style prompt contains good principles (retrieval practice, scaffolding, mastery-based advancement, interleaving, immediate feedback) but applies them uniformly. The LLM gets the same instructions for "What is Geography?" (S1, introductory) and "The Blue Economy" (S3, analytical). It gets the same instructions for a student who has mastered 80% of prior lessons and one who is struggling with fundamentals.
+**The split creates two problems:**
 
-#### Proposed Solution: Principle Registry with Context-Sensitive Selection
+1. **Inconsistent configurability** — In step-based mode, an admin can change the teaching methodology by editing `PromptPack.teaching_style_prompt`. In conversational mode, the methodology is baked into Python. A curriculum editor who wants to change "2 retrieval questions" to "3" or adjust the exit ticket threshold from 80% to 70% must submit a code change.
 
-Introduce a **`PedagogicalPrinciple`** model that stores individual science-of-learning strategies as discrete, tagged records. At prompt assembly time, select and compose the relevant subset based on session context.
+2. **The `PromptPack` is partially bypassed** — Conversational mode calls `self.prompt_pack.get_full_system_prompt()` as a *prefix* to the engine's own protocol. The PromptPack's persona and safety rules are preserved, but its `teaching_style_prompt` is effectively overridden by the engine's hardcoded phase protocol. The two pedagogical instruction sets may contradict each other.
+
+**Additionally, `ChildProtection.get_age_appropriate_system_prompt()` exists but is not wired** — The safety module defines a method that returns a child-safety prompt addendum, but neither `prompts.py` nor `engine.py` calls it. This is a gap: the safety prompt in the `PromptPack` is a static text field, while the `ChildProtection` module has dynamic, age-aware logic that is never injected.
+
+#### Revised Proposal
+
+The original `PedagogicalPrinciple` registry proposal remains the right long-term architecture. The new engine's phase state machine is a strong foundation to build on — it just needs to be made configurable. The revised approach works in two stages:
+
+**Stage 1: Extract engine constants to database configuration**
+
+Introduce a `SessionConfig` model (or extend `PromptPack`) with fields that the engine currently hardcodes:
 
 ```mermaid
 erDiagram
-    Institution ||--o{ PedagogicalPrinciple : "defines"
-    PedagogicalPrinciple {
-        string name
-        text description
-        text prompt_fragment
-        string category
-        json applicability_tags
-        int priority
+    Institution ||--o{ SessionConfig : "configures"
+    SessionConfig {
+        int retrieval_question_count
+        int practice_question_count
+        int exit_ticket_question_count
+        int exit_ticket_pass_threshold
+        text retrieval_phase_prompt
+        text instruction_phase_prompt
+        text practice_phase_prompt
+        text exit_ticket_phase_prompt
         bool is_active
     }
 ```
 
-Where `applicability_tags` encode when a principle should be injected:
+The engine reads these values at session start instead of using class constants. Phase-specific prompt fragments come from the database instead of `_build_phase_context()` string literals. This makes the conversational mode as editable as the step-based mode without changing the phase machine architecture.
 
-```json
-{
-  "subjects": ["mathematics"],
-  "grade_levels": ["S1", "S2"],
-  "lesson_phases": ["guided_practice"],
-  "student_performance": ["struggling"],
-  "step_types": ["practice", "quiz"]
-}
-```
+**Stage 2: Implement the `PedagogicalPrinciple` registry (original proposal)**
 
-The prompt assembly function gains a new stage:
+Decompose the phase prompts further into individual, tagged principles that are selected based on subject, grade, phase, and student performance. This builds naturally on Stage 1 — the phase prompt fields become composition targets rather than monolithic strings.
 
-```mermaid
-flowchart TD
-    CTX["Session Context\n(subject, grade, lesson phase,\nstudent performance history)"]
-
-    REG["PedagogicalPrinciple Registry\n(database table)"]
-
-    CTX --> SELECT["select_principles(context)\nFilter by applicability_tags\nSort by priority"]
-    REG --> SELECT
-
-    SELECT --> COMPOSE["Compose teaching_style block\nfrom selected principle fragments"]
-
-    COMPOSE --> SYS["Assemble into system prompt\n(replacing static teaching_style_prompt)"]
-
-    subgraph "Example: S1 Math, struggling student"
-        P1["Concrete before abstract\n(math, S1)"]
-        P2["Extra scaffolding\n(struggling)"]
-        P3["Worked examples first\n(math, guided_practice)"]
-        P4["Slower pacing\n(struggling)"]
-    end
-
-    subgraph "Example: S3 Geography, proficient student"
-        P5["Case-study approach\n(geography)"]
-        P6["Higher-order questions\n(proficient)"]
-        P7["Interleaving with prior units\n(proficient)"]
-    end
-
-    SELECT -.-> P1 & P2 & P3 & P4
-    SELECT -.-> P5 & P6 & P7
-```
-
-**How it changes prompt assembly:**
-
-```mermaid
-sequenceDiagram
-    participant E as TutorEngine
-    participant DB as Database
-    participant P as prompts.py
-
-    E->>DB: Query StudentLessonProgress\n(mastery history, streaks)
-    DB-->>E: Performance context
-
-    E->>DB: Query PedagogicalPrinciple\nWHERE tags match (subject, grade, performance)
-    DB-->>E: Relevant principles (ordered by priority)
-
-    E->>P: assemble_system_prompt(\nprompt_pack, lesson, principles[])
-    Note right of P: teaching_style_prompt composed\nfrom selected principles,\nnot the static PromptPack field
-
-    P-->>E: Context-aware system prompt
-```
-
-**Seeding pedagogical principles** — the existing `TEACHING_STYLE_PROMPT` content would be decomposed into ~15-20 individual principle records. For example:
-
-| Principle | Category | Applies to |
-|---|---|---|
-| "Start with 1-2 retrieval questions about previously learned topics" | retrieval_practice | all subjects, all grades |
-| "Break concepts into small, digestible pieces" | explicit_instruction | all subjects, S1-S2 |
-| "Use Seychelles as primary case study when possible" | localization | geography |
-| "Show step-by-step working for all calculations" | worked_examples | mathematics |
-| "If student struggles on 2+ problems, slow down and re-explain" | adaptive_pacing | all subjects, struggling |
-| "Mix in review of older topics" | interleaving | all subjects, proficient |
-| "Use concrete examples before abstract concepts" | scaffolding | mathematics, S1-S3 |
-| "Encourage analytical reasoning with open-ended questions" | higher_order_thinking | all subjects, S3+, proficient |
-
-**Benefits:**
-- Pedagogical strategies can be added, modified, or deactivated without code changes
-- Different subject-pedagogy combinations emerge naturally (math gets worked-examples emphasis, geography gets case-study emphasis)
-- Student performance data already in `StudentLessonProgress` can drive adaptive principle selection
-- Researchers can A/B test pedagogical strategies by toggling principles on/off
-- New principles from learning science research can be added as data, not code
+**Wire `ChildProtection.get_age_appropriate_system_prompt()`** — Both `assemble_system_prompt()` in `prompts.py` and `_build_structured_system_prompt()` in `engine.py` should call this method and append the result. This requires passing the student user to the prompt assembly functions.
 
 ---
 
 ### Issue 3: Learning Content Is Not Localized or Pre-Authored, Relying Entirely on LLM Generation
 
-#### The Problem
+#### What Has Changed
 
-In the Seychelles deployment, the LLM generates **all** learning content at runtime:
-
-- Practice examples and worked problems
-- Activities and exercises
-- Exit ticket quiz questions and answer options
-- Contextual examples and analogies
-
-The only localization cue is a 6-line block in the system prompt telling the AI to use Seychelles place names, currency, and industries. Whether the AI actually produces well-localized, pedagogically appropriate content depends entirely on the LLM's interpretation of these general instructions on every single turn.
+This issue has seen the most progress. The system now generates and stores content ahead of time, but localization remains static.
 
 ```mermaid
 flowchart TD
-    subgraph "Current: Runtime-Only Content Generation"
-        TS["teacher_script\n(objectives + generic flow)"]
-        LOC["System prompt\n'Use Seychelles place names...'"]
-        TS --> LLM["LLM generates everything\nat runtime"]
-        LOC --> LLM
-        LLM --> Q["Questions?  Uncontrolled"]
-        LLM --> EX["Examples?  Uncontrolled"]
-        LLM --> ACT["Activities?  Uncontrolled"]
-        LLM --> MCQ["Exit ticket?  Uncontrolled"]
+    subgraph "Before (seed_seychelles only)"
+        OLD_TS["teacher_script\n(objectives + generic flow)"]
+        OLD_LOC["System prompt\n'Use Seychelles place names...'"]
+        OLD_TS --> OLD_LLM["Everything generated\nat runtime"]
+        OLD_LOC --> OLD_LLM
     end
 
-    style Q fill:#f96,stroke:#333
-    style EX fill:#f96,stroke:#333
-    style ACT fill:#f96,stroke:#333
-    style MCQ fill:#f96,stroke:#333
+    subgraph "After (generator.py + exit tickets)"
+        NEW_GEN["generator.py creates:\n• Rich teacher scripts\n• Worked examples\n• Practice problems with hints\n• Summary content"]
+        NEW_ET["generate_exit_tickets creates:\n• 10 MCQ questions per lesson\n• Difficulty-tagged (easy/medium/hard)\n• Stored in ExitTicket model"]
+        NEW_MEDIA["DALL-E generates:\n• Lesson images\n• Stored as MediaAsset"]
+        NEW_ENGINE["Engine injects:\n• Pre-defined exit ticket questions\n• Available media references\n• AI-generated images on request"]
+
+        NEW_GEN --> DB["Database\n(reviewable, editable)"]
+        NEW_ET --> DB
+        NEW_MEDIA --> DB
+        DB --> NEW_ENGINE
+    end
+
+    style OLD_LLM fill:#f96,stroke:#333
+    style DB fill:#6f6,stroke:#333
 ```
 
-**Consequences:**
+**What is now pre-authored and stored:**
 
-- **Quality variance** — the same lesson can produce excellent or mediocre content depending on the LLM's generation. There is no floor on quality.
-- **Shallow localization** — "Use Seychelles place names" is a surface-level instruction. True localization means using correct local examples (e.g., the actual fish species caught in Seychelles for a biology lesson, or real SCR prices for a percentage problem).
-- **No content review** — because content is generated on-the-fly, there is no opportunity for curriculum experts or teachers to review, approve, or improve it before students see it.
-- **No reuse** — a great example the AI generates in one session is lost. It cannot be captured, curated, and reused.
-- **Factual risk** — the LLM may generate incorrect local facts (wrong population figures, wrong distances between islands, wrong fish species).
+| Content Type | Source | Stored In | Editable? | Used At Runtime? |
+|---|---|---|---|---|
+| Teacher scripts | `generator.py` | `LessonStep.teacher_script` | Django Admin | Yes — step-based mode |
+| Worked examples | `generator.py` | `LessonStep` (WORKED_EXAMPLE type) | Django Admin | Yes — step-based mode |
+| Practice problems + hints | `generator.py` | `LessonStep` (PRACTICE type) | Django Admin | Yes — step-based mode |
+| Exit ticket questions | `generate_exit_tickets` | `ExitTicketQuestion` | Django Admin | Yes — both modes |
+| Lesson images | `generator.py` / DALL-E | `MediaAsset` + `StepMedia` | Django Admin | Yes — both modes |
 
-#### Proposed Solution: Content Bank with Dynamic Prompt Injection
+**What is still generated entirely at runtime:**
 
-Introduce a **`ContentItem`** model that stores pre-authored, reviewed, and localized learning content fragments. These are injected into the prompt at assembly time, giving the LLM vetted raw material to work with rather than asking it to invent everything.
-
-```mermaid
-erDiagram
-    Institution ||--o{ ContentItem : "owns"
-    Lesson ||--o{ ContentItem : "associated_with"
-    Unit ||--o{ ContentItem : "associated_with"
-
-    ContentItem {
-        string content_type
-        text content
-        json metadata
-        string locale_context
-        int difficulty_level
-        bool is_reviewed
-        bool is_active
-    }
-```
-
-Where `content_type` is one of: `worked_example`, `practice_problem`, `mcq_question`, `real_world_example`, `local_fact`, `activity`, `analogy`.
-
-**Example content items for "Simple Interest" lesson:**
-
-| Type | Content | Locale context |
+| Content Type | When | Localization Source |
 |---|---|---|
-| `real_world_example` | "Marie saves 5,000 SCR at Seychelles Commercial Bank at 3.5% annual interest" | Seychelles, SCR, real bank name |
-| `practice_problem` | "Pierre's family takes a loan of 15,000 SCR to repair their fishing boat. The bank charges 6% simple interest per year. How much interest do they pay after 2 years?" | Seychelles, fishing industry, SCR |
-| `mcq_question` | "A tourism shop in Victoria borrows 20,000 SCR at 4% simple interest for 3 years. What is the total interest? A) 2,400 SCR B) 2,000 SCR C) 3,000 SCR D) 1,600 SCR" | Seychelles, tourism, Victoria |
-| `local_fact` | "The Central Bank of Seychelles sets the base lending rate. In 2024 it was approximately 4.5%." | Verifiable local fact |
-| `analogy` | "Think of interest like rent — when you borrow someone's money, you pay rent (interest) for using it, just like paying rent for a house in Beau Vallon." | Seychelles place name |
+| Retrieval practice questions | Conversational mode, RETRIEVAL phase | Hardcoded `"Seychelles examples"` in `_build_phase_context()` |
+| Instruction explanations | Conversational mode, INSTRUCTION phase | Hardcoded `"[Clear explanation with Seychelles examples]"` in engine |
+| Practice problems | Conversational mode, PRACTICE phase | PromptPack system_prompt locale block |
+| Feedback on answers | Both modes | PromptPack system_prompt locale block |
+| Dynamic images | Conversational mode, on-demand | Hardcoded `"secondary school students in Seychelles"` in `image_service.py` |
 
-**How it changes prompt assembly:**
+**Localization is hardcoded in 7 locations across the codebase:**
 
-```mermaid
-sequenceDiagram
-    participant E as TutorEngine
-    participant DB as Database
-    participant P as prompts.py
-    participant LLM as LLM Provider
+| File | What | Line(s) |
+|---|---|---|
+| `generator.py` | `LOCAL_CONTEXT` constant | 51-58 |
+| `generator.py` | `"rooted in Seychelles context"` | 382 |
+| `generate_exit_tickets.py` | `"relevant to Seychelles secondary school students"` | 32 |
+| `tasks.py` | `"students in Seychelles"` | 237 |
+| `tasks.py` | `"Seychelles secondary students"` | 271 |
+| `engine.py` | `"[Clear explanation with Seychelles examples]"` | 813 |
+| `image_service.py` | `"secondary school students in Seychelles."` | 243 |
 
-    E->>DB: Get lesson + step
-    E->>DB: Query ContentItem\nWHERE lesson=current\nAND content_type IN (needed types)\nAND is_reviewed=True
-    DB-->>E: Content items (randomized selection)
+Additionally, `engine.py`'s `_find_relevant_media()` has hardcoded Geography-specific keyword boosts (`layer`, `rain`, `earth`, `diagram`) that will not match media for other subjects.
 
-    E->>P: build_step_instruction(\nstep, content_items=[...])
-    Note right of P: Injects content bank items\ninto the step instruction:\n"USE THESE EXAMPLES:\n• {item_1}\n• {item_2}\nAdapt them naturally."
+#### Revised Proposal
 
-    P-->>E: Step instruction with seeded content
-    E->>LLM: generate(system_prompt, messages)
-    Note right of LLM: LLM adapts and presents\npre-vetted content naturally,\nrather than inventing from scratch
-```
+The exit ticket system is a **partial implementation of the content bank concept** from the original proposal. It proves the pattern works: AI-generates content once → stores in DB → reviewed/editable → injected at runtime. The revised proposal extends this pattern to cover the remaining runtime-generated content types.
 
-The `teacher_script` template would gain a new section:
+**The content bank model and injection pipeline remain as proposed**, with these adjustments:
 
-```
-LESSON: {title}
-LEARNING OBJECTIVE: {objective}
-TERMINAL OBJECTIVES:
-• ...
+1. **`ExitTicketQuestion` is already a content bank for assessment** — the model exists, works, and is wired into the engine. Extend the pattern to practice problems and worked examples by creating a parallel `LessonContent` model (or reuse `ContentItem` as proposed) for non-assessment content.
 
-CONTENT BANK (use these in your teaching — adapt naturally):
-
-WORKED EXAMPLE:
-  Marie saves 5,000 SCR at Seychelles Commercial Bank at 3.5% annual interest...
-
-PRACTICE PROBLEMS (present one at a time):
-  1. Pierre's family takes a loan of 15,000 SCR to repair their fishing boat...
-  2. A hotel in Beau Vallon needs 50,000 SCR for renovations...
-
-EXIT TICKET QUESTIONS (present as MCQ):
-  1. A tourism shop in Victoria borrows 20,000 SCR at 4%...
-     A) 2,400 SCR  B) 2,000 SCR  C) 3,000 SCR  D) 1,600 SCR
-     Correct: A
-
-Begin this tutoring session following the structured flow...
-```
-
-**The content pipeline:**
+2. **Centralize localization context** — Extract all 7 hardcoded Seychelles references into a single `Institution.localization_context` field:
 
 ```mermaid
-flowchart TD
-    subgraph "Content Authoring (offline)"
-        A1["LLM-assisted generation\n(bulk-generate candidates)"] --> REVIEW
-        A2["Teacher contribution\n(submit local examples)"] --> REVIEW
-        A3["Curriculum team\n(write key examples)"] --> REVIEW
-        REVIEW["Editorial review\n(accuracy, localization, pedagogy)"]
-        REVIEW --> DB["ContentItem table\nis_reviewed=True"]
-    end
+flowchart LR
+    INST["Institution.localization_context\n(JSON or structured text)"]
 
-    subgraph "Runtime (per session)"
-        DB --> SELECT["Select relevant items\n(by lesson, difficulty, type)"]
-        SELECT --> INJECT["Inject into teacher_script\nas content bank"]
-        INJECT --> LLM["LLM uses vetted content\nas raw material"]
-        LLM --> STUDENT["Student sees localized,\nreviewed content"]
-    end
-
-    subgraph "Feedback loop"
-        STUDENT --> CAPTURE["Capture LLM-generated\ncontent from transcripts"]
-        CAPTURE --> REVIEW
-    end
+    INST --> GEN["generator.py\nuses it for content generation"]
+    INST --> ET["generate_exit_tickets\nuses it for question generation"]
+    INST --> TASKS["tasks.py\nuses it for structure parsing"]
+    INST --> ENGINE["engine.py\nuses it for phase context"]
+    INST --> IMG["image_service.py\nuses it for DALL-E prompts"]
 ```
 
-**Key design decisions:**
+A single database field replaces 7 hardcoded strings. Changing deployment from Seychelles to Kenya becomes a data change, not a code change.
 
-1. **Content items supplement, not replace, the LLM** — the AI still adapts, paraphrases, and sequences the content. The content bank gives it vetted ingredients; it's still the chef.
+3. **Make media keyword matching configurable** — The `_find_relevant_media()` function in `engine.py` has hardcoded Geography keyword boosts. Move these to the `Course` or `Unit` model as a `media_keywords` JSONField, or derive them from the lesson's subject at runtime.
 
-2. **Progressive enrichment** — lessons can start with zero content items (current behavior) and gain them over time. The system gracefully degrades: if no items exist, the LLM generates everything as it does today.
-
-3. **Random selection from pools** — if a lesson has 10 practice problems but only 3 are needed per session, randomly select 3. This provides variety across sessions while keeping content quality controlled.
-
-4. **Difficulty-tagged items** — content items carry a `difficulty_level` (1-5). Combined with student performance data, the assembler can select easier or harder items adaptively.
-
-5. **Feedback loop** — session transcripts (`SessionTurn`) already capture everything the AI generates. A curation workflow can extract good AI-generated examples from transcripts, review them, and add them back to the content bank. Over time, the content bank grows organically.
+4. **The feedback loop is now feasible** — Session transcripts (`SessionTurn`) capture all AI-generated content. With the `ExitTicket` pattern as a model, a curation workflow can: (a) scan transcripts for well-received practice problems (high student engagement, correct answers), (b) surface them for editorial review, (c) save approved ones back to the content bank. The infrastructure for steps (a) and (c) exists; step (b) needs a dashboard view.
 
 ---
 
-## Part 3: How the Three Proposals Fit Together
-
-The three proposals are complementary and can be implemented incrementally:
+## Part 3: How the Three Proposals Fit Together (Revised)
 
 ```mermaid
 flowchart TD
     subgraph "Issue 1: Editorial Workflow"
-        YAML["Curriculum YAML files\n(objectives, structure)"]
-        IMPORT["import_curriculum command"]
+        UNIFY["Unify generator.py + tasks.py\ninto CurriculumGenerationService"]
+        REVIEW_UI["Add content review/edit\nUI to dashboard"]
+        YAML["YAML import path\n(for version-controlled curricula)"]
     end
 
     subgraph "Issue 2: Dynamic Pedagogy"
-        PRINC["PedagogicalPrinciple table\n(tagged, prioritized)"]
-        PSEL["Context-sensitive selection"]
+        SCONFIG["SessionConfig model\n(extract engine constants)"]
+        WIRE_SAFETY["Wire ChildProtection\ninto prompt assembly"]
+        PRINC["PedagogicalPrinciple registry\n(tagged, context-sensitive)"]
     end
 
     subgraph "Issue 3: Content Bank"
-        CBANK["ContentItem table\n(localized, reviewed)"]
-        CINJ["Dynamic injection into prompts"]
+        LOC_FIELD["Institution.localization_context\n(centralize 7 hardcoded strings)"]
+        CONTENT_MODEL["LessonContent model\n(extend ExitTicket pattern)"]
+        FEEDBACK["Transcript → curation\nfeedback loop"]
     end
 
-    YAML --> IMPORT --> DB["Database\n(Course > Unit > Lesson)"]
-    PRINC --> PSEL --> PROMPT["assemble_system_prompt()"]
-    CBANK --> CINJ --> STEP["build_step_instruction()"]
+    UNIFY --> REVIEW_UI
+    REVIEW_UI --> YAML
 
-    DB --> ENGINE["TutorEngine"]
-    PROMPT --> ENGINE
-    STEP --> ENGINE
-    ENGINE --> LLM["LLM Call"]
-    STUDENT_PERF["StudentLessonProgress"] --> PSEL
-    STUDENT_PERF --> CINJ
+    SCONFIG --> WIRE_SAFETY
+    WIRE_SAFETY --> PRINC
+
+    LOC_FIELD --> CONTENT_MODEL
+    CONTENT_MODEL --> FEEDBACK
+
+    subgraph "Existing Infrastructure (leverage)"
+        ET["ExitTicket model ✓"]
+        DASH["Teacher dashboard ✓"]
+        PHASE["Phase state machine ✓"]
+        MEDIA["MediaAsset pipeline ✓"]
+        SAFETY["Safety module ✓"]
+    end
+
+    ET -.-> CONTENT_MODEL
+    DASH -.-> REVIEW_UI
+    PHASE -.-> SCONFIG
+    MEDIA -.-> CONTENT_MODEL
+    SAFETY -.-> WIRE_SAFETY
 ```
 
-**Implementation order recommendation:**
+#### Revised Implementation Order
 
-1. **Issue 1 first** — extract curriculum to YAML files and build the generic importer. This unblocks non-developers from maintaining curriculum and establishes the declarative data pattern.
+The new code changes the priority sequence. The exit ticket system and dashboard are already in place — build on them rather than starting from scratch.
 
-2. **Issue 3 second** — build the `ContentItem` model and injection pipeline. This can reuse the YAML file pattern (content items can live alongside curriculum files). The highest-value content items are localized practice problems and MCQ questions for exit tickets.
+**Phase 1: Consolidate and centralize (low effort, high impact)**
 
-3. **Issue 2 third** — decompose the teaching style prompt into principle records. This is the most nuanced change and benefits from having the content bank in place (principles like "use worked examples before practice" are more effective when there are actually worked examples to inject).
+1. Add `localization_context` to `Institution` — eliminates 7 hardcoded strings
+2. Unify the two generation pipelines into a shared service
+3. Wire `generate_exit_tickets` and `generate_lesson_content` into the dashboard UI
+4. Wire `ChildProtection.get_age_appropriate_system_prompt()` into both prompt paths
+
+**Phase 2: Make the engine configurable (medium effort)**
+
+5. Extract engine constants to `SessionConfig` model
+6. Move phase-specific prompt fragments to database
+7. Add content editing to the dashboard (lesson steps, exit ticket questions)
+
+**Phase 3: Build the full content bank (higher effort, builds on Phase 1-2)**
+
+8. `LessonContent` model extending the `ExitTicket` pattern to practice problems, worked examples, and localized facts
+9. Dynamic injection into both step-based and conversational prompt paths
+10. Transcript curation workflow (feedback loop)
+
+**Phase 4: Pedagogical principle registry (builds on Phase 2-3)**
+
+11. Decompose `SessionConfig` phase prompts into tagged `PedagogicalPrinciple` records
+12. Context-sensitive selection based on subject, grade, phase, and student performance
+13. A/B testing infrastructure for pedagogical strategies
 
 ---
 
-*Generated February 2026. Based on analysis of the ai-tutor repository at commit `7768177`.*
+## Appendix: New Code Inventory
+
+Files added or significantly modified in the `104cebc` merge:
+
+| File | Lines | Status | Primary Concern |
+|---|---|---|---|
+| `apps/curriculum/generator.py` | 603 | New | Issue 1 (generation pipeline) + Issue 3 (localized content) |
+| `apps/tutoring/engine.py` | 1,560 | Expanded | Issue 2 (phase-based SoL) + Issue 3 (exit ticket injection) |
+| `apps/tutoring/models.py` | 352 | Modified | Issue 3 (ExitTicket models) |
+| `apps/tutoring/management/commands/generate_exit_tickets.py` | 199 | New | Issue 3 (assessment generation) |
+| `apps/tutoring/image_service.py` | 304 | New | Issue 3 (localized media) |
+| `apps/tutoring/views.py` | 794 | Expanded | Safety integration, SSE streaming |
+| `apps/llm/prompts.py` | 216 | Modified | Media-aware prompts |
+| `apps/dashboard/views.py` | 611 | New | Issue 1 (editorial UI) |
+| `apps/dashboard/models.py` | 110 | New | Issue 1 (upload tracking) |
+| `apps/dashboard/tasks.py` | 347 | New | Issue 1 (web generation pipeline) |
+| `apps/safety/__init__.py` | 543 | New | Safety, privacy, COPPA/GDPR |
+| `apps/safety/models.py` | 99 | New | Audit logging, consent |
+| `apps/safety/views.py` | 197 | New | Privacy dashboard |
+| **Total** | **~5,935** | | |
+
+---
+
+*Generated February 2026. Revision 2 based on analysis of the ai-tutor repository at commit `104cebc`.*
