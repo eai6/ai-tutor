@@ -973,8 +973,20 @@ function renderQuestion(data) {
     if (data.options && data.options.length > 0) {
         optionsHtml = '<div class="options">';
         data.options.forEach((opt, i) => {
-            const letter = String.fromCharCode(65 + i);
-            const text = opt.replace(/^[A-D]\)\s*/, '');
+            // Extract the letter if option starts with "A)", "B)", etc.
+            const letterMatch = opt.match(/^([A-D])\)\s*/);
+            let letter, text;
+            
+            if (letterMatch) {
+                // Option has letter prefix like "A) Option text"
+                letter = letterMatch[1];
+                text = opt.replace(/^[A-D]\)\s*/, '');
+            } else {
+                // No letter prefix, assign based on index
+                letter = String.fromCharCode(65 + i);
+                text = opt;
+            }
+            
             optionsHtml += `
                 <button class="option" onclick="selectOption(this, '${letter}')" data-letter="${letter}">
                     <span class="option-letter">${letter}</span>
@@ -986,7 +998,9 @@ function renderQuestion(data) {
         optionsHtml += `<button class="submit-answer" onclick="submitAnswer()" disabled>Submit Answer</button>`;
     }
     
-    console.log('[MCQ] Rendered new question:', data.label, 'Correct:', data.correct);
+    console.log('[MCQ] Rendered question:', data.label);
+    console.log('[MCQ] Options:', data.options);
+    console.log('[MCQ] Correct answer:', data.correct);
     
     return `
         <div class="artifact-question" data-correct="${data.correct || ''}">

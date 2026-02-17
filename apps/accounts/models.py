@@ -34,9 +34,7 @@ class Membership(models.Model):
     A user can have different roles in different institutions.
     """
     class Role(models.TextChoices):
-        ADMIN = 'admin', 'Institution Admin'
-        TEACHER = 'teacher', 'Teacher'
-        EDITOR = 'editor', 'Content Editor'
+        STAFF = 'staff', 'Staff (Teacher/Admin)'
         STUDENT = 'student', 'Student'
 
     user = models.ForeignKey(
@@ -67,8 +65,8 @@ class Membership(models.Model):
 
     @property
     def is_staff(self):
-        """Returns True if user has admin, teacher, or editor role."""
-        return self.role in [self.Role.ADMIN, self.Role.TEACHER, self.Role.EDITOR]
+        """Returns True if user has staff role."""
+        return self.role == self.Role.STAFF
 
 
 class StudentProfile(models.Model):
@@ -128,3 +126,50 @@ class StudentProfile(models.Model):
             if code == self.school:
                 return name
         return self.school
+
+
+class StaffInvitation(models.Model):
+    """
+    Invitation for staff (teachers/admins) to join an institution.
+    Staff cannot self-register - they must be invited.
+    """
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name='invitations'
+    )
+    email = models.EmailField()
+    role = models.CharField(
+        max_length=20,
+        choices=Membership.Role.choices,
+        default=Membership.Role.STAFF
+    )
+    token = models.CharField(max_length=64, unique=True)
+    invited_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='sent_invitations'
+    )
+    
+    is_used = models.BooleanField(default=False)
+    registered_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invitation'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.email} - {self.role} @ {self.institution.name}"
+    
+    def get_role_display(self):
+        """Return human-readable role name."""
+        return dict(Membership.Role.choices).get(self.role, self.role)

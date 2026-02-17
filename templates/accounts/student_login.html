@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block title %}Student Sign In - AI Tutor{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card card animate-in">
+        <div class="auth-header">
+            <div class="auth-icon">🎓</div>
+            <h1>Student Sign In</h1>
+            <p class="text-muted">Welcome back! Let's continue learning.</p>
+        </div>
+        
+        {% if error %}
+        <div class="alert alert-error">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <form method="post" class="auth-form">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    value="{{ username|default:'' }}"
+                    placeholder="Enter your username"
+                    required
+                    autofocus
+                >
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    placeholder="Enter your password"
+                    required
+                >
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-full">
+                Sign In →
+            </button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="{% url 'accounts:student_register' %}">Register as Student</a></p>
+            <p style="margin-top: 0.5rem;"><a href="{% url 'accounts:landing' %}">← Back to home</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .auth-container {
+        max-width: 420px;
+        margin: 2rem auto;
+    }
+    
+    .auth-card {
+        padding: 2.5rem;
+    }
+    
+    .auth-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .auth-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .auth-header h1 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+    }
+    
+    .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+    
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .form-group label {
+        font-weight: 700;
+        font-size: 0.875rem;
+        color: var(--text-dark);
+    }
+    
+    .form-group input {
+        padding: 0.875rem 1rem;
+        border: 2px solid #E8E8E8;
+        border-radius: var(--radius-md);
+        font-family: inherit;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+    }
+    
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--primary);
+        background: white;
+    }
+    
+    .btn-full {
+        width: 100%;
+        padding: 1rem;
+        font-size: 1.1rem;
+        margin-top: 0.5rem;
+    }
+    
+    .auth-footer {
+        text-align: center;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid rgba(0,0,0,0.08);
+    }
+    
+    .auth-footer a {
+        color: var(--primary);
+        font-weight: 700;
+        text-decoration: none;
+    }
+    
+    .alert {
+        padding: 1rem;
+        border-radius: var(--radius-sm);
+        margin-bottom: 1.5rem;
+        font-weight: 600;
+    }
+    
+    .alert-error {
+        background: #FEF5F5;
+        color: var(--error);
+        border-left: 3px solid var(--error);
+    }
+</style>
+{% endblock %}

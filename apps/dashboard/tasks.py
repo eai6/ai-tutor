@@ -298,6 +298,101 @@ Make it engaging for Seychelles secondary students. Include local examples and c
     return lesson_content
 
 
+def generate_exit_ticket_for_lesson(lesson) -> bool:
+    """Generate an exit ticket for a single lesson."""
+    from apps.tutoring.exit_ticket_models import ExitTicket, ExitTicketQuestion
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+    
+    # Skip if already has exit ticket
+    if ExitTicket.objects.filter(lesson=lesson).exists():
+        return False
+    
+    model_config = ModelConfig.objects.filter(is_active=True).first()
+    if not model_config:
+        logger.warning("No active model config for exit ticket generation")
+        return False
+    
+    llm_client = get_llm_client(model_config)
+    
+    subject = lesson.unit.course.title if lesson.unit and lesson.unit.course else "General"
+    
+    prompt = f"""Generate exactly 10 multiple choice questions for a summative assessment on this lesson.
+
+LESSON: {lesson.title}
+OBJECTIVE: {lesson.objective}
+SUBJECT: {subject}
+
+REQUIREMENTS:
+1. Generate EXACTLY 10 questions
+2. Questions should progress from easy to hard
+3. Each question must have exactly 4 options (A, B, C, D)
+4. Use context relevant to Seychelles secondary school students
+
+OUTPUT FORMAT (JSON array only, no other text):
+[
+    {{
+        "question": "What is...?",
+        "option_a": "First option",
+        "option_b": "Second option", 
+        "option_c": "Third option",
+        "option_d": "Fourth option",
+        "correct": "B",
+        "explanation": "Brief explanation",
+        "difficulty": "easy"
+    }}
+]
+
+Generate the 10 questions now:"""
+
+    try:
+        response = llm_client.generate(
+            messages=[{"role": "user", "content": prompt}],
+            system_prompt="You are an expert educational assessment designer. Output only valid JSON."
+        )
+        
+        content = response.content
+        start = content.find('[')
+        end = content.rfind(']') + 1
+        
+        if start == -1 or end <= start:
+            logger.error(f"No JSON array in exit ticket response for lesson {lesson.id}")
+            return False
+        
+        questions = json.loads(content[start:end])
+        
+        if len(questions) < 10:
+            logger.warning(f"Only {len(questions)} questions generated for lesson {lesson.id}")
+        
+        # Create exit ticket
+        exit_ticket = ExitTicket.objects.create(
+            lesson=lesson,
+            passing_score=8,
+            time_limit_minutes=15,
+            instructions=f"Answer all 10 questions about {lesson.title}. You need 8 correct to pass."
+        )
+        
+        for i, q in enumerate(questions[:10]):
+            ExitTicketQuestion.objects.create(
+                exit_ticket=exit_ticket,
+                question_text=q['question'],
+                option_a=q['option_a'],
+                option_b=q['option_b'],
+                option_c=q['option_c'],
+                option_d=q['option_d'],
+                correct_answer=q['correct'],
+                explanation=q.get('explanation', ''),
+                difficulty=q.get('difficulty', 'medium'),
+                order_index=i,
+            )
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Exit ticket generation failed for lesson {lesson.id}: {e}")
+        return False
+
+
 def process_curriculum_upload(upload_id: int) -> dict:
     """Main function to process a curriculum upload."""
     from apps.dashboard.models import CurriculumUpload
@@ -329,6 +424,23 @@ def process_curriculum_upload(upload_id: int) -> dict:
             upload.institution,
             upload
         )
+        
+        # Step 4: Generate exit tickets for new lessons
+        upload.add_log("Generating exit tickets...")
+        from apps.curriculum.models import Lesson
+        
+        course = upload.created_course
+        if course:
+            lessons = Lesson.objects.filter(unit__course=course)
+            tickets_created = 0
+            for lesson in lessons:
+                upload.add_log(f"  Generating exit ticket for: {lesson.title}...")
+                if generate_exit_ticket_for_lesson(lesson):
+                    tickets_created += 1
+                    upload.add_log(f"    ✓ Created")
+                else:
+                    upload.add_log(f"    ⏭️ Skipped (exists or failed)")
+            upload.add_log(f"Generated {tickets_created} exit tickets")
         
         # Mark complete
         upload.status = 'completed'

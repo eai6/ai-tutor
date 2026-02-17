@@ -1,8 +1,7 @@
 """
 Tutoring Views - Web endpoints for the tutoring interface.
 
-For now, we'll use simple Django views with JSON responses.
-This can later be upgraded to DRF or a websocket-based approach.
+Uses the step-based engine for predictable, curriculum-driven tutoring.
 """
 
 import json
@@ -122,33 +121,28 @@ def start_session(request, lesson_id):
         status=TutorSession.Status.ACTIVE
     ).first()
     
+    is_resume = False
     if existing:
-        # Resume existing session
         session = existing
+        is_resume = True
     else:
-        # Create new session
         session = create_tutor_session(
             student=request.user,
             lesson=lesson,
             institution=institution,
         )
     
-    # Start the engine
+    # Use step-based engine
     engine = TutorEngine(session)
     
-    # If new session, get the opening message
-    if not existing:
-        response = engine.start()
+    if is_resume:
+        response = engine.resume()
     else:
-        # For existing session, get current state
-        response = engine.start()  # TODO: Resume properly
+        response = engine.start()
     
     # Get media for current step
     current_step = engine.current_step
     media = get_step_media(current_step)
-    
-    # Get ALL media for the lesson (for AI to reference)
-    all_media = get_all_lesson_media(lesson)
     
     return JsonResponse({
         "session_id": session.id,
@@ -164,9 +158,10 @@ def start_session(request, lesson_id):
         "is_session_complete": response.is_session_complete,
         "mastery_achieved": response.mastery_achieved,
         "phase": response.phase,
-        "commands": response.commands,  # Artifact commands for frontend
+        "question": response.question,
+        "commands": response.commands,
         "media": media,
-        "all_media": all_media,  # All lesson media for inline references
+        "is_resume": is_resume,
     })
 
 
@@ -243,29 +238,31 @@ def submit_answer(request, session_id):
     # Use filtered content
     safe_answer = safety_result.filtered_content
     
+    # Use step-based engine
     engine = TutorEngine(session)
-    response = engine.process_student_answer(safe_answer)
-    
-    # Filter AI response for child safety
-    safe_message = ChildProtection.filter_ai_response_for_children(response.message)
+    response = engine.process_answer(safe_answer)
     
     # Get media for current step
     current_step = engine.current_step
     media = get_step_media(current_step)
     
     return JsonResponse({
-        "tutor_message": safe_message,
+        "tutor_message": response.message,
         "step_index": response.step_index,
         "step_type": response.step_type,
+        "phase": response.phase,
         "is_waiting_for_answer": response.is_waiting_for_answer,
         "is_session_complete": response.is_session_complete,
         "mastery_achieved": response.mastery_achieved,
+        "question": response.question,
         "grading": {
             "result": response.grading.result.value,
             "feedback": response.grading.feedback,
             "score": response.grading.score,
         } if response.grading else None,
         "attempts_remaining": response.attempts_remaining,
+        "hint": response.hint,
+        "commands": response.commands,
         "media": media,
     })
 
@@ -282,7 +279,7 @@ def advance_step(request, session_id):
     )
     
     engine = TutorEngine(session)
-    response = engine.advance_step()
+    response = engine.advance()
     
     # Get media for current step
     current_step = engine.current_step
@@ -346,6 +343,7 @@ def lesson_catalog(request):
         return render(request, 'tutoring/catalog.html', {
             "subjects": [],
             "selected_subject": None,
+            "active_sessions": [],
         })
     
     institution = get_user_institution(request.user)
@@ -353,7 +351,25 @@ def lesson_catalog(request):
         return render(request, 'tutoring/catalog.html', {
             "subjects": [],
             "selected_subject": None,
+            "active_sessions": [],
         })
+    
+    # Get active sessions (incomplete) for resume
+    active_sessions = TutorSession.objects.filter(
+        student=request.user,
+        institution=institution,
+        status=TutorSession.Status.ACTIVE
+    ).select_related('lesson', 'lesson__unit', 'lesson__unit__course').order_by('-started_at')[:5]
+    
+    active_sessions_data = [{
+        'session_id': s.id,
+        'lesson_id': s.lesson.id,
+        'lesson_title': s.lesson.title,
+        'course_title': s.lesson.unit.course.title,
+        'started_at': s.started_at,
+        'phase': s.engine_state.get('phase', 'retrieval') if s.engine_state else 'retrieval',
+        'questions_correct': s.engine_state.get('questions_correct', 0) if s.engine_state else 0,
+    } for s in active_sessions]
     
     # Get all courses (subjects) for this institution
     courses = Course.objects.filter(
@@ -433,6 +449,7 @@ def lesson_catalog(request):
     return render(request, 'tutoring/catalog.html', {
         "subjects": subjects,
         "selected_subject": selected_subject,
+        "active_sessions": active_sessions_data,
     })
 
 

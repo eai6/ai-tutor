@@ -1,5 +1,5 @@
 """
-Teacher & Management Dashboard Views
+Staff Dashboard Views
 
 Provides:
 - Dashboard overview with key metrics
@@ -26,11 +26,11 @@ from apps.tutoring.models import TutorSession, StudentLessonProgress
 from django.contrib.auth.models import User
 
 
-def get_teacher_context(request):
-    """Get common context for teacher views."""
+def get_staff_context(request):
+    """Get common context for staff views."""
     membership = Membership.objects.filter(
         user=request.user,
-        role__in=['admin', 'teacher', 'editor'],
+        role='staff',
         is_active=True
     ).select_related('institution').first()
     
@@ -44,27 +44,31 @@ def get_teacher_context(request):
     }
 
 
-def teacher_required(view_func):
-    """Decorator to require teacher/admin role."""
+def staff_required(view_func):
+    """Decorator to require staff role."""
     @login_required
     def wrapper(request, *args, **kwargs):
-        ctx = get_teacher_context(request)
+        ctx = get_staff_context(request)
         if not ctx:
-            messages.error(request, "You don't have teacher access.")
+            messages.error(request, "You don't have staff access.")
             return redirect('tutoring:catalog')
-        request.teacher_ctx = ctx
+        request.staff_ctx = ctx
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+# Alias for backwards compatibility
+teacher_required = staff_required
 
 
 # ============================================================================
 # Dashboard Home
 # ============================================================================
 
-@teacher_required
+@staff_required
 def dashboard_home(request):
-    """Main teacher dashboard with overview metrics."""
-    institution = request.teacher_ctx['institution']
+    """Main dashboard with overview metrics."""
+    institution = request.staff_ctx['institution']
     
     # Date ranges
     today = timezone.now().date()
@@ -169,7 +173,7 @@ def dashboard_home(request):
         })
     
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
         'total_students': total_students,
         'active_students': active_students,
         'total_sessions': total_sessions,
@@ -193,7 +197,7 @@ def dashboard_home(request):
 @teacher_required
 def student_list(request):
     """List all students with progress summary."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     # Get students with their progress
     students = Membership.objects.filter(
@@ -240,7 +244,7 @@ def student_list(request):
     students_page = paginator.get_page(page)
     
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
         'students': students_page,
         'total_count': len(student_data),
     }
@@ -251,7 +255,7 @@ def student_list(request):
 @teacher_required
 def student_detail(request, student_id):
     """Detailed view of a student's progress."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     student = get_object_or_404(User, id=student_id)
     
@@ -307,7 +311,7 @@ def student_detail(request, student_id):
             courses_progress[course.id]['mastered'] += 1
     
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
         'student': student,
         'profile': getattr(student, 'student_profile', None),
         'stats': stats,
@@ -325,7 +329,7 @@ def student_detail(request, student_id):
 @teacher_required
 def curriculum_list(request):
     """List all courses grouped by grade level."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     courses = Course.objects.filter(
         institution=institution
@@ -345,7 +349,7 @@ def curriculum_list(request):
         })
     
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
         'courses': course_data,
     }
     
@@ -355,7 +359,7 @@ def curriculum_list(request):
 @teacher_required
 def course_detail(request, course_id):
     """View and manage a course's units and lessons."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     course = get_object_or_404(Course, id=course_id, institution=institution)
     
@@ -378,7 +382,7 @@ def course_detail(request, course_id):
             }
     
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
         'course': course,
         'units': units,
         'lesson_stats': lesson_stats,
@@ -390,7 +394,7 @@ def course_detail(request, course_id):
 @teacher_required
 def curriculum_upload(request):
     """Upload curriculum document to auto-generate course structure."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     if request.method == 'POST':
         # Handle file upload
@@ -436,7 +440,7 @@ def curriculum_upload(request):
     
     # GET - show upload form
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
         'grade_levels': StudentProfile.GradeLevel.choices,
     }
     
@@ -446,7 +450,7 @@ def curriculum_upload(request):
 @teacher_required
 def curriculum_process(request, upload_id):
     """Process uploaded curriculum and show progress."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     from apps.dashboard.models import CurriculumUpload
     
@@ -457,7 +461,7 @@ def curriculum_process(request, upload_id):
     )
     
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
         'upload': upload,
     }
     
@@ -467,7 +471,7 @@ def curriculum_process(request, upload_id):
 @teacher_required
 def curriculum_generate(request, upload_id):
     """API endpoint to start curriculum generation."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     from apps.dashboard.models import CurriculumUpload
     from apps.dashboard.tasks import process_curriculum_upload
@@ -507,7 +511,7 @@ def curriculum_generate(request, upload_id):
 @teacher_required  
 def class_list(request):
     """List and manage classes/groups."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     # For now, show students grouped by grade
     students_by_grade = {}
@@ -527,7 +531,7 @@ def class_list(request):
         students_by_grade[grade].append(m.user)
     
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
         'students_by_grade': students_by_grade,
     }
     
@@ -541,7 +545,7 @@ def class_list(request):
 @teacher_required
 def reports_overview(request):
     """Generate reports on student progress."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     # Get date range from request
     days = int(request.GET.get('days', 30))
@@ -577,7 +581,7 @@ def reports_overview(request):
     ).order_by('-attempts')[:20]
     
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
         'days': days,
         'sessions_by_day': list(sessions_by_day),
         'top_students': top_students,
@@ -594,7 +598,7 @@ def reports_overview(request):
 @teacher_required
 def settings_page(request):
     """Institution settings."""
-    institution = request.teacher_ctx['institution']
+    institution = request.staff_ctx['institution']
     
     if request.method == 'POST':
         # Update institution settings
@@ -605,7 +609,7 @@ def settings_page(request):
         return redirect('dashboard:settings')
     
     context = {
-        **request.teacher_ctx,
+        **request.staff_ctx,
     }
     
     return render(request, 'dashboard/settings.html', context)

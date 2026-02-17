@@ -35,6 +35,33 @@
         <p class="text-muted">Choose a subject to continue learning</p>
     </div>
     
+    {% if active_sessions %}
+    <!-- Continue Learning Section -->
+    <div class="continue-section animate-in" style="animation-delay: 0.05s">
+        <h2 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--text-dark);">⏳ Continue where you left off</h2>
+        <div class="active-sessions-grid">
+            {% for session in active_sessions %}
+            <a href="{% url 'tutoring:tutor_interface' session.lesson_id %}" class="active-session-card card">
+                <div class="session-course">{{ session.course_title }}</div>
+                <div class="session-lesson">{{ session.lesson_title }}</div>
+                <div class="session-meta">
+                    <span class="session-phase">
+                        {% if session.phase == 'retrieval' %}📝 Warm-up
+                        {% elif session.phase == 'instruction' %}📖 Learning
+                        {% elif session.phase == 'practice' %}✏️ Practice
+                        {% elif session.phase == 'exit_ticket' %}🎯 Quiz ({{ session.questions_correct }}/10)
+                        {% else %}📝 In Progress
+                        {% endif %}
+                    </span>
+                    <span class="session-time">{{ session.started_at|timesince }} ago</span>
+                </div>
+                <div class="session-cta">Resume →</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
     <!-- Subject Cards -->
     <div class="subjects-grid animate-in" style="animation-delay: 0.1s">
         {% for subject in subjects %}
@@ -149,6 +176,69 @@
         font-size: 1.75rem;
         font-weight: 800;
         margin-bottom: 0.25rem;
+    }
+    
+    /* Continue Learning Section */
+    .continue-section {
+        margin-bottom: 2rem;
+        padding: 1.25rem;
+        background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);
+        border-radius: var(--radius-lg);
+        border: 1px solid #FED7AA;
+    }
+    
+    .active-sessions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+    
+    .active-session-card {
+        padding: 1rem 1.25rem;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+    }
+    
+    .active-session-card:hover {
+        border-color: var(--primary);
+        transform: translateY(-2px);
+    }
+    
+    .session-course {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--primary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.25rem;
+    }
+    
+    .session-lesson {
+        font-weight: 700;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-dark);
+    }
+    
+    .session-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        color: var(--text-light);
+        margin-bottom: 0.75rem;
+    }
+    
+    .session-phase {
+        color: var(--text-dark);
+    }
+    
+    .session-cta {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--primary);
     }
     
     /* Subject Cards Grid */
