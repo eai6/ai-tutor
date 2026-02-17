@@ -1,0 +1,61 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px;">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Institution Settings</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label" for="name">Institution Name</label>
+                    <input type="text" class="form-control" id="name" name="name" value="{{ institution.name }}">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="timezone">Timezone</label>
+                    <select class="form-control" id="timezone" name="timezone">
+                        <option value="UTC" {% if institution.timezone == 'UTC' %}selected{% endif %}>UTC</option>
+                        <option value="Indian/Mahe" {% if institution.timezone == 'Indian/Mahe' %}selected{% endif %}>Seychelles (Indian/Mahe)</option>
+                        <option value="Africa/Nairobi" {% if institution.timezone == 'Africa/Nairobi' %}selected{% endif %}>East Africa (Africa/Nairobi)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Your Account</h3>
+            </div>
+            <div class="card-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <div style="font-size: 0.875rem; color: var(--gray-500);">Name</div>
+                        <div style="font-weight: 500;">{{ user.get_full_name|default:user.username }}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.875rem; color: var(--gray-500);">Email</div>
+                        <div style="font-weight: 500;">{{ user.email }}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.875rem; color: var(--gray-500);">Role</div>
+                        <div style="font-weight: 500;">{{ membership.get_role_display }}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.875rem; color: var(--gray-500);">Member Since</div>
+                        <div style="font-weight: 500;">{{ membership.joined_at|date:"M d, Y" }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+    </form>
+</div>
+{% endblock %}

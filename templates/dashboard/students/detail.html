@@ -1,0 +1,140 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}{{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block page_title %}Student Progress{% endblock %}
+
+{% block content %}
+<!-- Back link -->
+<a href="{% url 'dashboard:student_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1.5rem;">
+    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Back to Students
+</a>
+
+<!-- Student Header -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-body">
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 600;">
+                {{ student.first_name|slice:":1"|upper }}{{ student.last_name|slice:":1"|upper }}
+            </div>
+            <div style="flex: 1;">
+                <h2 style="font-size: 1.5rem; margin-bottom: 0.25rem;">{{ student.first_name }} {{ student.last_name }}</h2>
+                <p style="color: var(--gray-500); margin-bottom: 0.5rem;">{{ student.email }}</p>
+                {% if profile %}
+                <div style="display: flex; gap: 1rem;">
+                    <span class="badge badge-info">{{ profile.grade_level }}</span>
+                    <span style="color: var(--gray-500);">{{ profile.get_school_display_name }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total Sessions</div>
+        <div class="stat-value">{{ stats.total_sessions }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Completed</div>
+        <div class="stat-value">{{ stats.completed_sessions }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Lessons Mastered</div>
+        <div class="stat-value" style="color: var(--success);">{{ stats.mastered_lessons }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">In Progress</div>
+        <div class="stat-value" style="color: var(--warning);">{{ stats.in_progress_lessons }}</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+    <!-- Course Progress -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Course Progress</h3>
+        </div>
+        <div class="card-body">
+            {% if courses_progress %}
+                {% for cp in courses_progress %}
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="font-weight: 600;">{{ cp.course.title }}</span>
+                        <span style="color: var(--gray-500);">{{ cp.mastered }}/{{ cp.total }} lessons</span>
+                    </div>
+                    <div class="progress-bar" style="margin-bottom: 0.75rem;">
+                        {% widthratio cp.mastered cp.total 100 as pct %}
+                        <div class="progress-fill {% if pct >= 70 %}success{% endif %}" style="width: {{ pct|default:0 }}%;"></div>
+                    </div>
+                    
+                    <!-- Lesson list -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                        {% for lesson in cp.lessons %}
+                        <div style="padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8125rem;
+                            {% if lesson.mastery_level == 'mastered' %}
+                                background: #D1FAE5; color: #065F46;
+                            {% elif lesson.mastery_level == 'in_progress' %}
+                                background: #FEF3C7; color: #92400E;
+                            {% else %}
+                                background: var(--gray-100); color: var(--gray-500);
+                            {% endif %}
+                        ">
+                            {{ lesson.lesson.title|truncatewords:3 }}
+                            {% if lesson.mastery_level == 'mastered' %}✓{% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>No course progress yet</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Recent Sessions -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Sessions</h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if sessions %}
+                {% for session in sessions %}
+                <div style="padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--gray-100);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 500;">{{ session.lesson.title }}</div>
+                            <div style="font-size: 0.8125rem; color: var(--gray-500);">
+                                {{ session.started_at|date:"M d, Y H:i" }}
+                            </div>
+                        </div>
+                        <div>
+                            {% if session.mastery_achieved %}
+                                <span class="badge badge-success">Mastered</span>
+                            {% elif session.status == 'completed' %}
+                                <span class="badge badge-warning">Completed</span>
+                            {% elif session.status == 'active' %}
+                                <span class="badge badge-info">In Progress</span>
+                            {% else %}
+                                <span class="badge">{{ session.status }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>No sessions yet</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

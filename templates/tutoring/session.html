@@ -3,888 +3,1235 @@
 {% block title %}{{ lesson.title }} - AI Tutor{% endblock %}
 
 {% block content %}
-<div class="session-container">
-    <!-- Progress bar with phases -->
-    <div class="progress-container animate-in">
-        <div class="phase-indicators">
-            <div class="phase" id="phase-retrieval" data-phase="1">
-                <span class="phase-icon">🔄</span>
-                <span class="phase-label">Retrieval</span>
+<div class="tutor-app">
+    <!-- Chat Panel -->
+    <div class="chat-panel" id="chat-panel">
+        <!-- Header -->
+        <header class="chat-header">
+            <a href="{% url 'tutoring:catalog' %}" class="back-btn" title="Back to lessons">←</a>
+            <div class="lesson-info">
+                <h1>{{ lesson.title }}</h1>
+                <span class="objective">{{ lesson.objective|truncatewords:12 }}</span>
             </div>
-            <div class="phase" id="phase-instruction" data-phase="2">
-                <span class="phase-icon">📖</span>
-                <span class="phase-label">Instruction</span>
+            <div class="header-controls">
+                <div class="phase-track">
+                    <div class="phase-dot active" data-phase="retrieval" title="Warm-up"></div>
+                    <div class="phase-line"></div>
+                    <div class="phase-dot" data-phase="instruction" title="Learn"></div>
+                    <div class="phase-line"></div>
+                    <div class="phase-dot" data-phase="practice" title="Practice"></div>
+                    <div class="phase-line"></div>
+                    <div class="phase-dot" data-phase="exit_ticket" title="Quiz"></div>
+                </div>
+                <button class="artifact-btn" id="artifact-btn" onclick="toggleArtifact()">
+                    <span class="artifact-icon">📋</span>
+                    <span class="artifact-badge" id="artifact-badge" style="display:none;">!</span>
+                </button>
             </div>
-            <div class="phase" id="phase-practice" data-phase="3">
-                <span class="phase-icon">🎯</span>
-                <span class="phase-label">Practice</span>
-            </div>
-            <div class="phase" id="phase-exit" data-phase="4">
-                <span class="phase-icon">📝</span>
-                <span class="phase-label">Exit Ticket</span>
-            </div>
-        </div>
-        <div class="progress-bar">
-            <div class="progress-fill" id="progress-fill"></div>
-        </div>
-    </div>
-    
-    <!-- Lesson header -->
-    <div class="lesson-info animate-in" style="animation-delay: 0.1s">
-        <h1>{{ lesson.title }}</h1>
-        <p>{{ lesson.objective }}</p>
-    </div>
-    
-    <!-- Chat area -->
-    <div class="chat-container card animate-in" style="animation-delay: 0.2s">
-        <div class="chat-messages" id="messages">
-            <div class="message tutor">
-                <div class="message-avatar">🤖</div>
-                <div class="message-bubble">
-                    <div class="typing-indicator">
-                        <span></span><span></span><span></span>
-                    </div>
+        </header>
+
+        <!-- Messages -->
+        <main class="chat-messages" id="chat-messages">
+            <div class="msg tutor">
+                <div class="avatar">🤖</div>
+                <div class="bubble loading">
+                    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
                 </div>
             </div>
-        </div>
-    </div>
-    
-    <!-- Input area -->
-    <div class="input-container animate-in" style="animation-delay: 0.3s">
-        <!-- Answer input -->
-        <div class="input-box card" id="answer-box" style="display: none;">
-            <input 
-                type="text" 
-                id="answer-input" 
-                placeholder="Type your answer..." 
-                autocomplete="off"
-            >
-            <button class="btn btn-primary" id="submit-btn" onclick="submitAnswer()">
-                <span class="btn-text">Send</span>
-                <span class="btn-icon">→</span>
-            </button>
-        </div>
-        
-        <!-- Continue button -->
-        <div class="action-box" id="continue-box" style="display: none;">
-            <button class="btn btn-primary btn-large" onclick="advanceStep()">
-                Continue →
-            </button>
-        </div>
-        
-        <!-- Complete state -->
-        <div class="complete-box card" id="complete-box" style="display: none;">
-            <div class="complete-content">
-                <div class="complete-icon">🎉</div>
-                <div class="complete-text">
-                    <h3>Lesson Complete!</h3>
-                    <p id="complete-message">Great work!</p>
-                </div>
+        </main>
+
+        <!-- Input -->
+        <footer class="chat-input">
+            <div class="input-wrapper">
+                <textarea id="user-input" placeholder="Type your answer..." rows="1"></textarea>
+                <button id="send-btn" onclick="sendMessage()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                    </svg>
+                </button>
             </div>
-            <a href="{% url 'tutoring:catalog' %}" class="btn btn-primary">
-                ← Back to Lessons
-            </a>
+        </footer>
+    </div>
+
+    <!-- Artifact Panel -->
+    <aside class="artifact-panel" id="artifact-panel">
+        <div class="artifact-header">
+            <span class="artifact-title" id="artifact-title">📋 Learning Content</span>
+            <button class="close-btn" onclick="toggleArtifact()">×</button>
         </div>
+        <div class="artifact-content" id="artifact-content">
+            <!-- Artifacts render here -->
+        </div>
+    </aside>
+</div>
+
+<!-- Completion Modal -->
+<div class="modal" id="complete-modal">
+    <div class="modal-box">
+        <div class="modal-emoji">🎉</div>
+        <h2>Lesson Complete!</h2>
+        <p id="modal-message">Great work!</p>
+        <a href="{% url 'tutoring:catalog' %}" class="modal-btn">Continue Learning →</a>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_css %}
 <style>
-    .session-container {
-        max-width: 700px;
-        margin: 0 auto;
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
-    }
-    
-    /* Phase indicators */
-    .progress-container {
-        text-align: center;
-    }
-    
-    .phase-indicators {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 0.75rem;
-        padding: 0 0.5rem;
-    }
-    
-    .phase {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.25rem;
-        opacity: 0.4;
-        transition: all 0.3s ease;
-    }
-    
-    .phase.active {
-        opacity: 1;
-    }
-    
-    .phase.completed {
-        opacity: 1;
-    }
-    
-    .phase.completed .phase-icon {
-        background: var(--success);
-        color: white;
-    }
-    
-    .phase-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        background: var(--bg-warm);
-        transition: all 0.3s ease;
-    }
-    
-    .phase.active .phase-icon {
-        background: var(--primary);
-        color: white;
-        transform: scale(1.1);
-        box-shadow: 0 2px 8px rgba(255, 107, 53, 0.4);
-    }
-    
-    .phase-label {
-        font-size: 0.7rem;
-        font-weight: 700;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .phase.active .phase-label {
-        color: var(--primary);
-    }
-    
-    .progress-bar {
-        height: 6px;
-        background: rgba(0,0,0,0.08);
-        border-radius: var(--radius-full);
-        overflow: hidden;
-    }
-    
-    .progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, var(--secondary), var(--primary));
-        border-radius: var(--radius-full);
-        width: 0%;
-        transition: width 0.5s ease;
-    }
-    
-    /* Lesson info */
-    .lesson-info {
-        text-align: center;
-    }
-    
-    .lesson-info h1 {
-        font-size: 1.5rem;
-        font-weight: 800;
-        margin-bottom: 0.25rem;
-    }
-    
-    .lesson-info p {
-        color: var(--text-muted);
-        font-size: 0.9375rem;
-    }
-    
-    /* Chat area */
-    .chat-container {
-        min-height: 350px;
-        max-height: 450px;
-        overflow-y: auto;
-        padding: 1.5rem;
-    }
-    
-    .chat-messages {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
-    
-    .message {
-        display: flex;
-        gap: 0.75rem;
-        max-width: 85%;
-        animation: fadeInUp 0.3s ease-out;
-    }
-    
-    .message.tutor {
-        align-self: flex-start;
-    }
-    
-    .message.student {
-        align-self: flex-end;
-        flex-direction: row-reverse;
-    }
-    
-    .message-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-        flex-shrink: 0;
-    }
-    
-    .message.tutor .message-avatar {
-        background: linear-gradient(135deg, var(--primary), var(--secondary));
-    }
-    
-    .message.student .message-avatar {
-        background: var(--secondary);
-    }
-    
-    .message-bubble {
-        padding: 0.875rem 1.125rem;
-        border-radius: var(--radius-md);
-        line-height: 1.6;
-    }
-    
-    .message.tutor .message-bubble {
-        background: var(--bg-warm);
-        border-bottom-left-radius: 4px;
-    }
-    
-    .message.student .message-bubble {
-        background: var(--primary);
-        color: white;
-        border-bottom-right-radius: 4px;
-    }
-    
-    /* Rich text formatting in tutor messages */
-    .message.tutor .message-bubble strong,
-    .message.tutor .message-bubble b {
-        font-weight: 700;
-        color: var(--text-dark);
-    }
-    
-    .message.tutor .message-bubble em,
-    .message.tutor .message-bubble i {
-        font-style: italic;
-    }
-    
-    .message.tutor .message-bubble code {
-        background: rgba(0,0,0,0.08);
-        padding: 0.125rem 0.375rem;
-        border-radius: 4px;
-        font-family: monospace;
-        font-size: 0.9em;
-    }
-    
-    .message.tutor .message-bubble ul,
-    .message.tutor .message-bubble ol {
-        margin: 0.5rem 0;
-        padding-left: 1.5rem;
-    }
-    
-    .message.tutor .message-bubble li {
-        margin: 0.25rem 0;
-    }
-    
-    .message.tutor .message-bubble p {
-        margin: 0.5rem 0;
-    }
-    
-    .message.tutor .message-bubble p:first-child {
-        margin-top: 0;
-    }
-    
-    .message.tutor .message-bubble p:last-child {
-        margin-bottom: 0;
-    }
-    
-    /* Feedback states */
-    .message.correct .message-bubble {
-        background: #E8F8F5;
-        border-left: 3px solid var(--success);
-    }
-    
-    .message.incorrect .message-bubble {
-        background: #FEF5F5;
-        border-left: 3px solid var(--error);
-    }
-    
-    /* Media in messages */
-    .message-media {
-        margin-bottom: 0.75rem;
-    }
-    
-    .media-item {
-        margin-bottom: 0.5rem;
-        border-radius: var(--radius-sm);
-        overflow: hidden;
-    }
-    
-    .media-image img {
-        max-width: 100%;
-        height: auto;
-        display: block;
-        border-radius: var(--radius-sm);
-    }
-    
-    .media-video video {
-        max-width: 100%;
-        border-radius: var(--radius-sm);
-    }
-    
-    .media-audio audio {
+/* ========== Layout ========== */
+.tutor-app {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    background: #F8F7F5;
+}
+
+.chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* ========== Header ========== */
+.chat-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1.25rem;
+    background: white;
+    border-bottom: 1px solid #E5E5E5;
+}
+
+.back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: #666;
+    text-decoration: none;
+    font-size: 1.25rem;
+}
+.back-btn:hover { background: #F0F0F0; }
+
+.lesson-info { flex: 1; min-width: 0; }
+.lesson-info h1 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.lesson-info .objective {
+    font-size: 0.75rem;
+    color: #888;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Phase Tracker */
+.phase-track {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.phase-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #E0E0E0;
+    transition: all 0.3s;
+    cursor: help;
+}
+.phase-dot.active { background: #FF6B35; transform: scale(1.2); }
+.phase-dot.done { background: #10B981; }
+
+.phase-line {
+    width: 20px;
+    height: 2px;
+    background: #E0E0E0;
+}
+
+/* Artifact Button */
+.artifact-btn {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: #F0F0F0;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1.25rem;
+    transition: all 0.2s;
+}
+.artifact-btn:hover { background: #E0E0E0; }
+.artifact-btn.has-content { background: #FFF0EB; }
+
+.artifact-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    background: #FF6B35;
+    color: white;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ========== Messages ========== */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.msg {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.msg.user { flex-direction: row-reverse; }
+
+.avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #FF6B35, #FF8F6B);
+}
+.msg.user .avatar { background: #E8E8E8; }
+
+.bubble {
+    padding: 0.875rem 1.125rem;
+    border-radius: 16px;
+    line-height: 1.6;
+    font-size: 0.9375rem;
+    max-width: 75%;
+}
+.msg.tutor .bubble {
+    background: white;
+    border: 1px solid #E8E8E8;
+}
+.msg.user .bubble {
+    background: #FF6B35;
+    color: white;
+}
+
+/* Loading */
+.bubble.loading {
+    display: flex;
+    gap: 4px;
+    padding: 1rem;
+}
+.dot {
+    width: 8px;
+    height: 8px;
+    background: #999;
+    border-radius: 50%;
+    animation: bounce 1.4s ease-in-out infinite;
+}
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+}
+
+/* ========== Input ========== */
+.chat-input {
+    padding: 1rem 1.5rem 1.5rem;
+    background: #F8F7F5;
+}
+
+.input-wrapper {
+    display: flex;
+    gap: 0.75rem;
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    border: 2px solid #E5E5E5;
+    border-radius: 16px;
+    padding: 0.75rem 1rem;
+    transition: border-color 0.2s;
+}
+.input-wrapper:focus-within { border-color: #FF6B35; }
+
+.input-wrapper textarea {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 0.9375rem;
+    font-family: inherit;
+    resize: none;
+    max-height: 100px;
+    line-height: 1.5;
+}
+
+#send-btn {
+    width: 40px;
+    height: 40px;
+    background: #FF6B35;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+#send-btn:hover { background: #E55A2B; }
+#send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ========== Artifact Panel ========== */
+.artifact-panel {
+    width: 0;
+    background: white;
+    border-left: 1px solid #E5E5E5;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.3s ease;
+}
+.artifact-panel.open { width: 480px; }
+
+.artifact-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #E5E5E5;
+    background: #FAFAFA;
+}
+.artifact-title { font-weight: 600; font-size: 0.9375rem; }
+.close-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: none;
+    font-size: 1.5rem;
+    color: #888;
+    cursor: pointer;
+    border-radius: 6px;
+}
+.close-btn:hover { background: #F0F0F0; }
+
+.artifact-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+/* ========== Artifact Types ========== */
+
+/* Objective Card */
+.artifact-objective {
+    background: linear-gradient(135deg, #FFF8F5, #FFF0EB);
+    border-radius: 16px;
+    padding: 1.5rem;
+}
+.artifact-objective h2 {
+    font-size: 1.125rem;
+    margin: 0 0 0.25rem;
+    color: #FF6B35;
+}
+.artifact-objective h3 {
+    font-size: 0.875rem;
+    color: #666;
+    margin: 0 0 1rem;
+    font-weight: 500;
+}
+.artifact-objective ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+.artifact-objective li {
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+}
+.artifact-objective .time-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    background: white;
+    border-radius: 100px;
+    font-size: 0.8125rem;
+    color: #666;
+}
+.artifact-objective .media-img {
+    width: 100%;
+    border-radius: 12px;
+    margin-top: 1rem;
+}
+
+/* Concept Card */
+.artifact-concept {
+    background: white;
+    border: 1px solid #E5E5E5;
+    border-radius: 16px;
+    overflow: hidden;
+}
+.artifact-concept .media-img {
+    width: 100%;
+    display: block;
+}
+.artifact-concept .content {
+    padding: 1.25rem;
+}
+.artifact-concept h3 {
+    font-size: 1rem;
+    margin: 0 0 0.75rem;
+}
+.artifact-concept p {
+    line-height: 1.6;
+    color: #444;
+    margin: 0;
+}
+.artifact-concept .caption {
+    font-size: 0.8125rem;
+    color: #888;
+    font-style: italic;
+    margin-top: 0.75rem;
+}
+
+/* Media Card */
+.artifact-media {
+    background: white;
+    border: 1px solid #E5E5E5;
+    border-radius: 16px;
+    overflow: hidden;
+}
+.artifact-media .media-img {
+    width: 100%;
+    display: block;
+}
+.artifact-media .media-info {
+    padding: 1rem 1.25rem;
+}
+.artifact-media h3 {
+    font-size: 0.9375rem;
+    margin: 0 0 0.5rem;
+    color: #333;
+}
+.artifact-media .caption {
+    font-size: 0.8125rem;
+    color: #666;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Question Card */
+.artifact-question {
+    background: #F8F7F5;
+    border-radius: 16px;
+    padding: 1.5rem;
+}
+.artifact-question .q-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #FF6B35;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+}
+.artifact-question .q-text {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+}
+.artifact-question .q-media {
+    width: 100%;
+    border-radius: 12px;
+    margin-bottom: 1.25rem;
+}
+
+/* Options */
+.options { display: flex; flex-direction: column; gap: 0.625rem; }
+
+.option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: white;
+    border: 2px solid #E5E5E5;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    font-size: 0.9375rem;
+}
+.option:hover { border-color: #FF6B35; }
+.option.selected { border-color: #FF6B35; background: #FFF0EB; }
+.option.correct { border-color: #10B981; background: #D1FAE5; }
+.option.incorrect { border-color: #EF4444; background: #FEE2E2; }
+
+.option-letter {
+    width: 28px;
+    height: 28px;
+    background: #F0F0F0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+.option.selected .option-letter { background: #FF6B35; color: white; }
+.option.correct .option-letter { background: #10B981; color: white; }
+.option.incorrect .option-letter { background: #EF4444; color: white; }
+
+.submit-answer {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.875rem;
+    background: #FF6B35;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.submit-answer:hover { background: #E55A2B; }
+.submit-answer:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Worked Example */
+.artifact-example {
+    background: white;
+    border: 1px solid #E5E5E5;
+    border-radius: 16px;
+    overflow: hidden;
+}
+.artifact-example .ex-header {
+    background: #F8F7F5;
+    padding: 1rem 1.25rem;
+    font-weight: 600;
+    border-bottom: 1px solid #E5E5E5;
+}
+.artifact-example .ex-problem {
+    padding: 1.25rem;
+    background: #FFFBF8;
+    border-bottom: 1px solid #E5E5E5;
+    font-weight: 500;
+}
+.artifact-example .ex-steps {
+    padding: 1.25rem;
+}
+.artifact-example .step {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px dashed #E5E5E5;
+}
+.artifact-example .step:last-child { border-bottom: none; margin-bottom: 0; }
+.artifact-example .step-num {
+    width: 24px;
+    height: 24px;
+    background: #FF6B35;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+.artifact-example .step-text { line-height: 1.6; }
+.artifact-example .ex-answer {
+    background: #D1FAE5;
+    padding: 1rem 1.25rem;
+    font-weight: 600;
+    color: #059669;
+}
+
+/* Hint Card */
+.artifact-hint {
+    background: #FEF3C7;
+    border: 1px solid #F59E0B;
+    border-radius: 16px;
+    padding: 1.25rem;
+}
+.artifact-hint .hint-header {
+    font-weight: 600;
+    color: #B45309;
+    margin-bottom: 0.75rem;
+}
+.artifact-hint .hint-text {
+    line-height: 1.6;
+    color: #78350F;
+}
+
+/* Result Card */
+.artifact-result {
+    text-align: center;
+    padding: 2rem;
+}
+.artifact-result .score-ring {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+.artifact-result.passed .score-ring { background: #D1FAE5; color: #059669; }
+.artifact-result.failed .score-ring { background: #FEE2E2; color: #DC2626; }
+.artifact-result .score-ring .score { font-size: 2rem; }
+.artifact-result .score-ring .percent { font-size: 0.875rem; }
+.artifact-result h3 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+.artifact-result .message { color: #666; margin: 0; }
+
+/* ========== Modal ========== */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.modal.show { display: flex; }
+.modal-box {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 360px;
+}
+.modal-emoji { font-size: 4rem; margin-bottom: 1rem; }
+.modal-box h2 { margin: 0 0 0.5rem; }
+.modal-box p { color: #666; margin: 0 0 1.5rem; }
+.modal-btn {
+    display: inline-block;
+    padding: 0.875rem 2rem;
+    background: #FF6B35;
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 900px) {
+    .artifact-panel.open {
+        position: fixed;
+        top: 70px;
+        right: 0;
+        bottom: 0;
         width: 100%;
+        z-index: 100;
     }
-    
-    .media-caption {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        font-style: italic;
-        margin-top: 0.25rem;
-        text-align: center;
-    }
-    
-    .pdf-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 1rem;
-        background: white;
-        border: 1px solid #E0E0E0;
-        border-radius: var(--radius-sm);
-        color: var(--primary);
-        text-decoration: none;
-        font-weight: 600;
-    }
-    
-    .pdf-link:hover {
-        background: var(--bg-warm);
-    }
-    
-    /* Typing indicator */
-    .typing-indicator {
-        display: flex;
-        gap: 4px;
-        padding: 4px 0;
-    }
-    
-    .typing-indicator span {
-        width: 8px;
-        height: 8px;
-        background: var(--text-light);
-        border-radius: 50%;
-        animation: typing 1.4s ease-in-out infinite;
-    }
-    
-    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-    
-    @keyframes typing {
-        0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-        30% { transform: translateY(-4px); opacity: 1; }
-    }
-    
-    /* Input area */
-    .input-container {
-        position: sticky;
-        bottom: 1rem;
-    }
-    
-    .input-box {
-        display: flex;
-        gap: 0.75rem;
-        padding: 0.75rem;
-        box-shadow: var(--shadow-md);
-    }
-    
-    .input-box input {
-        flex: 1;
-        padding: 0.875rem 1rem;
-        border: 2px solid transparent;
-        border-radius: var(--radius-md);
-        background: var(--bg-warm);
-        font-family: inherit;
-        font-size: 1rem;
-        transition: all 0.2s ease;
-    }
-    
-    .input-box input:focus {
-        outline: none;
-        border-color: var(--primary);
-        background: white;
-    }
-    
-    .input-box .btn {
-        padding: 0.875rem 1.5rem;
-    }
-    
-    .btn-text { margin-right: 0.25rem; }
-    
-    .action-box {
-        text-align: center;
-    }
-    
-    .btn-large {
-        padding: 1rem 2.5rem;
-        font-size: 1.125rem;
-    }
-    
-    /* Complete state */
-    .complete-box {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1.5rem;
-        padding: 2rem;
-        text-align: center;
-    }
-    
-    .complete-content {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-    
-    .complete-icon {
-        font-size: 2.5rem;
-    }
-    
-    .complete-text h3 {
-        font-size: 1.25rem;
-        font-weight: 700;
-        margin-bottom: 0.25rem;
-    }
-    
-    .complete-text p {
-        color: var(--text-muted);
-        font-size: 0.9375rem;
-    }
-    
-    /* Loading state */
-    .loading .btn-text { display: none; }
-    .loading .btn-icon { 
-        animation: spin 1s linear infinite;
-    }
-    
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-    
-    /* Scrollbar styling */
-    .chat-container::-webkit-scrollbar {
-        width: 6px;
-    }
-    
-    .chat-container::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    
-    .chat-container::-webkit-scrollbar-thumb {
-        background: var(--text-light);
-        border-radius: 3px;
-    }
-    
-    /* Mobile responsiveness */
-    @media (max-width: 600px) {
-        .phase-label {
-            display: none;
-        }
-        
-        .phase-icon {
-            width: 32px;
-            height: 32px;
-        }
-    }
+    .phase-track { display: none; }
+}
 </style>
 {% endblock %}
 
 {% block extra_js %}
-<!-- Include a simple markdown parser -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-    const lessonId = {{ lesson.id }};
-    let sessionId = null;
-    let currentPhase = 1;
-    let messageCount = 0;
-    
-    // Phase detection keywords
-    const phaseKeywords = {
-        1: ['warm up', 'retrieval', 'remember', 'recall', 'previous', 'last time', 'before we begin'],
-        2: ['today', 'learn', 'understand', 'concept', 'explain', 'instruction', 'teaching', 'let me show'],
-        3: ['try', 'practice', 'your turn', 'solve', 'calculate', 'answer', 'what is', 'can you'],
-        4: ['exit ticket', 'quiz', 'final', 'check', 'assessment', 'multiple choice', '5 questions', 'question 1', 'question 2']
-    };
-    
-    // Configure marked for safe rendering
-    if (typeof marked !== 'undefined') {
-        marked.setOptions({
-            breaks: true,
-            gfm: true
+// ========== State ==========
+const lessonId = {{ lesson.id }};
+let sessionId = null;
+let currentPhase = 'retrieval';
+let selectedAnswer = null;
+let isSubmitting = false;
+let hasArtifactContent = false;
+
+// ========== Init ==========
+document.addEventListener('DOMContentLoaded', startSession);
+
+document.getElementById('user-input').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+});
+
+document.getElementById('user-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+// ========== Session ==========
+async function startSession() {
+    try {
+        const res = await fetch(`/tutor/api/session/start/${lessonId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
         });
-    }
-    
-    // Initialize on page load
-    window.onload = () => {
-        startSession();
         
-        // Handle Enter key
-        document.getElementById('answer-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submitAnswer();
-            }
+        const data = await res.json();
+        
+        if (data.error) {
+            showMessage('tutor', '❌ ' + data.error);
+            return;
+        }
+        
+        sessionId = data.session_id;
+        document.getElementById('chat-messages').innerHTML = '';
+        
+        // Show initial message
+        showMessage('tutor', data.tutor_message);
+        
+        // Process commands (artifacts)
+        if (data.commands) {
+            processCommands(data.commands);
+        }
+        
+        // Update phase
+        if (data.phase) {
+            setPhase(data.phase);
+        }
+        
+    } catch (err) {
+        console.error('Start error:', err);
+        showMessage('tutor', '❌ Failed to start session. Please refresh.');
+    }
+}
+
+async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const text = input.value.trim();
+    if (!text) return;
+    
+    input.value = '';
+    input.style.height = 'auto';
+    showMessage('user', text);
+    setLoading(true);
+    
+    try {
+        const res = await fetch(`/tutor/api/session/${sessionId}/answer/stream/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ answer: text }),
         });
-    };
-    
-    function detectPhase(message) {
-        const lowerMessage = message.toLowerCase();
         
-        // Check for exit ticket first (most specific)
-        for (const keyword of phaseKeywords[4]) {
-            if (lowerMessage.includes(keyword)) {
-                return 4;
-            }
-        }
+        const msgEl = createStreamingMessage();
+        const bubble = msgEl.querySelector('.bubble');
+        let fullContent = '';
+        let isComplete = false;
+        let commands = [];
         
-        // Check for practice
-        for (const keyword of phaseKeywords[3]) {
-            if (lowerMessage.includes(keyword)) {
-                return 3;
-            }
-        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
         
-        // Check for instruction
-        for (const keyword of phaseKeywords[2]) {
-            if (lowerMessage.includes(keyword)) {
-                return 2;
-            }
-        }
-        
-        // Default to retrieval at start
-        if (messageCount <= 2) {
-            return 1;
-        }
-        
-        return currentPhase; // Keep current phase
-    }
-    
-    function updatePhaseIndicators(phase) {
-        currentPhase = phase;
-        
-        // Update all phase indicators
-        for (let i = 1; i <= 4; i++) {
-            const phaseEl = document.querySelector(`.phase[data-phase="${i}"]`);
-            phaseEl.classList.remove('active', 'completed');
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
             
-            if (i < phase) {
-                phaseEl.classList.add('completed');
-            } else if (i === phase) {
-                phaseEl.classList.add('active');
-            }
-        }
-        
-        // Update progress bar
-        const progress = ((phase - 1) / 4) * 100 + 12.5; // Center within phase
-        document.getElementById('progress-fill').style.width = `${Math.min(progress, 100)}%`;
-    }
-    
-    async function startSession() {
-        try {
-            const response = await fetch(`/tutor/api/session/start/${lessonId}/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
-            });
-            
-            const data = await response.json();
-            
-            if (data.error) {
-                showMessage('tutor', '❌ ' + data.error);
-                return;
-            }
-            
-            sessionId = data.session_id;
-            
-            // Clear loading and show first message
-            document.getElementById('messages').innerHTML = '';
-            showMessage('tutor', data.tutor_message, '', data.media || []);
-            
-            // Detect and update phase
-            const phase = detectPhase(data.tutor_message);
-            updatePhaseIndicators(phase);
-            
-            updateUI(data);
-            
-        } catch (error) {
-            showMessage('tutor', '❌ Failed to start. Please refresh the page.');
-            console.error(error);
-        }
-    }
-    
-    async function submitAnswer() {
-        const input = document.getElementById('answer-input');
-        const answer = input.value.trim();
-        
-        if (!answer) return;
-        
-        showMessage('student', answer);
-        input.value = '';
-        setLoading(true);
-        
-        // Show typing indicator
-        showTyping();
-        
-        try {
-            const response = await fetch(`/tutor/api/session/${sessionId}/answer/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
-                body: JSON.stringify({ answer }),
-            });
-            
-            const data = await response.json();
-            
-            removeTyping();
-            
-            const feedbackClass = data.grading?.result === 'correct' ? 'correct' : 
-                                  data.grading?.result === 'incorrect' ? 'incorrect' : '';
-            showMessage('tutor', data.tutor_message, feedbackClass, data.media || []);
-            
-            // Detect and update phase
-            const phase = detectPhase(data.tutor_message);
-            updatePhaseIndicators(phase);
-            
-            updateUI(data);
-            
-        } catch (error) {
-            removeTyping();
-            showMessage('tutor', '❌ Something went wrong. Please try again.');
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    }
-    
-    async function advanceStep() {
-        setLoading(true);
-        showTyping();
-        
-        try {
-            const response = await fetch(`/tutor/api/session/${sessionId}/advance/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
-            });
-            
-            const data = await response.json();
-            
-            removeTyping();
-            showMessage('tutor', data.tutor_message, '', data.media || []);
-            
-            // Detect and update phase
-            const phase = detectPhase(data.tutor_message);
-            updatePhaseIndicators(phase);
-            
-            updateUI(data);
-            
-        } catch (error) {
-            removeTyping();
-            showMessage('tutor', '❌ Something went wrong. Please try again.');
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    }
-    
-    function updateUI(data) {
-        // Show/hide input areas
-        const answerBox = document.getElementById('answer-box');
-        const continueBox = document.getElementById('continue-box');
-        const completeBox = document.getElementById('complete-box');
-        
-        if (data.is_session_complete) {
-            answerBox.style.display = 'none';
-            continueBox.style.display = 'none';
-            completeBox.style.display = 'flex';
-            
-            // Mark all phases as completed
-            updatePhaseIndicators(5);
-            document.getElementById('progress-fill').style.width = '100%';
-            
-            if (data.mastery_achieved) {
-                document.getElementById('complete-message').textContent = '🏆 Mastery achieved! Amazing work!';
-            }
-        } else if (data.is_waiting_for_answer) {
-            answerBox.style.display = 'flex';
-            continueBox.style.display = 'none';
-            completeBox.style.display = 'none';
-            document.getElementById('answer-input').focus();
-        } else {
-            answerBox.style.display = 'none';
-            continueBox.style.display = 'block';
-            completeBox.style.display = 'none';
-        }
-    }
-    
-    function renderMarkdown(text) {
-        if (typeof marked !== 'undefined') {
-            // Use marked to render markdown
-            return marked.parse(text);
-        }
-        // Fallback: basic formatting
-        return text
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/`(.*?)`/g, '<code>$1</code>')
-            .replace(/\n/g, '<br>');
-    }
-    
-    function renderMedia(mediaList) {
-        if (!mediaList || mediaList.length === 0) return '';
-        
-        let html = '<div class="message-media">';
-        
-        for (const media of mediaList) {
-            if (media.type === 'image') {
-                html += `
-                    <div class="media-item media-image" data-placement="${media.placement}">
-                        <img src="${media.url}" alt="${media.alt_text || media.title}" loading="lazy">
-                        ${media.caption ? `<p class="media-caption">${media.caption}</p>` : ''}
-                    </div>
-                `;
-            } else if (media.type === 'video') {
-                html += `
-                    <div class="media-item media-video" data-placement="${media.placement}">
-                        <video controls>
-                            <source src="${media.url}" type="video/mp4">
-                            Your browser does not support video.
-                        </video>
-                        ${media.caption ? `<p class="media-caption">${media.caption}</p>` : ''}
-                    </div>
-                `;
-            } else if (media.type === 'audio') {
-                html += `
-                    <div class="media-item media-audio" data-placement="${media.placement}">
-                        <audio controls>
-                            <source src="${media.url}" type="audio/mpeg">
-                            Your browser does not support audio.
-                        </audio>
-                        ${media.caption ? `<p class="media-caption">${media.caption}</p>` : ''}
-                    </div>
-                `;
-            } else if (media.type === 'pdf') {
-                html += `
-                    <div class="media-item media-pdf" data-placement="${media.placement}">
-                        <a href="${media.url}" target="_blank" class="pdf-link">
-                            📄 ${media.title}
-                        </a>
-                    </div>
-                `;
-            }
-        }
-        
-        html += '</div>';
-        return html;
-    }
-    
-    function showMessage(role, content, extraClass = '', media = []) {
-        messageCount++;
-        const messages = document.getElementById('messages');
-        const avatar = role === 'tutor' ? '🤖' : '😊';
-        
-        // Render content based on role
-        let renderedContent;
-        if (role === 'tutor') {
-            renderedContent = renderMarkdown(content);
-            // Add media if present
-            if (media && media.length > 0) {
-                renderedContent = renderMedia(media) + renderedContent;
-            }
-        } else {
-            // Escape HTML for student messages
-            const div = document.createElement('div');
-            div.textContent = content;
-            renderedContent = div.innerHTML;
-        }
-        
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message ${role} ${extraClass}`;
-        msgDiv.innerHTML = `
-            <div class="message-avatar">${avatar}</div>
-            <div class="message-bubble">${renderedContent}</div>
-        `;
-        messages.appendChild(msgDiv);
-        
-        // Scroll to bottom
-        const chat = document.querySelector('.chat-container');
-        chat.scrollTop = chat.scrollHeight;
-    }
-    
-    function showTyping() {
-        const messages = document.getElementById('messages');
-        const div = document.createElement('div');
-        div.className = 'message tutor typing';
-        div.id = 'typing-indicator';
-        div.innerHTML = `
-            <div class="message-avatar">🤖</div>
-            <div class="message-bubble">
-                <div class="typing-indicator">
-                    <span></span><span></span><span></span>
-                </div>
-            </div>
-        `;
-        messages.appendChild(div);
-        
-        const chat = document.querySelector('.chat-container');
-        chat.scrollTop = chat.scrollHeight;
-    }
-    
-    function removeTyping() {
-        const typing = document.getElementById('typing-indicator');
-        if (typing) typing.remove();
-    }
-    
-    function setLoading(loading) {
-        const btn = document.getElementById('submit-btn');
-        const input = document.getElementById('answer-input');
-        
-        btn.disabled = loading;
-        input.disabled = loading;
-        
-        if (loading) {
-            btn.classList.add('loading');
-            btn.querySelector('.btn-icon').textContent = '⟳';
-        } else {
-            btn.classList.remove('loading');
-            btn.querySelector('.btn-icon').textContent = '→';
-        }
-    }
-    
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie) {
-            const cookies = document.cookie.split(';');
-            for (let cookie of cookies) {
-                cookie = cookie.trim();
-                if (cookie.startsWith(name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
+            const chunk = decoder.decode(value);
+            for (const line of chunk.split('\n')) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const d = JSON.parse(line.slice(6));
+                        if (d.chunk) {
+                            fullContent += d.chunk;
+                            bubble.innerHTML = renderMarkdown(cleanForDisplay(fullContent));
+                            scrollToBottom();
+                        }
+                        if (d.commands) {
+                            commands = d.commands;
+                        }
+                        if (d.done) {
+                            isComplete = d.is_session_complete;
+                            // Always reset submitting state
+                            isSubmitting = false;
+                            
+                            if (d.phase) {
+                                console.log('[SYNC] Setting phase:', d.phase);
+                                setPhase(d.phase);
+                            }
+                            // Process commands from the final response
+                            if (d.commands && d.commands.length > 0) {
+                                console.log('[SYNC] Processing commands:', d.commands.map(c => c.type));
+                                console.log('[SYNC] Full commands:', JSON.stringify(d.commands));
+                                processCommands(d.commands);
+                            } else {
+                                console.log('[SYNC] No commands received in done message');
+                                // Try commands collected earlier
+                                if (commands && commands.length > 0) {
+                                    console.log('[SYNC] Using earlier commands:', commands.map(c => c.type));
+                                    processCommands(commands);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Parse error:', e, line);
+                    }
                 }
             }
         }
-        return cookieValue;
+        
+        // Also try to parse artifacts from content (legacy support)
+        parseArtifacts(fullContent);
+        
+        if (isComplete) {
+            showCompleteModal();
+        }
+        
+    } catch (err) {
+        console.error('Send error:', err);
+        showMessage('tutor', '❌ Error. Please try again.');
+    } finally {
+        setLoading(false);
+        // Always reset submission state
+        isSubmitting = false;
+        selectedAnswer = null;
     }
+}
+
+// ========== Artifact Parsing ==========
+function parseArtifacts(content) {
+    console.log("=== PARSING ARTIFACTS ===");
+    console.log("Raw content:", content);
+    
+    // Parse [ARTIFACT:type]{...}[/ARTIFACT] blocks
+    const artifactPattern = /\[ARTIFACT:(\w+)\]([\s\S]*?)\[\/ARTIFACT\]/g;
+    let match;
+    let hasArtifact = false;
+    
+    while ((match = artifactPattern.exec(content)) !== null) {
+        const type = match[1];
+        console.log("Found artifact type:", type);
+        console.log("Artifact data:", match[2]);
+        try {
+            const data = JSON.parse(match[2]);
+            console.log("Parsed data:", data);
+            renderArtifact(type, data);
+            hasArtifact = true;
+        } catch (e) {
+            console.error('Failed to parse artifact:', e);
+            console.error('Raw data was:', match[2]);
+        }
+    }
+    
+    // Also check for legacy [QUESTION:...] format
+    const questionMatch = content.match(/\[QUESTION:([\s\S]*?)\[\/QUESTION\]/);
+    if (questionMatch) {
+        console.log("Found legacy QUESTION format");
+        try {
+            const data = JSON.parse(questionMatch[1]);
+            renderArtifact('question', data);
+            hasArtifact = true;
+        } catch (e) {
+            console.error('Failed to parse legacy question:', e);
+        }
+    }
+    
+    if (!hasArtifact) {
+        console.log("No artifacts found in content");
+    }
+    
+    // Detect phase from content
+    detectPhase(content);
+}
+
+function detectPhase(content) {
+    const lower = content.toLowerCase();
+    if (lower.includes('warm-up') || lower.includes('retrieval') || lower.includes('let\'s start')) {
+        setPhase('retrieval');
+    } else if (lower.includes('let me explain') || lower.includes('now let\'s learn') || lower.includes('the key concept')) {
+        setPhase('instruction');
+    } else if (lower.includes('your turn') || lower.includes('practice') || lower.includes('try this')) {
+        setPhase('practice');
+    } else if (lower.includes('exit ticket') || lower.includes('final quiz') || lower.includes('check your understanding')) {
+        setPhase('exit_ticket');
+    }
+}
+
+// ========== Artifact Rendering ==========
+function renderArtifact(type, data) {
+    const container = document.getElementById('artifact-content');
+    let html = '';
+    let title = '📋 Content';
+    
+    switch (type) {
+        case 'objective':
+            title = '🎯 Learning Objectives';
+            html = renderObjective(data);
+            break;
+        case 'concept':
+            title = '📖 ' + (data.title || 'Key Concept');
+            html = renderConcept(data);
+            break;
+        case 'question':
+            title = data.label || '❓ Question';
+            html = renderQuestion(data);
+            break;
+        case 'worked_example':
+            title = '📝 Worked Example';
+            html = renderWorkedExample(data);
+            break;
+        case 'hint':
+            title = '💡 Hint';
+            html = renderHint(data);
+            break;
+        case 'result':
+            title = '📊 Results';
+            html = renderResult(data);
+            break;
+        case 'media':
+            title = '🖼️ ' + (data.title || 'Image');
+            html = renderMedia(data);
+            break;
+    }
+    
+    container.innerHTML = html;
+    document.getElementById('artifact-title').textContent = title;
+    showArtifactNotification();
+    openArtifact();
+}
+
+function renderObjective(data) {
+    const objectives = Array.isArray(data.objectives) 
+        ? data.objectives.map(o => `<li>${o}</li>`).join('')
+        : `<li>${data.objectives}</li>`;
+    
+    return `
+        <div class="artifact-objective">
+            <h2>${data.lesson_title || 'Today\'s Lesson'}</h2>
+            <h3>What you'll learn:</h3>
+            <ul>${objectives}</ul>
+            <div class="time-badge">⏱️ About ${data.estimated_time || 15} minutes</div>
+            ${data.media ? `<img class="media-img" src="${data.media.url}" alt="${data.media.alt_text || ''}">` : ''}
+        </div>
+    `;
+}
+
+function renderConcept(data) {
+    return `
+        <div class="artifact-concept">
+            ${data.media ? `<img class="media-img" src="${data.media.url}" alt="${data.media.alt_text || ''}">` : ''}
+            <div class="content">
+                <h3>${data.title || 'Key Concept'}</h3>
+                <p>${data.explanation || ''}</p>
+                ${data.media?.caption ? `<p class="caption">${data.media.caption}</p>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function renderMedia(data) {
+    return `
+        <div class="artifact-media">
+            <img class="media-img" src="${data.url}" alt="${data.alt_text || data.title || ''}">
+            <div class="media-info">
+                <h3>${data.title || 'Image'}</h3>
+                ${data.caption ? `<p class="caption">${data.caption}</p>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function renderQuestion(data) {
+    // Reset selection state when new question renders
+    selectedAnswer = null;
+    isSubmitting = false;
+    
+    let optionsHtml = '';
+    
+    if (data.options && data.options.length > 0) {
+        optionsHtml = '<div class="options">';
+        data.options.forEach((opt, i) => {
+            const letter = String.fromCharCode(65 + i);
+            const text = opt.replace(/^[A-D]\)\s*/, '');
+            optionsHtml += `
+                <button class="option" onclick="selectOption(this, '${letter}')" data-letter="${letter}">
+                    <span class="option-letter">${letter}</span>
+                    <span class="option-text">${text}</span>
+                </button>
+            `;
+        });
+        optionsHtml += '</div>';
+        optionsHtml += `<button class="submit-answer" onclick="submitAnswer()" disabled>Submit Answer</button>`;
+    }
+    
+    console.log('[MCQ] Rendered new question:', data.label, 'Correct:', data.correct);
+    
+    return `
+        <div class="artifact-question" data-correct="${data.correct || ''}">
+            <div class="q-label">${data.label || 'Question'}</div>
+            ${data.media ? `<img class="q-media" src="${data.media.url}" alt="">` : ''}
+            <div class="q-text">${data.question}</div>
+            ${optionsHtml}
+        </div>
+    `;
+}
+
+function renderWorkedExample(data) {
+    let stepsHtml = '';
+    if (data.steps && data.steps.length > 0) {
+        stepsHtml = data.steps.map((step, i) => `
+            <div class="step">
+                <span class="step-num">${i + 1}</span>
+                <span class="step-text">${step.text || step}</span>
+            </div>
+        `).join('');
+    }
+    
+    return `
+        <div class="artifact-example">
+            <div class="ex-header">📝 Worked Example</div>
+            <div class="ex-problem">${data.problem}</div>
+            ${data.media ? `<img style="width:100%" src="${data.media.url}" alt="">` : ''}
+            <div class="ex-steps">${stepsHtml}</div>
+            <div class="ex-answer">✓ Answer: ${data.answer}</div>
+        </div>
+    `;
+}
+
+function renderHint(data) {
+    return `
+        <div class="artifact-hint">
+            <div class="hint-header">💡 Hint ${data.hint_number || ''} ${data.total_hints ? `of ${data.total_hints}` : ''}</div>
+            <div class="hint-text">${data.hint}</div>
+        </div>
+    `;
+}
+
+function renderResult(data) {
+    const passed = data.passed || (data.score / data.total >= 0.8);
+    const percent = Math.round((data.score / data.total) * 100);
+    
+    return `
+        <div class="artifact-result ${passed ? 'passed' : 'failed'}">
+            <div class="score-ring">
+                <span class="score">${data.score}/${data.total}</span>
+                <span class="percent">${percent}%</span>
+            </div>
+            <h3>${passed ? '🎉 Passed!' : '📚 Keep Practicing'}</h3>
+            <p class="message">${data.message || (passed ? 'Great job!' : 'You can do it!')}</p>
+        </div>
+    `;
+}
+
+function processCommands(commands) {
+    console.log('[SYNC] processCommands called with:', commands);
+    if (!commands) return;
+    
+    for (const cmd of commands) {
+        console.log('[SYNC] Processing command:', cmd.type, cmd.data ? cmd.data.label || '' : '');
+        if (cmd.type === 'set_phase') {
+            setPhase(cmd.phase);
+        } else if (cmd.type.startsWith('show_')) {
+            const artifactType = cmd.type.replace('show_', '');
+            console.log('[SYNC] Rendering artifact:', artifactType);
+            renderArtifact(artifactType, cmd.data || cmd);
+        }
+    }
+}
+
+// ========== Question Interaction ==========
+
+function selectOption(btn, letter) {
+    // Don't allow selection while submitting
+    if (isSubmitting) return;
+    
+    // Clear all selections and feedback colors
+    document.querySelectorAll('.option').forEach(o => {
+        o.classList.remove('selected', 'correct', 'incorrect');
+    });
+    
+    // Select this option
+    btn.classList.add('selected');
+    selectedAnswer = letter;
+    
+    // Enable submit button
+    const submitBtn = document.querySelector('.submit-answer');
+    if (submitBtn) submitBtn.disabled = false;
+    
+    console.log('[MCQ] Selected:', letter);
+}
+
+function submitAnswer() {
+    if (!selectedAnswer || isSubmitting) return;
+    
+    isSubmitting = true;
+    
+    // Get correct answer from artifact
+    const questionEl = document.querySelector('.artifact-question');
+    const correct = questionEl ? questionEl.dataset.correct : '';
+    
+    console.log('[MCQ] Submitting:', selectedAnswer, 'Correct:', correct);
+    
+    // Show immediate feedback on options
+    document.querySelectorAll('.option').forEach(opt => {
+        const letter = opt.dataset.letter;
+        if (letter === correct) {
+            opt.classList.add('correct');
+        } else if (letter === selectedAnswer && letter !== correct) {
+            opt.classList.add('incorrect');
+        }
+    });
+    
+    // Disable submit button
+    const submitBtn = document.querySelector('.submit-answer');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+    }
+    
+    // Send answer to chat after brief delay to show feedback
+    setTimeout(() => {
+        document.getElementById('user-input').value = selectedAnswer;
+        sendMessage();
+        
+        // Reset state after sending
+        selectedAnswer = null;
+        isSubmitting = false;
+    }, 500);
+}
+
+// ========== UI Helpers ==========
+function setPhase(phase) {
+    currentPhase = phase;
+    document.querySelectorAll('.phase-dot').forEach(dot => {
+        dot.classList.remove('active', 'done');
+    });
+    
+    const phases = ['retrieval', 'instruction', 'practice', 'exit_ticket'];
+    const idx = phases.indexOf(phase);
+    
+    phases.forEach((p, i) => {
+        const dot = document.querySelector(`[data-phase="${p}"]`);
+        if (dot) {
+            if (i < idx) dot.classList.add('done');
+            else if (i === idx) dot.classList.add('active');
+        }
+    });
+}
+
+function showArtifactNotification() {
+    const badge = document.getElementById('artifact-badge');
+    const btn = document.getElementById('artifact-btn');
+    badge.style.display = 'flex';
+    btn.classList.add('has-content');
+    hasArtifactContent = true;
+}
+
+function toggleArtifact() {
+    const panel = document.getElementById('artifact-panel');
+    panel.classList.toggle('open');
+    
+    // Clear notification when opened
+    if (panel.classList.contains('open')) {
+        document.getElementById('artifact-badge').style.display = 'none';
+    }
+}
+
+function openArtifact() {
+    document.getElementById('artifact-panel').classList.add('open');
+    document.getElementById('artifact-badge').style.display = 'none';
+}
+
+function showMessage(role, text) {
+    const container = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = `msg ${role === 'tutor' ? 'tutor' : 'user'}`;
+    div.innerHTML = `
+        <div class="avatar">${role === 'tutor' ? '🤖' : '😊'}</div>
+        <div class="bubble">${role === 'tutor' ? renderMarkdown(cleanForDisplay(text)) : escapeHtml(text)}</div>
+    `;
+    container.appendChild(div);
+    scrollToBottom();
+}
+
+function createStreamingMessage() {
+    const container = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = 'msg tutor';
+    div.innerHTML = `
+        <div class="avatar">🤖</div>
+        <div class="bubble"></div>
+    `;
+    container.appendChild(div);
+    return div;
+}
+
+function cleanForDisplay(text) {
+    return text
+        .replace(/\[ARTIFACT:\w+\][\s\S]*?\[\/ARTIFACT\]/g, '')
+        .replace(/\[QUESTION:[\s\S]*?\[\/QUESTION\]/g, '')
+        .replace(/\[INSTRUCTION:[\s\S]*?\[\/INSTRUCTION\]/g, '')
+        .replace(/\[SHOW_MEDIA:.*?\]/g, '')
+        .replace(/\[GENERATE_IMAGE:.*?\]/g, '')
+        .replace(/\[SESSION_COMPLETE\]/g, '')
+        .trim();
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('chat-messages');
+    container.scrollTop = container.scrollHeight;
+}
+
+function setLoading(on) {
+    document.getElementById('send-btn').disabled = on;
+    document.getElementById('user-input').disabled = on;
+}
+
+function showCompleteModal() {
+    document.getElementById('complete-modal').classList.add('show');
+}
+
+function renderMarkdown(text) {
+    if (typeof marked !== 'undefined') {
+        return marked.parse(text);
+    }
+    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+}
+
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+function getCookie(name) {
+    for (let c of document.cookie.split(';')) {
+        c = c.trim();
+        if (c.startsWith(name + '=')) return decodeURIComponent(c.slice(name.length + 1));
+    }
+    return null;
+}
 </script>
 {% endblock %}

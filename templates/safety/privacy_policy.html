@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block title %}Privacy Policy - AI Tutor{% endblock %}
+
+{% block content %}
+<div class="legal-page">
+    <div class="container">
+        <h1>Privacy Policy</h1>
+        <p class="last-updated">Last updated: February 2026</p>
+
+        <section>
+            <h2>1. Introduction</h2>
+            <p>AI Tutor ("we", "our", "us") is committed to protecting the privacy of our users, especially students and minors. This Privacy Policy explains how we collect, use, and protect your information.</p>
+        </section>
+
+        <section>
+            <h2>2. Information We Collect</h2>
+            
+            <h3>2.1 Account Information</h3>
+            <p>When you create an account, we collect:</p>
+            <ul>
+                <li>Name and email address</li>
+                <li>School/institution affiliation</li>
+                <li>Date of birth (for age verification)</li>
+            </ul>
+
+            <h3>2.2 Learning Data</h3>
+            <p>During tutoring sessions, we collect:</p>
+            <ul>
+                <li>Questions you ask and answers you provide</li>
+                <li>Session duration and progress</li>
+                <li>Learning outcomes and mastery levels</li>
+            </ul>
+
+            <h3>2.3 Technical Data</h3>
+            <p>We automatically collect:</p>
+            <ul>
+                <li>Device type and browser information</li>
+                <li>IP address (anonymized after 30 days)</li>
+                <li>Usage patterns and timestamps</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>3. How We Use Your Information</h2>
+            <p>We use your information to:</p>
+            <ul>
+                <li>Provide personalized AI tutoring services</li>
+                <li>Track your learning progress</li>
+                <li>Improve our educational content and AI models</li>
+                <li>Ensure platform safety and prevent abuse</li>
+                <li>Comply with legal requirements</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>4. Child Protection (COPPA Compliance)</h2>
+            <p>We take special care to protect children under 13:</p>
+            <ul>
+                <li>Users must be at least 13 years old to create an account</li>
+                <li>We do not knowingly collect personal information from children under 13</li>
+                <li>For users under 16, we require parental consent for data processing</li>
+                <li>AI interactions are filtered for age-appropriate content</li>
+                <li>We never share children's data with third parties for marketing</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>5. Data Protection Measures</h2>
+            <p>We protect your data through:</p>
+            <ul>
+                <li>Encryption in transit and at rest</li>
+                <li>Content safety filters on all AI interactions</li>
+                <li>Automatic PII detection and redaction</li>
+                <li>Rate limiting to prevent abuse</li>
+                <li>Regular security audits</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>6. Data Retention</h2>
+            <ul>
+                <li>Learning session data: 90 days</li>
+                <li>Account information: Until account deletion</li>
+                <li>Anonymized analytics: Up to 2 years</li>
+                <li>Security logs: 1 year</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>7. Your Rights (GDPR/FERPA)</h2>
+            <p>You have the right to:</p>
+            <ul>
+                <li><strong>Access</strong> - View all data we hold about you</li>
+                <li><strong>Portability</strong> - Download your data in a standard format</li>
+                <li><strong>Correction</strong> - Update inaccurate information</li>
+                <li><strong>Erasure</strong> - Delete your data and account</li>
+                <li><strong>Restriction</strong> - Limit how we process your data</li>
+                <li><strong>Withdraw Consent</strong> - Change your consent preferences anytime</li>
+            </ul>
+            <p>Exercise these rights in your <a href="{% url 'safety:privacy_dashboard' %}">Privacy Dashboard</a>.</p>
+        </section>
+
+        <section>
+            <h2>8. AI and Automated Processing</h2>
+            <p>Our AI tutor:</p>
+            <ul>
+                <li>Uses your responses to provide personalized feedback</li>
+                <li>Does not make decisions that significantly affect you without human oversight</li>
+                <li>Is monitored for bias and inappropriate content</li>
+                <li>Never shares your personal conversations with other users</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>9. Third-Party Services</h2>
+            <p>We use the following third-party services:</p>
+            <ul>
+                <li>AI language models (for tutoring) - No personal data shared</li>
+                <li>Cloud hosting (for data storage) - Data encrypted</li>
+            </ul>
+            <p>We do not sell your data to third parties.</p>
+        </section>
+
+        <section>
+            <h2>10. Contact Us</h2>
+            <p>For privacy concerns or data requests:</p>
+            <ul>
+                <li>Email: privacy@aitutor.edu</li>
+                <li>Data Protection Officer: dpo@aitutor.edu</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>11. Changes to This Policy</h2>
+            <p>We may update this policy periodically. We will notify you of significant changes via email or platform notification.</p>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.legal-page {
+    padding: 2rem 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.legal-page h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.last-updated {
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.legal-page section {
+    margin-bottom: 2rem;
+}
+
+.legal-page h2 {
+    font-size: 1.25rem;
+    color: #FF6B35;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #FFF0EB;
+    padding-bottom: 0.5rem;
+}
+
+.legal-page h3 {
+    font-size: 1rem;
+    margin: 1rem 0 0.5rem;
+}
+
+.legal-page p {
+    line-height: 1.7;
+    margin-bottom: 1rem;
+}
+
+.legal-page ul {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+}
+
+.legal-page li {
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+}
+
+.legal-page a {
+    color: #FF6B35;
+}
+</style>
+{% endblock %}

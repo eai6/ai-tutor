@@ -10,7 +10,7 @@ content editors control the "what" (curriculum).
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 from apps.llm.models import PromptPack
 from apps.curriculum.models import Lesson, LessonStep
@@ -23,6 +23,29 @@ class AssembledPrompt:
     step_instruction: str  # Added to the conversation as context
 
 
+def get_lesson_media(lesson: Lesson) -> List[dict]:
+    """Get all media assets for a lesson."""
+    from apps.media_library.models import StepMedia
+    
+    media_list = []
+    attachments = StepMedia.objects.filter(
+        lesson_step__lesson=lesson
+    ).select_related('media_asset').order_by('lesson_step__order_index', 'order_index')
+    
+    for att in attachments:
+        asset = att.media_asset
+        media_list.append({
+            'title': asset.title,
+            'type': asset.asset_type,
+            'url': asset.file.url if asset.file else None,
+            'caption': asset.caption,
+            'alt_text': asset.alt_text,
+            'step_title': att.lesson_step.teacher_script[:50] if att.lesson_step else '',
+        })
+    
+    return media_list
+
+
 def assemble_system_prompt(prompt_pack: PromptPack, lesson: Lesson) -> str:
     """
     Build the full system prompt from PromptPack + lesson context.
@@ -33,6 +56,7 @@ def assemble_system_prompt(prompt_pack: PromptPack, lesson: Lesson) -> str:
     - Safety guidelines  
     - Format rules
     - Lesson context (objective)
+    - Available media
     """
     parts = []
     
@@ -59,6 +83,24 @@ LEARNING OBJECTIVE: {lesson.objective}
 You are guiding the student through this lesson step by step. Follow the step instructions provided with each message.
 """.strip()
     parts.append(lesson_context)
+    
+    # Add available media context
+    media_list = get_lesson_media(lesson)
+    if media_list:
+        media_context = """
+AVAILABLE MEDIA FOR THIS LESSON:
+You have access to the following images/media to help teach this lesson. When appropriate, you can display them by including the exact marker [SHOW_MEDIA:title] in your response, where 'title' is the media title.
+
+"""
+        for media in media_list:
+            media_context += f"- {media['title']} ({media['type']}): {media['caption'] or media['alt_text'] or 'Educational visual'}\n"
+        
+        media_context += """
+Example usage: "Let me show you a diagram of this concept. [SHOW_MEDIA:Plate Tectonics Diagram]"
+
+IMPORTANT: Only reference media that exists in the list above. When a student asks to see a figure or image, show them relevant media from this list.
+"""
+        parts.append(media_context)
     
     return "\n\n".join(parts)
 

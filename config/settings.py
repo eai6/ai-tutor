@@ -35,6 +35,8 @@ INSTALLED_APPS = [
     'apps.media_library',
     'apps.tutoring',
     'apps.llm',
+    'apps.safety',
+    'apps.dashboard',
 ]
 
 MIDDLEWARE = [
@@ -45,6 +47,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.safety.SafetyMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

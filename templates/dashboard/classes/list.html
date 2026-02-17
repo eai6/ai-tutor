@@ -1,0 +1,70 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Classes{% endblock %}
+{% block page_title %}Classes{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <p style="color: var(--gray-500);">Students grouped by grade level</p>
+</div>
+
+{% if students_by_grade %}
+    {% for grade, students in students_by_grade.items %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">
+                    {% if grade == 'Unknown' %}
+                        Unassigned
+                    {% else %}
+                        {{ grade }}
+                    {% endif %}
+                </h2>
+                <p style="font-size: 0.875rem; color: var(--gray-500); margin-top: 0.25rem;">
+                    {{ students|length }} student{{ students|length|pluralize }}
+                </p>
+            </div>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Email</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem;">
+                                    {{ student.first_name|slice:":1"|upper }}{{ student.last_name|slice:":1"|upper }}
+                                </div>
+                                <span style="font-weight: 500;">{{ student.first_name }} {{ student.last_name }}</span>
+                            </div>
+                        </td>
+                        <td style="color: var(--gray-500);">{{ student.email }}</td>
+                        <td>
+                            <a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-secondary btn-sm">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+        <h3>No Students Yet</h3>
+        <p>Students will appear here once they join and complete their profiles.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,157 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard Overview{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total Students</div>
+        <div class="stat-value">{{ total_students }}</div>
+        <div class="stat-change positive">{{ active_students }} active this week</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Sessions (30 days)</div>
+        <div class="stat-value">{{ total_sessions }}</div>
+        <div class="stat-change">{{ completed_sessions }} completed</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Average Mastery</div>
+        <div class="stat-value">{{ avg_mastery }}%</div>
+        <div class="progress-bar" style="margin-top: 0.5rem;">
+            <div class="progress-fill success" style="width: {{ avg_mastery }}%;"></div>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Students At Risk</div>
+        <div class="stat-value" style="color: {% if at_risk_count > 0 %}var(--danger){% else %}var(--success){% endif %};">
+            {{ at_risk_count }}
+        </div>
+        <div class="stat-change">No activity in 7+ days</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+    <!-- Course Progress -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Course Progress</h2>
+            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <div class="card-body">
+            {% if course_progress %}
+                {% for cp in course_progress %}
+                <div style="margin-bottom: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="font-weight: 500;">{{ cp.course.title }}</span>
+                        <span style="color: var(--gray-500);">{{ cp.progress }}%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ cp.progress }}%;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>No courses yet. <a href="{% url 'dashboard:curriculum_upload' %}">Upload a curriculum</a> to get started.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Recent Activity -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Recent Activity</h2>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if recent_sessions %}
+                {% for session in recent_sessions %}
+                <div style="padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--gray-100); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;">
+                        {{ session.student.first_name|slice:":1"|upper }}{{ session.student.last_name|slice:":1"|upper }}
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {{ session.student.first_name }} {{ session.student.last_name }}
+                        </div>
+                        <div style="font-size: 0.8125rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {{ session.lesson.title }}
+                        </div>
+                    </div>
+                    <div>
+                        {% if session.mastery_achieved %}
+                            <span class="badge badge-success">✓</span>
+                        {% elif session.status == 'completed' %}
+                            <span class="badge badge-warning">—</span>
+                        {% else %}
+                            <span class="badge badge-info">⏳</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>No recent activity</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Activity Chart -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Sessions (Last 14 Days)</h2>
+    </div>
+    <div class="card-body">
+        <div id="activity-chart" style="height: 200px; display: flex; align-items: flex-end; gap: 4px;">
+            <!-- Chart rendered by JS -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Simple bar chart
+    const activityData = {{ activity_data|safe }};
+    const chart = document.getElementById('activity-chart');
+    
+    if (activityData && activityData.length > 0) {
+        const maxVal = Math.max(...activityData.map(d => d.sessions), 1);
+        
+        activityData.forEach(d => {
+            const bar = document.createElement('div');
+            bar.style.flex = '1';
+            bar.style.display = 'flex';
+            bar.style.flexDirection = 'column';
+            bar.style.alignItems = 'center';
+            bar.style.gap = '4px';
+            
+            const barFill = document.createElement('div');
+            barFill.style.width = '100%';
+            barFill.style.background = 'var(--primary)';
+            barFill.style.borderRadius = '4px 4px 0 0';
+            barFill.style.height = Math.max((d.sessions / maxVal) * 160, 4) + 'px';
+            barFill.style.transition = 'height 0.3s';
+            barFill.title = `${d.date}: ${d.sessions} sessions`;
+            
+            const label = document.createElement('div');
+            label.style.fontSize = '10px';
+            label.style.color = 'var(--gray-500)';
+            label.style.transform = 'rotate(-45deg)';
+            label.style.whiteSpace = 'nowrap';
+            label.textContent = d.date;
+            
+            bar.appendChild(barFill);
+            bar.appendChild(label);
+            chart.appendChild(bar);
+        });
+    }
+</script>
+{% endblock %}

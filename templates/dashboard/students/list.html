@@ -1,0 +1,121 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Students{% endblock %}
+{% block page_title %}Students{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">All Students ({{ total_count }})</h2>
+        <div style="display: flex; gap: 0.5rem;">
+            <input type="text" class="form-control" placeholder="Search students..." style="width: 250px;" id="search-input">
+        </div>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if students %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Grade</th>
+                    <th>School</th>
+                    <th>Progress</th>
+                    <th>Last Active</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in students %}
+                <tr class="student-row" data-name="{{ s.user.first_name }} {{ s.user.last_name }}">
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.875rem;">
+                                {{ s.user.first_name|slice:":1"|upper }}{{ s.user.last_name|slice:":1"|upper }}
+                            </div>
+                            <div>
+                                <div style="font-weight: 500;">{{ s.user.first_name }} {{ s.user.last_name }}</div>
+                                <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ s.user.email }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if s.profile %}
+                            <span class="badge badge-info">{{ s.profile.grade_level }}</span>
+                        {% else %}
+                            <span style="color: var(--gray-400);">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if s.profile %}
+                            {{ s.profile.get_school_display_name }}
+                        {% else %}
+                            <span style="color: var(--gray-400);">—</span>
+                        {% endif %}
+                    </td>
+                    <td style="width: 200px;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div class="progress-bar" style="flex: 1;">
+                                <div class="progress-fill {% if s.mastery_pct >= 70 %}success{% endif %}" style="width: {{ s.mastery_pct }}%;"></div>
+                            </div>
+                            <span style="font-size: 0.875rem; color: var(--gray-500); min-width: 60px;">
+                                {{ s.lessons_mastered }}/{{ s.lessons_total }}
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if s.last_active %}
+                            <span style="font-size: 0.875rem;">{{ s.last_active|timesince }} ago</span>
+                        {% else %}
+                            <span style="color: var(--gray-400);">Never</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'dashboard:student_detail' s.user.id %}" class="btn btn-secondary btn-sm">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- Pagination -->
+        {% if students.has_other_pages %}
+        <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: center; gap: 0.5rem;">
+            {% if students.has_previous %}
+                <a href="?page={{ students.previous_page_number }}" class="btn btn-secondary btn-sm">← Previous</a>
+            {% endif %}
+            
+            <span style="padding: 0.5rem 1rem; color: var(--gray-500);">
+                Page {{ students.number }} of {{ students.paginator.num_pages }}
+            </span>
+            
+            {% if students.has_next %}
+                <a href="?page={{ students.next_page_number }}" class="btn btn-secondary btn-sm">Next →</a>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+            <h3>No Students Yet</h3>
+            <p>Students will appear here once they join your institution.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Simple search filter
+    document.getElementById('search-input').addEventListener('input', function(e) {
+        const search = e.target.value.toLowerCase();
+        document.querySelectorAll('.student-row').forEach(row => {
+            const name = row.dataset.name.toLowerCase();
+            row.style.display = name.includes(search) ? '' : 'none';
+        });
+    });
+</script>
+{% endblock %}

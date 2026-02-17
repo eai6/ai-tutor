@@ -14,9 +14,10 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 
 from apps.accounts.models import Institution, Membership
-from apps.curriculum.models import Course, Lesson
+from apps.curriculum.models import Course, Lesson, LessonStep
 from apps.tutoring.models import TutorSession, StudentLessonProgress
 from apps.tutoring.engine import TutorEngine, create_tutor_session
+from apps.media_library.models import StepMedia
 
 
 def get_user_institution(user):
@@ -36,6 +37,43 @@ def get_student_progress(user, institution):
     ).select_related('lesson')
     
     return {p.lesson_id: p for p in progress}
+
+
+def get_step_media(step: LessonStep) -> list:
+    """Get media attachments for a lesson step."""
+    if not step:
+        return []
+    
+    attachments = StepMedia.objects.filter(
+        lesson_step=step
+    ).select_related('media_asset').order_by('order_index')
+    
+    return [{
+        'id': att.media_asset.id,
+        'title': att.media_asset.title,
+        'type': att.media_asset.asset_type,
+        'url': att.media_asset.file.url if att.media_asset.file else None,
+        'alt_text': att.media_asset.alt_text,
+        'caption': att.media_asset.caption,
+        'placement': att.placement,
+    } for att in attachments]
+
+
+def get_all_lesson_media(lesson: Lesson) -> list:
+    """Get ALL media attachments for a lesson (all steps)."""
+    attachments = StepMedia.objects.filter(
+        lesson_step__lesson=lesson
+    ).select_related('media_asset').order_by('lesson_step__order_index', 'order_index')
+    
+    return [{
+        'id': att.media_asset.id,
+        'title': att.media_asset.title,
+        'type': att.media_asset.asset_type,
+        'url': att.media_asset.file.url if att.media_asset.file else None,
+        'alt_text': att.media_asset.alt_text,
+        'caption': att.media_asset.caption,
+        'placement': att.placement,
+    } for att in attachments]
 
 
 @login_required
@@ -105,6 +143,13 @@ def start_session(request, lesson_id):
         # For existing session, get current state
         response = engine.start()  # TODO: Resume properly
     
+    # Get media for current step
+    current_step = engine.current_step
+    media = get_step_media(current_step)
+    
+    # Get ALL media for the lesson (for AI to reference)
+    all_media = get_all_lesson_media(lesson)
+    
     return JsonResponse({
         "session_id": session.id,
         "lesson": {
@@ -118,6 +163,10 @@ def start_session(request, lesson_id):
         "is_waiting_for_answer": response.is_waiting_for_answer,
         "is_session_complete": response.is_session_complete,
         "mastery_achieved": response.mastery_achieved,
+        "phase": response.phase,
+        "commands": response.commands,  # Artifact commands for frontend
+        "media": media,
+        "all_media": all_media,  # All lesson media for inline references
     })
 
 
@@ -125,13 +174,33 @@ def start_session(request, lesson_id):
 @csrf_exempt  # For simplicity; use proper CSRF in production
 @require_http_methods(["POST"])
 def submit_answer(request, session_id):
-    """Submit a student answer."""
+    """Submit a student answer with safety checks."""
+    from apps.safety import (
+        ContentSafetyFilter, RateLimiter, SafetyAuditLog,
+        ChildProtection, ContentFlag
+    )
+    
     session = get_object_or_404(
         TutorSession,
         id=session_id,
         student=request.user,
         status=TutorSession.Status.ACTIVE
     )
+    
+    # Rate limiting
+    allowed, reason = RateLimiter.check_rate_limit(request.user.id)
+    if not allowed:
+        SafetyAuditLog.log(
+            'rate_limited',
+            user=request.user,
+            session_id=session.id,
+            details={'reason': reason},
+            severity='warning',
+            request=request,
+        )
+        return JsonResponse({"error": reason, "rate_limited": True}, status=429)
+    
+    RateLimiter.record_message(request.user.id)
     
     try:
         data = json.loads(request.body)
@@ -142,11 +211,50 @@ def submit_answer(request, session_id):
     if not answer:
         return JsonResponse({"error": "Answer required"}, status=400)
     
+    # Content safety check
+    safety_result = ContentSafetyFilter.check_content(answer, context="student_input")
+    
+    if safety_result.flags:
+        SafetyAuditLog.log(
+            'content_flagged',
+            user=request.user,
+            session_id=session.id,
+            details={
+                'flags': [f.value for f in safety_result.flags],
+                'warnings': safety_result.warnings,
+            },
+            severity='warning' if not safety_result.blocked else 'critical',
+            request=request,
+        )
+    
+    # Handle blocked content
+    if safety_result.blocked:
+        safe_response = ContentSafetyFilter.get_safe_response(safety_result.flags[0])
+        return JsonResponse({
+            "tutor_message": safe_response,
+            "step_index": session.current_step_index,
+            "step_type": "safety",
+            "is_waiting_for_answer": True,
+            "is_session_complete": False,
+            "mastery_achieved": False,
+            "safety_warning": True,
+        })
+    
+    # Use filtered content
+    safe_answer = safety_result.filtered_content
+    
     engine = TutorEngine(session)
-    response = engine.process_student_answer(answer)
+    response = engine.process_student_answer(safe_answer)
+    
+    # Filter AI response for child safety
+    safe_message = ChildProtection.filter_ai_response_for_children(response.message)
+    
+    # Get media for current step
+    current_step = engine.current_step
+    media = get_step_media(current_step)
     
     return JsonResponse({
-        "tutor_message": response.message,
+        "tutor_message": safe_message,
         "step_index": response.step_index,
         "step_type": response.step_type,
         "is_waiting_for_answer": response.is_waiting_for_answer,
@@ -158,6 +266,7 @@ def submit_answer(request, session_id):
             "score": response.grading.score,
         } if response.grading else None,
         "attempts_remaining": response.attempts_remaining,
+        "media": media,
     })
 
 
@@ -175,6 +284,10 @@ def advance_step(request, session_id):
     engine = TutorEngine(session)
     response = engine.advance_step()
     
+    # Get media for current step
+    current_step = engine.current_step
+    media = get_step_media(current_step)
+    
     return JsonResponse({
         "tutor_message": response.message,
         "step_index": response.step_index,
@@ -182,6 +295,7 @@ def advance_step(request, session_id):
         "is_waiting_for_answer": response.is_waiting_for_answer,
         "is_session_complete": response.is_session_complete,
         "mastery_achieved": response.mastery_achieved,
+        "media": media,
     })
 
 
@@ -320,3 +434,362 @@ def lesson_catalog(request):
         "subjects": subjects,
         "selected_subject": selected_subject,
     })
+
+
+# ---- Streaming endpoint ----
+
+from django.http import StreamingHttpResponse
+from apps.llm.prompts import build_tutor_message
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def submit_answer_stream(request, session_id):
+    """Submit a student answer and stream the response with safety checks."""
+    from apps.safety import (
+        ContentSafetyFilter, RateLimiter, SafetyAuditLog,
+        ChildProtection, ContentFlag
+    )
+    
+    session = get_object_or_404(
+        TutorSession,
+        id=session_id,
+        student=request.user,
+        status=TutorSession.Status.ACTIVE
+    )
+    
+    # Rate limiting
+    allowed, reason = RateLimiter.check_rate_limit(request.user.id)
+    if not allowed:
+        SafetyAuditLog.log(
+            'rate_limited',
+            user=request.user,
+            session_id=session.id,
+            details={'reason': reason},
+            severity='warning',
+            request=request,
+        )
+        return JsonResponse({"error": reason, "rate_limited": True}, status=429)
+    
+    RateLimiter.record_message(request.user.id)
+    
+    try:
+        data = json.loads(request.body)
+        answer = data.get("answer", "").strip()
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    if not answer:
+        return JsonResponse({"error": "Answer required"}, status=400)
+    
+    # Content safety check
+    safety_result = ContentSafetyFilter.check_content(answer, context="student_input")
+    
+    if safety_result.flags:
+        SafetyAuditLog.log(
+            'content_flagged',
+            user=request.user,
+            session_id=session.id,
+            details={
+                'flags': [f.value for f in safety_result.flags],
+                'warnings': safety_result.warnings,
+            },
+            severity='warning' if not safety_result.blocked else 'critical',
+            request=request,
+        )
+    
+    # Handle blocked content with streaming response
+    if safety_result.blocked:
+        safe_response = ContentSafetyFilter.get_safe_response(safety_result.flags[0])
+        def blocked_stream():
+            yield f"data: {json.dumps({'chunk': safe_response})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'is_session_complete': False, 'safety_warning': True})}\n\n"
+        
+        response = StreamingHttpResponse(blocked_stream(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        return response
+    
+    # Use filtered content
+    safe_answer = safety_result.filtered_content
+    
+    def generate_stream():
+        """Generator that yields SSE formatted chunks."""
+        from apps.tutoring.engine import TutorEngine
+        from apps.tutoring.models import SessionTurn
+        
+        engine = TutorEngine(session)
+        
+        # Process answer through engine (handles phase tracking, commands, etc.)
+        response = engine.process_student_answer(safe_answer)
+        
+        # Stream the response content
+        # For now, yield the full message (can be chunked later if needed)
+        yield f"data: {json.dumps({'chunk': response.message})}\n\n"
+        
+        # Send commands for artifact updates
+        if response.commands:
+            yield f"data: {json.dumps({'commands': response.commands})}\n\n"
+        
+        # Send final metadata
+        yield f"data: {json.dumps({
+            'done': True, 
+            'is_session_complete': response.is_session_complete,
+            'phase': response.phase,
+            'commands': response.commands,
+        })}\n\n"
+    
+    response = StreamingHttpResponse(
+        generate_stream(),
+        content_type='text/event-stream'
+    )
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response
+
+
+# ---- Image Generation Endpoint ----
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_image(request):
+    """Generate an educational image using DALL-E."""
+    import os
+    
+    try:
+        data = json.loads(request.body)
+        prompt = data.get("prompt", "").strip()
+        session_id = data.get("session_id")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    if not prompt:
+        return JsonResponse({"error": "Prompt required"}, status=400)
+    
+    # Get OpenAI key
+    openai_key = os.environ.get('OPENAI_API_KEY')
+    if not openai_key:
+        return JsonResponse({"error": "Image generation not configured"}, status=503)
+    
+    try:
+        from openai import OpenAI
+        import requests
+        from django.core.files.base import ContentFile
+        from apps.media_library.models import MediaAsset
+        
+        client = OpenAI(api_key=openai_key)
+        
+        # Add educational style to prompt
+        full_prompt = f"{prompt}. Style: educational illustration, clear and simple, suitable for secondary school students, no text overlays."
+        
+        # Generate image
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=full_prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+        
+        image_url = response.data[0].url
+        
+        # Download image
+        image_response = requests.get(image_url)
+        image_response.raise_for_status()
+        
+        # Save as MediaAsset
+        institution = get_user_institution(request.user)
+        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:50])
+        filename = f"generated_{safe_title}.png"
+        
+        media_asset = MediaAsset.objects.create(
+            institution=institution,
+            title=prompt[:100],
+            asset_type='image',
+            alt_text=prompt[:200],
+            caption=f"AI-generated: {prompt[:100]}",
+            tags="ai-generated, educational",
+        )
+        
+        media_asset.file.save(
+            filename,
+            ContentFile(image_response.content),
+            save=True
+        )
+        
+        return JsonResponse({
+            "url": media_asset.file.url,
+            "title": media_asset.title,
+            "caption": media_asset.caption,
+        })
+        
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+# ---- Structured Session Views ----
+
+@login_required
+def tutor_interface_v2(request, lesson_id):
+    """Render the new split-panel tutoring interface."""
+    institution = get_user_institution(request.user)
+    if not institution:
+        return render(request, 'tutoring/error.html', {"message": "No institution"})
+    
+    lesson = get_object_or_404(
+        Lesson,
+        id=lesson_id,
+        unit__course__institution=institution,
+        is_published=True
+    )
+    
+    return render(request, 'tutoring/session_v2.html', {
+        "lesson": lesson,
+        "user": request.user,
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def start_structured_session(request, lesson_id):
+    """Start a structured tutoring session."""
+    from apps.tutoring.structured_engine import StructuredSessionEngine
+    
+    institution = get_user_institution(request.user)
+    if not institution:
+        return JsonResponse({"error": "No institution membership"}, status=403)
+    
+    lesson = get_object_or_404(
+        Lesson,
+        id=lesson_id,
+        unit__course__institution=institution,
+        is_published=True
+    )
+    
+    # Check for existing active session
+    existing = TutorSession.objects.filter(
+        student=request.user,
+        lesson=lesson,
+        status=TutorSession.Status.ACTIVE
+    ).first()
+    
+    if existing:
+        session = existing
+    else:
+        session = create_tutor_session(
+            student=request.user,
+            lesson=lesson,
+            institution=institution,
+        )
+    
+    # Use structured engine
+    engine = StructuredSessionEngine(session)
+    
+    if not existing:
+        response = engine.start()
+    else:
+        # Resume - get current state
+        response = engine.start()
+    
+    # Get all lesson media
+    all_media = get_all_lesson_media(lesson)
+    
+    return JsonResponse({
+        "session_id": session.id,
+        "lesson": {
+            "id": lesson.id,
+            "title": lesson.title,
+            "objective": lesson.objective,
+        },
+        "chat_message": response.chat_message,
+        "commands": response.commands,
+        "phase": response.phase.value,
+        "is_complete": response.is_complete,
+        "all_media": all_media,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def structured_session_input(request, session_id):
+    """Process input in a structured session."""
+    from apps.tutoring.structured_engine import StructuredSessionEngine
+    
+    session = get_object_or_404(
+        TutorSession,
+        id=session_id,
+        student=request.user,
+        status=TutorSession.Status.ACTIVE
+    )
+    
+    try:
+        data = json.loads(request.body)
+        user_input = data.get("input", "").strip()
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    if not user_input:
+        return JsonResponse({"error": "Input required"}, status=400)
+    
+    engine = StructuredSessionEngine(session)
+    response = engine.process_input(user_input)
+    
+    return JsonResponse({
+        "chat_message": response.chat_message,
+        "commands": response.commands,
+        "phase": response.phase.value,
+        "is_complete": response.is_complete,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def structured_session_input_stream(request, session_id):
+    """Process input in a structured session with streaming response."""
+    from apps.tutoring.structured_engine import StructuredSessionEngine, SessionPhase
+    
+    session = get_object_or_404(
+        TutorSession,
+        id=session_id,
+        student=request.user,
+        status=TutorSession.Status.ACTIVE
+    )
+    
+    try:
+        data = json.loads(request.body)
+        user_input = data.get("input", "").strip()
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    if not user_input:
+        return JsonResponse({"error": "Input required"}, status=400)
+    
+    def generate_stream():
+        engine = StructuredSessionEngine(session)
+        
+        try:
+            response = engine.process_input(user_input)
+            
+            # Stream the chat message in chunks (simulate streaming for now)
+            # TODO: Implement true streaming in structured engine
+            words = response.chat_message.split(' ')
+            for i in range(0, len(words), 3):
+                chunk = ' '.join(words[i:i+3]) + ' '
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            
+            # Send commands and final state
+            yield f"data: {json.dumps({'commands': response.commands, 'phase': response.phase.value, 'done': True, 'is_complete': response.is_complete})}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    response = StreamingHttpResponse(
+        generate_stream(),
+        content_type='text/event-stream'
+    )
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response

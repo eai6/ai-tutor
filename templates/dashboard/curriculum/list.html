@@ -1,0 +1,84 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Curriculum{% endblock %}
+{% block page_title %}Curriculum{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <p style="color: var(--gray-500);">Manage your courses and lessons</p>
+    <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Upload Curriculum
+    </a>
+</div>
+
+{% if courses %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">All Courses ({{ courses|length }})</h2>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Course</th>
+                    <th>Grade</th>
+                    <th>Units</th>
+                    <th>Lessons</th>
+                    <th>Published</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in courses %}
+                <tr>
+                    <td>
+                        <span style="font-weight: 500;">{{ c.course.title }}</span>
+                        {% if c.course.description %}
+                        <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ c.course.description|truncatewords:10 }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-info">{{ c.course.grade_level|default:"—" }}</span>
+                    </td>
+                    <td>{{ c.unit_count }}</td>
+                    <td>{{ c.total_lessons }}</td>
+                    <td>
+                        <span style="color: var(--gray-500);">{{ c.published_lessons }}/{{ c.total_lessons }}</span>
+                    </td>
+                    <td>
+                        {% if c.course.is_published %}
+                            <span class="badge badge-success">Published</span>
+                        {% else %}
+                            <span class="badge badge-warning">Draft</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'dashboard:course_detail' c.course.id %}" class="btn btn-secondary btn-sm">
+                            Manage
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state" style="padding: 4rem;">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 64px; height: 64px; margin-bottom: 1rem; color: var(--gray-300);">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+        </svg>
+        <h3>No Courses Yet</h3>
+        <p style="margin-bottom: 1.5rem;">Upload a curriculum document to automatically generate courses and lessons.</p>
+        <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary">
+            Upload Curriculum
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

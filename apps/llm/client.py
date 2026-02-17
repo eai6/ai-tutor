@@ -6,6 +6,7 @@ Design decisions:
 - All clients share the same interface: generate(messages, system_prompt)
 - Handles API key lookup from environment variables
 - Returns structured response with content + token usage
+- Supports streaming via generate_stream()
 
 Supports: Anthropic, OpenAI, Ollama (local)
 """
@@ -14,7 +15,7 @@ import os
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Generator
 import anthropic
 
 from apps.llm.models import ModelConfig
@@ -61,6 +62,23 @@ class BaseLLMClient(ABC):
             LLMResponse with content and token usage
         """
         pass
+    
+    def generate_stream(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+    ) -> Generator[str, None, LLMResponse]:
+        """
+        Generate a streaming response from the LLM.
+        
+        Yields chunks of text as they arrive.
+        Returns final LLMResponse when complete.
+        
+        Default implementation falls back to non-streaming.
+        """
+        response = self.generate(messages, system_prompt)
+        yield response.content
+        return response
 
 
 class AnthropicClient(BaseLLMClient):
@@ -95,6 +113,41 @@ class AnthropicClient(BaseLLMClient):
             tokens_out=response.usage.output_tokens,
             model=response.model,
             stop_reason=response.stop_reason,
+        )
+    
+    def generate_stream(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+    ) -> Generator[str, None, LLMResponse]:
+        """Stream response from Claude API."""
+        
+        full_content = ""
+        tokens_in = 0
+        tokens_out = 0
+        
+        with self.client.messages.stream(
+            model=self.config.model_name,
+            max_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+            system=system_prompt,
+            messages=messages,
+        ) as stream:
+            for text in stream.text_stream:
+                full_content += text
+                yield text
+            
+            # Get final message for token counts
+            final_message = stream.get_final_message()
+            tokens_in = final_message.usage.input_tokens
+            tokens_out = final_message.usage.output_tokens
+        
+        return LLMResponse(
+            content=full_content,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            model=self.config.model_name,
+            stop_reason="end_turn",
         )
 
 

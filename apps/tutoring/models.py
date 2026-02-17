@@ -1,9 +1,12 @@
 """
-Tutoring app - Session tracking and student progress.
+Tutoring app - Session tracking, student progress, and exit tickets.
 
 TutorSession: A single tutoring interaction (student + lesson)
 SessionTurn: Each message in the conversation
 StudentLessonProgress: Tracks mastery across sessions
+ExitTicket: Standardized summative assessment (10 MCQs)
+ExitTicketQuestion: Individual questions in an exit ticket
+ExitTicketAttempt: Records student attempts
 """
 
 from django.db import models
@@ -16,9 +19,6 @@ from apps.llm.models import PromptPack, ModelConfig
 class TutorSession(models.Model):
     """
     A single tutoring session - one student working through one lesson.
-    
-    Captures which prompt pack and model config were used (for reproducibility
-    and debugging).
     """
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Active'
@@ -64,6 +64,9 @@ class TutorSession(models.Model):
     )
     mastery_achieved = models.BooleanField(default=False)
     
+    # Structured engine state (for phase tracking, etc.)
+    engine_state = models.JSONField(default=dict, blank=True)
+    
     # Timing
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)
@@ -82,8 +85,6 @@ class TutorSession(models.Model):
 class SessionTurn(models.Model):
     """
     A single message in the tutoring conversation.
-    
-    Stores both student and tutor messages for the full transcript.
     """
     class Role(models.TextChoices):
         SYSTEM = 'system', 'System'
@@ -130,8 +131,6 @@ class SessionTurn(models.Model):
 class StudentLessonProgress(models.Model):
     """
     Tracks a student's overall progress on a lesson across multiple sessions.
-    
-    This is the "persistent" progress - survives individual sessions.
     """
     class MasteryLevel(models.TextChoices):
         NOT_STARTED = 'not_started', 'Not Started'
@@ -183,3 +182,172 @@ class StudentLessonProgress(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.lesson.title} ({self.mastery_level})"
+
+
+# ============================================================================
+# Exit Ticket Models (Standardized Summative Assessment)
+# ============================================================================
+
+class ExitTicket(models.Model):
+    """
+    A standardized exit ticket (summative assessment) for a lesson.
+    
+    Each lesson should have exactly one exit ticket with 10 MCQ questions.
+    Students need 8/10 (80%) to pass.
+    """
+    lesson = models.OneToOneField(
+        Lesson,
+        on_delete=models.CASCADE,
+        related_name='exit_ticket'
+    )
+    
+    passing_score = models.PositiveIntegerField(
+        default=8,
+        help_text="Minimum correct answers to pass (out of 10)"
+    )
+    
+    time_limit_minutes = models.PositiveIntegerField(
+        default=10,
+        help_text="Time limit for exit ticket (0 = no limit)"
+    )
+    
+    instructions = models.TextField(
+        default="Answer all 10 questions. You need 8 correct to pass.",
+        blank=True
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Exit Ticket"
+        verbose_name_plural = "Exit Tickets"
+
+    def __str__(self):
+        return f"Exit Ticket: {self.lesson.title}"
+    
+    @property
+    def question_count(self):
+        return self.questions.count()
+    
+    @property
+    def is_complete(self):
+        """Check if exit ticket has required 10 questions."""
+        return self.question_count >= 10
+
+
+class ExitTicketQuestion(models.Model):
+    """
+    A single MCQ question in an exit ticket.
+    """
+    class Difficulty(models.TextChoices):
+        EASY = 'easy', 'Easy (recall)'
+        MEDIUM = 'medium', 'Medium (apply)'
+        HARD = 'hard', 'Hard (analyze)'
+
+    exit_ticket = models.ForeignKey(
+        ExitTicket,
+        on_delete=models.CASCADE,
+        related_name='questions'
+    )
+    
+    question_text = models.TextField(help_text="The question stem")
+    
+    option_a = models.CharField(max_length=500)
+    option_b = models.CharField(max_length=500)
+    option_c = models.CharField(max_length=500)
+    option_d = models.CharField(max_length=500)
+    
+    correct_answer = models.CharField(
+        max_length=1,
+        choices=[('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D')],
+        help_text="The correct option (A, B, C, or D)"
+    )
+    
+    explanation = models.TextField(
+        blank=True,
+        help_text="Explanation of the correct answer"
+    )
+    
+    difficulty = models.CharField(
+        max_length=10,
+        choices=Difficulty.choices,
+        default=Difficulty.MEDIUM
+    )
+    
+    order_index = models.PositiveIntegerField(
+        default=0,
+        help_text="Order in the exit ticket (0-9)"
+    )
+    
+    image = models.ImageField(
+        upload_to='exit_tickets/',
+        blank=True,
+        null=True,
+        help_text="Optional image for the question"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order_index']
+        verbose_name = "Exit Ticket Question"
+
+    def __str__(self):
+        return f"Q{self.order_index + 1}: {self.question_text[:50]}..."
+    
+    def to_dict(self):
+        """Convert to dictionary for API/frontend."""
+        return {
+            'id': self.id,
+            'question': self.question_text,
+            'options': [
+                f"A) {self.option_a}",
+                f"B) {self.option_b}",
+                f"C) {self.option_c}",
+                f"D) {self.option_d}",
+            ],
+            'correct': self.correct_answer,
+            'explanation': self.explanation,
+            'difficulty': self.difficulty,
+            'order': self.order_index,
+            'image_url': self.image.url if self.image else None,
+        }
+
+
+class ExitTicketAttempt(models.Model):
+    """
+    Records a student's attempt at an exit ticket.
+    """
+    exit_ticket = models.ForeignKey(
+        ExitTicket,
+        on_delete=models.CASCADE,
+        related_name='attempts'
+    )
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='exit_ticket_attempts'
+    )
+    session = models.ForeignKey(
+        TutorSession,
+        on_delete=models.CASCADE,
+        related_name='exit_ticket_attempts',
+        null=True,
+        blank=True
+    )
+    
+    score = models.PositiveIntegerField(default=0)
+    passed = models.BooleanField(default=False)
+    
+    # Detailed answers: {question_id: {answer: 'A', correct: True}}
+    answers = models.JSONField(default=dict)
+    
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f"{self.student.username} - {self.exit_ticket.lesson.title}: {self.score}/10"

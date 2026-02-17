@@ -1,0 +1,139 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}{{ course.title }}{% endblock %}
+{% block page_title %}{{ course.title }}{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:curriculum_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1.5rem;">
+    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Back to Curriculum
+</a>
+
+<!-- Course Header -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-body">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                    <h2 style="font-size: 1.5rem;">{{ course.title }}</h2>
+                    {% if course.is_published %}
+                        <span class="badge badge-success">Published</span>
+                    {% else %}
+                        <span class="badge badge-warning">Draft</span>
+                    {% endif %}
+                </div>
+                <p style="color: var(--gray-500);">{{ course.description|default:"No description" }}</p>
+                <div style="margin-top: 0.75rem; display: flex; gap: 1.5rem; font-size: 0.875rem; color: var(--gray-500);">
+                    <span><strong>{{ course.units.count }}</strong> units</span>
+                    <span><strong>{{ course.units.all|length }}</strong> lessons</span>
+                    <span>Grade: <strong>{{ course.grade_level }}</strong></span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-secondary btn-sm">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Edit
+                </button>
+                {% if not course.is_published %}
+                <button class="btn btn-primary btn-sm">Publish</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Units and Lessons -->
+{% for unit in units %}
+<div class="card" style="margin-bottom: 1rem;">
+    <div class="card-header" style="background: var(--gray-50);">
+        <div>
+            <h3 class="card-title">{{ forloop.counter }}. {{ unit.title }}</h3>
+            <p style="font-size: 0.875rem; color: var(--gray-500); margin-top: 0.25rem;">
+                {{ unit.lessons.count }} lesson{{ unit.lessons.count|pluralize }}
+            </p>
+        </div>
+        <button class="btn btn-secondary btn-sm">+ Add Lesson</button>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if unit.lessons.all %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Lesson</th>
+                    <th>Objective</th>
+                    <th style="width: 100px;">Duration</th>
+                    <th style="width: 120px;">Students</th>
+                    <th style="width: 100px;">Status</th>
+                    <th style="width: 80px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lesson in unit.lessons.all %}
+                <tr>
+                    <td style="color: var(--gray-400);">{{ forloop.counter }}</td>
+                    <td>
+                        <span style="font-weight: 500;">{{ lesson.title }}</span>
+                    </td>
+                    <td style="font-size: 0.875rem; color: var(--gray-500);">
+                        {{ lesson.objective|truncatewords:12 }}
+                    </td>
+                    <td>{{ lesson.estimated_minutes }} min</td>
+                    <td>
+                        {% with stats=lesson_stats|default_if_none:lesson.id %}
+                            {% if stats %}
+                                <span style="color: var(--success);">{{ stats.students_mastered }}</span> / 
+                                <span>{{ stats.students_started }}</span>
+                            {% else %}
+                                <span style="color: var(--gray-400);">0 / 0</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td>
+                        {% if lesson.is_published %}
+                            <span class="badge badge-success">Published</span>
+                        {% else %}
+                            <span class="badge badge-warning">Draft</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm">Edit</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <p>No lessons in this unit yet</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% empty %}
+<div class="card">
+    <div class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+        </svg>
+        <h3>No Units Yet</h3>
+        <p>Add units to organize your course content.</p>
+        <button class="btn btn-primary">Add Unit</button>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Add Unit Button -->
+{% if units %}
+<button class="btn btn-secondary" style="margin-top: 1rem;">
+    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Add Unit
+</button>
+{% endif %}
+{% endblock %}

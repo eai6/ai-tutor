@@ -1,0 +1,137 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+<!-- Date Range Filter -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <p style="color: var(--gray-500);">Analytics and insights</p>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="?days=7" class="btn {% if days == 7 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">7 days</a>
+        <a href="?days=30" class="btn {% if days == 30 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">30 days</a>
+        <a href="?days=90" class="btn {% if days == 90 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">90 days</a>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+    <!-- Sessions Over Time -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Sessions Over Time</h3>
+        </div>
+        <div class="card-body">
+            {% if sessions_by_day %}
+            <div style="height: 200px; display: flex; align-items: flex-end; gap: 2px;">
+                {% for day in sessions_by_day %}
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                    <div style="width: 100%; background: var(--primary); border-radius: 2px; min-height: 4px;"
+                         title="{{ day.date }}: {{ day.count }} sessions"
+                         data-count="{{ day.count }}" data-max="{% if sessions_by_day %}{{ sessions_by_day|length }}{% else %}1{% endif %}">
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <script>
+                // Simple bar heights
+                document.querySelectorAll('[data-count]').forEach(bar => {
+                    const max = Math.max(...Array.from(document.querySelectorAll('[data-count]')).map(b => parseInt(b.dataset.count)));
+                    const height = max > 0 ? (parseInt(bar.dataset.count) / max) * 180 : 4;
+                    bar.style.height = Math.max(height, 4) + 'px';
+                });
+            </script>
+            {% else %}
+            <div class="empty-state">
+                <p>No session data for this period</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Top Students -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Top Performing Students</h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if top_students %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th style="text-align: right;">Lessons Mastered</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in top_students %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'dashboard:student_detail' s.student__id %}" style="color: inherit; text-decoration: none;">
+                                {{ s.student__first_name }} {{ s.student__last_name }}
+                            </a>
+                        </td>
+                        <td style="text-align: right;">
+                            <span class="badge badge-success">{{ s.mastered_count }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <p>No mastery data yet</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Lesson Performance -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Lesson Performance</h3>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if lessons %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Lesson</th>
+                    <th>Course</th>
+                    <th style="text-align: center;">Attempts</th>
+                    <th style="text-align: center;">Completions</th>
+                    <th style="width: 150px;">Success Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lesson in lessons %}
+                <tr>
+                    <td style="font-weight: 500;">{{ lesson.title }}</td>
+                    <td style="color: var(--gray-500);">{{ lesson.unit.course.title }}</td>
+                    <td style="text-align: center;">{{ lesson.attempts }}</td>
+                    <td style="text-align: center;">{{ lesson.completions }}</td>
+                    <td>
+                        {% if lesson.attempts > 0 %}
+                            {% widthratio lesson.completions lesson.attempts 100 as rate %}
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div class="progress-bar" style="flex: 1;">
+                                    <div class="progress-fill {% if rate >= 70 %}success{% endif %}" style="width: {{ rate }}%;"></div>
+                                </div>
+                                <span style="font-size: 0.875rem; color: var(--gray-500); min-width: 35px;">{{ rate }}%</span>
+                            </div>
+                        {% else %}
+                            <span style="color: var(--gray-400);">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <p>No lesson data yet</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

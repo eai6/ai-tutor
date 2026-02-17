@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block title %}Terms of Service - AI Tutor{% endblock %}
+
+{% block content %}
+<div class="legal-page">
+    <div class="container">
+        <h1>Terms of Service</h1>
+        <p class="last-updated">Last updated: February 2026</p>
+
+        <section>
+            <h2>1. Acceptance of Terms</h2>
+            <p>By accessing or using AI Tutor, you agree to be bound by these Terms of Service. If you are under 18, you represent that your parent or guardian has reviewed and agreed to these terms.</p>
+        </section>
+
+        <section>
+            <h2>2. Description of Service</h2>
+            <p>AI Tutor provides AI-powered educational tutoring services designed to help students learn and master academic subjects. The service includes:</p>
+            <ul>
+                <li>Interactive tutoring sessions with an AI tutor</li>
+                <li>Curriculum-aligned lesson content</li>
+                <li>Progress tracking and assessments</li>
+                <li>Educational media and resources</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>3. User Accounts</h2>
+            <h3>3.1 Eligibility</h3>
+            <ul>
+                <li>Users must be at least 13 years old to create an account</li>
+                <li>Users under 16 require parental consent</li>
+                <li>Accounts are for individual use only</li>
+            </ul>
+
+            <h3>3.2 Account Security</h3>
+            <p>You are responsible for:</p>
+            <ul>
+                <li>Maintaining the confidentiality of your password</li>
+                <li>All activities under your account</li>
+                <li>Notifying us immediately of unauthorized access</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>4. Acceptable Use</h2>
+            <h3>4.1 You agree NOT to:</h3>
+            <ul>
+                <li>Share inappropriate, harmful, or illegal content</li>
+                <li>Attempt to manipulate or "jailbreak" the AI tutor</li>
+                <li>Share personal information (yours or others')</li>
+                <li>Use the service to cheat on exams or assignments</li>
+                <li>Harass, bully, or harm other users</li>
+                <li>Attempt to access unauthorized areas of the system</li>
+                <li>Use automated tools to access the service</li>
+                <li>Violate any applicable laws or regulations</li>
+            </ul>
+
+            <h3>4.2 You agree to:</h3>
+            <ul>
+                <li>Use the service for legitimate educational purposes</li>
+                <li>Respect the AI tutor's educational boundaries</li>
+                <li>Report any concerning content or behavior</li>
+                <li>Comply with your school's academic integrity policies</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>5. AI Tutor Interactions</h2>
+            <p>You understand that:</p>
+            <ul>
+                <li>The AI tutor is a tool to support learning, not replace teachers</li>
+                <li>AI responses may occasionally contain errors</li>
+                <li>The AI will not help with inappropriate requests</li>
+                <li>Conversations may be monitored for safety purposes</li>
+                <li>The AI cannot provide medical, legal, or professional advice</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>6. Content and Intellectual Property</h2>
+            <p>All content provided by AI Tutor, including lessons, questions, and media, is protected by copyright. You may:</p>
+            <ul>
+                <li>Use content for personal educational purposes</li>
+                <li>Take notes and screenshots for your own study</li>
+            </ul>
+            <p>You may NOT:</p>
+            <ul>
+                <li>Redistribute or sell our content</li>
+                <li>Use content to train other AI systems</li>
+                <li>Remove copyright notices</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>7. Privacy</h2>
+            <p>Your use of the service is also governed by our <a href="{% url 'safety:privacy_policy' %}">Privacy Policy</a>, which explains how we collect and protect your data.</p>
+        </section>
+
+        <section>
+            <h2>8. Safety Measures</h2>
+            <p>To ensure a safe learning environment, we:</p>
+            <ul>
+                <li>Filter all content for age-appropriateness</li>
+                <li>Detect and block harmful requests</li>
+                <li>Rate limit interactions to prevent abuse</li>
+                <li>Monitor for signs of distress and provide resources</li>
+                <li>Comply with child protection laws (COPPA)</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>9. Disclaimers</h2>
+            <ul>
+                <li>The service is provided "as is" without warranties</li>
+                <li>We do not guarantee specific learning outcomes</li>
+                <li>AI responses should be verified with teachers/textbooks</li>
+                <li>Service availability may vary</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>10. Limitation of Liability</h2>
+            <p>To the maximum extent permitted by law, AI Tutor shall not be liable for:</p>
+            <ul>
+                <li>Indirect, incidental, or consequential damages</li>
+                <li>Loss of data or academic performance</li>
+                <li>Actions taken based on AI responses</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>11. Termination</h2>
+            <p>We may suspend or terminate your account if you:</p>
+            <ul>
+                <li>Violate these Terms of Service</li>
+                <li>Engage in harmful or abusive behavior</li>
+                <li>Attempt to manipulate or abuse the AI system</li>
+            </ul>
+            <p>You may delete your account at any time through the Privacy Dashboard.</p>
+        </section>
+
+        <section>
+            <h2>12. Changes to Terms</h2>
+            <p>We may update these terms periodically. Continued use after changes constitutes acceptance of the new terms.</p>
+        </section>
+
+        <section>
+            <h2>13. Governing Law</h2>
+            <p>These terms are governed by the laws of the Republic of Seychelles.</p>
+        </section>
+
+        <section>
+            <h2>14. Contact</h2>
+            <p>For questions about these terms:</p>
+            <ul>
+                <li>Email: legal@aitutor.edu</li>
+            </ul>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.legal-page {
+    padding: 2rem 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.legal-page h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.last-updated {
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.legal-page section {
+    margin-bottom: 2rem;
+}
+
+.legal-page h2 {
+    font-size: 1.25rem;
+    color: #FF6B35;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #FFF0EB;
+    padding-bottom: 0.5rem;
+}
+
+.legal-page h3 {
+    font-size: 1rem;
+    margin: 1rem 0 0.5rem;
+}
+
+.legal-page p {
+    line-height: 1.7;
+    margin-bottom: 1rem;
+}
+
+.legal-page ul {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+}
+
+.legal-page li {
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+}
+
+.legal-page a {
+    color: #FF6B35;
+}
+</style>
+{% endblock %}
