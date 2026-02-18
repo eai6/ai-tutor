@@ -1,8 +1,8 @@
 # System Architecture: Tutoring Engine, Content Pipeline & Data Model
 
-> A detailed analysis of how the step-based tutoring engine works, how curriculum content is generated and stored, how prompts are assembled, and design proposals for evolving the system.
+> A detailed analysis of how the step-based tutoring engine works, how curriculum content is generated and stored, how the RAG knowledge base integrates, and how the teacher dashboard manages the editorial workflow.
 >
-> **Based on codebase at commit `b93e17b`** (February 2026)
+> **Based on codebase at commit `1ae99b8`** (February 2026)
 
 ---
 
@@ -10,9 +10,9 @@
 
 ### 1.1 Tutoring Engine — Step-Based, No Runtime AI
 
-The system uses a single, deterministic tutoring engine (`apps/tutoring/engine.py`, 615 lines). There is **no AI generation during tutoring sessions** — all content is pre-generated and stored in the database. The engine walks through `LessonStep` records in order, grades answers deterministically (or via an optional LLM client for free-text), and serves pre-loaded exit ticket questions.
+The system uses a single, deterministic tutoring engine (`apps/tutoring/engine.py`, 627 lines). There is **no AI generation during tutoring sessions** — all content is pre-generated and stored in the database. The engine walks through `LessonStep` records in order, grades answers deterministically (or via an optional LLM client for free-text), and serves pre-loaded exit ticket questions.
 
-> The old conversational engine with its 5-phase state machine (RETRIEVAL → INSTRUCTION → PRACTICE → EXIT_TICKET → COMPLETE) and artifact protocol is preserved in `engine_backup.py` (1,711 lines) but is not used by any live code path.
+> The old conversational engine with its 5-phase state machine (RETRIEVAL → INSTRUCTION → PRACTICE → EXIT_TICKET → COMPLETE) and artifact protocol is preserved in `engine_backup.py` but is not used by any live code path. The current engine maps old phase names to new ones in `_load_state()` for backward compatibility.
 
 #### Session Phases
 
@@ -28,7 +28,7 @@ stateDiagram-v2
 ```
 
 The `SessionPhase` enum has three values:
-- **`LESSON`** — Walking through `LessonStep` records (TEACH → WORKED_EXAMPLE → PRACTICE → SUMMARY)
+- **`LESSON`** — Walking through `LessonStep` records (any phase: engage, explore, explain, practice, evaluate)
 - **`EXIT_TICKET`** — Serving pre-stored `ExitTicketQuestion` MCQs
 - **`COMPLETED`** — Session finished, mastery evaluated
 
@@ -94,7 +94,7 @@ sequenceDiagram
     E-->>S: Final score + mastery result
 ```
 
-#### Grading (`apps/tutoring/grader.py`, 277 lines)
+#### Grading (`apps/tutoring/grader.py`, 276 lines)
 
 A dedicated grading module routes to the appropriate strategy based on `LessonStep.answer_type`:
 
@@ -133,7 +133,11 @@ The engine is stateless between requests — it loads from `engine_state` on ini
 
 This is the only hardcoded constant. All other behavior (number of steps, number of exit questions, max attempts per step) comes from the database records themselves.
 
-### 1.2 Prompt Assembly (`apps/llm/prompts.py`, 217 lines)
+#### Factory Function
+
+`create_tutor_session(student, lesson, institution)` (line 613) creates a new `TutorSession` with default engine state. This is used by `views.py` when starting sessions.
+
+### 1.2 Prompt Assembly (`apps/llm/prompts.py`, 216 lines)
 
 The prompt assembler exists for potential LLM-based tutoring (currently used only by the streaming endpoint and grader). It builds a two-layer prompt:
 
@@ -164,8 +168,12 @@ erDiagram
     Institution ||--o{ Membership : "has"
     Institution ||--o{ StaffInvitation : "sends"
     Institution ||--o{ CurriculumUpload : "tracks"
+    Institution ||--o{ TeacherClass : "organizes"
     User ||--o{ Membership : "belongs_to"
     User ||--|| StudentProfile : "has (optional)"
+    User ||--o{ TeacherClass : "teaches"
+    TeacherClass }o--o{ User : "enrolls students"
+    TeacherClass }o--o{ Course : "assigns"
     Course ||--o{ Unit : "contains"
     Unit ||--o{ Lesson : "contains"
     Lesson ||--o{ LessonStep : "contains"
@@ -204,16 +212,27 @@ erDiagram
         string school "from SCHOOL_CHOICES"
     }
 
+    TeacherClass {
+        string name
+        string grade_level
+        FK teacher
+        M2M students
+        M2M courses
+        bool is_active
+    }
+
     Lesson {
         string title
         text objective
         int estimated_minutes
         int order_index
         bool is_published
+        json metadata "key_concepts, enabling_objectives, teaching_strategies, etc."
     }
 
     LessonStep {
         enum step_type "teach | worked_example | practice | quiz | summary"
+        string phase "engage | explore | explain | elaborate | evaluate"
         text teacher_script
         text question
         enum answer_type "none | multiple_choice | free_text | short_numeric | true_false"
@@ -225,11 +244,14 @@ erDiagram
         text hint_3
         int max_attempts
         int order_index
+        json media "images, videos, audio with URLs and descriptions"
+        json educational_content "vocabulary, worked_example, formulas, key_points, seychelles_context"
+        json curriculum_context "teaching_strategies, objectives, assessment_criteria, differentiation"
     }
 
     ExitTicket {
         int passing_score "default 8"
-        int time_limit_minutes "default 10"
+        int time_limit_minutes "default 15"
         text instructions
     }
 
@@ -257,9 +279,15 @@ erDiagram
         string file_path
         string subject_name
         string grade_level
-        enum status "pending | processing | completed | failed"
+        enum status "pending | processing | review | media_processing | completed | failed"
+        int current_step "1=extract, 2=vectorize, 3=generate, 4=content"
+        json parsed_data "stores parsed structure between steps"
+        int extracted_text_length
         text processing_log
+        text teacher_feedback
+        int units_created
         int lessons_created
+        int steps_created
     }
 ```
 
@@ -267,92 +295,180 @@ erDiagram
 
 - **`StaffInvitation`** — Invitation-gated staff onboarding. Staff cannot self-register; they must receive a token-based invitation from an admin. Students self-register with school and grade selection.
 - **`StudentProfile.SCHOOL_CHOICES`** — Hardcoded list of 11 Seychelles secondary schools.
-- **`ExitTicket` / `ExitTicketQuestion`** — Standardized 10-question MCQ assessments per lesson. Questions have Bloom's-aligned difficulty tiers (easy/recall, medium/apply, hard/analyze), individual option fields (not JSON), and an optional image. The engine loads these at session start.
+- **`TeacherClass`** — Groups students into teacher-managed classes with assigned courses. Supports per-teacher class management.
+- **`ExitTicket` / `ExitTicketQuestion`** — Standardized 10-question MCQ assessments per lesson. Questions have individual option fields (not JSON), an optional image, and an explanation. The engine loads these at session start.
 - **`TutorSession.engine_state`** (JSONField) — Persists phase, step index, attempt counters, exit ticket score across turns.
-- **`CurriculumUpload`** — Tracks dashboard file uploads with processing status, log, and link to the created Course.
+- **`CurriculumUpload`** — Tracks dashboard file uploads with multi-step processing state, parsed structure for teacher review, processing log, and link to the created Course. Supports statuses: `pending`, `processing`, `review`, `media_processing`, `completed`, `failed`.
+- **`LessonStep.media`** (JSONField) — Structured media: `{images: [{url, alt, caption, type, source, description}], videos: [...], audio: [...]}`. URLs start empty (pending) and are filled during media generation.
+- **`LessonStep.educational_content`** (JSONField) — Enrichment data: vocabulary, worked examples, formulas, key points, common mistakes, real-world connections, Seychelles context.
+- **`LessonStep.curriculum_context`** (JSONField) — RAG-sourced data: teaching strategies, learning objectives, assessment criteria, differentiation guidance.
+- **`LessonStep.phase`** — 5E pedagogical phase marker: engage, explore, explain, elaborate, evaluate.
+- **`Lesson.metadata`** (JSONField) — Stores key concepts, enabling objectives, teaching strategies, resources, and assessment methods from curriculum parsing.
 
-### 1.4 Content Pipelines — Three Paths
+### 1.4 Content Pipeline — Five-Step Architecture
+
+The system has a 5-step pipeline for transforming curriculum documents into tutoring sessions, plus two legacy paths:
 
 ```mermaid
 flowchart TD
-    subgraph "Path 1: seed_seychelles (original)"
+    subgraph "Pipeline: Document Upload (Primary)"
+        UPLOAD["Teacher uploads PDF/DOCX\nvia dashboard"]
+        STEP1["Step 1: PARSE\n(curriculum_parser.py)\nExtract text: PyMuPDF/python-docx"]
+        STEP2["Step 2: VECTORIZE\n(knowledge_base.py)\nChunk + embed into ChromaDB\nall-MiniLM-L6-v2 model"]
+        STEP3["Step 3: GENERATE STRUCTURE\n(pipeline.py or curriculum_parser.py)\nLLM generates units/lessons\nOR regex-based parsing"]
+        REVIEW["PAUSE: Teacher Review\nstatus='review'\nTeacher edits/approves structure"]
+        STEP4["Step 4: CREATE RECORDS\n(pipeline.py / curriculum_parser.py)\nCourse/Unit/Lesson + placeholder steps"]
+        ASYNC["Background async generation\n(background_tasks.py → threading)"]
+        PHASE1["Phase 1: LessonContentGenerator\n(content_generator.py)\n5E model: 8-12 steps per lesson\nWith hints, media descriptions,\neducational content"]
+        PHASE2["Phase 2: DALL-E Media\n(image_service.py)\nGenerate images for step.media"]
+        PHASE3["Phase 3: Exit Tickets\n(background_tasks.py)\n10 MCQ per lesson → ExitTicket model"]
+        UPLOAD --> STEP1 --> STEP2 --> STEP3 --> REVIEW --> STEP4 --> ASYNC
+        ASYNC --> PHASE1 --> PHASE2 --> PHASE3
+    end
+
+    subgraph "Legacy: seed_seychelles"
         SS_IN["Hardcoded Python dicts"]
-        SS_OUT["1 TEACH step per lesson\n(objectives + generic flow)\nNo questions, hints, or media"]
+        SS_OUT["Thin single-TEACH-step lessons\nNo questions, hints, or media"]
         SS_IN --> SS_OUT
     end
 
-    subgraph "Path 2: LessonContentGenerator (generator.py)"
-        GEN_IN["Existing Lesson records\n(from Path 1 or Path 3)"]
-        GEN_AI["LLM generates rich content\n(via injected llm_client)"]
-        GEN_OUT["Multi-step lessons\n(TEACH sections + WORKED_EXAMPLE +\nPRACTICE×5 + SUMMARY)\nWith hints and Seychelles examples\n+ 10 ExitTicket questions"]
-        GEN_IN --> GEN_AI --> GEN_OUT
+    subgraph "Legacy: CLI generation"
+        CLI["generate_lesson_content command\n(management command)"]
+        CLI_GEN["LessonContentGenerator\n(content_generator.py)"]
+        CLI --> CLI_GEN
     end
 
-    subgraph "Path 3: Dashboard upload (web pipeline)"
-        DASH_IN["Teacher uploads PDF/DOCX\nvia web UI"]
-        DASH_AI["LLM parses structure\n(tasks.py)"]
-        DASH_OUT["Thin placeholder lessons\n(is_published=False)\n1 TEACH step: 'Teach about: {objective}'"]
-        DASH_ET["Auto-generate exit tickets\n(generate_exit_ticket_for_lesson)"]
-        DASH_IN --> DASH_AI --> DASH_OUT --> DASH_ET
-    end
-
-    SS_OUT --> GEN_IN
-    DASH_OUT --> GEN_IN
-
-    GEN_OUT --> ENGINE["TutorEngine\n(step-based)"]
-    DASH_ET --> ENGINE
+    PHASE3 --> ENGINE["TutorEngine\n(step-based)"]
+    SS_OUT --> CLI_GEN
+    CLI_GEN --> ENGINE
 ```
 
-#### Path 1: `seed_seychelles` (management command)
+#### Step 1: PARSE — Text Extraction
 
-Hardcoded Python data producing thin single-step lessons. 59 lessons across Geography and Mathematics, each with 1 TEACH step containing objectives and a generic 6-step flow instruction. All content is AI-generated at runtime (or requires Path 2 enrichment for the step-based engine).
+**Two implementations exist** (code duplication):
+- `apps/curriculum/curriculum_parser.py` — `extract_text_from_file()` (primary)
+- `apps/curriculum/pipeline.py` — `extract_text_from_file()` (duplicate)
 
-#### Path 2: `LessonContentGenerator` (`apps/curriculum/generator.py`, 453 lines)
+Both support PDF (PyMuPDF), DOCX (python-docx), and TXT/MD. The `curriculum_parser.py` version also exports table content from DOCX.
 
-A content enrichment class that takes **existing** lessons and generates rich, multi-step content. Unlike the old `CurriculumGenerator` (now in `generator_backup.py`), this does not parse documents or create courses — it enriches lessons that already exist in the database.
+#### Step 2: VECTORIZE — ChromaDB Knowledge Base
 
-**Pipeline:**
-1. Takes an `llm_client` (injected, not hardcoded) and a `Lesson` object
-2. Calls LLM with `LESSON_CONTENT_PROMPT` to generate: teaching sections, worked examples, practice problems (with hints), summary, and image suggestions
-3. Calls LLM with `EXIT_TICKET_PROMPT` to generate 10 MCQ questions
-4. Saves to DB in an atomic transaction: clears existing steps, creates TEACH + WORKED_EXAMPLE + PRACTICE + SUMMARY `LessonStep` records + `ExitTicket` + `ExitTicketQuestion` records
+`apps/curriculum/knowledge_base.py` (`CurriculumKnowledgeBase`, 735 lines) is a **new RAG layer** that provides semantic search over curriculum documents.
 
-**Step types created:**
+**Architecture:**
+- Per-institution data isolation: collection name `curriculum_{institution_id}`
+- Stored at `MEDIA_ROOT/vectordb/institution_{id}/`
+- Embedding model: `all-MiniLM-L6-v2` (via sentence-transformers)
+- Storage: ChromaDB `PersistentClient` (auto-persists)
+- Graceful degradation: if ChromaDB is not installed, all queries return empty results with no crash
 
-| Step Type | Count | Has Question? |
+**Chunking strategy:**
+- Splits text on section boundaries (markdown headers, ALL CAPS headers, numbered sections)
+- Maximum chunk size: ~2000 characters (~500 tokens)
+- Each chunk tagged with `chunk_type`: `objective`, `teaching_strategy`, `assessment`, `resource`, `content`
+
+**Query interfaces:**
+| Method | Use Case | Returns |
 |---|---|---|
-| TEACH | 2-3 (one per teaching section) | No |
-| WORKED_EXAMPLE | 1+ | No |
-| PRACTICE | 5 (mix of MCQ + short answer) | Yes, with 3-level hint ladder |
-| SUMMARY | 1 | No |
+| `query_for_lesson_generation()` | Step 3: structure generation | Curriculum chunks for unit/lesson creation |
+| `query_for_content_generation()` | Step 4: content enrichment | Teaching strategies + related content for step generation |
+| `query_for_tutoring()` | Live sessions (not yet wired) | Context for runtime tutoring |
+
+#### Step 3: GENERATE STRUCTURE — Lesson Structure
+
+**Two parallel implementations:**
+
+1. **`pipeline.py` → `generate_lesson_structure()`** — Queries the knowledge base first, then calls LLM to produce `{units: [{title, lessons: [{title, objective}]}]}`. Used by the main pipeline (`process_curriculum_upload()`).
+
+2. **`curriculum_parser.py` → `parse_curriculum_with_llm()` / `parse_mathematics_curriculum()` / `parse_generic_curriculum()`** — LLM-based parsing with regex fallbacks. Has a dedicated Mathematics parser for Seychelles strand structure (NUMBER, MEASURES, SHAPE AND SPACE, ALGEBRA, HANDLING DATA). Used by the step-by-step processing API (`curriculum_process_api`).
+
+Both produce a `ParsedCurriculum` or JSON structure that is stored in `CurriculumUpload.parsed_data` and presented to the teacher for review.
+
+#### Teacher Review (NEW)
+
+After parsing, the pipeline pauses with `CurriculumUpload.status = 'review'`. The teacher can:
+- View the extracted structure (units and lessons)
+- Edit unit names, lesson titles, and objectives
+- Approve to trigger record creation + background content generation
+- Reject or provide feedback
+
+This review step is served by `curriculum_process` (view) and `curriculum_approve` (POST API).
+
+#### Step 4: CREATE RECORDS — Database Population
+
+Both `pipeline.py:complete_curriculum_upload()` and `curriculum_parser.py:create_curriculum_from_structure()` create Course/Unit/Lesson/LessonStep records. Each lesson gets:
+- `is_published=False`
+- A thin placeholder TEACH step: `"Today we will learn about: {objective}"`
+- `metadata` populated with key concepts, teaching strategies, and the upload ID
+
+#### Background Content Generation (`apps/dashboard/background_tasks.py`, 555 lines)
+
+Uses Python `threading` for non-blocking generation. `run_async(func, *args)` wraps any function in a daemon thread with DB connection cleanup.
+
+**`generate_all_content_async(course_id, upload_id, generate_media)`** runs three phases:
+
+| Phase | What | Module |
+|---|---|---|
+| 1: Tutoring steps | `LessonContentGenerator.generate_for_lesson()` per lesson | `content_generator.py` |
+| 2: Media assets | DALL-E image generation for `step.media['images']` | `image_service.py` |
+| 3: Exit tickets | 10 MCQ per lesson → `ExitTicket`/`ExitTicketQuestion` models | `background_tasks.py` |
+
+Progress is tracked via `CurriculumUpload.processing_log` and rendered in real-time at `/dashboard/curriculum/content-progress/<id>/` and `/dashboard/curriculum/media-progress/<id>/`.
+
+#### Content Generator (`apps/curriculum/content_generator.py`, 798 lines)
+
+`LessonContentGenerator` is the primary content enrichment class. It replaces the old `generator.py` (deleted).
+
+| Aspect | Details |
+|---|---|
+| Constructor | `__init__(self, institution_id)` — resolves LLM client from DB `ModelConfig`, initializes `CurriculumKnowledgeBase` |
+| Pedagogical model | **5E model**: Engage (1-2 steps), Explore (2-3), Explain (2-3), Practice (3-4), Evaluate (1-2) = 8-12 steps total |
+| KB integration | Queries `CurriculumKnowledgeBase.query_for_content_generation()` for teaching strategies and related curriculum chunks |
+| Step types generated | `teach`, `worked_example`, `practice`, `quiz` |
+| Hints | 3-level hint ladder per practice/quiz step |
+| Media | Generates `media` JSON per step with image descriptions (URLs filled later by DALL-E phase) |
+| Educational content | Populates `educational_content` JSONField: vocabulary, worked examples, key points, Seychelles context |
+| Exit tickets | Saves 3-5 questions to `Lesson.metadata['exit_ticket']` as JSON |
+| Save strategy | `update_or_create` by `order_index` (does NOT clear existing steps) |
 
 **Batch helpers:**
-- `generate_content_for_course(course_id)` — Iterates all lessons in a course
-- `generate_content_for_lesson(lesson_id)` — Single lesson enrichment
+- `generate_content_for_course(course_id, force)` — Iterates all units/lessons in a course
+- `generate_content_for_unit(unit_id, force)` — All lessons in a unit
+- `generate_content_for_lesson(lesson_id, force)` — Single lesson enrichment
 
-Both resolve `ModelConfig` from the database (no hardcoded model).
+**`MediaGenerationService`** (also in `content_generator.py`) — Looks up existing media library assets or delegates to `ImageGenerationService` for DALL-E generation.
 
-#### Path 3: Dashboard upload (`apps/dashboard/tasks.py`, 459 lines)
+#### Image Service (`apps/tutoring/image_service.py`, 180 lines)
 
-A web-facing pipeline:
-1. Teacher uploads PDF/DOCX via the dashboard
-2. `CurriculumUpload` record created with `status=pending`
-3. `process_curriculum_upload()` extracts text (PyMuPDF/pdfplumber/python-docx), calls LLM for structure, creates Course/Unit/Lesson records
-4. Lessons are created with `is_published=False` and a thin placeholder TEACH step (`"Teach about: {objective}"`)
-5. **Auto-generates exit tickets** for each lesson via `generate_exit_ticket_for_lesson()`
-6. Teacher reviews in the dashboard before publishing
+`ImageGenerationService` handles DALL-E image generation:
+- Constructor: `__init__(lesson=None, institution=None)`
+- `get_or_generate_image(prompt, category, **kwargs)` — Always generates fresh with DALL-E (no library fallback)
+- `_enhance_prompt()` — Prepends educational context (hardcoded: "secondary school students in Seychelles")
+- Generated images saved as `MediaAsset` records with unique filenames (`generated_{hash}.png`)
+- Accepts `**kwargs` for backward compatibility (silently ignores `prefer_existing`, `generate_only`)
 
-**`generate_lesson_content()` exists but is not wired** — The function (line 223) can enrich a placeholder lesson with full teaching content, but it is not called during `process_curriculum_upload()` or from any dashboard view. It remains a standalone function.
+#### Dashboard Tasks (`apps/dashboard/tasks.py`, 217 lines)
 
-#### Post-generation: `generate_exit_tickets` management command
+Now a **thin delegation layer** — all inline logic has been extracted to `pipeline.py`, `curriculum_parser.py`, and `content_generator.py`:
 
-A CLI command (`apps/tutoring/management/commands/generate_exit_tickets.py`) that generates standardized 10-question exit tickets:
-- Supports `--lesson`, `--course`, or `--all` targeting
-- Uses active `ModelConfig` from the database
-- Bloom's-aligned difficulty distribution (Q1-3 easy, Q4-7 medium, Q8-10 hard)
-- Supports `--dry-run` and `--overwrite`
+| Function | Delegates to |
+|---|---|
+| `process_curriculum_upload()` | `curriculum.pipeline.process_curriculum_upload` |
+| `generate_content_for_course()` | `content_generator.generate_content_for_course` |
+| `generate_media_for_course()` | `ImageGenerationService.get_or_generate_image()` |
+| `regenerate_lesson_content()` | `content_generator.generate_content_for_lesson` |
 
-> The dashboard upload (Path 3) now calls `generate_exit_ticket_for_lesson()` directly, so this command is mainly useful for enriching Path 1 (seed) lessons.
+Legacy wrappers preserved for backward compatibility: `extract_text_from_file()`, `parse_curriculum_with_ai()`, `create_curriculum_from_structure()`, `generate_exit_ticket_for_lesson()`.
+
+#### Management Commands
+
+| Command | File | Purpose | Status |
+|---|---|---|---|
+| `generate_content` | `apps/curriculum/management/commands/generate_content.py` (123 lines) | `--lesson N \| --course N \| --all` | **BUG**: Calls `LessonContentGenerator(llm_client)` with wrong constructor signature |
+| `generate_lesson_content` | `apps/curriculum/management/commands/generate_lesson_content.py` (144 lines) | `--lesson-id N \| --course-id N` | Working. Supports `--dry-run`, `--force`, `--limit` |
+| `generate_exit_tickets` | `apps/tutoring/management/commands/generate_exit_tickets.py` | `--lesson \| --course \| --all` | Working. Bloom's-aligned difficulty distribution |
+| `seed_seychelles` | `apps/curriculum/management/commands/seed_seychelles.py` | Hardcoded Seychelles Geography + Mathematics seed data | Working. Produces thin single-step lessons |
+| `generate_media` | `apps/curriculum/management/commands/generate_media.py` | DALL-E image generation for courses | Working |
 
 ### 1.5 Authentication & Routing
 
@@ -376,7 +492,7 @@ A CLI command (`apps/tutoring/management/commands/generate_exit_tickets.py`) tha
 - **Staff**: Must receive invitation token → register via token link → assigned to invitation's institution with invitation's role → redirected to dashboard
 - **Role-based redirect**: `redirect_by_role()` sends staff to dashboard, students to catalog
 
-### 1.6 Views Layer (`apps/tutoring/views.py`, 812 lines)
+### 1.6 Views Layer — Tutoring (`apps/tutoring/views.py`, 828 lines)
 
 | Endpoint | Method | Purpose |
 |---|---|---|
@@ -387,7 +503,7 @@ A CLI command (`apps/tutoring/management/commands/generate_exit_tickets.py`) tha
 | `advance_step` | POST | Advance to next non-question step |
 | `session_status` | GET | Current session state |
 | `tutor_interface` | GET | HTML tutoring page |
-| `submit_answer_stream` | POST | SSE streaming endpoint |
+| `submit_answer_stream` | POST | SSE streaming endpoint (uses step-based engine, not LLM) |
 | `generate_image` | POST | DALL-E image generation on demand |
 
 **Safety integration in `submit_answer`:**
@@ -398,21 +514,54 @@ A CLI command (`apps/tutoring/management/commands/generate_exit_tickets.py`) tha
 
 **Structured session endpoints** (`tutor_interface_v2`, `start_structured_session`, `structured_session_input`, `structured_session_input_stream`) import from `apps.tutoring.structured_engine.StructuredSessionEngine` which does not exist in the codebase — these are non-functional stubs.
 
-### 1.7 Dashboard (`apps/dashboard/views.py`, 615 lines)
+### 1.7 Dashboard — Full Editorial CMS (`apps/dashboard/views.py`, 1,699 lines)
+
+The dashboard has evolved into a full content management system with 24 URL patterns:
+
+#### Overview & Analytics
 
 | View | Purpose |
 |---|---|
 | `dashboard_home` | Overview metrics: active students, sessions, mastery rates, activity chart |
 | `student_list` | Paginated student list with progress summary |
 | `student_detail` | Individual student's progress across all courses |
-| `curriculum_list` | All courses with lesson counts (published vs total) |
-| `course_detail` | Read-only view of units and lessons with per-lesson progress stats |
-| `curriculum_upload` | Upload PDF/DOCX to auto-generate course structure |
-| `curriculum_process` | Show processing progress/results |
-| `curriculum_generate` | API to trigger `process_curriculum_upload()` |
-| `class_list` | Students grouped by grade |
 | `reports_overview` | Sessions by day, top students, lesson completion rates |
 | `settings_page` | Edit institution name and timezone |
+| `class_list` | Students grouped by grade |
+
+#### Curriculum Management
+
+| View | Purpose |
+|---|---|
+| `curriculum_list` | All courses with lesson counts (published vs total) |
+| `course_detail` | Units and lessons with per-lesson content stats, media stats, exit ticket status |
+| `curriculum_upload` | Upload PDF/DOCX to start curriculum processing pipeline |
+| `curriculum_process` | Show processing progress/results, display parsed structure for review |
+| `curriculum_generate` | API to trigger `process_curriculum_upload()` |
+| `curriculum_approve` | Teacher reviews/edits parsed structure, approves, triggers async content generation |
+| `curriculum_process_api` | Step-by-step processing API (extract → parse → create_lessons → save) |
+
+#### Content Editorial
+
+| View | Purpose |
+|---|---|
+| `lesson_detail` | View lesson steps, media, exit ticket, student completion stats |
+| `lesson_regenerate` | Delete existing steps + exit ticket, regenerate everything |
+| `lesson_generate_content` | Generate content for a lesson that has none |
+| `lesson_publish` | Toggle lesson publish status |
+| `step_edit` | Edit a lesson step: phase, type, content, question, choices, hints |
+| `unit_create` | Create a new unit in a course |
+| `lesson_create` | Create a new lesson in a unit |
+
+#### Bulk Operations
+
+| View | Purpose |
+|---|---|
+| `course_generate_all` | Trigger background generation for entire course (steps + media + exit tickets) |
+| `course_generate_media` | Trigger background media-only generation with `force_regenerate` option |
+| `course_publish_all` | Publish all lessons that have content (steps >= 5) |
+| `content_progress` | Real-time content generation progress (polls `CurriculumUpload.processing_log`) |
+| `media_progress` | Real-time media generation progress |
 
 ---
 
@@ -422,59 +571,55 @@ A CLI command (`apps/tutoring/management/commands/generate_exit_tickets.py`) tha
 
 Localization is hardcoded in multiple files across the codebase. Deploying to a different country requires code changes, not data changes.
 
-| File | What | Line(s) |
+| File | What | Location |
 |---|---|---|
-| `apps/curriculum/generator.py` | `LESSON_CONTENT_PROMPT` — "Seychelles secondary school students", "Seychelles context", "seychelles_example" fields | 26, 43, 49, 61, 104, 122 |
-| `apps/curriculum/generator.py` | `_format_teaching_script()` — "Example from Seychelles" | 357 |
-| `apps/dashboard/tasks.py` | `generate_lesson_content()` — "students in Seychelles", "Seychelles examples", "Seychelles secondary students" | 237, 246, 271 |
-| `apps/dashboard/tasks.py` | `generate_exit_ticket_for_lesson()` — "Seychelles secondary school students" | 330 |
-| `apps/tutoring/image_service.py` | DALL-E prompt — "secondary school students in Seychelles" | 243 |
-| `apps/tutoring/management/commands/generate_exit_tickets.py` | Exit ticket prompt — "Seychelles secondary school students" | 32 |
-| `apps/accounts/models.py` | `StudentProfile.SCHOOL_CHOICES` — 11 hardcoded Seychelles school names | 84-98 |
+| `apps/curriculum/content_generator.py` | `_default_strategies()` — "Seychelles context", "SCR currency", "local measurements" | lines 203-226 |
+| `apps/curriculum/content_generator.py` | `_generate_steps()` prompt — "Seychelles secondary school", "SCR currency, local places" | lines 245, 367 |
+| `apps/curriculum/curriculum_parser.py` | `parse_mathematics_curriculum()` — "Seychelles secondary schools", "Seychelles context" | lines 222-237 |
+| `apps/tutoring/image_service.py` | `_enhance_prompt()` — "secondary school students in Seychelles" | line 119 |
+| `apps/tutoring/management/commands/generate_exit_tickets.py` | Exit ticket prompt — "Seychelles secondary school students" | ~line 32 |
+| `apps/accounts/models.py` | `StudentProfile.SCHOOL_CHOICES` — 11 hardcoded Seychelles school names | lines 84-98 |
 | `apps/curriculum/management/commands/seed_seychelles.py` | Entire file — Seychelles-specific seed data | throughout |
 
 **Proposal:** Add an `Institution.localization_context` TextField (or JSONField) carrying place names, currency, industries, school names, and cultural references. Inject this into all generation prompts dynamically. The `SCHOOL_CHOICES` on `StudentProfile` should also come from the institution or be configurable.
 
-### Issue 2: Content Pipeline Fragmentation
+### Issue 2: Exit Ticket Storage Inconsistency
 
-Three paths exist for creating curriculum content, with overlapping but inconsistent capabilities:
+Two different paths store exit tickets differently:
 
-| Concern | `generator.py` | `tasks.py` (Dashboard) | `seed_seychelles` |
-|---|---|---|---|
-| Who triggers | Developer/CLI | Teacher (web upload) | Developer (management command) |
-| Creates courses | No (enriches existing) | Yes (from document) | Yes (hardcoded) |
-| Content richness | Full (multi-step, hints, exit tickets) | Thin (placeholder + exit ticket) | Thin (single TEACH step) |
-| Published by default | Preserves existing | No (`is_published=False`) | Yes |
-| LLM model | From DB (`ModelConfig`) | From DB (`ModelConfig`) | N/A |
-| Exit ticket generation | Built-in | Auto-generated during upload | Requires separate command |
+| Path | Storage | Format |
+|---|---|---|
+| `content_generator.py:_save_exit_ticket()` | `Lesson.metadata['exit_ticket']` (JSON) | 3-5 questions, mixed types (MCQ + T/F + numeric) |
+| `background_tasks.py:generate_exit_tickets_for_lessons()` | `ExitTicket` + `ExitTicketQuestion` models | 10 MCQ questions |
+| `dashboard/views.py:generate_exit_ticket_for_lesson()` | `ExitTicket` + `ExitTicketQuestion` models | 10 MCQ questions |
 
-**Proposals:**
-1. **Wire `generate_lesson_content()` into the dashboard** — Add a "Generate rich content" button that calls `LessonContentGenerator.generate_for_lesson()` for selected lessons
-2. **Add content editing to the dashboard** — `course_detail` is read-only. Add edit capabilities for lesson steps and exit ticket questions to complete the editorial loop: upload → generate → review → publish
-3. **Unify** the generation logic — `generator.py`'s `LessonContentGenerator` and `tasks.py`'s `generate_lesson_content()` overlap. The generator is more complete; the tasks.py version should delegate to it.
+The engine only reads from the `ExitTicket`/`ExitTicketQuestion` models. Exit tickets stored in `Lesson.metadata` by `content_generator.py` are **invisible to the engine**.
 
-### Issue 3: `PromptPack` Teaching Style Is Unused in Step-Based Mode
+**Proposal:** `content_generator.py:_save_exit_ticket()` should save to the `ExitTicket`/`ExitTicketQuestion` models instead of `Lesson.metadata`. Or remove exit ticket generation from `content_generator.py` entirely and rely on the background task Phase 3.
 
-The step-based engine serves content directly from `LessonStep.teacher_script` without consulting `PromptPack.teaching_style_prompt`. This means:
-- An admin editing the teaching methodology in `PromptPack` has **no effect** on step-based sessions
-- The `PromptPack` is only meaningful if the streaming endpoint or LLM grader is used
-- The science-of-learning principles that `PromptPack` encodes are disconnected from the primary delivery path
+### Issue 3: `generate_content` Management Command Bug
 
-**Proposal:** Either:
-- (a) Inject `PromptPack` principles into the content generation prompts (so the stored content reflects the methodology), or
-- (b) Add an optional LLM "presentation layer" that takes `teacher_script` + `PromptPack.teaching_style_prompt` and produces the final student-facing message at session time
+`apps/curriculum/management/commands/generate_content.py` (line 58) calls `LessonContentGenerator(llm_client)` with the old constructor signature. The new constructor expects `institution_id`, not an `llm_client`. This command will fail at runtime with a `TypeError`.
 
-### Issue 4: `ChildProtection` Module Exists but Is Not Wired into Prompt Assembly
+**Fix:** Change to `LessonContentGenerator(institution_id=institution_id)` matching the working `generate_lesson_content` command.
 
-`apps/safety/__init__.py` defines `ChildProtection.get_age_appropriate_system_prompt()` which returns a child-safety prompt addendum. Neither `prompts.py` nor the engine calls it. The safety prompt in the `PromptPack` is static, while `ChildProtection` has dynamic, age-aware logic that is never injected.
+### Issue 4: `MediaGenerationService` References Non-Existent Method
 
-**Proposal:** Both `assemble_system_prompt()` in `prompts.py` and any future LLM-using path should call this method and append the result.
+`content_generator.py:639` calls `service.generate_educational_image(prompt, style)` which does not exist on `ImageGenerationService`. The actual method is `get_or_generate_image(prompt, category)`.
 
-### Issue 5: Streaming Endpoint Bug
+### Issue 5: Code Duplication — Text Extraction
 
-`submit_answer_stream` at `views.py:541` calls `engine.process_student_answer(safe_answer)` — but the method on `TutorEngine` is `process_answer()`, not `process_student_answer()`. This will raise `AttributeError` at runtime.
+`extract_text_from_file()` is duplicated between `curriculum_parser.py` and `pipeline.py` with identical implementations.
 
-### Issue 6: Structured Session Stubs Reference Non-Existent Module
+### Issue 6: `PromptPack` Teaching Style Is Unused in Step-Based Mode
+
+The step-based engine serves content directly from `LessonStep.teacher_script` without consulting `PromptPack.teaching_style_prompt`. An admin editing the teaching methodology in `PromptPack` has **no effect** on step-based sessions.
+
+### Issue 7: `ChildProtection` Module Exists but Is Not Wired into Prompt Assembly
+
+`apps/safety/__init__.py` defines `ChildProtection.get_age_appropriate_system_prompt()` which returns a child-safety prompt addendum. Neither `prompts.py` nor the engine calls it.
+
+### Issue 8: Structured Session Stubs Reference Non-Existent Module
 
 Four views (`tutor_interface_v2`, `start_structured_session`, `structured_session_input`, `structured_session_input_stream`) import from `apps.tutoring.structured_engine.StructuredSessionEngine` which does not exist. These endpoints will fail with `ImportError`.
 
@@ -485,16 +630,18 @@ Four views (`tutor_interface_v2`, `start_structured_session`, `structured_sessio
 ```mermaid
 flowchart TD
     subgraph "Phase 1: Fix & Consolidate"
-        FIX_STREAM["Fix streaming endpoint\n(process_student_answer → process_answer)"]
+        FIX_CMD["Fix generate_content command\n(wrong constructor signature)"]
+        FIX_MEDIA["Fix MediaGenerationService\n(non-existent method call)"]
+        FIX_EXIT["Unify exit ticket storage\n(always use ExitTicket model)"]
+        DEDUP["Deduplicate extract_text_from_file\n(pipeline.py → curriculum_parser.py)"]
         LOC["Add Institution.localization_context\n(eliminate hardcoded Seychelles refs)"]
-        UNIFY["Unify generator.py + tasks.py\ngeneration logic"]
         WIRE_SAFETY["Wire ChildProtection\ninto prompt assembly"]
     end
 
-    subgraph "Phase 2: Complete Editorial Workflow"
-        EDIT_UI["Add content editing\nto dashboard"]
-        GEN_BTN["Wire LessonContentGenerator\ninto dashboard UI"]
-        PUBLISH["Complete publish flow:\nupload → generate → review → publish"]
+    subgraph "Phase 2: Strengthen Pipeline"
+        CELERY["Replace threading with Celery\n(production-grade async)"]
+        VECTORIZE_AUTO["Auto-vectorize on upload\n(make Step 2 always run)"]
+        KB_LIVE["Wire KB into live tutoring\n(query_for_tutoring → engine)"]
     end
 
     subgraph "Phase 3: Configurable Pedagogy"
@@ -503,40 +650,28 @@ flowchart TD
         PRES_LAYER["Optional LLM presentation layer\n(apply PromptPack style to stored content)"]
     end
 
-    subgraph "Phase 4: Content Bank"
-        CONTENT_MODEL["Extend ExitTicket pattern\nto all content types"]
-        FEEDBACK["Transcript → curation\nfeedback loop"]
-    end
-
-    FIX_STREAM --> LOC
-    LOC --> UNIFY
-    UNIFY --> WIRE_SAFETY
-
-    WIRE_SAFETY --> EDIT_UI
-    EDIT_UI --> GEN_BTN
-    GEN_BTN --> PUBLISH
-
-    PUBLISH --> SCONFIG
-    SCONFIG --> PRINC
-    PRINC --> PRES_LAYER
-
-    PUBLISH --> CONTENT_MODEL
-    CONTENT_MODEL --> FEEDBACK
+    FIX_CMD --> FIX_MEDIA --> FIX_EXIT --> DEDUP --> LOC --> WIRE_SAFETY
+    WIRE_SAFETY --> CELERY --> VECTORIZE_AUTO --> KB_LIVE
+    KB_LIVE --> SCONFIG --> PRINC --> PRES_LAYER
 
     subgraph "Existing Infrastructure"
         ET["ExitTicket model"]
-        DASH["Teacher dashboard"]
+        DASH["Teacher dashboard (CMS)"]
         ENGINE["Step-based engine"]
         MEDIA["MediaAsset pipeline"]
         SAFETY["Safety module"]
         GRADER["Grader module"]
         AUTH["Role-based auth"]
+        KB["ChromaDB knowledge base"]
+        BG["Background task runner"]
     end
 
-    ET -.-> CONTENT_MODEL
-    DASH -.-> EDIT_UI
+    ET -.-> FIX_EXIT
+    DASH -.-> CELERY
     ENGINE -.-> SCONFIG
     SAFETY -.-> WIRE_SAFETY
+    KB -.-> KB_LIVE
+    BG -.-> CELERY
 ```
 
 ---
@@ -545,25 +680,33 @@ flowchart TD
 
 | File | Lines | Purpose |
 |---|---|---|
-| `apps/tutoring/engine.py` | 615 | Step-based tutoring engine (LESSON → EXIT_TICKET → COMPLETED) |
-| `apps/tutoring/engine_backup.py` | 1,711 | Old conversational engine (backup, not used) |
-| `apps/tutoring/grader.py` | 277 | Answer grading (exact match, numeric, T/F, LLM rubric) |
-| `apps/tutoring/models.py` | 353 | TutorSession, SessionTurn, StudentLessonProgress, ExitTicket* |
-| `apps/tutoring/views.py` | 812 | Tutoring endpoints + safety integration |
-| `apps/tutoring/image_service.py` | 304 | DALL-E image generation |
-| `apps/tutoring/management/commands/generate_exit_tickets.py` | ~199 | CLI exit ticket generation |
-| `apps/curriculum/generator.py` | 453 | LessonContentGenerator (content enrichment) |
-| `apps/curriculum/generator_backup.py` | 603 | Old CurriculumGenerator (backup, not used) |
-| `apps/llm/prompts.py` | 217 | Prompt assembly (system + step context) |
-| `apps/dashboard/views.py` | 615 | Staff dashboard (metrics, curriculum, students) |
-| `apps/dashboard/models.py` | 110 | CurriculumUpload |
-| `apps/dashboard/tasks.py` | 459 | Curriculum parsing + upload processing |
-| `apps/accounts/models.py` | 176 | Institution, Membership, StudentProfile, StaffInvitation |
-| `apps/accounts/views.py` | 397 | Role-based auth (student self-register, staff invitation) |
+| **Tutoring** | | |
+| `apps/tutoring/engine.py` | 627 | Step-based tutoring engine (LESSON → EXIT_TICKET → COMPLETED) |
+| `apps/tutoring/grader.py` | 276 | Answer grading (exact match, numeric, T/F, LLM rubric) |
+| `apps/tutoring/models.py` | 352 | TutorSession, SessionTurn, StudentLessonProgress, ExitTicket* |
+| `apps/tutoring/views.py` | 828 | Tutoring endpoints + safety integration + streaming |
+| `apps/tutoring/image_service.py` | 180 | DALL-E image generation |
+| **Curriculum** | | |
+| `apps/curriculum/models.py` | 354 | Course, Unit, Lesson, LessonStep (with media/educational/curriculum JSON fields) |
+| `apps/curriculum/content_generator.py` | 798 | LessonContentGenerator (5E model, KB-integrated) + MediaGenerationService |
+| `apps/curriculum/curriculum_parser.py` | 964 | Document parsing (regex + LLM), DB record creation, upload processing |
+| `apps/curriculum/knowledge_base.py` | 735 | ChromaDB RAG layer (vectorize, query for generation/tutoring) |
+| `apps/curriculum/pipeline.py` | 874 | 5-step pipeline orchestration (parse → vectorize → generate → review → create) |
+| **Dashboard** | | |
+| `apps/dashboard/views.py` | 1,699 | Full editorial CMS (24 URL patterns) |
+| `apps/dashboard/models.py` | 119 | CurriculumUpload, TeacherClass |
+| `apps/dashboard/tasks.py` | 217 | Thin delegation layer to pipeline/generator |
+| `apps/dashboard/background_tasks.py` | 555 | Threading-based async task runner (content + media + exit tickets) |
+| **LLM** | | |
+| `apps/llm/prompts.py` | 216 | Prompt assembly (system + step context) |
+| **Accounts** | | |
+| `apps/accounts/models.py` | 175 | Institution, Membership, StudentProfile, StaffInvitation |
+| `apps/accounts/views.py` | 396 | Role-based auth (student self-register, staff invitation) |
+| **Safety** | | |
 | `apps/safety/__init__.py` | 543 | ContentSafetyFilter, RateLimiter, ChildProtection |
 | `apps/safety/models.py` | 99 | SafetyAuditLog, consent tracking |
 | `apps/safety/views.py` | 197 | Privacy dashboard |
 
 ---
 
-*Generated February 2026. Based on analysis of the ai-tutor repository at commit `b93e17b`.*
+*Generated February 2026. Based on analysis of the ai-tutor repository at commit `1ae99b8`.*
