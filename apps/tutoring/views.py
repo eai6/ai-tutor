@@ -394,9 +394,9 @@ def lesson_catalog(request):
         in_progress_lessons = 0
         
         units_data = []
-        for unit in course.units.all():
+        for unit in course.units.all().order_by('order_index'):
             unit_lessons = []
-            for lesson in unit.lessons.filter(is_published=True):
+            for lesson in unit.lessons.filter(is_published=True).order_by('order_index'):
                 total_lessons += 1
                 
                 # Check progress
@@ -437,7 +437,10 @@ def lesson_catalog(request):
             'progress_percent': int((completed_lessons / total_lessons * 100)) if total_lessons > 0 else 0,
             'units': units_data,
         }
-        subjects.append(subject_data)
+        
+        # Only add courses that have at least 1 published lesson
+        if total_lessons > 0:
+            subjects.append(subject_data)
         
         if selected_subject_id and str(course.id) == selected_subject_id:
             selected_subject = subject_data
@@ -827,3 +830,357 @@ def structured_session_input_stream(request, session_id):
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
+
+
+# =============================================================================
+# V3 API - Clean Tutor Engine
+# =============================================================================
+
+@login_required
+def tutor_interface_v3(request, lesson_id):
+    """Render the clean tutoring interface."""
+    institution = get_user_institution(request.user)
+    if not institution:
+        return render(request, 'tutoring/error.html', {"message": "No institution"})
+    
+    lesson = get_object_or_404(
+        Lesson,
+        id=lesson_id,
+        unit__course__institution=institution,
+        is_published=True
+    )
+    
+    # Get step count for template
+    total_steps = lesson.steps.count()
+    
+    return render(request, 'tutoring/session_clean.html', {
+        "lesson": lesson,
+        "total_steps": total_steps,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def start_session_v3(request, lesson_id):
+    """Start or resume a tutoring session using clean engine."""
+    from apps.tutoring.engine import TutorEngine, create_tutor_session
+    
+    institution = get_user_institution(request.user)
+    if not institution:
+        return JsonResponse({"error": "No institution membership"}, status=403)
+    
+    lesson = get_object_or_404(
+        Lesson,
+        id=lesson_id,
+        unit__course__institution=institution,
+        is_published=True
+    )
+    
+    # Check for existing active session
+    existing = TutorSession.objects.filter(
+        student=request.user,
+        lesson=lesson,
+        status=TutorSession.Status.ACTIVE
+    ).first()
+    
+    is_resume = False
+    if existing:
+        session = existing
+        is_resume = True
+    else:
+        session = create_tutor_session(
+            student=request.user,
+            lesson=lesson,
+            institution=institution,
+        )
+    
+    # Use engine
+    engine = TutorEngine(session)
+    
+    if is_resume:
+        response = engine.resume()
+    else:
+        response = engine.start()
+    
+    # Get media for current step
+    current_step = engine.current_step
+    media = []
+    if current_step and current_step.media:
+        for img in current_step.media.get('images', []):
+            if img.get('url'):
+                media.append({
+                    'type': 'image',
+                    'url': img['url'],
+                    'alt': img.get('alt', ''),
+                    'caption': img.get('caption', ''),
+                })
+    
+    return JsonResponse({
+        "session_id": session.id,
+        "message": response.message,
+        "step_index": response.step_index,
+        "total_steps": len(engine.steps),
+        "phase": response.phase,
+        "media": media,
+        "is_question": response.is_waiting_for_answer,
+        "question_type": response.step_type if response.is_waiting_for_answer else "",
+        "choices": response.question.get('choices', []) if response.question else [],
+        "awaiting_response": response.is_waiting_for_answer,
+        "is_complete": response.is_session_complete,
+        "mastery_achieved": response.mastery_achieved,
+        "exit_ticket": None,
+        "is_resume": is_resume,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def session_input_v3(request, session_id):
+    """Handle student input in tutoring session."""
+    from apps.tutoring.engine import TutorEngine
+    
+    session = get_object_or_404(
+        TutorSession,
+        id=session_id,
+        student=request.user,
+        status=TutorSession.Status.ACTIVE
+    )
+    
+    try:
+        data = json.loads(request.body)
+        user_input = data.get("input", "").strip()
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    if not user_input:
+        return JsonResponse({"error": "Input required"}, status=400)
+    
+    engine = TutorEngine(session)
+    response = engine.process_answer(user_input)
+    
+    # Get media for current step
+    current_step = engine.current_step
+    media = []
+    if current_step and current_step.media:
+        for img in current_step.media.get('images', []):
+            if img.get('url'):
+                media.append({
+                    'type': 'image',
+                    'url': img['url'],
+                    'alt': img.get('alt', ''),
+                    'caption': img.get('caption', ''),
+                })
+    
+    return JsonResponse({
+        "message": response.message,
+        "step_index": response.step_index,
+        "total_steps": len(engine.steps),
+        "phase": response.phase,
+        "media": media,
+        "is_question": response.is_waiting_for_answer,
+        "question_type": response.step_type if response.is_waiting_for_answer else "",
+        "choices": response.question.get('choices', []) if response.question else [],
+        "awaiting_response": response.is_waiting_for_answer,
+        "is_complete": response.is_session_complete,
+        "mastery_achieved": response.mastery_achieved,
+        "is_correct": response.grading.result.value == 'correct' if response.grading else None,
+        "feedback": response.grading.feedback if response.grading else "",
+        "hint": response.hint or "",
+        "exit_ticket": None,
+        "attempts_remaining": response.attempts_remaining,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def session_advance_v3(request, session_id):
+    """Advance to next step (for non-question steps)."""
+    from apps.tutoring.engine import TutorEngine
+    
+    session = get_object_or_404(
+        TutorSession,
+        id=session_id,
+        student=request.user,
+        status=TutorSession.Status.ACTIVE
+    )
+    
+    engine = TutorEngine(session)
+    response = engine.advance()
+    
+    # Get media for current step
+    current_step = engine.current_step
+    media = []
+    if current_step and current_step.media:
+        for img in current_step.media.get('images', []):
+            if img.get('url'):
+                media.append({
+                    'type': 'image',
+                    'url': img['url'],
+                    'alt': img.get('alt', ''),
+                    'caption': img.get('caption', ''),
+                })
+    
+    return JsonResponse({
+        "message": response.message,
+        "step_index": response.step_index,
+        "total_steps": len(engine.steps),
+        "phase": response.phase,
+        "media": media,
+        "is_question": response.is_waiting_for_answer,
+        "question_type": response.step_type if response.is_waiting_for_answer else "",
+        "choices": response.question.get('choices', []) if response.question else [],
+        "awaiting_response": response.is_waiting_for_answer,
+        "is_complete": response.is_session_complete,
+        "mastery_achieved": response.mastery_achieved,
+        "exit_ticket": None,
+    })
+
+
+# =============================================================================
+# CHAT-BASED CONVERSATIONAL AI TUTOR API
+# =============================================================================
+
+@login_required
+def chat_tutor_interface(request, lesson_id):
+    """Render the chat-based tutoring interface."""
+    institution = get_user_institution(request.user)
+    if not institution:
+        return render(request, 'tutoring/error.html', {"message": "No institution"})
+    
+    lesson = get_object_or_404(
+        Lesson,
+        id=lesson_id,
+        unit__course__institution=institution,
+        is_published=True
+    )
+    
+    return render(request, 'tutoring/chat_tutor.html', {
+        "lesson": lesson,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def chat_start_session(request, lesson_id):
+    """Start or resume a conversational tutoring session."""
+    from apps.tutoring.conversational_tutor import ConversationalTutor
+    
+    institution = get_user_institution(request.user)
+    if not institution:
+        return JsonResponse({"error": "No institution membership"}, status=403)
+    
+    lesson = get_object_or_404(
+        Lesson,
+        id=lesson_id,
+        unit__course__institution=institution,
+        is_published=True
+    )
+    
+    # Check for existing active session
+    existing = TutorSession.objects.filter(
+        student=request.user,
+        lesson=lesson,
+        status=TutorSession.Status.ACTIVE
+    ).first()
+    
+    if existing:
+        session = existing
+        tutor = ConversationalTutor(session)
+        response = tutor.resume()
+    else:
+        # Create new session
+        session = TutorSession.objects.create(
+            student=request.user,
+            lesson=lesson,
+            institution=institution,
+            status=TutorSession.Status.ACTIVE,
+        )
+        tutor = ConversationalTutor(session)
+        response = tutor.start()
+    
+    return JsonResponse({
+        "session_id": session.id,
+        "message": response.content,
+        "phase": response.phase,
+        "media": response.media,
+        "show_exit_ticket": response.show_exit_ticket,
+        "exit_ticket": response.exit_ticket_data,
+        "is_complete": response.is_complete,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def chat_respond(request, session_id):
+    """Handle student message in conversational tutoring."""
+    from apps.tutoring.conversational_tutor import ConversationalTutor
+    
+    session = get_object_or_404(
+        TutorSession,
+        id=session_id,
+        student=request.user,
+    )
+    
+    # Handle completed sessions
+    if session.status == TutorSession.Status.COMPLETED:
+        return JsonResponse({
+            "message": "🎉 This lesson is already complete! Great work!",
+            "phase": "completed",
+            "is_complete": True,
+        })
+    
+    try:
+        data = json.loads(request.body)
+        message = data.get("message", "").strip()
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    if not message:
+        return JsonResponse({"error": "Message required"}, status=400)
+    
+    tutor = ConversationalTutor(session)
+    response = tutor.respond(message)
+    
+    return JsonResponse({
+        "message": response.content,
+        "phase": response.phase,
+        "media": response.media,
+        "show_exit_ticket": response.show_exit_ticket,
+        "exit_ticket": response.exit_ticket_data,
+        "is_complete": response.is_complete,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def chat_exit_ticket(request, session_id):
+    """Submit exit ticket answers."""
+    from apps.tutoring.conversational_tutor import ConversationalTutor
+    
+    session = get_object_or_404(
+        TutorSession,
+        id=session_id,
+        student=request.user,
+    )
+    
+    try:
+        data = json.loads(request.body)
+        answers = data.get("answers", [])
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    tutor = ConversationalTutor(session)
+    response = tutor.submit_exit_ticket(answers)
+    
+    return JsonResponse({
+        "message": response.content,
+        "phase": response.phase,
+        "exit_ticket": response.exit_ticket_data,
+        "is_complete": response.is_complete,
+    })

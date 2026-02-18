@@ -190,30 +190,19 @@ class TutorEngine:
         return self._process_step_answer(answer)
     
     def advance(self) -> TutorResponse:
-        """Advance to next step (called when user clicks Continue)."""
+        """Advance to next step (for non-question steps)."""
         if self.phase == SessionPhase.EXIT_TICKET:
             return self._present_exit_question()
         
         step = self.current_step
-        
-        # If current step requires response and hasn't been answered, prompt
         if step and step.requires_response():
-            # Check if this is a "just answered" situation by looking at attempt counter
-            # If attempts were reset, we've answered and are ready to move on
-            if self.current_attempt > 0:
-                return TutorResponse(
-                    message="Please answer the question first.",
-                    step_index=self.current_step_index,
-                    step_type=step.step_type,
-                    phase=self.phase.value,
-                    question=self._build_question_data(step),
-                    is_waiting_for_answer=True,
-                )
-        
-        # For teaching steps (no response needed), increment and present
-        if step and not step.requires_response():
-            self.current_step_index += 1
-            self._save_state()
+            return TutorResponse(
+                message="Please answer the question first.",
+                step_index=self.current_step_index,
+                step_type=step.step_type,
+                phase=self.phase.value,
+                is_waiting_for_answer=True,
+            )
         
         return self._advance_to_next_step()
     
@@ -290,8 +279,8 @@ class TutorEngine:
         self.current_attempt += 1
         
         if grading.result == GradeResult.CORRECT:
-            # Correct! Show feedback, then they click Continue
-            message = f"✓ **Correct!** {grading.feedback}"
+            # Correct! Move to next step
+            message = f"✓ **Correct!** {grading.feedback}\n\n"
             
             self._save_turn(
                 role=SessionTurn.Role.TUTOR,
@@ -299,24 +288,12 @@ class TutorEngine:
                 step=step,
             )
             
-            # Reset attempt counter but DON'T advance yet - wait for Continue
+            # Reset attempt counter and advance
             self.current_attempt = 0
             self.hints_given = 0
-            self.current_step_index += 1  # Mark as ready for next step
             self._save_state()
             
-            # Check if we're done with all steps
-            if self.current_step_index >= len(self.steps):
-                return self._start_exit_ticket(prefix_message=message + "\n\n")
-            
-            return TutorResponse(
-                message=message,
-                step_index=self.current_step_index - 1,  # Show current step in progress
-                step_type=step.step_type,
-                phase=self.phase.value,
-                is_waiting_for_answer=False,  # Show Continue button
-                grading=grading,
-            )
+            return self._advance_to_next_step(prefix_message=message)
         
         else:
             # Incorrect
@@ -324,9 +301,9 @@ class TutorEngine:
             
             if attempts_remaining <= 0:
                 # Out of attempts, show answer and move on
-                message = f"✗ Not quite. The correct answer is: **{step.expected_answer}**"
+                message = f"✗ Not quite. The correct answer is: **{step.expected_answer}**\n\n"
                 if step.rubric:
-                    message += f"\n\n{step.rubric}"
+                    message += f"{step.rubric}\n\n"
                 
                 self._save_turn(
                     role=SessionTurn.Role.TUTOR,
@@ -336,31 +313,19 @@ class TutorEngine:
                 
                 self.current_attempt = 0
                 self.hints_given = 0
-                self.current_step_index += 1  # Ready for next step
                 self._save_state()
                 
-                # Check if we're done with all steps
-                if self.current_step_index >= len(self.steps):
-                    return self._start_exit_ticket(prefix_message=message + "\n\n")
-                
-                return TutorResponse(
-                    message=message,
-                    step_index=self.current_step_index - 1,
-                    step_type=step.step_type,
-                    phase=self.phase.value,
-                    is_waiting_for_answer=False,  # Show Continue button
-                    grading=grading,
-                )
+                return self._advance_to_next_step(prefix_message=message)
             
             else:
                 # Give hint and let them try again
                 hint = self._get_next_hint(step)
                 self.hints_given += 1
                 
-                message = f"✗ {grading.feedback}"
+                message = f"✗ {grading.feedback}\n\n"
                 if hint:
-                    message += f"\n\n💡 **Hint:** {hint}"
-                message += f"\n\nTry again! ({attempts_remaining} attempt{'s' if attempts_remaining > 1 else ''} remaining)"
+                    message += f"💡 **Hint:** {hint}\n\n"
+                message += f"Try again! ({attempts_remaining} attempt{'s' if attempts_remaining > 1 else ''} remaining)"
                 
                 self._save_turn(
                     role=SessionTurn.Role.TUTOR,
@@ -376,23 +341,26 @@ class TutorEngine:
                     step_type=step.step_type,
                     phase=self.phase.value,
                     question=self._build_question_data(step),
-                    is_waiting_for_answer=True,  # Keep showing input
+                    is_waiting_for_answer=True,
                     grading=grading,
                     attempts_remaining=attempts_remaining,
                     hint=hint,
                 )
     
     def _advance_to_next_step(self, prefix_message: str = "") -> TutorResponse:
-        """Move to the next step (called when user clicks Continue)."""
-        # Note: step_index is already incremented after answer processing
-        # This just presents the current step
+        """Move to the next step."""
+        self.current_step_index += 1
+        self._save_state()
         
         if self.current_step_index >= len(self.steps):
             # Finished all steps, start exit ticket
-            return self._start_exit_ticket()
+            return self._start_exit_ticket(prefix_message=prefix_message)
         
-        # Present the current step
-        return self._present_current_step()
+        # Present next step
+        response = self._present_current_step()
+        if prefix_message:
+            response.message = prefix_message + response.message
+        return response
     
     def _grade_step_answer(self, step: LessonStep, answer: str) -> GradingOutcome:
         """Grade a step answer."""

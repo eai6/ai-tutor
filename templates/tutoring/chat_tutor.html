@@ -1,0 +1,693 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ lesson.title }} - AI Tutor{% endblock %}
+
+{% block content %}
+<div class="chat-tutor">
+    <!-- Header -->
+    <header class="chat-header">
+        <a href="{% url 'tutoring:catalog' %}" class="back-link">← Back to Lessons</a>
+        <div class="lesson-title">
+            <h1>{{ lesson.title }}</h1>
+            <span class="phase-badge" id="phase-badge">Starting...</span>
+        </div>
+    </header>
+
+    <!-- Chat Messages -->
+    <main class="chat-messages" id="chat-messages">
+        <!-- Messages will be inserted here -->
+        <div class="typing-indicator" id="typing">
+            <span></span><span></span><span></span>
+        </div>
+    </main>
+
+    <!-- Input Area -->
+    <footer class="chat-input-area" id="input-area">
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="user-input" 
+                placeholder="Type your answer..." 
+                autocomplete="off"
+                autofocus
+            >
+            <button id="send-btn" onclick="sendMessage()">
+                Send
+            </button>
+        </div>
+    </footer>
+
+    <!-- Exit Ticket Modal -->
+    <div class="modal" id="exit-modal" style="display: none;">
+        <div class="modal-content exit-ticket">
+            <h2>📝 Exit Quiz</h2>
+            <p class="modal-subtitle">Answer all questions. You need 8/10 to pass.</p>
+            <div id="exit-questions"></div>
+            <button class="submit-btn" id="submit-exit" onclick="submitExitTicket()" disabled>
+                Submit Quiz
+            </button>
+        </div>
+    </div>
+
+    <!-- Completion Modal -->
+    <div class="modal" id="complete-modal" style="display: none;">
+        <div class="modal-content completion">
+            <div class="completion-icon" id="completion-icon">🎉</div>
+            <h2 id="completion-title">Lesson Complete!</h2>
+            <p id="completion-message"></p>
+            <a href="{% url 'tutoring:catalog' %}" class="btn-primary">Continue Learning →</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+    --primary: #E85D04;
+    --primary-dark: #D4520A;
+    --bg: #F8F9FA;
+    --white: #FFFFFF;
+    --text: #1F2937;
+    --text-light: #6B7280;
+    --border: #E5E7EB;
+    --success: #10B981;
+    --error: #EF4444;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+}
+
+.chat-tutor {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 800px;
+    margin: 0 auto;
+    background: var(--white);
+}
+
+/* Header */
+.chat-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--white);
+}
+
+.back-link {
+    color: var(--text-light);
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+
+.back-link:hover { color: var(--primary); }
+
+.lesson-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.lesson-title h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.phase-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--primary);
+    color: white;
+    border-radius: 999px;
+    text-transform: capitalize;
+}
+
+/* Chat Messages */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.message {
+    display: flex;
+    gap: 0.75rem;
+    max-width: 85%;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.message.tutor { align-self: flex-start; }
+.message.student { align-self: flex-end; flex-direction: row-reverse; }
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.message.tutor .avatar { background: #FFF4ED; }
+.message.student .avatar { background: #E0E7FF; }
+
+.bubble {
+    padding: 1rem 1.25rem;
+    border-radius: 1.25rem;
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+.message.tutor .bubble {
+    background: var(--bg);
+    border-bottom-left-radius: 0.25rem;
+}
+
+.message.student .bubble {
+    background: var(--primary);
+    color: white;
+    border-bottom-right-radius: 0.25rem;
+}
+
+.bubble p { margin-bottom: 0.75rem; }
+.bubble p:last-child { margin-bottom: 0; }
+.bubble strong { font-weight: 600; }
+
+/* Media in messages */
+.message-media {
+    margin-top: 1rem;
+}
+
+.message-media img {
+    max-width: 100%;
+    border-radius: 0.75rem;
+}
+
+.message-media .caption {
+    font-size: 0.875rem;
+    color: var(--text-light);
+    margin-top: 0.5rem;
+    font-style: italic;
+}
+
+/* Typing Indicator */
+.typing-indicator {
+    display: none;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--bg);
+    border-radius: 1.25rem;
+    width: fit-content;
+}
+
+.typing-indicator.show { display: flex; }
+
+.typing-indicator span {
+    width: 8px;
+    height: 8px;
+    background: var(--text-light);
+    border-radius: 50%;
+    animation: bounce 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) { animation-delay: 0s; }
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-8px); }
+}
+
+/* Input Area */
+.chat-input-area {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    background: var(--white);
+}
+
+.input-container {
+    display: flex;
+    gap: 0.75rem;
+}
+
+#user-input {
+    flex: 1;
+    padding: 1rem 1.25rem;
+    border: 2px solid var(--border);
+    border-radius: 1.5rem;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+#user-input:focus {
+    border-color: var(--primary);
+}
+
+#send-btn {
+    padding: 1rem 1.75rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#send-btn:hover { background: var(--primary-dark); }
+#send-btn:disabled { background: var(--text-light); cursor: not-allowed; }
+
+/* Modals */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+}
+
+.modal-content {
+    background: var(--white);
+    border-radius: 1rem;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 2rem;
+}
+
+.modal-content h2 {
+    margin-bottom: 0.5rem;
+}
+
+.modal-subtitle {
+    color: var(--text-light);
+    margin-bottom: 1.5rem;
+}
+
+/* Exit Ticket Questions */
+.exit-question {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.exit-question:last-of-type {
+    border-bottom: none;
+}
+
+.question-num {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+}
+
+.question-text {
+    font-weight: 500;
+    margin-bottom: 1rem;
+}
+
+.options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.option:hover { border-color: var(--primary); }
+.option.selected { border-color: var(--primary); background: #FFF4ED; }
+.option.correct { border-color: var(--success); background: #D1FAE5; }
+.option.incorrect { border-color: var(--error); background: #FEE2E2; }
+
+.option .letter {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.option.selected .letter {
+    background: var(--primary);
+    color: white;
+}
+
+.submit-btn {
+    width: 100%;
+    padding: 1rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 1rem;
+}
+
+.submit-btn:disabled { background: var(--text-light); }
+
+/* Completion */
+.completion {
+    text-align: center;
+}
+
+.completion-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.btn-primary {
+    display: inline-block;
+    padding: 1rem 2rem;
+    background: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    margin-top: 1rem;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+    .chat-messages { padding: 1rem; }
+    .message { max-width: 90%; }
+    .bubble { padding: 0.875rem 1rem; }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+const lessonId = {{ lesson.id }};
+let sessionId = null;
+let exitTicketData = null;
+let exitAnswers = {};
+
+const chatMessages = document.getElementById('chat-messages');
+const typing = document.getElementById('typing');
+const userInput = document.getElementById('user-input');
+const sendBtn = document.getElementById('send-btn');
+const phaseBadge = document.getElementById('phase-badge');
+
+// Initialize
+document.addEventListener('DOMContentLoaded', startSession);
+userInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+async function startSession() {
+    showTyping(true);
+    
+    try {
+        const response = await fetch(`/tutor/api/chat/start/${lessonId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            showTyping(false);
+            addMessage('tutor', '❌ ' + data.error);
+            return;
+        }
+        
+        sessionId = data.session_id;
+        handleResponse(data);
+        
+    } catch (error) {
+        console.error('Start error:', error);
+        showTyping(false);
+        addMessage('tutor', '❌ Failed to start. Please refresh.');
+    }
+}
+
+function handleResponse(data) {
+    showTyping(false);
+    
+    // Update phase badge
+    if (data.phase) {
+        phaseBadge.textContent = data.phase.replace('_', ' ');
+    }
+    
+    // Add tutor message
+    addMessage('tutor', data.message, data.media);
+    
+    // Handle exit ticket
+    if (data.show_exit_ticket && data.exit_ticket) {
+        exitTicketData = data.exit_ticket;
+        setTimeout(() => showExitTicket(), 1000);
+        return;
+    }
+    
+    // Handle completion
+    if (data.is_complete) {
+        showCompletion(data.message);
+        return;
+    }
+    
+    // Focus input
+    userInput.focus();
+}
+
+function addMessage(role, content, media = []) {
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+    
+    const avatar = role === 'tutor' ? '🎓' : '👤';
+    
+    let mediaHtml = '';
+    if (media && media.length > 0) {
+        mediaHtml = '<div class="message-media">';
+        for (const m of media) {
+            if (m.type === 'image') {
+                mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}">`;
+                if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
+            }
+        }
+        mediaHtml += '</div>';
+    }
+    
+    div.innerHTML = `
+        <div class="avatar">${avatar}</div>
+        <div class="bubble">${marked.parse(content)}${mediaHtml}</div>
+    `;
+    
+    chatMessages.insertBefore(div, typing);
+    scrollToBottom();
+}
+
+async function sendMessage() {
+    const text = userInput.value.trim();
+    if (!text || !sessionId) return;
+    
+    // Add student message
+    addMessage('student', text);
+    userInput.value = '';
+    
+    // Show typing
+    showTyping(true);
+    sendBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`/tutor/api/chat/${sessionId}/respond/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ message: text }),
+        });
+        
+        const data = await response.json();
+        sendBtn.disabled = false;
+        
+        if (data.error) {
+            showTyping(false);
+            addMessage('tutor', '❌ ' + data.error);
+            return;
+        }
+        
+        handleResponse(data);
+        
+    } catch (error) {
+        console.error('Send error:', error);
+        showTyping(false);
+        sendBtn.disabled = false;
+        addMessage('tutor', '❌ Something went wrong. Please try again.');
+    }
+}
+
+function showExitTicket() {
+    if (!exitTicketData) return;
+    
+    document.getElementById('input-area').style.display = 'none';
+    
+    const container = document.getElementById('exit-questions');
+    container.innerHTML = '';
+    
+    exitTicketData.questions.forEach((q, i) => {
+        const div = document.createElement('div');
+        div.className = 'exit-question';
+        div.innerHTML = `
+            <div class="question-num">Question ${i + 1}</div>
+            <div class="question-text">${q.question}</div>
+            <div class="options" data-q="${i}">
+                ${q.options.map(opt => `
+                    <div class="option" data-letter="${opt.letter}" onclick="selectOption(${i}, '${opt.letter}', this)">
+                        <span class="letter">${opt.letter}</span>
+                        <span>${opt.text}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        container.appendChild(div);
+    });
+    
+    document.getElementById('exit-modal').style.display = 'flex';
+}
+
+function selectOption(qIndex, letter, el) {
+    // Deselect others
+    el.parentElement.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    exitAnswers[qIndex] = letter;
+    
+    // Enable submit if all answered
+    document.getElementById('submit-exit').disabled = 
+        Object.keys(exitAnswers).length < exitTicketData.questions.length;
+}
+
+async function submitExitTicket() {
+    const answers = [];
+    for (let i = 0; i < exitTicketData.questions.length; i++) {
+        answers.push(exitAnswers[i] || '');
+    }
+    
+    try {
+        const response = await fetch(`/tutor/api/chat/${sessionId}/exit-ticket/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ answers }),
+        });
+        
+        const data = await response.json();
+        
+        // Show results
+        if (data.exit_ticket && data.exit_ticket.results) {
+            showExitResults(data.exit_ticket.results);
+        }
+        
+        setTimeout(() => {
+            document.getElementById('exit-modal').style.display = 'none';
+            if (data.is_complete) {
+                showCompletion(data.message);
+            } else {
+                // Failed - show message and let them try again
+                document.getElementById('input-area').style.display = 'block';
+                addMessage('tutor', data.message);
+            }
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Submit error:', error);
+        alert('Failed to submit. Please try again.');
+    }
+}
+
+function showExitResults(results) {
+    results.forEach(r => {
+        const options = document.querySelector(`[data-q="${r.index}"]`);
+        if (!options) return;
+        
+        options.querySelectorAll('.option').forEach(opt => {
+            const letter = opt.dataset.letter;
+            if (letter === r.correct_answer) {
+                opt.classList.add('correct');
+            } else if (letter === r.selected && !r.is_correct) {
+                opt.classList.add('incorrect');
+            }
+        });
+    });
+}
+
+function showCompletion(message) {
+    document.getElementById('input-area').style.display = 'none';
+    document.getElementById('completion-message').textContent = message || 'Great work!';
+    document.getElementById('complete-modal').style.display = 'flex';
+}
+
+function showTyping(show) {
+    typing.classList.toggle('show', show);
+    if (show) scrollToBottom();
+}
+
+function scrollToBottom() {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function getCookie(name) {
+    let value = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let c of cookies) {
+            c = c.trim();
+            if (c.startsWith(name + '=')) {
+                value = decodeURIComponent(c.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return value;
+}
+</script>
+{% endblock %}
