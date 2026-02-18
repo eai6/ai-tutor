@@ -1,0 +1,144 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Media Generation Progress{% endblock %}
+{% block page_title %}Media Generation{% endblock %}
+
+{% block extra_css %}
+<style>
+    .progress-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    .progress-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--gray-100);
+    }
+    .progress-body {
+        padding: 1.5rem;
+    }
+    
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .status-badge.processing {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .status-badge.completed {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    .status-badge.failed {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .log-container {
+        background: var(--gray-900);
+        color: #10B981;
+        padding: 1rem;
+        border-radius: 8px;
+        font-family: 'Monaco', 'Menlo', monospace;
+        font-size: 0.8rem;
+        max-height: 400px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:course_detail' course.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
+    ← Back to {{ course.title }}
+</a>
+
+<div class="progress-card">
+    <div class="progress-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h2 style="margin: 0; font-size: 1.25rem;">🖼️ Media Generation</h2>
+                <p style="margin: 0.5rem 0 0 0; color: var(--gray-500);">{{ course.title }}</p>
+            </div>
+            <div>
+                {% if upload.status == 'media_processing' %}
+                <span class="status-badge processing">
+                    <span class="spinner"></span>
+                    Processing...
+                </span>
+                {% elif upload.status == 'completed' %}
+                <span class="status-badge completed">
+                    ✓ Complete
+                </span>
+                {% elif upload.status == 'failed' %}
+                <span class="status-badge failed">
+                    ✗ Failed
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="progress-body">
+        {% if upload.status == 'media_processing' %}
+        <div style="text-align: center; padding: 1rem 0 1.5rem;">
+            <div class="spinner" style="width: 40px; height: 40px; border-width: 3px; margin: 0 auto 1rem;"></div>
+            <p style="color: var(--gray-600); margin: 0;">Generating images for each lesson step...</p>
+            <p style="color: var(--gray-400); font-size: 0.875rem; margin: 0.5rem 0 0;">This page auto-refreshes every 5 seconds</p>
+        </div>
+        {% endif %}
+        
+        <h4 style="margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--gray-600);">📋 Progress Log</h4>
+        <div class="log-container" id="log-container">{{ upload.processing_log }}</div>
+        
+        {% if upload.status == 'completed' %}
+        <div style="margin-top: 1.5rem; text-align: center;">
+            <a href="{% url 'dashboard:course_detail' course.id %}" class="btn btn-primary">
+                ← Back to Course
+            </a>
+        </div>
+        {% endif %}
+        
+        {% if upload.status == 'failed' and upload.error_message %}
+        <div style="margin-top: 1rem; padding: 1rem; background: #fee2e2; border-radius: 8px; color: #991b1b;">
+            <strong>Error:</strong> {{ upload.error_message }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if upload.status == 'media_processing' %}
+// Auto-refresh while processing
+setTimeout(() => window.location.reload(), 5000);
+
+// Auto-scroll log to bottom
+const logEl = document.getElementById('log-container');
+if (logEl) {
+    logEl.scrollTop = logEl.scrollHeight;
+}
+{% endif %}
+</script>
+{% endblock %}

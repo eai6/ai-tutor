@@ -1,0 +1,167 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Edit Step{% endblock %}
+{% block page_title %}Edit Step {{ step.order_index|add:1 }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; font-weight: 500; margin-bottom: 0.5rem; color: var(--gray-700); }
+    .form-group small { display: block; color: var(--gray-500); margin-top: 0.25rem; font-size: 0.8rem; }
+    .form-control { width: 100%; padding: 0.625rem 0.75rem; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 0.9rem; }
+    .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+    textarea.form-control { min-height: 120px; resize: vertical; }
+    
+    .step-meta { display: flex; gap: 1rem; padding: 1rem; background: var(--gray-50); border-radius: 8px; margin-bottom: 1.5rem; }
+    .step-meta-item { display: flex; flex-direction: column; }
+    .step-meta-label { font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; }
+    .step-meta-value { font-weight: 600; }
+    
+    .phase-select { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .phase-option { padding: 0.5rem 1rem; border: 2px solid var(--gray-200); border-radius: 6px; cursor: pointer; font-size: 0.875rem; transition: all 0.2s; }
+    .phase-option:hover { border-color: var(--gray-400); }
+    .phase-option.selected { border-color: var(--primary); background: #eff6ff; }
+    .phase-option input { display: none; }
+    
+    .media-editor { border: 1px solid var(--gray-200); border-radius: 8px; padding: 1rem; background: var(--gray-50); }
+    .media-item-card { background: white; border: 1px solid var(--gray-200); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.75rem; }
+    .media-item-card img { max-width: 100%; max-height: 250px; border-radius: 6px; margin-bottom: 0.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
+    ← Back to {{ lesson.title }}
+</a>
+
+<div class="card" style="max-width: 800px;">
+    <div class="card-header">
+        <h3 class="card-title">Edit Step {{ step.order_index|add:1 }}</h3>
+    </div>
+    <div class="card-body">
+        <div class="step-meta">
+            <div class="step-meta-item">
+                <span class="step-meta-label">Lesson</span>
+                <span class="step-meta-value">{{ lesson.title }}</span>
+            </div>
+            <div class="step-meta-item">
+                <span class="step-meta-label">Unit</span>
+                <span class="step-meta-value">{{ lesson.unit.title }}</span>
+            </div>
+            <div class="step-meta-item">
+                <span class="step-meta-label">Step</span>
+                <span class="step-meta-value">{{ step.order_index|add:1 }} of {{ total_steps }}</span>
+            </div>
+        </div>
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label>Phase (5E Model)</label>
+                <div class="phase-select">
+                    {% for phase_val, phase_label in phases %}
+                    <label class="phase-option {% if step.phase == phase_val %}selected{% endif %}">
+                        <input type="radio" name="phase" value="{{ phase_val }}" {% if step.phase == phase_val %}checked{% endif %}>
+                        {{ phase_label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="step_type">Step Type</label>
+                <select name="step_type" id="step_type" class="form-control">
+                    <option value="teach" {% if step.step_type == 'teach' %}selected{% endif %}>Teach - Direct instruction</option>
+                    <option value="worked_example" {% if step.step_type == 'worked_example' %}selected{% endif %}>Worked Example</option>
+                    <option value="practice" {% if step.step_type == 'practice' %}selected{% endif %}>Practice - Student attempts</option>
+                    <option value="quiz" {% if step.step_type == 'quiz' %}selected{% endif %}>Quiz - Assessment</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="teacher_script">Tutor Script</label>
+                <textarea name="teacher_script" id="teacher_script" class="form-control" rows="6">{{ step.teacher_script }}</textarea>
+                <small>What the AI tutor says to explain concepts.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="question">Question (optional)</label>
+                <textarea name="question" id="question" class="form-control" rows="3">{{ step.question }}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="expected_answer">Expected Answer</label>
+                <input type="text" name="expected_answer" id="expected_answer" class="form-control" value="{{ step.expected_answer|default:'' }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="answer_type">Answer Type</label>
+                <select name="answer_type" id="answer_type" class="form-control">
+                    <option value="none" {% if step.answer_type == 'none' %}selected{% endif %}>None</option>
+                    <option value="free_text" {% if step.answer_type == 'free_text' %}selected{% endif %}>Free Text</option>
+                    <option value="multiple_choice" {% if step.answer_type == 'multiple_choice' %}selected{% endif %}>Multiple Choice</option>
+                    <option value="numeric" {% if step.answer_type == 'numeric' %}selected{% endif %}>Numeric</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="choices">Choices (one per line)</label>
+                <textarea name="choices" id="choices" class="form-control" rows="4">{% if step.choices %}{% for choice in step.choices %}{{ choice }}{% if not forloop.last %}
+{% endif %}{% endfor %}{% endif %}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="hints">Hints (one per line)</label>
+                <textarea name="hints" id="hints" class="form-control" rows="3">{% if step.hints %}{% for hint in step.hints %}{{ hint }}{% if not forloop.last %}
+{% endif %}{% endfor %}{% endif %}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Media</label>
+                <div class="media-editor">
+                    {% if step.media and step.media.images %}
+                        {% for img in step.media.images %}
+                        <div class="media-item-card">
+                            {% if img.url %}
+                            <img src="{{ img.url }}" alt="{{ img.description }}">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <strong>{{ img.type|default:"Image" }}</strong>
+                                <span style="color: var(--success);">✓ Generated</span>
+                            </div>
+                            {% else %}
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <strong>{{ img.type|default:"Image" }}</strong>
+                                <span style="color: var(--warning);">⏳ Pending</span>
+                            </div>
+                            {% endif %}
+                            <p style="font-size: 0.875rem; margin: 0.5rem 0 0 0; color: var(--gray-600);">{{ img.description }}</p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color: var(--gray-500); margin: 0;">No media attached to this step.</p>
+                    {% endif %}
+                </div>
+                <small>Media is generated using the "Generate Media" button on the course page.</small>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200);">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.phase-option').forEach(option => {
+    option.addEventListener('click', function() {
+        document.querySelectorAll('.phase-option').forEach(o => o.classList.remove('selected'));
+        this.classList.add('selected');
+        this.querySelector('input').checked = true;
+    });
+});
+</script>
+{% endblock %}

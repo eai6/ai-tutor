@@ -35,9 +35,6 @@ class ImageGenerationService:
         self.lesson = lesson
         self.institution = institution
         self.dalle_available = self._check_dalle_available()
-        
-        # Load existing media for fallback
-        self.existing_media = self._load_existing_media()
     
     def _check_dalle_available(self) -> bool:
         """Check if DALL-E API is available."""
@@ -54,150 +51,29 @@ class ImageGenerationService:
             logger.info("DALL-E not available: No internet connection")
             return False
     
-    def _load_existing_media(self) -> List[Dict]:
-        """Load existing media from the lesson."""
-        if not self.lesson:
-            return []
-        
-        from apps.media_library.models import StepMedia, MediaAsset
-        
-        # Get media attached to this lesson
-        attachments = StepMedia.objects.filter(
-            lesson_step__lesson=self.lesson
-        ).select_related('media_asset')
-        
-        media_list = []
-        for att in attachments:
-            asset = att.media_asset
-            media_list.append({
-                'id': asset.id,
-                'title': asset.title.lower(),
-                'type': asset.asset_type,
-                'url': asset.file.url if asset.file else None,
-                'caption': asset.caption or '',
-                'alt_text': asset.alt_text or '',
-                'keywords': (asset.caption or '').lower() + ' ' + (asset.alt_text or '').lower(),
-            })
-        
-        # Also get general media assets for the institution
-        if self.institution:
-            general_assets = MediaAsset.objects.filter(
-                institution=self.institution
-            )[:50]  # Limit for performance
-            
-            for asset in general_assets:
-                if not any(m['id'] == asset.id for m in media_list):
-                    media_list.append({
-                        'id': asset.id,
-                        'title': asset.title.lower(),
-                        'type': asset.asset_type,
-                        'url': asset.file.url if asset.file else None,
-                        'caption': asset.caption or '',
-                        'alt_text': asset.alt_text or '',
-                        'keywords': (asset.caption or '').lower() + ' ' + (asset.alt_text or '').lower(),
-                    })
-        
-        return media_list
-    
     def get_or_generate_image(
         self,
         prompt: str,
         category: str = "general",
-        prefer_existing: bool = True
+        **kwargs  # Ignore any extra args for compatibility
     ) -> Optional[Dict]:
         """
-        Get an existing image or generate a new one.
+        Generate a new image with DALL-E.
         
         Args:
             prompt: Description of the image needed
             category: Type of image (diagram, photo, illustration, etc.)
-            prefer_existing: If True, try existing media first
         
         Returns:
             Dict with 'url', 'title', 'caption', 'generated' keys, or None
         """
-        # Try existing media first
-        if prefer_existing:
-            existing = self._find_matching_media(prompt, category)
-            if existing:
-                logger.info(f"Using existing media: {existing['title']}")
-                return {
-                    'url': existing['url'],
-                    'title': existing['title'],
-                    'caption': existing.get('caption', ''),
-                    'alt_text': existing.get('alt_text', prompt),
-                    'generated': False,
-                }
-        
-        # Try DALL-E generation
+        # Always generate fresh with DALL-E
         if self.dalle_available:
             generated = self._generate_with_dalle(prompt, category)
             if generated:
                 return generated
         
-        # Final fallback - any related existing media
-        if not prefer_existing:
-            existing = self._find_matching_media(prompt, category)
-            if existing:
-                return {
-                    'url': existing['url'],
-                    'title': existing['title'],
-                    'caption': existing.get('caption', ''),
-                    'alt_text': existing.get('alt_text', prompt),
-                    'generated': False,
-                }
-        
-        logger.warning(f"No image available for prompt: {prompt[:50]}...")
-        return None
-    
-    def _find_matching_media(self, prompt: str, category: str) -> Optional[Dict]:
-        """Find existing media that matches the prompt."""
-        if not self.existing_media:
-            return None
-        
-        prompt_lower = prompt.lower()
-        prompt_words = set(prompt_lower.split())
-        
-        best_match = None
-        best_score = 0
-        
-        for media in self.existing_media:
-            if not media.get('url'):
-                continue
-            
-            # Score based on keyword matching
-            score = 0
-            
-            # Title match
-            title_words = set(media['title'].split())
-            title_overlap = len(prompt_words & title_words)
-            score += title_overlap * 3
-            
-            # Keyword match
-            keyword_words = set(media['keywords'].split())
-            keyword_overlap = len(prompt_words & keyword_words)
-            score += keyword_overlap * 2
-            
-            # Category/type match
-            if category.lower() in media['type'].lower():
-                score += 5
-            
-            # Specific keyword boosts
-            if 'diagram' in prompt_lower and 'diagram' in media['keywords']:
-                score += 10
-            if 'rainfall' in prompt_lower and 'rainfall' in media['keywords']:
-                score += 10
-            if 'map' in prompt_lower and 'map' in media['keywords']:
-                score += 10
-            
-            if score > best_score:
-                best_score = score
-                best_match = media
-        
-        # Require minimum score to match
-        if best_score >= 3:
-            return best_match
-        
+        logger.warning(f"DALL-E unavailable for: {prompt[:50]}...")
         return None
     
     def _generate_with_dalle(self, prompt: str, category: str) -> Optional[Dict]:

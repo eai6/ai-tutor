@@ -97,14 +97,26 @@ class TutorEngine:
         """Load session state from database."""
         state = self.session.engine_state or {}
         
-        self.phase = SessionPhase(state.get('phase', 'lesson'))
-        self.current_step_index = state.get('step_index', 0)
+        # Map old phase names to new ones
+        phase_str = state.get('phase', 'lesson')
+        phase_map = {
+            'retrieval': 'lesson',
+            'instruction': 'lesson', 
+            'practice': 'lesson',
+            'lesson': 'lesson',
+            'exit_ticket': 'exit_ticket',
+            'completed': 'completed',
+        }
+        phase_str = phase_map.get(phase_str, 'lesson')
+        
+        self.phase = SessionPhase(phase_str)
+        self.current_step_index = state.get('step_index', state.get('current_step_index', 0))
         self.current_attempt = state.get('current_attempt', 0)
         self.hints_given = state.get('hints_given', 0)
         
         # Exit ticket state
         self.exit_question_index = state.get('exit_question_index', 0)
-        self.exit_correct_count = state.get('exit_correct_count', 0)
+        self.exit_correct_count = state.get('exit_correct_count', state.get('questions_correct', 0))
         self.exit_answers = state.get('exit_answers', [])
     
     def _save_state(self):

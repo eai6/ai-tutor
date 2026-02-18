@@ -538,7 +538,7 @@ def submit_answer_stream(request, session_id):
         engine = TutorEngine(session)
         
         # Process answer through engine (handles phase tracking, commands, etc.)
-        response = engine.process_student_answer(safe_answer)
+        response = engine.process_answer(safe_answer)
         
         # Stream the response content
         # For now, yield the full message (can be chunked later if needed)
@@ -548,13 +548,30 @@ def submit_answer_stream(request, session_id):
         if response.commands:
             yield f"data: {json.dumps({'commands': response.commands})}\n\n"
         
-        # Send final metadata
-        yield f"data: {json.dumps({
+        # Send final metadata including question data for UI update
+        final_data = {
             'done': True, 
             'is_session_complete': response.is_session_complete,
             'phase': response.phase,
+            'step_index': response.step_index,
+            'step_type': response.step_type,
+            'is_waiting_for_answer': response.is_waiting_for_answer,
             'commands': response.commands,
-        })}\n\n"
+        }
+        
+        # Include question data if present
+        if response.question:
+            final_data['question'] = response.question
+        
+        # Include grading feedback if present
+        if response.grading:
+            final_data['grading'] = response.grading.value
+        if response.hint:
+            final_data['hint'] = response.hint
+        if response.attempts_remaining is not None:
+            final_data['attempts_remaining'] = response.attempts_remaining
+        
+        yield f"data: {json.dumps(final_data)}\n\n"
     
     response = StreamingHttpResponse(
         generate_stream(),

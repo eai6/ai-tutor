@@ -20,19 +20,9 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 
-# urlpatterns = [
-#     path('', lambda req: redirect('tutor/')),  # Root redirects to tutor
-#     path('admin/', admin.site.urls),
-#     path('accounts/', include('apps.accounts.urls')),
-#     path('tutor/', include('apps.tutoring.urls')),
-#     path('safety/', include('apps.safety.urls')),
-#     path('dashboard/', include('apps.dashboard.urls')),
-# ]
-
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('apps.accounts.urls')),  # Landing page at root
-    path('accounts/', include('apps.accounts.urls')),
     path('tutor/', include('apps.tutoring.urls')),
     path('dashboard/', include('apps.dashboard.urls')),
 ]

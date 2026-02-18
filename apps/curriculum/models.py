@@ -93,6 +93,10 @@ class Lesson(models.Model):
     )
     order_index = models.PositiveIntegerField(default=0)
     is_published = models.BooleanField(default=False)
+    
+    # Flexible metadata (key concepts, skills, image suggestions, etc.)
+    metadata = models.JSONField(default=dict, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -114,6 +118,11 @@ class LessonStep(models.Model):
     Steps can be teaching moments, worked examples, practice problems,
     quiz questions, or summaries. Each step type has slightly different
     fields that matter.
+    
+    Enhanced with:
+    - Media content (images, diagrams, videos)
+    - Educational materials (vocabulary, examples)
+    - Curriculum context (from knowledge base)
     """
     class StepType(models.TextChoices):
         TEACH = 'teach', 'Teaching'
@@ -180,6 +189,101 @@ class LessonStep(models.Model):
         default=3,
         help_text="Max attempts before showing answer"
     )
+    
+    # =========================================================================
+    # MEDIA CONTENT
+    # =========================================================================
+    media = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="""Media content for this step. Structure:
+        {
+            "images": [
+                {
+                    "url": "/media/lessons/...",
+                    "alt": "Description of image",
+                    "caption": "Figure 1: ...",
+                    "type": "diagram|photo|illustration|chart",
+                    "source": "generated|library|curriculum"
+                }
+            ],
+            "videos": [
+                {
+                    "url": "https://...",
+                    "title": "Video title",
+                    "duration_seconds": 120,
+                    "start_time": 0
+                }
+            ],
+            "audio": [
+                {
+                    "url": "/media/audio/...",
+                    "title": "Pronunciation guide"
+                }
+            ]
+        }
+        """
+    )
+    
+    # =========================================================================
+    # EDUCATIONAL MATERIALS
+    # =========================================================================
+    educational_content = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="""Educational materials for this step. Structure:
+        {
+            "key_vocabulary": [
+                {"term": "...", "definition": "...", "example": "..."}
+            ],
+            "worked_example": {
+                "problem": "...",
+                "steps": [
+                    {"step": 1, "action": "...", "explanation": "..."}
+                ],
+                "final_answer": "..."
+            },
+            "formulas": [
+                {"name": "...", "formula": "...", "variables": {...}}
+            ],
+            "key_points": ["point 1", "point 2"],
+            "common_mistakes": ["mistake 1", "mistake 2"],
+            "real_world_connections": ["connection 1"],
+            "seychelles_context": "Local example or connection"
+        }
+        """
+    )
+    
+    # =========================================================================
+    # CURRICULUM CONTEXT (from Knowledge Base)
+    # =========================================================================
+    curriculum_context = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="""Curriculum context from knowledge base. Structure:
+        {
+            "teaching_strategies": ["strategy 1", "strategy 2"],
+            "learning_objectives": ["objective 1"],
+            "assessment_criteria": ["criteria 1"],
+            "prerequisite_knowledge": ["prereq 1"],
+            "cross_curricular_links": ["link 1"],
+            "differentiation": {
+                "support": "For struggling students...",
+                "extension": "For advanced students..."
+            },
+            "resources_from_curriculum": ["resource 1"]
+        }
+        """
+    )
+    
+    # =========================================================================
+    # PHASE/PEDAGOGY
+    # =========================================================================
+    phase = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Pedagogical phase: engage, explore, explain, practice, evaluate"
+    )
 
     class Meta:
         ordering = ['order_index']
@@ -199,3 +303,52 @@ class LessonStep(models.Model):
     def requires_response(self):
         """Does this step need a student response?"""
         return self.answer_type != self.AnswerType.NONE
+    
+    # =========================================================================
+    # HELPER METHODS
+    # =========================================================================
+    
+    def get_images(self):
+        """Get list of images for this step."""
+        if self.media and isinstance(self.media, dict):
+            return self.media.get('images', [])
+        return []
+    
+    def get_primary_image(self):
+        """Get the first/main image for this step."""
+        images = self.get_images()
+        return images[0] if images else None
+    
+    def get_vocabulary(self):
+        """Get key vocabulary for this step."""
+        if self.educational_content and isinstance(self.educational_content, dict):
+            return self.educational_content.get('key_vocabulary', [])
+        return []
+    
+    def get_worked_example(self):
+        """Get worked example if this is a worked_example step."""
+        if self.educational_content and isinstance(self.educational_content, dict):
+            return self.educational_content.get('worked_example')
+        return None
+    
+    def get_teaching_strategies(self):
+        """Get teaching strategies from curriculum context."""
+        if self.curriculum_context and isinstance(self.curriculum_context, dict):
+            return self.curriculum_context.get('teaching_strategies', [])
+        return []
+    
+    def get_seychelles_context(self):
+        """Get local Seychelles context/examples."""
+        if self.educational_content and isinstance(self.educational_content, dict):
+            return self.educational_content.get('seychelles_context', '')
+        return ''
+    
+    def has_media(self):
+        """Check if step has any media content."""
+        if not self.media:
+            return False
+        return bool(
+            self.media.get('images') or 
+            self.media.get('videos') or 
+            self.media.get('audio')
+        )

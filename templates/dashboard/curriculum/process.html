@@ -5,201 +5,687 @@
 
 {% block extra_css %}
 <style>
-    .process-status {
+    .process-container { max-width: 1000px; }
+    
+    .upload-header {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .upload-meta { display: flex; gap: 2rem; }
+    .upload-meta-item { text-align: center; }
+    .upload-meta-label { font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; }
+    .upload-meta-value { font-weight: 600; }
+    
+    /* Timeline */
+    .steps-timeline {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+        position: relative;
+    }
+    .steps-timeline::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 10%;
+        right: 10%;
+        height: 3px;
+        background: var(--gray-200);
+        z-index: 0;
+    }
+    .timeline-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+        z-index: 1;
+        flex: 1;
+    }
+    .timeline-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
         display: flex;
         align-items: center;
-        gap: 1rem;
-        padding: 1.5rem;
+        justify-content: center;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .timeline-step.pending .timeline-icon { background: var(--gray-100); color: var(--gray-400); border: 2px solid var(--gray-200); }
+    .timeline-step.active .timeline-icon { background: #EFF6FF; color: #2563EB; border: 2px solid #2563EB; animation: pulse 2s infinite; }
+    .timeline-step.review .timeline-icon { background: #FEF3C7; color: #D97706; border: 2px solid #D97706; }
+    .timeline-step.completed .timeline-icon { background: #D1FAE5; color: #059669; border: 2px solid #059669; }
+    .timeline-label { font-size: 0.75rem; font-weight: 500; text-align: center; color: var(--gray-500); }
+    .timeline-step.active .timeline-label, .timeline-step.review .timeline-label { color: var(--gray-900); font-weight: 600; }
+    .timeline-step.completed .timeline-label { color: #059669; }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); } }
+    
+    /* Cards */
+    .step-card {
+        background: white;
         border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        overflow: hidden;
         margin-bottom: 1.5rem;
     }
-    
-    .process-status.pending {
-        background: #FEF3C7;
-        color: #92400E;
+    .step-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--gray-100);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
+    .step-title { display: flex; align-items: center; gap: 0.75rem; font-weight: 600; font-size: 1.125rem; }
+    .step-number { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; }
+    .step-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; padding: 0.375rem 0.75rem; border-radius: 20px; }
+    .step-status.processing { background: #DBEAFE; color: #1D4ED8; }
+    .step-status.review { background: #FEF3C7; color: #B45309; }
+    .step-status.completed { background: #D1FAE5; color: #047857; }
+    .step-body { padding: 1.5rem; }
     
-    .process-status.processing {
-        background: #DBEAFE;
-        color: #1E40AF;
-    }
+    /* Results */
+    .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .result-card { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: 1rem; text-align: center; }
+    .result-card h4 { font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--gray-600); }
+    .result-card .count { font-size: 2rem; font-weight: 700; color: var(--primary); }
     
-    .process-status.completed {
-        background: #D1FAE5;
-        color: #065F46;
+    /* Editable Unit/Lesson List */
+    .unit-review-list { border: 1px solid var(--gray-200); border-radius: 8px; overflow: hidden; }
+    .unit-review-item { border-bottom: 1px solid var(--gray-100); }
+    .unit-review-item:last-child { border-bottom: none; }
+    .unit-review-header {
+        background: var(--gray-50);
+        padding: 0.75rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
     }
+    .unit-review-header:hover { background: var(--gray-100); }
+    .unit-review-title { font-weight: 600; display: flex; align-items: center; gap: 0.5rem; flex: 1; }
+    .unit-review-title input {
+        flex: 1;
+        border: 1px solid transparent;
+        background: transparent;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: inherit;
+    }
+    .unit-review-title input:focus { border-color: var(--primary); background: white; outline: none; }
+    .unit-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .lesson-count-badge { font-size: 0.75rem; background: var(--primary); color: white; padding: 0.125rem 0.5rem; border-radius: 10px; }
+    .lesson-review-list { padding: 0; display: none; background: white; }
+    .unit-review-item.expanded .lesson-review-list { display: block; }
+    .unit-review-item.expanded .unit-review-header { background: var(--gray-100); }
+    .lesson-review-item { padding: 0.75rem 1rem 0.75rem 2.5rem; border-top: 1px solid var(--gray-100); display: flex; align-items: flex-start; gap: 0.75rem; }
+    .lesson-review-item:hover { background: var(--gray-50); }
+    .lesson-number { color: var(--gray-400); font-size: 0.75rem; min-width: 24px; padding-top: 0.5rem; }
     
-    .process-status.failed {
-        background: #FEE2E2;
-        color: #991B1B;
+    .lesson-details { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; }
+    .lesson-title-input { 
+        width: 100%; 
+        border: 1px solid transparent; 
+        background: transparent; 
+        padding: 0.375rem 0.5rem; 
+        border-radius: 4px; 
+        font-size: 0.9rem;
+        font-weight: 500;
     }
+    .lesson-title-input:focus { border-color: var(--primary); background: white; outline: none; }
+    .lesson-objective-input {
+        width: 100%;
+        border: 1px solid var(--gray-200);
+        background: var(--gray-50);
+        padding: 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        color: var(--gray-600);
+        resize: vertical;
+        min-height: 40px;
+    }
+    .lesson-objective-input:focus { border-color: var(--primary); background: white; outline: none; }
+    .lesson-objective-input::placeholder { color: var(--gray-400); }
     
-    .spinner {
-        width: 24px;
-        height: 24px;
-        border: 3px solid currentColor;
-        border-top-color: transparent;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
+    .add-lesson-row { border-top: 1px dashed var(--gray-200); padding: 0.5rem 1rem 0.5rem 2.5rem; }
     
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
+    .expand-icon { transition: transform 0.2s; color: var(--gray-400); }
+    .unit-review-item.expanded .expand-icon { transform: rotate(90deg); }
     
-    .log-output {
-        background: var(--gray-900);
-        color: #10B981;
-        font-family: 'Monaco', 'Menlo', monospace;
-        font-size: 0.8125rem;
-        padding: 1.5rem;
-        border-radius: 8px;
-        max-height: 400px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-        line-height: 1.6;
-    }
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; font-size: 0.875rem; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { filter: brightness(0.9); }
+    .btn-secondary { background: var(--gray-100); color: var(--gray-700); }
+    .btn-secondary:hover { background: var(--gray-200); }
+    .btn-success { background: #059669; color: white; }
+    .btn-success:hover { background: #047857; }
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+    .btn-icon { padding: 0.35rem; border-radius: 6px; background: transparent; border: none; cursor: pointer; color: var(--gray-400); }
+    .btn-icon:hover { background: var(--gray-100); color: var(--gray-700); }
+    .btn-icon.danger:hover { background: #FEE2E2; color: #DC2626; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    /* Spinner */
+    .spinner { width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* Info Box */
+    .info-box { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; gap: 0.75rem; }
+    .info-box-icon { font-size: 1.25rem; }
+    .info-box-content { flex: 1; }
+    .info-box-title { font-weight: 600; color: #1E40AF; margin-bottom: 0.25rem; }
+    .info-box-text { font-size: 0.875rem; color: #1E40AF; }
+    
+    /* Options */
+    .generation-options { background: var(--gray-50); border-radius: 8px; padding: 1rem; margin-top: 1rem; }
+    .generation-options h4 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .option-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .option-row input[type="checkbox"] { width: 16px; height: 16px; }
+    .option-row label { font-size: 0.875rem; }
+    
+    .step-actions { display: flex; gap: 1rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-100); margin-top: 1.5rem; flex-wrap: wrap; }
+    
+    /* Complete */
+    .complete-banner { background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1.5rem; }
+    .complete-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .complete-title { font-size: 1.5rem; font-weight: 700; color: #065F46; margin-bottom: 0.5rem; }
+    .complete-stats { display: flex; justify-content: center; gap: 2rem; margin: 1.5rem 0; }
+    .complete-stat { text-align: center; }
+    .complete-stat-value { font-size: 2rem; font-weight: 700; color: #047857; }
+    .complete-stat-label { font-size: 0.875rem; color: #065F46; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div style="max-width: 800px;">
-    <!-- Status -->
-    <div class="process-status {{ upload.status }}">
-        {% if upload.status == 'pending' %}
-            <div class="spinner"></div>
-            <div>
-                <strong>Ready to Process</strong>
-                <p style="margin: 0;">Click the button below to start processing your curriculum.</p>
-            </div>
-        {% elif upload.status == 'processing' %}
-            <div class="spinner"></div>
-            <div>
-                <strong>Processing...</strong>
-                <p style="margin: 0;">Analyzing your curriculum and generating lessons. This may take a few minutes.</p>
-            </div>
-        {% elif upload.status == 'completed' %}
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
-            <div>
-                <strong>Processing Complete!</strong>
-                <p style="margin: 0;">{{ upload.lessons_created }} lessons have been created.</p>
-            </div>
-        {% elif upload.status == 'failed' %}
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            <div>
-                <strong>Processing Failed</strong>
-                <p style="margin: 0;">{{ upload.error_message }}</p>
-            </div>
-        {% endif %}
-    </div>
-    
-    <!-- Details -->
-    <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
-            <h3 class="card-title">Upload Details</h3>
+<div class="process-container">
+    <!-- Upload Header -->
+    <div class="upload-header">
+        <div>
+            <h2 style="margin: 0; font-size: 1.25rem;">{{ upload.subject_name }} Curriculum</h2>
+            <p style="margin: 0.25rem 0 0; color: var(--gray-500); font-size: 0.875rem;">{{ upload.original_filename }}</p>
         </div>
-        <div class="card-body">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--gray-500);">Subject</div>
-                    <div style="font-weight: 500;">{{ upload.subject_name }}</div>
-                </div>
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--gray-500);">Grade Level</div>
-                    <div style="font-weight: 500;">{{ upload.grade_level|default:"Not specified" }}</div>
-                </div>
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--gray-500);">Uploaded</div>
-                    <div style="font-weight: 500;">{{ upload.created_at|date:"M d, Y H:i" }}</div>
-                </div>
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--gray-500);">Uploaded By</div>
-                    <div style="font-weight: 500;">{{ upload.uploaded_by.get_full_name|default:upload.uploaded_by.username }}</div>
-                </div>
+        <div class="upload-meta">
+            <div class="upload-meta-item">
+                <div class="upload-meta-label">Grade</div>
+                <div class="upload-meta-value">{{ upload.grade_level|default:"S1" }}</div>
+            </div>
+            <div class="upload-meta-item">
+                <div class="upload-meta-label">Uploaded</div>
+                <div class="upload-meta-value">{{ upload.created_at|date:"M d, H:i" }}</div>
             </div>
         </div>
     </div>
     
-    <!-- Processing Log -->
-    {% if upload.processing_log %}
-    <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
-            <h3 class="card-title">Processing Log</h3>
+    <!-- Steps Timeline -->
+    <div class="steps-timeline">
+        {% with step=upload.current_step|default:0 %}
+        <div class="timeline-step {% if step >= 1 %}completed{% else %}pending{% endif %}">
+            <div class="timeline-icon">{% if step >= 1 %}✓{% else %}📄{% endif %}</div>
+            <div class="timeline-label">Extract<br>Text</div>
         </div>
-        <div class="card-body" style="padding: 0;">
-            <div class="log-output" id="log-output">{{ upload.processing_log }}</div>
+        <div class="timeline-step {% if upload.status == 'review' %}review{% elif step >= 2 %}completed{% else %}pending{% endif %}">
+            <div class="timeline-icon">{% if step > 2 %}✓{% elif upload.status == 'review' %}👁{% else %}📚{% endif %}</div>
+            <div class="timeline-label">Review<br>Structure</div>
+        </div>
+        <div class="timeline-step {% if step >= 3 %}{% if step == 3 and upload.status == 'processing' %}active{% else %}completed{% endif %}{% else %}pending{% endif %}">
+            <div class="timeline-icon">{% if step > 3 %}✓{% else %}💾{% endif %}</div>
+            <div class="timeline-label">Create<br>Records</div>
+        </div>
+        <div class="timeline-step {% if step >= 4 %}{% if upload.status == 'processing' %}active{% else %}completed{% endif %}{% else %}pending{% endif %}">
+            <div class="timeline-icon">{% if upload.status == 'completed' %}✓{% else %}📝{% endif %}</div>
+            <div class="timeline-label">Generate<br>Content</div>
+        </div>
+        <div class="timeline-step {% if upload.status == 'completed' %}completed{% else %}pending{% endif %}">
+            <div class="timeline-icon">{% if upload.status == 'completed' %}🎉{% else %}✅{% endif %}</div>
+            <div class="timeline-label">Complete</div>
+        </div>
+        {% endwith %}
+    </div>
+    
+    {% if upload.status == 'completed' %}
+    <!-- Complete State -->
+    <div class="complete-banner">
+        <div class="complete-icon">🎉</div>
+        <div class="complete-title">Curriculum Processing Complete!</div>
+        <p style="color: #065F46; margin: 0;">Your curriculum has been processed and lesson content generated.</p>
+        
+        <div class="complete-stats">
+            <div class="complete-stat">
+                <div class="complete-stat-value">{{ upload.units_created|default:0 }}</div>
+                <div class="complete-stat-label">Units</div>
+            </div>
+            <div class="complete-stat">
+                <div class="complete-stat-value">{{ upload.lessons_created|default:0 }}</div>
+                <div class="complete-stat-label">Lessons</div>
+            </div>
+            <div class="complete-stat">
+                <div class="complete-stat-value">{{ upload.steps_created|default:0 }}</div>
+                <div class="complete-stat-label">Steps</div>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+            {% if upload.created_course %}
+            <a href="{% url 'dashboard:course_detail' upload.created_course.id %}" class="btn btn-success" style="font-size: 1rem; padding: 0.75rem 2rem;">📖 View Course</a>
+            {% endif %}
+            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Back to Curriculum</a>
+        </div>
+    </div>
+    
+    {% elif upload.status == 'pending' %}
+    <!-- Pending: Ready to Start -->
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-title"><span class="step-number">1</span> Extract & Parse Curriculum</div>
+        </div>
+        <div class="step-body">
+            <p style="color: var(--gray-600); margin-bottom: 1rem;">We'll extract text from your document and identify units and lessons using AI.</p>
+            <div class="results-grid" style="max-width: 400px;">
+                <div class="result-card">
+                    <h4>📄 Document</h4>
+                    <div style="font-size: 0.875rem; font-weight: 500;">{{ upload.subject_name }}</div>
+                    <div style="font-size: 0.75rem; color: var(--gray-500);">{{ upload.grade_level|default:"S1" }}</div>
+                </div>
+                <div class="result-card">
+                    <h4>📋 Status</h4>
+                    <div style="font-size: 0.875rem; color: #D97706; font-weight: 500;">Ready</div>
+                </div>
+            </div>
+            <div class="step-actions">
+                <button id="start-btn" class="btn btn-primary" onclick="startProcessing()">🚀 Start Processing</button>
+                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </div>
+    </div>
+    
+    {% elif upload.status == 'processing' %}
+    <!-- Processing State -->
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-title">
+                <span class="step-number">{{ upload.current_step|default:1 }}</span>
+                {% if upload.current_step == 1 %}Extracting Text{% elif upload.current_step == 2 %}Parsing Structure{% elif upload.current_step == 3 %}Creating Records{% elif upload.current_step == 4 %}Generating Content{% else %}Processing{% endif %}
+            </div>
+            <div class="step-status processing"><div class="spinner"></div> Processing...</div>
+        </div>
+        <div class="step-body">
+            <div style="text-align: center; padding: 1.5rem;">
+                <div class="spinner" style="width: 48px; height: 48px; border-width: 3px; margin: 0 auto 1rem;"></div>
+                <p style="color: var(--gray-600); font-weight: 500;">
+                    {% if upload.current_step == 1 %}Extracting text from your document...
+                    {% elif upload.current_step == 2 %}Analyzing curriculum structure with AI...
+                    {% elif upload.current_step == 3 %}Creating units and lessons...
+                    {% elif upload.current_step == 4 %}Generating lesson content (this runs in the background)...
+                    {% else %}Working...{% endif %}
+                </p>
+                {% if upload.current_step == 4 %}
+                <p style="color: var(--gray-500); font-size: 0.875rem;">
+                    Content is being generated for each lesson. This page will auto-refresh every 10 seconds.
+                </p>
+                {% else %}
+                <p style="color: var(--gray-400); font-size: 0.875rem;">This may take a few minutes</p>
+                {% endif %}
+            </div>
+            
+            {% if upload.processing_log %}
+            <div style="margin-top: 1rem;">
+                <h4 style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 0.5rem;">📋 Progress Log</h4>
+                <pre id="progress-log" style="background: var(--gray-900); color: #10B981; padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{{ upload.processing_log }}</pre>
+            </div>
+            {% endif %}
+            
+            {% if upload.created_course %}
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--gray-100); text-align: center;">
+                <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 0.75rem;">
+                    Course created! You can view it while content generates:
+                </p>
+                <a href="{% url 'dashboard:course_detail' upload.created_course.id %}" class="btn btn-secondary">
+                    📖 View Course Progress
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% elif upload.status == 'review' %}
+    <!-- Review State -->
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-title"><span class="step-number">2</span> Review & Edit Structure</div>
+            <div class="step-status review">👁️ Needs Review</div>
+        </div>
+        <div class="step-body">
+            <div class="info-box">
+                <div class="info-box-icon">💡</div>
+                <div class="info-box-content">
+                    <div class="info-box-title">Review Your Curriculum</div>
+                    <div class="info-box-text">
+                        Click to expand units and review lessons. Edit titles and objectives as needed. 
+                        Remove any that don't belong. When satisfied, click "Approve & Generate Content".
+                    </div>
+                </div>
+            </div>
+            
+            <div class="results-grid">
+                <div class="result-card"><h4>📚 Units</h4><div class="count" id="units-count">{{ parsed_data.units|length|default:0 }}</div></div>
+                <div class="result-card"><h4>📖 Lessons</h4><div class="count" id="lessons-count">{{ total_lessons|default:0 }}</div></div>
+                <div class="result-card"><h4>📝 Characters</h4><div class="count" style="font-size: 1.5rem;">{{ upload.extracted_text_length|default:0 }}</div></div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 1.5rem 0 0.75rem;">
+                <h4 style="margin: 0;">📚 Units & Lessons</h4>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-sm btn-secondary" onclick="expandAll()">Expand All</button>
+                    <button class="btn btn-sm btn-secondary" onclick="collapseAll()">Collapse All</button>
+                    <button class="btn btn-sm btn-primary" onclick="addUnit()">+ Add Unit</button>
+                </div>
+            </div>
+            
+            <div class="unit-review-list" id="units-container">
+                {% for unit in parsed_data.units %}
+                <div class="unit-review-item" data-unit-index="{{ forloop.counter0 }}">
+                    <div class="unit-review-header" onclick="toggleUnit(this)">
+                        <div class="unit-review-title">
+                            <span class="expand-icon">▶</span>
+                            <input type="text" value="{{ unit.title }}" onclick="event.stopPropagation()" placeholder="Unit title" class="unit-title-input">
+                        </div>
+                        <div class="unit-actions">
+                            <span class="lesson-count-badge">{{ unit.lessons|length }} lessons</span>
+                            <button type="button" class="btn-icon danger" onclick="event.stopPropagation(); removeUnit(this)" title="Remove unit">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="lesson-review-list">
+                        {% for lesson in unit.lessons %}
+                        <div class="lesson-review-item" data-lesson-index="{{ forloop.counter0 }}">
+                            <span class="lesson-number">{{ forloop.counter }}.</span>
+                            <div class="lesson-details">
+                                <input type="text" value="{{ lesson.title }}" placeholder="Lesson title" class="lesson-title-input">
+                                <textarea placeholder="Learning objective (what students will be able to do)" class="lesson-objective-input" rows="2">{{ lesson.objective|default:"" }}</textarea>
+                            </div>
+                            <button type="button" class="btn-icon danger" onclick="removeLesson(this)" title="Remove lesson">✕</button>
+                        </div>
+                        {% endfor %}
+                        <div class="lesson-review-item add-lesson-row">
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="addLesson(this)">+ Add Lesson</button>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="empty-units-message" style="padding: 2rem; text-align: center; color: var(--gray-500);">
+                    No units found. Click "+ Add Unit" to create one manually.
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="generation-options">
+                <h4>⚙️ Generation Options</h4>
+                <div class="option-row">
+                    <input type="checkbox" id="generate-steps" checked>
+                    <label for="generate-steps"><strong>Generate tutoring steps</strong> - AI-powered lesson content with explanations, examples, and practice questions</label>
+                </div>
+                <div class="option-row">
+                    <input type="checkbox" id="generate-media" checked>
+                    <label for="generate-media"><strong>Generate media</strong> - Educational images and diagrams for each lesson</label>
+                </div>
+                <div class="option-row">
+                    <input type="checkbox" id="generate-exit-tickets" checked>
+                    <label for="generate-exit-tickets"><strong>Generate exit tickets</strong> - Assessment questions to check understanding</label>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--gray-500); margin: 0.75rem 0 0 1.5rem;">
+                    Content generation runs in the background. You can view progress on this page.
+                </p>
+            </div>
+            
+            <div class="step-actions">
+                <button type="button" class="btn btn-success btn-lg" onclick="approveAndGenerate()" id="approve-btn">
+                    ✓ Approve & Generate Content
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="saveOnly()">
+                    💾 Save Structure Only
+                </button>
+                <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-secondary">
+                    ✗ Re-upload
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    {% elif upload.status == 'failed' %}
+    <!-- Failed State -->
+    <div class="step-card" style="border: 2px solid #FCA5A5;">
+        <div class="step-header" style="background: #FEE2E2;">
+            <div class="step-title" style="color: #991B1B;">❌ Processing Failed</div>
+        </div>
+        <div class="step-body">
+            <p style="color: #991B1B; margin-bottom: 1rem;">{{ upload.error_message|default:"An error occurred." }}</p>
+            {% if upload.processing_log %}
+            <details style="margin-bottom: 1rem;"><summary style="cursor: pointer;">View details</summary>
+            <pre style="background: var(--gray-100); padding: 1rem; border-radius: 8px; font-size: 0.75rem; margin-top: 0.5rem;">{{ upload.processing_log }}</pre>
+            </details>
+            {% endif %}
+            <div class="step-actions">
+                <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary">📤 Upload Different File</a>
+                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Back</a>
+            </div>
         </div>
     </div>
     {% endif %}
-    
-    <!-- Actions -->
-    <div style="display: flex; gap: 1rem;">
-        {% if upload.status == 'pending' %}
-            <button id="start-btn" class="btn btn-primary" onclick="startProcessing()">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                Start Processing
-            </button>
-        {% elif upload.status == 'completed' %}
-            {% if upload.created_course %}
-                <a href="{% url 'dashboard:course_detail' upload.created_course.id %}" class="btn btn-primary">
-                    View Course
-                </a>
-            {% endif %}
-        {% elif upload.status == 'failed' %}
-            <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary">
-                Try Again
-            </a>
-        {% endif %}
-        
-        <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">
-            Back to Curriculum
-        </a>
-    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    function startProcessing() {
-        const btn = document.getElementById('start-btn');
-        btn.disabled = true;
-        btn.innerHTML = `
-            <div class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>
-            Processing...
-        `;
-        
-        fetch('{% url "dashboard:curriculum_generate" upload.id %}', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                window.location.reload();
-            } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
-                window.location.reload();
-            }
-        })
-        .catch(err => {
-            alert('Error: ' + err.message);
-            window.location.reload();
+const uploadId = {{ upload.id }};
+const csrfToken = '{{ csrf_token }}';
+
+function startProcessing() {
+    const btn = document.getElementById('start-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Processing...';
+    
+    fetch('{% url "dashboard:curriculum_generate" upload.id %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+    })
+    .then(r => r.json())
+    .then(data => { window.location.reload(); })
+    .catch(err => { alert('Error: ' + err.message); window.location.reload(); });
+}
+
+function toggleUnit(header) {
+    header.closest('.unit-review-item').classList.toggle('expanded');
+}
+
+function expandAll() {
+    document.querySelectorAll('.unit-review-item').forEach(u => u.classList.add('expanded'));
+}
+
+function collapseAll() {
+    document.querySelectorAll('.unit-review-item').forEach(u => u.classList.remove('expanded'));
+}
+
+function removeUnit(btn) {
+    if (confirm('Remove this unit and all its lessons?')) {
+        btn.closest('.unit-review-item').remove();
+        updateCounts();
+    }
+}
+
+function removeLesson(btn) {
+    btn.closest('.lesson-review-item').remove();
+    updateCounts();
+}
+
+function addUnit() {
+    const container = document.getElementById('units-container');
+    const idx = container.querySelectorAll('.unit-review-item').length;
+    const html = `
+        <div class="unit-review-item expanded" data-unit-index="${idx}">
+            <div class="unit-review-header" onclick="toggleUnit(this)">
+                <div class="unit-review-title">
+                    <span class="expand-icon">▶</span>
+                    <input type="text" value="New Unit" onclick="event.stopPropagation()" class="unit-title-input">
+                </div>
+                <div class="unit-actions">
+                    <span class="lesson-count-badge">0 lessons</span>
+                    <button type="button" class="btn-icon danger" onclick="event.stopPropagation(); removeUnit(this)">🗑️</button>
+                </div>
+            </div>
+            <div class="lesson-review-list">
+                <div class="lesson-review-item add-lesson-row">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addLesson(this)">+ Add Lesson</button>
+                </div>
+            </div>
+        </div>`;
+    const empty = container.querySelector('.empty-units-message');
+    if (empty) empty.remove();
+    container.insertAdjacentHTML('beforeend', html);
+    updateCounts();
+}
+
+function addLesson(btn) {
+    const list = btn.closest('.lesson-review-list');
+    const count = list.querySelectorAll('.lesson-review-item[data-lesson-index]').length;
+    const html = `
+        <div class="lesson-review-item" data-lesson-index="${count}">
+            <span class="lesson-number">${count + 1}.</span>
+            <div class="lesson-details">
+                <input type="text" value="New Lesson" placeholder="Lesson title" class="lesson-title-input">
+                <textarea placeholder="Learning objective (e.g., Students will be able to...)" class="lesson-objective-input" rows="2"></textarea>
+            </div>
+            <button type="button" class="btn-icon danger" onclick="removeLesson(this)">✕</button>
+        </div>`;
+    btn.closest('.lesson-review-item').insertAdjacentHTML('beforebegin', html);
+    updateCounts();
+}
+
+function updateCounts() {
+    const units = document.querySelectorAll('.unit-review-item');
+    let total = 0;
+    units.forEach(u => {
+        const lessons = u.querySelectorAll('.lesson-review-item[data-lesson-index]');
+        const badge = u.querySelector('.lesson-count-badge');
+        if (badge) badge.textContent = lessons.length + ' lessons';
+        total += lessons.length;
+        lessons.forEach((l, i) => { 
+            const n = l.querySelector('.lesson-number'); 
+            if (n) n.textContent = (i+1) + '.'; 
         });
+    });
+    document.getElementById('units-count').textContent = units.length;
+    document.getElementById('lessons-count').textContent = total;
+}
+
+function collectData() {
+    const units = [];
+    document.querySelectorAll('.unit-review-item').forEach(u => {
+        const title = u.querySelector('.unit-title-input')?.value?.trim();
+        if (!title) return;
+        const lessons = [];
+        u.querySelectorAll('.lesson-review-item[data-lesson-index]').forEach(l => {
+            const lessonTitle = l.querySelector('.lesson-title-input')?.value?.trim();
+            const objective = l.querySelector('.lesson-objective-input')?.value?.trim() || '';
+            if (lessonTitle) {
+                lessons.push({ 
+                    title: lessonTitle, 
+                    objective: objective 
+                });
+            }
+        });
+        units.push({ title, lessons });
+    });
+    return {
+        units,
+        generate_steps: document.getElementById('generate-steps')?.checked ?? true,
+        generate_media: document.getElementById('generate-media')?.checked ?? true,
+        generate_exit_tickets: document.getElementById('generate-exit-tickets')?.checked ?? true
+    };
+}
+
+function approveAndGenerate() {
+    const btn = document.getElementById('approve-btn');
+    const data = collectData();
+    
+    if (data.units.length === 0) {
+        alert('Please add at least one unit with lessons.');
+        return;
     }
     
-    {% if upload.status == 'processing' %}
-    // Auto-refresh while processing
-    setTimeout(() => window.location.reload(), 5000);
-    {% endif %}
+    const totalLessons = data.units.reduce((sum, u) => sum + u.lessons.length, 0);
+    if (totalLessons === 0) {
+        alert('Please add at least one lesson.');
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Creating curriculum...';
+    
+    fetch(`/dashboard/curriculum/process/${uploadId}/approve/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else { 
+            alert('Error: ' + (data.error || 'Unknown')); 
+            btn.disabled = false; 
+            btn.innerHTML = '✓ Approve & Generate Content'; 
+        }
+    })
+    .catch(err => { 
+        alert('Error: ' + err.message); 
+        btn.disabled = false; 
+        btn.innerHTML = '✓ Approve & Generate Content'; 
+    });
+}
+
+function saveOnly() {
+    const btn = event.target;
+    const data = collectData();
+    
+    if (data.units.length === 0) {
+        alert('Please add at least one unit with lessons.');
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Saving...';
+    
+    data.generate_steps = false;
+    data.generate_media = false;
+    data.generate_exit_tickets = false;
+    
+    fetch(`/dashboard/curriculum/process/${uploadId}/approve/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => { window.location.reload(); })
+    .catch(err => { alert('Error: ' + err.message); btn.disabled = false; btn.innerHTML = '💾 Save Structure Only'; });
+}
+
+{% if upload.status == 'processing' %}
+// Auto-refresh while processing (every 10 seconds for content generation)
+const refreshInterval = {{ upload.current_step }} >= 4 ? 10000 : 5000;
+setTimeout(() => window.location.reload(), refreshInterval);
+
+// Auto-scroll log to bottom
+const logEl = document.getElementById('progress-log');
+if (logEl) {
+    logEl.scrollTop = logEl.scrollHeight;
+}
+{% endif %}
 </script>
 {% endblock %}

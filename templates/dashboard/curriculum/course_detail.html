@@ -1,10 +1,117 @@
 {% extends "dashboard/base.html" %}
+{% load dashboard_extras %}
 
 {% block title %}{{ course.title }}{% endblock %}
 {% block page_title %}{{ course.title }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 9999px;
+    }
+    .status-indicator.ready {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    .status-indicator.pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .status-indicator.missing {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .stats-bar {
+        display: flex;
+        gap: 2rem;
+        padding: 1rem 1.5rem;
+        background: var(--gray-50);
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+    .stat-item {
+        text-align: center;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .progress-bar {
+        height: 6px;
+        background: var(--gray-200);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        background: var(--success);
+        border-radius: 3px;
+        transition: width 0.3s;
+    }
+    
+    .lesson-row {
+        display: grid;
+        grid-template-columns: 40px 1fr 120px 80px 140px 80px;
+        gap: 1rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--gray-100);
+        align-items: center;
+    }
+    .lesson-row:last-child {
+        border-bottom: none;
+    }
+    .lesson-row:hover {
+        background: var(--gray-50);
+    }
+    
+    .content-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    .content-badge {
+        font-size: 0.65rem;
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    .content-badge.steps { background: #dbeafe; color: #1e40af; }
+    .content-badge.media { background: #fce7f3; color: #9d174d; }
+    .content-badge.exit { background: #d1fae5; color: #065f46; }
+    .content-badge.none { background: #f3f4f6; color: #6b7280; }
+    
+    .bulk-actions {
+        display: flex;
+        gap: 0.5rem;
+        padding: 1rem;
+        background: #eff6ff;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        align-items: center;
+    }
+    .bulk-actions-label {
+        font-size: 0.875rem;
+        color: #1e40af;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<a href="{% url 'dashboard:curriculum_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1.5rem;">
+<a href="{% url 'dashboard:curriculum_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
     </svg>
@@ -17,99 +124,201 @@
         <div style="display: flex; justify-content: space-between; align-items: start;">
             <div>
                 <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-                    <h2 style="font-size: 1.5rem;">{{ course.title }}</h2>
+                    <h2 style="font-size: 1.5rem; margin: 0;">{{ course.title }}</h2>
                     {% if course.is_published %}
                         <span class="badge badge-success">Published</span>
                     {% else %}
                         <span class="badge badge-warning">Draft</span>
                     {% endif %}
                 </div>
-                <p style="color: var(--gray-500);">{{ course.description|default:"No description" }}</p>
-                <div style="margin-top: 0.75rem; display: flex; gap: 1.5rem; font-size: 0.875rem; color: var(--gray-500);">
-                    <span><strong>{{ course.units.count }}</strong> units</span>
-                    <span><strong>{{ course.units.all|length }}</strong> lessons</span>
-                    <span>Grade: <strong>{{ course.grade_level }}</strong></span>
-                </div>
+                <p style="color: var(--gray-500); margin: 0.5rem 0;">{{ course.description|default:"No description" }}</p>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-secondary btn-sm">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                    </svg>
-                    Edit
-                </button>
+                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary btn-sm">Edit Course</a>
                 {% if not course.is_published %}
-                <button class="btn btn-primary btn-sm">Publish</button>
+                <form method="post" action="{% url 'dashboard:course_publish_all' course.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Publish all lessons in this course?');">Publish All</button>
+                </form>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
 
+<!-- Stats Bar -->
+<div class="stats-bar">
+    <div class="stat-item">
+        <div class="stat-value">{{ total_lessons }}</div>
+        <div class="stat-label">Total Lessons</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value" style="color: var(--success);">{{ lessons_with_content }}</div>
+        <div class="stat-label">With Content</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value" style="color: var(--info);">{{ total_media }}</div>
+        <div class="stat-label">Media Assets</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value" style="color: var(--warning);">{{ total_media_pending }}</div>
+        <div class="stat-label">Media Pending</div>
+    </div>
+    <div style="flex: 1;"></div>
+    <div class="stat-item" style="min-width: 150px;">
+        <div style="margin-bottom: 0.25rem; font-size: 0.75rem; color: var(--gray-500);">Content Progress</div>
+        <div class="progress-bar">
+            {% if total_lessons > 0 %}
+                {% widthratio lessons_with_content total_lessons 100 as progress %}
+            {% else %}
+                {% with progress=0 %}{% endwith %}
+            {% endif %}
+            <div class="progress-bar-fill" style="width: {{ progress|default:0 }}%;"></div>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
+            {{ progress|default:0 }}% complete
+        </div>
+    </div>
+</div>
+
+<!-- Content Generation Status -->
+{% if lessons_without_content > 0 %}
+<div class="bulk-actions" style="background: #FEF3C7; border: 1px solid #FCD34D;">
+    <span style="font-size: 1.25rem;">⚠️</span>
+    <div style="flex: 1;">
+        <strong style="color: #92400E;">{{ lessons_without_content }} lesson{{ lessons_without_content|pluralize }} need{{ lessons_without_content|pluralize:"s," }} content</strong>
+        <div style="font-size: 0.8rem; color: #A16207;">Click "Generate All Content" to create tutoring steps, or use ⚡ on individual lessons</div>
+    </div>
+    <form method="post" action="{% url 'dashboard:course_generate_all' course.id %}" style="display: inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary" onclick="this.disabled=true; this.innerHTML='⏳ Generating...'; this.form.submit();">
+            ⚡ Generate All Content
+        </button>
+    </form>
+</div>
+{% else %}
+<!-- Bulk Actions -->
+<div class="bulk-actions">
+    <span class="bulk-actions-label">🚀 Quick Actions:</span>
+    <form method="post" action="{% url 'dashboard:course_generate_all' course.id %}" style="display: inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-sm" onclick="this.disabled=true; this.innerHTML='Generating...'; this.form.submit();">
+            ⚡ Generate All Content & Media
+        </button>
+    </form>
+</div>
+{% endif %}
+
 <!-- Units and Lessons -->
 {% for unit in units %}
 <div class="card" style="margin-bottom: 1rem;">
     <div class="card-header" style="background: var(--gray-50);">
         <div>
-            <h3 class="card-title">{{ forloop.counter }}. {{ unit.title }}</h3>
-            <p style="font-size: 0.875rem; color: var(--gray-500); margin-top: 0.25rem;">
+            <h3 class="card-title" style="margin: 0;">{{ forloop.counter }}. {{ unit.title }}</h3>
+            <p style="font-size: 0.875rem; color: var(--gray-500); margin: 0.25rem 0 0 0;">
                 {{ unit.lessons.count }} lesson{{ unit.lessons.count|pluralize }}
             </p>
         </div>
-        <button class="btn btn-secondary btn-sm">+ Add Lesson</button>
+        <a href="{% url 'dashboard:lesson_create' unit.id %}" class="btn btn-secondary btn-sm">+ Add Lesson</a>
     </div>
     <div class="card-body" style="padding: 0;">
         {% if unit.lessons.all %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th style="width: 40px;">#</th>
-                    <th>Lesson</th>
-                    <th>Objective</th>
-                    <th style="width: 100px;">Duration</th>
-                    <th style="width: 120px;">Students</th>
-                    <th style="width: 100px;">Status</th>
-                    <th style="width: 80px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for lesson in unit.lessons.all %}
-                <tr>
-                    <td style="color: var(--gray-400);">{{ forloop.counter }}</td>
-                    <td>
-                        <span style="font-weight: 500;">{{ lesson.title }}</span>
-                    </td>
-                    <td style="font-size: 0.875rem; color: var(--gray-500);">
-                        {{ lesson.objective|truncatewords:12 }}
-                    </td>
-                    <td>{{ lesson.estimated_minutes }} min</td>
-                    <td>
-                        {% with stats=lesson_stats|default_if_none:lesson.id %}
-                            {% if stats %}
-                                <span style="color: var(--success);">{{ stats.students_mastered }}</span> / 
-                                <span>{{ stats.students_started }}</span>
-                            {% else %}
-                                <span style="color: var(--gray-400);">0 / 0</span>
-                            {% endif %}
-                        {% endwith %}
-                    </td>
-                    <td>
-                        {% if lesson.is_published %}
-                            <span class="badge badge-success">Published</span>
+        
+        <!-- Header Row -->
+        <div class="lesson-row" style="background: var(--gray-50); font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">
+            <div>#</div>
+            <div>Lesson</div>
+            <div>Content</div>
+            <div>Students</div>
+            <div>Status</div>
+            <div></div>
+        </div>
+        
+        {% for lesson in unit.lessons.all %}
+        <div class="lesson-row">
+            <div style="color: var(--gray-400); font-weight: 500;">{{ forloop.counter }}</div>
+            
+            <div>
+                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="font-weight: 500; color: var(--gray-900); text-decoration: none;">
+                    {{ lesson.title }}
+                </a>
+                <div style="font-size: 0.8rem; color: var(--gray-500); margin-top: 0.15rem;">
+                    {{ lesson.objective|truncatewords:10 }}
+                </div>
+            </div>
+            
+            <div class="content-badges">
+                {% with lstats=lesson_stats|get_item:lesson.id %}
+                    {% if lstats %}
+                        {% if lstats.has_content %}
+                            <span class="content-badge steps">{{ lstats.steps_count }} steps</span>
                         {% else %}
-                            <span class="badge badge-warning">Draft</span>
+                            <span class="content-badge none">No content</span>
                         {% endif %}
-                    </td>
-                    <td>
-                        <button class="btn btn-secondary btn-sm">Edit</button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        
+                        {% if lstats.media_count > 0 %}
+                            <span class="content-badge media">{{ lstats.media_count }} 📷</span>
+                        {% elif lstats.media_pending > 0 %}
+                            <span class="content-badge none" title="{{ lstats.media_pending }} media pending">⏳ {{ lstats.media_pending }}</span>
+                        {% endif %}
+                        
+                        {% if lstats.has_exit_ticket %}
+                            <span class="content-badge exit">✓ Exit</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="content-badge none">No content</span>
+                    {% endif %}
+                {% endwith %}
+            </div>
+            
+            <div style="font-size: 0.875rem;">
+                {% with lstats=lesson_stats|get_item:lesson.id %}
+                    {% if lstats %}
+                        <span style="color: var(--success);">{{ lstats.students_mastered }}</span> / 
+                        <span>{{ lstats.students_started }}</span>
+                    {% else %}
+                        <span style="color: var(--gray-400);">—</span>
+                    {% endif %}
+                {% endwith %}
+            </div>
+            
+            <div>
+                {% if lesson.is_published %}
+                    <span class="status-indicator ready">✓ Published</span>
+                {% else %}
+                    {% with lstats=lesson_stats|get_item:lesson.id %}
+                        {% if lstats and lstats.has_content %}
+                            {% if lstats.has_exit_ticket %}
+                                <span class="status-indicator ready">Ready</span>
+                            {% else %}
+                                <span class="status-indicator pending">Has Content</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="status-indicator missing">No Content</span>
+                        {% endif %}
+                    {% endwith %}
+                {% endif %}
+            </div>
+            
+            <div style="display: flex; gap: 0.25rem;">
+                {% with lstats=lesson_stats|get_item:lesson.id %}
+                    {% if not lstats or not lstats.has_content %}
+                    <form method="post" action="{% url 'dashboard:lesson_generate_content' lesson.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary btn-sm" title="Generate tutoring content" onclick="this.disabled=true; this.innerHTML='⏳'; this.form.submit();">
+                            ⚡
+                        </button>
+                    </form>
+                    {% endif %}
+                {% endwith %}
+                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">Review</a>
+            </div>
+        </div>
+        {% endfor %}
+        
         {% else %}
-        <div class="empty-state">
-            <p>No lessons in this unit yet</p>
+        <div class="empty-state" style="padding: 2rem;">
+            <p style="margin: 0;">No lessons in this unit yet</p>
         </div>
         {% endif %}
     </div>
@@ -117,23 +326,22 @@
 {% empty %}
 <div class="card">
     <div class="empty-state">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 48px; height: 48px;">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
         </svg>
         <h3>No Units Yet</h3>
-        <p>Add units to organize your course content.</p>
-        <button class="btn btn-primary">Add Unit</button>
+        <p>Upload a curriculum document to automatically create units and lessons.</p>
+        <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary">Upload Curriculum</a>
     </div>
 </div>
 {% endfor %}
 
-<!-- Add Unit Button -->
 {% if units %}
-<button class="btn btn-secondary" style="margin-top: 1rem;">
+<a href="{% url 'dashboard:unit_create' course.id %}" class="btn btn-secondary" style="margin-top: 1rem;">
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
     </svg>
     Add Unit
-</button>
+</a>
 {% endif %}
 {% endblock %}

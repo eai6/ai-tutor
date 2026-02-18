@@ -13,6 +13,8 @@ class CurriculumUpload(models.Model):
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
         PROCESSING = 'processing', 'Processing'
+        REVIEW = 'review', 'Review'  # Waiting for teacher approval
+        MEDIA_PROCESSING = 'media_processing', 'Media Processing'  # Generating images
         COMPLETED = 'completed', 'Completed'
         FAILED = 'failed', 'Failed'
     
@@ -40,6 +42,11 @@ class CurriculumUpload(models.Model):
     )
     error_message = models.TextField(blank=True)
     
+    # Processing state
+    current_step = models.IntegerField(default=0)  # Track which step we're on
+    parsed_data = models.JSONField(null=True, blank=True)  # Store parsed curriculum for review
+    extracted_text_length = models.IntegerField(default=0)
+    
     # Results
     created_course = models.ForeignKey(
         'curriculum.Course',
@@ -47,10 +54,13 @@ class CurriculumUpload(models.Model):
         null=True,
         blank=True
     )
+    units_created = models.IntegerField(default=0)
     lessons_created = models.IntegerField(default=0)
+    steps_created = models.IntegerField(default=0)  # Lesson steps generated
     
     # Processing log
     processing_log = models.TextField(blank=True)
+    teacher_feedback = models.TextField(blank=True)  # Store teacher feedback
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
