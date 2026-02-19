@@ -4,101 +4,11 @@
 
 ---
 
-## 1. Distilled Principles (Chapters 10–23)
-
-Fourteen principles emerge from the research synthesised in *The Math Academy Way*. They are ordered from the most fundamental (how the brain works) to the most systemic (what technology must orchestrate).
-
-### 1.1 Active Learning (Ch 10)
-
-Every student must be **actively performing** learning tasks on every piece of material — not passively consuming explanations. Hundreds of studies confirm that passive methods (video, lecture, re-reading) produce significantly worse outcomes. "Following along" is not learning; learning is a positive change in **long-term memory**, demonstrated by the ability to reproduce information and solve problems independently.
-
-**Implication for the tutor:** Instructional explanations must be a *minimum effective dose* — just enough for the student to begin solving problems within minutes. The majority of session time should be spent on the student doing something (answering, computing, explaining back) rather than reading script.
-
-### 1.2 Direct Instruction + Active Practice (Ch 11)
-
-Active learning should not mean unguided discovery. The optimal combination is **"Active and Direct"**: all information is explicitly communicated, and all practice is performed with corrective feedback. Rapidly alternating between minimum effective doses of instruction and practice outperforms both pure lecture and unguided exploration.
-
-**Implication for the tutor:** Every teaching segment should be immediately followed by a student action. The tutor should never present two consecutive blocks of pure instruction without a practice opportunity in between.
-
-### 1.3 Deliberate Practice (Ch 12)
-
-Not all practice is equal. **Deliberate practice** consists of individualised tasks specifically chosen to improve targeted aspects of performance, through repetition and successive refinement at the **edge of the student's ability**. It requires full concentration, corrective feedback, and progressive challenge. Mindless repetition within one's repertoire does not count.
-
-**Implication for the tutor:** Practice questions must be calibrated to the student's demonstrated level — not too easy (mindless) and not too far beyond mastery (frustrating). After errors, the tutor should provide focused corrective feedback on the specific skill that failed, then offer a similar but slightly varied problem.
-
-### 1.4 Mastery Learning (Ch 13)
-
-Students must demonstrate **proficiency on prerequisites before advancing**. True mastery learning at a granular level requires individualised instruction. Students are 3–4× more likely to succeed on a topic when it lies on their personal **knowledge frontier** (Zone of Proximal Development). Advancing students who lack prerequisite mastery wastes their time and builds learned helplessness.
-
-**Implication for the tutor:** The engine should gate progression on demonstrated mastery, not on step count. If a student consistently fails practice problems, the session should diagnose which prerequisite is the bottleneck rather than simply revealing the answer and moving on.
-
-### 1.5 Minimising Cognitive Load (Ch 14)
-
-Working memory is limited to roughly 4 chunks / ~20 seconds. Cognitive overload prevents learning entirely and is a better predictor of academic success than IQ. The antidote is **fine scaffolding**: break material into many small steps, start each with a worked example, use subgoal labelling (grouping solution steps into meaningful units), and leverage **dual coding** (verbal + visual).
-
-**Implication for the tutor:** Tutor responses should present one idea at a time. Worked examples should appear before any practice on a new concept. Each explanation should name its subgoals explicitly. Diagrams and visual media should be surfaced inline, not deferred.
-
-### 1.6 Developing Automaticity (Ch 15)
-
-When low-level skills become automatic, they stop consuming working memory slots, freeing capacity for higher-order reasoning. Without automaticity on basics, even perfectly scaffolded instruction for an advanced skill will fail because the student cannot fit all the pieces in working memory at once.
-
-**Implication for the tutor:** Review of foundational skills should be woven into sessions. If a student is slow or inaccurate on a prerequisite skill during a lesson, the tutor should note it for remediation rather than ignoring it.
-
-### 1.7 Layering (Ch 16)
-
-Continually building on existing knowledge (layering) produces **retroactive facilitation** (reinforcing prior knowledge) and **proactive facilitation** (making new knowledge easier to acquire). The more connections to a piece of knowledge, the stronger and more deeply understood it becomes. Advanced topics should genuinely exercise earlier skills, not avoid them.
-
-**Implication for the tutor:** Practice problems should authentically require prerequisite skills. Explanations should explicitly link new concepts to previously mastered ones ("This is like the fraction division you already know, but now the numerator is an expression").
-
-### 1.8 Non-Interference (Ch 17)
-
-Highly similar concepts taught in close succession cause **associative interference** — students confuse them. Spacing related concepts apart and teaching dissimilar material together reduces confusion, improves recall, and keeps sessions varied and engaging.
-
-**Implication for the tutor:** When serving lessons, the system should avoid placing confusable topics back-to-back. Within a single lesson, the tutor should make discriminating features explicit when a concept could be confused with a related one.
-
-### 1.9 Spaced Repetition (Ch 18)
-
-Memory decays, but spaced reviews restore *and consolidate* it, slowing decay each time. Optimal spacing adapts to individual performance — expanding intervals after success, shrinking after failure. Massed practice (cramming) is markedly inferior.
-
-**Implication for the tutor:** The system needs a per-student, per-skill scheduling mechanism that determines when review is due. Exit tickets and lesson completion alone cannot substitute for ongoing, spaced review over days and weeks.
-
-### 1.10 Interleaving / Mixed Practice (Ch 19)
-
-Blocked practice (15 identical problems) creates an illusion of mastery. **Interleaved** practice — mixing different problem types — forces students to identify which strategy applies, producing vastly superior retention and transfer. Each review assignment should cover a broad mix of previously learned topics in minimum effective doses.
-
-**Implication for the tutor:** Exit tickets and review tasks should draw from a mix of topics, not just the lesson just taught. Within a session's practice phase, problem types should vary enough that the student cannot mindlessly repeat one procedure.
-
-### 1.11 The Testing Effect / Retrieval Practice (Ch 20)
-
-Actively retrieving information from memory — without looking at reference material — is the single most effective consolidation strategy. Combined with spaced repetition, it produces **spaced retrieval practice**, the gold standard. Frequent, low-stakes quizzes (with feedback) promote learning on both tested and untested material.
-
-**Implication for the tutor:** The tutor should not offer hints too eagerly; the student should first attempt genuine retrieval. Scaffolding should be stripped during review so the student must recall rather than recognise.
-
-### 1.12 Targeted Remediation (Ch 21)
-
-When a student struggles, the response should not be to lower the bar (hints that give away the answer), but to **target the specific prerequisite skill** causing struggle. Give more questions, provide a break and return later, and if the same point of failure recurs, assign remedial practice on the precise key prerequisite.
-
-**Implication for the tutor:** The engine needs a mapping from each lesson/skill to its **key prerequisites**. When a student fails repeatedly, the system should serve remedial practice on those prerequisites rather than recycling the same unsolvable problem or simply revealing the answer.
-
-### 1.13 Gamification (Ch 22)
-
-XP systems, leaderboards, streak mechanics, and bonus/penalty structures significantly increase engagement, learning, and enjoyment. A "carrot and stick" design awards bonus XP for perfect performance and penalises task blow-offs. Loophole-closing (changing questions on retakes, delay periods) prevents gaming.
-
-**Implication for the tutor:** The system should track and surface XP, streaks, or progress indicators within the tutoring session. Positive reinforcement should be prominent; penalties reserved for clearly adversarial behaviour.
-
-### 1.14 Expertise Reversal Effect (Ch 14, revisited)
-
-Scaffolding that helps beginners *hinders* experts. As mastery develops, scaffolding should be **progressively stripped away** — worked examples give way to retrieval practice, hints become unavailable on review, and reference material is withheld to force independent problem-solving.
-
-**Implication for the tutor:** The tutoring engine should modulate its support level based on the student's demonstrated mastery. First encounters with a topic get full scaffolding; review encounters get progressively less.
-
----
-
-## 2. Gap Analysis: Current Implementation vs. Principles
+## 1. Gap Analysis: Current Implementation vs. Principles
 
 The architecture at commit `9bee720` has two engines (conversational AI tutor + legacy step-based), a skills knowledge graph with SM-2 spaced repetition, and five personalization services. The critical finding is that **much of the science-of-learning infrastructure is built but not wired in**. The gap analysis distinguishes between the two engines and the unwired services.
 
-### 2.1 Conversational AI Tutor (Primary Engine)
+### 1.1 Conversational AI Tutor (Primary Engine)
 
 | # | Principle | What Exists | Gap / Risk |
 |---|-----------|-------------|------------|
@@ -117,7 +27,7 @@ The architecture at commit `9bee720` has two engines (conversational AI tutor + 
 | 13 | **Gamification** | `StudentKnowledgeProfile` has `total_xp`, `level`, `current_streak_days` fields. `SkillPracticeLog` tracks streaks. | **Not surfaced to the student.** No XP is awarded or displayed during sessions. No streak UI. No leaderboard. No bonus/penalty system. The fields exist in the DB but are never incremented by any engine or view. |
 | 14 | **Expertise Reversal** | No mechanism. | Both engines provide the same level of scaffolding on first encounter and review. There is no concept of reducing support as mastery increases. `StudentSkillMastery.mastery_level` could drive this but is not consulted. |
 
-### 2.2 Step-Based Engine (Legacy)
+### 1.2 Step-Based Engine (Legacy)
 
 All gaps from the conversational tutor apply equally to the step-based engine, **plus** the following additional gaps:
 
@@ -128,7 +38,7 @@ All gaps from the conversational tutor apply equally to the step-based engine, *
 | **No remediation loop** | When max attempts are exhausted, the answer is shown and the engine advances. There is no re-teaching or prerequisite branching. |
 | **No concept coverage tracking** | The engine has no awareness of whether the student understood the material — only whether they got the right answer. |
 
-### 2.3 Summary: Built vs. Wired
+### 1.3 Summary: Built vs. Wired
 
 | Component | Status | Impact |
 |-----------|--------|--------|
@@ -148,7 +58,7 @@ All gaps from the conversational tutor apply equally to the step-based engine, *
 
 ---
 
-## 3. Recommendations
+## 2. Recommendations
 
 Recommendations are grouped into three tiers. Because so much infrastructure already exists, the primary work is **integration, not construction**.
 
@@ -259,7 +169,7 @@ If accuracy is above 90%:
 
 ---
 
-## 4. System Prompt for the Conversational AI Tutor
+## 3. System Prompt for the Conversational AI Tutor
 
 This prompt replaces the current `TUTOR_SYSTEM_PROMPT` (lines 43–99 of `conversational_tutor.py`). It encodes all fourteen science-of-learning principles as behavioural instructions. Variables in `{{double_braces}}` should be replaced per-session.
 
