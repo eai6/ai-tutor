@@ -161,6 +161,26 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
             log(f"   ⚠️ Exit ticket generation error: {str(e)}")
             logger.error(f"Exit ticket generation error: {e}")
         
+        # Phase 4: Extract skills and build knowledge graph
+        skills_extracted = 0
+        prerequisites_created = 0
+        log(f"")
+        log(f"🧠 Phase 4: Extracting skills and building knowledge graph...")
+
+        try:
+            from apps.tutoring.skill_extraction import SkillExtractionService
+            skill_service = SkillExtractionService(institution_id=institution_id)
+            skill_result = skill_service.extract_skills_for_course(course)
+            skills_extracted = skill_result.get('skills_created', 0)
+            prerequisites_created = skill_result.get('prerequisites_created', 0)
+            log(f"   ✓ Extracted {skills_extracted} skills, {prerequisites_created} prerequisites")
+            if skill_result.get('errors'):
+                for error in skill_result['errors'][:5]:
+                    log(f"   ⚠️ {error}")
+        except Exception as e:
+            log(f"   ⚠️ Skill extraction error: {str(e)}")
+            logger.error(f"Skill extraction error: {e}")
+
         # Summary
         log(f"")
         log(f"🎉 All Done!")
@@ -169,7 +189,8 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
         if generate_media:
             log(f"   🖼️ {media_generated} media assets")
         log(f"   ❓ {exit_tickets_generated} exit tickets")
-        
+        log(f"   🧠 {skills_extracted} skills extracted, {prerequisites_created} prerequisites")
+
         # Update upload record
         if upload:
             upload.steps_created = total_steps
@@ -177,7 +198,7 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
             from django.utils import timezone
             upload.completed_at = timezone.now()
             upload.save()
-        
+
         return {
             'success': success,
             'failed': failed,
@@ -185,6 +206,8 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
             'total_steps': total_steps,
             'media_generated': media_generated,
             'exit_tickets_generated': exit_tickets_generated,
+            'skills_extracted': skills_extracted,
+            'prerequisites_created': prerequisites_created,
         }
         
     except Exception as e:

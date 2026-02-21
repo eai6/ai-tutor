@@ -351,3 +351,13 @@ class ExitTicketAttempt(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.exit_ticket.lesson.title}: {self.score}/10"
+
+
+# Import skills models so Django discovers them for migrations
+from apps.tutoring.skills_models import (  # noqa: E402, F401
+    Skill,
+    LessonPrerequisite,
+    StudentSkillMastery,
+    SkillPracticeLog,
+    StudentKnowledgeProfile,
+)

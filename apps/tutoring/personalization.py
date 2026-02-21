@@ -458,9 +458,12 @@ class SkillAssessmentService:
             retention_estimate=retention_before,
         )
         
+        # Award XP for practice (R13)
+        self._award_practice_xp(skill.course, was_correct, hints_used)
+
         # Update knowledge profile
         self._update_knowledge_profile(skill.course)
-        
+
         return SkillAssessment(
             skill=skill,
             was_correct=was_correct,
@@ -504,6 +507,34 @@ class SkillAssessmentService:
         else:
             return 5  # Perfect recall
     
+    def _award_practice_xp(self, course: Course, was_correct: bool, hints_used: int):
+        """
+        Award XP for practice attempts (R13 - Gamification).
+
+        XP Schedule:
+        - Correct answer: 10 XP
+        - No hints bonus: +5 XP
+        - Streak bonus: +current_streak_days XP (capped at 10)
+        - Incorrect answer: 2 XP (effort reward)
+        """
+        try:
+            profile, _ = StudentKnowledgeProfile.objects.get_or_create(
+                student=self.student,
+                course=course
+            )
+            if was_correct:
+                xp = 10
+                if hints_used == 0:
+                    xp += 5  # No-hints bonus
+                streak_bonus = min(profile.current_streak_days, 10)
+                xp += streak_bonus
+            else:
+                xp = 2  # Effort reward
+
+            profile.add_xp(xp, reason='practice')
+        except Exception as e:
+            logger.warning(f"Failed to award XP: {e}")
+
     def _update_knowledge_profile(self, course: Course):
         """Update the student's aggregated knowledge profile."""
         profile, created = StudentKnowledgeProfile.objects.get_or_create(

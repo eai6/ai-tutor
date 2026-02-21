@@ -90,6 +90,10 @@ class TutorEngine:
             ExitTicketQuestion.objects.filter(exit_ticket=self.exit_ticket).order_by('order_index')
         ) if self.exit_ticket else []
         
+        # Skill assessment (R2)
+        self._skill_assessment_service = None
+        self._lesson_skills = None
+
         # Load or initialize state
         self._load_state()
     
@@ -288,7 +292,17 @@ class TutorEngine:
         # Grade the answer
         grading = self._grade_step_answer(step, answer)
         self.current_attempt += 1
-        
+
+        # Record skill practice (R2)
+        try:
+            self._record_skill_practice(
+                step=step,
+                was_correct=(grading.result == GradeResult.CORRECT),
+                hints_used=self.hints_given,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to record skill practice: {e}")
+
         if grading.result == GradeResult.CORRECT:
             # Correct! Show feedback, then they click Continue
             message = f"✓ **Correct!** {grading.feedback}"
@@ -624,6 +638,36 @@ class TutorEngine:
     # HELPERS
     # ========================================================================
     
+    def _record_skill_practice(self, step, was_correct, hints_used=0):
+        """Record a skill practice attempt via SkillAssessmentService (R2)."""
+        if self._skill_assessment_service is None:
+            try:
+                from apps.tutoring.personalization import SkillAssessmentService
+                self._skill_assessment_service = SkillAssessmentService(
+                    self.session.student, session=self.session
+                )
+            except Exception:
+                return
+
+        if self._lesson_skills is None:
+            try:
+                from apps.tutoring.skills_models import Skill
+                self._lesson_skills = list(Skill.objects.filter(lessons=self.lesson))
+            except Exception:
+                self._lesson_skills = []
+
+        if not self._lesson_skills:
+            return
+
+        skill = self._lesson_skills[0]
+        self._skill_assessment_service.record_practice(
+            skill=skill,
+            was_correct=was_correct,
+            lesson_step=step,
+            practice_type='initial',
+            hints_used=hints_used,
+        )
+
     def _save_turn(self, role: str, content: str, step: LessonStep = None,
                    tokens_in: int = 0, tokens_out: int = 0, metadata: Dict = None):
         """Save a conversation turn."""
