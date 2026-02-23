@@ -19,6 +19,48 @@ from apps.tutoring.engine import TutorEngine, create_tutor_session
 from apps.media_library.models import StepMedia
 
 
+import logging
+logger = logging.getLogger(__name__)
+
+
+def check_lesson_prerequisites(student, lesson):
+    """
+    Check if student meets prerequisites for a lesson (R7).
+    Returns (met, unmet_lessons) where unmet_lessons is a list of dicts.
+    Fails open -- returns (True, []) if the check itself fails.
+    """
+    try:
+        from apps.tutoring.skills_models import LessonPrerequisite
+
+        prerequisites = LessonPrerequisite.objects.filter(
+            lesson=lesson,
+            is_direct=True,
+        ).select_related('prerequisite')
+
+        if not prerequisites.exists():
+            return True, []
+
+        unmet = []
+        for prereq in prerequisites:
+            progress = StudentLessonProgress.objects.filter(
+                student=student,
+                lesson=prereq.prerequisite,
+                mastery_level='mastered',
+            ).first()
+
+            if not progress:
+                unmet.append({
+                    'lesson_id': prereq.prerequisite.id,
+                    'lesson_title': prereq.prerequisite.title,
+                    'strength': prereq.strength,
+                })
+
+        return len(unmet) == 0, unmet
+    except Exception as e:
+        logger.warning(f"Prerequisite check failed: {e}")
+        return True, []
+
+
 def get_user_institution(user):
     """Get the user's active institution membership."""
     membership = Membership.objects.filter(
@@ -106,21 +148,31 @@ def start_session(request, lesson_id):
     institution = get_user_institution(request.user)
     if not institution:
         return JsonResponse({"error": "No institution membership"}, status=403)
-    
+
     lesson = get_object_or_404(
         Lesson,
         id=lesson_id,
         unit__course__institution=institution,
         is_published=True
     )
-    
+
     # Check for existing active session
     existing = TutorSession.objects.filter(
         student=request.user,
         lesson=lesson,
         status=TutorSession.Status.ACTIVE
     ).first()
-    
+
+    # Prerequisite gating -- only for new sessions (R7)
+    if not existing:
+        prereqs_met, unmet_prereqs = check_lesson_prerequisites(request.user, lesson)
+        if not prereqs_met:
+            return JsonResponse({
+                "error": "prerequisite_not_met",
+                "message": "You need to complete prerequisite lessons first.",
+                "unmet_prerequisites": unmet_prereqs,
+            }, status=400)
+
     is_resume = False
     if existing:
         session = existing
@@ -1068,7 +1120,22 @@ def chat_tutor_interface(request, lesson_id):
 def chat_start_session(request, lesson_id):
     """Start or resume a conversational tutoring session."""
     from apps.tutoring.conversational_tutor import ConversationalTutor
-    
+    from apps.safety import RateLimiter, SafetyAuditLog
+
+    # Rate limiting (R8)
+    allowed, reason = RateLimiter.check_rate_limit(request.user.id)
+    if not allowed:
+        SafetyAuditLog.log(
+            'rate_limited',
+            user=request.user,
+            details={'reason': reason, 'endpoint': 'chat_start_session'},
+            severity='warning',
+            request=request,
+        )
+        return JsonResponse({"error": reason, "rate_limited": True}, status=429)
+
+    RateLimiter.record_message(request.user.id)
+
     institution = get_user_institution(request.user)
     if not institution:
         return JsonResponse({"error": "No institution membership"}, status=403)
@@ -1086,7 +1153,17 @@ def chat_start_session(request, lesson_id):
         lesson=lesson,
         status=TutorSession.Status.ACTIVE
     ).first()
-    
+
+    # Prerequisite gating -- only for new sessions, not resume (R7)
+    if not existing:
+        prereqs_met, unmet_prereqs = check_lesson_prerequisites(request.user, lesson)
+        if not prereqs_met:
+            return JsonResponse({
+                "error": "prerequisite_not_met",
+                "message": "You need to complete prerequisite lessons first.",
+                "unmet_prerequisites": unmet_prereqs,
+            }, status=400)
+
     if existing:
         session = existing
         tutor = ConversationalTutor(session)
@@ -1119,13 +1196,16 @@ def chat_start_session(request, lesson_id):
 def chat_respond(request, session_id):
     """Handle student message in conversational tutoring."""
     from apps.tutoring.conversational_tutor import ConversationalTutor
-    
+    from apps.safety import (
+        ContentSafetyFilter, RateLimiter, SafetyAuditLog
+    )
+
     session = get_object_or_404(
         TutorSession,
         id=session_id,
         student=request.user,
     )
-    
+
     # Handle completed sessions
     if session.status == TutorSession.Status.COMPLETED:
         return JsonResponse({
@@ -1133,16 +1213,61 @@ def chat_respond(request, session_id):
             "phase": "completed",
             "is_complete": True,
         })
-    
+
+    # Rate limiting (R8)
+    allowed, reason = RateLimiter.check_rate_limit(request.user.id)
+    if not allowed:
+        SafetyAuditLog.log(
+            'rate_limited',
+            user=request.user,
+            session_id=session.id,
+            details={'reason': reason},
+            severity='warning',
+            request=request,
+        )
+        return JsonResponse({"error": reason, "rate_limited": True}, status=429)
+
+    RateLimiter.record_message(request.user.id)
+
     try:
         data = json.loads(request.body)
         message = data.get("message", "").strip()
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
-    
+
     if not message:
         return JsonResponse({"error": "Message required"}, status=400)
-    
+
+    # Content safety check (R8)
+    safety_result = ContentSafetyFilter.check_content(message, context="student_input")
+
+    if safety_result.flags:
+        SafetyAuditLog.log(
+            'content_flagged',
+            user=request.user,
+            session_id=session.id,
+            details={
+                'flags': [f.value for f in safety_result.flags],
+                'warnings': safety_result.warnings,
+            },
+            severity='warning' if not safety_result.blocked else 'critical',
+            request=request,
+        )
+
+    if safety_result.blocked:
+        safe_response = ContentSafetyFilter.get_safe_response(safety_result.flags[0])
+        return JsonResponse({
+            "message": safe_response,
+            "phase": "safety",
+            "media": [],
+            "show_exit_ticket": False,
+            "exit_ticket": None,
+            "is_complete": False,
+        })
+
+    # Use filtered content
+    message = safety_result.filtered_content
+
     tutor = ConversationalTutor(session)
     response = tutor.respond(message)
     

@@ -40,96 +40,233 @@ logger = logging.getLogger(__name__)
 # SYSTEM PROMPTS
 # =============================================================================
 
-TUTOR_SYSTEM_PROMPT = """You are an expert AI tutor for secondary school students in Seychelles. Your name is "Tutor".
+TUTOR_SYSTEM_PROMPT_TEMPLATE = """<system_prompt>
 
-CORE IDENTITY:
-- Warm, patient, encouraging - genuinely invested in student success
-- You LEAD the conversation - students follow your guidance
-- You ask questions, never just lecture
-- You celebrate effort and progress
-- Mistakes are learning opportunities
+<identity>
+You are a friendly, encouraging tutor for secondary school students at
+{institution_name} ({locale_context}). Your name is {tutor_name}.
+You speak in {language} appropriate for {grade_level} students.
+You are warm, patient, and believe every student can succeed with the right support.
+</identity>
 
-LOCAL CONTEXT (SEYCHELLES):
-- Use local names: Jean, Marie, Pierre, Ansel, Lisette, Antoine, Rosa
-- Use local places: Victoria, Mahé, Praslin, La Digue, Beau Vallon, Anse Royale
-- Use local currency: Seychelles Rupee (SCR)
-- Reference: fishing, tourism, coconuts, cinnamon, coral reefs, tropical climate
+<core_philosophy>
+You follow the science of learning. Every interaction must advance the student's
+long-term memory, not just their momentary understanding. "Following along" is not
+learning -- only active retrieval and successful independent problem-solving count.
+Your teaching must be ACTIVE and DIRECT: you explicitly teach concepts, then
+immediately have the student practice with corrective feedback.
+</core_philosophy>
 
-VISUAL AIDS:
-- You CAN show images and diagrams when helpful
-- When you have a relevant image, point out key features for the student to notice
-- If a student asks for a visual, you will try to show one
-- Reference visuals naturally: "Look at this diagram..." or "Notice in the image..."
-- When no image is available, help the student visualize with clear descriptions
+<principle id="active_learning">
+ACTIVE OVER PASSIVE
+- Keep explanations to a MINIMUM EFFECTIVE DOSE: explain just enough for the
+  student to attempt a problem, then immediately get them doing something.
+- Never present more than 3 sentences of explanation without prompting the
+  student to respond -- even a comprehension check like "In your own words,
+  what is the first step?"
+- The student should be DOING something (answering, computing, explaining back,
+  choosing, comparing) at least 60% of interaction turns.
+- If you find yourself writing a long explanation, STOP. Break it into a short
+  explanation + a question, then continue explaining after the student responds.
+</principle>
 
-TEACHING METHODOLOGY:
-1. ALWAYS ASK QUESTIONS - Every response should end with a question or prompt
-2. NEVER GIVE DIRECT ANSWERS - Guide students to discover answers themselves
-3. SCAFFOLD LEARNING - Break complex problems into smaller steps
-4. IMMEDIATE FEEDBACK - Respond to what student said, then guide forward
-5. PRAISE EFFORT - "Great thinking!" "I can see you're working hard!"
-6. USE CONCRETE EXAMPLES - Connect abstract concepts to real life
-7. USE VISUALS - When teaching visual concepts, show or describe diagrams
+<principle id="direct_instruction">
+DIRECT + GUIDED, NOT DISCOVERY
+- Explicitly teach the method or concept BEFORE asking the student to apply it.
+  Do not ask students to "discover" or "figure out" a new concept on their own.
+- The cycle is: short, clear instruction -> student practice -> feedback -> repeat.
+- Socratic questions are for CHECKING understanding, not for teaching new content.
+  Teach first, then question. Never replace direct instruction with open-ended
+  discovery questions on material the student hasn't seen yet.
+</principle>
 
-RESPONSE FORMAT:
-- Keep responses concise (2-4 sentences max for teaching, then a question)
-- Use simple language appropriate for secondary school
-- End EVERY response with a question or "Try this:" prompt
-- Never say "Click continue" or reference UI elements
-- When showing an image, describe what to look for
+<principle id="deliberate_practice">
+DELIBERATE PRACTICE AT THE EDGE OF ABILITY
+- Target practice at the boundary of what the student can and cannot do.
+- If they get 3+ in a row correct easily, acknowledge it and move to harder material
+  or a new concept: "You've clearly got this -- let's level up."
+- If they struggle, slow down, provide a simpler variant, and build back up.
+- Never let practice become mindless repetition of something already mastered.
+- Use the [STUDENT PROFILE] data if available to calibrate difficulty.
+</principle>
 
-WHEN STUDENT IS WRONG:
-- Don't say "Wrong" - say "Not quite" or "Let's think about this differently"
-- Give a hint or break down the problem
-- Ask a simpler question that leads to understanding
+<principle id="mastery_learning">
+MASTERY BEFORE ADVANCEMENT
+- Do not advance to a new concept until the student demonstrates they can solve
+  problems on the current concept independently (without hints).
+- If the student cannot solve a problem because of a weak PREREQUISITE, address
+  the prerequisite FIRST. Say: "Let's take a quick detour -- I think the tricky
+  part here is [prerequisite skill]. Let me give you a quick practice on that."
+- After prerequisite remediation, return to the original problem.
+- Never just tell the student the answer and move on.
+</principle>
 
-WHEN STUDENT IS RIGHT:
-- Praise specifically: "Excellent! You correctly identified..."
-- Then advance: "Now let's build on that..."
-- Ask a slightly harder question
+<principle id="cognitive_load">
+MINIMISE COGNITIVE LOAD
+- Present ONE idea at a time. Short paragraphs (2-3 sentences max).
+- Before asking the student to solve a new type of problem, show a WORKED EXAMPLE
+  with labelled subgoals (Step 1: ..., Step 2: ..., Step 3: ...).
+- Use concrete numbers and visuals before abstract notation.
+- Use dual coding: pair verbal explanations with diagrams, number lines, tables,
+  or visual representations whenever possible. Use [SHOW_MEDIA:title] syntax to
+  display available media assets at the moment they're most useful.
+- If the student seems overwhelmed, break the current step into even smaller pieces.
+</principle>
 
-WHEN STUDENT ASKS FOR VISUAL:
-- If you have one: "Great idea! Here's a diagram that shows this. Notice how..."
-- If you don't: "Let me help you picture this..." then describe it clearly
+<principle id="automaticity">
+BUILD AUTOMATICITY ON BASICS
+- If you notice the student is slow or error-prone on a basic skill during a lesson
+  (e.g., arithmetic errors while learning algebra), briefly flag it:
+  "I notice multiplying negatives is tripping you up -- let's do two quick ones."
+- Speed and accuracy on fundamentals matter because they free up working memory
+  for higher-order thinking.
+</principle>
 
-WHEN STUDENT IS CONFUSED:
-- Acknowledge: "I can see this is tricky"
-- Simplify: "Let's start with something simpler"
-- Use analogy or example from Seychelles context
-- Consider if a visual would help"""
+<principle id="layering">
+LAYER AND CONNECT
+- When introducing a new concept, explicitly connect it to something the student
+  already knows: "Remember when we learned X? This is the same idea, but now..."
+- Practice problems should authentically require earlier skills, not artificially
+  simplify them away.
+- Reference the student's prior successes to build confidence:
+  "You did great with [earlier topic] -- this builds right on top of that."
+</principle>
 
+<principle id="non_interference">
+AVOID CONFUSING SIMILAR CONCEPTS
+- When the current topic is easily confused with a related one (e.g., area vs.
+  perimeter, permutations vs. combinations), explicitly name the difference:
+  "Be careful -- this looks like [related concept], but the key difference is..."
+- Give a quick discrimination example when relevant.
+</principle>
 
-SESSION_PHASES = """
-SESSION FLOW (follow this structure):
+<principle id="testing_effect">
+RETRIEVAL FIRST, HINTS LATER
+- When a student gives an incorrect answer, your FIRST response should prompt them
+  to try again with a targeted nudge -- NOT a hint.
+  Example: "Not quite. Before I give you a hint, try once more -- what operation
+  should you start with?"
+- Only offer a structured hint after the student has made a genuine second attempt.
+- On review problems, provide LESS scaffolding than on first-encounter problems.
+  The goal is retrieval from memory, not recognition from prompts.
+</principle>
 
-1. WARM-UP (1-2 exchanges)
-   - Greet student warmly
-   - Ask a simple review question from previous knowledge
-   - Build confidence before new material
+<principle id="spaced_repetition">
+REFERENCE SPACED PRACTICE
+- At the beginning of a session, if retrieval questions are provided in the
+  [WARMUP RETRIEVAL] context, use them for active warmup practice.
+- At the end of a session, briefly preview what they'll revisit next time:
+  "We'll come back to this in a few days to make sure it sticks."
+- Celebrate review success: "Great -- you remembered this from last week!"
+</principle>
 
-2. INTRODUCTION (1-2 exchanges)
-   - Introduce today's topic with a hook (interesting fact, real-world example)
-   - Ask what they already know about the topic
-   
-3. INSTRUCTION (3-5 exchanges)
-   - Explain concepts through questions, not lectures
-   - Use worked examples - walk through step by step
-   - Show media/diagrams when available
-   - Check understanding frequently
+<principle id="interleaving">
+MIX IT UP
+- During practice, if interleaved review questions are provided in the
+  [INTERLEAVED PRACTICE] context, weave them in naturally:
+  "Before we continue, quick question from an earlier topic..."
+- Make the student identify WHICH strategy to apply, not just execute one on repeat.
+</principle>
 
-4. GUIDED PRACTICE (3-5 exchanges)
-   - Present problems one at a time
-   - Scaffold with hints if they struggle
-   - Increase difficulty as they succeed
-   
-5. WRAP-UP (1-2 exchanges)
-   - Summarize what they learned (have THEM tell you)
-   - Praise their effort
-   - Preview next topic
+<principle id="targeted_remediation">
+TARGETED REMEDIATION, NOT LOWERED BARS
+- When a student struggles repeatedly on a problem, diagnose the ROOT CAUSE.
+  Is it the new concept, or a weak prerequisite?
+- Never "give away" the full answer just to move on. Instead:
+  1. Identify the specific sub-skill causing difficulty.
+  2. Give a simpler problem that isolates that sub-skill.
+  3. Once they succeed on the simpler problem, return to the original.
+- Phrase it positively: "Let's build up to this."
+</principle>
 
-You are currently in phase: {phase}
-Progress: {progress}
-"""
+<principle id="gamification">
+MOTIVATE AND CELEBRATE
+- Celebrate correct answers with genuine, specific praise:
+  "Exactly right -- and you did that without any hints!"
+- Track streaks informally: "That's 3 in a row -- nice momentum!"
+- Normalise mistakes: "Mistakes are how your brain builds stronger connections.
+  Let's see what happened."
+- Frame difficulty positively (desirable difficulty): "If it feels a bit hard,
+  that's a sign you're learning -- your brain is working harder, and that's
+  what builds real understanding."
+</principle>
+
+<principle id="expertise_reversal">
+FADE SCAFFOLDING AS MASTERY GROWS
+- First encounter: full worked example -> guided practice -> independent practice.
+- Later encounters / reviews: skip worked example -> go straight to problems with
+  no hints -> only provide a hint if the student explicitly asks.
+- If the student demonstrates fluency: "You clearly know this well. Let's
+  challenge you with something new."
+- Use [STUDENT PROFILE] mastery data to determine scaffolding level.
+</principle>
+
+<feedback_protocol>
+HOW TO GIVE FEEDBACK ON ANSWERS
+1. CORRECT ANSWER:
+   - Confirm immediately: "Yes, that's correct!"
+   - Add a brief explanation of WHY it's correct to reinforce the concept.
+   - If they solved it on the first try, add specific praise.
+
+2. INCORRECT ANSWER (1st attempt):
+   - Do NOT reveal the answer. Do NOT give a hint yet.
+   - Give a brief, targeted nudge pointing to the type of error without solving it:
+     "Almost -- check your sign in the second step."
+   - Ask them to try again.
+
+3. INCORRECT ANSWER (2nd attempt):
+   - Now offer a structured hint from the available hints.
+   - If available, offer a visual or worked sub-step.
+   - Ask them to try again.
+
+4. INCORRECT ANSWER (3rd+ attempt):
+   - Offer a stronger hint.
+   - Consider whether the real issue is a prerequisite gap. If so, pivot:
+     "I think the challenge here is actually [prerequisite]. Let's practice that first."
+
+5. INCORRECT ANSWER (final attempt / giving up):
+   - Walk through the full solution step-by-step.
+   - Ask them to explain each step back to you in their own words.
+   - Then give ONE more similar problem to confirm they can now do it.
+   - Never show the answer and move on silently.
+</feedback_protocol>
+
+<session_structure>
+SESSION FLOW (adapt timing to student pace)
+1. WARMUP (1-2 exchanges): Retrieval practice on a previously learned skill.
+   If [WARMUP RETRIEVAL] questions are provided, use them. Otherwise, ask a
+   quick recall question related to a prerequisite of today's lesson.
+2. INTRODUCTION (2-3 exchanges): State the learning objective. Connect to prior
+   knowledge. Preview what the student will be able to do by the end.
+3. INSTRUCTION (4-6 exchanges): Direct instruction with immediate comprehension
+   checks. Show worked examples with labelled subgoals. Alternate explanation
+   and student response every 2-3 sentences.
+4. PRACTICE (4-6 exchanges): Student solves problems with decreasing support.
+   Mix in interleaved review questions if provided. Track accuracy.
+5. WRAPUP (1-2 exchanges): Summarise key takeaways. Preview next session.
+   Check concept coverage before proceeding to exit ticket.
+6. EXIT TICKET: Present assessment. No hints, no scaffolding.
+</session_structure>
+
+<safety>
+{safety_prompt}
+Keep all content and language age-appropriate for {grade_level} students.
+If the student seems distressed, frustrated, or disengaged, pause the lesson
+and check in: "Hey, how are you feeling about this? We can slow down or try
+a different approach -- no rush."
+</safety>
+
+<format_rules>
+- Respond in 2-4 sentences maximum per turn.
+- Always end with a question or a prompt for student action.
+- Use short paragraphs. Never produce a wall of text.
+- Use LaTeX or clear notation for mathematical expressions.
+- Use [SHOW_MEDIA:title] to display available media assets at the relevant moment.
+- Suggested quick-reply responses should include at least one "I'm not sure" or
+  "Can you explain that differently?" option to lower the barrier for honest confusion.
+</format_rules>
+
+</system_prompt>"""
 
 
 # =============================================================================
@@ -208,6 +345,13 @@ class ConversationalTutor:
         # Initialize services
         self._llm_client = None
         self._knowledge_base = None
+
+        # Skill assessment and personalization (R2, R3)
+        self._lesson_skills = None
+        self._skill_assessment_service = None
+        self._personalization = None
+        self._remediation_plan = None
+        self._interleaved_practice_block_cache = None
     
     def _load_exit_ticket_concepts(self) -> List[Dict]:
         """
@@ -269,6 +413,9 @@ class ConversationalTutor:
         self.is_remediation = state.get('is_remediation', False)
         self.remediation_attempt = state.get('remediation_attempt', 0)
         self.failed_exit_questions = state.get('failed_exit_questions', [])
+
+        # Mastery-based transition tracking (R10)
+        self.instruction_checks_correct = state.get('instruction_checks_correct', 0)
         
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
@@ -297,6 +444,8 @@ class ConversationalTutor:
             'is_remediation': getattr(self, 'is_remediation', False),
             'remediation_attempt': getattr(self, 'remediation_attempt', 0),
             'failed_exit_questions': getattr(self, 'failed_exit_questions', []),
+            # Mastery-based transition tracking (R10)
+            'instruction_checks_correct': getattr(self, 'instruction_checks_correct', 0),
         }
         self.session.save()
     
@@ -395,17 +544,65 @@ class ConversationalTutor:
             except Exception as e:
                 logger.warning(f"Could not load knowledge base: {e}")
         return self._knowledge_base
-    
+
+    @property
+    def lesson_skills(self):
+        """Lazy load skills for this lesson (R2)."""
+        if self._lesson_skills is None:
+            try:
+                from apps.tutoring.skills_models import Skill
+                self._lesson_skills = list(Skill.objects.filter(lessons=self.lesson))
+            except Exception:
+                self._lesson_skills = []
+        return self._lesson_skills
+
+    @property
+    def skill_assessment_service(self):
+        """Lazy load skill assessment service (R2)."""
+        if self._skill_assessment_service is None:
+            try:
+                from apps.tutoring.personalization import SkillAssessmentService
+                self._skill_assessment_service = SkillAssessmentService(
+                    self.student, session=self.session
+                )
+            except Exception:
+                self._skill_assessment_service = None
+        return self._skill_assessment_service
+
+    def _get_current_skill(self):
+        """Get the most relevant skill for the current topic (R2)."""
+        if not self.lesson_skills:
+            return None
+
+        if self.current_topic_index < len(self.steps):
+            step = self.steps[self.current_topic_index]
+            step_text = (step.teacher_script or "").lower()
+            best_match = None
+            best_score = 0
+            for skill in self.lesson_skills:
+                keywords = skill.name.lower().split()
+                score = sum(1 for kw in keywords if len(kw) > 3 and kw in step_text)
+                if score > best_score:
+                    best_score = score
+                    best_match = skill
+            if best_match:
+                return best_match
+
+        return self.lesson_skills[0] if self.lesson_skills else None
+
     # =========================================================================
     # PUBLIC API
     # =========================================================================
-    
+
     def start(self) -> TutorMessage:
         """Start the tutoring conversation."""
         if self.conversation:
             # Resume existing conversation
             return self.resume()
-        
+
+        # Load personalization before generating opening (R3)
+        self._load_personalization()
+
         # Generate opening message
         return self._generate_opening()
     
@@ -878,37 +1075,256 @@ Keep it to 3-4 sentences + question."""
     # RESPONSE GENERATION
     # =========================================================================
     
+    def _load_personalization(self):
+        """Load session personalization data (R3)."""
+        try:
+            from apps.tutoring.personalization import SessionPersonalizationService
+            service = SessionPersonalizationService(self.student, self.lesson)
+            self._personalization = service.get_session_personalization()
+            logger.info(
+                f"Loaded personalization: {len(self._personalization.retrieval_questions)} retrieval Qs, "
+                f"pace={self._personalization.recommended_pace}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load personalization: {e}")
+            self._personalization = None
+
+    def _build_retrieval_block(self) -> str:
+        """Build [WARMUP RETRIEVAL] context block for the LLM (R4)."""
+        if not self._personalization or not self._personalization.retrieval_questions:
+            return ""
+
+        questions = self._personalization.retrieval_questions[:2]
+
+        lines = [
+            "[WARMUP RETRIEVAL]",
+            "Present these 1-2 retrieval practice questions at the start of the session.",
+            "These are spaced-repetition reviews of previously learned skills.",
+            "Do NOT give hints -- the goal is genuine retrieval from memory.",
+        ]
+
+        for i, rq in enumerate(questions):
+            days_ago = ""
+            if rq.mastery_record and rq.mastery_record.last_practiced:
+                delta = (timezone.now() - rq.mastery_record.last_practiced).days
+                days_ago = f", last reviewed: {delta} days ago"
+
+            lines.append(f"Q{i+1}: {rq.question_text} (Skill: {rq.skill.name}{days_ago})")
+            lines.append(f"Expected answer: {rq.expected_answer} [TUTOR REFERENCE ONLY]")
+
+        lines.append("After each answer, give brief feedback, then transition to today's lesson.")
+        lines.append("[/WARMUP RETRIEVAL]")
+
+        return "\n".join(lines)
+
     def _generate_opening(self) -> TutorMessage:
         """Generate the opening message for the session."""
-        # Get a retrieval question from previous lessons
-        retrieval_context = self._get_retrieval_context()
-        
+        # Build student profile from personalization (R11)
+        student_profile = self._build_student_profile_block()
+        retrieval_block = self._build_retrieval_block()
+
+        # Fallback retrieval context if no personalization
+        retrieval_context = ""
+        if not retrieval_block:
+            retrieval_context = self._get_retrieval_context()
+
         prompt = f"""Generate an opening message for this tutoring session.
 
 {self.lesson_context}
 
-PREVIOUS KNOWLEDGE TO REVIEW:
-{retrieval_context}
+{student_profile}
+
+{retrieval_block if retrieval_block else f"PREVIOUS KNOWLEDGE TO REVIEW:\\n{retrieval_context}"}
 
 Generate a warm, engaging opening that:
-1. Greets the student warmly (use a Seychelles name if appropriate)
-2. Either asks a simple review question from previous topics OR
-3. Asks what they already know about today's topic
+1. Greets the student warmly
+2. If retrieval questions are provided above, present one as a warmup activity
+3. Otherwise, asks what they already know about today's topic
 
 End with a question. Keep it to 3-4 sentences max."""
 
         response = self._generate_response(prompt)
-        
+
         # Save
         self._save_turn("tutor", response)
         self.conversation.append({"role": "assistant", "content": response})
         self._save_state()
-        
+
         return self._create_message(response)
     
+    def _build_student_profile_block(self) -> str:
+        """Build [STUDENT PROFILE] context block with mastery data (R11)."""
+        try:
+            from apps.tutoring.skills_models import Skill, StudentSkillMastery, StudentKnowledgeProfile
+
+            lesson_skills = Skill.objects.filter(lessons=self.lesson)
+
+            lines = ["[STUDENT PROFILE]"]
+            lines.append(f"Student: {self.student.first_name or self.student.username}")
+            lines.append(f"Current lesson: {self.lesson.title}")
+
+            approaching = []
+            needs_work = []
+            prereq_gaps = []
+
+            for skill in lesson_skills:
+                mastery = StudentSkillMastery.objects.filter(
+                    student=self.student, skill=skill
+                ).first()
+
+                if mastery:
+                    level = mastery.mastery_level
+                    if level >= 0.7:
+                        approaching.append(f"{skill.name} ({level:.0%})")
+                    elif level < 0.5:
+                        needs_work.append(f"{skill.name} ({level:.0%})")
+
+            for skill in lesson_skills:
+                for prereq in skill.prerequisites.all():
+                    mastery = StudentSkillMastery.objects.filter(
+                        student=self.student, skill=prereq
+                    ).first()
+                    if not mastery or mastery.mastery_level < 0.7:
+                        level = mastery.mastery_level if mastery else 0.0
+                        prereq_gaps.append(f"{prereq.name} ({level:.0%})")
+
+            if approaching:
+                lines.append(f"Skills approaching mastery: {', '.join(approaching)}")
+            if needs_work:
+                lines.append(f"Skills needing work: {', '.join(needs_work)}")
+            if prereq_gaps:
+                lines.append(f"Prerequisite gaps: {', '.join(prereq_gaps)} -- consider remediation")
+
+            lines.append(f"Session practice score: {self.practice_correct}/{self.practice_total}")
+
+            # Gamification data (R13)
+            try:
+                profile = StudentKnowledgeProfile.objects.filter(
+                    student=self.student,
+                    course=self.lesson.unit.course
+                ).first()
+                if profile:
+                    lines.append(f"XP: {profile.total_xp} | Level: {profile.level} | Streak: {profile.current_streak_days} days")
+            except Exception:
+                pass
+
+            if self._personalization:
+                lines.append(f"Pace recommendation: {self._personalization.recommended_pace}")
+
+            lines.append("[/STUDENT PROFILE]")
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.warning(f"Failed to build student profile block: {e}")
+            return ""
+
+    def _build_worked_example_block(self) -> str:
+        """Build [WORKED EXAMPLE] context block for INSTRUCTION phase (R14)."""
+        if self.phase != ConversationPhase.INSTRUCTION:
+            return ""
+
+        if self.current_topic_index >= len(self.steps):
+            return ""
+
+        step = self.steps[self.current_topic_index]
+        worked_example = step.get_worked_example() if hasattr(step, 'get_worked_example') else None
+
+        if not worked_example:
+            for i in range(max(0, self.current_topic_index - 1), min(len(self.steps), self.current_topic_index + 3)):
+                candidate = self.steps[i]
+                if candidate.step_type == 'worked_example':
+                    worked_example = candidate.get_worked_example() if hasattr(candidate, 'get_worked_example') else None
+                    if worked_example:
+                        break
+
+        if not worked_example:
+            return ""
+
+        lines = [
+            "[WORKED EXAMPLE]",
+            "Present this worked example BEFORE asking the student to solve a similar problem.",
+            "Use labelled subgoals (Step 1, Step 2, etc.).",
+        ]
+
+        if worked_example.get('problem'):
+            lines.append(f"Problem: {worked_example['problem']}")
+
+        steps_list = worked_example.get('steps', [])
+        for s in steps_list:
+            step_num = s.get('step', '?')
+            action = s.get('action', '')
+            explanation = s.get('explanation', '')
+            lines.append(f"Step {step_num}: {action}")
+            if explanation:
+                lines.append(f"  Why: {explanation}")
+
+        if worked_example.get('final_answer'):
+            lines.append(f"Final answer: {worked_example['final_answer']}")
+
+        if steps_list:
+            random_step = random.choice(range(1, len(steps_list) + 1))
+            lines.append(f'After presenting, ask: "What did we do in Step {random_step} and why?"')
+
+        lines.append("Then give a similar problem for guided practice.")
+        lines.append("[/WORKED EXAMPLE]")
+
+        return "\n".join(lines)
+
+    def _build_interleaved_practice_block(self) -> str:
+        """Build [INTERLEAVED PRACTICE] context block for PRACTICE phase (R6)."""
+        if self.phase != ConversationPhase.PRACTICE:
+            return ""
+
+        # Use cached block if available
+        if self._interleaved_practice_block_cache:
+            return self._interleaved_practice_block_cache
+
+        try:
+            from apps.tutoring.personalization import InterleavedPracticeService
+
+            service = InterleavedPracticeService(self.student, self.lesson)
+            practice_steps = [s for s in self.steps if s.step_type in ('practice', 'quiz')]
+
+            if not practice_steps:
+                return ""
+
+            interleaved = service.get_interleaved_questions(
+                new_questions=practice_steps,
+                review_ratio=0.2
+            )
+
+            review_items = [item for item in interleaved if item['type'] == 'review']
+
+            if not review_items:
+                return ""
+
+            lines = [
+                "[INTERLEAVED PRACTICE]",
+                'Weave these review questions naturally into the practice phase (approx 1 review',
+                'for every 4 new-topic questions). Introduce them with: "Quick question from',
+                'an earlier topic..."',
+            ]
+
+            for i, item in enumerate(review_items[:3]):
+                step = item['step']
+                skill = item.get('skill')
+                skill_name = skill.name if skill else "earlier topic"
+                lines.append(f"Review Q{i+1}: {step.question} (Skill: {skill_name})")
+                lines.append(f"Expected answer: {step.expected_answer} [TUTOR REFERENCE ONLY]")
+
+            lines.append("[/INTERLEAVED PRACTICE]")
+
+            result = "\n".join(lines)
+            self._interleaved_practice_block_cache = result
+            return result
+
+        except Exception as e:
+            logger.warning(f"Failed to build interleaved practice block: {e}")
+            return ""
+
     def _generate_contextual_response(
-        self, 
-        student_input: str, 
+        self,
+        student_input: str,
         kb_context: str,
         media_context: str = "",
         visual_requested: bool = False
@@ -943,6 +1359,11 @@ The student asked for a visual, but no matching image was found.
 - Continue with the lesson
 """
         
+        # Build enriched context blocks (R11, R14, R6)
+        student_profile = self._build_student_profile_block()
+        worked_example_block = self._build_worked_example_block()
+        interleaved_block = self._build_interleaved_practice_block()
+
         prompt = f"""CONVERSATION CONTEXT:
 {self._format_recent_conversation(5)}
 
@@ -957,17 +1378,17 @@ CURRICULUM KNOWLEDGE:
 CURRENT TEACHING GUIDANCE:
 {current_guidance}
 {visual_instructions}
+{worked_example_block}
 {concept_coverage}
 
 {next_concept}
 
+{interleaved_block}
+
 PHASE: {self.phase.value.upper()}
 {phase_instructions}
 
-STUDENT PROFILE:
-- Struggles with: {', '.join(self.student_struggles) if self.student_struggles else 'Nothing noted yet'}
-- Strong at: {', '.join(self.student_strengths) if self.student_strengths else 'Nothing noted yet'}
-- Practice score: {self.practice_correct}/{self.practice_total}
+{student_profile}
 
 Generate your response following these rules:
 1. RESPOND to what the student said (acknowledge their answer)
@@ -978,7 +1399,6 @@ Generate your response following these rules:
 6. If an image is being shown, DESCRIBE WHAT IT ACTUALLY SHOWS - don't make up features
 7. END with a question or "Try this:" prompt
 8. Keep it concise (2-4 sentences + question)
-9. Use Seychelles context where natural
 
 YOUR RESPONSE:"""
 
@@ -1047,7 +1467,7 @@ Guide your teaching toward helping the student understand this concept!"""
             # Call LLM (max_tokens and temperature come from ModelConfig)
             response = self.llm_client.generate(
                 messages=messages,
-                system_prompt=TUTOR_SYSTEM_PROMPT,
+                system_prompt=self._build_system_prompt(),
             )
             
             return response.content.strip()
@@ -1064,7 +1484,34 @@ Guide your teaching toward helping the student understand this concept!"""
             "I see what you're thinking. Let's break this down - what's the key concept here?",
         ]
         return random.choice(fallbacks)
-    
+
+    def _build_system_prompt(self) -> str:
+        """Build the system prompt with session-specific context (R9)."""
+        institution = self.session.institution
+        course = self.lesson.unit.course
+
+        # Get grade level from course or student profile
+        grade_level = "secondary school"
+        try:
+            from apps.accounts.models import StudentProfile
+            profile = StudentProfile.objects.filter(user=self.student).first()
+            if profile and profile.grade_level:
+                grade_level = profile.grade_level
+        except Exception:
+            pass
+
+        # Build safety prompt
+        safety_prompt = "Ensure all interactions are safe and age-appropriate."
+
+        return TUTOR_SYSTEM_PROMPT_TEMPLATE.format(
+            institution_name=institution.name if institution else "our school",
+            locale_context="Seychelles",
+            tutor_name="Tutor",
+            language="English",
+            grade_level=grade_level,
+            safety_prompt=safety_prompt,
+        )
+
     # =========================================================================
     # CONTEXT HELPERS
     # =========================================================================
@@ -1174,13 +1621,24 @@ Guide your teaching toward helping the student understand this concept!"""
         attempt = getattr(self, 'remediation_attempt', 0)
         
         if is_remediation:
+            # Build prerequisite gap context from remediation plan (R5)
+            prereq_gap_context = ""
+            remediation_plan = getattr(self, '_remediation_plan', None)
+            if remediation_plan and remediation_plan.get('prerequisite_gaps'):
+                gap_names = [s.name for s in remediation_plan['prerequisite_gaps'][:5]]
+                prereq_gap_context = f"""
+PREREQUISITE GAPS DETECTED:
+The student may be struggling because they have gaps in these prerequisite skills:
+{chr(10).join(f'  - {name}' for name in gap_names)}
+Address these gaps FIRST before re-teaching the failed concepts.
+"""
             # Special remediation instructions
             return f"""
 🎯 REMEDIATION MODE (Attempt #{attempt})
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 The student failed the exit ticket and is reviewing the {failed_count} concepts they got wrong.
-
+{prereq_gap_context}
 YOUR GOALS:
 1. Focus ONLY on the concepts they missed - don't re-teach everything
 2. Use DIFFERENT explanations than before - they didn't understand the first time
@@ -1266,31 +1724,52 @@ WRAPUP PHASE - Goals:
                         logger.info(f"Remediation: Transitioned to phase: {self.phase.value}")
             return
         
-        # Normal flow
-        transitions = {
+        # Mastery-based transitions with exchange-count fallbacks (R10)
+        # INSTRUCTION → PRACTICE: when 2+ comprehension checks correct (fallback: 8 exchanges)
+        # PRACTICE → WRAPUP: when ≥70% accuracy on 3+ questions (fallback: 7 exchanges)
+        # Other transitions remain exchange-count based
+        fallback_transitions = {
             ConversationPhase.WARMUP: (2, ConversationPhase.INTRODUCTION),
             ConversationPhase.INTRODUCTION: (3, ConversationPhase.INSTRUCTION),
-            ConversationPhase.INSTRUCTION: (6, ConversationPhase.PRACTICE),
-            ConversationPhase.PRACTICE: (5, ConversationPhase.WRAPUP),
+            ConversationPhase.INSTRUCTION: (8, ConversationPhase.PRACTICE),
+            ConversationPhase.PRACTICE: (7, ConversationPhase.WRAPUP),
             ConversationPhase.WRAPUP: (2, ConversationPhase.EXIT_TICKET),
         }
-        
-        if self.phase in transitions:
-            threshold, next_phase = transitions[self.phase]
-            
-            # Special check before exit ticket: ensure concepts are covered
-            if next_phase == ConversationPhase.EXIT_TICKET:
-                uncovered = self._get_uncovered_concepts()
-                if uncovered and self.phase_exchange_count < threshold + 3:
-                    # Don't transition yet - still have uncovered concepts
-                    # Give up to 3 extra exchanges to cover them
-                    logger.info(f"Delaying exit ticket - {len(uncovered)} concepts uncovered")
-                    return
-            
-            if self.phase_exchange_count >= threshold:
-                self.phase = next_phase
-                self.phase_exchange_count = 0
-                logger.info(f"Transitioned to phase: {self.phase.value}")
+
+        if self.phase not in fallback_transitions:
+            return
+
+        fallback_threshold, next_phase = fallback_transitions[self.phase]
+
+        # Special check before exit ticket: ensure concepts are covered
+        if next_phase == ConversationPhase.EXIT_TICKET:
+            uncovered = self._get_uncovered_concepts()
+            if uncovered and self.phase_exchange_count < fallback_threshold + 3:
+                logger.info(f"Delaying exit ticket - {len(uncovered)} concepts uncovered")
+                return
+
+        # Check mastery-based criteria first (R10)
+        mastery_met = False
+        if self.phase == ConversationPhase.INSTRUCTION:
+            checks_correct = getattr(self, 'instruction_checks_correct', 0)
+            if checks_correct >= 2:
+                mastery_met = True
+                logger.info(f"Mastery transition INSTRUCTION→PRACTICE: {checks_correct} checks correct")
+        elif self.phase == ConversationPhase.PRACTICE:
+            if self.practice_total >= 3:
+                accuracy = self.practice_correct / self.practice_total
+                if accuracy >= 0.7:
+                    mastery_met = True
+                    logger.info(f"Mastery transition PRACTICE→WRAPUP: {accuracy:.0%} accuracy on {self.practice_total} questions")
+
+        # Transition if mastery criteria met OR fallback threshold reached
+        if mastery_met or self.phase_exchange_count >= fallback_threshold:
+            self.phase = next_phase
+            self.phase_exchange_count = 0
+            # Reset instruction checks when leaving INSTRUCTION
+            if next_phase == ConversationPhase.PRACTICE:
+                self.instruction_checks_correct = 0
+            logger.info(f"Transitioned to phase: {self.phase.value}")
     
     def _get_uncovered_concepts(self) -> List[Dict]:
         """Get list of exit ticket concepts not yet covered."""
@@ -1349,28 +1828,54 @@ WRAPUP PHASE - Goals:
         # Track practice attempts
         if self.phase == ConversationPhase.PRACTICE:
             self.practice_total += 1
-        
+
+        # Track comprehension checks in INSTRUCTION (R10)
+        if self.phase == ConversationPhase.INSTRUCTION:
+            if any(signal in response_lower for signal in success_signals):
+                self.instruction_checks_correct = getattr(self, 'instruction_checks_correct', 0) + 1
+
+        # Record skill practice via SkillAssessmentService (R2)
+        try:
+            if self.lesson_skills and self.skill_assessment_service:
+                current_skill = self._get_current_skill()
+                if current_skill:
+                    was_correct = any(
+                        signal in response_lower
+                        for signal in success_signals
+                    )
+                    self.skill_assessment_service.record_practice(
+                        skill=current_skill,
+                        was_correct=was_correct,
+                        lesson_step=self.steps[self.current_topic_index] if self.current_topic_index < len(self.steps) else None,
+                        practice_type='remediation' if self.is_remediation else 'initial',
+                        hints_used=0,
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to record skill practice: {e}")
+
         # CRITICAL: Track exit ticket concept coverage
-        self._update_concept_coverage(combined_text)
-        
+        # Use LLM-based assessment every 2 exchanges; keyword fallback otherwise (R12)
+        if self.exchange_count > 0 and self.exchange_count % 2 == 0:
+            self._llm_concept_coverage_check(combined_text)
+        else:
+            self._keyword_concept_coverage_check(combined_text)
+
         # Advance topic if making progress
         if self.phase in [ConversationPhase.INSTRUCTION, ConversationPhase.PRACTICE]:
             if self.phase_exchange_count > 0 and self.phase_exchange_count % 2 == 0:
                 if self.current_topic_index < len(self.steps) - 1:
                     self.current_topic_index += 1
     
-    def _update_concept_coverage(self, conversation_text: str):
+    def _keyword_concept_coverage_check(self, conversation_text: str):
         """
-        Check if any exit ticket concepts were covered in the conversation.
-        
-        Uses keyword matching to detect when concepts are being discussed.
+        Check concept coverage using keyword matching (fast fallback for R12).
         """
         conversation_lower = conversation_text.lower()
-        
+
         for concept in self.exit_ticket_concepts:
             if concept.get('covered'):
                 continue  # Already covered
-            
+
             # Extract keywords from the question and answer
             question_words = set(
                 word.lower() for word in re.findall(r'\b\w{4,}\b', concept['question'])
@@ -1381,23 +1886,66 @@ WRAPUP PHASE - Goals:
             explanation_words = set(
                 word.lower() for word in re.findall(r'\b\w{4,}\b', concept.get('explanation', ''))
             )
-            
+
             # Combine all relevant keywords
             concept_keywords = question_words | answer_words | explanation_words
-            
+
             # Remove common words
             stop_words = {'this', 'that', 'what', 'which', 'would', 'could', 'should', 'with', 'from', 'have', 'been', 'they', 'their', 'there', 'when', 'where', 'about', 'into', 'more', 'some', 'other'}
             concept_keywords -= stop_words
-            
+
             # Check how many keywords appear in the conversation
             if concept_keywords:
                 matches = sum(1 for kw in concept_keywords if kw in conversation_lower)
                 coverage_ratio = matches / len(concept_keywords)
-                
+
                 # Mark as covered if significant overlap (>30% of keywords discussed)
                 if coverage_ratio > 0.3 or matches >= 3:
                     concept['covered'] = True
-                    logger.info(f"Concept covered: {concept['question'][:50]}... (match ratio: {coverage_ratio:.1%})")
+                    logger.info(f"Concept covered (keyword): {concept['question'][:50]}... (match ratio: {coverage_ratio:.1%})")
+
+    def _llm_concept_coverage_check(self, conversation_text: str):
+        """
+        Use LLM to semantically assess which exit ticket concepts were meaningfully covered (R12).
+
+        Runs every 2 exchanges to manage cost. Falls back to keyword matching on failure.
+        """
+        uncovered = [c for c in self.exit_ticket_concepts if not c.get('covered')]
+        if not uncovered:
+            return
+
+        # Build concept list for LLM
+        concept_descriptions = []
+        for i, concept in enumerate(uncovered):
+            concept_descriptions.append(
+                f"{i+1}. {concept['question'][:120]}"
+            )
+
+        prompt = f"""Analyze whether the following conversation meaningfully covered any of these exit ticket concepts.
+A concept is "covered" if the core idea was taught, discussed, or practiced — not just mentioned in passing.
+
+CONVERSATION EXCERPT:
+{conversation_text[:1500]}
+
+UNCOVERED CONCEPTS:
+{chr(10).join(concept_descriptions)}
+
+Return ONLY a JSON list of concept numbers that were meaningfully covered, e.g. [1, 3].
+If none were covered, return [].
+"""
+        try:
+            response = self._generate_response(prompt)
+            # Parse the JSON list from the response
+            match = re.search(r'\[[\d,\s]*\]', response)
+            if match:
+                covered_indices = json.loads(match.group())
+                for idx in covered_indices:
+                    if 1 <= idx <= len(uncovered):
+                        uncovered[idx - 1]['covered'] = True
+                        logger.info(f"Concept covered (LLM): {uncovered[idx-1]['question'][:50]}...")
+        except Exception as e:
+            logger.warning(f"LLM concept coverage check failed, using keyword fallback: {e}")
+            self._keyword_concept_coverage_check(conversation_text)
     
     # =========================================================================
     # EXIT TICKET
@@ -1566,13 +2114,27 @@ WRAPUP PHASE - Goals:
         self.failed_exit_questions = failed_questions
         self.remediation_attempt = getattr(self, 'remediation_attempt', 0) + 1
         self.is_remediation = True
-        
+
+        # Wire RemediationService for targeted remediation plan (R5)
+        try:
+            from apps.tutoring.personalization import RemediationService
+            remediation_service = RemediationService(self.student, self.lesson)
+            self._remediation_plan = remediation_service.get_remediation_plan(
+                exit_ticket_score=score / len(results) if results else 0,
+            )
+            if self._remediation_plan.get('prerequisite_gaps'):
+                gap_names = [s.name for s in self._remediation_plan['prerequisite_gaps'][:5]]
+                logger.info(f"Remediation plan: prerequisite gaps = {gap_names}")
+        except Exception as e:
+            logger.warning(f"Failed to get remediation plan: {e}")
+            self._remediation_plan = None
+
         # Mark failed concepts as NOT covered (need to re-teach)
         failed_ids = {fq['id'] for fq in failed_questions}
         for concept in self.exit_ticket_concepts:
             if concept['id'] in failed_ids:
                 concept['covered'] = False
-        
+
         # Reset to instruction phase for targeted review
         self.phase = ConversationPhase.INSTRUCTION
         self.phase_exchange_count = 0
