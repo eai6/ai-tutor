@@ -159,8 +159,17 @@ MIT License
 
 
 # Next steps 
-# 1. Extract Docs Materials
-https://edu.gov.sc/
-# 2. Use Google gemini for content generation/organization and tutoring
-# 3. Optimize media usage in tutoring. Prioritize already generated media, only generate a limited number of new images when requested by the student. 
-# 4. Add protection against the generation of harmful material (text/media) during tutoring
+# 1. Extract open-source teaching materials
+https://openstax.org/
+
+# 2. Improve tutoring interface
+
+# 3. Test offline system with Ollama for curriculum/material upload parsing and tutoring session
+
+# 4. Deploy systems to cloud
+
+# 5. Clean up project and document
+
+# 6. Create presentation slides for project
+
+

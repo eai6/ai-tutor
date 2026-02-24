@@ -107,6 +107,20 @@ class TeachingMaterialUpload(models.Model):
         null=True,
         related_name='teaching_material_uploads'
     )
+    course = models.ForeignKey(
+        'curriculum.Course',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='teaching_materials'
+    )
+    curriculum_upload = models.ForeignKey(
+        'CurriculumUpload',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='teaching_materials'
+    )
 
     file_path = models.CharField(max_length=500)
     original_filename = models.CharField(max_length=255)

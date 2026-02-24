@@ -65,7 +65,7 @@
     {% endif %}
 
     <div style="margin-top: 1.5rem;">
-        <a href="{% url 'dashboard:material_list' %}" class="btn btn-secondary">Back to Materials</a>
+        <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Back to Materials</a>
         {% if upload.status == 'processing' %}
         <button class="btn btn-primary" onclick="location.reload()" style="margin-left: 0.5rem;">Refresh Status</button>
         {% endif %}

@@ -7,3 +7,5 @@ __Pycache__*
 dist
 build
 archives
+notebooks
+seychelles_package

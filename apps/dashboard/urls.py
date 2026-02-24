@@ -47,9 +47,8 @@ urlpatterns = [
     path('curriculum/content-progress/<int:upload_id>/', views.content_progress, name='content_progress'),
     
     # Teaching Materials
-    path('materials/', views.material_list, name='material_list'),
-    path('materials/upload/', views.material_upload, name='material_upload'),
     path('materials/process/<int:upload_id>/', views.material_process, name='material_process'),
+    path('curriculum/course/<int:course_id>/upload-material/', views.course_upload_material, name='course_upload_material'),
 
     # Classes
     path('classes/', views.class_list, name='class_list'),

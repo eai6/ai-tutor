@@ -181,6 +181,98 @@
     </div>
 </div>
 
+<!-- Teaching Materials -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title" style="margin: 0;">Teaching Materials{% if materials %} ({{ materials|length }}){% endif %}</h3>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('material-upload-form').style.display = document.getElementById('material-upload-form').style.display === 'none' ? 'block' : 'none';">
+            + Upload Material
+        </button>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if materials %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Chunks</th>
+                    <th>Date</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in materials %}
+                <tr>
+                    <td>
+                        <span style="font-weight: 500;">{{ m.title }}</span>
+                        {% if m.description %}
+                        <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ m.description|truncatewords:8 }}</div>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge badge-secondary">{{ m.get_material_type_display }}</span></td>
+                    <td>
+                        {% if m.status == 'completed' %}
+                            <span class="badge badge-success">Completed</span>
+                        {% elif m.status == 'processing' %}
+                            <span class="badge badge-warning">Processing</span>
+                        {% elif m.status == 'failed' %}
+                            <span class="badge badge-danger">Failed</span>
+                        {% else %}
+                            <span class="badge badge-secondary">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ m.chunks_created }}</td>
+                    <td>{{ m.created_at|date:"M d" }}</td>
+                    <td>
+                        <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary">Details</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="padding: 1.5rem; text-align: center; color: var(--gray-500); font-size: 0.875rem;">
+            No teaching materials linked to this course yet.
+        </div>
+        {% endif %}
+
+        <!-- Inline upload form (hidden by default) -->
+        <div id="material-upload-form" style="display: none; padding: 1.25rem; border-top: 1px solid var(--gray-200);">
+            <form method="post" action="{% url 'dashboard:course_upload_material' course.id %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">File</label>
+                        <input type="file" name="material_file" accept=".pdf,.docx,.doc,.txt" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Title</label>
+                        <input type="text" name="material_title" class="form-control" placeholder="e.g., Biology Textbook Ch.5" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="material_type" class="form-control">
+                            {% for code, name in material_types %}
+                            <option value="{{ code }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Description (optional)</label>
+                        <textarea name="material_description" class="form-control" rows="2" placeholder="Brief description..."></textarea>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                    <button type="submit" class="btn btn-primary btn-sm">Upload & Process</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('material-upload-form').style.display='none';">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Content Generation Status -->
 {% if lessons_without_content > 0 %}
 <div class="bulk-actions" style="background: #FEF3C7; border: 1px solid #FCD34D;">

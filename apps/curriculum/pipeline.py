@@ -800,6 +800,14 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
         
         upload.created_course = course
         upload.add_log(f"   {'Created' if created else 'Updated'} course: {course.title}")
+
+        # Link any teaching materials uploaded with this curriculum
+        from apps.dashboard.models import TeachingMaterialUpload
+        linked = TeachingMaterialUpload.objects.filter(
+            curriculum_upload=upload, course__isnull=True
+        ).update(course=course)
+        if linked:
+            upload.add_log(f"   Linked {linked} teaching material(s) to course")
         
         units_created = 0
         lessons_created = 0
