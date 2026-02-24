@@ -1,0 +1,163 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Upload Teaching Material{% endblock %}
+{% block page_title %}Upload Teaching Material{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-zone {
+        border: 2px dashed var(--gray-300);
+        border-radius: 12px;
+        padding: 3rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: var(--gray-50);
+    }
+    .upload-zone:hover,
+    .upload-zone.dragover {
+        border-color: var(--primary);
+        background: var(--primary-light);
+    }
+    .upload-zone svg { width: 48px; height: 48px; color: var(--gray-400); margin-bottom: 1rem; }
+    .upload-zone.dragover svg { color: var(--primary); }
+    .upload-zone h3 { margin-bottom: 0.5rem; color: var(--gray-700); }
+    .upload-zone p { color: var(--gray-500); font-size: 0.875rem; }
+    .file-selected { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--gray-50); border-radius: 8px; margin-top: 1rem; }
+    .file-selected svg { width: 32px; height: 32px; color: var(--primary); }
+    .file-info { flex: 1; }
+    .file-name { font-weight: 500; }
+    .file-size { font-size: 0.875rem; color: var(--gray-500); }
+    .remove-file { background: none; border: none; color: var(--gray-400); cursor: pointer; padding: 0.5rem; }
+    .remove-file:hover { color: var(--danger); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 700px;">
+    <p style="color: var(--gray-500); margin-bottom: 2rem;">
+        Upload textbooks, reference materials, or worksheets. These will be indexed into the knowledge base to enrich tutoring sessions.
+    </p>
+
+    <form method="post" enctype="multipart/form-data" id="upload-form">
+        {% csrf_token %}
+
+        <div class="card">
+            <div class="card-body">
+                <!-- File Upload -->
+                <div class="form-group">
+                    <label class="form-label">Document File</label>
+                    <div class="upload-zone" id="upload-zone">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                        </svg>
+                        <h3>Drop your file here</h3>
+                        <p>or click to browse (PDF, DOCX, TXT)</p>
+                        <input type="file" name="material_file" id="file-input" accept=".pdf,.docx,.doc,.txt" style="display: none;">
+                    </div>
+                    <div id="file-selected" class="file-selected" style="display: none;">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <div class="file-info">
+                            <div class="file-name" id="file-name"></div>
+                            <div class="file-size" id="file-size"></div>
+                        </div>
+                        <button type="button" class="remove-file" id="remove-file">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Title -->
+                <div class="form-group">
+                    <label class="form-label" for="title">Title</label>
+                    <input type="text" class="form-control" id="title" name="title" placeholder="e.g., Biology Form 3 Textbook" required>
+                </div>
+
+                <!-- Subject Name -->
+                <div class="form-group">
+                    <label class="form-label" for="subject_name">Subject</label>
+                    <input type="text" class="form-control" id="subject_name" name="subject_name" placeholder="e.g., Biology, Mathematics" required>
+                </div>
+
+                <!-- Grade Level -->
+                <div class="form-group">
+                    <label class="form-label" for="grade_level">Grade Level</label>
+                    <select class="form-control" id="grade_level" name="grade_level">
+                        <option value="">Select grade level (optional)</option>
+                        {% for code, name in grade_levels %}
+                        <option value="{{ code }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Material Type -->
+                <div class="form-group">
+                    <label class="form-label" for="material_type">Material Type</label>
+                    <select class="form-control" id="material_type" name="material_type">
+                        {% for code, name in material_types %}
+                        <option value="{{ code }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Description -->
+                <div class="form-group">
+                    <label class="form-label" for="description">Description (optional)</label>
+                    <textarea class="form-control" id="description" name="description" rows="2" placeholder="Brief description of this material..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+            <button type="submit" class="btn btn-primary" id="submit-btn" disabled>
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                Upload & Process
+            </button>
+            <a href="{% url 'dashboard:material_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const uploadZone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileSelected = document.getElementById('file-selected');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+    const removeFile = document.getElementById('remove-file');
+    const submitBtn = document.getElementById('submit-btn');
+
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault(); uploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; handleFileSelect(e.dataTransfer.files[0]); }
+    });
+    fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFileSelect(e.target.files[0]); });
+
+    function handleFileSelect(file) {
+        fileName.textContent = file.name;
+        fileSize.textContent = file.size < 1024*1024 ? (file.size/1024).toFixed(1)+' KB' : (file.size/(1024*1024)).toFixed(1)+' MB';
+        uploadZone.style.display = 'none';
+        fileSelected.style.display = 'flex';
+        submitBtn.disabled = false;
+    }
+    removeFile.addEventListener('click', () => {
+        fileInput.value = ''; uploadZone.style.display = 'block'; fileSelected.style.display = 'none'; submitBtn.disabled = true;
+    });
+    document.getElementById('upload-form').addEventListener('submit', function() {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" style="animation: spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Processing...';
+    });
+</script>
+<style>@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>
+{% endblock %}

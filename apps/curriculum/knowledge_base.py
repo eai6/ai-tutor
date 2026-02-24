@@ -341,6 +341,66 @@ class CurriculumKnowledgeBase:
         logger.info(f"Indexed {len(chunks)} chunks into ChromaDB")
         return {"indexed": len(chunks)}
     
+    def index_teaching_material(
+        self,
+        file_path: str,
+        subject: str,
+        grade_level: str,
+        material_title: str,
+        material_type: str = 'textbook',
+        upload_id: int = None
+    ) -> Dict:
+        """
+        Parse a teaching material (textbook, reference, worksheet) and index it.
+
+        Uses the same chunking and indexing as curriculum documents, but tags
+        chunks with source_type='teaching_material' so they can be distinguished.
+
+        Args:
+            file_path: Path to the document
+            subject: Subject name
+            grade_level: Grade level
+            material_title: Title of the material
+            material_type: Type (textbook, reference, worksheet, notes, other)
+            upload_id: Optional TeachingMaterialUpload ID
+
+        Returns:
+            Dict with indexing statistics
+        """
+        from apps.curriculum.curriculum_parser import extract_text_from_file
+
+        logger.info(f"Parsing teaching material: {file_path}")
+        text, file_type = extract_text_from_file(file_path)
+
+        if not text or len(text) < 100:
+            raise ValueError("Could not extract meaningful text from document")
+
+        # Chunk the text (reuse curriculum chunking)
+        chunks = self._chunk_curriculum_text(
+            text=text,
+            subject=subject,
+            grade_level=grade_level,
+            source_file=os.path.basename(file_path),
+            upload_id=upload_id
+        )
+
+        # Tag chunks with teaching material metadata
+        for chunk in chunks:
+            chunk.metadata['source_type'] = 'teaching_material'
+            chunk.metadata['material_type'] = material_type
+            chunk.metadata['material_title'] = material_title
+
+        # Index into vector DB
+        result = self._index_chunks(chunks)
+
+        return {
+            "success": True,
+            "file_path": file_path,
+            "text_length": len(text),
+            "chunks_created": len(chunks),
+            "chunks_indexed": result.get("indexed", 0),
+        }
+
     # ========================================================================
     # STEP 3: GENERATE LESSONS (Query for structure)
     # ========================================================================

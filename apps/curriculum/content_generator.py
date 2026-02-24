@@ -178,7 +178,7 @@ class LessonContentGenerator:
             return {
                 'teaching_strategies': context.teaching_strategies or self._default_strategies(subject),
                 'objectives': context.objectives,
-                'related_content': [c.get('content', '')[:200] for c in context.chunks[:3]],
+                'related_content': [c.get('content', '')[:500] for c in context.chunks[:6]],
                 'subject': subject,
                 'grade_level': course.grade_level if course else "S1",
             }
@@ -235,7 +235,21 @@ class LessonContentGenerator:
         
         # Build context string
         strategies_str = "\n".join(f"- {s}" for s in curriculum_context.get('teaching_strategies', [])[:5])
-        
+
+        # Build knowledge base reference material
+        related_content = curriculum_context.get('related_content', [])
+        kb_context_str = ""
+        if related_content:
+            kb_chunks = "\n\n".join(f"--- Excerpt {i+1} ---\n{chunk}" for i, chunk in enumerate(related_content) if chunk.strip())
+            if kb_chunks:
+                kb_context_str = f"""
+REFERENCE MATERIAL FROM TEXTBOOKS AND TEACHING RESOURCES:
+Use the following excerpts from uploaded textbooks/teaching materials to ground the lesson content
+in what students are actually studying. Align terminology, examples, and depth of coverage accordingly.
+
+{kb_chunks}
+"""
+
         prompt = f"""Create a complete tutoring session for this lesson.
 
 LESSON: {lesson.title}
@@ -246,6 +260,7 @@ GRADE: {grade} (Seychelles secondary school)
 
 TEACHING STRATEGIES TO USE:
 {strategies_str}
+{kb_context_str}
 
 Create 8-12 steps following the 5E model. Each step needs complete content.
 
@@ -403,12 +418,29 @@ Return ONLY valid JSON, no other text."""
     
     def _generate_exit_ticket(self, lesson, curriculum_context: Dict) -> List[Dict]:
         """Generate exit ticket questions for assessment."""
-        
+
+        subject = curriculum_context.get('subject', 'General')
+        grade = curriculum_context.get('grade_level', 'S1')
+
+        # Build KB reference material for question generation
+        related_content = curriculum_context.get('related_content', [])
+        kb_context_str = ""
+        if related_content:
+            kb_chunks = "\n".join(f"- {chunk[:300]}" for chunk in related_content if chunk.strip())
+            if kb_chunks:
+                kb_context_str = f"""
+REFERENCE MATERIAL FROM TEXTBOOKS:
+Use these excerpts to ensure questions align with what students are actually studying:
+{kb_chunks}
+"""
+
         prompt = f"""Create 3-5 exit ticket questions for this lesson:
 
 LESSON: {lesson.title}
 OBJECTIVE: {lesson.objective or 'Master the lesson concepts'}
-
+SUBJECT: {subject}
+GRADE: {grade} (Seychelles secondary school)
+{kb_context_str}
 Exit tickets should:
 1. Be quick to answer (1-2 minutes each)
 2. Check understanding of KEY concepts

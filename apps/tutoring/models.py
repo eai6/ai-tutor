@@ -232,8 +232,8 @@ class ExitTicket(models.Model):
     
     @property
     def is_complete(self):
-        """Check if exit ticket has required 10 questions."""
-        return self.question_count >= 10
+        """Check if exit ticket has a full question bank (30+)."""
+        return self.question_count >= 30
 
 
 class ExitTicketQuestion(models.Model):
@@ -268,7 +268,13 @@ class ExitTicketQuestion(models.Model):
         blank=True,
         help_text="Explanation of the correct answer"
     )
-    
+
+    concept_tag = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="The concept/objective this question assesses"
+    )
+
     difficulty = models.CharField(
         max_length=10,
         choices=Difficulty.choices,

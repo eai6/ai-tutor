@@ -333,28 +333,56 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
             continue
         
         try:
-            prompt = f"""Generate 10 multiple choice exit ticket questions for this lesson.
+            # Query KB for additional context from teaching materials
+            kb_context = ""
+            try:
+                from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+                course = lesson.unit.course
+                kb = CurriculumKnowledgeBase(institution_id=course.institution_id)
+                kb_result = kb.query_for_content_generation(
+                    lesson_title=lesson.title,
+                    lesson_objective=lesson.objective or '',
+                    unit_title=lesson.unit.title,
+                    subject=course.title,
+                    grade_level=course.grade_level or '',
+                    n_results=15,
+                )
+                if kb_result.chunks:
+                    kb_context = "\n\nADDITIONAL CONTEXT FROM TEXTBOOKS/MATERIALS:\n"
+                    for chunk in kb_result.chunks[:10]:
+                        kb_context += f"- {chunk.get('content', '')[:200]}...\n"
+            except Exception as e:
+                logger.warning(f"KB query for exit tickets failed: {e}")
+
+            prompt = f"""Generate 35 multiple choice exit ticket questions for this lesson.
 
 Lesson: {lesson.title}
 Objective: {lesson.objective}
 Subject: {lesson.unit.course.title}
+{kb_context}
 
-Generate questions that test understanding of the key concepts. Each question should have:
+Generate 35 questions that cover ALL key concepts in this lesson. Each question should have:
 - A clear question
 - 4 answer choices (A, B, C, D)
 - The correct answer letter (just the letter: A, B, C, or D)
 - Brief explanation
+- A concept_tag identifying which learning objective/concept it assesses
+
+Ensure broad coverage: at least 2-3 questions per major concept.
+Mix difficulty levels: ~10 easy (recall), ~15 medium (apply), ~10 hard (analyze).
 
 Return as JSON array:
 [
   {{
     "question": "What is...",
     "option_a": "First option",
-    "option_b": "Second option", 
+    "option_b": "Second option",
     "option_c": "Third option",
     "option_d": "Fourth option",
     "correct_answer": "A",
-    "explanation": "Brief explanation of why A is correct"
+    "explanation": "Brief explanation of why A is correct",
+    "concept_tag": "Name of the concept this tests",
+    "difficulty": "easy"
   }}
 ]
 
@@ -362,10 +390,10 @@ Return ONLY the JSON array, no other text."""
 
             system_prompt = "You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text."
             messages = [{"role": "user", "content": prompt}]
-            
+
             response = client.generate(messages, system_prompt)
             response_text = response.content.strip()
-            
+
             # Handle markdown code blocks
             if '```json' in response_text:
                 response_text = response_text.split('```json')[1].split('```')[0]
@@ -373,24 +401,31 @@ Return ONLY the JSON array, no other text."""
                 parts = response_text.split('```')
                 if len(parts) >= 2:
                     response_text = parts[1]
-            
+
             response_text = response_text.strip()
             questions_data = json.loads(response_text)
-            
+
             if not questions_data or not isinstance(questions_data, list):
                 failed += 1
                 continue
-            
+
+            num_questions = len(questions_data)
+
             # Create exit ticket
             exit_ticket = ExitTicket.objects.create(
                 lesson=lesson,
                 passing_score=8,
                 time_limit_minutes=15,
-                instructions="Answer all 10 questions. You need 8 correct to pass."
+                instructions=f"Answer all 10 questions. You need 8 correct to pass. (Selected from a bank of {num_questions})"
             )
-            
-            # Create questions
-            for i, q in enumerate(questions_data[:10]):
+
+            # Create questions (up to 40)
+            for i, q in enumerate(questions_data[:40]):
+                # Map difficulty string
+                diff = q.get('difficulty', 'medium').lower()
+                if diff not in ('easy', 'medium', 'hard'):
+                    diff = 'medium'
+
                 ExitTicketQuestion.objects.create(
                     exit_ticket=exit_ticket,
                     question_text=q.get('question', ''),
@@ -400,11 +435,13 @@ Return ONLY the JSON array, no other text."""
                     option_d=q.get('option_d', ''),
                     correct_answer=q.get('correct_answer', 'A')[:1].upper(),
                     explanation=q.get('explanation', ''),
-                    order_index=i
+                    concept_tag=q.get('concept_tag', '')[:200],
+                    difficulty=diff,
+                    order_index=i,
                 )
-            
+
             generated += 1
-            log(f"   ✓ {lesson.title}: 10 questions")
+            log(f"   ✓ {lesson.title}: {min(num_questions, 40)} questions ({len(set(q.get('concept_tag','') for q in questions_data))} concepts)")
             
         except Exception as e:
             failed += 1

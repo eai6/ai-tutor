@@ -1,0 +1,81 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Processing: {{ upload.title }}{% endblock %}
+{% block page_title %}{{ upload.title }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px;">
+    <!-- Status card -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h3 style="margin: 0;">{{ upload.title }}</h3>
+                    <p style="color: var(--gray-500); margin: 0.25rem 0 0;">
+                        {{ upload.subject_name }}{% if upload.grade_level %} &middot; {{ upload.grade_level }}{% endif %}
+                        &middot; {{ upload.get_material_type_display }}
+                    </p>
+                </div>
+                <div>
+                    {% if upload.status == 'completed' %}
+                        <span class="badge badge-success" style="font-size: 1rem; padding: 0.5rem 1rem;">Completed</span>
+                    {% elif upload.status == 'processing' %}
+                        <span class="badge badge-warning" style="font-size: 1rem; padding: 0.5rem 1rem;">Processing...</span>
+                    {% elif upload.status == 'failed' %}
+                        <span class="badge badge-danger" style="font-size: 1rem; padding: 0.5rem 1rem;">Failed</span>
+                    {% else %}
+                        <span class="badge badge-secondary" style="font-size: 1rem; padding: 0.5rem 1rem;">Pending</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if upload.status == 'completed' %}
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem;">
+                <div style="text-align: center; padding: 1rem; background: var(--gray-50); border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: 600;">{{ upload.extracted_text_length|floatformat:0 }}</div>
+                    <div style="color: var(--gray-500); font-size: 0.875rem;">Characters extracted</div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: var(--gray-50); border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: 600;">{{ upload.chunks_created }}</div>
+                    <div style="color: var(--gray-500); font-size: 0.875rem;">Knowledge chunks</div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: var(--gray-50); border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: 600;">{{ upload.completed_at|date:"M d" }}</div>
+                    <div style="color: var(--gray-500); font-size: 0.875rem;">Completed</div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if upload.error_message %}
+            <div style="background: #FEF2F2; border-radius: 8px; padding: 1rem; margin-top: 1rem; color: #991B1B;">
+                <strong>Error:</strong> {{ upload.error_message }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Processing log -->
+    {% if upload.processing_log %}
+    <div class="card">
+        <div class="card-body">
+            <h4 style="margin-bottom: 1rem;">Processing Log</h4>
+            <pre style="background: var(--gray-50); padding: 1rem; border-radius: 8px; font-size: 0.8rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{{ upload.processing_log }}</pre>
+        </div>
+    </div>
+    {% endif %}
+
+    <div style="margin-top: 1.5rem;">
+        <a href="{% url 'dashboard:material_list' %}" class="btn btn-secondary">Back to Materials</a>
+        {% if upload.status == 'processing' %}
+        <button class="btn btn-primary" onclick="location.reload()" style="margin-left: 0.5rem;">Refresh Status</button>
+        {% endif %}
+    </div>
+</div>
+
+{% if upload.status == 'processing' %}
+<script>
+    // Auto-refresh while processing
+    setTimeout(() => location.reload(), 5000);
+</script>
+{% endif %}
+{% endblock %}

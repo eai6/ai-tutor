@@ -85,10 +85,11 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
     @patch('apps.safety.RateLimiter.record_message')
     @patch('apps.safety.RateLimiter.check_rate_limit')
     @patch('apps.safety.ContentSafetyFilter.check_content')
-    @patch('apps.tutoring.conversational_tutor.ConversationalTutor.respond')
-    def test_chat_respond_uses_filtered_content(self, mock_respond, mock_check_content, mock_rate_check, mock_record):
-        """chat_respond should pass filtered (PII-scrubbed) content to tutor."""
+    @patch('apps.tutoring.conversational_tutor.ConversationalTutor.respond_stream')
+    def test_chat_respond_uses_filtered_content(self, mock_respond_stream, mock_check_content, mock_rate_check, mock_record):
+        """chat_respond should pass filtered (PII-scrubbed) content to tutor (streaming)."""
         from apps.tutoring.views import chat_respond
+        import json as _json
 
         mock_rate_check.return_value = (True, None)
         mock_check_content.return_value = SafetyCheckResult(
@@ -98,22 +99,19 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
             warnings=['PII detected'],
             blocked=False,
         )
-        from apps.tutoring.conversational_tutor import TutorMessage
-        mock_respond.return_value = TutorMessage(
-            content='Great question!',
-            phase='instruction',
-            is_complete=False,
-            media=[],
-            show_exit_ticket=False,
-            exit_ticket_data=None,
-        )
+        # respond_stream is a generator; mock it to yield a done chunk
+        mock_respond_stream.return_value = iter([
+            _json.dumps({"type": "done", "content": "Great question!", "phase": "instruction", "media": [], "show_exit_ticket": False, "exit_ticket": None, "is_complete": False})
+        ])
 
         session = self._create_session()
         request = self._make_request(self.student_user, {'message': 'my email is test@example.com'})
 
-        chat_respond(request, session.id)
+        response = chat_respond(request, session.id)
+        # StreamingHttpResponse is lazy - consume it to trigger respond_stream
+        list(response.streaming_content)
 
         # Tutor should receive filtered content, not original
-        mock_respond.assert_called_once()
-        call_args = mock_respond.call_args
+        mock_respond_stream.assert_called_once()
+        call_args = mock_respond_stream.call_args
         self.assertIn('[REDACTED]', call_args[0][0])

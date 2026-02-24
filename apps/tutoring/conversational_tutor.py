@@ -355,23 +355,48 @@ class ConversationalTutor:
     
     def _load_exit_ticket_concepts(self) -> List[Dict]:
         """
-        Load exit ticket questions and extract the concepts that must be covered.
-        
-        This ensures the tutor covers all material needed for the exit assessment.
+        Load exit ticket questions and select a randomized subset of 10.
+
+        If the question bank has 30+ questions, selects 10 with concept coverage:
+        1. Group by concept_tag
+        2. Pick one question per unique concept tag (random within each group)
+        3. Fill remaining slots randomly from unused questions
+        4. Shuffle the final 10
+
+        If resuming, loads the previously selected question IDs from engine_state.
         """
         from apps.tutoring.models import ExitTicket, ExitTicketQuestion
-        
+
         concepts = []
-        
+
         try:
             exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
             if not exit_ticket:
                 return concepts
-            
-            questions = ExitTicketQuestion.objects.filter(
-                exit_ticket=exit_ticket
-            ).order_by('order_index')
-            
+
+            # Check if we have previously selected questions (resume)
+            state = self.session.engine_state or {}
+            selected_ids = state.get('selected_exit_ticket_ids')
+
+            if selected_ids:
+                # Resume: load the exact previously-selected questions
+                questions = ExitTicketQuestion.objects.filter(
+                    id__in=selected_ids
+                )
+                # Preserve original selection order
+                id_order = {qid: idx for idx, qid in enumerate(selected_ids)}
+                questions = sorted(questions, key=lambda q: id_order.get(q.id, 0))
+            else:
+                # New session: select 10 from the full bank
+                all_questions = list(ExitTicketQuestion.objects.filter(
+                    exit_ticket=exit_ticket
+                ).order_by('order_index'))
+
+                if len(all_questions) > 10:
+                    questions = self._select_randomized_questions(all_questions, count=10)
+                else:
+                    questions = all_questions
+
             for q in questions:
                 concepts.append({
                     'id': q.id,
@@ -380,15 +405,61 @@ class ConversationalTutor:
                     'correct_text': getattr(q, f'option_{q.correct_answer.lower()}', ''),
                     'explanation': q.explanation,
                     'difficulty': q.difficulty,
-                    'covered': False,  # Track if this concept has been taught
+                    'concept_tag': q.concept_tag,
+                    'covered': False,
                 })
-            
+
             logger.info(f"Loaded {len(concepts)} exit ticket concepts for {self.lesson.title}")
-            
+
         except Exception as e:
             logger.warning(f"Could not load exit ticket concepts: {e}")
-        
+
         return concepts
+
+    def _select_randomized_questions(
+        self, all_questions: list, count: int = 10
+    ) -> list:
+        """
+        Select `count` questions from the bank ensuring concept coverage.
+
+        1. Group by concept_tag
+        2. Pick one per unique concept tag (random within group)
+        3. Fill remaining slots randomly from unused questions
+        4. Shuffle the final set
+        """
+        from collections import defaultdict
+
+        # Group by concept_tag
+        by_tag = defaultdict(list)
+        no_tag = []
+        for q in all_questions:
+            tag = q.concept_tag.strip() if q.concept_tag else ''
+            if tag:
+                by_tag[tag].append(q)
+            else:
+                no_tag.append(q)
+
+        selected = []
+        used_ids = set()
+
+        # Step 1: one per concept tag
+        for tag, group in by_tag.items():
+            pick = random.choice(group)
+            selected.append(pick)
+            used_ids.add(pick.id)
+            if len(selected) >= count:
+                break
+
+        # Step 2: fill remaining from unused
+        remaining = [q for q in all_questions if q.id not in used_ids]
+        random.shuffle(remaining)
+        for q in remaining:
+            if len(selected) >= count:
+                break
+            selected.append(q)
+
+        random.shuffle(selected)
+        return selected[:count]
     
     def _load_state(self):
         """Load session state."""
@@ -428,7 +499,12 @@ class ConversationalTutor:
         covered_concept_ids = [
             c['id'] for c in self.exit_ticket_concepts if c.get('covered')
         ]
-        
+
+        # Persist the selected question IDs so resume gets the same set
+        selected_exit_ticket_ids = [
+            c['id'] for c in self.exit_ticket_concepts
+        ]
+
         self.session.engine_state = {
             'phase': self.phase.value,
             'exchange_count': self.exchange_count,
@@ -440,6 +516,7 @@ class ConversationalTutor:
             'practice_correct': self.practice_correct,
             'practice_total': self.practice_total,
             'covered_concept_ids': covered_concept_ids,
+            'selected_exit_ticket_ids': selected_exit_ticket_ids,
             # Remediation state
             'is_remediation': getattr(self, 'is_remediation', False),
             'remediation_attempt': getattr(self, 'remediation_attempt', 0),
@@ -475,12 +552,17 @@ class ConversationalTutor:
             "",
             "KEY CONCEPTS TO COVER:",
         ]
-        
+
+        # Collect educational materials across all steps
+        all_vocabulary = []
+        all_common_mistakes = []
+        all_seychelles_context = []
+
         # Extract key concepts from steps
         for i, step in enumerate(self.steps):
-            step_type = step.step_type.upper()
             content_preview = step.teacher_script[:200] if step.teacher_script else ""
-            
+            hints = [h for h in [step.hint_1, step.hint_2, step.hint_3] if h]
+
             if step.step_type == 'teach':
                 context_parts.append(f"  {i+1}. [TEACH] {content_preview}...")
             elif step.step_type == 'practice':
@@ -488,16 +570,56 @@ class ConversationalTutor:
                 context_parts.append(f"  {i+1}. [PRACTICE] {question}...")
                 if step.expected_answer:
                     context_parts.append(f"      Expected: {step.expected_answer}")
+                if hints:
+                    context_parts.append(f"      Hints: {' → '.join(h[:80] for h in hints)}")
             elif step.step_type == 'worked_example':
                 context_parts.append(f"  {i+1}. [EXAMPLE] {content_preview}...")
-        
+
+            # Gather educational materials
+            ed = step.educational_content if isinstance(step.educational_content, dict) else {}
+            vocab = ed.get('key_vocabulary', [])
+            if vocab:
+                all_vocabulary.extend(vocab)
+            mistakes = ed.get('common_mistakes', [])
+            if mistakes:
+                all_common_mistakes.extend(mistakes)
+            sey_ctx = ed.get('seychelles_context', '')
+            if sey_ctx:
+                all_seychelles_context.append(sey_ctx)
+
+        # Add aggregated educational materials section
+        if all_vocabulary or all_common_mistakes or all_seychelles_context:
+            context_parts.append("")
+            context_parts.append("EDUCATIONAL MATERIALS:")
+
+            if all_vocabulary:
+                context_parts.append("  Key Vocabulary:")
+                for term in all_vocabulary:
+                    if isinstance(term, dict):
+                        context_parts.append(f"    - {term.get('term', '')}: {term.get('definition', '')}")
+                    else:
+                        context_parts.append(f"    - {term}")
+
+            if all_common_mistakes:
+                context_parts.append("  Common Mistakes to Watch For:")
+                for mistake in all_common_mistakes:
+                    if isinstance(mistake, dict):
+                        context_parts.append(f"    - {mistake.get('mistake', mistake.get('description', str(mistake)))}")
+                    else:
+                        context_parts.append(f"    - {mistake}")
+
+            if all_seychelles_context:
+                context_parts.append("  Seychelles Context:")
+                for ctx in all_seychelles_context:
+                    context_parts.append(f"    - {ctx[:200]}")
+
         # Add terminal objectives if available
         if self.lesson.metadata and 'terminal_objectives' in self.lesson.metadata:
             context_parts.append("")
             context_parts.append("TERMINAL OBJECTIVES:")
             for obj in self.lesson.metadata['terminal_objectives']:
                 context_parts.append(f"  • {obj}")
-        
+
         # CRITICAL: Add exit ticket concepts that MUST be covered
         if self.exit_ticket_concepts:
             context_parts.append("")
@@ -506,7 +628,7 @@ class ConversationalTutor:
             context_parts.append("The student will be assessed on these questions.")
             context_parts.append("Make sure to teach the concepts needed to answer them.")
             context_parts.append("")
-            
+
             for i, concept in enumerate(self.exit_ticket_concepts):
                 status = "✓ COVERED" if concept.get('covered') else "⚠ NOT YET COVERED"
                 context_parts.append(f"  Q{i+1}. [{status}] {concept['question'][:150]}")
@@ -514,7 +636,7 @@ class ConversationalTutor:
                 if concept.get('explanation'):
                     context_parts.append(f"      Key concept: {concept['explanation'][:100]}")
                 context_parts.append("")
-        
+
         return "\n".join(context_parts)
     
     @property
@@ -706,7 +828,204 @@ Keep it to 2-3 sentences."""
         self.conversation.append({"role": "assistant", "content": response})
         
         return self._create_message(response, media=media)
-    
+
+    def _prepare_response(self, student_input: str) -> Optional[Dict]:
+        """
+        Shared pre-generation logic for respond() and respond_stream().
+
+        Saves student turn, updates counts, builds prompt context, checks
+        phase transitions. Returns context dict, or None if exit_ticket phase.
+        """
+        # Save student message
+        self._save_turn("student", student_input)
+        self.conversation.append({"role": "user", "content": student_input})
+
+        # Update counts
+        self.exchange_count += 1
+        self.phase_exchange_count += 1
+
+        # Check if student is requesting a visual
+        visual_request = self._detect_visual_request(student_input)
+
+        # Get curriculum context from knowledge base
+        kb_context = self._get_knowledge_context(student_input)
+
+        # Check if we should transition phases
+        self._maybe_transition_phase()
+
+        # Exit ticket is handled separately (non-streamable)
+        if self.phase == ConversationPhase.EXIT_TICKET:
+            return None
+
+        # Determine media
+        media = []
+        media_context = ""
+
+        if visual_request:
+            media = self._find_matching_media(student_input, min_relevance=0.3)
+            if not media:
+                generated = self._generate_visual_aid(student_input)
+                if generated:
+                    media = [generated]
+        else:
+            media = self._get_proactive_media()
+
+        if media:
+            media_context = self._build_media_context(media)
+
+        return {
+            'student_input': student_input,
+            'kb_context': kb_context,
+            'media_context': media_context,
+            'visual_requested': bool(visual_request),
+            'media': media,
+        }
+
+    def _finalize_response(self, full_response: str, student_input: str, media: List[Dict]) -> Dict:
+        """
+        Shared post-generation logic for respond() and respond_stream().
+
+        Runs post-processing (concept tracking, state save, media handling).
+        Returns metadata dict.
+        """
+        # Try generating visual if response references one but we don't have it
+        if not media and self._response_needs_visual(full_response):
+            visual_need = self._determine_visual_need(full_response)
+            if visual_need:
+                generated = self._generate_visual_aid(visual_need)
+                if generated:
+                    media.append(generated)
+
+        # Analyze student response for adaptation
+        self._analyze_student_response(student_input, full_response)
+
+        # Save state
+        self._save_state()
+
+        # Save tutor response
+        self._save_turn("tutor", full_response)
+        self.conversation.append({"role": "assistant", "content": full_response})
+
+        return {
+            'phase': self.phase.value,
+            'media': media,
+            'show_exit_ticket': False,
+            'exit_ticket': None,
+            'is_complete': self.phase == ConversationPhase.COMPLETED,
+        }
+
+    def respond_stream(self, student_input: str):
+        """
+        Streaming version of respond(). Yields SSE-compatible chunks.
+
+        Chunk format:
+            {"type": "token", "content": "Hello "}
+            {"type": "done", "phase": "instruction", "media": [...], ...}
+        """
+        import json as _json
+
+        ctx = self._prepare_response(student_input)
+
+        # Exit ticket phase - not streamable, yield as single chunk
+        if ctx is None:
+            et_msg = self._handle_exit_ticket()
+            yield _json.dumps({
+                "type": "done",
+                "content": et_msg.content,
+                "phase": et_msg.phase,
+                "media": et_msg.media,
+                "show_exit_ticket": et_msg.show_exit_ticket,
+                "exit_ticket": et_msg.exit_ticket_data,
+                "is_complete": et_msg.is_complete,
+            })
+            return
+
+        # Build the prompt (same as _generate_contextual_response)
+        current_guidance = self._get_current_guidance()
+        phase_instructions = self._get_phase_instructions()
+        concept_coverage = self._get_concept_coverage_summary()
+        next_concept = self._get_next_uncovered_concept()
+        student_profile = self._build_student_profile_block()
+        worked_example_block = self._build_worked_example_block()
+        interleaved_block = self._build_interleaved_practice_block()
+
+        visual_instructions = ""
+        if ctx['media_context']:
+            visual_instructions = f"\n{ctx['media_context']}\n"
+        elif ctx['visual_requested']:
+            visual_instructions = "\n⚠️ VISUAL REQUESTED BUT NOT AVAILABLE:\nThe student asked for a visual, but no matching image was found.\n- Acknowledge their request\n- Provide a clear verbal description instead\n- Continue with the lesson\n"
+
+        prompt = f"""CONVERSATION CONTEXT:
+{self._format_recent_conversation(5)}
+
+STUDENT JUST SAID: "{ctx['student_input']}"
+
+LESSON CONTEXT:
+{self.lesson_context}
+
+CURRICULUM KNOWLEDGE:
+{ctx['kb_context']}
+
+CURRENT TEACHING GUIDANCE:
+{current_guidance}
+{visual_instructions}
+{worked_example_block}
+{concept_coverage}
+
+{next_concept}
+
+{interleaved_block}
+
+PHASE: {self.phase.value.upper()}
+{phase_instructions}
+
+{student_profile}
+
+Generate your response following these rules:
+1. RESPOND to what the student said (acknowledge their answer)
+2. If correct: praise specifically, then advance to the next concept
+3. If incorrect: encourage, give a hint, ask a simpler question
+4. If confused: simplify, use an example
+5. PRIORITIZE teaching uncovered exit ticket concepts
+6. If an image is being shown, DESCRIBE WHAT IT ACTUALLY SHOWS
+7. Use KEY VOCABULARY terms naturally
+8. Watch for COMMON MISTAKES and address them proactively
+9. Weave in local Seychelles context where relevant
+10. Use the full HINT LADDER for progressive scaffolding
+11. END with a question or "Try this:" prompt
+12. Keep it concise (2-4 sentences + question)
+
+YOUR RESPONSE:"""
+
+        # Stream from LLM
+        full_content = ""
+        if self.llm_client:
+            try:
+                messages = [{"role": "user", "content": prompt}]
+                system_prompt = self._build_system_prompt()
+
+                for token in self.llm_client.generate_stream(messages, system_prompt):
+                    full_content += token
+                    yield _json.dumps({"type": "token", "content": token})
+            except Exception as e:
+                logger.error(f"LLM streaming failed: {e}")
+                full_content = self._fallback_response()
+                yield _json.dumps({"type": "token", "content": full_content})
+        else:
+            full_content = self._fallback_response()
+            yield _json.dumps({"type": "token", "content": full_content})
+
+        # Post-processing
+        metadata = self._finalize_response(
+            full_content, ctx['student_input'], ctx['media']
+        )
+
+        yield _json.dumps({
+            "type": "done",
+            "content": full_content,
+            **metadata,
+        })
+
     def _get_proactive_media(self) -> List[Dict]:
         """Get media that would proactively help with current topic."""
         if self.current_topic_index >= len(self.steps):
@@ -897,7 +1216,26 @@ IMPORTANT: You are showing these images with your response.
         return list(set(terms))[:10]  # Limit to 10 unique terms
     
     def _generate_visual_aid(self, request: str) -> Optional[Dict]:
-        """Generate a visual aid using DALL-E or similar."""
+        """Generate a visual aid using Gemini Imagen."""
+        # Image safety check
+        try:
+            from apps.safety import ImageSafetyFilter, SafetyAuditLog
+            safety_result = ImageSafetyFilter.check_image_request(
+                request, lesson_title=self.lesson.title
+            )
+            if safety_result.blocked:
+                SafetyAuditLog.log(
+                    'image_blocked',
+                    user=self.student,
+                    session_id=self.session.id,
+                    details={'prompt': request[:200], 'reason': safety_result.block_reason},
+                    severity='warning',
+                )
+                logger.warning(f"Image request blocked: {request[:50]}...")
+                return None
+        except Exception as e:
+            logger.warning(f"Image safety check failed (allowing): {e}")
+
         try:
             from apps.tutoring.image_service import ImageGenerationService
             
@@ -1397,8 +1735,12 @@ Generate your response following these rules:
 4. If confused: simplify, use an example
 5. PRIORITIZE teaching uncovered exit ticket concepts
 6. If an image is being shown, DESCRIBE WHAT IT ACTUALLY SHOWS - don't make up features
-7. END with a question or "Try this:" prompt
-8. Keep it concise (2-4 sentences + question)
+7. Use KEY VOCABULARY terms naturally in your explanation — introduce and define them
+8. Watch for COMMON MISTAKES listed in the guidance and address them proactively
+9. Weave in local Seychelles context where relevant to make the lesson relatable
+10. Use the full HINT LADDER (hint 1 → 2 → 3) for progressive scaffolding — don't jump to the answer
+11. END with a question or "Try this:" prompt
+12. Keep it concise (2-4 sentences + question)
 
 YOUR RESPONSE:"""
 
@@ -1568,19 +1910,65 @@ Guide your teaching toward helping the student understand this concept!"""
         """Get guidance from current lesson step."""
         if self.current_topic_index < len(self.steps):
             step = self.steps[self.current_topic_index]
-            
+
             guidance = f"Current topic: {step.step_type}\n"
             guidance += f"Content: {step.teacher_script[:300]}...\n" if step.teacher_script else ""
-            
+
             if step.question:
                 guidance += f"Suggested question: {step.question}\n"
             if step.expected_answer:
                 guidance += f"Expected answer: {step.expected_answer}\n"
-            if step.hint_1:
-                guidance += f"Hint if stuck: {step.hint_1}\n"
-            
+
+            # Full hint ladder
+            hints = [h for h in [step.hint_1, step.hint_2, step.hint_3] if h]
+            if hints:
+                guidance += "Hint ladder (use progressively if student is stuck):\n"
+                for j, hint in enumerate(hints, 1):
+                    guidance += f"  Hint {j}: {hint}\n"
+
+            # Rubric for grading
+            if step.rubric:
+                guidance += f"Rubric: {step.rubric[:200]}\n"
+
+            # Answer type and choices
+            if step.answer_type and step.answer_type != 'none':
+                guidance += f"Answer type: {step.answer_type}\n"
+            if step.choices:
+                guidance += f"Choices: {step.choices}\n"
+
+            # Educational content for this step
+            ed = step.educational_content if isinstance(step.educational_content, dict) else {}
+
+            vocab = ed.get('key_vocabulary', [])
+            if vocab:
+                terms = []
+                for t in vocab:
+                    terms.append(t.get('term', str(t)) if isinstance(t, dict) else str(t))
+                guidance += f"Key vocabulary: {', '.join(terms)}\n"
+
+            mistakes = ed.get('common_mistakes', [])
+            if mistakes:
+                items = []
+                for m in mistakes:
+                    items.append(m.get('mistake', m.get('description', str(m))) if isinstance(m, dict) else str(m))
+                guidance += f"Common mistakes: {'; '.join(items)}\n"
+
+            sey_ctx = ed.get('seychelles_context', '')
+            if sey_ctx:
+                guidance += f"Seychelles context: {sey_ctx[:200]}\n"
+
+            key_points = ed.get('key_points', [])
+            if key_points:
+                guidance += f"Key points: {'; '.join(str(p) for p in key_points)}\n"
+
+            # Teaching strategies from curriculum context
+            cur = step.curriculum_context if isinstance(step.curriculum_context, dict) else {}
+            strategies = cur.get('teaching_strategies', [])
+            if strategies:
+                guidance += f"Teaching strategies: {'; '.join(str(s) for s in strategies)}\n"
+
             return guidance
-        
+
         return "All planned topics covered. Move to wrap-up."
     
     def _get_current_topic(self) -> str:
@@ -1952,39 +2340,42 @@ If none were covered, return [].
     # =========================================================================
     
     def _handle_exit_ticket(self) -> TutorMessage:
-        """Handle exit ticket phase."""
+        """Handle exit ticket phase using the pre-selected randomized questions."""
         from apps.tutoring.models import ExitTicket, ExitTicketQuestion
-        
-        exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
-        
-        if not exit_ticket:
-            # No exit ticket, just complete
+
+        # Use the pre-selected randomized set from self.exit_ticket_concepts
+        if not self.exit_ticket_concepts:
             return self._complete_session()
-        
-        questions = ExitTicketQuestion.objects.filter(
-            exit_ticket=exit_ticket
-        ).order_by('order_index')
-        
-        if not questions:
+
+        # Load full question objects for the selected IDs
+        selected_ids = [c['id'] for c in self.exit_ticket_concepts]
+        questions = ExitTicketQuestion.objects.filter(id__in=selected_ids)
+        q_map = {q.id: q for q in questions}
+
+        # Build exit ticket data preserving the randomized order
+        exit_questions = []
+        for i, concept in enumerate(self.exit_ticket_concepts):
+            q = q_map.get(concept['id'])
+            if not q:
+                continue
+            exit_questions.append({
+                'index': i,
+                'question': q.question_text,
+                'options': [
+                    {'letter': 'A', 'text': q.option_a},
+                    {'letter': 'B', 'text': q.option_b},
+                    {'letter': 'C', 'text': q.option_c},
+                    {'letter': 'D', 'text': q.option_d},
+                ],
+                'correct': q.correct_answer,
+            })
+
+        if not exit_questions:
             return self._complete_session()
-        
-        # Build exit ticket data for frontend
+
         exit_data = {
-            'questions': [
-                {
-                    'index': i,
-                    'question': q.question_text,
-                    'options': [
-                        {'letter': 'A', 'text': q.option_a},
-                        {'letter': 'B', 'text': q.option_b},
-                        {'letter': 'C', 'text': q.option_c},
-                        {'letter': 'D', 'text': q.option_d},
-                    ],
-                    'correct': q.correct_answer,
-                }
-                for i, q in enumerate(questions)
-            ],
-            'total': len(questions),
+            'questions': exit_questions,
+            'total': len(exit_questions),
             'passing_score': 8,
         }
         
@@ -2020,16 +2411,16 @@ If none were covered, return [].
         )
     
     def submit_exit_ticket(self, answers: List[str]) -> TutorMessage:
-        """Process exit ticket submission."""
-        from apps.tutoring.models import ExitTicket, ExitTicketQuestion
-        
-        exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
-        if not exit_ticket:
+        """Process exit ticket submission using the pre-selected randomized questions."""
+        from apps.tutoring.models import ExitTicketQuestion
+
+        if not self.exit_ticket_concepts:
             return self._complete_session()
-        
-        questions = list(ExitTicketQuestion.objects.filter(
-            exit_ticket=exit_ticket
-        ).order_by('order_index'))
+
+        # Load the pre-selected questions in the randomized order
+        selected_ids = [c['id'] for c in self.exit_ticket_concepts]
+        q_map = {q.id: q for q in ExitTicketQuestion.objects.filter(id__in=selected_ids)}
+        questions = [q_map[qid] for qid in selected_ids if qid in q_map]
         
         # Grade
         correct = 0

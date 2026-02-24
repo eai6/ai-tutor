@@ -344,30 +344,64 @@ def get_resources_for_topic(unit_name: str) -> List[str]:
 # LLM-BASED CURRICULUM PARSER (Robust)
 # ============================================================================
 
-def parse_curriculum_with_llm(text: str, subject: str, grade_level: str) -> ParsedCurriculum:
+def parse_curriculum_with_llm(text: str, subject: str, grade_level: str, institution_id: int = None) -> ParsedCurriculum:
     """
     Use LLM to parse curriculum structure from text.
     This is more robust than regex-based parsing.
+
+    If institution_id is provided, queries the knowledge base for teaching
+    material context to help align unit/lesson structure with textbooks.
     """
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
-    
+
     # Get LLM client
     model_config = ModelConfig.objects.filter(is_active=True).first()
     if not model_config:
         logger.warning("No LLM configured, falling back to regex parser")
         return parse_generic_curriculum(text, subject, grade_level)
-    
+
     llm_client = get_llm_client(model_config)
-    
+
+    # Query knowledge base for teaching material context if available
+    kb_context_str = ""
+    if institution_id:
+        try:
+            from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+            kb = CurriculumKnowledgeBase(institution_id=institution_id)
+            kb_result = kb.query_for_content_generation(
+                lesson_title=subject,
+                lesson_objective=f"{subject} curriculum structure",
+                unit_title="",
+                subject=subject,
+                grade_level=grade_level,
+                n_results=8,
+            )
+            if kb_result and kb_result.chunks:
+                excerpts = "\n\n".join(
+                    f"--- From {c.get('metadata', {}).get('material_title', 'teaching material')} ---\n{c.get('content', '')[:400]}"
+                    for c in kb_result.chunks[:6]
+                    if c.get('content', '').strip()
+                )
+                if excerpts:
+                    kb_context_str = f"""
+REFERENCE MATERIAL FROM UPLOADED TEXTBOOKS/TEACHING RESOURCES:
+The following excerpts are from textbooks and materials used at this school.
+Align unit and lesson names with the terminology and structure used in these materials where appropriate.
+
+{excerpts}
+"""
+        except Exception as e:
+            logger.warning(f"KB query for curriculum parsing failed: {e}")
+
     # Truncate text if too long (keep first and last parts for context)
     max_chars = 30000
     if len(text) > max_chars:
         # Keep first 20k and last 10k
         text = text[:20000] + "\n\n[...middle section truncated...]\n\n" + text[-10000:]
-    
+
     cycle = "4" if grade_level in ["S1", "S2"] else "5"
-    
+
     prompt = f"""Analyze this curriculum document and extract its structure.
 
 DOCUMENT TEXT:
@@ -377,7 +411,7 @@ CONTEXT:
 - Subject: {subject}
 - Grade Level: {grade_level} (Cycle {cycle})
 - This is a Seychelles secondary school curriculum
-
+{kb_context_str}
 TASK:
 Extract the curriculum structure as JSON with this format:
 {{
@@ -837,7 +871,10 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
         # Try LLM-based parsing first (more robust)
         try:
             upload.add_log("   Using AI to analyze document structure...")
-            curriculum = parse_curriculum_with_llm(text, detected_subject, upload.grade_level or 'S1')
+            curriculum = parse_curriculum_with_llm(
+                text, detected_subject, upload.grade_level or 'S1',
+                institution_id=upload.institution_id,
+            )
             upload.add_log("   ✓ AI parsing complete")
         except Exception as e:
             upload.add_log(f"   ⚠️ AI parsing failed: {e}")

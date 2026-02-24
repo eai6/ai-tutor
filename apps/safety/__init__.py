@@ -519,6 +519,59 @@ class SafetyAuditLog:
 # Safety Middleware
 # ============================================================================
 
+class ImageSafetyFilter:
+    """
+    Safety filter specifically for image generation requests.
+    Checks for inappropriate content before generating images.
+    """
+
+    BLOCKED_IMAGE_PATTERNS = [
+        r'\b(nude|naked|sexual|explicit|pornograph|erotic)\b',
+        r'\b(violence|gore|blood|gruesome|mutilat)\b',
+        r'\b(weapon|gun|knife|bomb|explosive)\b',
+        r'\b(drug|cocaine|heroin|meth)\b',
+        r'\b(celebrity|famous\s+person|real\s+person)\b',
+        r'\b(scary|horror|frightening|terrifying|creepy)\b',
+    ]
+
+    @classmethod
+    def check_image_request(
+        cls, prompt: str, lesson_title: str = "", subject: str = ""
+    ) -> SafetyCheckResult:
+        """
+        Check an image generation request for safety issues.
+
+        1. Runs standard ContentSafetyFilter.check_content() first
+        2. Checks image-specific blocked patterns
+        3. Returns SafetyCheckResult
+        """
+        # Standard content safety check first
+        result = ContentSafetyFilter.check_content(prompt, context="student_input")
+        if result.blocked:
+            return result
+
+        # Image-specific pattern checks
+        prompt_lower = prompt.lower()
+        for pattern in cls.BLOCKED_IMAGE_PATTERNS:
+            if re.search(pattern, prompt_lower):
+                return SafetyCheckResult(
+                    is_safe=False,
+                    flags=[ContentFlag.INAPPROPRIATE],
+                    filtered_content=prompt,
+                    warnings=[f"Image request contains inappropriate content"],
+                    blocked=True,
+                    block_reason="This image request contains content that isn't appropriate for an educational setting. Please describe an educational image instead.",
+                )
+
+        return SafetyCheckResult(
+            is_safe=True,
+            flags=[],
+            filtered_content=prompt,
+            warnings=[],
+            blocked=False,
+        )
+
+
 class SafetyMiddleware:
     """Django middleware for safety checks."""
     

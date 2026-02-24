@@ -1,12 +1,12 @@
-"""Tests for R2: SkillAssessmentService wired into both tutoring engines."""
+"""Tests for R2: SkillAssessmentService wired into ConversationalTutor."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from apps.tutoring.tests.fixtures import BaseTutoringTestCase
 from apps.tutoring.skills_models import Skill
 
 
 class TestR2SkillAssessmentWiring(BaseTutoringTestCase):
-    """Test that skill assessment recording is wired into both engines."""
+    """Test that skill assessment recording is wired into ConversationalTutor."""
 
     # =========================================================================
     # ConversationalTutor — property existence and loading
@@ -121,72 +121,3 @@ class TestR2SkillAssessmentWiring(BaseTutoringTestCase):
             self.skill1.lessons.add(self.lesson)
             self.skill2.lessons.add(self.lesson)
 
-    # =========================================================================
-    # TutorEngine — _record_skill_practice
-    # =========================================================================
-
-    def test_engine_has_record_skill_practice(self):
-        """TutorEngine should have _record_skill_practice method."""
-        from apps.tutoring.engine import TutorEngine
-
-        session = self._create_session()
-        engine = TutorEngine(session)
-
-        self.assertTrue(hasattr(engine, '_record_skill_practice'))
-        self.assertTrue(callable(engine._record_skill_practice))
-
-    @patch('apps.tutoring.personalization.SkillAssessmentService')
-    def test_engine_record_skill_practice_calls_service(self, mock_svc_cls):
-        """TutorEngine._record_skill_practice should lazy-load service and call record_practice."""
-        from apps.tutoring.engine import TutorEngine
-
-        session = self._create_session()
-        engine = TutorEngine(session)
-
-        mock_svc = MagicMock()
-        mock_svc_cls.return_value = mock_svc
-
-        engine._record_skill_practice(
-            step=self.step2,
-            was_correct=True,
-            hints_used=0,
-        )
-
-        # Should have called record_practice on the service
-        mock_svc.record_practice.assert_called_once()
-        call_kwargs = mock_svc.record_practice.call_args[1]
-        self.assertTrue(call_kwargs['was_correct'])
-        self.assertEqual(call_kwargs['lesson_step'], self.step2)
-
-    def test_engine_record_skill_practice_no_crash_without_skills(self):
-        """_record_skill_practice should not crash when no skills exist."""
-        from apps.tutoring.engine import TutorEngine
-
-        # Remove skill-lesson associations
-        self.skill1.lessons.remove(self.lesson)
-        self.skill2.lessons.remove(self.lesson)
-
-        try:
-            session = self._create_session()
-            engine = TutorEngine(session)
-
-            # Should not raise
-            engine._record_skill_practice(
-                step=self.step2,
-                was_correct=True,
-                hints_used=0,
-            )
-        finally:
-            # Restore
-            self.skill1.lessons.add(self.lesson)
-            self.skill2.lessons.add(self.lesson)
-
-    def test_engine_initializes_skill_state(self):
-        """TutorEngine should initialize _skill_assessment_service and _lesson_skills."""
-        from apps.tutoring.engine import TutorEngine
-
-        session = self._create_session()
-        engine = TutorEngine(session)
-
-        self.assertIsNone(engine._skill_assessment_service)
-        self.assertIsNone(engine._lesson_skills)

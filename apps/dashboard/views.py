@@ -1015,6 +1015,108 @@ def reports_overview(request):
 
 
 # ============================================================================
+# Teaching Materials
+# ============================================================================
+
+@staff_required
+def material_list(request):
+    """List all teaching material uploads for the institution."""
+    from apps.dashboard.models import TeachingMaterialUpload
+
+    institution = request.staff_ctx['institution']
+    materials = TeachingMaterialUpload.objects.filter(institution=institution)
+
+    context = {
+        **request.staff_ctx,
+        'materials': materials,
+    }
+    return render(request, 'dashboard/materials/list.html', context)
+
+
+@staff_required
+def material_upload(request):
+    """Upload a teaching material (textbook, reference, etc.)."""
+    import os
+    from django.conf import settings as django_settings
+    from apps.dashboard.models import TeachingMaterialUpload
+    from apps.dashboard.material_tasks import process_teaching_material
+    from apps.dashboard.background_tasks import run_async
+
+    institution = request.staff_ctx['institution']
+
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('material_file')
+        title = request.POST.get('title', '').strip()
+        subject_name = request.POST.get('subject_name', '').strip()
+        grade_level = request.POST.get('grade_level', '')
+        material_type = request.POST.get('material_type', 'textbook')
+        description = request.POST.get('description', '').strip()
+
+        if not uploaded_file:
+            messages.error(request, "Please upload a file.")
+            return redirect('dashboard:material_upload')
+
+        if not title or not subject_name:
+            messages.error(request, "Title and subject are required.")
+            return redirect('dashboard:material_upload')
+
+        # Save file
+        upload_dir = os.path.join(django_settings.MEDIA_ROOT, 'material_uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+
+        file_path = os.path.join(upload_dir, uploaded_file.name)
+        with open(file_path, 'wb+') as dest:
+            for chunk in uploaded_file.chunks():
+                dest.write(chunk)
+
+        # Create record
+        upload_record = TeachingMaterialUpload.objects.create(
+            institution=institution,
+            uploaded_by=request.user,
+            file_path=file_path,
+            original_filename=uploaded_file.name,
+            title=title,
+            subject_name=subject_name,
+            grade_level=grade_level,
+            material_type=material_type,
+            description=description,
+        )
+
+        # Process in background
+        run_async(process_teaching_material, upload_record.id)
+
+        messages.success(request, f"'{title}' uploaded! Processing started.")
+        return redirect('dashboard:material_process', upload_id=upload_record.id)
+
+    # GET - show upload form
+    context = {
+        **request.staff_ctx,
+        'grade_levels': StudentProfile.GradeLevel.choices,
+        'material_types': TeachingMaterialUpload.MaterialType.choices,
+    }
+    return render(request, 'dashboard/materials/upload.html', context)
+
+
+@staff_required
+def material_process(request, upload_id):
+    """Show processing status for a teaching material upload."""
+    from apps.dashboard.models import TeachingMaterialUpload
+
+    institution = request.staff_ctx['institution']
+    upload = get_object_or_404(
+        TeachingMaterialUpload,
+        id=upload_id,
+        institution=institution,
+    )
+
+    context = {
+        **request.staff_ctx,
+        'upload': upload,
+    }
+    return render(request, 'dashboard/materials/process.html', context)
+
+
+# ============================================================================
 # Settings
 # ============================================================================
 

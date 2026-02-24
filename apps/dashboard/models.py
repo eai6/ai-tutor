@@ -80,6 +80,74 @@ class CurriculumUpload(models.Model):
         self.save(update_fields=['processing_log'])
 
 
+class TeachingMaterialUpload(models.Model):
+    """Track teaching material uploads (textbooks, references, worksheets)."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        PROCESSING = 'processing', 'Processing'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+
+    class MaterialType(models.TextChoices):
+        TEXTBOOK = 'textbook', 'Textbook'
+        REFERENCE = 'reference', 'Reference'
+        WORKSHEET = 'worksheet', 'Worksheet'
+        NOTES = 'notes', 'Notes'
+        OTHER = 'other', 'Other'
+
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name='teaching_material_uploads'
+    )
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='teaching_material_uploads'
+    )
+
+    file_path = models.CharField(max_length=500)
+    original_filename = models.CharField(max_length=255)
+    title = models.CharField(max_length=255)
+    subject_name = models.CharField(max_length=100)
+    grade_level = models.CharField(max_length=10, blank=True)
+    material_type = models.CharField(
+        max_length=20,
+        choices=MaterialType.choices,
+        default=MaterialType.TEXTBOOK
+    )
+    description = models.TextField(blank=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+    error_message = models.TextField(blank=True)
+    extracted_text_length = models.IntegerField(default=0)
+    chunks_created = models.IntegerField(default=0)
+    processing_log = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} ({self.material_type}) - {self.status}"
+
+    def add_log(self, message):
+        """Add a message to the processing log."""
+        from django.utils import timezone
+        timestamp = timezone.now().strftime('%H:%M:%S')
+        self.processing_log += f"[{timestamp}] {message}\n"
+        self.save(update_fields=['processing_log'])
+
+
 class TeacherClass(models.Model):
     """Optional: Group students into classes for easier management."""
     

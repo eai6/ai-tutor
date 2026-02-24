@@ -526,15 +526,15 @@ function addMessage(role, content, media = []) {
 async function sendMessage() {
     const text = userInput.value.trim();
     if (!text || !sessionId) return;
-    
+
     // Add student message
     addMessage('student', text);
     userInput.value = '';
-    
+
     // Show typing
     showTyping(true);
     sendBtn.disabled = true;
-    
+
     try {
         const response = await fetch(`/tutor/api/chat/${sessionId}/respond/`, {
             method: 'POST',
@@ -544,24 +544,108 @@ async function sendMessage() {
             },
             body: JSON.stringify({ message: text }),
         });
-        
-        const data = await response.json();
-        sendBtn.disabled = false;
-        
-        if (data.error) {
-            showTyping(false);
-            addMessage('tutor', '❌ ' + data.error);
+
+        // Non-streaming responses (errors, safety blocks) return JSON
+        const contentType = response.headers.get('Content-Type') || '';
+        if (contentType.includes('application/json')) {
+            const data = await response.json();
+            sendBtn.disabled = false;
+            if (data.error) {
+                showTyping(false);
+                addMessage('tutor', data.error);
+                return;
+            }
+            handleResponse(data);
             return;
         }
-        
-        handleResponse(data);
-        
+
+        // Streaming SSE response
+        showTyping(false);
+        const streamDiv = createStreamingMessage();
+        let fullContent = '';
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // Parse SSE lines
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // keep incomplete line in buffer
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try {
+                    const chunk = JSON.parse(line.slice(6));
+
+                    if (chunk.type === 'token') {
+                        fullContent += chunk.content;
+                        updateStreamingMessage(streamDiv, fullContent);
+                    } else if (chunk.type === 'done') {
+                        // Final metadata
+                        updateStreamingMessage(streamDiv, chunk.content || fullContent, chunk.media);
+                        sendBtn.disabled = false;
+
+                        if (chunk.phase) {
+                            phaseBadge.textContent = chunk.phase.replace('_', ' ');
+                        }
+                        if (chunk.show_exit_ticket && chunk.exit_ticket) {
+                            exitTicketData = chunk.exit_ticket;
+                            setTimeout(() => showExitTicket(), 1000);
+                            return;
+                        }
+                        if (chunk.is_complete) {
+                            showCompletion(chunk.content || fullContent);
+                            return;
+                        }
+                        userInput.focus();
+                    }
+                } catch (e) {
+                    // skip malformed chunks
+                }
+            }
+        }
+        sendBtn.disabled = false;
+
     } catch (error) {
         console.error('Send error:', error);
         showTyping(false);
         sendBtn.disabled = false;
-        addMessage('tutor', '❌ Something went wrong. Please try again.');
+        addMessage('tutor', 'Something went wrong. Please try again.');
     }
+}
+
+function createStreamingMessage() {
+    const div = document.createElement('div');
+    div.className = 'message tutor';
+    div.innerHTML = `
+        <div class="avatar">🎓</div>
+        <div class="bubble"></div>
+    `;
+    chatMessages.insertBefore(div, typing);
+    scrollToBottom();
+    return div;
+}
+
+function updateStreamingMessage(div, content, media = []) {
+    let mediaHtml = '';
+    if (media && media.length > 0) {
+        mediaHtml = '<div class="message-media">';
+        for (const m of media) {
+            if (m.type === 'image') {
+                mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}">`;
+                if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
+            }
+        }
+        mediaHtml += '</div>';
+    }
+    div.querySelector('.bubble').innerHTML = marked.parse(content) + mediaHtml;
+    scrollToBottom();
 }
 
 function showExitTicket() {
