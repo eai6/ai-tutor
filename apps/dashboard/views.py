@@ -33,7 +33,7 @@ def get_staff_context(request):
     """Get common context for staff views."""
     membership = Membership.objects.filter(
         user=request.user,
-        role='staff',
+        role__in=['staff', 'superadmin'],
         is_active=True
     ).select_related('institution').first()
     
@@ -1132,21 +1132,69 @@ def course_upload_material(request, course_id):
 
 @teacher_required
 def settings_page(request):
-    """Institution settings."""
+    """Institution settings — general for all staff, theme + prompts for superadmins."""
     institution = request.staff_ctx['institution']
-    
+    membership = request.staff_ctx['membership']
+    is_superadmin = membership.role == 'superadmin'
+
     if request.method == 'POST':
-        # Update institution settings
-        institution.name = request.POST.get('name', institution.name)
-        institution.timezone = request.POST.get('timezone', institution.timezone)
-        institution.save()
-        messages.success(request, "Settings updated.")
+        action = request.POST.get('action', 'general')
+
+        if action == 'general':
+            institution.name = request.POST.get('name', institution.name)
+            institution.timezone = request.POST.get('timezone', institution.timezone)
+            institution.save()
+            messages.success(request, "Settings updated.")
+
+        elif action == 'theme' and is_superadmin:
+            if request.FILES.get('logo'):
+                institution.logo = request.FILES['logo']
+            if request.POST.get('clear_logo') == '1':
+                institution.logo = None
+            institution.primary_color = request.POST.get('primary_color', institution.primary_color)
+            institution.secondary_color = request.POST.get('secondary_color', institution.secondary_color)
+            institution.accent_color = request.POST.get('accent_color', institution.accent_color)
+            institution.custom_css = request.POST.get('custom_css', '')
+            institution.save()
+            messages.success(request, "Theme updated.")
+
+        elif action == 'prompts' and is_superadmin:
+            from apps.llm.models import PromptPack
+            prompt_pack = PromptPack.objects.filter(
+                institution=institution, is_active=True
+            ).first()
+            if not prompt_pack:
+                prompt_pack = PromptPack.objects.create(
+                    institution=institution,
+                    name='Default',
+                    system_prompt='',
+                    is_active=True,
+                )
+            prompt_pack.tutor_system_prompt = request.POST.get('tutor_system_prompt', '')
+            prompt_pack.content_generation_prompt = request.POST.get('content_generation_prompt', '')
+            prompt_pack.exit_ticket_prompt = request.POST.get('exit_ticket_prompt', '')
+            prompt_pack.grading_prompt = request.POST.get('grading_prompt', '')
+            prompt_pack.image_generation_prompt = request.POST.get('image_generation_prompt', '')
+            prompt_pack.safety_prompt = request.POST.get('safety_prompt', '')
+            prompt_pack.save()
+            messages.success(request, "AI prompts updated.")
+
         return redirect('dashboard:settings')
-    
+
+    # Load prompt pack for display
+    prompt_pack = None
+    if is_superadmin:
+        from apps.llm.models import PromptPack
+        prompt_pack = PromptPack.objects.filter(
+            institution=institution, is_active=True
+        ).first()
+
     context = {
         **request.staff_ctx,
+        'is_superadmin': is_superadmin,
+        'prompt_pack': prompt_pack,
     }
-    
+
     return render(request, 'dashboard/settings.html', context)
 
 

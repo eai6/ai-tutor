@@ -4,10 +4,13 @@
 {% block page_title %}Settings{% endblock %}
 
 {% block content %}
-<div style="max-width: 600px;">
+<div style="max-width: 700px;">
+
+    {# ── General Settings (all staff) ── #}
     <form method="post">
         {% csrf_token %}
-        
+        <input type="hidden" name="action" value="general">
+
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
                 <h3 class="card-title">Institution Settings</h3>
@@ -17,7 +20,7 @@
                     <label class="form-label" for="name">Institution Name</label>
                     <input type="text" class="form-control" id="name" name="name" value="{{ institution.name }}">
                 </div>
-                
+
                 <div class="form-group">
                     <label class="form-label" for="timezone">Timezone</label>
                     <select class="form-control" id="timezone" name="timezone">
@@ -28,7 +31,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
                 <h3 class="card-title">Your Account</h3>
@@ -54,8 +57,120 @@
                 </div>
             </div>
         </div>
-        
-        <button type="submit" class="btn btn-primary">Save Changes</button>
+
+        <button type="submit" class="btn btn-primary">Save General Settings</button>
     </form>
+
+    {% if is_superadmin %}
+    {# ── Appearance & Branding (superadmin only) ── #}
+    <form method="post" enctype="multipart/form-data" style="margin-top: 2rem;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="theme">
+
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Appearance &amp; Branding</h3>
+            </div>
+            <div class="card-body">
+
+                {# Logo #}
+                <div class="form-group">
+                    <label class="form-label">Logo</label>
+                    {% if institution.logo %}
+                    <div style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 1rem;">
+                        <img src="{{ institution.logo.url }}" alt="Current logo" style="width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--gray-200);">
+                        <label style="font-size:0.875rem;cursor:pointer;">
+                            <input type="checkbox" name="clear_logo" value="1"> Remove logo
+                        </label>
+                    </div>
+                    {% endif %}
+                    <input type="file" name="logo" accept="image/*" class="form-control">
+                    <small style="color:var(--gray-500);">Square image recommended (at least 128x128px).</small>
+                </div>
+
+                {# Colors #}
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label" for="primary_color">Primary Color</label>
+                        <input type="color" class="form-control" id="primary_color" name="primary_color" value="{{ institution.primary_color|default:'#E8590C' }}" style="height:40px;padding:2px;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="secondary_color">Secondary Color</label>
+                        <input type="color" class="form-control" id="secondary_color" name="secondary_color" value="{{ institution.secondary_color|default:'#4ECDC4' }}" style="height:40px;padding:2px;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="accent_color">Accent Color</label>
+                        <input type="color" class="form-control" id="accent_color" name="accent_color" value="{{ institution.accent_color|default:'#FFE66D' }}" style="height:40px;padding:2px;">
+                    </div>
+                </div>
+
+                {# Custom CSS #}
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label" for="custom_css">Custom CSS</label>
+                    <textarea class="form-control" id="custom_css" name="custom_css" rows="4" style="font-family:monospace;font-size:0.85rem;" placeholder="/* Override any styles here */&#10;.sidebar { background: #1a1a2e; }">{{ institution.custom_css }}</textarea>
+                    <small style="color:var(--gray-500);">Advanced: add custom CSS rules to override platform styles.</small>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Theme</button>
+    </form>
+
+    {# ── AI System Prompts (superadmin only) ── #}
+    <form method="post" style="margin-top: 2rem;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="prompts">
+
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('prompts-body').style.display=document.getElementById('prompts-body').style.display==='none'?'block':'none'">
+                <h3 class="card-title">AI System Prompts <small style="font-weight:normal;color:var(--gray-500);">(click to expand)</small></h3>
+            </div>
+            <div class="card-body" id="prompts-body" style="display:none;">
+                <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                    Leave fields empty to use the built-in default prompt. The placeholder text shows the current default.
+                </p>
+
+                <div class="form-group" style="margin-bottom:1.5rem;">
+                    <label class="form-label" for="tutor_system_prompt">Tutor System Prompt</label>
+                    <textarea class="form-control" id="tutor_system_prompt" name="tutor_system_prompt" rows="6" style="font-family:monospace;font-size:0.8rem;" placeholder="Supports placeholders: {institution_name}, {locale_context}, {tutor_name}, {language}, {grade_level}, {safety_prompt}">{{ prompt_pack.tutor_system_prompt|default:"" }}</textarea>
+                    <small style="color:var(--gray-500);">The main system prompt for the conversational tutor.</small>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1.5rem;">
+                    <label class="form-label" for="safety_prompt">Safety Prompt</label>
+                    <textarea class="form-control" id="safety_prompt" name="safety_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="Ensure all interactions are safe and age-appropriate.">{{ prompt_pack.safety_prompt|default:"" }}</textarea>
+                    <small style="color:var(--gray-500);">Safety guidelines injected into the tutor prompt.</small>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1.5rem;">
+                    <label class="form-label" for="content_generation_prompt">Content Generation Prompt</label>
+                    <textarea class="form-control" id="content_generation_prompt" name="content_generation_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="You are an expert curriculum designer creating engaging tutoring content for secondary students. Return only valid JSON.">{{ prompt_pack.content_generation_prompt|default:"" }}</textarea>
+                    <small style="color:var(--gray-500);">System prompt for AI-generated lesson content.</small>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1.5rem;">
+                    <label class="form-label" for="exit_ticket_prompt">Exit Ticket Prompt</label>
+                    <textarea class="form-control" id="exit_ticket_prompt" name="exit_ticket_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text.">{{ prompt_pack.exit_ticket_prompt|default:"" }}</textarea>
+                    <small style="color:var(--gray-500);">System prompt for exit ticket question generation.</small>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1.5rem;">
+                    <label class="form-label" for="grading_prompt">Grading Prompt</label>
+                    <textarea class="form-control" id="grading_prompt" name="grading_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="You are a fair, encouraging grader. Respond only with valid JSON.">{{ prompt_pack.grading_prompt|default:"" }}</textarea>
+                    <small style="color:var(--gray-500);">System prompt for AI answer grading.</small>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1.5rem;">
+                    <label class="form-label" for="image_generation_prompt">Image Generation Context</label>
+                    <textarea class="form-control" id="image_generation_prompt" name="image_generation_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="Educational diagram for secondary school students in Seychelles. ">{{ prompt_pack.image_generation_prompt|default:"" }}</textarea>
+                    <small style="color:var(--gray-500);">Prefix added to all image generation prompts (style, safety, educational context).</small>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save AI Prompts</button>
+    </form>
+    {% endif %}
+
 </div>
 {% endblock %}

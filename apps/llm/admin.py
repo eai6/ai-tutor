@@ -17,6 +17,11 @@ class PromptPackAdmin(admin.ModelAdmin):
             'fields': ('system_prompt', 'teaching_style_prompt', 'safety_prompt', 'format_rules_prompt'),
             'classes': ('wide',)
         }),
+        ('Extended Prompts', {
+            'fields': ('tutor_system_prompt', 'content_generation_prompt', 'exit_ticket_prompt', 'grading_prompt', 'image_generation_prompt'),
+            'classes': ('collapse', 'wide'),
+            'description': 'Override system prompts for specific consumers. Leave empty to use built-in defaults.',
+        }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)

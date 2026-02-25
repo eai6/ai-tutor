@@ -11,10 +11,10 @@
         :root {
             --bg-warm: #FFF9F5;
             --bg-card: #FFFFFF;
-            --primary: #FF6B35;
-            --primary-dark: #E55A2B;
-            --secondary: #4ECDC4;
-            --accent: #FFE66D;
+            --primary: {{ theme_primary|default:"#FF6B35" }};
+            --primary-dark: {{ theme_primary_dark|default:"#E55A2B" }};
+            --secondary: {{ theme_secondary|default:"#4ECDC4" }};
+            --accent: {{ theme_accent|default:"#FFE66D" }};
             --text-dark: #2D3436;
             --text-muted: #636E72;
             --text-light: #B2BEC3;
@@ -221,13 +221,18 @@
         }
     </style>
     {% block extra_css %}{% endblock %}
+    {% if theme_custom_css %}<style>{{ theme_custom_css|safe }}</style>{% endif %}
 </head>
 <body>
     <header class="header">
         <div class="header-content">
             <a href="/tutor/" class="logo">
+                {% if theme_logo_url %}
+                <img src="{{ theme_logo_url }}" alt="{{ theme_institution_name|default:'AI Tutor' }}" style="width:40px;height:40px;border-radius:var(--radius-sm);object-fit:cover;">
+                {% else %}
                 <div class="logo-icon">🎓</div>
-                <div class="logo-text">AI <span>Tutor</span></div>
+                {% endif %}
+                <div class="logo-text">{{ theme_institution_name|default:"AI <span>Tutor</span>" }}</div>
             </a>
             {% if user.is_authenticated %}
             <div class="user-menu">

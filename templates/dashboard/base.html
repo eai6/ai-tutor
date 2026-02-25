@@ -13,9 +13,9 @@
         }
         
         :root {
-            --primary: #E8590C;
-            --primary-dark: #D14800;
-            --primary-light: #FFF4F0;
+            --primary: {{ theme_primary|default:"#E8590C" }};
+            --primary-dark: {{ theme_primary_dark|default:"#D14800" }};
+            --primary-light: {{ theme_primary_light|default:"#FFF4F0" }};
             --success: #10B981;
             --warning: #F59E0B;
             --danger: #EF4444;
@@ -469,6 +469,7 @@
         }
     </style>
     {% block extra_css %}{% endblock %}
+    {% if theme_custom_css %}<style>{{ theme_custom_css|safe }}</style>{% endif %}
 </head>
 <body>
     <div class="dashboard-layout">
@@ -476,12 +477,16 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <a href="{% url 'dashboard:home' %}" class="sidebar-logo">
+                    {% if theme_logo_url %}
+                    <img src="{{ theme_logo_url }}" alt="{{ theme_institution_name|default:'AI Tutor' }}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">
+                    {% else %}
                     <svg viewBox="0 0 40 40" fill="none">
-                        <rect width="40" height="40" rx="8" fill="#E8590C"/>
+                        <rect width="40" height="40" rx="8" fill="{{ theme_primary|default:'#E8590C' }}"/>
                         <path d="M12 28V12h4l4 10 4-10h4v16h-3V18l-3.5 10h-3L15 18v10h-3z" fill="white"/>
                     </svg>
+                    {% endif %}
                     <span>
-                        AI Tutor
+                        {{ theme_institution_name|default:"AI Tutor" }}
                         <small>Teacher Dashboard</small>
                     </span>
                 </a>
@@ -541,7 +546,7 @@
                 
                 <div class="nav-section">
                     <div class="nav-section-title">Settings</div>
-                    {% if role == 'admin' %}
+                    {% if role == 'superadmin' %}
                     <a href="{% url 'accounts:invite_staff' %}" class="nav-link {% if 'invite' in request.path %}active{% endif %}">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>

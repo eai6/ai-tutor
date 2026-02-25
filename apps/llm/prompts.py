@@ -9,11 +9,36 @@ This separation lets institutions customize the "how" (prompts) while
 content editors control the "what" (curriculum).
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Optional, List
 
 from apps.llm.models import PromptPack
 from apps.curriculum.models import Lesson, LessonStep
+
+logger = logging.getLogger(__name__)
+
+
+def get_active_prompt_pack(institution_id):
+    """Get active PromptPack for institution, or None."""
+    if not institution_id:
+        return None
+    try:
+        return PromptPack.objects.filter(
+            institution_id=institution_id, is_active=True
+        ).first()
+    except Exception:
+        return None
+
+
+def get_prompt_or_default(institution_id, field_name, default):
+    """Get prompt field from PromptPack, fall back to default if empty/missing."""
+    pack = get_active_prompt_pack(institution_id)
+    if pack:
+        value = getattr(pack, field_name, '')
+        if value and value.strip():
+            return value
+    return default
 
 
 @dataclass

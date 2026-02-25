@@ -195,8 +195,14 @@ class Command(BaseCommand):
             exam_context=exam_context,
         )
         
+        from apps.llm.prompts import get_prompt_or_default
+        institution_id = lesson.unit.course.institution_id if lesson.unit and lesson.unit.course else None
+        exit_sys_prompt = get_prompt_or_default(
+            institution_id, 'exit_ticket_prompt',
+            "You are an expert educational assessment designer."
+        )
         messages = [{"role": "user", "content": prompt}]
-        response = llm_client.generate(messages, system_prompt="You are an expert educational assessment designer.")
+        response = llm_client.generate(messages, system_prompt=exit_sys_prompt)
         
         # Parse JSON from response
         content = response.content

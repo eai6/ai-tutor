@@ -18,6 +18,14 @@ class Institution(models.Model):
     slug = models.SlugField(unique=True, help_text="URL-friendly identifier")
     timezone = models.CharField(max_length=50, default='UTC')
     is_active = models.BooleanField(default=True)
+
+    # Theme / Branding
+    logo = models.ImageField(upload_to='institution_logos/', blank=True, null=True)
+    primary_color = models.CharField(max_length=7, default='#E8590C')
+    secondary_color = models.CharField(max_length=7, default='#4ECDC4')
+    accent_color = models.CharField(max_length=7, default='#FFE66D')
+    custom_css = models.TextField(blank=True, default='')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -34,6 +42,7 @@ class Membership(models.Model):
     A user can have different roles in different institutions.
     """
     class Role(models.TextChoices):
+        SUPERADMIN = 'superadmin', 'Super Admin'
         STAFF = 'staff', 'Staff (Teacher/Admin)'
         STUDENT = 'student', 'Student'
 
@@ -65,8 +74,13 @@ class Membership(models.Model):
 
     @property
     def is_staff(self):
-        """Returns True if user has staff role."""
-        return self.role == self.Role.STAFF
+        """Returns True if user has staff or superadmin role."""
+        return self.role in (self.Role.STAFF, self.Role.SUPERADMIN)
+
+    @property
+    def is_superadmin(self):
+        """Returns True if user has superadmin role."""
+        return self.role == self.Role.SUPERADMIN
 
 
 class StudentProfile(models.Model):

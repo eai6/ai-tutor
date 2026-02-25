@@ -1829,6 +1829,9 @@ Guide your teaching toward helping the student understand this concept!"""
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt with session-specific context (R9)."""
+        from collections import defaultdict
+        from apps.llm.prompts import get_active_prompt_pack
+
         institution = self.session.institution
         course = self.lesson.unit.course
 
@@ -1842,17 +1845,28 @@ Guide your teaching toward helping the student understand this concept!"""
         except Exception:
             pass
 
-        # Build safety prompt
+        # Build safety prompt — use PromptPack override if set
         safety_prompt = "Ensure all interactions are safe and age-appropriate."
+        institution_id = institution.id if institution else None
+        prompt_pack = get_active_prompt_pack(institution_id)
+        if prompt_pack and prompt_pack.safety_prompt and prompt_pack.safety_prompt.strip():
+            safety_prompt = prompt_pack.safety_prompt
 
-        return TUTOR_SYSTEM_PROMPT_TEMPLATE.format(
-            institution_name=institution.name if institution else "our school",
-            locale_context="Seychelles",
-            tutor_name="Tutor",
-            language="English",
-            grade_level=grade_level,
-            safety_prompt=safety_prompt,
-        )
+        template_vars = defaultdict(str, {
+            'institution_name': institution.name if institution else "our school",
+            'locale_context': "Seychelles",
+            'tutor_name': "Tutor",
+            'language': "English",
+            'grade_level': grade_level,
+            'safety_prompt': safety_prompt,
+        })
+
+        # Use custom tutor_system_prompt if set in PromptPack
+        template = TUTOR_SYSTEM_PROMPT_TEMPLATE
+        if prompt_pack and prompt_pack.tutor_system_prompt and prompt_pack.tutor_system_prompt.strip():
+            template = prompt_pack.tutor_system_prompt
+
+        return template.format_map(template_vars)
 
     # =========================================================================
     # CONTEXT HELPERS

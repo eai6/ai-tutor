@@ -35,7 +35,7 @@ def redirect_by_role(user):
     if not membership:
         return redirect('tutoring:catalog')
     
-    if membership.role == 'staff':
+    if membership.role in ('staff', 'superadmin'):
         return redirect('dashboard:home')
     else:
         return redirect('tutoring:catalog')
@@ -179,10 +179,10 @@ def staff_login(request):
         user = authenticate(request, username=username, password=password)
         
         if user is not None:
-            # Check if user has staff role
+            # Check if user has staff or superadmin role
             membership = Membership.objects.filter(
                 user=user,
-                role='staff',
+                role__in=['staff', 'superadmin'],
                 is_active=True
             ).first()
             

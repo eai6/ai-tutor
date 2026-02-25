@@ -403,7 +403,11 @@ Return as JSON array:
 
 Return ONLY the JSON array, no other text."""
 
-            system_prompt = "You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text."
+            from apps.llm.prompts import get_prompt_or_default
+            system_prompt = get_prompt_or_default(
+                lesson.unit.course.institution_id, 'exit_ticket_prompt',
+                "You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text."
+            )
             messages = [{"role": "user", "content": prompt}]
 
             response = client.generate(messages, system_prompt)

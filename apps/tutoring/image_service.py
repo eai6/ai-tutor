@@ -119,7 +119,12 @@ class ImageGenerationService:
 
     def _enhance_prompt(self, prompt: str, category: str) -> str:
         """Enhance prompt for better Imagen results."""
-        context = "Educational diagram for secondary school students in Seychelles. "
+        from apps.llm.prompts import get_prompt_or_default
+        institution_id = self.institution.id if self.institution else None
+        context = get_prompt_or_default(
+            institution_id, 'image_generation_prompt',
+            "Educational diagram for secondary school students in Seychelles. "
+        )
 
         style_map = {
             'diagram': "Clear, labeled scientific diagram with arrows and annotations. ",

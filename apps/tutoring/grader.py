@@ -153,6 +153,7 @@ def grade_with_llm(
     rubric: str,
     question: str,
     llm_client: BaseLLMClient,
+    institution_id: int = None,
 ) -> GradingOutcome:
     """
     Use LLM to grade free-text answers against a rubric.
@@ -182,9 +183,14 @@ Respond ONLY with the JSON, no other text.
 """
     
     try:
+        from apps.llm.prompts import get_prompt_or_default
+        grading_sys_prompt = get_prompt_or_default(
+            institution_id, 'grading_prompt',
+            "You are a fair, encouraging grader. Respond only with valid JSON.",
+        )
         response = llm_client.generate(
             messages=[{"role": "user", "content": grading_prompt}],
-            system_prompt="You are a fair, encouraging grader. Respond only with valid JSON.",
+            system_prompt=grading_sys_prompt,
         )
         
         # Parse LLM response

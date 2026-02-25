@@ -46,7 +46,29 @@ class PromptPack(models.Model):
         blank=True,
         help_text="Output formatting rules (length, structure, etc.)"
     )
-    
+
+    # Extended prompts — empty means use built-in default
+    tutor_system_prompt = models.TextField(
+        blank=True, default='',
+        help_text="Full tutor system prompt override. Supports {institution_name}, {locale_context}, {tutor_name}, {language}, {grade_level}, {safety_prompt} placeholders."
+    )
+    content_generation_prompt = models.TextField(
+        blank=True, default='',
+        help_text="System prompt for lesson content generation."
+    )
+    exit_ticket_prompt = models.TextField(
+        blank=True, default='',
+        help_text="System prompt for exit ticket generation."
+    )
+    grading_prompt = models.TextField(
+        blank=True, default='',
+        help_text="System prompt for answer grading."
+    )
+    image_generation_prompt = models.TextField(
+        blank=True, default='',
+        help_text="Prefix/context for image generation prompts (style, safety, educational context)."
+    )
+
     version = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
