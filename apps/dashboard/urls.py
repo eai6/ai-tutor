@@ -58,4 +58,7 @@ urlpatterns = [
     
     # Settings
     path('settings/', views.settings_page, name='settings'),
+
+    # School picker
+    path('switch-school/', views.switch_school, name='switch_school'),
 ]

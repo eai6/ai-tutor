@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Tutor - Seychelles Secondary Schools</title>
+    <title>{{ theme_institution_name|default:"AI Tutor" }}</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         :root {
-            --primary: #E8590C;
-            --primary-dark: #D14800;
-            --primary-light: #FFF7ED;
+            --primary: {{ theme_primary|default:"#E8590C" }};
+            --primary-dark: {{ theme_primary_dark|default:"#D14800" }};
+            --primary-light: {{ theme_primary_light|default:"#FFF7ED" }};
             --success: #10B981;
             --gray-50: #F9FAFB;
             --gray-100: #F3F4F6;
@@ -26,7 +26,7 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 50%, #FED7AA 100%);
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-light) 50%, var(--primary-light) 100%);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -228,15 +228,19 @@
 <body>
     <header class="header">
         <a href="/" class="logo">
+            {% if theme_logo_url %}
+            <img src="{{ theme_logo_url }}" alt="{{ theme_institution_name|default:'AI Tutor' }}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;">
+            {% else %}
             <div class="logo-icon">M</div>
-            <span class="logo-text">AI <span>Tutor</span></span>
+            {% endif %}
+            <span class="logo-text">{{ theme_institution_name|default:"AI <span>Tutor</span>" }}</span>
         </a>
     </header>
     
     <main class="main">
         <div class="hero">
-            <h1>Welcome to AI Tutor</h1>
-            <p>Personalized learning for Seychelles secondary schools. Choose how you'd like to continue.</p>
+            <h1>Welcome to {{ theme_institution_name|default:"AI Tutor" }}</h1>
+            <p>Personalized learning powered by AI. Choose how you'd like to continue.</p>
         </div>
         
         <div class="roles-container">
@@ -264,7 +268,7 @@
     </main>
     
     <footer class="footer">
-        <p>© 2024 AI Tutor for Seychelles Secondary Schools</p>
+        <p>© 2026 The World Bank Group</p>
     </footer>
 </body>
 </html>

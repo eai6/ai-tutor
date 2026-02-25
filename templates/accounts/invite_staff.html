@@ -6,9 +6,9 @@
 {% block content %}
 <div style="max-width: 700px;">
     <p style="color: var(--gray-500); margin-bottom: 2rem;">
-        Invite teachers and administrators to join {{ institution.name }}.
+        Invite teachers and administrators to join a school.
     </p>
-    
+
     <div class="card" style="margin-bottom: 2rem;">
         <div class="card-header">
             <h3 class="card-title">Send New Invitation</h3>
@@ -16,32 +16,33 @@
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
-                
+
                 <div class="form-group">
-                    <label class="form-label" for="email">Email Address</label>
-                    <input type="email" class="form-control" id="email" name="email" 
-                           placeholder="teacher@school.edu" required>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="role">Role</label>
-                    <select class="form-control" id="role" name="role">
-                        <option value="teacher">Teacher - Can view students and upload curriculum</option>
-                        <option value="admin">Admin - Full school management access</option>
-                        <option value="editor">Content Editor - Can only edit curriculum</option>
+                    <label class="form-label" for="school_id">School</label>
+                    <select class="form-control" id="school_id" name="school_id" required>
+                        <option value="">-- Select a school --</option>
+                        {% for school in active_schools %}
+                        <option value="{{ school.id }}">{{ school.name }}</option>
+                        {% endfor %}
                     </select>
                 </div>
-                
+
+                <div class="form-group">
+                    <label class="form-label" for="email">Email Address <span style="font-weight:normal;color:var(--gray-500);">(optional)</span></label>
+                    <input type="email" class="form-control" id="email" name="email"
+                           placeholder="Optional — leave blank for link-only invite">
+                </div>
+
                 <button type="submit" class="btn btn-primary">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
                     </svg>
-                    Send Invitation
+                    Create Invitation
                 </button>
             </form>
         </div>
     </div>
-    
+
     {% if pending_invitations %}
     <div class="card">
         <div class="card-header">
@@ -51,6 +52,7 @@
             <table class="table">
                 <thead>
                     <tr>
+                        <th>School</th>
                         <th>Email</th>
                         <th>Role</th>
                         <th>Sent</th>
@@ -60,7 +62,8 @@
                 <tbody>
                     {% for inv in pending_invitations %}
                     <tr>
-                        <td>{{ inv.email }}</td>
+                        <td>{{ inv.institution.name }}</td>
+                        <td>{% if inv.email %}{{ inv.email }}{% else %}<span style="color:var(--gray-500);">Link-only</span>{% endif %}</td>
                         <td>
                             <span class="badge badge-info">{{ inv.get_role_display }}</span>
                         </td>

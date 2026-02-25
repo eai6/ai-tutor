@@ -1,12 +1,11 @@
 """
-Theme context processor — injects institution branding into every template.
+Theme context processor — injects platform branding into every template.
 
-For staff users, piggybacks on `request.staff_ctx` (zero extra queries).
-For students, does one Membership lookup.
-Anonymous users get an empty dict (all templates use |default filters).
+Branding is platform-wide (stored in PlatformConfig), so all users see the
+same theme regardless of which school they belong to.
 """
 
-from apps.accounts.models import Membership
+from apps.accounts.models import PlatformConfig
 
 
 def _darken_hex(hex_color, factor=0.15):
@@ -29,37 +28,21 @@ def _lighten_hex(hex_color, factor=0.85):
     return f'#{r:02x}{g:02x}{b:02x}'
 
 
-def institution_theme(request):
-    """Return theme variables for the current user's institution."""
-    if not hasattr(request, 'user') or not request.user.is_authenticated:
-        return {}
-
-    institution = None
-
-    # Staff path — reuse already-loaded context (zero queries)
-    if hasattr(request, 'staff_ctx') and request.staff_ctx:
-        institution = request.staff_ctx.get('institution')
-    else:
-        # Student path — one query
-        membership = Membership.objects.filter(
-            user=request.user,
-            is_active=True,
-        ).select_related('institution').first()
-        if membership:
-            institution = membership.institution
-
-    if not institution:
-        return {}
-
-    primary = institution.primary_color or '#E8590C'
-
+def _build_theme_dict():
+    """Build theme context dict from PlatformConfig singleton."""
+    config = PlatformConfig.load()
+    primary = config.primary_color or '#E8590C'
     return {
         'theme_primary': primary,
-        'theme_secondary': institution.secondary_color or '#4ECDC4',
-        'theme_accent': institution.accent_color or '#FFE66D',
+        'theme_secondary': config.secondary_color or '#4ECDC4',
+        'theme_accent': config.accent_color or '#FFE66D',
         'theme_primary_dark': _darken_hex(primary),
         'theme_primary_light': _lighten_hex(primary),
-        'theme_custom_css': institution.custom_css or '',
-        'theme_logo_url': institution.logo.url if institution.logo else '',
-        'theme_institution_name': institution.name,
+        'theme_logo_url': config.logo.url if config.logo else '',
+        'theme_institution_name': config.platform_name or 'AI Tutor',
     }
+
+
+def institution_theme(request):
+    """Return platform-wide theme variables for every template."""
+    return _build_theme_dict()

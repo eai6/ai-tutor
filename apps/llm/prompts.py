@@ -19,26 +19,75 @@ from apps.curriculum.models import Lesson, LessonStep
 logger = logging.getLogger(__name__)
 
 
+JSON_SUFFIX = "\n\nIMPORTANT: You MUST respond with valid JSON only. No other text."
+
+
+def _get_tutor_system_prompt_template():
+    """Lazy-load the tutor system prompt template to avoid circular imports."""
+    from apps.tutoring.conversational_tutor import TUTOR_SYSTEM_PROMPT_TEMPLATE
+    return TUTOR_SYSTEM_PROMPT_TEMPLATE
+
+
+# Static defaults for non-tutor prompts
+_STATIC_PROMPT_DEFAULTS = {
+    'safety_prompt': "Ensure all interactions are safe and age-appropriate for secondary school students.",
+    'content_generation_prompt': (
+        "You are an expert curriculum designer creating engaging tutoring content "
+        "for secondary students. Return only valid JSON."
+    ),
+    'exit_ticket_prompt': (
+        "You are an expert teacher creating assessment questions. "
+        "Return ONLY valid JSON, no other text."
+    ),
+    'grading_prompt': "You are a fair, encouraging grader. Respond only with valid JSON.",
+    'image_generation_prompt': "Educational diagram for secondary school students.",
+}
+
+
+def get_prompt_defaults():
+    """Return full PROMPT_DEFAULTS dict, including lazy-loaded tutor template."""
+    defaults = dict(_STATIC_PROMPT_DEFAULTS)
+    defaults['tutor_system_prompt'] = _get_tutor_system_prompt_template()
+    return defaults
+
+
+# Eagerly-evaluated alias for static contexts (template rendering etc.)
+# Callers that need the tutor template should use get_prompt_defaults().
+PROMPT_DEFAULTS = _STATIC_PROMPT_DEFAULTS
+
+
 def get_active_prompt_pack(institution_id):
-    """Get active PromptPack for institution, or None."""
-    if not institution_id:
-        return None
+    """Get active PromptPack for institution, falling back to platform-wide."""
     try:
+        if institution_id:
+            pack = PromptPack.objects.filter(
+                institution_id=institution_id, is_active=True
+            ).first()
+            if pack:
+                return pack
+        # Fall back to platform-wide prompt pack
         return PromptPack.objects.filter(
-            institution_id=institution_id, is_active=True
+            institution__isnull=True, is_active=True
         ).first()
     except Exception:
         return None
 
 
-def get_prompt_or_default(institution_id, field_name, default):
-    """Get prompt field from PromptPack, fall back to default if empty/missing."""
+def get_prompt_or_default(institution_id, field_name, default, json_required=False):
+    """Get prompt field from PromptPack, fall back to default if empty/missing.
+
+    If json_required=True and the resolved prompt doesn't mention 'json',
+    append JSON_SUFFIX to enforce valid JSON output.
+    """
     pack = get_active_prompt_pack(institution_id)
+    prompt = default
     if pack:
         value = getattr(pack, field_name, '')
         if value and value.strip():
-            return value
-    return default
+            prompt = value
+    if json_required and 'json' not in prompt.lower():
+        prompt = prompt.rstrip() + JSON_SUFFIX
+    return prompt
 
 
 @dataclass

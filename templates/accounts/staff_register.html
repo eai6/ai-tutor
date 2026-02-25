@@ -21,7 +21,7 @@
         <div class="auth-header">
             <div class="auth-icon">🎉</div>
             <h1>You're Invited!</h1>
-            <p class="text-muted">Complete your registration to join <strong>{{ invitation.institution.name }}</strong> as a <strong>{{ invitation.get_role_display }}</strong>.</p>
+            <p class="text-muted">Complete your registration to join <strong>{{ invitation.institution.name }}</strong> as a staff member.</p>
         </div>
         
         {% if errors %}
@@ -38,8 +38,18 @@
             {% csrf_token %}
             
             <div class="form-group">
-                <label>Email</label>
+                <label for="email">Email <span style="font-weight:normal;color:#6B7280;">(optional)</span></label>
+                {% if invitation.email %}
                 <input type="email" value="{{ invitation.email }}" disabled class="disabled">
+                {% else %}
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value="{{ email|default:'' }}"
+                    placeholder="Your email address (optional)"
+                >
+                {% endif %}
             </div>
             
             <div class="form-row">

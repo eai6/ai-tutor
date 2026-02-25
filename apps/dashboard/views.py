@@ -10,6 +10,7 @@ Provides:
 
 import json
 import logging
+import zoneinfo
 from datetime import timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -21,7 +22,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 
-from apps.accounts.models import Institution, Membership, StudentProfile
+from apps.accounts.models import Institution, Membership, StudentProfile, PlatformConfig
 from apps.curriculum.models import Course, Unit, Lesson
 from apps.tutoring.models import TutorSession, StudentLessonProgress
 from django.contrib.auth.models import User
@@ -30,21 +31,80 @@ logger = logging.getLogger(__name__)
 
 
 def get_staff_context(request):
-    """Get common context for staff views."""
-    membership = Membership.objects.filter(
-        user=request.user,
-        role__in=['staff', 'superadmin'],
-        is_active=True
-    ).select_related('institution').first()
-    
-    if not membership:
+    """Get common context for staff views.
+
+    Supports multi-school via session-stored ``selected_school_id``.
+    When no school is selected (or value is ``'all'``), ``institution``
+    is ``None`` which means aggregated / all-schools mode.
+    """
+    selected = request.session.get('selected_school_id')
+
+    if request.user.is_staff:
+        # Superadmin — platform-wide access
+        all_schools = list(Institution.objects.filter(is_active=True).order_by('name'))
+
+        if selected and selected != 'all':
+            institution = Institution.objects.filter(id=selected, is_active=True).first()
+        else:
+            institution = None  # aggregated mode
+
+        return {
+            'membership': None,
+            'institution': institution,
+            'role': 'superadmin',
+            'all_schools': all_schools,
+            'is_aggregated': institution is None,
+        }
+
+    # Regular staff — may belong to multiple schools
+    memberships = list(
+        Membership.objects.filter(
+            user=request.user,
+            role='staff',
+            is_active=True
+        ).select_related('institution')
+    )
+    if not memberships:
         return None
-    
+
+    staff_schools = [m.institution for m in memberships if m.institution.is_active]
+
+    if selected and selected != 'all':
+        institution = next((s for s in staff_schools if str(s.id) == str(selected)), None)
+        if not institution:
+            institution = staff_schools[0] if staff_schools else memberships[0].institution
+    else:
+        institution = staff_schools[0] if staff_schools else memberships[0].institution
+
+    membership = next((m for m in memberships if m.institution == institution), memberships[0])
+
     return {
         'membership': membership,
-        'institution': membership.institution,
-        'role': membership.role,
+        'institution': institution,
+        'role': 'staff',
+        'all_schools': staff_schools if len(staff_schools) > 1 else [],
+        'is_aggregated': False,
     }
+
+
+def filter_by_institution(queryset, institution, field='institution'):
+    """Filter queryset by institution. If institution is None (aggregated), return all."""
+    if institution is not None:
+        return queryset.filter(**{field: institution})
+    return queryset
+
+
+def get_scoped_object_or_404(model, institution, **kwargs):
+    """get_object_or_404 with optional institution scoping.
+
+    When *institution* is not None the lookup includes an ``institution``
+    filter (or ``course__institution`` for Unit, ``unit__course__institution``
+    for Lesson, etc. – callers pass kwargs directly).  When *institution* is
+    None (aggregated mode) the institution filter is omitted.
+    """
+    if institution is not None:
+        kwargs['institution'] = institution
+    return get_object_or_404(model, **kwargs)
 
 
 def staff_required(view_func):
@@ -64,6 +124,19 @@ def staff_required(view_func):
 teacher_required = staff_required
 
 
+@login_required
+@require_POST
+def switch_school(request):
+    """Store selected school in session."""
+    school_id = request.POST.get('school_id', 'all')
+    request.session['selected_school_id'] = school_id
+    # Redirect back to the page they came from, or dashboard home
+    next_url = request.POST.get('next', request.META.get('HTTP_REFERER', ''))
+    if next_url:
+        return redirect(next_url)
+    return redirect('dashboard:home')
+
+
 # ============================================================================
 # Dashboard Home
 # ============================================================================
@@ -72,77 +145,72 @@ teacher_required = staff_required
 def dashboard_home(request):
     """Main dashboard with overview metrics."""
     institution = request.staff_ctx['institution']
-    
+
     # Date ranges
     today = timezone.now().date()
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
-    
-    # Get all students in institution
-    student_memberships = Membership.objects.filter(
-        institution=institution,
-        role='student',
-        is_active=True
+
+    # Get all students in institution (or all if aggregated)
+    student_memberships = filter_by_institution(
+        Membership.objects.filter(role='student', is_active=True),
+        institution
     ).select_related('user')
-    
+
     student_ids = list(student_memberships.values_list('user_id', flat=True))
     total_students = len(student_ids)
-    
+
     # Active students (had session in last 7 days)
-    active_students = TutorSession.objects.filter(
-        institution=institution,
-        student_id__in=student_ids,
-        started_at__date__gte=week_ago
+    active_students = filter_by_institution(
+        TutorSession.objects.filter(student_id__in=student_ids, started_at__date__gte=week_ago),
+        institution
     ).values('student').distinct().count()
-    
+
     # Sessions stats
-    total_sessions = TutorSession.objects.filter(
-        institution=institution,
-        started_at__date__gte=month_ago
+    total_sessions = filter_by_institution(
+        TutorSession.objects.filter(started_at__date__gte=month_ago),
+        institution
     ).count()
-    
-    completed_sessions = TutorSession.objects.filter(
-        institution=institution,
-        status='completed',
-        started_at__date__gte=month_ago
+
+    completed_sessions = filter_by_institution(
+        TutorSession.objects.filter(status='completed', started_at__date__gte=month_ago),
+        institution
     ).count()
-    
-    mastery_sessions = TutorSession.objects.filter(
-        institution=institution,
-        status='completed',
-        mastery_achieved=True,
-        started_at__date__gte=month_ago
+
+    mastery_sessions = filter_by_institution(
+        TutorSession.objects.filter(status='completed', mastery_achieved=True, started_at__date__gte=month_ago),
+        institution
     ).count()
-    
+
     # Progress stats
-    progress_stats = StudentLessonProgress.objects.filter(
-        institution=institution
+    progress_stats = filter_by_institution(
+        StudentLessonProgress.objects.all(), institution
     ).aggregate(
         total=Count('id'),
         mastered=Count('id', filter=Q(mastery_level='mastered')),
         in_progress=Count('id', filter=Q(mastery_level='in_progress')),
     )
-    
+
     avg_mastery = 0
     if progress_stats['total'] > 0:
         avg_mastery = round((progress_stats['mastered'] / progress_stats['total']) * 100)
-    
+
     # Students at risk (started but no activity in 7 days)
-    at_risk_students = TutorSession.objects.filter(
-        institution=institution,
-        student_id__in=student_ids,
+    at_risk_students = filter_by_institution(
+        TutorSession.objects.filter(student_id__in=student_ids),
+        institution
     ).exclude(
         started_at__date__gte=week_ago
     ).values('student').distinct().count()
-    
+
     # Recent activity
-    recent_sessions = TutorSession.objects.filter(
-        institution=institution
+    recent_sessions = filter_by_institution(
+        TutorSession.objects.all(), institution
     ).select_related('student', 'lesson').order_by('-started_at')[:10]
-    
+
     # Course progress
-    courses = Course.objects.filter(
-        institution=institution
+    courses = filter_by_institution(
+        Course.objects.all(), institution
     ).annotate(
         lesson_count=Count('units__lessons'),
         mastered_count=Count(
@@ -150,7 +218,7 @@ def dashboard_home(request):
             filter=Q(units__lessons__student_progress__mastery_level='mastered')
         )
     )
-    
+
     course_progress = []
     for course in courses:
         if course.lesson_count > 0:
@@ -161,14 +229,14 @@ def dashboard_home(request):
             'course': course,
             'progress': min(progress_pct, 100),
         })
-    
+
     # Activity chart data (last 14 days)
     activity_data = []
     for i in range(14, -1, -1):
         date = today - timedelta(days=i)
-        count = TutorSession.objects.filter(
-            institution=institution,
-            started_at__date=date
+        count = filter_by_institution(
+            TutorSession.objects.filter(started_at__date=date),
+            institution
         ).count()
         activity_data.append({
             'date': date.strftime('%b %d'),
@@ -203,30 +271,29 @@ def student_list(request):
     institution = request.staff_ctx['institution']
     
     # Get students with their progress
-    students = Membership.objects.filter(
-        institution=institution,
-        role='student',
-        is_active=True
+    students = filter_by_institution(
+        Membership.objects.filter(role='student', is_active=True),
+        institution
     ).select_related('user').order_by('user__last_name', 'user__first_name')
-    
+
     # Enrich with progress data
     student_data = []
     for membership in students:
         user = membership.user
-        
+
         # Get progress stats
-        progress = StudentLessonProgress.objects.filter(
-            institution=institution,
-            student=user
+        progress = filter_by_institution(
+            StudentLessonProgress.objects.filter(student=user),
+            institution
         ).aggregate(
             total=Count('id'),
             mastered=Count('id', filter=Q(mastery_level='mastered')),
         )
-        
+
         # Get recent session
-        last_session = TutorSession.objects.filter(
-            institution=institution,
-            student=user
+        last_session = filter_by_institution(
+            TutorSession.objects.filter(student=user),
+            institution
         ).order_by('-started_at').first()
         
         # Get profile
@@ -261,38 +328,37 @@ def student_detail(request, student_id):
     institution = request.staff_ctx['institution']
     
     student = get_object_or_404(User, id=student_id)
-    
-    # Verify student belongs to this institution
-    membership = Membership.objects.filter(
-        user=student,
-        institution=institution,
-        role='student'
+
+    # Verify student belongs to this institution (or any if aggregated)
+    membership = filter_by_institution(
+        Membership.objects.filter(user=student, role='student'),
+        institution
     ).first()
-    
+
     if not membership:
         messages.error(request, "Student not found.")
         return redirect('dashboard:student_list')
-    
+
     # Get all progress
-    progress_list = StudentLessonProgress.objects.filter(
-        institution=institution,
-        student=student
+    progress_list = filter_by_institution(
+        StudentLessonProgress.objects.filter(student=student),
+        institution
     ).select_related('lesson', 'lesson__unit', 'lesson__unit__course').order_by(
         'lesson__unit__course__name',
         'lesson__unit__order_index',
         'lesson__order_index'
     )
-    
+
     # Get all sessions
-    sessions = TutorSession.objects.filter(
-        institution=institution,
-        student=student
+    sessions = filter_by_institution(
+        TutorSession.objects.filter(student=student),
+        institution
     ).select_related('lesson').order_by('-started_at')[:20]
-    
+
     # Stats
     stats = {
-        'total_sessions': TutorSession.objects.filter(institution=institution, student=student).count(),
-        'completed_sessions': TutorSession.objects.filter(institution=institution, student=student, status='completed').count(),
+        'total_sessions': filter_by_institution(TutorSession.objects.filter(student=student), institution).count(),
+        'completed_sessions': filter_by_institution(TutorSession.objects.filter(student=student, status='completed'), institution).count(),
         'mastered_lessons': progress_list.filter(mastery_level='mastered').count(),
         'in_progress_lessons': progress_list.filter(mastery_level='in_progress').count(),
     }
@@ -334,25 +400,25 @@ def curriculum_list(request):
     """List all courses grouped by grade level."""
     institution = request.staff_ctx['institution']
     
-    courses = Course.objects.filter(
-        institution=institution
+    courses = filter_by_institution(
+        Course.objects.all(), institution
     ).prefetch_related('units__lessons').order_by('grade_level', 'title')
-    
+
     # Enrich with stats
     course_data = []
     for course in courses:
         total_lessons = Lesson.objects.filter(unit__course=course).count()
         published_lessons = Lesson.objects.filter(unit__course=course, is_published=True).count()
-        
+
         course_data.append({
             'course': course,
             'unit_count': course.units.count(),
             'total_lessons': total_lessons,
             'published_lessons': published_lessons,
         })
-    
+
     from apps.dashboard.models import TeachingMaterialUpload
-    materials = TeachingMaterialUpload.objects.filter(institution=institution)
+    materials = filter_by_institution(TeachingMaterialUpload.objects.all(), institution)
 
     context = {
         **request.staff_ctx,
@@ -367,8 +433,11 @@ def curriculum_list(request):
 def course_detail(request, course_id):
     """View and manage a course's units and lessons."""
     institution = request.staff_ctx['institution']
-    
-    course = get_object_or_404(Course, id=course_id, institution=institution)
+
+    if institution is not None:
+        course = get_object_or_404(Course, id=course_id, institution=institution)
+    else:
+        course = get_object_or_404(Course, id=course_id)
     
     units = course.units.prefetch_related('lessons', 'lessons__steps').order_by('order_index')
     
@@ -380,9 +449,9 @@ def course_detail(request, course_id):
     for unit in units:
         for lesson in unit.lessons.all():
             # Progress stats
-            progress = StudentLessonProgress.objects.filter(
-                institution=institution,
-                lesson=lesson
+            progress = filter_by_institution(
+                StudentLessonProgress.objects.filter(lesson=lesson),
+                institution
             ).aggregate(
                 total=Count('id'),
                 mastered=Count('id', filter=Q(mastery_level='mastered')),
@@ -447,6 +516,10 @@ def course_detail(request, course_id):
 def curriculum_upload(request):
     """Upload curriculum document with optional teaching material attachment."""
     institution = request.staff_ctx['institution']
+
+    if institution is None:
+        messages.warning(request, "Please select a specific school before uploading curriculum.")
+        return redirect('dashboard:curriculum_list')
 
     if request.method == 'POST':
         uploaded_file = request.FILES.get('curriculum_file')
@@ -523,7 +596,7 @@ def curriculum_upload(request):
 
     context = {
         **request.staff_ctx,
-        'grade_levels': StudentProfile.GradeLevel.choices,
+        'grade_levels': PlatformConfig.get_grade_choices(),
         'material_types': TeachingMaterialUpload.MaterialType.choices,
     }
 
@@ -537,12 +610,11 @@ def curriculum_process(request, upload_id):
     
     from apps.dashboard.models import CurriculumUpload
     
-    upload = get_object_or_404(
-        CurriculumUpload,
-        id=upload_id,
-        institution=institution
-    )
-    
+    lookup = {'id': upload_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    upload = get_object_or_404(CurriculumUpload, **lookup)
+
     # Prepare context based on status
     context = {
         **request.staff_ctx,
@@ -569,12 +641,11 @@ def curriculum_generate(request, upload_id):
     from apps.dashboard.models import CurriculumUpload
     from apps.dashboard.tasks import process_curriculum_upload
     
-    upload = get_object_or_404(
-        CurriculumUpload,
-        id=upload_id,
-        institution=institution
-    )
-    
+    lookup = {'id': upload_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    upload = get_object_or_404(CurriculumUpload, **lookup)
+
     if upload.status != 'pending':
         return JsonResponse({'error': 'Already processing'}, status=400)
     
@@ -613,12 +684,11 @@ def curriculum_approve(request, upload_id):
     from apps.dashboard.models import CurriculumUpload
     from apps.curriculum.models import Course, Unit, Lesson, LessonStep
     
-    upload = get_object_or_404(
-        CurriculumUpload,
-        id=upload_id,
-        institution=institution
-    )
-    
+    lookup = {'id': upload_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    upload = get_object_or_404(CurriculumUpload, **lookup)
+
     if upload.status != 'review':
         return JsonResponse({'error': 'Not in review state'}, status=400)
     
@@ -651,7 +721,7 @@ def curriculum_approve(request, upload_id):
         course_title = f"{subject} {grade}"
         
         course, created = Course.objects.update_or_create(
-            institution=institution,
+            institution=institution or upload.institution,
             title=course_title,
             defaults={
                 'description': f"{subject} curriculum for {grade}",
@@ -791,13 +861,12 @@ def curriculum_process_api(request, upload_id):
     )
     
     institution = request.staff_ctx['institution']
-    
-    upload = get_object_or_404(
-        CurriculumUpload,
-        id=upload_id,
-        institution=institution
-    )
-    
+
+    lookup = {'id': upload_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    upload = get_object_or_404(CurriculumUpload, **lookup)
+
     try:
         data = json.loads(request.body)
         step = data.get('step', 'extract')
@@ -931,7 +1000,7 @@ def curriculum_process_api(request, upload_id):
             # Save to database
             result = create_curriculum_from_structure(
                 structure=structure,
-                institution=institution,
+                institution=institution or upload.institution,
                 upload=upload
             )
             
@@ -979,10 +1048,9 @@ def class_list(request):
     # For now, show students grouped by grade
     students_by_grade = {}
     
-    memberships = Membership.objects.filter(
-        institution=institution,
-        role='student',
-        is_active=True
+    memberships = filter_by_institution(
+        Membership.objects.filter(role='student', is_active=True),
+        institution
     ).select_related('user', 'user__student_profile')
     
     for m in memberships:
@@ -1015,9 +1083,9 @@ def reports_overview(request):
     start_date = timezone.now().date() - timedelta(days=days)
     
     # Sessions by day
-    sessions_by_day = TutorSession.objects.filter(
-        institution=institution,
-        started_at__date__gte=start_date
+    sessions_by_day = filter_by_institution(
+        TutorSession.objects.filter(started_at__date__gte=start_date),
+        institution
     ).annotate(
         date=TruncDate('started_at')
     ).values('date').annotate(
@@ -1025,19 +1093,19 @@ def reports_overview(request):
         completed=Count('id', filter=Q(status='completed')),
         mastered=Count('id', filter=Q(mastery_achieved=True))
     ).order_by('date')
-    
+
     # Top performing students
-    top_students = StudentLessonProgress.objects.filter(
-        institution=institution,
-        mastery_level='mastered'
+    top_students = filter_by_institution(
+        StudentLessonProgress.objects.filter(mastery_level='mastered'),
+        institution
     ).values('student__first_name', 'student__last_name', 'student__id').annotate(
         mastered_count=Count('id')
     ).order_by('-mastered_count')[:10]
-    
+
     # Lessons completion rate
-    lessons = Lesson.objects.filter(
-        unit__course__institution=institution,
-        is_published=True
+    lessons = filter_by_institution(
+        Lesson.objects.filter(is_published=True),
+        institution, field='unit__course__institution'
     ).annotate(
         attempts=Count('sessions'),
         completions=Count('sessions', filter=Q(sessions__mastery_achieved=True))
@@ -1064,11 +1132,10 @@ def material_process(request, upload_id):
     from apps.dashboard.models import TeachingMaterialUpload
 
     institution = request.staff_ctx['institution']
-    upload = get_object_or_404(
-        TeachingMaterialUpload,
-        id=upload_id,
-        institution=institution,
-    )
+    lookup = {'id': upload_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    upload = get_object_or_404(TeachingMaterialUpload, **lookup)
 
     context = {
         **request.staff_ctx,
@@ -1088,7 +1155,7 @@ def course_upload_material(request, course_id):
     from apps.dashboard.background_tasks import run_async
 
     institution = request.staff_ctx['institution']
-    course = get_object_or_404(Course, id=course_id, institution=institution)
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
 
     uploaded_file = request.FILES.get('material_file')
     title = request.POST.get('material_title', '').strip()
@@ -1108,7 +1175,7 @@ def course_upload_material(request, course_id):
             dest.write(chunk)
 
     material_record = TeachingMaterialUpload.objects.create(
-        institution=institution,
+        institution=course.institution,
         uploaded_by=request.user,
         file_path=file_path,
         original_filename=uploaded_file.name,
@@ -1135,37 +1202,76 @@ def settings_page(request):
     """Institution settings — general for all staff, theme + prompts for superadmins."""
     institution = request.staff_ctx['institution']
     membership = request.staff_ctx['membership']
-    is_superadmin = membership.role == 'superadmin'
+    is_superadmin = request.user.is_staff
 
     if request.method == 'POST':
         action = request.POST.get('action', 'general')
 
-        if action == 'general':
+        if action == 'general' and institution is not None:
             institution.name = request.POST.get('name', institution.name)
             institution.timezone = request.POST.get('timezone', institution.timezone)
             institution.save()
             messages.success(request, "Settings updated.")
 
         elif action == 'theme' and is_superadmin:
+            platform_config = PlatformConfig.load()
+            platform_config.platform_name = request.POST.get('platform_name', platform_config.platform_name)
             if request.FILES.get('logo'):
-                institution.logo = request.FILES['logo']
+                platform_config.logo = request.FILES['logo']
             if request.POST.get('clear_logo') == '1':
-                institution.logo = None
-            institution.primary_color = request.POST.get('primary_color', institution.primary_color)
-            institution.secondary_color = request.POST.get('secondary_color', institution.secondary_color)
-            institution.accent_color = request.POST.get('accent_color', institution.accent_color)
-            institution.custom_css = request.POST.get('custom_css', '')
-            institution.save()
+                platform_config.logo = None
+            platform_config.primary_color = request.POST.get('primary_color', platform_config.primary_color)
+            platform_config.secondary_color = request.POST.get('secondary_color', platform_config.secondary_color)
+            platform_config.accent_color = request.POST.get('accent_color', platform_config.accent_color)
+            platform_config.save()
             messages.success(request, "Theme updated.")
+
+        elif action == 'add_school' and is_superadmin:
+            school_name = request.POST.get('school_name', '').strip()
+            school_slug = request.POST.get('school_slug', '').strip()
+            school_tz = request.POST.get('school_timezone', 'UTC')
+            if school_name and school_slug:
+                if Institution.objects.filter(slug=school_slug).exists():
+                    messages.error(request, f"A school with slug '{school_slug}' already exists.")
+                else:
+                    Institution.objects.create(
+                        name=school_name,
+                        slug=school_slug,
+                        timezone=school_tz,
+                        is_active=True,
+                    )
+                    messages.success(request, f"School '{school_name}' created.")
+            else:
+                messages.error(request, "School name and slug are required.")
+
+        elif action == 'toggle_school' and is_superadmin:
+            school_id = request.POST.get('school_id')
+            if school_id:
+                school = Institution.objects.filter(id=school_id).first()
+                if school:
+                    school.is_active = not school.is_active
+                    school.save()
+                    status = "activated" if school.is_active else "deactivated"
+                    messages.success(request, f"School '{school.name}' {status}.")
+
+        elif action == 'grades' and is_superadmin:
+            platform_config = PlatformConfig.load()
+            grades_json = request.POST.get('grades_json', '[]')
+            try:
+                platform_config.grades = json.loads(grades_json)
+                platform_config.save()
+                messages.success(request, "Grade levels updated.")
+            except json.JSONDecodeError:
+                messages.error(request, "Invalid data format. Please try again.")
 
         elif action == 'prompts' and is_superadmin:
             from apps.llm.models import PromptPack
             prompt_pack = PromptPack.objects.filter(
-                institution=institution, is_active=True
+                institution__isnull=True, is_active=True
             ).first()
             if not prompt_pack:
                 prompt_pack = PromptPack.objects.create(
-                    institution=institution,
+                    institution=None,
                     name='Default',
                     system_prompt='',
                     is_active=True,
@@ -1181,18 +1287,51 @@ def settings_page(request):
 
         return redirect('dashboard:settings')
 
-    # Load prompt pack for display
+    # Load prompt pack and prompt defaults for display
     prompt_pack = None
+    prompt_fields = []
+    platform_config = None
     if is_superadmin:
         from apps.llm.models import PromptPack
         prompt_pack = PromptPack.objects.filter(
-            institution=institution, is_active=True
+            institution__isnull=True, is_active=True
         ).first()
+
+        from apps.llm.prompts import get_prompt_defaults
+        PROMPT_DEFAULTS = get_prompt_defaults()
+
+        # Build structured list for template: (field_name, label, desc, default, current)
+        field_meta = [
+            ('tutor_system_prompt', 'Tutor System Prompt', 'The main system prompt for the conversational tutor.'),
+            ('safety_prompt', 'Safety Prompt', 'Safety guidelines injected into the tutor prompt.'),
+            ('content_generation_prompt', 'Content Generation Prompt', 'System prompt for AI-generated lesson content.'),
+            ('exit_ticket_prompt', 'Exit Ticket Prompt', 'System prompt for exit ticket question generation.'),
+            ('grading_prompt', 'Grading Prompt', 'System prompt for AI answer grading.'),
+            ('image_generation_prompt', 'Image Generation Context', 'Prefix added to all image generation prompts.'),
+        ]
+        for fname, label, desc in field_meta:
+            current = getattr(prompt_pack, fname, '') if prompt_pack else ''
+            prompt_fields.append({
+                'name': fname,
+                'label': label,
+                'desc': desc,
+                'default': PROMPT_DEFAULTS.get(fname, ''),
+                'current': current or '',
+            })
+
+        platform_config = PlatformConfig.load()
+
+    all_timezones = sorted(zoneinfo.available_timezones())
+    all_schools = Institution.objects.all().order_by('name') if is_superadmin else []
 
     context = {
         **request.staff_ctx,
         'is_superadmin': is_superadmin,
         'prompt_pack': prompt_pack,
+        'prompt_fields': prompt_fields,
+        'platform_config': platform_config,
+        'all_timezones': all_timezones,
+        'all_schools': all_schools,
     }
 
     return render(request, 'dashboard/settings.html', context)
@@ -1211,11 +1350,10 @@ def lesson_detail(request, lesson_id):
     
     institution = request.staff_ctx['institution']
     
-    lesson = get_object_or_404(
-        Lesson,
-        id=lesson_id,
-        unit__course__institution=institution
-    )
+    lookup = {'id': lesson_id}
+    if institution is not None:
+        lookup['unit__course__institution'] = institution
+    lesson = get_object_or_404(Lesson, **lookup)
     
     # Get all steps
     steps = lesson.steps.all().order_by('order_index')
@@ -1387,11 +1525,10 @@ def lesson_regenerate(request, lesson_id):
     
     institution = request.staff_ctx['institution']
     
-    lesson = get_object_or_404(
-        Lesson,
-        id=lesson_id,
-        unit__course__institution=institution
-    )
+    lookup = {'id': lesson_id}
+    if institution is not None:
+        lookup['unit__course__institution'] = institution
+    lesson = get_object_or_404(Lesson, **lookup)
     
     try:
         # Delete existing steps
@@ -1429,7 +1566,7 @@ def lesson_regenerate(request, lesson_id):
                         
                         service = ImageGenerationService(
                             lesson=lesson,
-                            institution=institution
+                            institution=institution or lesson.unit.course.institution
                         )
                         
                         img_result = service.get_or_generate_image(
@@ -1480,11 +1617,10 @@ def lesson_generate_content(request, lesson_id):
     
     institution = request.staff_ctx['institution']
     
-    lesson = get_object_or_404(
-        Lesson,
-        id=lesson_id,
-        unit__course__institution=institution
-    )
+    lookup = {'id': lesson_id}
+    if institution is not None:
+        lookup['unit__course__institution'] = institution
+    lesson = get_object_or_404(Lesson, **lookup)
     
     # Check if already has content
     if lesson.steps.count() >= 5:
@@ -1520,7 +1656,7 @@ def lesson_generate_content(request, lesson_id):
                         
                         service = ImageGenerationService(
                             lesson=lesson,
-                            institution=institution
+                            institution=institution or lesson.unit.course.institution
                         )
                         
                         # Always generate fresh images (don't use potentially mismatched existing ones)
@@ -1572,11 +1708,10 @@ def lesson_publish(request, lesson_id):
     
     institution = request.staff_ctx['institution']
     
-    lesson = get_object_or_404(
-        Lesson,
-        id=lesson_id,
-        unit__course__institution=institution
-    )
+    lookup = {'id': lesson_id}
+    if institution is not None:
+        lookup['unit__course__institution'] = institution
+    lesson = get_object_or_404(Lesson, **lookup)
     
     # Toggle publish status
     lesson.is_published = not lesson.is_published
@@ -1595,11 +1730,10 @@ def step_edit(request, step_id):
     
     institution = request.staff_ctx['institution']
     
-    step = get_object_or_404(
-        LessonStep,
-        id=step_id,
-        lesson__unit__course__institution=institution
-    )
+    lookup = {'id': step_id}
+    if institution is not None:
+        lookup['lesson__unit__course__institution'] = institution
+    step = get_object_or_404(LessonStep, **lookup)
     
     lesson = step.lesson
     total_steps = lesson.steps.count()
@@ -1660,11 +1794,11 @@ def course_generate_all(request, course_id):
     from apps.dashboard.models import CurriculumUpload
     
     institution = request.staff_ctx['institution']
-    course = get_object_or_404(Course, id=course_id, institution=institution)
-    
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
+
     # Create a new processing record for progress tracking
     upload = CurriculumUpload.objects.create(
-        institution=institution,
+        institution=course.institution,
         created_course=course,
         status='processing',
         subject_name=course.title,
@@ -1692,14 +1826,14 @@ def course_generate_media(request, course_id):
     from apps.dashboard.models import CurriculumUpload
     
     institution = request.staff_ctx['institution']
-    course = get_object_or_404(Course, id=course_id, institution=institution)
-    
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
+
     # Check if force regenerate was requested
     force_regenerate = request.POST.get('force', '') == '1'
-    
+
     # Create a new processing record for progress tracking
     upload = CurriculumUpload.objects.create(
-        institution=institution,
+        institution=course.institution,
         created_course=course,
         status='media_processing',
         subject_name=course.title,
@@ -1726,18 +1860,17 @@ def media_progress(request, upload_id):
     
     institution = request.staff_ctx['institution']
     
-    upload = get_object_or_404(
-        CurriculumUpload,
-        id=upload_id,
-        institution=institution
-    )
-    
+    lookup = {'id': upload_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    upload = get_object_or_404(CurriculumUpload, **lookup)
+
     context = {
         **request.staff_ctx,
         'upload': upload,
         'course': upload.created_course,
     }
-    
+
     return render(request, 'dashboard/curriculum/media_progress.html', context)
 
 
@@ -1745,14 +1878,13 @@ def media_progress(request, upload_id):
 def content_progress(request, upload_id):
     """Show content generation progress."""
     from apps.dashboard.models import CurriculumUpload
-    
+
     institution = request.staff_ctx['institution']
-    
-    upload = get_object_or_404(
-        CurriculumUpload,
-        id=upload_id,
-        institution=institution
-    )
+
+    lookup = {'id': upload_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    upload = get_object_or_404(CurriculumUpload, **lookup)
     
     context = {
         **request.staff_ctx,
@@ -1770,8 +1902,8 @@ def course_publish_all(request, course_id):
     from apps.curriculum.models import Lesson
     
     institution = request.staff_ctx['institution']
-    course = get_object_or_404(Course, id=course_id, institution=institution)
-    
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
+
     # Publish all lessons that have content
     lessons = Lesson.objects.filter(unit__course=course)
     published = 0
@@ -1796,8 +1928,8 @@ def unit_create(request, course_id):
     from apps.curriculum.models import Unit
     
     institution = request.staff_ctx['institution']
-    course = get_object_or_404(Course, id=course_id, institution=institution)
-    
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
+
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
         description = request.POST.get('description', '').strip()
@@ -1830,7 +1962,10 @@ def lesson_create(request, unit_id):
     from apps.curriculum.models import Unit, Lesson
     
     institution = request.staff_ctx['institution']
-    unit = get_object_or_404(Unit, id=unit_id, course__institution=institution)
+    if institution is not None:
+        unit = get_object_or_404(Unit, id=unit_id, course__institution=institution)
+    else:
+        unit = get_object_or_404(Unit, id=unit_id)
     
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()

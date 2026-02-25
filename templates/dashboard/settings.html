@@ -6,60 +6,69 @@
 {% block content %}
 <div style="max-width: 700px;">
 
-    {# ── General Settings (all staff) ── #}
+    {# ── School Settings (when a specific school is selected) ── #}
+    {% if institution %}
     <form method="post">
         {% csrf_token %}
         <input type="hidden" name="action" value="general">
 
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Institution Settings</h3>
+                <h3 class="card-title">School Settings</h3>
             </div>
             <div class="card-body">
                 <div class="form-group">
-                    <label class="form-label" for="name">Institution Name</label>
+                    <label class="form-label" for="name">School Name</label>
                     <input type="text" class="form-control" id="name" name="name" value="{{ institution.name }}">
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="timezone">Timezone</label>
                     <select class="form-control" id="timezone" name="timezone">
-                        <option value="UTC" {% if institution.timezone == 'UTC' %}selected{% endif %}>UTC</option>
-                        <option value="Indian/Mahe" {% if institution.timezone == 'Indian/Mahe' %}selected{% endif %}>Seychelles (Indian/Mahe)</option>
-                        <option value="Africa/Nairobi" {% if institution.timezone == 'Africa/Nairobi' %}selected{% endif %}>East Africa (Africa/Nairobi)</option>
+                        {% for tz in all_timezones %}
+                        <option value="{{ tz }}" {% if institution.timezone == tz %}selected{% endif %}>{{ tz }}</option>
+                        {% endfor %}
                     </select>
                 </div>
             </div>
         </div>
 
-        <div class="card" style="margin-bottom: 1.5rem;">
-            <div class="card-header">
-                <h3 class="card-title">Your Account</h3>
-            </div>
-            <div class="card-body">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div>
-                        <div style="font-size: 0.875rem; color: var(--gray-500);">Name</div>
-                        <div style="font-weight: 500;">{{ user.get_full_name|default:user.username }}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.875rem; color: var(--gray-500);">Email</div>
-                        <div style="font-weight: 500;">{{ user.email }}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.875rem; color: var(--gray-500);">Role</div>
-                        <div style="font-weight: 500;">{{ membership.get_role_display }}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.875rem; color: var(--gray-500);">Member Since</div>
-                        <div style="font-weight: 500;">{{ membership.joined_at|date:"M d, Y" }}</div>
-                    </div>
+        <button type="submit" class="btn btn-primary">Save School Settings</button>
+    </form>
+    {% elif is_superadmin %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <p style="color:var(--gray-500);">Select a specific school from the dropdown above to edit its settings, or manage all schools below.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    {# ── Your Account ── #}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h3 class="card-title">Your Account</h3>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <div style="font-size: 0.875rem; color: var(--gray-500);">Name</div>
+                    <div style="font-weight: 500;">{{ user.get_full_name|default:user.username }}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.875rem; color: var(--gray-500);">Email</div>
+                    <div style="font-weight: 500;">{{ user.email }}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.875rem; color: var(--gray-500);">Role</div>
+                    <div style="font-weight: 500;">{% if user.is_staff %}Super Admin{% elif membership %}{{ membership.get_role_display }}{% endif %}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.875rem; color: var(--gray-500);">Member Since</div>
+                    <div style="font-weight: 500;">{% if membership %}{{ membership.joined_at|date:"M d, Y" }}{% else %}{{ user.date_joined|date:"M d, Y" }}{% endif %}</div>
                 </div>
             </div>
         </div>
-
-        <button type="submit" class="btn btn-primary">Save General Settings</button>
-    </form>
+    </div>
 
     {% if is_superadmin %}
     {# ── Appearance & Branding (superadmin only) ── #}
@@ -73,12 +82,18 @@
             </div>
             <div class="card-body">
 
+                {# Platform Name #}
+                <div class="form-group">
+                    <label class="form-label" for="platform_name">Platform Name</label>
+                    <input type="text" class="form-control" id="platform_name" name="platform_name" value="{{ platform_config.platform_name|default:'AI Tutor' }}">
+                </div>
+
                 {# Logo #}
                 <div class="form-group">
                     <label class="form-label">Logo</label>
-                    {% if institution.logo %}
+                    {% if platform_config.logo %}
                     <div style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 1rem;">
-                        <img src="{{ institution.logo.url }}" alt="Current logo" style="width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--gray-200);">
+                        <img src="{{ platform_config.logo.url }}" alt="Current logo" style="width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--gray-200);">
                         <label style="font-size:0.875rem;cursor:pointer;">
                             <input type="checkbox" name="clear_logo" value="1"> Remove logo
                         </label>
@@ -92,28 +107,124 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                     <div class="form-group">
                         <label class="form-label" for="primary_color">Primary Color</label>
-                        <input type="color" class="form-control" id="primary_color" name="primary_color" value="{{ institution.primary_color|default:'#E8590C' }}" style="height:40px;padding:2px;">
+                        <input type="color" class="form-control" id="primary_color" name="primary_color" value="{{ platform_config.primary_color|default:'#E8590C' }}" style="height:40px;padding:2px;">
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="secondary_color">Secondary Color</label>
-                        <input type="color" class="form-control" id="secondary_color" name="secondary_color" value="{{ institution.secondary_color|default:'#4ECDC4' }}" style="height:40px;padding:2px;">
+                        <input type="color" class="form-control" id="secondary_color" name="secondary_color" value="{{ platform_config.secondary_color|default:'#4ECDC4' }}" style="height:40px;padding:2px;">
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="accent_color">Accent Color</label>
-                        <input type="color" class="form-control" id="accent_color" name="accent_color" value="{{ institution.accent_color|default:'#FFE66D' }}" style="height:40px;padding:2px;">
+                        <input type="color" class="form-control" id="accent_color" name="accent_color" value="{{ platform_config.accent_color|default:'#FFE66D' }}" style="height:40px;padding:2px;">
                     </div>
                 </div>
 
-                {# Custom CSS #}
-                <div class="form-group" style="margin-top: 1rem;">
-                    <label class="form-label" for="custom_css">Custom CSS</label>
-                    <textarea class="form-control" id="custom_css" name="custom_css" rows="4" style="font-family:monospace;font-size:0.85rem;" placeholder="/* Override any styles here */&#10;.sidebar { background: #1a1a2e; }">{{ institution.custom_css }}</textarea>
-                    <small style="color:var(--gray-500);">Advanced: add custom CSS rules to override platform styles.</small>
-                </div>
             </div>
         </div>
 
         <button type="submit" class="btn btn-primary">Save Theme</button>
+    </form>
+
+    {# ── Manage Schools (superadmin only) ── #}
+    <div style="margin-top: 2rem;">
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Manage Schools</h3>
+            </div>
+            <div class="card-body">
+                <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                    Each school is a separate institution. Students and staff belong to specific schools.
+                </p>
+
+                {% if all_schools %}
+                <table class="table" style="margin-bottom:1rem;">
+                    <thead>
+                        <tr><th>Name</th><th>Slug</th><th>Timezone</th><th>Status</th><th style="width:100px;"></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for school in all_schools %}
+                        <tr>
+                            <td>{{ school.name }}</td>
+                            <td><code>{{ school.slug }}</code></td>
+                            <td>{{ school.timezone }}</td>
+                            <td>
+                                {% if school.is_active %}
+                                <span class="badge badge-success">Active</span>
+                                {% else %}
+                                <span class="badge badge-danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="toggle_school">
+                                    <input type="hidden" name="school_id" value="{{ school.id }}">
+                                    <button type="submit" class="btn btn-sm btn-secondary">
+                                        {% if school.is_active %}Deactivate{% else %}Activate{% endif %}
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="color:var(--gray-500);font-style:italic;">No schools yet.</p>
+                {% endif %}
+
+                {# Add new school form #}
+                <form method="post" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--gray-200);">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_school">
+                    <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:0.75rem;align-items:end;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">School Name</label>
+                            <input type="text" class="form-control" name="school_name" placeholder="e.g. Mont Fleuri Secondary" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Slug</label>
+                            <input type="text" class="form-control" name="school_slug" placeholder="e.g. mont-fleuri" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Timezone</label>
+                            <select class="form-control" name="school_timezone">
+                                {% for tz in all_timezones %}
+                                <option value="{{ tz }}" {% if tz == 'Indian/Mahe' %}selected{% endif %}>{{ tz }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm" style="height:38px;">Add School</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# ── Grade Levels (superadmin only) ── #}
+    <form method="post" style="margin-top: 2rem;" id="grades-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="grades">
+        <input type="hidden" name="grades_json" id="grades_json" value="">
+
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('grades-body').style.display=document.getElementById('grades-body').style.display==='none'?'block':'none'">
+                <h3 class="card-title">Grade Levels <small style="font-weight:normal;color:var(--gray-500);">(click to expand)</small></h3>
+            </div>
+            <div class="card-body" id="grades-body" style="display:none;">
+                <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                    Configure grade levels available to students during registration. Leave empty to use built-in defaults.
+                </p>
+                <table class="table" id="grades-table" style="margin-bottom:0.5rem;">
+                    <thead>
+                        <tr><th>Code</th><th>Name</th><th style="width:60px;"></th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addRow('grades')">+ Add Grade</button>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Grade Levels</button>
     </form>
 
     {# ── AI System Prompts (superadmin only) ── #}
@@ -127,44 +238,22 @@
             </div>
             <div class="card-body" id="prompts-body" style="display:none;">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    Leave fields empty to use the built-in default prompt. The placeholder text shows the current default.
+                    Leave fields empty to use the built-in default prompt. Expand "View default" to see the actual default used.
                 </p>
 
+                {% for pf in prompt_fields %}
                 <div class="form-group" style="margin-bottom:1.5rem;">
-                    <label class="form-label" for="tutor_system_prompt">Tutor System Prompt</label>
-                    <textarea class="form-control" id="tutor_system_prompt" name="tutor_system_prompt" rows="6" style="font-family:monospace;font-size:0.8rem;" placeholder="Supports placeholders: {institution_name}, {locale_context}, {tutor_name}, {language}, {grade_level}, {safety_prompt}">{{ prompt_pack.tutor_system_prompt|default:"" }}</textarea>
-                    <small style="color:var(--gray-500);">The main system prompt for the conversational tutor.</small>
-                </div>
+                    <label class="form-label" for="{{ pf.name }}">{{ pf.label }}</label>
 
-                <div class="form-group" style="margin-bottom:1.5rem;">
-                    <label class="form-label" for="safety_prompt">Safety Prompt</label>
-                    <textarea class="form-control" id="safety_prompt" name="safety_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="Ensure all interactions are safe and age-appropriate.">{{ prompt_pack.safety_prompt|default:"" }}</textarea>
-                    <small style="color:var(--gray-500);">Safety guidelines injected into the tutor prompt.</small>
-                </div>
+                    <details style="margin-bottom:0.5rem;">
+                        <summary style="font-size:0.8rem;color:var(--gray-500);cursor:pointer;">View default</summary>
+                        <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:0.75rem;margin-top:0.25rem;font-family:monospace;font-size:0.75rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;color:var(--gray-700);">{{ pf.default }}</div>
+                    </details>
 
-                <div class="form-group" style="margin-bottom:1.5rem;">
-                    <label class="form-label" for="content_generation_prompt">Content Generation Prompt</label>
-                    <textarea class="form-control" id="content_generation_prompt" name="content_generation_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="You are an expert curriculum designer creating engaging tutoring content for secondary students. Return only valid JSON.">{{ prompt_pack.content_generation_prompt|default:"" }}</textarea>
-                    <small style="color:var(--gray-500);">System prompt for AI-generated lesson content.</small>
+                    <textarea class="form-control" id="{{ pf.name }}" name="{{ pf.name }}" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="Leave empty to use the default above">{{ pf.current }}</textarea>
+                    <small style="color:var(--gray-500);">{{ pf.desc }}</small>
                 </div>
-
-                <div class="form-group" style="margin-bottom:1.5rem;">
-                    <label class="form-label" for="exit_ticket_prompt">Exit Ticket Prompt</label>
-                    <textarea class="form-control" id="exit_ticket_prompt" name="exit_ticket_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text.">{{ prompt_pack.exit_ticket_prompt|default:"" }}</textarea>
-                    <small style="color:var(--gray-500);">System prompt for exit ticket question generation.</small>
-                </div>
-
-                <div class="form-group" style="margin-bottom:1.5rem;">
-                    <label class="form-label" for="grading_prompt">Grading Prompt</label>
-                    <textarea class="form-control" id="grading_prompt" name="grading_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="You are a fair, encouraging grader. Respond only with valid JSON.">{{ prompt_pack.grading_prompt|default:"" }}</textarea>
-                    <small style="color:var(--gray-500);">System prompt for AI answer grading.</small>
-                </div>
-
-                <div class="form-group" style="margin-bottom:1.5rem;">
-                    <label class="form-label" for="image_generation_prompt">Image Generation Context</label>
-                    <textarea class="form-control" id="image_generation_prompt" name="image_generation_prompt" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="Educational diagram for secondary school students in Seychelles. ">{{ prompt_pack.image_generation_prompt|default:"" }}</textarea>
-                    <small style="color:var(--gray-500);">Prefix added to all image generation prompts (style, safety, educational context).</small>
-                </div>
+                {% endfor %}
             </div>
         </div>
 
@@ -173,4 +262,50 @@
     {% endif %}
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if is_superadmin %}
+<script>
+(function() {
+    var gradesData = {{ platform_config.grades|safe|default:"[]" }};
+
+    function renderTable(type) {
+        var data = gradesData;
+        var tbody = document.querySelector('#' + type + '-table tbody');
+        tbody.innerHTML = '';
+        data.forEach(function(item, i) {
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td><input type="text" class="form-control" value="' + (item.code || '').replace(/"/g, '&quot;') + '" onchange="updateItem(' + i + ',\'code\',this.value)" style="font-size:0.85rem;"></td>'
+                + '<td><input type="text" class="form-control" value="' + (item.name || '').replace(/"/g, '&quot;') + '" onchange="updateItem(' + i + ',\'name\',this.value)" style="font-size:0.85rem;"></td>'
+                + '<td><button type="button" class="btn btn-sm" style="color:var(--danger);padding:0.25rem 0.5rem;" onclick="removeItem(' + i + ')">X</button></td>';
+            tbody.appendChild(tr);
+        });
+    }
+
+    window.addRow = function() {
+        gradesData.push({code: '', name: ''});
+        renderTable('grades');
+    };
+
+    window.removeItem = function(index) {
+        gradesData.splice(index, 1);
+        renderTable('grades');
+    };
+
+    window.updateItem = function(index, field, value) {
+        gradesData[index][field] = value;
+    };
+
+    var form = document.getElementById('grades-form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            document.getElementById('grades_json').value = JSON.stringify(gradesData);
+        });
+    }
+
+    renderTable('grades');
+})();
+</script>
+{% endif %}
 {% endblock %}

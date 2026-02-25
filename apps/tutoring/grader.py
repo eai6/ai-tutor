@@ -187,6 +187,7 @@ Respond ONLY with the JSON, no other text.
         grading_sys_prompt = get_prompt_or_default(
             institution_id, 'grading_prompt',
             "You are a fair, encouraging grader. Respond only with valid JSON.",
+            json_required=True,
         )
         response = llm_client.generate(
             messages=[{"role": "user", "content": grading_prompt}],

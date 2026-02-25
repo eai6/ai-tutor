@@ -10,32 +10,28 @@
             <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
             <h2 style="margin-bottom: 0.5rem;">Invitation Created!</h2>
             <p style="color: var(--gray-500); margin-bottom: 2rem;">
-                An invitation has been created for <strong>{{ invitation.email }}</strong> 
-                to join as a <strong>{{ invitation.get_role_display }}</strong>.
+                {% if invitation.email %}
+                Invitation for <strong>{{ invitation.email }}</strong> to join as staff.
+                {% else %}
+                Link-only invitation created. Share the link below with the invitee.
+                {% endif %}
             </p>
-            
+
             <div style="background: var(--gray-50); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; text-align: left;">
                 <label style="font-size: 0.875rem; font-weight: 600; color: var(--gray-500); display: block; margin-bottom: 0.5rem;">
                     Registration Link (share this with the invitee):
                 </label>
                 <div style="display: flex; gap: 0.5rem;">
-                    <input type="text" id="invite-url" value="{{ invite_url }}" readonly 
+                    <input type="text" id="invite-url" value="{{ invite_url }}" readonly
                            style="flex: 1; padding: 0.75rem; border: 1px solid var(--gray-300); border-radius: 6px; font-family: monospace; font-size: 0.8125rem;">
                     <button onclick="copyLink()" class="btn btn-secondary" style="white-space: nowrap;">
-                        📋 Copy
+                        Copy Link
                     </button>
                 </div>
             </div>
-            
-            <div style="background: #FEF3C7; border-radius: 8px; padding: 1rem; text-align: left; margin-bottom: 2rem;">
-                <strong style="color: #92400E;">⚠️ Note:</strong>
-                <span style="color: #92400E;">
-                    Email delivery is not yet configured. Please share this link manually with the invitee.
-                </span>
-            </div>
-            
+
             <a href="{% url 'accounts:invite_staff' %}" class="btn btn-primary">
-                Send Another Invitation
+                Create Another Invitation
             </a>
         </div>
     </div>

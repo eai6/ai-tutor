@@ -199,7 +199,8 @@ class Command(BaseCommand):
         institution_id = lesson.unit.course.institution_id if lesson.unit and lesson.unit.course else None
         exit_sys_prompt = get_prompt_or_default(
             institution_id, 'exit_ticket_prompt',
-            "You are an expert educational assessment designer."
+            "You are an expert educational assessment designer.",
+            json_required=True,
         )
         messages = [{"role": "user", "content": prompt}]
         response = llm_client.generate(messages, system_prompt=exit_sys_prompt)

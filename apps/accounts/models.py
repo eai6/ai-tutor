@@ -11,20 +11,13 @@ from django.contrib.auth.models import User
 
 class Institution(models.Model):
     """
-    Top-level tenant. Schools, organizations, etc.
-    All data is scoped to an institution.
+    Represents a school. Each Institution record is a distinct school
+    managed by the platform. Staff and students belong to specific schools.
     """
     name = models.CharField(max_length=255)
     slug = models.SlugField(unique=True, help_text="URL-friendly identifier")
     timezone = models.CharField(max_length=50, default='UTC')
     is_active = models.BooleanField(default=True)
-
-    # Theme / Branding
-    logo = models.ImageField(upload_to='institution_logos/', blank=True, null=True)
-    primary_color = models.CharField(max_length=7, default='#E8590C')
-    secondary_color = models.CharField(max_length=7, default='#4ECDC4')
-    accent_color = models.CharField(max_length=7, default='#FFE66D')
-    custom_css = models.TextField(blank=True, default='')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -42,7 +35,6 @@ class Membership(models.Model):
     A user can have different roles in different institutions.
     """
     class Role(models.TextChoices):
-        SUPERADMIN = 'superadmin', 'Super Admin'
         STAFF = 'staff', 'Staff (Teacher/Admin)'
         STUDENT = 'student', 'Student'
 
@@ -74,13 +66,8 @@ class Membership(models.Model):
 
     @property
     def is_staff(self):
-        """Returns True if user has staff or superadmin role."""
-        return self.role in (self.Role.STAFF, self.Role.SUPERADMIN)
-
-    @property
-    def is_superadmin(self):
-        """Returns True if user has superadmin role."""
-        return self.role == self.Role.SUPERADMIN
+        """Returns True if user has staff role."""
+        return self.role == self.Role.STAFF
 
 
 class StudentProfile(models.Model):
@@ -94,9 +81,9 @@ class StudentProfile(models.Model):
         S3 = 'S3', 'Secondary 3'
         S4 = 'S4', 'Secondary 4'
         S5 = 'S5', 'Secondary 5'
-    
-    # Seychelles Secondary Schools
-    SCHOOL_CHOICES = [
+
+    # Fallback defaults (used when PlatformConfig has no entries)
+    DEFAULT_SCHOOL_CHOICES = [
         ('anse_boileau', 'Anse Boileau Secondary'),
         ('anse_royale', 'Anse Royale Secondary'),
         ('belonie', 'Belonie Secondary'),
@@ -110,6 +97,9 @@ class StudentProfile(models.Model):
         ('praslin', 'Praslin Secondary'),
         ('other', 'Other'),
     ]
+    SCHOOL_CHOICES = DEFAULT_SCHOOL_CHOICES  # backward compat alias
+
+    DEFAULT_GRADE_CHOICES = list(GradeLevel.choices)
     
     user = models.OneToOneField(
         User,
@@ -136,10 +126,61 @@ class StudentProfile(models.Model):
     
     def get_school_display_name(self):
         """Return the full school name."""
-        for code, name in self.SCHOOL_CHOICES:
+        for code, name in PlatformConfig.get_school_choices():
             if code == self.school:
                 return name
         return self.school
+
+
+class PlatformConfig(models.Model):
+    """
+    Singleton model for platform-wide configuration (branding, grades, etc.).
+    Superadmins can edit these via the Settings page.
+    """
+    platform_name = models.CharField(max_length=255, default='AI Tutor')
+
+    # Branding (platform-wide)
+    logo = models.ImageField(upload_to='platform_logos/', blank=True, null=True)
+    primary_color = models.CharField(max_length=7, default='#E8590C')
+    secondary_color = models.CharField(max_length=7, default='#4ECDC4')
+    accent_color = models.CharField(max_length=7, default='#FFE66D')
+
+    schools = models.JSONField(default=list)   # [{"code": "...", "name": "..."}]
+    grades = models.JSONField(default=list)    # [{"code": "...", "name": "..."}]
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # Enforce singleton
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @classmethod
+    def get_school_choices(cls):
+        """Return school choices. Prefers Institution records, then JSON config, then defaults."""
+        schools = Institution.objects.filter(is_active=True).order_by('name')
+        if schools.exists():
+            return [(str(inst.id), inst.name) for inst in schools]
+        obj = cls.load()
+        if obj.schools:
+            return [(s['code'], s['name']) for s in obj.schools]
+        return StudentProfile.DEFAULT_SCHOOL_CHOICES
+
+    @classmethod
+    def get_grade_choices(cls):
+        obj = cls.load()
+        if obj.grades:
+            return [(g['code'], g['name']) for g in obj.grades]
+        return StudentProfile.DEFAULT_GRADE_CHOICES
+
+    class Meta:
+        verbose_name = 'Platform Configuration'
+
+    def __str__(self):
+        return 'Platform Configuration'
 
 
 class StaffInvitation(models.Model):
@@ -152,7 +193,7 @@ class StaffInvitation(models.Model):
         on_delete=models.CASCADE,
         related_name='invitations'
     )
-    email = models.EmailField()
+    email = models.EmailField(blank=True, default='')
     role = models.CharField(
         max_length=20,
         choices=Membership.Role.choices,

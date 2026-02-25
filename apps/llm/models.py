@@ -26,7 +26,10 @@ class PromptPack(models.Model):
     institution = models.ForeignKey(
         Institution,
         on_delete=models.CASCADE,
-        related_name='prompt_packs'
+        related_name='prompt_packs',
+        null=True,
+        blank=True,
+        help_text="Null = platform-wide prompts"
     )
     name = models.CharField(max_length=100, help_text="e.g., 'Friendly K-5 Tutor'")
     
@@ -76,10 +79,10 @@ class PromptPack(models.Model):
 
     class Meta:
         ordering = ['-is_active', '-updated_at']
-        unique_together = ['institution', 'name', 'version']
 
     def __str__(self):
-        return f"{self.name} v{self.version} ({self.institution.slug})"
+        scope = self.institution.slug if self.institution else 'platform'
+        return f"{self.name} v{self.version} ({scope})"
 
     def get_full_system_prompt(self):
         """Assemble all prompt components into the final system prompt."""

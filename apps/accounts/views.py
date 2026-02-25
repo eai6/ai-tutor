@@ -14,7 +14,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import Http404
-from apps.accounts.models import Institution, Membership, StudentProfile
+from apps.accounts.models import Institution, Membership, StudentProfile, PlatformConfig
 
 
 def landing_page(request):
@@ -27,18 +27,18 @@ def landing_page(request):
 
 def redirect_by_role(user):
     """Redirect user to appropriate dashboard based on role."""
+    if user.is_staff:
+        return redirect('dashboard:home')
+
     membership = Membership.objects.filter(
         user=user,
         is_active=True
     ).first()
-    
-    if not membership:
-        return redirect('tutoring:catalog')
-    
-    if membership.role in ('staff', 'superadmin'):
+
+    if membership and membership.role == 'staff':
         return redirect('dashboard:home')
-    else:
-        return redirect('tutoring:catalog')
+
+    return redirect('tutoring:catalog')
 
 
 # ============================================================================
@@ -74,8 +74,8 @@ def student_register(request):
     if request.user.is_authenticated:
         return redirect_by_role(request.user)
     
-    school_choices = StudentProfile.SCHOOL_CHOICES
-    grade_choices = StudentProfile.GradeLevel.choices
+    school_choices = PlatformConfig.get_school_choices()
+    grade_choices = PlatformConfig.get_grade_choices()
     
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
@@ -142,9 +142,14 @@ def student_register(request):
             grade_level=grade_level,
         )
         
-        # Auto-assign to institution based on school
-        institution = Institution.objects.filter(is_active=True).first()
-        
+        # Auto-assign to institution based on selected school
+        institution = Institution.objects.filter(id=school, is_active=True).first()
+        if not institution:
+            # Fallback: try matching by slug for legacy school codes
+            institution = Institution.objects.filter(slug=school, is_active=True).first()
+        if not institution:
+            institution = Institution.objects.filter(is_active=True).first()
+
         if institution:
             Membership.objects.create(
                 user=user,
@@ -179,14 +184,14 @@ def staff_login(request):
         user = authenticate(request, username=username, password=password)
         
         if user is not None:
-            # Check if user has staff or superadmin role
-            membership = Membership.objects.filter(
+            # Check if user is superadmin (is_staff) or has staff Membership
+            has_access = user.is_staff or Membership.objects.filter(
                 user=user,
-                role__in=['staff', 'superadmin'],
+                role='staff',
                 is_active=True
-            ).first()
-            
-            if membership:
+            ).exists()
+
+            if has_access:
                 login(request, user)
                 messages.success(request, f"Welcome, {user.first_name or user.username}!")
                 return redirect('dashboard:home')
@@ -234,24 +239,33 @@ def staff_register(request, token=None):
         password_confirm = request.POST.get('password_confirm', '')
         first_name = request.POST.get('first_name', '').strip()
         last_name = request.POST.get('last_name', '').strip()
-        
+
+        # Email: use invitation email if set, otherwise allow user to enter one
+        if invitation.email:
+            email = invitation.email
+        else:
+            email = request.POST.get('email', '').strip()
+
         errors = []
-        
+
         if not first_name:
             errors.append("Please enter your first name.")
-        
+
         if not username or len(username) < 3:
             errors.append("Username must be at least 3 characters.")
-        
+
         if User.objects.filter(username=username).exists():
             errors.append("Username already taken.")
-        
+
+        if email and User.objects.filter(email=email).exists():
+            errors.append("Email already registered.")
+
         if len(password) < 8:
             errors.append("Password must be at least 8 characters.")
-        
+
         if password != password_confirm:
             errors.append("Passwords don't match.")
-        
+
         if errors:
             return render(request, 'accounts/staff_register.html', {
                 'errors': errors,
@@ -259,34 +273,35 @@ def staff_register(request, token=None):
                 'username': username,
                 'first_name': first_name,
                 'last_name': last_name,
+                'email': email,
             })
-        
+
         # Create user
         user = User.objects.create_user(
             username=username,
-            email=invitation.email,
+            email=email,
             password=password,
             first_name=first_name,
             last_name=last_name,
         )
-        
-        # Create membership with invited role
+
+        # Create membership with staff role
         Membership.objects.create(
             user=user,
             institution=invitation.institution,
-            role=invitation.role,
+            role='staff',
             is_active=True,
         )
-        
+
         # Mark invitation as used
         invitation.is_used = True
         invitation.registered_user = user
         invitation.save()
-        
+
         login(request, user)
-        messages.success(request, f"Welcome, {first_name}! Your {invitation.get_role_display()} account is ready.")
+        messages.success(request, f"Welcome, {first_name}! Your staff account is ready.")
         return redirect('dashboard:home')
-    
+
     return render(request, 'accounts/staff_register.html', {
         'invitation': invitation,
     })
@@ -298,71 +313,75 @@ def staff_register(request, token=None):
 
 @login_required
 def invite_staff(request):
-    """Admin can invite teachers and other admins."""
-    membership = Membership.objects.filter(
-        user=request.user,
-        role='admin',
-        is_active=True
-    ).first()
-    
-    if not membership:
+    """Superadmin can invite staff members to a specific school."""
+    if not request.user.is_staff:
         messages.error(request, "Only administrators can invite staff.")
         return redirect('dashboard:home')
-    
+
     from apps.accounts.models import StaffInvitation
     import secrets
-    
+
+    active_schools = Institution.objects.filter(is_active=True).order_by('name')
+    if not active_schools.exists():
+        messages.error(request, "No active schools found. Please create a school first.")
+        return redirect('dashboard:settings')
+
     if request.method == 'POST':
         email = request.POST.get('email', '').strip()
-        role = request.POST.get('role', 'teacher')
-        
-        if not email or '@' not in email:
-            messages.error(request, "Please enter a valid email.")
+        school_id = request.POST.get('school_id', '')
+
+        # Validate school selection
+        institution = active_schools.filter(id=school_id).first() if school_id else None
+        if not institution:
+            messages.error(request, "Please select a valid school.")
             return redirect('accounts:invite_staff')
-        
-        if role not in ['teacher', 'admin', 'editor']:
-            role = 'teacher'
-        
-        # Check if already invited
-        existing = StaffInvitation.objects.filter(
-            email=email,
-            institution=membership.institution,
-            is_used=False
-        ).first()
-        
-        if existing:
-            messages.warning(request, f"An invitation was already sent to {email}.")
+
+        # Validate email only if provided
+        if email and '@' not in email:
+            messages.error(request, "Please enter a valid email address.")
             return redirect('accounts:invite_staff')
-        
-        # Create invitation
+
+        # Duplicate check only if email provided
+        if email:
+            existing = StaffInvitation.objects.filter(
+                email=email,
+                institution=institution,
+                is_used=False
+            ).first()
+            if existing:
+                messages.warning(request, f"An invitation was already sent to {email} for {institution.name}.")
+                return redirect('accounts:invite_staff')
+
+        # Create invitation (always role=staff)
         invitation = StaffInvitation.objects.create(
-            institution=membership.institution,
+            institution=institution,
             email=email,
-            role=role,
+            role='staff',
             invited_by=request.user,
             token=secrets.token_urlsafe(32),
         )
-        
-        # TODO: Send email with invitation link
-        # For now, show the link directly
-        invite_url = request.build_absolute_uri(f'/accounts/staff/register/{invitation.token}/')
-        
-        messages.success(request, f"Invitation created for {email}!")
-        
+
+        from django.urls import reverse
+        invite_url = request.build_absolute_uri(reverse('accounts:staff_register', args=[invitation.token]))
+
+        if email:
+            messages.success(request, f"Invitation created for {email} at {institution.name}!")
+        else:
+            messages.success(request, f"Link-only invitation created for {institution.name}!")
+
         return render(request, 'accounts/invite_success.html', {
             'invitation': invitation,
             'invite_url': invite_url,
         })
-    
-    # Show pending invitations
+
+    # Show pending invitations across all schools
     pending = StaffInvitation.objects.filter(
-        institution=membership.institution,
         is_used=False
-    ).order_by('-created_at')
-    
+    ).select_related('institution').order_by('-created_at')
+
     return render(request, 'accounts/invite_staff.html', {
         'pending_invitations': pending,
-        'institution': membership.institution,
+        'active_schools': active_schools,
     })
 
 

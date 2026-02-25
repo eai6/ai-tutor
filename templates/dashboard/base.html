@@ -469,7 +469,6 @@
         }
     </style>
     {% block extra_css %}{% endblock %}
-    {% if theme_custom_css %}<style>{{ theme_custom_css|safe }}</style>{% endif %}
 </head>
 <body>
     <div class="dashboard-layout">
@@ -546,7 +545,7 @@
                 
                 <div class="nav-section">
                     <div class="nav-section-title">Settings</div>
-                    {% if role == 'superadmin' %}
+                    {% if user.is_staff %}
                     <a href="{% url 'accounts:invite_staff' %}" class="nav-link {% if 'invite' in request.path %}active{% endif %}">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
@@ -582,9 +581,23 @@
             <header class="top-bar">
                 <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
                 <div class="user-menu">
+                    {% if all_schools %}
+                    <form method="post" action="{% url 'dashboard:switch_school' %}" style="margin:0;">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <select name="school_id" class="form-control" style="width:auto;min-width:180px;font-size:0.875rem;" onchange="this.form.submit()">
+                            {% if user.is_staff %}
+                            <option value="all" {% if is_aggregated %}selected{% endif %}>All Schools</option>
+                            {% endif %}
+                            {% for school in all_schools %}
+                            <option value="{{ school.id }}" {% if institution.id == school.id %}selected{% endif %}>{{ school.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                    {% endif %}
                     <div class="user-info">
                         <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
-                        <div class="user-role">{{ membership.get_role_display }} • {{ institution.name }}</div>
+                        <div class="user-role">{% if user.is_staff %}Super Admin{% elif membership %}{{ membership.get_role_display }}{% endif %}{% if institution %} &bull; {{ institution.name }}{% endif %}</div>
                     </div>
                     <div class="user-avatar">
                         {{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}

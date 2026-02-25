@@ -389,7 +389,8 @@ Return ONLY valid JSON, no other text."""
             from apps.llm.prompts import get_prompt_or_default
             content_sys_prompt = get_prompt_or_default(
                 self.institution_id, 'content_generation_prompt',
-                "You are an expert curriculum designer creating engaging tutoring content for Seychelles secondary students. Return only valid JSON."
+                "You are an expert curriculum designer creating engaging tutoring content for Seychelles secondary students. Return only valid JSON.",
+                json_required=True,
             )
             response = self.llm_client.generate(
                 messages=[{"role": "user", "content": prompt}],
@@ -503,7 +504,8 @@ Return ONLY the JSON array."""
             from apps.llm.prompts import get_prompt_or_default
             exit_sys_prompt = get_prompt_or_default(
                 self.institution_id, 'exit_ticket_prompt',
-                "Create assessment questions. Return only valid JSON array."
+                "Create assessment questions. Return only valid JSON array.",
+                json_required=True,
             )
             response = self.llm_client.generate(
                 messages=[{"role": "user", "content": prompt}],

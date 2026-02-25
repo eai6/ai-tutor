@@ -164,12 +164,14 @@ https://openstax.org/
 
 # 2. Improve tutoring interface
 
-# 3. Test offline system with Ollama for curriculum/material upload parsing and tutoring session
+# 3. Customize for country theme
 
 # 4. Deploy systems to cloud
 
 # 5. Clean up project and document
 
 # 6. Create presentation slides for project
+
+# 7. Incorporate video systems. Start with learning videos on open-source systems (https://www.youtube.com/@ScalarLearning/playlists)
 
 
