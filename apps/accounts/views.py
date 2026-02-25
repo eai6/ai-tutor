@@ -364,8 +364,30 @@ def invite_staff(request):
         from django.urls import reverse
         invite_url = request.build_absolute_uri(reverse('accounts:staff_register', args=[invitation.token]))
 
+        # Send email if address was provided
         if email:
-            messages.success(request, f"Invitation created for {email} at {institution.name}!")
+            from django.core.mail import send_mail
+            from django.conf import settings
+            platform_name = PlatformConfig.load().platform_name or 'AI Tutor'
+            try:
+                send_mail(
+                    subject=f"You're invited to join {institution.name} on {platform_name}",
+                    message=(
+                        f"Hello,\n\n"
+                        f"You've been invited to join {institution.name} as a staff member "
+                        f"on {platform_name}.\n\n"
+                        f"Click the link below to complete your registration:\n"
+                        f"{invite_url}\n\n"
+                        f"This invitation was sent by {request.user.get_full_name() or request.user.username}.\n\n"
+                        f"— {platform_name}"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+                messages.success(request, f"Invitation emailed to {email} at {institution.name}!")
+            except Exception as e:
+                messages.success(request, f"Invitation created for {email} at {institution.name}! (Email delivery failed: {e})")
         else:
             messages.success(request, f"Link-only invitation created for {institution.name}!")
 
