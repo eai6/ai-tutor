@@ -139,12 +139,14 @@ def detect_subject(text: str, provided_subject: str = "") -> str:
 def parse_mathematics_curriculum(text: str, grade_level: str = "S1") -> ParsedCurriculum:
     """
     Parse Seychelles Mathematics curriculum text.
-    
+
     The curriculum is organized by:
     - Strands: Number, Measures, Shape & Space, Algebra, Handling Data
     - Each strand has Terminal Objectives
     """
-    cycle = "4" if grade_level in ["S1", "S2"] else "5"
+    from apps.curriculum.utils import determine_cycles
+    cycles = determine_cycles(grade_level)
+    cycle = "/".join(cycles)
     
     # Define the strands
     strands = {
@@ -400,7 +402,9 @@ Align unit and lesson names with the terminology and structure used in these mat
         # Keep first 20k and last 10k
         text = text[:20000] + "\n\n[...middle section truncated...]\n\n" + text[-10000:]
 
-    cycle = "4" if grade_level in ["S1", "S2"] else "5"
+    from apps.curriculum.utils import determine_cycles
+    cycles = determine_cycles(grade_level)
+    cycle = "/".join(cycles)
 
     prompt = f"""Analyze this curriculum document and extract its structure.
 
@@ -514,8 +518,10 @@ def parse_generic_curriculum(text: str, subject: str, grade_level: str) -> Parse
     Generic curriculum parser using flexible text extraction.
     Handles various document formats.
     """
-    cycle = "4" if grade_level in ["S1", "S2"] else "5"
-    
+    from apps.curriculum.utils import determine_cycles
+    cycles = determine_cycles(grade_level)
+    cycle = "/".join(cycles)
+
     units = []
     current_unit = None
     objectives = []
@@ -724,12 +730,14 @@ def create_curriculum_from_structure(structure: Dict, institution, upload=None) 
     """
     from apps.curriculum.models import Course, Unit, Lesson, LessonStep
     
+    from apps.curriculum.utils import format_grade_display
     subject_name = structure.get('subject', 'General')
-    grade = structure.get('grade_level', 'S1')
-    
+    grade = structure.get('grade_level', '')
+    grade_display = format_grade_display(grade)
+
     # Create course
-    course_name = f"{subject_name} {grade}"
-    
+    course_name = f"{subject_name} {grade_display}"
+
     course, created = Course.objects.update_or_create(
         institution=institution,
         title=course_name,
@@ -872,7 +880,7 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
         try:
             upload.add_log("   Using AI to analyze document structure...")
             curriculum = parse_curriculum_with_llm(
-                text, detected_subject, upload.grade_level or 'S1',
+                text, detected_subject, upload.grade_level or '',
                 institution_id=upload.institution_id,
             )
             upload.add_log("   ✓ AI parsing complete")
@@ -881,9 +889,9 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
             upload.add_log("   Falling back to pattern-based parsing...")
             # Fall back to regex-based parsing
             if 'math' in detected_subject.lower():
-                curriculum = parse_mathematics_curriculum(text, upload.grade_level or 'S1')
+                curriculum = parse_mathematics_curriculum(text, upload.grade_level or '')
             else:
-                curriculum = parse_generic_curriculum(text, detected_subject, upload.grade_level or 'S1')
+                curriculum = parse_generic_curriculum(text, detected_subject, upload.grade_level or '')
         
         structure = asdict(curriculum)
         

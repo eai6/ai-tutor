@@ -525,7 +525,8 @@ def curriculum_upload(request):
     if request.method == 'POST':
         uploaded_file = request.FILES.get('curriculum_file')
         subject_name = request.POST.get('subject_name', '').strip()
-        grade_level = request.POST.get('grade_level', '')
+        grade_levels = request.POST.getlist('grade_level')
+        grade_level = ','.join(grade_levels)
 
         if not uploaded_file:
             messages.error(request, "Please upload a curriculum file.")
@@ -558,9 +559,9 @@ def curriculum_upload(request):
             status='pending'
         )
 
-        # Handle optional material attachment
-        material_file = request.FILES.get('material_file')
-        if material_file and request.POST.get('attach_material'):
+        # Handle optional material attachments (multi-file)
+        material_files = request.FILES.getlist('material_files')
+        if material_files and request.POST.get('attach_material'):
             material_title = request.POST.get('material_title', '').strip()
             if material_title:
                 from apps.dashboard.material_tasks import process_teaching_material
@@ -569,25 +570,33 @@ def curriculum_upload(request):
                 mat_dir = os.path.join(settings.MEDIA_ROOT, 'material_uploads')
                 os.makedirs(mat_dir, exist_ok=True)
 
-                mat_path = os.path.join(mat_dir, material_file.name)
-                with open(mat_path, 'wb+') as dest:
-                    for chunk in material_file.chunks():
-                        dest.write(chunk)
+                for material_file in material_files:
+                    mat_path = os.path.join(mat_dir, material_file.name)
+                    with open(mat_path, 'wb+') as dest:
+                        for chunk in material_file.chunks():
+                            dest.write(chunk)
 
-                material_record = TeachingMaterialUpload.objects.create(
-                    institution=institution,
-                    uploaded_by=request.user,
-                    file_path=mat_path,
-                    original_filename=material_file.name,
-                    title=material_title,
-                    subject_name=subject_name,
-                    grade_level=grade_level,
-                    material_type=request.POST.get('material_type', 'textbook'),
-                    description=request.POST.get('material_description', '').strip(),
-                    curriculum_upload=upload_record,
-                )
+                    # For multiple files, append filename stem to title
+                    if len(material_files) > 1:
+                        stem = os.path.splitext(material_file.name)[0]
+                        file_title = f"{material_title} - {stem}"
+                    else:
+                        file_title = material_title
 
-                run_async(process_teaching_material, material_record.id)
+                    material_record = TeachingMaterialUpload.objects.create(
+                        institution=institution,
+                        uploaded_by=request.user,
+                        file_path=mat_path,
+                        original_filename=material_file.name,
+                        title=file_title,
+                        subject_name=subject_name,
+                        grade_level=grade_level,
+                        material_type=request.POST.get('material_type', 'textbook'),
+                        description=request.POST.get('material_description', '').strip(),
+                        curriculum_upload=upload_record,
+                    )
+
+                    run_async(process_teaching_material, material_record.id)
 
         messages.success(request, "Curriculum uploaded! Processing will begin shortly.")
         return redirect('dashboard:curriculum_process', upload_id=upload_record.id)
@@ -717,16 +726,17 @@ def curriculum_approve(request, upload_id):
         upload.save()
         
         # Create or update course
+        from apps.curriculum.utils import format_grade_display
         subject = upload.subject_name
-        grade = upload.grade_level or 'S1'
-        course_title = f"{subject} {grade}"
-        
+        grade_display = format_grade_display(upload.grade_level)
+        course_title = f"{subject} {grade_display}"
+
         course, created = Course.objects.update_or_create(
             institution=institution or upload.institution,
             title=course_title,
             defaults={
-                'description': f"{subject} curriculum for {grade}",
-                'grade_level': grade,
+                'description': f"{subject} curriculum for {grade_display}",
+                'grade_level': upload.grade_level,
                 'is_published': False,
             }
         )

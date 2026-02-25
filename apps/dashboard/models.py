@@ -33,15 +33,15 @@ class CurriculumUpload(models.Model):
     file_path = models.CharField(max_length=500)
     original_filename = models.CharField(max_length=255, blank=True)
     subject_name = models.CharField(max_length=100)
-    grade_level = models.CharField(max_length=10, blank=True)
-    
+    grade_level = models.CharField(max_length=20, blank=True)
+
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
         default=Status.PENDING
     )
     error_message = models.TextField(blank=True)
-    
+
     # Processing state
     current_step = models.IntegerField(default=0)  # Track which step we're on
     parsed_data = models.JSONField(null=True, blank=True)  # Store parsed curriculum for review
@@ -127,7 +127,7 @@ class TeachingMaterialUpload(models.Model):
     original_filename = models.CharField(max_length=255)
     title = models.CharField(max_length=255)
     subject_name = models.CharField(max_length=100)
-    grade_level = models.CharField(max_length=10, blank=True)
+    grade_level = models.CharField(max_length=20, blank=True)
     material_type = models.CharField(
         max_length=20,
         choices=MaterialType.choices,
@@ -172,7 +172,7 @@ class TeacherClass(models.Model):
         related_name='teacher_classes'
     )
     name = models.CharField(max_length=100)
-    grade_level = models.CharField(max_length=10, blank=True)
+    grade_level = models.CharField(max_length=20, blank=True)
     teacher = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

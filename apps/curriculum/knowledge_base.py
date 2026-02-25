@@ -657,12 +657,19 @@ class CurriculumKnowledgeBase:
             query_text = f"{subject} {grade_level} curriculum units objectives"
 
         # Query with filters and global fallback
-        where_filter = {
-            "$and": [
-                {"subject": {"$eq": subject}},
-                {"grade_level": {"$eq": grade_level}}
-            ]
-        }
+        from apps.curriculum.utils import parse_grade_level_string
+        grade_list = parse_grade_level_string(grade_level)
+        if grade_list:
+            # Include individual grades and the full CSV to match both old and new data
+            grade_match = grade_list + ([grade_level] if len(grade_list) > 1 else [])
+            where_filter = {
+                "$and": [
+                    {"subject": {"$eq": subject}},
+                    {"grade_level": {"$in": grade_match}}
+                ]
+            }
+        else:
+            where_filter = {"subject": {"$eq": subject}}
 
         merged = self.query_with_global_fallback(
             query_text=query_text,

@@ -125,6 +125,99 @@
         border-color: var(--primary);
         background: var(--primary-light);
     }
+
+    /* Grade pill checkboxes */
+    .grade-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
+    }
+
+    .grade-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid var(--gray-300);
+        border-radius: 999px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: all 0.15s;
+        background: #fff;
+        user-select: none;
+    }
+
+    .grade-pill:hover {
+        border-color: var(--primary);
+    }
+
+    .grade-pill:has(input:checked) {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+    }
+
+    .grade-pill input[type="checkbox"] {
+        display: none;
+    }
+
+    .grade-select-all {
+        font-size: 0.8125rem;
+        color: var(--primary);
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 0;
+        text-decoration: underline;
+    }
+
+    /* Material file list */
+    .material-files-list {
+        margin-top: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .material-file-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--gray-50);
+        border-radius: 6px;
+        font-size: 0.875rem;
+    }
+
+    .material-file-item svg {
+        width: 18px;
+        height: 18px;
+        color: var(--primary);
+        flex-shrink: 0;
+    }
+
+    .material-file-item .file-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .material-file-item .file-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 500;
+        font-size: 0.8125rem;
+    }
+
+    .material-file-item .file-size {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+    }
+
+    .material-file-item .remove-file {
+        padding: 0.25rem;
+    }
 </style>
 {% endblock %}
 
@@ -173,52 +266,46 @@
                            placeholder="e.g., Geography, Mathematics, Biology" required>
                 </div>
 
-                <!-- Grade Level -->
+                <!-- Grade Level — checkbox pills -->
                 <div class="form-group">
-                    <label class="form-label" for="grade_level">Grade Level</label>
-                    <select class="form-control" id="grade_level" name="grade_level">
-                        <option value="">Select grade level (optional)</option>
+                    <label class="form-label">
+                        Grade Level
+                        <button type="button" class="grade-select-all" id="grade-select-all">Select all</button>
+                    </label>
+                    <div class="grade-pills" id="grade-pills">
                         {% for code, name in grade_levels %}
-                        <option value="{{ code }}">{{ name }}</option>
+                        <label class="grade-pill">
+                            <input type="checkbox" name="grade_level" value="{{ code }}"> {{ name }}
+                        </label>
                         {% endfor %}
-                    </select>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
+                        Leave unchecked for all grade levels
+                    </div>
                 </div>
 
                 <!-- Optional Teaching Material Attachment -->
                 <div class="material-section" id="material-section">
                     <label class="material-checkbox-label">
                         <input type="checkbox" id="attach-material" name="attach_material" value="1">
-                        Attach a teaching material (optional)
+                        Attach teaching materials (optional)
                     </label>
                     <div style="font-size: 0.8125rem; color: var(--gray-500); margin-top: 0.25rem; margin-left: 1.5rem;">
-                        Attach a textbook or reference that will be indexed into the knowledge base for AI tutoring.
+                        Attach textbooks or references that will be indexed into the knowledge base for AI tutoring.
                     </div>
 
                     <div id="material-fields" class="material-fields" style="display: none;">
-                        <!-- Material file upload -->
+                        <!-- Material file upload (multi-file) -->
                         <div class="form-group">
-                            <label class="form-label">Material File</label>
+                            <label class="form-label">Material Files</label>
                             <div class="material-upload-zone" id="material-upload-zone">
                                 <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                                 </svg>
-                                <p style="margin: 0.5rem 0 0; font-size: 0.875rem;">Drop file or click to browse</p>
-                                <input type="file" name="material_file" id="material-file-input" accept=".pdf,.docx,.doc,.txt" style="display: none;">
+                                <p style="margin: 0.5rem 0 0; font-size: 0.875rem;">Drop files or click to browse (multiple allowed)</p>
+                                <input type="file" name="material_files" id="material-file-input" accept=".pdf,.docx,.doc,.txt" multiple style="display: none;">
                             </div>
-                            <div id="material-file-selected" class="file-selected" style="display: none;">
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 24px; height: 24px;">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                                <div class="file-info">
-                                    <div class="file-name" id="material-file-name"></div>
-                                    <div class="file-size" id="material-file-size"></div>
-                                </div>
-                                <button type="button" class="remove-file" id="material-remove-file">
-                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                </button>
-                            </div>
+                            <div id="material-files-list" class="material-files-list"></div>
                         </div>
 
                         <div class="form-group">
@@ -245,7 +332,7 @@
                                 <svg width="16" height="16" fill="none" stroke="#3B82F6" viewBox="0 0 24 24" style="flex-shrink: 0; margin-top: 0.125rem;">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                This material will be chunked and indexed into the knowledge base. The AI tutor will use it to enrich tutoring sessions. Subject and grade are inherited from the curriculum fields above.
+                                These materials will be chunked and indexed into the knowledge base. The AI tutor will use them to enrich tutoring sessions. Subject and grade are inherited from the curriculum fields above.
                             </div>
                         </div>
                     </div>
@@ -330,6 +417,21 @@
         submitBtn.disabled = true;
     });
 
+    // Grade pills — Select All toggle
+    const selectAllBtn = document.getElementById('grade-select-all');
+    const gradeCheckboxes = document.querySelectorAll('#grade-pills input[type="checkbox"]');
+
+    selectAllBtn.addEventListener('click', () => {
+        const allChecked = Array.from(gradeCheckboxes).every(cb => cb.checked);
+        gradeCheckboxes.forEach(cb => { cb.checked = !allChecked; });
+        selectAllBtn.textContent = allChecked ? 'Select all' : 'Clear all';
+    });
+
+    document.getElementById('grade-pills').addEventListener('change', () => {
+        const allChecked = Array.from(gradeCheckboxes).every(cb => cb.checked);
+        selectAllBtn.textContent = allChecked ? 'Clear all' : 'Select all';
+    });
+
     // Material attachment toggle
     const attachCheckbox = document.getElementById('attach-material');
     const materialFields = document.getElementById('material-fields');
@@ -342,13 +444,13 @@
         materialTitleInput.required = this.checked;
     });
 
-    // Material file upload
+    // Material file upload — multi-file with DataTransfer merging
     const materialUploadZone = document.getElementById('material-upload-zone');
     const materialFileInput = document.getElementById('material-file-input');
-    const materialFileSelected = document.getElementById('material-file-selected');
-    const materialFileName = document.getElementById('material-file-name');
-    const materialFileSize = document.getElementById('material-file-size');
-    const materialRemoveFile = document.getElementById('material-remove-file');
+    const materialFilesList = document.getElementById('material-files-list');
+
+    // Keep a DataTransfer to accumulate files
+    let collectedFiles = new DataTransfer();
 
     materialUploadZone.addEventListener('click', () => materialFileInput.click());
 
@@ -360,28 +462,62 @@
     materialUploadZone.addEventListener('drop', (e) => {
         e.preventDefault();
         materialUploadZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) {
-            materialFileInput.files = e.dataTransfer.files;
-            handleMaterialFileSelect(e.dataTransfer.files[0]);
-        }
+        addMaterialFiles(e.dataTransfer.files);
     });
 
     materialFileInput.addEventListener('change', (e) => {
-        if (e.target.files.length) handleMaterialFileSelect(e.target.files[0]);
+        if (e.target.files.length) addMaterialFiles(e.target.files);
     });
 
-    function handleMaterialFileSelect(file) {
-        materialFileName.textContent = file.name;
-        materialFileSize.textContent = formatFileSize(file.size);
-        materialUploadZone.style.display = 'none';
-        materialFileSelected.style.display = 'flex';
+    function addMaterialFiles(fileList) {
+        for (const file of fileList) {
+            // Avoid duplicates by name+size
+            let isDupe = false;
+            for (let i = 0; i < collectedFiles.files.length; i++) {
+                if (collectedFiles.files[i].name === file.name && collectedFiles.files[i].size === file.size) {
+                    isDupe = true;
+                    break;
+                }
+            }
+            if (!isDupe) collectedFiles.items.add(file);
+        }
+        materialFileInput.files = collectedFiles.files;
+        renderMaterialFileList();
     }
 
-    materialRemoveFile.addEventListener('click', () => {
-        materialFileInput.value = '';
-        materialUploadZone.style.display = 'block';
-        materialFileSelected.style.display = 'none';
-    });
+    function removeMaterialFile(index) {
+        const dt = new DataTransfer();
+        for (let i = 0; i < collectedFiles.files.length; i++) {
+            if (i !== index) dt.items.add(collectedFiles.files[i]);
+        }
+        collectedFiles = dt;
+        materialFileInput.files = collectedFiles.files;
+        renderMaterialFileList();
+    }
+
+    function renderMaterialFileList() {
+        materialFilesList.innerHTML = '';
+        for (let i = 0; i < collectedFiles.files.length; i++) {
+            const file = collectedFiles.files[i];
+            const item = document.createElement('div');
+            item.className = 'material-file-item';
+            item.innerHTML = `
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <div class="file-info">
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${formatFileSize(file.size)}</div>
+                </div>
+                <button type="button" class="remove-file" onclick="removeMaterialFile(${i})">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            `;
+            materialFilesList.appendChild(item);
+        }
+    }
 
     function formatFileSize(bytes) {
         if (bytes < 1024) return bytes + ' B';

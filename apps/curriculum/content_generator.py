@@ -228,11 +228,12 @@ class LessonContentGenerator:
     def _generate_steps(self, lesson, curriculum_context: Dict) -> Dict:
         """Generate lesson steps using LLM."""
         
+        from apps.curriculum.utils import format_grade_display
         unit = lesson.unit
         course = unit.course
         subject = curriculum_context.get('subject', 'General')
-        grade = curriculum_context.get('grade_level', 'S1')
-        
+        grade = format_grade_display(curriculum_context.get('grade_level', ''))
+
         # Build context string
         strategies_str = "\n".join(f"- {s}" for s in curriculum_context.get('teaching_strategies', [])[:5])
 
@@ -425,8 +426,9 @@ Return ONLY valid JSON, no other text."""
     def _generate_exit_ticket(self, lesson, curriculum_context: Dict) -> List[Dict]:
         """Generate exit ticket questions for assessment, grounded in real exam questions."""
 
+        from apps.curriculum.utils import format_grade_display
         subject = curriculum_context.get('subject', 'General')
-        grade = curriculum_context.get('grade_level', 'S1')
+        grade = format_grade_display(curriculum_context.get('grade_level', ''))
 
         # Build KB reference material for question generation
         related_content = curriculum_context.get('related_content', [])
