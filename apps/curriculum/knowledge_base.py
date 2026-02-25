@@ -243,15 +243,17 @@ class CurriculumKnowledgeBase:
         current_section = "Introduction"
         current_chunk = []
         current_chunk_type = "general"
-        
+        chunk_counter = [0]  # mutable counter for closure
+
         def create_chunk(content: str, section: str, chunk_type: str) -> CurriculumChunk:
             """Create a chunk with metadata."""
             content = content.strip()
             if not content or len(content) < 20:
                 return None
-            
+
+            chunk_counter[0] += 1
             chunk_id = hashlib.md5(
-                f"{source_file}:{section}:{content[:100]}".encode()
+                f"{source_file}:{chunk_counter[0]}:{section}:{content[:100]}".encode()
             ).hexdigest()[:16]
             
             return CurriculumChunk(
