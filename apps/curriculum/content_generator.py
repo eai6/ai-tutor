@@ -417,7 +417,7 @@ Return ONLY valid JSON, no other text."""
             return {'success': False, 'error': str(e)}
     
     def _generate_exit_ticket(self, lesson, curriculum_context: Dict) -> List[Dict]:
-        """Generate exit ticket questions for assessment."""
+        """Generate exit ticket questions for assessment, grounded in real exam questions."""
 
         subject = curriculum_context.get('subject', 'General')
         grade = curriculum_context.get('grade_level', 'S1')
@@ -434,13 +434,30 @@ Use these excerpts to ensure questions align with what students are actually stu
 {kb_chunks}
 """
 
+        # Get real exam questions for grounding
+        exam_context_str = ""
+        if self.kb_available:
+            try:
+                exam_questions = self.kb.query_for_exit_ticket_generation(
+                    lesson_title=lesson.title,
+                    lesson_objective=lesson.objective or '',
+                    subject=subject,
+                    grade_level=grade,
+                    n_results=5,
+                )
+                formatted = self.kb.format_exam_questions_for_prompt(exam_questions)
+                if formatted:
+                    exam_context_str = "\n" + formatted + "\n"
+            except Exception as e:
+                logger.warning(f"Exam question grounding failed: {e}")
+
         prompt = f"""Create 3-5 exit ticket questions for this lesson:
 
 LESSON: {lesson.title}
 OBJECTIVE: {lesson.objective or 'Master the lesson concepts'}
 SUBJECT: {subject}
 GRADE: {grade} (Seychelles secondary school)
-{kb_context_str}
+{kb_context_str}{exam_context_str}
 Exit tickets should:
 1. Be quick to answer (1-2 minutes each)
 2. Check understanding of KEY concepts

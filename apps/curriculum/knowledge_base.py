@@ -78,10 +78,20 @@ class QueryResult:
 class CurriculumKnowledgeBase:
     """
     Vector-based knowledge base for curriculum content.
-    
+
     Uses ChromaDB for local vector storage and sentence-transformers for embeddings.
+    Supports two-tier retrieval: institution-specific KB + global/platform KB (institution_id=0).
     """
-    
+
+    GLOBAL_INSTITUTION_ID = 0
+    # Minimum number of results from institution KB before we skip global fallback
+    FALLBACK_THRESHOLD = 3
+
+    @classmethod
+    def get_global_kb(cls):
+        """Get the global/platform-level knowledge base (OpenStax, shared resources)."""
+        return cls(institution_id=cls.GLOBAL_INSTITUTION_ID)
+
     def __init__(self, institution_id: int, persist_directory: str = None):
         """
         Initialize the knowledge base.
@@ -315,7 +325,201 @@ class CurriculumKnowledgeBase:
         
         logger.info(f"Created {len(chunks)} chunks from document")
         return chunks
-    
+
+    def _chunk_question_bank_text(
+        self,
+        text: str,
+        subject: str,
+        grade_level: str,
+        source_file: str,
+        upload_id: int = None
+    ) -> List[CurriculumChunk]:
+        """
+        Split question bank / exam paper text into individual question chunks.
+
+        Designed to be robust across different exam paper formats:
+        - Extracts metadata (year, paper number, marking scheme) from BOTH
+          filename and content, with content taking priority
+        - Detects question boundaries via numbered patterns (Q1, 1., Question 1, etc.)
+        - Classifies questions as MCQ (if A/B/C/D options found) or structured
+        - Detects marking schemes from content keywords, not just filename
+        - Falls back to standard section chunking if <3 questions detected
+        """
+        chunks = []
+
+        # --- Extract metadata from filename (optional enrichment) ---
+        year = None
+        paper_number = None
+        is_marking_scheme = False
+
+        filename_lower = source_file.lower()
+
+        # Year from filename (e.g., "2021", "2019")
+        year_match = re.search(r'(20\d{2})', source_file)
+        if year_match:
+            year = year_match.group(1)
+
+        # Paper number from filename
+        paper_match = re.search(r'[Pp]aper[_\s\-]*(\d)', source_file)
+        if paper_match:
+            paper_number = paper_match.group(1)
+
+        # Marking scheme from filename
+        ms_patterns = ['marking_scheme', 'mark_scheme', 'markscheme', 'corrig',
+                       'answer_key', 'answers', 'memo', 'memorandum']
+        if any(p in filename_lower for p in ms_patterns):
+            is_marking_scheme = True
+
+        # --- Extract/override metadata from content ---
+        # Year from content header (e.g., "June 2021", "November 2020 Examination")
+        content_year_match = re.search(
+            r'(?:January|February|March|April|May|June|July|August|September|October|November|December)'
+            r'[\s,]*(\d{4})',
+            text[:2000], re.IGNORECASE
+        )
+        if content_year_match:
+            year = content_year_match.group(1)
+
+        # Paper number from content (e.g., "Paper 1", "PAPER 2")
+        content_paper_match = re.search(r'[Pp][Aa][Pp][Ee][Rr]\s*(\d)', text[:2000])
+        if content_paper_match:
+            paper_number = content_paper_match.group(1)
+
+        # Marking scheme from content
+        ms_content_patterns = [
+            r'mark\s*(?:ing)?\s*scheme', r'mark\s*allocation',
+            r'answer\s*key', r'model\s*answers?', r'suggested\s*answers?',
+            r'correct\s*answers?', r'memorandum'
+        ]
+        first_500 = text[:500].lower()
+        if any(re.search(p, first_500) for p in ms_content_patterns):
+            is_marking_scheme = True
+
+        # --- Detect question boundaries ---
+        # Patterns that mark the start of a new question
+        question_patterns = [
+            r'^\s*(?:Q(?:uestion)?\.?\s*)(\d{1,3})\s*[\.\)\:]',  # Q1. Q.1) Question 1:
+            r'^\s*(\d{1,3})\s*[\.\)]\s+(?=[A-Z])',                # 1. What... or 1) What...
+            r'^\s*(\d{1,3})\s*[\.\)]\s*\(',                        # 1. (a) ...
+        ]
+
+        lines = text.split('\n')
+        question_starts = []  # List of (line_index, question_number)
+
+        for i, line in enumerate(lines):
+            for pattern in question_patterns:
+                match = re.match(pattern, line)
+                if match:
+                    q_num = int(match.group(1))
+                    # Sanity check: question numbers should be reasonable (1-200)
+                    if 1 <= q_num <= 200:
+                        question_starts.append((i, q_num))
+                    break
+
+        # --- Fallback to standard chunking if too few questions detected ---
+        if len(question_starts) < 3:
+            logger.info(f"Only {len(question_starts)} questions detected in {source_file}, "
+                        f"falling back to standard chunking")
+            fallback_chunks = self._chunk_curriculum_text(
+                text=text, subject=subject, grade_level=grade_level,
+                source_file=source_file, upload_id=upload_id
+            )
+            # Tag fallback chunks with question bank metadata
+            for chunk in fallback_chunks:
+                chunk.metadata['source_type'] = 'question_bank'
+                if is_marking_scheme:
+                    chunk.metadata['chunk_type'] = 'marking_scheme'
+                if year:
+                    chunk.metadata['year'] = year
+                if paper_number:
+                    chunk.metadata['paper_number'] = paper_number
+            return fallback_chunks
+
+        # --- Build question chunks ---
+        def _detect_question_type(q_text: str) -> str:
+            """Detect if MCQ (has A/B/C/D options) or structured."""
+            option_patterns = [
+                r'^\s*[A-D]\s*[\.\)\:]',         # A. or A) or A:
+                r'^\s*\([A-D]\)',                  # (A)
+                r'\b[A-D]\s*[\.\)]\s+\w',          # A. Something
+            ]
+            option_count = 0
+            for line in q_text.split('\n'):
+                for pat in option_patterns:
+                    if re.match(pat, line.strip()):
+                        option_count += 1
+                        break
+            return 'mcq' if option_count >= 3 else 'structured'
+
+        def _detect_has_answers(q_text: str) -> bool:
+            """Check if chunk contains answer indicators."""
+            answer_patterns = [
+                r'(?:correct|right)\s*(?:answer|option)',
+                r'(?:ans(?:wer)?)\s*[:=]',
+                r'\b(?:mark|score)\s*[:=]\s*\d',
+                r'(?:solution|working)',
+            ]
+            text_lower = q_text.lower()
+            return any(re.search(p, text_lower) for p in answer_patterns)
+
+        for idx, (start_line, q_num) in enumerate(question_starts):
+            # Determine end of this question (start of next question or end of text)
+            if idx + 1 < len(question_starts):
+                end_line = question_starts[idx + 1][0]
+            else:
+                end_line = len(lines)
+
+            q_text = '\n'.join(lines[start_line:end_line]).strip()
+
+            if not q_text or len(q_text) < 15:
+                continue
+
+            # If chunk is very long (>3000 chars), it might contain sub-questions
+            # Keep it as one chunk but cap at 4000 chars
+            if len(q_text) > 4000:
+                q_text = q_text[:4000] + "\n[truncated]"
+
+            question_type = _detect_question_type(q_text)
+            has_answers = _detect_has_answers(q_text)
+
+            chunk_type = 'marking_scheme' if is_marking_scheme else 'exam_question'
+
+            chunk_id = hashlib.md5(
+                f"{source_file}:q{q_num}:{q_text[:100]}".encode()
+            ).hexdigest()[:16]
+
+            metadata = {
+                "subject": subject,
+                "grade_level": grade_level,
+                "section": f"Question {q_num}",
+                "chunk_type": chunk_type,
+                "source_file": source_file,
+                "upload_id": upload_id,
+                "institution_id": self.institution_id,
+                "source_type": "question_bank",
+                "question_number": q_num,
+                "question_type": question_type,
+                "has_answers": has_answers,
+            }
+
+            # Add optional metadata only if available
+            if year:
+                metadata["year"] = year
+            if paper_number:
+                metadata["paper_number"] = paper_number
+
+            chunks.append(CurriculumChunk(
+                id=chunk_id,
+                content=q_text,
+                metadata=metadata,
+            ))
+
+        logger.info(
+            f"Created {len(chunks)} question chunks from {source_file} "
+            f"(year={year}, paper={paper_number}, marking_scheme={is_marking_scheme})"
+        )
+        return chunks
+
     def _index_chunks(self, chunks: List[CurriculumChunk]) -> Dict:
         """Index chunks into the vector database."""
         if not self._chromadb_available:
@@ -375,14 +579,24 @@ class CurriculumKnowledgeBase:
         if not text or len(text) < 100:
             raise ValueError("Could not extract meaningful text from document")
 
-        # Chunk the text (reuse curriculum chunking)
-        chunks = self._chunk_curriculum_text(
-            text=text,
-            subject=subject,
-            grade_level=grade_level,
-            source_file=os.path.basename(file_path),
-            upload_id=upload_id
-        )
+        # Route to specialized chunking for question banks
+        source_file = os.path.basename(file_path)
+        if material_type == 'question_bank':
+            chunks = self._chunk_question_bank_text(
+                text=text,
+                subject=subject,
+                grade_level=grade_level,
+                source_file=source_file,
+                upload_id=upload_id
+            )
+        else:
+            chunks = self._chunk_curriculum_text(
+                text=text,
+                subject=subject,
+                grade_level=grade_level,
+                source_file=source_file,
+                upload_id=upload_id
+            )
 
         # Tag chunks with teaching material metadata
         for chunk in chunks:
@@ -434,30 +648,27 @@ class CurriculumKnowledgeBase:
                 objectives=[]
             )
         
-        collection = self._get_collection()
-        
         # Build query
         if unit_title:
             query_text = f"{subject} {grade_level} {unit_title} objectives lessons content"
         else:
             query_text = f"{subject} {grade_level} curriculum units objectives"
-        
-        # Query with filters
+
+        # Query with filters and global fallback
         where_filter = {
             "$and": [
                 {"subject": {"$eq": subject}},
                 {"grade_level": {"$eq": grade_level}}
             ]
         }
-        
-        results = collection.query(
-            query_texts=[query_text],
+
+        merged = self.query_with_global_fallback(
+            query_text=query_text,
             n_results=n_results,
-            where=where_filter,
-            include=["documents", "metadatas"]
+            where_filter=where_filter,
         )
-        
-        return self._process_query_results(results)
+
+        return self._process_query_results(self._convert_fallback_to_query_results(merged))
     
     # ========================================================================
     # STEP 4: GENERATE CONTENT (Query for rich context)
@@ -497,19 +708,16 @@ class CurriculumKnowledgeBase:
                 objectives=[lesson_objective]
             )
         
-        collection = self._get_collection()
-        
-        # Query for relevant content
+        # Query for relevant content with global fallback
         query_text = f"{lesson_title} {lesson_objective} {unit_title} teaching strategies methods"
-        
-        results = collection.query(
-            query_texts=[query_text],
+
+        merged = self.query_with_global_fallback(
+            query_text=query_text,
             n_results=n_results,
-            where={"subject": {"$eq": subject}},
-            include=["documents", "metadatas"]
+            where_filter={"subject": {"$eq": subject}},
         )
-        
-        return self._process_query_results(results)
+
+        return self._process_query_results(self._convert_fallback_to_query_results(merged))
     
     # ========================================================================
     # STEP 5: TUTORING (Query for live session context)
@@ -546,9 +754,7 @@ class CurriculumKnowledgeBase:
                 ),
                 objectives=[lesson.objective] if lesson.objective else []
             )
-        
-        collection = self._get_collection()
-        
+
         # Build context-aware query
         query_parts = [lesson.title, lesson.objective or ""]
         
@@ -566,19 +772,243 @@ class CurriculumKnowledgeBase:
         if hasattr(lesson, 'unit') and hasattr(lesson.unit, 'course'):
             subject = lesson.unit.course.title.split()[0]  # First word of course title
         
-        results = collection.query(
-            query_texts=[query_text],
+        merged = self.query_with_global_fallback(
+            query_text=query_text,
             n_results=n_results,
-            where={"subject": {"$eq": subject}},
-            include=["documents", "metadatas"]
+            where_filter={"subject": {"$eq": subject}},
         )
-        
-        return self._process_query_results(results)
+
+        return self._process_query_results(self._convert_fallback_to_query_results(merged))
     
+    # ========================================================================
+    # EXIT TICKET GROUNDING
+    # ========================================================================
+
+    def query_for_exit_ticket_generation(
+        self,
+        lesson_title: str,
+        lesson_objective: str,
+        subject: str,
+        grade_level: str = '',
+        n_results: int = 5,
+    ) -> List[Dict]:
+        """
+        Query the KB for real exam questions to ground exit ticket generation.
+
+        Searches for exam_question and marking_scheme chunks that are relevant
+        to the lesson topic. Uses two-tier retrieval (institution + global fallback).
+
+        Args:
+            lesson_title: Title of the lesson
+            lesson_objective: Learning objective
+            subject: Subject name
+            grade_level: Grade level
+            n_results: Number of reference questions to return
+
+        Returns:
+            List of dicts with keys: content, metadata, distance, source_tier
+            Each dict represents a real exam question with available metadata
+            (year, paper_number, question_type, has_answers, etc.)
+        """
+        if not self._chromadb_available:
+            return []
+
+        query_text = f"{lesson_title} {lesson_objective} exam question assessment"
+
+        # Try filtered query first (only exam questions / marking schemes)
+        try:
+            merged = self.query_with_global_fallback(
+                query_text=query_text,
+                n_results=n_results,
+                where_filter={
+                    "$and": [
+                        {"subject": {"$eq": subject}},
+                        {"chunk_type": {"$in": ["exam_question", "marking_scheme", "assessment"]}},
+                    ]
+                },
+            )
+        except Exception:
+            # ChromaDB may fail if no chunks have chunk_type field yet; fall back to unfiltered
+            merged = []
+
+        # If filtered query returned too few results, try broader subject-only query
+        if len(merged) < 2:
+            try:
+                broader = self.query_with_global_fallback(
+                    query_text=query_text,
+                    n_results=n_results,
+                    where_filter={"subject": {"$eq": subject}},
+                )
+                # Only add chunks that look like questions (heuristic)
+                for r in broader:
+                    if r not in merged:
+                        content_lower = r.get("content", "").lower()
+                        if any(kw in content_lower for kw in [
+                            'question', 'marks', 'answer', 'choose',
+                            'calculate', 'explain', 'describe', 'state',
+                            'a)', 'b)', 'c)', 'd)',
+                        ]):
+                            merged.append(r)
+                merged = merged[:n_results]
+            except Exception:
+                pass
+
+        return merged
+
+    def format_exam_questions_for_prompt(self, exam_questions: List[Dict]) -> str:
+        """
+        Format retrieved exam questions into a prompt-ready string.
+
+        Args:
+            exam_questions: Results from query_for_exit_ticket_generation()
+
+        Returns:
+            Formatted string for insertion into LLM prompts, or empty string if none.
+        """
+        if not exam_questions:
+            return ""
+
+        lines = ["REFERENCE EXAM QUESTIONS (match this style and difficulty level):"]
+        for i, q in enumerate(exam_questions, 1):
+            meta = q.get("metadata", {})
+            content = q.get("content", "").strip()
+
+            # Build label from available metadata
+            label_parts = []
+            if meta.get("year"):
+                label_parts.append(meta["year"])
+            if meta.get("paper_number"):
+                label_parts.append(f"Paper {meta['paper_number']}")
+            if meta.get("question_type"):
+                label_parts.append(meta["question_type"].upper())
+
+            label = f" [{', '.join(label_parts)}]" if label_parts else ""
+
+            # Truncate long questions
+            if len(content) > 500:
+                content = content[:500] + "..."
+
+            lines.append(f"Q{i}{label}: {content}")
+
+        return "\n".join(lines)
+
+    # ========================================================================
+    # TWO-TIER RETRIEVAL
+    # ========================================================================
+
+    def query_with_global_fallback(
+        self,
+        query_text: str,
+        n_results: int = 10,
+        where_filter: Dict = None,
+        institution_boost: float = 0.7,
+    ) -> List[Dict]:
+        """
+        Query institution KB first, then fall back to global KB if results are insufficient.
+
+        Uses lazy evaluation: global KB is only queried when institution KB returns
+        fewer than FALLBACK_THRESHOLD results. This means zero overhead in the common case.
+
+        Institution results get a distance boost (multiplied by institution_boost < 1.0,
+        so lower distance = higher relevance) to prefer local content over global.
+
+        Args:
+            query_text: The search query
+            n_results: Total results desired
+            where_filter: Optional metadata filter (applied to both tiers)
+            institution_boost: Multiplier for institution distances (< 1.0 = prefer institution)
+
+        Returns:
+            List of dicts with keys: content, metadata, distance, source_tier
+        """
+        if not self._chromadb_available:
+            return []
+
+        # --- Query institution KB ---
+        collection = self._get_collection()
+        try:
+            inst_results = collection.query(
+                query_texts=[query_text],
+                n_results=n_results,
+                where=where_filter,
+                include=["documents", "metadatas", "distances"]
+            )
+        except Exception as e:
+            logger.warning(f"Institution KB query failed: {e}")
+            inst_results = None
+
+        merged = []
+        if inst_results and inst_results.get('documents') and inst_results['documents'][0]:
+            for i, doc in enumerate(inst_results['documents'][0]):
+                raw_dist = inst_results['distances'][0][i] if inst_results.get('distances') else 1.0
+                merged.append({
+                    "content": doc,
+                    "metadata": inst_results['metadatas'][0][i] if inst_results.get('metadatas') else {},
+                    "distance": raw_dist * institution_boost,
+                    "raw_distance": raw_dist,
+                    "source_tier": "institution",
+                })
+
+        # --- Lazy fallback to global KB ---
+        if (self.institution_id != self.GLOBAL_INSTITUTION_ID
+                and len(merged) < self.FALLBACK_THRESHOLD):
+            try:
+                global_kb = CurriculumKnowledgeBase(institution_id=self.GLOBAL_INSTITUTION_ID)
+                global_collection = global_kb._get_collection()
+
+                # For global, relax institution-specific filters but keep subject filter
+                global_filter = None
+                if where_filter:
+                    # Extract just the subject filter if present
+                    if isinstance(where_filter, dict):
+                        if "subject" in where_filter:
+                            global_filter = where_filter
+                        elif "$and" in where_filter:
+                            for clause in where_filter["$and"]:
+                                if "subject" in clause:
+                                    global_filter = clause
+                                    break
+
+                global_results = global_collection.query(
+                    query_texts=[query_text],
+                    n_results=n_results,
+                    where=global_filter,
+                    include=["documents", "metadatas", "distances"]
+                )
+
+                if global_results and global_results.get('documents') and global_results['documents'][0]:
+                    for i, doc in enumerate(global_results['documents'][0]):
+                        raw_dist = global_results['distances'][0][i] if global_results.get('distances') else 1.0
+                        merged.append({
+                            "content": doc,
+                            "metadata": global_results['metadatas'][0][i] if global_results.get('metadatas') else {},
+                            "distance": raw_dist,  # No boost for global (natural distance)
+                            "raw_distance": raw_dist,
+                            "source_tier": "global",
+                        })
+            except Exception as e:
+                logger.warning(f"Global KB fallback query failed: {e}")
+
+        # Sort by adjusted distance (lower = more relevant), take top N
+        merged.sort(key=lambda x: x["distance"])
+        return merged[:n_results]
+
+    def _convert_fallback_to_query_results(self, merged: List[Dict]) -> Dict:
+        """Convert query_with_global_fallback() output to ChromaDB query() format
+        so it can be passed to _process_query_results()."""
+        if not merged:
+            return {"documents": [[]], "metadatas": [[]], "distances": [[]]}
+
+        return {
+            "documents": [[r["content"] for r in merged]],
+            "metadatas": [[r["metadata"] for r in merged]],
+            "distances": [[r["distance"] for r in merged]],
+        }
+
     # ========================================================================
     # HELPER METHODS
     # ========================================================================
-    
+
     def _process_query_results(self, results: Dict) -> QueryResult:
         """Process ChromaDB query results into a QueryResult."""
         chunks = []

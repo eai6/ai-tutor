@@ -335,10 +335,13 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
         try:
             # Query KB for additional context from teaching materials
             kb_context = ""
+            exam_context = ""
             try:
                 from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
                 course = lesson.unit.course
                 kb = CurriculumKnowledgeBase(institution_id=course.institution_id)
+
+                # Get textbook/teaching material context
                 kb_result = kb.query_for_content_generation(
                     lesson_title=lesson.title,
                     lesson_objective=lesson.objective or '',
@@ -351,6 +354,18 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
                     kb_context = "\n\nADDITIONAL CONTEXT FROM TEXTBOOKS/MATERIALS:\n"
                     for chunk in kb_result.chunks[:10]:
                         kb_context += f"- {chunk.get('content', '')[:200]}...\n"
+
+                # Get real exam questions for grounding
+                exam_questions = kb.query_for_exit_ticket_generation(
+                    lesson_title=lesson.title,
+                    lesson_objective=lesson.objective or '',
+                    subject=course.title,
+                    grade_level=course.grade_level or '',
+                    n_results=5,
+                )
+                exam_context = kb.format_exam_questions_for_prompt(exam_questions)
+                if exam_context:
+                    exam_context = "\n\n" + exam_context + "\n"
             except Exception as e:
                 logger.warning(f"KB query for exit tickets failed: {e}")
 
@@ -359,7 +374,7 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
 Lesson: {lesson.title}
 Objective: {lesson.objective}
 Subject: {lesson.unit.course.title}
-{kb_context}
+{kb_context}{exam_context}
 
 Generate 35 questions that cover ALL key concepts in this lesson. Each question should have:
 - A clear question

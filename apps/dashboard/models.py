@@ -94,6 +94,7 @@ class TeachingMaterialUpload(models.Model):
         REFERENCE = 'reference', 'Reference'
         WORKSHEET = 'worksheet', 'Worksheet'
         NOTES = 'notes', 'Notes'
+        QUESTION_BANK = 'question_bank', 'Question Bank / Exam Paper'
         OTHER = 'other', 'Other'
 
     institution = models.ForeignKey(

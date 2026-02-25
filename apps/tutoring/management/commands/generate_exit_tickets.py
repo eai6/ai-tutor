@@ -22,7 +22,7 @@ EXIT_TICKET_PROMPT = """Generate exactly 10 multiple choice questions for a summ
 LESSON: {lesson_title}
 OBJECTIVE: {lesson_objective}
 SUBJECT: {subject}
-
+{exam_context}
 REQUIREMENTS:
 1. Generate EXACTLY 10 questions
 2. Questions should progress from easy (recall) to hard (analysis)
@@ -166,13 +166,33 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("\nDone!"))
 
     def _generate_questions(self, llm_client, lesson) -> list:
-        """Generate 10 MCQ questions using AI."""
+        """Generate 10 MCQ questions using AI, grounded in real exam questions when available."""
         subject = lesson.unit.course.title if lesson.unit and lesson.unit.course else "General"
-        
+
+        # Query KB for real exam questions to ground the generation
+        exam_context = ""
+        try:
+            from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+            course = lesson.unit.course
+            kb = CurriculumKnowledgeBase(institution_id=course.institution_id)
+            exam_questions = kb.query_for_exit_ticket_generation(
+                lesson_title=lesson.title,
+                lesson_objective=lesson.objective or '',
+                subject=subject,
+                grade_level=course.grade_level or '',
+                n_results=5,
+            )
+            exam_context = kb.format_exam_questions_for_prompt(exam_questions)
+            if exam_context:
+                exam_context = "\n\n" + exam_context + "\n"
+        except Exception as e:
+            self.stderr.write(f"  KB query failed (continuing without): {e}")
+
         prompt = EXIT_TICKET_PROMPT.format(
             lesson_title=lesson.title,
             lesson_objective=lesson.objective,
             subject=subject,
+            exam_context=exam_context,
         )
         
         messages = [{"role": "user", "content": prompt}]
