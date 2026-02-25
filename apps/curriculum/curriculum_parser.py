@@ -58,7 +58,10 @@ def extract_text_from_file(file_path: str) -> Tuple[str, str]:
     
     elif ext == '.pdf':
         return extract_from_pdf(file_path), 'pdf'
-    
+
+    elif ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif']:
+        return extract_from_image(file_path), 'image'
+
     else:
         # Try reading as text anyway
         try:
@@ -93,18 +96,212 @@ def extract_from_docx(file_path: str) -> str:
 
 
 def extract_from_pdf(file_path: str) -> str:
-    """Extract text from PDF file."""
+    """Extract text from PDF, with multimodal LLM fallback for scanned docs."""
     try:
         import fitz
         doc = fitz.open(file_path)
+
+        # First pass: embedded text
         text = ""
         for page in doc:
             text += page.get_text()
-        doc.close()
-        return text
+
+        if len(text.strip()) >= 100:
+            doc.close()
+            return text
+
+        # Multimodal LLM fallback
+        logger.info(f"Low text ({len(text.strip())} chars), trying LLM vision: {file_path}")
+        try:
+            llm_text = _extract_pdf_with_vision(doc)
+            doc.close()
+            return llm_text if len(llm_text.strip()) > len(text.strip()) else text
+        except Exception as e:
+            logger.warning(f"LLM vision extraction failed: {e}")
+            doc.close()
+            return text
+
     except Exception as e:
         logger.error(f"PDF extraction failed: {e}")
         return ""
+
+
+def _extract_pdf_with_vision(doc) -> str:
+    """
+    Render PDF pages to images and use multimodal LLM to extract content.
+
+    Processes pages in batches of 10 to stay within token limits.
+    Builds provider-appropriate multimodal message format.
+    """
+    import base64
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+
+    config = ModelConfig.objects.filter(is_active=True).first()
+    if not config:
+        raise RuntimeError("No active LLM model configured")
+
+    client = get_llm_client(config)
+
+    # Render pages to images at 200 DPI, falling back to lower DPI or JPEG if too large
+    MAX_IMAGE_BYTES = 4_500_000  # stay under Anthropic's 5MB limit
+    page_images = []   # list of (base64_str, media_type)
+    for page in doc:
+        pix = page.get_pixmap(dpi=200)
+        img_bytes = pix.tobytes("png")
+        media_type = "image/png"
+
+        # If PNG too large, try JPEG (much smaller for scanned content)
+        if len(img_bytes) > MAX_IMAGE_BYTES:
+            img_bytes = pix.tobytes("jpeg", jpg_quality=80)
+            media_type = "image/jpeg"
+
+        # If still too large, re-render at lower DPI
+        if len(img_bytes) > MAX_IMAGE_BYTES:
+            pix = page.get_pixmap(dpi=120)
+            img_bytes = pix.tobytes("jpeg", jpg_quality=80)
+
+        page_images.append((base64.b64encode(img_bytes).decode("utf-8"), media_type))
+
+    is_anthropic = config.provider == ModelConfig.Provider.ANTHROPIC
+
+    system_prompt = (
+        "You are a document text extraction assistant. "
+        "Extract ALL text, labels, titles, and describe visual elements "
+        "(maps, diagrams, charts) from the provided document pages. "
+        "Return only the extracted content, no commentary."
+    )
+    extraction_prompt = (
+        "Extract ALL text, labels, titles, and describe visual elements "
+        "(maps, diagrams, charts) from these document pages."
+    )
+
+    # Process in batches of 10 pages
+    all_text_parts = []
+    batch_size = 10
+
+    # Temporarily override max_tokens for extraction
+    original_max_tokens = config.max_tokens
+    config.max_tokens = 4096
+
+    try:
+        for i in range(0, len(page_images), batch_size):
+            batch = page_images[i:i + batch_size]
+
+            # Build multimodal content blocks
+            content_blocks = []
+            for img_b64, media_type in batch:
+                if is_anthropic:
+                    content_blocks.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": img_b64,
+                        },
+                    })
+                else:
+                    content_blocks.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{media_type};base64,{img_b64}",
+                        },
+                    })
+
+            content_blocks.append({"type": "text", "text": extraction_prompt})
+
+            messages = [{"role": "user", "content": content_blocks}]
+            response = client.generate(messages=messages, system_prompt=system_prompt)
+            all_text_parts.append(response.content)
+    finally:
+        config.max_tokens = original_max_tokens
+
+    return "\n\n".join(all_text_parts)
+
+
+def extract_from_image(file_path: str) -> str:
+    """Extract text/content from an image file using multimodal LLM."""
+    import base64
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+
+    config = ModelConfig.objects.filter(is_active=True).first()
+    if not config:
+        logger.warning("No active LLM configured, cannot extract from image")
+        return ""
+
+    # Determine media type from extension
+    ext = os.path.splitext(file_path)[1].lower()
+    media_types = {
+        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp',
+        '.tiff': 'image/tiff', '.tif': 'image/tiff',
+    }
+    media_type = media_types.get(ext, 'image/png')
+
+    with open(file_path, 'rb') as f:
+        img_bytes = f.read()
+
+    # Downsize if over 4.5MB (Anthropic limit is 5MB)
+    if len(img_bytes) > 4_500_000:
+        try:
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(img_bytes))
+            # Scale down to ~75% until under limit
+            while len(img_bytes) > 4_500_000:
+                new_size = (int(img.width * 0.75), int(img.height * 0.75))
+                img = img.resize(new_size, Image.LANCZOS)
+                buf = io.BytesIO()
+                img.save(buf, format='JPEG', quality=85)
+                img_bytes = buf.getvalue()
+                media_type = 'image/jpeg'
+        except ImportError:
+            logger.warning("Pillow not installed, cannot resize large image")
+            return ""
+
+    img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+
+    is_anthropic = config.provider == ModelConfig.Provider.ANTHROPIC
+
+    if is_anthropic:
+        image_block = {
+            "type": "image",
+            "source": {"type": "base64", "media_type": media_type, "data": img_b64},
+        }
+    else:
+        image_block = {
+            "type": "image_url",
+            "image_url": {"url": f"data:{media_type};base64,{img_b64}"},
+        }
+
+    messages = [{"role": "user", "content": [
+        image_block,
+        {"type": "text", "text": (
+            "Extract ALL text, labels, titles, and describe visual elements "
+            "(maps, diagrams, charts) from this image."
+        )},
+    ]}]
+
+    client = get_llm_client(config)
+
+    original_max_tokens = config.max_tokens
+    config.max_tokens = 4096
+    try:
+        response = client.generate(
+            messages=messages,
+            system_prompt=(
+                "You are a document text extraction assistant. "
+                "Extract ALL text, labels, titles, and describe visual elements. "
+                "Return only the extracted content, no commentary."
+            ),
+        )
+        return response.content
+    except Exception as e:
+        logger.warning(f"LLM image extraction failed: {e}")
+        return ""
+    finally:
+        config.max_tokens = original_max_tokens
 
 
 # ============================================================================

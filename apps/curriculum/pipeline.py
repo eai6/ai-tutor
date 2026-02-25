@@ -46,7 +46,11 @@ def extract_text_from_file(file_path: str) -> Tuple[str, str]:
     
     elif ext == '.pdf':
         return _extract_from_pdf(file_path), 'pdf'
-    
+
+    elif ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif']:
+        from apps.curriculum.curriculum_parser import extract_from_image
+        return extract_from_image(file_path), 'image'
+
     else:
         # Try reading as text
         try:
@@ -80,18 +84,9 @@ def _extract_from_docx(file_path: str) -> str:
 
 
 def _extract_from_pdf(file_path: str) -> str:
-    """Extract text from PDF file."""
-    try:
-        import fitz  # PyMuPDF
-        doc = fitz.open(file_path)
-        text = ""
-        for page in doc:
-            text += page.get_text()
-        doc.close()
-        return text
-    except Exception as e:
-        logger.error(f"PDF extraction failed: {e}")
-        return ""
+    """Extract text from PDF file (delegates to shared implementation with LLM vision fallback)."""
+    from apps.curriculum.curriculum_parser import extract_from_pdf
+    return extract_from_pdf(file_path)
 
 
 # ============================================================================
