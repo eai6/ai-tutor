@@ -26,6 +26,7 @@ from apps.accounts.models import Institution, Membership, StudentProfile, Platfo
 from apps.curriculum.models import Course, Unit, Lesson
 from apps.tutoring.models import TutorSession, StudentLessonProgress
 from django.contrib.auth.models import User
+from django.contrib.auth import update_session_auth_hash, logout
 
 logger = logging.getLogger(__name__)
 
@@ -1207,11 +1208,52 @@ def settings_page(request):
     if request.method == 'POST':
         action = request.POST.get('action', 'general')
 
-        if action == 'general' and institution is not None:
+        if action == 'general' and institution is not None and is_superadmin:
             institution.name = request.POST.get('name', institution.name)
             institution.timezone = request.POST.get('timezone', institution.timezone)
             institution.save()
             messages.success(request, "Settings updated.")
+
+        elif action == 'account':
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            email = request.POST.get('email', '').strip()
+            if not email:
+                messages.error(request, "Email is required.")
+            elif User.objects.filter(email=email).exclude(pk=request.user.pk).exists():
+                messages.error(request, "That email is already in use by another account.")
+            else:
+                request.user.first_name = first_name
+                request.user.last_name = last_name
+                request.user.email = email
+                request.user.save()
+                messages.success(request, "Profile updated.")
+
+        elif action == 'password':
+            current_password = request.POST.get('current_password', '')
+            new_password = request.POST.get('new_password', '')
+            confirm_password = request.POST.get('confirm_password', '')
+            if not request.user.check_password(current_password):
+                messages.error(request, "Current password is incorrect.")
+            elif len(new_password) < 6:
+                messages.error(request, "New password must be at least 6 characters.")
+            elif new_password != confirm_password:
+                messages.error(request, "New passwords do not match.")
+            else:
+                request.user.set_password(new_password)
+                request.user.save()
+                update_session_auth_hash(request, request.user)
+                messages.success(request, "Password changed successfully.")
+
+        elif action == 'delete_account':
+            if request.user.is_staff:
+                messages.error(request, "Super Admin accounts cannot be self-deleted.")
+            else:
+                from apps.safety import DataPrivacy
+                DataPrivacy.delete_user_data(request.user, keep_anonymized=True)
+                request.user.delete()
+                logout(request)
+                return redirect('accounts:landing')
 
         elif action == 'theme' and is_superadmin:
             platform_config = PlatformConfig.load()

@@ -6,8 +6,8 @@
 {% block content %}
 <div style="max-width: 700px;">
 
-    {# ── School Settings (when a specific school is selected) ── #}
-    {% if institution %}
+    {# ── School Settings (superadmin only, when a specific school is selected) ── #}
+    {% if institution and is_superadmin %}
     <form method="post">
         {% csrf_token %}
         <input type="hidden" name="action" value="general">
@@ -43,29 +43,94 @@
     </div>
     {% endif %}
 
-    {# ── Your Account ── #}
-    <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
-            <h3 class="card-title">Your Account</h3>
+    {# ── Update Profile ── #}
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="account">
+
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Your Account</h3>
+            </div>
+            <div class="card-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="first_name">First Name</label>
+                        <input type="text" class="form-control" id="first_name" name="first_name" value="{{ user.first_name }}">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="last_name">Last Name</label>
+                        <input type="text" class="form-control" id="last_name" name="last_name" value="{{ user.last_name }}">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="email">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.875rem; color: var(--gray-500);">Role</div>
+                        <div style="font-weight: 500; margin-top: 0.25rem;">{% if user.is_staff %}Super Admin{% elif membership %}{{ membership.get_role_display }}{% endif %}</div>
+                        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
+                            Member since {% if membership %}{{ membership.joined_at|date:"M d, Y" }}{% else %}{{ user.date_joined|date:"M d, Y" }}{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--gray-500);">Name</div>
-                    <div style="font-weight: 500;">{{ user.get_full_name|default:user.username }}</div>
+
+        <button type="submit" class="btn btn-primary">Save Profile</button>
+    </form>
+
+    {# ── Change Password ── #}
+    <form method="post" style="margin-top: 2rem;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="password">
+
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Change Password</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label" for="current_password">Current Password</label>
+                    <input type="password" class="form-control" id="current_password" name="current_password" required>
                 </div>
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--gray-500);">Email</div>
-                    <div style="font-weight: 500;">{{ user.email }}</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="new_password">New Password</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="confirm_password">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
                 </div>
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--gray-500);">Role</div>
-                    <div style="font-weight: 500;">{% if user.is_staff %}Super Admin{% elif membership %}{{ membership.get_role_display }}{% endif %}</div>
-                </div>
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--gray-500);">Member Since</div>
-                    <div style="font-weight: 500;">{% if membership %}{{ membership.joined_at|date:"M d, Y" }}{% else %}{{ user.date_joined|date:"M d, Y" }}{% endif %}</div>
-                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Change Password</button>
+    </form>
+
+    {# ── Delete Account (danger zone) ── #}
+    <div style="margin-top: 2rem;">
+        <div class="card" style="border: 1px solid var(--danger); margin-bottom: 1.5rem;">
+            <div class="card-header" style="background: rgba(220, 53, 69, 0.05);">
+                <h3 class="card-title" style="color: var(--danger);">Danger Zone</h3>
+            </div>
+            <div class="card-body">
+                {% if user.is_staff %}
+                <p style="color: var(--gray-500); font-size: 0.875rem;">
+                    Super Admin accounts cannot be deleted from this page. Contact another administrator to remove your account.
+                </p>
+                {% else %}
+                <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 1rem;">
+                    Permanently delete your account and all associated data. This action cannot be undone.
+                </p>
+                <form method="post" onsubmit="return confirm('Are you sure you want to delete your account? This action is permanent and cannot be undone.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_account">
+                    <button type="submit" class="btn" style="background: var(--danger); color: #fff;">Delete My Account</button>
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>
