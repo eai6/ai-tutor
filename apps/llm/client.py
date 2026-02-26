@@ -50,6 +50,7 @@ class BaseLLMClient(ABC):
         self,
         messages: list[dict],
         system_prompt: str,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         """
         Generate a response from the LLM.
@@ -83,7 +84,7 @@ class BaseLLMClient(ABC):
 
 class AnthropicClient(BaseLLMClient):
     """Client for Anthropic's Claude API."""
-    
+
     def __init__(self, config: ModelConfig):
         super().__init__(config)
         if not self.api_key:
@@ -91,28 +92,33 @@ class AnthropicClient(BaseLLMClient):
                 f"API key not found. Set {self.config.api_key_env_var} environment variable."
             )
         self.client = anthropic.Anthropic(api_key=self.api_key)
-    
+
     def generate(
         self,
         messages: list[dict],
         system_prompt: str,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
-        """Call Claude API and return standardized response."""
-        
-        response = self.client.messages.create(
+        """Call Claude API using streaming to avoid 10-minute timeout."""
+
+        full_content = ""
+        with self.client.messages.stream(
             model=self.config.model_name,
-            max_tokens=self.config.max_tokens,
+            max_tokens=max_tokens or self.config.max_tokens,
             temperature=self.config.temperature,
             system=system_prompt,
             messages=messages,
-        )
-        
+        ) as stream:
+            for text in stream.text_stream:
+                full_content += text
+            final_message = stream.get_final_message()
+
         return LLMResponse(
-            content=response.content[0].text,
-            tokens_in=response.usage.input_tokens,
-            tokens_out=response.usage.output_tokens,
-            model=response.model,
-            stop_reason=response.stop_reason,
+            content=full_content,
+            tokens_in=final_message.usage.input_tokens,
+            tokens_out=final_message.usage.output_tokens,
+            model=final_message.model,
+            stop_reason=final_message.stop_reason,
         )
     
     def generate_stream(
@@ -168,18 +174,19 @@ class OllamaClient(BaseLLMClient):
         self,
         messages: list[dict],
         system_prompt: str,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         """Call local Ollama API and return standardized response."""
         import requests
-        
+
         # Build Ollama-compatible messages (with system as first message)
         ollama_messages = [{"role": "system", "content": system_prompt}]
         ollama_messages.extend(messages)
-        
+
         # Ollama API endpoint
         api_base = self.config.api_base or "http://localhost:11434"
         url = f"{api_base}/api/chat"
-        
+
         try:
             response = requests.post(
                 url,
@@ -189,7 +196,7 @@ class OllamaClient(BaseLLMClient):
                     "stream": False,
                     "options": {
                         "temperature": self.config.temperature,
-                        "num_predict": self.config.max_tokens,
+                        "num_predict": max_tokens or self.config.max_tokens,
                     }
                 },
                 timeout=120,  # Longer timeout for local models
@@ -217,7 +224,7 @@ class OllamaClient(BaseLLMClient):
 
 class OpenAIClient(BaseLLMClient):
     """Client for OpenAI's GPT API."""
-    
+
     def __init__(self, config: ModelConfig):
         super().__init__(config)
         if not self.api_key:
@@ -229,21 +236,22 @@ class OpenAIClient(BaseLLMClient):
             self.client = openai.OpenAI(api_key=self.api_key)
         except ImportError:
             raise ImportError("openai package not installed. Run: pip install openai")
-    
+
     def generate(
         self,
         messages: list[dict],
         system_prompt: str,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         """Call OpenAI API and return standardized response."""
-        
+
         # OpenAI uses system message in the messages array
         openai_messages = [{"role": "system", "content": system_prompt}]
         openai_messages.extend(messages)
-        
+
         response = self.client.chat.completions.create(
             model=self.config.model_name,
-            max_tokens=self.config.max_tokens,
+            max_tokens=max_tokens or self.config.max_tokens,
             temperature=self.config.temperature,
             messages=openai_messages,
         )
@@ -270,6 +278,7 @@ class MockLLMClient(BaseLLMClient):
         self,
         messages: list[dict],
         system_prompt: str,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         # Simple mock: echo back a response based on last message
         last_msg = messages[-1]["content"] if messages else ""
