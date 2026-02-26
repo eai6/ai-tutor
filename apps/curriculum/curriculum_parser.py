@@ -388,6 +388,11 @@ def _extract_pdf_with_vision(doc) -> str:
             pix = page.get_pixmap(dpi=120)
             img_bytes = pix.tobytes("jpeg", jpg_quality=80)
 
+        # Skip pages that are still too large
+        if len(img_bytes) > MAX_IMAGE_BYTES:
+            logger.warning(f"Page image still too large ({len(img_bytes)} bytes) after compression, skipping")
+            continue
+
         page_images.append((base64.b64encode(img_bytes).decode("utf-8"), media_type))
 
     is_anthropic = config.provider == ModelConfig.Provider.ANTHROPIC
