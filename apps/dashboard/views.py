@@ -2096,7 +2096,36 @@ def course_delete(request, course_id):
         course = get_object_or_404(Course, id=course_id)
 
     title = course.title
+
+    # Clean up teaching materials: vector chunks, files, and DB records
+    from apps.dashboard.models import TeachingMaterialUpload
+    materials = TeachingMaterialUpload.objects.filter(course=course)
+    if materials.exists():
+        try:
+            from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+            kb = CurriculumKnowledgeBase(institution_id=course.institution_id)
+            collection = kb._get_collection()
+            if collection:
+                for mat in materials:
+                    try:
+                        collection.delete(where={"upload_id": mat.id})
+                    except Exception as e:
+                        logger.warning(f"Failed to delete vector chunks for material {mat.id}: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up vector DB for course {course_id}: {e}")
+
+        # Delete uploaded files from disk
+        import os
+        for mat in materials:
+            if mat.file_path and os.path.exists(mat.file_path):
+                try:
+                    os.remove(mat.file_path)
+                except OSError as e:
+                    logger.warning(f"Failed to delete file {mat.file_path}: {e}")
+
+        materials.delete()
+
     course.delete()
 
-    messages.success(request, f"Course '{title}' deleted.")
+    messages.success(request, f"Course '{title}' and its teaching materials deleted.")
     return redirect('dashboard:curriculum_list')

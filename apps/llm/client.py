@@ -100,6 +100,25 @@ class AnthropicClient(BaseLLMClient):
     MAX_RETRIES = 4
     RETRY_BACKOFF = [15, 30, 60, 120]  # seconds
 
+    # Known output token limits per model family
+    MODEL_MAX_OUTPUT = {
+        'haiku': 64000,
+        'sonnet': 64000,
+        'opus': 32000,
+    }
+
+    def _clamp_max_tokens(self, max_tokens: int) -> int:
+        """Clamp max_tokens to the model's known output limit."""
+        model = self.config.model_name.lower()
+        for family, limit in self.MODEL_MAX_OUTPUT.items():
+            if family in model:
+                if max_tokens > limit:
+                    logger.warning(
+                        f"Clamping max_tokens from {max_tokens} to {limit} for {self.config.model_name}"
+                    )
+                    return limit
+        return max_tokens
+
     def generate(
         self,
         messages: list[dict],
@@ -108,15 +127,17 @@ class AnthropicClient(BaseLLMClient):
     ) -> LLMResponse:
         """Call Claude API using streaming to avoid 10-minute timeout.
 
-        Retries with exponential backoff on rate limit (429) errors.
+        Retries with exponential backoff on rate limit (429) and
+        overloaded (529) errors.
         """
+        resolved_max_tokens = self._clamp_max_tokens(max_tokens or self.config.max_tokens)
 
         for attempt in range(self.MAX_RETRIES + 1):
             try:
                 full_content = ""
                 with self.client.messages.stream(
                     model=self.config.model_name,
-                    max_tokens=max_tokens or self.config.max_tokens,
+                    max_tokens=resolved_max_tokens,
                     temperature=self.config.temperature,
                     system=system_prompt,
                     messages=messages,
@@ -133,12 +154,12 @@ class AnthropicClient(BaseLLMClient):
                     stop_reason=final_message.stop_reason,
                 )
 
-            except anthropic.RateLimitError as e:
+            except (anthropic.RateLimitError, anthropic.InternalServerError) as e:
                 if attempt >= self.MAX_RETRIES:
                     raise
                 wait = self.RETRY_BACKOFF[attempt]
                 logger.warning(
-                    f"Rate limited (attempt {attempt + 1}/{self.MAX_RETRIES + 1}), "
+                    f"Retryable error (attempt {attempt + 1}/{self.MAX_RETRIES + 1}), "
                     f"retrying in {wait}s: {e}"
                 )
                 time.sleep(wait)
