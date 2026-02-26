@@ -181,8 +181,8 @@ def extract_figures_from_pdf(file_path: str, institution_id: int = None) -> List
     for page_num in range(len(doc)):
         page = doc[page_num]
         if _has_meaningful_figures(page):
-            # Render page at 150 DPI for vision analysis
-            pix = page.get_pixmap(dpi=150)
+            # Render page at 100 DPI for vision analysis (lower = fewer tokens)
+            pix = page.get_pixmap(dpi=100)
             image_bytes = pix.tobytes("png")
             pages_with_figures.append({
                 'page_number': page_num + 1,
@@ -227,7 +227,11 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
 
-    config = ModelConfig.get_for('generation')
+    # Use tutoring model (Sonnet) — cheaper, faster, higher rate limits, and
+    # fully multimodal. Figure description doesn't need Opus-level reasoning.
+    config = ModelConfig.get_for('tutoring')
+    if not config:
+        config = ModelConfig.get_for('generation')
     if not config:
         raise RuntimeError("No active LLM model configured for figure extraction")
 

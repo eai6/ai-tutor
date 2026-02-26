@@ -87,6 +87,9 @@ class CurriculumKnowledgeBase:
     # Minimum number of results from institution KB before we skip global fallback
     FALLBACK_THRESHOLD = 3
 
+    # Shared embedding function — loaded once, reused across all instances
+    _shared_embedding_fn = None
+
     @classmethod
     def get_global_kb(cls):
         """Get the global/platform-level knowledge base (OpenStax, shared resources)."""
@@ -124,21 +127,27 @@ class CurriculumKnowledgeBase:
         """Initialize ChromaDB client and embedding function."""
         try:
             import chromadb
-            
+
             # Use the new persistent client API
             self.chroma_client = chromadb.PersistentClient(
                 path=self.persist_directory
             )
-            
-            # Use sentence-transformers for embeddings
-            from chromadb.utils import embedding_functions
-            self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-                model_name="all-MiniLM-L6-v2"  # Fast, good quality
-            )
-            
+
+            # Reuse shared embedding function (load model only once across all instances)
+            if CurriculumKnowledgeBase._shared_embedding_fn is None:
+                from chromadb.utils import embedding_functions
+                CurriculumKnowledgeBase._shared_embedding_fn = (
+                    embedding_functions.SentenceTransformerEmbeddingFunction(
+                        model_name="all-MiniLM-L6-v2"  # Fast, good quality
+                    )
+                )
+                logger.info("Loaded sentence-transformers embedding model (shared singleton)")
+
+            self.embedding_fn = CurriculumKnowledgeBase._shared_embedding_fn
+
             self._chromadb_available = True
             logger.info(f"ChromaDB initialized at {self.persist_directory}")
-            
+
         except ImportError as e:
             logger.warning(f"ChromaDB not available: {e}. Install with: pip install chromadb sentence-transformers")
             self._chromadb_available = False
@@ -204,9 +213,9 @@ class CurriculumKnowledgeBase:
         # Step 3: Index chunks into vector DB
         result = self._index_chunks(chunks)
 
-        # Step 4: Extract and index figures from PDFs
+        # Step 4: Extract and index figures from PDFs (skip for global KB)
         figures_indexed = 0
-        if file_path.lower().endswith('.pdf'):
+        if file_path.lower().endswith('.pdf') and self.institution_id != self.GLOBAL_INSTITUTION_ID:
             try:
                 from apps.curriculum.curriculum_parser import extract_figures_from_pdf
                 figures = extract_figures_from_pdf(file_path, self.institution_id)
@@ -628,9 +637,9 @@ class CurriculumKnowledgeBase:
         # Index into vector DB
         result = self._index_chunks(chunks)
 
-        # Extract and index figures from PDFs
+        # Extract and index figures from PDFs (skip for global KB — too expensive for bulk reference content)
         figures_indexed = 0
-        if file_path.lower().endswith('.pdf'):
+        if file_path.lower().endswith('.pdf') and self.institution_id != self.GLOBAL_INSTITUTION_ID:
             try:
                 from apps.curriculum.curriculum_parser import extract_figures_from_pdf
                 figures = extract_figures_from_pdf(file_path, self.institution_id)
