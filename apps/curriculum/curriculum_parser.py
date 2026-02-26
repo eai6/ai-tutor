@@ -198,16 +198,27 @@ def extract_figures_from_pdf(file_path: str, institution_id: int = None) -> List
 
     logger.info(f"Found {len(pages_with_figures)} pages with figures in {file_path}")
 
-    # Process in batches of 5 pages
+    # Process one page at a time with delay to respect rate limits (30k tokens/min)
+    import time
     all_figures = []
-    batch_size = 5
-    for i in range(0, len(pages_with_figures), batch_size):
-        batch = pages_with_figures[i:i + batch_size]
-        try:
-            batch_figures = _batch_extract_figures_with_vision(batch)
-            all_figures.extend(batch_figures)
-        except Exception as e:
-            logger.error(f"Figure extraction batch failed (pages {i+1}-{i+len(batch)}): {e}")
+    for i, page_data in enumerate(pages_with_figures):
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                batch_figures = _batch_extract_figures_with_vision([page_data])
+                all_figures.extend(batch_figures)
+                # Pause between pages to stay under rate limits
+                if i < len(pages_with_figures) - 1:
+                    time.sleep(5)
+                break
+            except Exception as e:
+                if '429' in str(e) and attempt < max_retries - 1:
+                    wait = 30 * (attempt + 1)
+                    logger.warning(f"Rate limited on page {page_data['page_number']}, waiting {wait}s...")
+                    time.sleep(wait)
+                else:
+                    logger.error(f"Figure extraction failed for page {page_data['page_number']}: {e}")
+                    break
 
     logger.info(f"Extracted {len(all_figures)} figure descriptions from {file_path}")
     return all_figures
@@ -227,11 +238,7 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
 
-    # Use tutoring model (Sonnet) — cheaper, faster, higher rate limits, and
-    # fully multimodal. Figure description doesn't need Opus-level reasoning.
-    config = ModelConfig.get_for('tutoring')
-    if not config:
-        config = ModelConfig.get_for('generation')
+    config = ModelConfig.get_for('generation')
     if not config:
         raise RuntimeError("No active LLM model configured for figure extraction")
 
