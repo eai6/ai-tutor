@@ -636,11 +636,16 @@ function approveAndGenerate() {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            window.location.reload();
-        } else { 
-            alert('Error: ' + (data.error || 'Unknown')); 
-            btn.disabled = false; 
-            btn.innerHTML = '✓ Approve & Generate Content'; 
+            if (data.status === 'processing' && data.course_id) {
+                // Redirect to course detail — generation runs in background with per-lesson status
+                window.location.href = '/dashboard/curriculum/course/' + data.course_id + '/';
+            } else {
+                window.location.reload();
+            }
+        } else {
+            alert('Error: ' + (data.error || 'Unknown'));
+            btn.disabled = false;
+            btn.innerHTML = '✓ Approve & Generate Content';
         }
     })
     .catch(err => { 

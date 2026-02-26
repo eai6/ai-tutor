@@ -13,10 +13,14 @@ Supports: Anthropic, OpenAI, Ollama (local)
 
 import os
 import json
+import time
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Generator
 import anthropic
+
+logger = logging.getLogger(__name__)
 
 from apps.llm.models import ModelConfig
 
@@ -93,33 +97,51 @@ class AnthropicClient(BaseLLMClient):
             )
         self.client = anthropic.Anthropic(api_key=self.api_key)
 
+    MAX_RETRIES = 4
+    RETRY_BACKOFF = [15, 30, 60, 120]  # seconds
+
     def generate(
         self,
         messages: list[dict],
         system_prompt: str,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """Call Claude API using streaming to avoid 10-minute timeout."""
+        """Call Claude API using streaming to avoid 10-minute timeout.
 
-        full_content = ""
-        with self.client.messages.stream(
-            model=self.config.model_name,
-            max_tokens=max_tokens or self.config.max_tokens,
-            temperature=self.config.temperature,
-            system=system_prompt,
-            messages=messages,
-        ) as stream:
-            for text in stream.text_stream:
-                full_content += text
-            final_message = stream.get_final_message()
+        Retries with exponential backoff on rate limit (429) errors.
+        """
 
-        return LLMResponse(
-            content=full_content,
-            tokens_in=final_message.usage.input_tokens,
-            tokens_out=final_message.usage.output_tokens,
-            model=final_message.model,
-            stop_reason=final_message.stop_reason,
-        )
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                full_content = ""
+                with self.client.messages.stream(
+                    model=self.config.model_name,
+                    max_tokens=max_tokens or self.config.max_tokens,
+                    temperature=self.config.temperature,
+                    system=system_prompt,
+                    messages=messages,
+                ) as stream:
+                    for text in stream.text_stream:
+                        full_content += text
+                    final_message = stream.get_final_message()
+
+                return LLMResponse(
+                    content=full_content,
+                    tokens_in=final_message.usage.input_tokens,
+                    tokens_out=final_message.usage.output_tokens,
+                    model=final_message.model,
+                    stop_reason=final_message.stop_reason,
+                )
+
+            except anthropic.RateLimitError as e:
+                if attempt >= self.MAX_RETRIES:
+                    raise
+                wait = self.RETRY_BACKOFF[attempt]
+                logger.warning(
+                    f"Rate limited (attempt {attempt + 1}/{self.MAX_RETRIES + 1}), "
+                    f"retrying in {wait}s: {e}"
+                )
+                time.sleep(wait)
     
     def generate_stream(
         self,

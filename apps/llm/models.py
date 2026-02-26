@@ -112,6 +112,8 @@ class ModelConfig(models.Model):
     class Purpose(models.TextChoices):
         GENERATION = 'generation', 'Content Generation (Curriculum, Lessons)'
         TUTORING = 'tutoring', 'Student Tutoring'
+        EXIT_TICKETS = 'exit_tickets', 'Exit Ticket Generation'
+        SKILL_EXTRACTION = 'skill_extraction', 'Skill Extraction'
 
     institution = models.ForeignKey(
         Institution,
@@ -127,8 +129,8 @@ class ModelConfig(models.Model):
     )
     model_name = models.CharField(
         max_length=100,
-        default='claude-sonnet-4-20250514',
-        help_text="Model identifier (e.g., 'claude-sonnet-4-20250514', 'gpt-4o')"
+        default='claude-haiku-4-5-20251001',
+        help_text="Model identifier (e.g., 'claude-haiku-4-5-20251001', 'claude-sonnet-4-20250514', 'gpt-4o')"
     )
     
     # Connection settings

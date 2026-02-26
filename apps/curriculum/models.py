@@ -73,6 +73,12 @@ class Lesson(models.Model):
         PASS_QUIZ = 'pass_quiz', 'Pass exit quiz (80%+)'
         COMPLETE_ALL = 'complete_all', 'Complete all steps'
 
+    class ContentStatus(models.TextChoices):
+        EMPTY = 'empty', 'Empty'
+        GENERATING = 'generating', 'Generating'
+        READY = 'ready', 'Ready'
+        FAILED = 'failed', 'Failed'
+
     unit = models.ForeignKey(
         Unit,
         on_delete=models.CASCADE,
@@ -93,7 +99,13 @@ class Lesson(models.Model):
     )
     order_index = models.PositiveIntegerField(default=0)
     is_published = models.BooleanField(default=False)
-    
+    content_status = models.CharField(
+        max_length=20,
+        choices=ContentStatus.choices,
+        default=ContentStatus.EMPTY,
+        help_text="Status of generated content for this lesson"
+    )
+
     # Flexible metadata (key concepts, skills, image suggestions, etc.)
     metadata = models.JSONField(default=dict, blank=True)
     

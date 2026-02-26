@@ -5,7 +5,6 @@ Generates complete tutoring content for lessons including:
 - Structured lesson steps (5E pedagogy model)
 - Media content (images, diagrams, videos)
 - Educational materials (vocabulary, worked examples, key points)
-- Exit tickets for assessment
 - Seychelles-contextualized examples
 
 This module works with the curriculum knowledge base to ensure
@@ -138,22 +137,16 @@ class LessonContentGenerator:
         if not steps_data.get('success'):
             return steps_data
         
-        # Generate exit ticket
-        exit_ticket = self._generate_exit_ticket(lesson, curriculum_context)
-        
         # Save to database if requested
         if save_to_db:
             self._save_steps_to_db(lesson, steps_data['steps'])
-            self._save_exit_ticket(lesson, exit_ticket)
-        
+
         return {
             'success': True,
             'lesson_id': lesson.id,
             'lesson_title': lesson.title,
             'steps_generated': len(steps_data.get('steps', [])),
-            'exit_ticket_questions': len(exit_ticket),
             'steps': steps_data.get('steps', []),
-            'exit_ticket': exit_ticket,
             'lesson_summary': steps_data.get('lesson_summary', {}),
         }
     
@@ -462,136 +455,6 @@ Return ONLY valid JSON, no other text."""
             logger.error(f"Step generation failed: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _generate_exit_ticket(self, lesson, curriculum_context: Dict) -> List[Dict]:
-        """Generate exit ticket questions for assessment, grounded in real exam questions."""
-
-        from apps.curriculum.utils import format_grade_display
-        subject = curriculum_context.get('subject', 'General')
-        grade = format_grade_display(curriculum_context.get('grade_level', ''))
-
-        # Build KB reference material for question generation
-        related_content = curriculum_context.get('related_content', [])
-        kb_context_str = ""
-        if related_content:
-            kb_chunks = "\n".join(f"- {chunk[:300]}" for chunk in related_content if chunk.strip())
-            if kb_chunks:
-                kb_context_str = f"""
-REFERENCE MATERIAL FROM TEXTBOOKS:
-Use these excerpts to ensure questions align with what students are actually studying:
-{kb_chunks}
-"""
-
-        # Get real exam questions for grounding
-        exam_context_str = ""
-        if self.kb_available:
-            try:
-                exam_questions = self.kb.query_for_exit_ticket_generation(
-                    lesson_title=lesson.title,
-                    lesson_objective=lesson.objective or '',
-                    subject=subject,
-                    grade_level=grade,
-                    n_results=5,
-                )
-                formatted = self.kb.format_exam_questions_for_prompt(exam_questions)
-                if formatted:
-                    exam_context_str = "\n" + formatted + "\n"
-            except Exception as e:
-                logger.warning(f"Exam question grounding failed: {e}")
-
-        # Build figure reference for exit tickets
-        figure_descriptions = curriculum_context.get('figure_descriptions', [])
-        figures_str = ""
-        if figure_descriptions:
-            fig_lines = []
-            for fig in figure_descriptions:
-                fig_lines.append(
-                    f"- [{fig.get('figure_type', 'figure').upper()}] "
-                    f"{fig.get('figure_number', 'unlabeled')}: "
-                    f"{fig.get('description', '')}"
-                )
-            figures_str = f"""
-TEXTBOOK FIGURES FOR REFERENCE:
-These figures exist in the textbook. For questions that would benefit from a visual
-(e.g., interpreting a diagram, reading a map/chart), include an optional "figure_prompt"
-field describing the image to generate. The prompt should be specific enough for AI image
-generation.
-
-{chr(10).join(fig_lines)}
-"""
-
-        prompt = f"""Create 3-5 exit ticket questions for this lesson:
-
-LESSON: {lesson.title}
-OBJECTIVE: {lesson.objective or 'Master the lesson concepts'}
-SUBJECT: {subject}
-GRADE: {grade} (Seychelles secondary school)
-{kb_context_str}{exam_context_str}{figures_str}
-Exit tickets should:
-1. Be quick to answer (1-2 minutes each)
-2. Check understanding of KEY concepts
-3. Include a mix of question types
-4. Have clear correct answers
-
-Return JSON array:
-[
-    {{
-        "question": "Question text",
-        "answer_type": "multiple_choice",
-        "correct_answer": "A",
-        "choices": ["A) ...", "B) ...", "C) ...", "D) ..."],
-        "explanation": "Why this is correct",
-        "concept_tested": "What concept this tests",
-        "figure_prompt": null
-    }},
-    {{
-        "question": "True or False: Statement here",
-        "answer_type": "true_false",
-        "correct_answer": "True",
-        "choices": null,
-        "explanation": "Because...",
-        "concept_tested": "Concept",
-        "figure_prompt": null
-    }},
-    {{
-        "question": "Based on the diagram below, which layer is the thickest?",
-        "answer_type": "multiple_choice",
-        "correct_answer": "B",
-        "choices": ["A) Crust", "B) Mantle", "C) Outer core", "D) Inner core"],
-        "explanation": "The mantle is approximately 2,900 km thick",
-        "concept_tested": "Earth's layers",
-        "figure_prompt": "Cross-section diagram of Earth showing labeled layers: thin crust, thick mantle, outer core, and inner core with relative proportions"
-    }}
-]
-
-Note: "figure_prompt" is optional. Only include it for questions that genuinely need a visual.
-Return ONLY the JSON array."""
-
-        try:
-            from apps.llm.prompts import get_prompt_or_default
-            exit_sys_prompt = get_prompt_or_default(
-                self.institution_id, 'exit_ticket_prompt',
-                "Create assessment questions. Return only valid JSON array.",
-                json_required=True,
-            )
-            response = self.llm_client.generate(
-                messages=[{"role": "user", "content": prompt}],
-                system_prompt=exit_sys_prompt
-            )
-            
-            content = response.content.strip()
-            content = self._clean_json(content)
-            
-            # Handle if wrapped in object
-            if content.startswith('{'):
-                obj = json.loads(content)
-                return obj.get('questions', obj.get('exit_ticket', []))
-            
-            return json.loads(content)
-            
-        except Exception as e:
-            logger.error(f"Exit ticket generation failed: {e}")
-            return []
-    
     def _save_steps_to_db(self, lesson, steps: List[Dict]):
         """Save generated steps to database."""
         from apps.curriculum.models import LessonStep
@@ -621,18 +484,6 @@ Return ONLY the JSON array."""
             )
             
             logger.debug(f"{'Created' if created else 'Updated'} step {step.order_index}: {step.step_type}")
-    
-    def _save_exit_ticket(self, lesson, questions: List[Dict]):
-        """Save exit ticket to lesson metadata."""
-        if not questions:
-            return
-        
-        # Store in lesson metadata
-        if not lesson.metadata:
-            lesson.metadata = {}
-        
-        lesson.metadata['exit_ticket'] = questions
-        lesson.save(update_fields=['metadata'])
     
     def _clean_json(self, content: str) -> str:
         """Clean LLM response to extract JSON."""

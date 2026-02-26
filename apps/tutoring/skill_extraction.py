@@ -107,7 +107,7 @@ Return JSON:
     def llm_client(self):
         """Lazy load LLM client."""
         if self._llm_client is None:
-            config = ModelConfig.get_for('generation')
+            config = ModelConfig.get_for('skill_extraction')
             if config:
                 self._llm_client = get_llm_client(config)
         return self._llm_client
