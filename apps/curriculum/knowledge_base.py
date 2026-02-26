@@ -203,15 +203,34 @@ class CurriculumKnowledgeBase:
         
         # Step 3: Index chunks into vector DB
         result = self._index_chunks(chunks)
-        
+
+        # Step 4: Extract and index figures from PDFs
+        figures_indexed = 0
+        if file_path.lower().endswith('.pdf'):
+            try:
+                from apps.curriculum.curriculum_parser import extract_figures_from_pdf
+                figures = extract_figures_from_pdf(file_path, self.institution_id)
+                if figures:
+                    fig_result = self._process_and_index_figures(
+                        figures=figures,
+                        subject=subject,
+                        grade_level=grade_level,
+                        source_file=os.path.basename(file_path),
+                        upload_id=curriculum_upload_id,
+                    )
+                    figures_indexed = fig_result.get('figures_indexed', 0)
+            except Exception as e:
+                logger.warning(f"Figure extraction failed for {file_path}: {e}")
+
         return {
             "success": True,
             "file_path": file_path,
             "text_length": len(text),
             "chunks_created": len(chunks),
             "chunks_indexed": result.get("indexed", 0),
+            "figures_indexed": figures_indexed,
         }
-    
+
     def _chunk_curriculum_text(
         self,
         text: str,
@@ -609,13 +628,196 @@ class CurriculumKnowledgeBase:
         # Index into vector DB
         result = self._index_chunks(chunks)
 
+        # Extract and index figures from PDFs
+        figures_indexed = 0
+        if file_path.lower().endswith('.pdf'):
+            try:
+                from apps.curriculum.curriculum_parser import extract_figures_from_pdf
+                figures = extract_figures_from_pdf(file_path, self.institution_id)
+                if figures:
+                    fig_result = self._process_and_index_figures(
+                        figures=figures,
+                        subject=subject,
+                        grade_level=grade_level,
+                        source_file=source_file,
+                        upload_id=upload_id,
+                    )
+                    figures_indexed = fig_result.get('figures_indexed', 0)
+            except Exception as e:
+                logger.warning(f"Figure extraction failed for {file_path}: {e}")
+
         return {
             "success": True,
             "file_path": file_path,
             "text_length": len(text),
             "chunks_created": len(chunks),
             "chunks_indexed": result.get("indexed", 0),
+            "figures_indexed": figures_indexed,
         }
+
+    # ========================================================================
+    # FIGURE INDEXING & RETRIEVAL
+    # ========================================================================
+
+    def _process_and_index_figures(
+        self,
+        figures: List[Dict],
+        subject: str,
+        grade_level: str,
+        source_file: str,
+        upload_id: int = None,
+    ) -> Dict:
+        """
+        Process extracted figures: save page images as MediaAssets and index
+        figure descriptions as CurriculumChunks.
+
+        Args:
+            figures: List of figure dicts from extract_figures_from_pdf()
+            subject: Subject name
+            grade_level: Grade level
+            source_file: Original filename
+            upload_id: Optional upload record ID
+
+        Returns:
+            Dict with figures_found, figures_indexed, media_assets_created
+        """
+        chunks = []
+        media_assets_created = 0
+
+        for fig in figures:
+            figure_number = fig.get('figure_number', 'unlabeled')
+            figure_type = fig.get('figure_type', 'diagram')
+            description = fig.get('description', '')
+            educational_context = fig.get('educational_context', '')
+            page_number = fig.get('page_number', 0)
+
+            if not description:
+                continue
+
+            # Save page image as MediaAsset
+            figure_image_url = ''
+            page_image_bytes = fig.get('page_image_bytes')
+            if page_image_bytes:
+                try:
+                    from apps.media_library.models import MediaAsset
+                    from django.core.files.base import ContentFile
+                    from apps.accounts.models import Institution
+
+                    institution = Institution.objects.filter(id=self.institution_id).first()
+                    if institution:
+                        asset = MediaAsset.objects.create(
+                            institution=institution,
+                            title=f"{figure_number} - p{page_number} - {source_file}"[:200],
+                            asset_type='image',
+                            caption=description[:500] if description else '',
+                            alt_text=description[:300] if description else '',
+                            tags=f"textbook,figure,{subject},{figure_type}"[:200],
+                        )
+                        filename = f"figure_p{page_number}_{hashlib.md5(description.encode()).hexdigest()[:8]}.png"
+                        asset.file.save(filename, ContentFile(page_image_bytes))
+                        asset.save()
+                        figure_image_url = asset.file.url
+                        media_assets_created += 1
+                except Exception as e:
+                    logger.warning(f"Failed to save figure MediaAsset: {e}")
+
+            # Build chunk content
+            content = f"[FIGURE: {figure_number}] {description}"
+            if educational_context:
+                content += f" Context: {educational_context}"
+
+            chunk_id = hashlib.md5(
+                f"{source_file}:fig:{page_number}:{figure_number}:{description[:80]}".encode()
+            ).hexdigest()[:16]
+
+            chunks.append(CurriculumChunk(
+                id=chunk_id,
+                content=content,
+                metadata={
+                    "subject": subject,
+                    "grade_level": grade_level,
+                    "section": f"Figure on page {page_number}",
+                    "chunk_type": "figure_description",
+                    "source_file": source_file,
+                    "upload_id": upload_id,
+                    "institution_id": self.institution_id,
+                    "figure_type": figure_type,
+                    "figure_page": page_number,
+                    "figure_number": figure_number,
+                    "figure_image_url": figure_image_url,
+                },
+            ))
+
+        # Index figure chunks
+        result = self._index_chunks(chunks) if chunks else {"indexed": 0}
+
+        logger.info(
+            f"Indexed {result.get('indexed', 0)} figure descriptions, "
+            f"created {media_assets_created} media assets from {source_file}"
+        )
+
+        return {
+            "figures_found": len(figures),
+            "figures_indexed": result.get("indexed", 0),
+            "media_assets_created": media_assets_created,
+        }
+
+    def query_for_figure_descriptions(
+        self,
+        topic: str,
+        subject: str,
+        n_results: int = 5,
+    ) -> List[Dict]:
+        """
+        Query ChromaDB for figure descriptions related to a topic.
+
+        Args:
+            topic: Topic to search for (e.g., lesson title)
+            subject: Subject name for filtering
+            n_results: Max results to return
+
+        Returns:
+            List of dicts with description, figure_type, figure_number,
+            image_url, source_file
+        """
+        if not self._chromadb_available:
+            return []
+
+        collection = self._get_collection()
+        if collection is None:
+            return []
+
+        try:
+            results = collection.query(
+                query_texts=[topic],
+                n_results=n_results,
+                where={
+                    "$and": [
+                        {"chunk_type": {"$eq": "figure_description"}},
+                        {"subject": {"$eq": subject}},
+                    ]
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Figure description query failed: {e}")
+            return []
+
+        if not results or not results.get('documents') or not results['documents'][0]:
+            return []
+
+        figures = []
+        for i, doc in enumerate(results['documents'][0]):
+            meta = results['metadatas'][0][i] if results.get('metadatas') else {}
+            figures.append({
+                'description': doc,
+                'figure_type': meta.get('figure_type', ''),
+                'figure_number': meta.get('figure_number', ''),
+                'image_url': meta.get('figure_image_url', ''),
+                'source_file': meta.get('source_file', ''),
+                'figure_page': meta.get('figure_page', 0),
+            })
+
+        return figures
 
     # ========================================================================
     # STEP 3: GENERATE LESSONS (Query for structure)

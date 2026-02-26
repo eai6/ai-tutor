@@ -44,7 +44,7 @@ LESSON INFORMATION:
 
 LESSON CONTENT:
 {lesson_content}
-
+{figure_context}
 PREVIOUSLY DEFINED SKILLS IN THIS COURSE:
 {existing_skills}
 
@@ -107,7 +107,7 @@ Return JSON:
     def llm_client(self):
         """Lazy load LLM client."""
         if self._llm_client is None:
-            config = ModelConfig.objects.filter(is_active=True).first()
+            config = ModelConfig.get_for('generation')
             if config:
                 self._llm_client = get_llm_client(config)
         return self._llm_client
@@ -128,10 +128,35 @@ Return JSON:
         
         # Get lesson content
         lesson_content = self._get_lesson_content(lesson)
-        
+
         # Get existing skills in this course
         existing_skills = self._get_existing_skills(lesson.unit.course)
-        
+
+        # Get figure descriptions from KB
+        figure_context = ""
+        try:
+            from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+            kb = CurriculumKnowledgeBase(institution_id=self.institution_id)
+            course = lesson.unit.course
+            subject = course.title.split()[0] if course else "General"
+            fig_descs = kb.query_for_figure_descriptions(
+                topic=f"{lesson.title} {lesson.objective or ''}",
+                subject=subject,
+                n_results=5,
+            )
+            if fig_descs:
+                fig_lines = [f"- [{f['figure_type'].upper()}] {f['figure_number']}: {f['description']}"
+                             for f in fig_descs if f.get('description')]
+                if fig_lines:
+                    figure_context = (
+                        "\nFIGURES/DIAGRAMS IN THIS TOPIC:\n"
+                        + "\n".join(fig_lines)
+                        + "\n\nIf figures are present, consider extracting skills related to visual interpretation "
+                        "(e.g., reading maps, interpreting graphs, analyzing diagrams).\n"
+                    )
+        except Exception as e:
+            logger.warning(f"Figure context query failed for skill extraction: {e}")
+
         # Build prompt
         prompt = self.EXTRACTION_PROMPT.format(
             course_title=lesson.unit.course.title,
@@ -140,6 +165,7 @@ Return JSON:
             lesson_objective=lesson.objective,
             lesson_content=lesson_content,
             existing_skills=existing_skills,
+            figure_context=figure_context,
         )
         
         # Call LLM

@@ -54,6 +54,7 @@ class ImageGenerationService:
         self,
         prompt: str,
         category: str = "general",
+        textbook_context: str = "",
         **kwargs  # Ignore extra args for compatibility
     ) -> Optional[Dict]:
         """
@@ -62,19 +63,20 @@ class ImageGenerationService:
         Args:
             prompt: Description of the image needed
             category: Type of image (diagram, photo, illustration, etc.)
+            textbook_context: Optional description of the textbook figure style to match
 
         Returns:
             Dict with 'url', 'title', 'caption', 'generated' keys, or None
         """
         if self.imagen_available:
-            generated = self._generate_with_imagen(prompt, category)
+            generated = self._generate_with_imagen(prompt, category, textbook_context)
             if generated:
                 return generated
 
         logger.warning(f"Imagen unavailable for: {prompt[:50]}...")
         return None
 
-    def _generate_with_imagen(self, prompt: str, category: str) -> Optional[Dict]:
+    def _generate_with_imagen(self, prompt: str, category: str, textbook_context: str = "") -> Optional[Dict]:
         """Generate image with Gemini Imagen API."""
         try:
             from google import genai
@@ -82,7 +84,7 @@ class ImageGenerationService:
 
             client = genai.Client(api_key=os.environ['GOOGLE_API_KEY'])
 
-            enhanced_prompt = self._enhance_prompt(prompt, category)
+            enhanced_prompt = self._enhance_prompt(prompt, category, textbook_context)
 
             logger.info(f"Generating Imagen image: {enhanced_prompt[:100]}...")
 
@@ -117,7 +119,7 @@ class ImageGenerationService:
             logger.error(f"Imagen generation failed: {e}")
             return None
 
-    def _enhance_prompt(self, prompt: str, category: str) -> str:
+    def _enhance_prompt(self, prompt: str, category: str, textbook_context: str = "") -> str:
         """Enhance prompt for better Imagen results."""
         from apps.llm.prompts import get_prompt_or_default
         institution_id = self.institution.id if self.institution else None
@@ -135,7 +137,12 @@ class ImageGenerationService:
         }
 
         style = style_map.get(category, "Clear educational visual. ")
-        return context + style + prompt
+
+        textbook_style = ""
+        if textbook_context:
+            textbook_style = f"Match this textbook figure style: {textbook_context}. "
+
+        return context + style + textbook_style + prompt
 
     def _save_generated_image_bytes(
         self, image_bytes: bytes, prompt: str

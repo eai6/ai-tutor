@@ -97,10 +97,10 @@ class LessonContentGenerator:
         from apps.llm.models import ModelConfig
         from apps.llm.client import get_llm_client
         
-        config = ModelConfig.objects.filter(is_active=True).first()
+        config = ModelConfig.get_for('generation')
         if not config:
             raise ValueError("No active LLM model configured")
-        
+
         self.llm_client = get_llm_client(config)
     
     def _init_knowledge_base(self):
@@ -175,10 +175,30 @@ class LessonContentGenerator:
                 grade_level=course.grade_level if course else "S1"
             )
             
+            # Query for figure descriptions
+            figure_descriptions = []
+            try:
+                figures = self.kb.query_for_figure_descriptions(
+                    topic=f"{lesson.title} {lesson.objective or ''}",
+                    subject=subject,
+                    n_results=5,
+                )
+                for fig in figures:
+                    figure_descriptions.append({
+                        'description': fig.get('description', ''),
+                        'figure_type': fig.get('figure_type', ''),
+                        'figure_number': fig.get('figure_number', ''),
+                        'image_url': fig.get('image_url', ''),
+                        'source_file': fig.get('source_file', ''),
+                    })
+            except Exception as e:
+                logger.warning(f"Failed to query figure descriptions: {e}")
+
             return {
                 'teaching_strategies': context.teaching_strategies or self._default_strategies(subject),
                 'objectives': context.objectives,
                 'related_content': [c.get('content', '')[:500] for c in context.chunks[:6]],
+                'figure_descriptions': figure_descriptions,
                 'subject': subject,
                 'grade_level': course.grade_level if course else "S1",
             }
@@ -251,6 +271,25 @@ in what students are actually studying. Align terminology, examples, and depth o
 {kb_chunks}
 """
 
+        # Build figure descriptions section
+        figure_descriptions = curriculum_context.get('figure_descriptions', [])
+        figures_str = ""
+        if figure_descriptions:
+            fig_lines = []
+            for fig in figure_descriptions:
+                fig_lines.append(
+                    f"- [{fig.get('figure_type', 'figure').upper()}] "
+                    f"{fig.get('figure_number', 'unlabeled')}: "
+                    f"{fig.get('description', '')}"
+                )
+            figures_str = f"""
+TEXTBOOK FIGURES AVAILABLE:
+The following figures exist in the uploaded textbook/teaching materials. Where relevant,
+base your media.images[].description on these figures so generated images match the textbook style.
+
+{chr(10).join(fig_lines)}
+"""
+
         prompt = f"""Create a complete tutoring session for this lesson.
 
 LESSON: {lesson.title}
@@ -261,7 +300,7 @@ GRADE: {grade} (Seychelles secondary school)
 
 TEACHING STRATEGIES TO USE:
 {strategies_str}
-{kb_context_str}
+{kb_context_str}{figures_str}
 
 Create 8-12 steps following the 5E model. Each step needs complete content.
 
@@ -459,13 +498,34 @@ Use these excerpts to ensure questions align with what students are actually stu
             except Exception as e:
                 logger.warning(f"Exam question grounding failed: {e}")
 
+        # Build figure reference for exit tickets
+        figure_descriptions = curriculum_context.get('figure_descriptions', [])
+        figures_str = ""
+        if figure_descriptions:
+            fig_lines = []
+            for fig in figure_descriptions:
+                fig_lines.append(
+                    f"- [{fig.get('figure_type', 'figure').upper()}] "
+                    f"{fig.get('figure_number', 'unlabeled')}: "
+                    f"{fig.get('description', '')}"
+                )
+            figures_str = f"""
+TEXTBOOK FIGURES FOR REFERENCE:
+These figures exist in the textbook. For questions that would benefit from a visual
+(e.g., interpreting a diagram, reading a map/chart), include an optional "figure_prompt"
+field describing the image to generate. The prompt should be specific enough for AI image
+generation.
+
+{chr(10).join(fig_lines)}
+"""
+
         prompt = f"""Create 3-5 exit ticket questions for this lesson:
 
 LESSON: {lesson.title}
 OBJECTIVE: {lesson.objective or 'Master the lesson concepts'}
 SUBJECT: {subject}
 GRADE: {grade} (Seychelles secondary school)
-{kb_context_str}{exam_context_str}
+{kb_context_str}{exam_context_str}{figures_str}
 Exit tickets should:
 1. Be quick to answer (1-2 minutes each)
 2. Check understanding of KEY concepts
@@ -480,7 +540,8 @@ Return JSON array:
         "correct_answer": "A",
         "choices": ["A) ...", "B) ...", "C) ...", "D) ..."],
         "explanation": "Why this is correct",
-        "concept_tested": "What concept this tests"
+        "concept_tested": "What concept this tests",
+        "figure_prompt": null
     }},
     {{
         "question": "True or False: Statement here",
@@ -488,18 +549,21 @@ Return JSON array:
         "correct_answer": "True",
         "choices": null,
         "explanation": "Because...",
-        "concept_tested": "Concept"
+        "concept_tested": "Concept",
+        "figure_prompt": null
     }},
     {{
-        "question": "Calculate: problem here",
-        "answer_type": "short_numeric",
-        "correct_answer": "42",
-        "choices": null,
-        "explanation": "Step-by-step solution",
-        "concept_tested": "Calculation skill"
+        "question": "Based on the diagram below, which layer is the thickest?",
+        "answer_type": "multiple_choice",
+        "correct_answer": "B",
+        "choices": ["A) Crust", "B) Mantle", "C) Outer core", "D) Inner core"],
+        "explanation": "The mantle is approximately 2,900 km thick",
+        "concept_tested": "Earth's layers",
+        "figure_prompt": "Cross-section diagram of Earth showing labeled layers: thin crust, thick mantle, outer core, and inner core with relative proportions"
     }}
 ]
 
+Note: "figure_prompt" is optional. Only include it for questions that genuinely need a visual.
 Return ONLY the JSON array."""
 
         try:

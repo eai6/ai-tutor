@@ -126,6 +126,201 @@ def extract_from_pdf(file_path: str) -> str:
         return ""
 
 
+# ============================================================================
+# FIGURE EXTRACTION
+# ============================================================================
+
+def _has_meaningful_figures(page) -> bool:
+    """
+    Check if a PDF page contains meaningful figures (not tiny icons).
+
+    Uses PyMuPDF to detect:
+    - Embedded raster images larger than 100x100 pixels
+    - Vector drawings with >10 operations (suggests diagram, not just borders)
+    """
+    # Check for embedded raster images (filter tiny icons < 100x100)
+    for img_info in page.get_images(full=True):
+        width, height = img_info[2], img_info[3]
+        if width > 100 and height > 100:
+            return True
+    # Check for vector drawings (>10 ops suggests a diagram, not just borders)
+    if len(page.get_drawings()) > 10:
+        return True
+    return False
+
+
+def extract_figures_from_pdf(file_path: str, institution_id: int = None) -> List[Dict]:
+    """
+    Extract figure descriptions from a PDF using LLM vision.
+
+    Only pages with meaningful figures (detected via PyMuPDF) are sent to the
+    LLM for description, controlling cost.
+
+    Args:
+        file_path: Path to the PDF file
+        institution_id: Optional institution ID for LLM config
+
+    Returns:
+        List of dicts with keys: page_number, figure_number, figure_type,
+        description, educational_context, page_image_bytes, page_image_media_type
+    """
+    try:
+        import fitz
+    except ImportError:
+        logger.warning("PyMuPDF (fitz) not installed, cannot extract figures")
+        return []
+
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        logger.error(f"Could not open PDF for figure extraction: {e}")
+        return []
+
+    # Identify pages with meaningful figures
+    pages_with_figures = []
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        if _has_meaningful_figures(page):
+            # Render page at 150 DPI for vision analysis
+            pix = page.get_pixmap(dpi=150)
+            image_bytes = pix.tobytes("png")
+            pages_with_figures.append({
+                'page_number': page_num + 1,
+                'image_bytes': image_bytes,
+                'media_type': 'image/png',
+            })
+
+    doc.close()
+
+    if not pages_with_figures:
+        logger.info(f"No meaningful figures found in {file_path}")
+        return []
+
+    logger.info(f"Found {len(pages_with_figures)} pages with figures in {file_path}")
+
+    # Process in batches of 5 pages
+    all_figures = []
+    batch_size = 5
+    for i in range(0, len(pages_with_figures), batch_size):
+        batch = pages_with_figures[i:i + batch_size]
+        try:
+            batch_figures = _batch_extract_figures_with_vision(batch)
+            all_figures.extend(batch_figures)
+        except Exception as e:
+            logger.error(f"Figure extraction batch failed (pages {i+1}-{i+len(batch)}): {e}")
+
+    logger.info(f"Extracted {len(all_figures)} figure descriptions from {file_path}")
+    return all_figures
+
+
+def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
+    """
+    Use LLM vision to extract figure descriptions from rendered page images.
+
+    Args:
+        pages_data: List of dicts with page_number, image_bytes, media_type
+
+    Returns:
+        List of figure dicts with descriptions and metadata
+    """
+    import base64
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+
+    config = ModelConfig.get_for('generation')
+    if not config:
+        raise RuntimeError("No active LLM model configured for figure extraction")
+
+    client = get_llm_client(config)
+
+    # Build multimodal message with all page images
+    content_parts = [
+        {
+            "type": "text",
+            "text": (
+                "Analyze the following PDF page images and extract ALL figures, diagrams, "
+                "charts, maps, illustrations, and visual elements (NOT decorative borders or "
+                "page numbers). For each figure found, provide a JSON description.\n\n"
+                "Return a JSON array with one object per figure:\n"
+                "[\n"
+                '  {\n'
+                '    "page_number": 5,\n'
+                '    "figure_number": "Figure 3.2",\n'
+                '    "figure_type": "diagram",\n'
+                '    "description": "Detailed 2-4 sentence description specific enough to recreate the figure.",\n'
+                '    "educational_context": "What concept this figure teaches or illustrates."\n'
+                '  }\n'
+                "]\n\n"
+                "figure_type must be one of: diagram, chart, graph, map, illustration, photo, table\n"
+                "If a figure has no label, use \"unlabeled\" for figure_number.\n"
+                "If no figures are found on a page, omit that page from results.\n"
+                "Return ONLY the JSON array, no other text."
+            ),
+        }
+    ]
+
+    for page_data in pages_data:
+        b64_image = base64.b64encode(page_data['image_bytes']).decode('utf-8')
+        content_parts.append({
+            "type": "text",
+            "text": f"\n--- Page {page_data['page_number']} ---",
+        })
+        content_parts.append({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": page_data['media_type'],
+                "data": b64_image,
+            },
+        })
+
+    messages = [{"role": "user", "content": content_parts}]
+
+    response = client.generate(
+        messages=messages,
+        system_prompt="You are an expert at analyzing educational documents. Extract figure descriptions precisely. Return only valid JSON.",
+        max_tokens=4096,
+    )
+
+    # Parse response
+    response_text = response.content.strip()
+    if '```' in response_text:
+        if '```json' in response_text:
+            response_text = response_text.split('```json')[1].split('```')[0]
+        else:
+            parts = response_text.split('```')
+            if len(parts) >= 2:
+                response_text = parts[1]
+        response_text = response_text.strip()
+
+    try:
+        figures = json.loads(response_text)
+    except json.JSONDecodeError:
+        # Try to find JSON array in response
+        match = re.search(r'\[[\s\S]*\]', response_text)
+        if match:
+            figures = json.loads(match.group())
+        else:
+            logger.warning(f"Could not parse figure extraction response: {response_text[:200]}")
+            return []
+
+    if not isinstance(figures, list):
+        return []
+
+    # Attach page image bytes to each figure for later storage
+    page_data_by_num = {p['page_number']: p for p in pages_data}
+    results = []
+    for fig in figures:
+        page_num = fig.get('page_number')
+        page_info = page_data_by_num.get(page_num)
+        if page_info:
+            fig['page_image_bytes'] = page_info['image_bytes']
+            fig['page_image_media_type'] = page_info['media_type']
+        results.append(fig)
+
+    return results
+
+
 def _extract_pdf_with_vision(doc) -> str:
     """
     Render PDF pages to images and use multimodal LLM to extract content.
@@ -137,7 +332,7 @@ def _extract_pdf_with_vision(doc) -> str:
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
 
-    config = ModelConfig.objects.filter(is_active=True).first()
+    config = ModelConfig.get_for('generation')
     if not config:
         raise RuntimeError("No active LLM model configured")
 
@@ -180,41 +375,34 @@ def _extract_pdf_with_vision(doc) -> str:
     all_text_parts = []
     batch_size = 10
 
-    # Temporarily override max_tokens for extraction
-    original_max_tokens = config.max_tokens
-    config.max_tokens = 4096
+    for i in range(0, len(page_images), batch_size):
+        batch = page_images[i:i + batch_size]
 
-    try:
-        for i in range(0, len(page_images), batch_size):
-            batch = page_images[i:i + batch_size]
+        # Build multimodal content blocks
+        content_blocks = []
+        for img_b64, media_type in batch:
+            if is_anthropic:
+                content_blocks.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": img_b64,
+                    },
+                })
+            else:
+                content_blocks.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{media_type};base64,{img_b64}",
+                    },
+                })
 
-            # Build multimodal content blocks
-            content_blocks = []
-            for img_b64, media_type in batch:
-                if is_anthropic:
-                    content_blocks.append({
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": img_b64,
-                        },
-                    })
-                else:
-                    content_blocks.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{media_type};base64,{img_b64}",
-                        },
-                    })
+        content_blocks.append({"type": "text", "text": extraction_prompt})
 
-            content_blocks.append({"type": "text", "text": extraction_prompt})
-
-            messages = [{"role": "user", "content": content_blocks}]
-            response = client.generate(messages=messages, system_prompt=system_prompt)
-            all_text_parts.append(response.content)
-    finally:
-        config.max_tokens = original_max_tokens
+        messages = [{"role": "user", "content": content_blocks}]
+        response = client.generate(messages=messages, system_prompt=system_prompt, max_tokens=4096)
+        all_text_parts.append(response.content)
 
     return "\n\n".join(all_text_parts)
 
@@ -225,7 +413,7 @@ def extract_from_image(file_path: str) -> str:
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
 
-    config = ModelConfig.objects.filter(is_active=True).first()
+    config = ModelConfig.get_for('generation')
     if not config:
         logger.warning("No active LLM configured, cannot extract from image")
         return ""
@@ -285,8 +473,6 @@ def extract_from_image(file_path: str) -> str:
 
     client = get_llm_client(config)
 
-    original_max_tokens = config.max_tokens
-    config.max_tokens = 4096
     try:
         response = client.generate(
             messages=messages,
@@ -295,13 +481,12 @@ def extract_from_image(file_path: str) -> str:
                 "Extract ALL text, labels, titles, and describe visual elements. "
                 "Return only the extracted content, no commentary."
             ),
+            max_tokens=4096,
         )
         return response.content
     except Exception as e:
         logger.warning(f"LLM image extraction failed: {e}")
         return ""
-    finally:
-        config.max_tokens = original_max_tokens
 
 
 # ============================================================================
@@ -555,7 +740,7 @@ def parse_curriculum_with_llm(text: str, subject: str, grade_level: str, institu
     from apps.llm.client import get_llm_client
 
     # Get LLM client
-    model_config = ModelConfig.objects.filter(is_active=True).first()
+    model_config = ModelConfig.get_for('generation')
     if not model_config:
         logger.warning("No LLM configured, falling back to regex parser")
         return parse_generic_curriculum(text, subject, grade_level)

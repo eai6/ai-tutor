@@ -309,7 +309,7 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
             upload.add_log(message)
     
     # Get LLM config
-    config = ModelConfig.objects.filter(is_active=True).first()
+    config = ModelConfig.get_for('generation')
     if not config:
         logger.error("No active LLM model configured for exit ticket generation")
         return {'generated': 0, 'failed': 0, 'skipped': 0}
@@ -440,13 +440,14 @@ Return ONLY the JSON array, no other text."""
             )
 
             # Create questions (up to 40)
+            questions_with_figures = []
             for i, q in enumerate(questions_data[:40]):
                 # Map difficulty string
                 diff = q.get('difficulty', 'medium').lower()
                 if diff not in ('easy', 'medium', 'hard'):
                     diff = 'medium'
 
-                ExitTicketQuestion.objects.create(
+                question_obj = ExitTicketQuestion.objects.create(
                     exit_ticket=exit_ticket,
                     question_text=q.get('question', ''),
                     option_a=q.get('option_a', ''),
@@ -460,8 +461,67 @@ Return ONLY the JSON array, no other text."""
                     order_index=i,
                 )
 
+                # Track questions that need figure generation
+                figure_prompt = q.get('figure_prompt')
+                if figure_prompt:
+                    questions_with_figures.append((question_obj, figure_prompt))
+
+            # Generate figures for questions that need them
+            figures_generated = 0
+            for question_obj, figure_prompt in questions_with_figures:
+                try:
+                    from apps.tutoring.image_service import ImageGenerationService
+                    from django.core.files.base import ContentFile
+
+                    service = ImageGenerationService(
+                        lesson=lesson,
+                        institution=lesson.unit.course.institution,
+                    )
+
+                    # Build textbook context from KB figure descriptions
+                    textbook_ctx = ""
+                    try:
+                        from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+                        kb = CurriculumKnowledgeBase(institution_id=lesson.unit.course.institution_id)
+                        fig_descs = kb.query_for_figure_descriptions(
+                            topic=lesson.title,
+                            subject=lesson.unit.course.title,
+                            n_results=2,
+                        )
+                        if fig_descs:
+                            textbook_ctx = fig_descs[0].get('description', '')
+                    except Exception:
+                        pass
+
+                    category = _detect_figure_category(figure_prompt)
+                    result = service.get_or_generate_image(
+                        prompt=figure_prompt,
+                        category=category,
+                        textbook_context=textbook_ctx,
+                    )
+
+                    if result and result.get('url'):
+                        # Download and save to question's image field
+                        import requests
+                        from django.conf import settings
+                        import os
+
+                        image_url = result['url']
+                        # If it's a local media URL, read from filesystem
+                        if image_url.startswith('/media/'):
+                            image_path = os.path.join(settings.MEDIA_ROOT, image_url.lstrip('/media/'))
+                            if os.path.exists(image_path):
+                                with open(image_path, 'rb') as f:
+                                    image_bytes = f.read()
+                                filename = os.path.basename(image_path)
+                                question_obj.image.save(filename, ContentFile(image_bytes), save=True)
+                                figures_generated += 1
+                except Exception as e:
+                    logger.warning(f"Figure generation failed for exit ticket question: {e}")
+
             generated += 1
-            log(f"   ✓ {lesson.title}: {min(num_questions, 40)} questions ({len(set(q.get('concept_tag','') for q in questions_data))} concepts)")
+            fig_msg = f", {figures_generated} figures" if figures_generated else ""
+            log(f"   ✓ {lesson.title}: {min(num_questions, 40)} questions ({len(set(q.get('concept_tag','') for q in questions_data))} concepts){fig_msg}")
             
         except Exception as e:
             failed += 1
@@ -634,3 +694,16 @@ def generate_media_async(course_id: int, upload_id: int = None, force_regenerate
             upload.error_message = str(e)
             upload.save()
         raise
+
+
+def _detect_figure_category(prompt: str) -> str:
+    """Detect the image category from a figure generation prompt."""
+    prompt_lower = prompt.lower()
+    # Check photo first (before chart) since "photograph" contains "graph"
+    if any(kw in prompt_lower for kw in ['photo', 'photograph', 'real image']):
+        return 'photo'
+    if any(kw in prompt_lower for kw in ['graph', 'chart', 'bar chart', 'pie', 'histogram', 'line graph']):
+        return 'chart'
+    if any(kw in prompt_lower for kw in ['map', 'geographic', 'contour', 'relief']):
+        return 'map'
+    return 'diagram'

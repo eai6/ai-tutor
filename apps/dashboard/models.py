@@ -143,6 +143,7 @@ class TeachingMaterialUpload(models.Model):
     error_message = models.TextField(blank=True)
     extracted_text_length = models.IntegerField(default=0)
     chunks_created = models.IntegerField(default=0)
+    figures_extracted = models.IntegerField(default=0)
     processing_log = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
