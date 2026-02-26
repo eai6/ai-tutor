@@ -17,41 +17,43 @@ from apps.llm.client import get_llm_client
 from apps.llm.models import ModelConfig
 
 
-EXIT_TICKET_PROMPT = """Generate exactly 10 multiple choice questions for a summative assessment (exit ticket) on this lesson.
+EXIT_TICKET_PROMPT = """Generate exactly 35 multiple choice questions for a summative assessment (exit ticket) question bank on this lesson.
 
 LESSON: {lesson_title}
 OBJECTIVE: {lesson_objective}
 SUBJECT: {subject}
 {exam_context}
 REQUIREMENTS:
-1. Generate EXACTLY 10 questions
-2. Questions should progress from easy (recall) to hard (analysis)
-3. Each question must have exactly 4 options (A, B, C, D)
-4. Include one correct answer per question
+1. Generate EXACTLY 35 questions
+2. Each question must have exactly 4 options (A, B, C, D)
+3. Include one correct answer per question
+4. Include a short concept_tag for each question (the specific concept it tests)
 5. Questions should directly assess the lesson objective
 6. Use context relevant to Seychelles secondary school students
+7. Vary question phrasing — avoid repetitive stems
 
 OUTPUT FORMAT (JSON array):
 [
     {{
         "question": "What is...?",
         "option_a": "First option",
-        "option_b": "Second option", 
+        "option_b": "Second option",
         "option_c": "Third option",
         "option_d": "Fourth option",
         "correct": "B",
         "explanation": "B is correct because...",
-        "difficulty": "easy"
+        "difficulty": "easy",
+        "concept_tag": "relief rainfall"
     }},
     ...
 ]
 
-DIFFICULTY DISTRIBUTION:
-- Questions 1-3: easy (recall facts)
-- Questions 4-7: medium (apply concepts)
-- Questions 8-10: hard (analyze/evaluate)
+DIFFICULTY DISTRIBUTION (out of 35):
+- Questions 1-12: easy (recall facts)
+- Questions 13-25: medium (apply concepts)
+- Questions 26-35: hard (analyze/evaluate)
 
-Generate the 10 questions now:"""
+Generate the 35 questions now:"""
 
 
 class Command(BaseCommand):
@@ -140,10 +142,10 @@ class Command(BaseCommand):
                         lesson=lesson,
                         passing_score=8,
                         time_limit_minutes=15,
-                        instructions=f"Answer all 10 questions about {lesson.title}. You need 8 correct to pass."
+                        instructions=f"Answer 10 questions about {lesson.title}. You need 8 correct to pass."
                     )
-                    
-                    # Create questions
+
+                    # Create questions (up to 35 in the bank, 10 selected per session)
                     for i, q in enumerate(questions):
                         ExitTicketQuestion.objects.create(
                             exit_ticket=exit_ticket,
@@ -154,6 +156,7 @@ class Command(BaseCommand):
                             option_d=q['option_d'],
                             correct_answer=q['correct'],
                             explanation=q.get('explanation', ''),
+                            concept_tag=q.get('concept_tag', ''),
                             difficulty=q.get('difficulty', 'medium'),
                             order_index=i,
                         )
@@ -203,25 +206,16 @@ class Command(BaseCommand):
             json_required=True,
         )
         messages = [{"role": "user", "content": prompt}]
-        response = llm_client.generate(messages, system_prompt=exit_sys_prompt)
-        
-        # Parse JSON from response
-        content = response.content
-        
-        # Try to extract JSON array
-        try:
-            # Find JSON array in response
-            start = content.find('[')
-            end = content.rfind(']') + 1
-            if start != -1 and end > start:
-                json_str = content[start:end]
-                questions = json.loads(json_str)
-                
-                if len(questions) < 10:
-                    raise ValueError(f"Only {len(questions)} questions generated, need 10")
-                
-                return questions[:10]  # Take first 10
-            else:
-                raise ValueError("No JSON array found in response")
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse questions: {e}")
+        response = llm_client.generate(messages, system_prompt=exit_sys_prompt, max_tokens=16000)
+
+        # Parse JSON from response (with automatic truncation repair)
+        from apps.llm.json_utils import parse_llm_json
+        questions = parse_llm_json(response.content, expect_array=True)
+
+        if not questions or not isinstance(questions, list):
+            raise ValueError(f"Failed to parse questions from LLM response ({len(response.content)} chars, stop={response.stop_reason})")
+
+        if len(questions) < 10:
+            raise ValueError(f"Only {len(questions)} questions generated, need at least 10")
+
+        return questions[:35]

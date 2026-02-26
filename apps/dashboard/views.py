@@ -749,7 +749,15 @@ def curriculum_approve(request, upload_id):
         
         upload.created_course = course
         upload.add_log(f"   {'Created' if created else 'Updated'} course: {course.title}")
-        
+
+        # Link any teaching materials uploaded with this curriculum to the new course
+        from apps.dashboard.models import TeachingMaterialUpload
+        linked_count = TeachingMaterialUpload.objects.filter(
+            curriculum_upload=upload, course__isnull=True
+        ).update(course=course)
+        if linked_count:
+            upload.add_log(f"   📎 Linked {linked_count} teaching material(s) to course")
+
         units_created = 0
         lessons_created = 0
         
@@ -1470,31 +1478,40 @@ def generate_exit_ticket_for_lesson(lesson, institution) -> int:
         logger.error("No active LLM model configured for exit ticket generation")
         return 0
     
-    # Build prompt for exit questions
-    prompt = f"""Generate 10 multiple choice exit ticket questions for this lesson.
+    # Build prompt for exit questions (35 for question bank, 10 selected per session)
+    prompt = f"""Generate exactly 35 multiple choice exit ticket questions for this lesson.
 
 Lesson: {lesson.title}
 Objective: {lesson.objective}
 Subject: {lesson.unit.course.title}
 
-Generate questions that test understanding of the key concepts. Each question should have:
-- A clear question
-- 4 answer choices (A, B, C, D)
-- The correct answer letter (just the letter: A, B, C, or D)
-- Brief explanation
+REQUIREMENTS:
+1. Generate EXACTLY 35 questions
+2. Each question must have exactly 4 options (A, B, C, D)
+3. Include one correct answer per question
+4. Include a short concept_tag for each question (the specific concept it tests)
+5. Questions should directly assess the lesson objective
+6. Vary question phrasing — avoid repetitive stems
 
 Return as JSON array:
 [
   {{
     "question": "What is...",
     "option_a": "First option",
-    "option_b": "Second option", 
+    "option_b": "Second option",
     "option_c": "Third option",
     "option_d": "Fourth option",
     "correct_answer": "A",
-    "explanation": "Brief explanation of why A is correct"
+    "explanation": "Brief explanation of why A is correct",
+    "difficulty": "easy",
+    "concept_tag": "key concept tested"
   }}
 ]
+
+DIFFICULTY DISTRIBUTION (out of 35):
+- Questions 1-12: easy (recall facts)
+- Questions 13-25: medium (apply concepts)
+- Questions 26-35: hard (analyze/evaluate)
 
 Return ONLY the JSON array, no other text."""
 
@@ -1504,29 +1521,18 @@ Return ONLY the JSON array, no other text."""
         system_prompt = "You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text."
         messages = [{"role": "user", "content": prompt}]
         
-        response = client.generate(messages, system_prompt)
+        response = client.generate(messages, system_prompt, max_tokens=16000)
         response_text = response.content.strip()
-        
-        logger.info(f"Exit ticket raw response length: {len(response_text)}")
-        
-        # Handle markdown code blocks
-        if '```json' in response_text:
-            response_text = response_text.split('```json')[1].split('```')[0]
-        elif '```' in response_text:
-            parts = response_text.split('```')
-            if len(parts) >= 2:
-                response_text = parts[1]
-        
-        response_text = response_text.strip()
-        
-        logger.info(f"Exit ticket cleaned response: {response_text[:200]}...")
-        
-        questions_data = json.loads(response_text)
-        
+
+        logger.info(f"Exit ticket response: {len(response_text)} chars, stop={response.stop_reason}")
+
+        from apps.llm.json_utils import parse_llm_json
+        questions_data = parse_llm_json(response_text, expect_array=True)
+
         if not questions_data or not isinstance(questions_data, list):
-            logger.warning(f"Invalid exit ticket response for {lesson.title}: not a list")
+            logger.warning(f"Failed to parse exit ticket JSON for {lesson.title}")
             return 0
-        
+
         logger.info(f"Parsed {len(questions_data)} questions for {lesson.title}")
         
         # Delete existing exit ticket and questions
@@ -1537,12 +1543,12 @@ Return ONLY the JSON array, no other text."""
             lesson=lesson,
             passing_score=8,
             time_limit_minutes=15,
-            instructions="Answer all 10 questions. You need 8 correct to pass."
+            instructions="Answer 10 questions. You need 8 correct to pass."
         )
-        
-        # Create questions
+
+        # Create questions (up to 35 in the bank, 10 selected per session)
         questions_created = 0
-        for i, q in enumerate(questions_data[:10]):  # Limit to 10
+        for i, q in enumerate(questions_data[:35]):
             try:
                 ExitTicketQuestion.objects.create(
                     exit_ticket=exit_ticket,
@@ -1553,6 +1559,8 @@ Return ONLY the JSON array, no other text."""
                     option_d=q.get('option_d', ''),
                     correct_answer=q.get('correct_answer', 'A')[:1].upper(),
                     explanation=q.get('explanation', ''),
+                    concept_tag=q.get('concept_tag', ''),
+                    difficulty=q.get('difficulty', 'medium'),
                     order_index=i
                 )
                 questions_created += 1
@@ -1571,6 +1579,38 @@ Return ONLY the JSON array, no other text."""
         import traceback
         logger.error(traceback.format_exc())
         return 0
+
+
+@teacher_required
+@require_POST
+def exit_question_edit(request, question_id):
+    """Edit or delete a single exit ticket question via AJAX."""
+    from apps.tutoring.models import ExitTicketQuestion
+    import json
+
+    institution = request.staff_ctx['institution']
+    lookup = {'id': question_id}
+    if institution is not None:
+        lookup['exit_ticket__lesson__unit__course__institution'] = institution
+    question = get_object_or_404(ExitTicketQuestion, **lookup)
+
+    data = json.loads(request.body) if request.body else {}
+
+    # Delete action
+    if data.get('action') == 'delete':
+        question.delete()
+        return JsonResponse({'success': True, 'deleted': True})
+
+    # Update fields
+    for field in ['question_text', 'option_a', 'option_b', 'option_c', 'option_d',
+                  'correct_answer', 'explanation', 'difficulty', 'concept_tag']:
+        if field in data:
+            value = data[field]
+            if field == 'correct_answer':
+                value = value[:1].upper()
+            setattr(question, field, value)
+    question.save()
+    return JsonResponse({'success': True})
 
 
 @teacher_required

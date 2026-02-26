@@ -35,6 +35,11 @@ class ImageGenerationService:
 
     def _check_imagen_available(self) -> bool:
         """Check if Gemini Imagen API is available."""
+        # Disabled until image quality is acceptable
+        # Set ENABLE_IMAGEN=1 in .env to re-enable
+        if not os.environ.get('ENABLE_IMAGEN'):
+            return False
+
         api_key = os.environ.get('GOOGLE_API_KEY')
         if not api_key:
             logger.info("Imagen not available: No GOOGLE_API_KEY")
@@ -89,11 +94,11 @@ class ImageGenerationService:
             logger.info(f"Generating Imagen image: {enhanced_prompt[:100]}...")
 
             response = client.models.generate_images(
-                model='imagen-3.0-generate-002',
+                model='imagen-4.0-generate-001',
                 prompt=enhanced_prompt,
                 config=types.GenerateImagesConfig(
                     number_of_images=1,
-                    safety_filter_level="BLOCK_MEDIUM_AND_ABOVE",
+                    safety_filter_level="BLOCK_LOW_AND_ABOVE",
                     person_generation="DONT_ALLOW",
                 ),
             )
@@ -120,29 +125,69 @@ class ImageGenerationService:
             return None
 
     def _enhance_prompt(self, prompt: str, category: str, textbook_context: str = "") -> str:
-        """Enhance prompt for better Imagen results."""
+        """Enhance prompt for better Imagen 4 results.
+
+        Applies best practices from the Imagen prompt guide:
+        - Subject + context + style structure
+        - Category-specific descriptive language and quality modifiers
+        - Keeps total under 480 tokens
+        """
         from apps.llm.prompts import get_prompt_or_default
         institution_id = self.institution.id if self.institution else None
         context = get_prompt_or_default(
             institution_id, 'image_generation_prompt',
-            "Educational diagram for secondary school students in Seychelles. "
+            "Educational visual for secondary school students. "
         )
 
         style_map = {
-            'diagram': "Clear, labeled scientific diagram with arrows and annotations. ",
-            'photo': "High-quality photograph. ",
-            'illustration': "Clean, colorful educational illustration. ",
-            'map': "Clear geographic map with labels. ",
-            'chart': "Professional chart or graph with clear labels. ",
+            'diagram': (
+                "A high-quality detailed educational diagram with clear labels, "
+                "arrows, and annotations on a clean white background. "
+                "Professional, precise, suitable for a textbook. "
+            ),
+            'photo': (
+                "A high-quality 4K photograph, sharp focus, natural lighting, "
+                "taken by a professional photographer. "
+            ),
+            'illustration': (
+                "A high-quality colorful digital educational illustration, "
+                "clean lines, detailed, vibrant colours, suitable for a "
+                "secondary school textbook. "
+            ),
+            'map': (
+                "A high-quality detailed geographic map with clear labels, "
+                "a legend, compass rose, and distinct colour-coded regions. "
+                "Professional cartographic style. "
+            ),
+            'chart': (
+                "A high-quality professional chart with clear axis labels, "
+                "a title, distinct colours, and a clean white background. "
+                "Suitable for a textbook or presentation. "
+            ),
+            'flowchart': (
+                "A high-quality flowchart with clear boxes, directional arrows, "
+                "and concise labels on a clean white background. "
+                "Professional, easy to follow. "
+            ),
+            'infographic': (
+                "A high-quality detailed educational infographic with icons, "
+                "short text labels, vibrant colours, and a clear visual hierarchy. "
+            ),
         }
 
-        style = style_map.get(category, "Clear educational visual. ")
+        style = style_map.get(category, (
+            "A high-quality detailed educational visual, clear and professional, "
+            "suitable for a secondary school textbook. "
+        ))
 
         textbook_style = ""
         if textbook_context:
-            textbook_style = f"Match this textbook figure style: {textbook_context}. "
+            textbook_style = f"In the style of: {textbook_context}. "
 
-        return context + style + textbook_style + prompt
+        # Build final prompt: style + context + textbook ref + user prompt
+        # Keep concise to stay under 480 token limit
+        enhanced = f"{style}{context}{textbook_style}{prompt}"
+        return enhanced[:1500]
 
     def _save_generated_image_bytes(
         self, image_bytes: bytes, prompt: str

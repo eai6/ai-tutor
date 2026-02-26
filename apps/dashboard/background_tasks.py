@@ -286,10 +286,10 @@ def generate_media_for_lessons(course_id: int, upload=None) -> dict:
                         step.save()
                         
                 except Exception as e:
-                    logger.warning(f"Failed to generate image for {lesson.title}: {e}")
+                    log(f"   ⚠️ {lesson.title}: image failed — {e}")
                     failed += 1
-    
-    log(f"   Media: {generated} generated, {skipped} already had URLs, {failed} failed")
+
+    log(f"   📊 Media: {generated} generated, {skipped} already had URLs, {failed} failed")
     return {'generated': generated, 'failed': failed, 'skipped': skipped}
 
 
@@ -321,17 +321,26 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
     failed = 0
     skipped = 0
     
-    for lesson in lessons:
+    total_lessons = lessons.count()
+    log(f"   Processing {total_lessons} lessons...")
+
+    for idx, lesson in enumerate(lessons):
+        step_count = lesson.steps.count()
+
         # Skip if already has exit ticket
         if ExitTicket.objects.filter(lesson=lesson).exists():
             skipped += 1
+            log(f"   [{idx+1}/{total_lessons}] ⏭️ {lesson.title} (already has exit ticket)")
             continue
-        
+
         # Skip if no content yet
-        if lesson.steps.count() < 5:
+        if step_count == 0:
             skipped += 1
+            log(f"   [{idx+1}/{total_lessons}] ⏭️ {lesson.title} (no steps yet)")
             continue
-        
+
+        log(f"   [{idx+1}/{total_lessons}] 🔄 {lesson.title} ({step_count} steps)...")
+
         try:
             # Query KB for additional context from teaching materials
             kb_context = ""
@@ -367,7 +376,7 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
                 if exam_context:
                     exam_context = "\n\n" + exam_context + "\n"
             except Exception as e:
-                logger.warning(f"KB query for exit tickets failed: {e}")
+                log(f"      ⚠️ KB query failed (continuing without): {e}")
 
             prompt = f"""Generate 35 multiple choice exit ticket questions for this lesson.
 
@@ -411,23 +420,21 @@ Return ONLY the JSON array, no other text."""
             )
             messages = [{"role": "user", "content": prompt}]
 
-            response = client.generate(messages, system_prompt)
+            response = client.generate(messages, system_prompt, max_tokens=16000)
             response_text = response.content.strip()
 
-            # Handle markdown code blocks
-            if '```json' in response_text:
-                response_text = response_text.split('```json')[1].split('```')[0]
-            elif '```' in response_text:
-                parts = response_text.split('```')
-                if len(parts) >= 2:
-                    response_text = parts[1]
+            log(f"      LLM response: {len(response_text)} chars, stop={response.stop_reason}")
 
-            response_text = response_text.strip()
-            questions_data = json.loads(response_text)
+            from apps.llm.json_utils import parse_llm_json
+            questions_data = parse_llm_json(response_text, expect_array=True)
 
             if not questions_data or not isinstance(questions_data, list):
+                log(f"   [{idx+1}/{total_lessons}] ✗ {lesson.title}: Failed to parse JSON from LLM response")
+                log(f"      First 200 chars: {response_text[:200]}")
                 failed += 1
                 continue
+
+            log(f"      Parsed {len(questions_data)} questions")
 
             num_questions = len(questions_data)
 
@@ -517,16 +524,20 @@ Return ONLY the JSON array, no other text."""
                                 question_obj.image.save(filename, ContentFile(image_bytes), save=True)
                                 figures_generated += 1
                 except Exception as e:
-                    logger.warning(f"Figure generation failed for exit ticket question: {e}")
+                    log(f"      ⚠️ Figure generation failed: {e}")
 
             generated += 1
+            concepts = len(set(q.get('concept_tag', '') for q in questions_data if q.get('concept_tag')))
             fig_msg = f", {figures_generated} figures" if figures_generated else ""
-            log(f"   ✓ {lesson.title}: {min(num_questions, 40)} questions ({len(set(q.get('concept_tag','') for q in questions_data))} concepts){fig_msg}")
-            
+            log(f"   [{idx+1}/{total_lessons}] ✓ {lesson.title}: {min(num_questions, 40)} questions ({concepts} concepts){fig_msg}")
+
         except Exception as e:
             failed += 1
-            logger.warning(f"Exit ticket generation failed for {lesson.title}: {e}")
-    
+            log(f"   [{idx+1}/{total_lessons}] ❌ {lesson.title}: {e}")
+            import traceback
+            logger.error(f"Exit ticket generation failed for {lesson.title}: {traceback.format_exc()}")
+
+    log(f"   📊 Exit tickets: {generated} generated, {failed} failed, {skipped} skipped")
     return {'generated': generated, 'failed': failed, 'skipped': skipped}
 
 

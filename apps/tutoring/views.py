@@ -263,14 +263,14 @@ def generate_image(request):
 
         client = genai.Client(api_key=google_key)
 
-        full_prompt = f"{prompt}. Style: educational illustration, clear and simple, suitable for secondary school students, no text overlays."
+        full_prompt = f"A high-quality detailed educational illustration, clean lines, vibrant colours, suitable for a secondary school textbook. {prompt}"
 
         response = client.models.generate_images(
-            model='imagen-3.0-generate-002',
+            model='imagen-4.0-generate-001',
             prompt=full_prompt,
             config=types.GenerateImagesConfig(
                 number_of_images=1,
-                safety_filter_level="BLOCK_MEDIUM_AND_ABOVE",
+                safety_filter_level="BLOCK_LOW_AND_ABOVE",
                 person_generation="DONT_ALLOW",
             ),
         )

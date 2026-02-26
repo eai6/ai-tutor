@@ -39,6 +39,7 @@ urlpatterns = [
     path('curriculum/lesson/<int:lesson_id>/generate/', views.lesson_generate_content, name='lesson_generate_content'),
     path('curriculum/lesson/<int:lesson_id>/publish/', views.lesson_publish, name='lesson_publish'),
     path('curriculum/step/<int:step_id>/edit/', views.step_edit, name='step_edit'),
+    path('curriculum/exit-question/<int:question_id>/edit/', views.exit_question_edit, name='exit_question_edit'),
     
     # Bulk Generation
     path('curriculum/course/<int:course_id>/generate-all/', views.course_generate_all, name='course_generate_all'),
