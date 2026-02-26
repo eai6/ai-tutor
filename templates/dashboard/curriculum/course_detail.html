@@ -26,6 +26,21 @@
         background: #fee2e2;
         color: #991b1b;
     }
+    .status-indicator.generating {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    .status-indicator.failed {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    .spinner-icon {
+        display: inline-block;
+        animation: spin 1s linear infinite;
+    }
     
     .stats-bar {
         display: flex;
@@ -107,6 +122,25 @@
         color: #1e40af;
         font-weight: 500;
     }
+
+    .collapsible-header {
+        cursor: pointer;
+        user-select: none;
+    }
+    .collapsible-header .chevron {
+        transition: transform 0.2s ease;
+        flex-shrink: 0;
+    }
+    .collapsible-header.collapsed .chevron {
+        transform: rotate(-90deg);
+    }
+    .collapsible-body {
+        overflow: hidden;
+        transition: max-height 0.25s ease;
+    }
+    .collapsible-body.collapsed {
+        max-height: 0 !important;
+    }
 </style>
 {% endblock %}
 
@@ -121,7 +155,7 @@
 <!-- Course Header -->
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-body">
-        <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div id="course-header-display" style="display: flex; justify-content: space-between; align-items: start;">
             <div>
                 <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
                     <h2 style="font-size: 1.5rem; margin: 0;">{{ course.title }}</h2>
@@ -132,16 +166,48 @@
                     {% endif %}
                 </div>
                 <p style="color: var(--gray-500); margin: 0.5rem 0;">{{ course.description|default:"No description" }}</p>
+                {% if course.grade_level %}
+                <p style="color: var(--gray-500); margin: 0; font-size: 0.875rem;">Grade: {{ course.grade_level }}</p>
+                {% endif %}
             </div>
             <div style="display: flex; gap: 0.5rem;">
-                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary btn-sm">Edit Course</a>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-header-display').style.display='none'; document.getElementById('course-edit-form').style.display='block';">Edit Course</button>
                 {% if not course.is_published %}
                 <form method="post" action="{% url 'dashboard:course_publish_all' course.id %}" style="display: inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Publish all lessons in this course?');">Publish All</button>
                 </form>
                 {% endif %}
+                <form method="post" action="{% url 'dashboard:course_delete' course.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone.');">Delete</button>
+                </form>
             </div>
+        </div>
+
+        <!-- Inline Edit Form (hidden by default) -->
+        <div id="course-edit-form" style="display: none;">
+            <form method="post" action="{% url 'dashboard:course_edit' course.id %}">
+                {% csrf_token %}
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Title</label>
+                        <input type="text" name="title" class="form-control" value="{{ course.title }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Grade Level</label>
+                        <input type="text" name="grade_level" class="form-control" value="{{ course.grade_level }}" placeholder="e.g., S1, S2">
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="2">{{ course.description }}</textarea>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                    <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-edit-form').style.display='none'; document.getElementById('course-header-display').style.display='flex';">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -183,98 +249,124 @@
 
 <!-- Teaching Materials -->
 <div class="card" style="margin-bottom: 1.5rem;">
-    <div class="card-header">
-        <h3 class="card-title" style="margin: 0;">Teaching Materials{% if materials %} ({{ materials|length }}){% endif %}</h3>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('material-upload-form').style.display = document.getElementById('material-upload-form').style.display === 'none' ? 'block' : 'none';">
+    <div class="card-header collapsible-header collapsed" onclick="toggleCollapse(this)">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+            <h3 class="card-title" style="margin: 0;">Teaching Materials{% if materials %} ({{ materials|length }}){% endif %}</h3>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); var el=document.getElementById('material-upload-form'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; var body=this.closest('.card').querySelector('.collapsible-body'); if(body.classList.contains('collapsed')){toggleCollapse(this.closest('.collapsible-header'));}">
             + Upload Material
         </button>
     </div>
-    <div class="card-body" style="padding: 0;">
-        {% if materials %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Title</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Chunks</th>
-                    <th>Date</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for m in materials %}
-                <tr>
-                    <td>
-                        <span style="font-weight: 500;">{{ m.title }}</span>
-                        {% if m.description %}
-                        <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ m.description|truncatewords:8 }}</div>
-                        {% endif %}
-                    </td>
-                    <td><span class="badge badge-secondary">{{ m.get_material_type_display }}</span></td>
-                    <td>
-                        {% if m.status == 'completed' %}
-                            <span class="badge badge-success">Completed</span>
-                        {% elif m.status == 'processing' %}
-                            <span class="badge badge-warning">Processing</span>
-                        {% elif m.status == 'failed' %}
-                            <span class="badge badge-danger">Failed</span>
-                        {% else %}
-                            <span class="badge badge-secondary">Pending</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ m.chunks_created }}</td>
-                    <td>{{ m.created_at|date:"M d" }}</td>
-                    <td>
-                        <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary">Details</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div style="padding: 1.5rem; text-align: center; color: var(--gray-500); font-size: 0.875rem;">
-            No teaching materials linked to this course yet.
-        </div>
-        {% endif %}
+    <div class="collapsible-body collapsed" style="max-height: 600px;">
+        <div class="card-body" style="padding: 0;">
+            {% if materials %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Chunks</th>
+                        <th>Date</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in materials %}
+                    <tr>
+                        <td>
+                            <span style="font-weight: 500;">{{ m.title }}</span>
+                            {% if m.description %}
+                            <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ m.description|truncatewords:8 }}</div>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge badge-secondary">{{ m.get_material_type_display }}</span></td>
+                        <td>
+                            {% if m.status == 'completed' %}
+                                <span class="badge badge-success">Completed</span>
+                            {% elif m.status == 'processing' %}
+                                <span class="badge badge-warning">Processing</span>
+                            {% elif m.status == 'failed' %}
+                                <span class="badge badge-danger">Failed</span>
+                            {% else %}
+                                <span class="badge badge-secondary">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ m.chunks_created }}</td>
+                        <td>{{ m.created_at|date:"M d" }}</td>
+                        <td>
+                            <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary">Details</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="padding: 1.5rem; text-align: center; color: var(--gray-500); font-size: 0.875rem;">
+                No teaching materials linked to this course yet.
+            </div>
+            {% endif %}
 
-        <!-- Inline upload form (hidden by default) -->
-        <div id="material-upload-form" style="display: none; padding: 1.25rem; border-top: 1px solid var(--gray-200);">
-            <form method="post" action="{% url 'dashboard:course_upload_material' course.id %}" enctype="multipart/form-data">
-                {% csrf_token %}
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">File</label>
-                        <input type="file" name="material_file" accept=".pdf,.docx,.doc,.txt" class="form-control" required>
+            <!-- Inline upload form (hidden by default) -->
+            <div id="material-upload-form" style="display: none; padding: 1.25rem; border-top: 1px solid var(--gray-200);">
+                <form method="post" action="{% url 'dashboard:course_upload_material' course.id %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label">File</label>
+                            <input type="file" name="material_file" accept=".pdf,.docx,.doc,.txt" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Title</label>
+                            <input type="text" name="material_title" class="form-control" placeholder="e.g., Biology Textbook Ch.5" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Type</label>
+                            <select name="material_type" class="form-control">
+                                {% for code, name in material_types %}
+                                <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label">Description (optional)</label>
+                            <textarea name="material_description" class="form-control" rows="2" placeholder="Brief description..."></textarea>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Title</label>
-                        <input type="text" name="material_title" class="form-control" placeholder="e.g., Biology Textbook Ch.5" required>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                        <button type="submit" class="btn btn-primary btn-sm">Upload & Process</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('material-upload-form').style.display='none';">Cancel</button>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Type</label>
-                        <select name="material_type" class="form-control">
-                            {% for code, name in material_types %}
-                            <option value="{{ code }}">{{ name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">Description (optional)</label>
-                        <textarea name="material_description" class="form-control" rows="2" placeholder="Brief description..."></textarea>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                    <button type="submit" class="btn btn-primary btn-sm">Upload & Process</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('material-upload-form').style.display='none';">Cancel</button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Content Generation Status -->
-{% if lessons_without_content > 0 %}
+{% if is_generating %}
+<div class="bulk-actions" style="background: #dbeafe; border: 1px solid #93c5fd;">
+    <span class="spinner-icon" style="font-size: 1.25rem;">⏳</span>
+    <div style="flex: 1;">
+        <strong style="color: #1e40af;">Content generation in progress...</strong>
+        <div style="font-size: 0.8rem; color: #3b82f6;">Lessons are being generated in the background. This page will refresh automatically.</div>
+    </div>
+    {% if active_upload %}
+    <form method="post" action="{% url 'dashboard:cancel_generation' active_upload.id %}" style="display: inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('Stop generating content? Lessons already completed will be kept.');">
+            ⛔ Stop Generation
+        </button>
+    </form>
+    {% else %}
+    <button class="btn btn-secondary" disabled>Generating...</button>
+    {% endif %}
+</div>
+<script>setTimeout(function(){ window.location.reload(); }, 15000);</script>
+{% elif lessons_without_content > 0 %}
 <div class="bulk-actions" style="background: #FEF3C7; border: 1px solid #FCD34D;">
     <span style="font-size: 1.25rem;">⚠️</span>
     <div style="flex: 1;">
@@ -304,115 +396,137 @@
 <!-- Units and Lessons -->
 {% for unit in units %}
 <div class="card" style="margin-bottom: 1rem;">
-    <div class="card-header" style="background: var(--gray-50);">
-        <div>
-            <h3 class="card-title" style="margin: 0;">{{ forloop.counter }}. {{ unit.title }}</h3>
-            <p style="font-size: 0.875rem; color: var(--gray-500); margin: 0.25rem 0 0 0;">
-                {{ unit.lessons.count }} lesson{{ unit.lessons.count|pluralize }}
-            </p>
-        </div>
-        <a href="{% url 'dashboard:lesson_create' unit.id %}" class="btn btn-secondary btn-sm">+ Add Lesson</a>
-    </div>
-    <div class="card-body" style="padding: 0;">
-        {% if unit.lessons.all %}
-        
-        <!-- Header Row -->
-        <div class="lesson-row" style="background: var(--gray-50); font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">
-            <div>#</div>
-            <div>Lesson</div>
-            <div>Content</div>
-            <div>Students</div>
-            <div>Status</div>
-            <div></div>
-        </div>
-        
-        {% for lesson in unit.lessons.all %}
-        <div class="lesson-row">
-            <div style="color: var(--gray-400); font-weight: 500;">{{ forloop.counter }}</div>
-            
+    <div class="card-header collapsible-header" style="background: var(--gray-50);" onclick="toggleCollapse(this)">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
             <div>
-                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="font-weight: 500; color: var(--gray-900); text-decoration: none;">
-                    {{ lesson.title }}
-                </a>
-                <div style="font-size: 0.8rem; color: var(--gray-500); margin-top: 0.15rem;">
-                    {{ lesson.objective|truncatewords:10 }}
-                </div>
+                <h3 class="card-title" style="margin: 0;">{{ forloop.counter }}. {{ unit.title }}</h3>
+                <p style="font-size: 0.875rem; color: var(--gray-500); margin: 0.25rem 0 0 0;">
+                    {{ unit.lessons.count }} lesson{{ unit.lessons.count|pluralize }}
+                </p>
             </div>
-            
-            <div class="content-badges">
-                {% with lstats=lesson_stats|get_item:lesson.id %}
-                    {% if lstats %}
-                        {% if lstats.has_content %}
-                            <span class="content-badge steps">{{ lstats.steps_count }} steps</span>
+        </div>
+        <a href="{% url 'dashboard:lesson_create' unit.id %}" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();">+ Add Lesson</a>
+    </div>
+    <div class="collapsible-body" style="max-height: 2000px;">
+        <div class="card-body" style="padding: 0;">
+            {% if unit.lessons.all %}
+
+            <!-- Header Row -->
+            <div class="lesson-row" style="background: var(--gray-50); font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">
+                <div>#</div>
+                <div>Lesson</div>
+                <div>Content</div>
+                <div>Students</div>
+                <div>Status</div>
+                <div></div>
+            </div>
+
+            {% for lesson in unit.lessons.all %}
+            <div class="lesson-row">
+                <div style="color: var(--gray-400); font-weight: 500;">{{ forloop.counter }}</div>
+
+                <div>
+                    <a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="font-weight: 500; color: var(--gray-900); text-decoration: none;">
+                        {{ lesson.title }}
+                    </a>
+                    <div style="font-size: 0.8rem; color: var(--gray-500); margin-top: 0.15rem;">
+                        {{ lesson.objective|truncatewords:10 }}
+                    </div>
+                </div>
+
+                <div class="content-badges">
+                    {% with lstats=lesson_stats|get_item:lesson.id %}
+                        {% if lstats %}
+                            {% if lstats.has_content %}
+                                <span class="content-badge steps">{{ lstats.steps_count }} steps</span>
+                            {% else %}
+                                <span class="content-badge none">No content</span>
+                            {% endif %}
+
+                            {% if lstats.media_count > 0 %}
+                                <span class="content-badge media">{{ lstats.media_count }} 📷</span>
+                            {% elif lstats.media_pending > 0 %}
+                                <span class="content-badge none" title="{{ lstats.media_pending }} media pending">⏳ {{ lstats.media_pending }}</span>
+                            {% endif %}
+
+                            {% if lstats.has_exit_ticket %}
+                                <span class="content-badge exit">✓ Exit</span>
+                            {% endif %}
                         {% else %}
                             <span class="content-badge none">No content</span>
                         {% endif %}
-                        
-                        {% if lstats.media_count > 0 %}
-                            <span class="content-badge media">{{ lstats.media_count }} 📷</span>
-                        {% elif lstats.media_pending > 0 %}
-                            <span class="content-badge none" title="{{ lstats.media_pending }} media pending">⏳ {{ lstats.media_pending }}</span>
-                        {% endif %}
-                        
-                        {% if lstats.has_exit_ticket %}
-                            <span class="content-badge exit">✓ Exit</span>
-                        {% endif %}
-                    {% else %}
-                        <span class="content-badge none">No content</span>
-                    {% endif %}
-                {% endwith %}
-            </div>
-            
-            <div style="font-size: 0.875rem;">
-                {% with lstats=lesson_stats|get_item:lesson.id %}
-                    {% if lstats %}
-                        <span style="color: var(--success);">{{ lstats.students_mastered }}</span> / 
-                        <span>{{ lstats.students_started }}</span>
-                    {% else %}
-                        <span style="color: var(--gray-400);">—</span>
-                    {% endif %}
-                {% endwith %}
-            </div>
-            
-            <div>
-                {% if lesson.is_published %}
-                    <span class="status-indicator ready">✓ Published</span>
-                {% else %}
+                    {% endwith %}
+                </div>
+
+                <div style="font-size: 0.875rem;">
                     {% with lstats=lesson_stats|get_item:lesson.id %}
-                        {% if lstats and lstats.has_content %}
-                            {% if lstats.has_exit_ticket %}
-                                <span class="status-indicator ready">Ready</span>
-                            {% else %}
-                                <span class="status-indicator pending">Has Content</span>
-                            {% endif %}
+                        {% if lstats %}
+                            <span style="color: var(--success);">{{ lstats.students_mastered }}</span> /
+                            <span>{{ lstats.students_started }}</span>
                         {% else %}
-                            <span class="status-indicator missing">No Content</span>
+                            <span style="color: var(--gray-400);">—</span>
                         {% endif %}
                     {% endwith %}
-                {% endif %}
-            </div>
-            
-            <div style="display: flex; gap: 0.25rem;">
-                {% with lstats=lesson_stats|get_item:lesson.id %}
-                    {% if not lstats or not lstats.has_content %}
-                    <form method="post" action="{% url 'dashboard:lesson_generate_content' lesson.id %}" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-primary btn-sm" title="Generate tutoring content" onclick="this.disabled=true; this.innerHTML='⏳'; this.form.submit();">
-                            ⚡
-                        </button>
-                    </form>
+                </div>
+
+                <div>
+                    {% if lesson.is_published %}
+                        <span class="status-indicator ready">✓ Published</span>
+                    {% else %}
+                        {% with lstats=lesson_stats|get_item:lesson.id %}
+                            {% if lstats.content_status == 'generating' %}
+                                <span class="status-indicator generating"><span class="spinner-icon">⏳</span> Generating</span>
+                            {% elif lstats.content_status == 'failed' %}
+                                <span class="status-indicator failed">✗ Failed</span>
+                            {% elif lstats.content_status == 'ready' %}
+                                {% if lstats.has_exit_ticket %}
+                                    <span class="status-indicator ready">Ready</span>
+                                {% else %}
+                                    <span class="status-indicator pending">Has Content</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="status-indicator missing">No Content</span>
+                            {% endif %}
+                        {% endwith %}
                     {% endif %}
-                {% endwith %}
-                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">Review</a>
+                </div>
+
+                <div style="display: flex; gap: 0.25rem;">
+                    {% with lstats=lesson_stats|get_item:lesson.id %}
+                        {% if lstats.content_status == 'generating' %}
+                            <form method="post" action="{% url 'dashboard:cancel_lesson_generation' lesson.id %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-size: 0.75rem;" title="Stop generating this lesson">
+                                    ⛔
+                                </button>
+                            </form>
+                        {% elif is_generating %}
+                            <button class="btn btn-secondary btn-sm" disabled title="Course generation in progress">
+                                ⚡
+                            </button>
+                        {% elif lstats.content_status != 'ready' %}
+                        <form method="post" action="{% url 'dashboard:lesson_generate_content' lesson.id %}" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary btn-sm" title="Generate tutoring content" onclick="this.disabled=true; this.innerHTML='⏳'; this.form.submit();">
+                                ⚡
+                            </button>
+                        </form>
+                        {% endif %}
+                    {% endwith %}
+                    <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">Review</a>
+                </div>
             </div>
+            {% endfor %}
+
+            {% else %}
+            <div class="empty-state" style="padding: 2rem;">
+                <p style="margin: 0;">No lessons in this unit yet</p>
+            </div>
+            {% endif %}
         </div>
-        {% endfor %}
-        
-        {% else %}
-        <div class="empty-state" style="padding: 2rem;">
-            <p style="margin: 0;">No lessons in this unit yet</p>
-        </div>
-        {% endif %}
     </div>
 </div>
 {% empty %}
@@ -436,4 +550,16 @@
     Add Unit
 </a>
 {% endif %}
+
+<script>
+function toggleCollapse(header) {
+    var body = header.nextElementSibling;
+    while (body && !body.classList.contains('collapsible-body')) {
+        body = body.nextElementSibling;
+    }
+    if (!body) return;
+    header.classList.toggle('collapsed');
+    body.classList.toggle('collapsed');
+}
+</script>
 {% endblock %}

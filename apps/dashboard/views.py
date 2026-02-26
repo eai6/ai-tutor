@@ -490,6 +490,7 @@ def course_detail(request, course_id):
                 'media_count': media_count,
                 'media_pending': media_pending,
                 'has_exit_ticket': has_exit_ticket,
+                'content_status': lesson.content_status,
             }
     
     # Course-level stats
@@ -499,8 +500,18 @@ def course_detail(request, course_id):
     total_media = sum(stats['media_count'] for stats in lesson_stats.values())
     total_media_pending = sum(stats['media_pending'] for stats in lesson_stats.values())
     
-    from apps.dashboard.models import TeachingMaterialUpload
+    # Check if any lesson is currently generating (course-wide generation in progress)
+    is_generating = any(s['content_status'] == 'generating' for s in lesson_stats.values())
+
+    from apps.dashboard.models import TeachingMaterialUpload, CurriculumUpload
     materials = TeachingMaterialUpload.objects.filter(course=course)
+
+    # Find the most recent processing upload for the stop button
+    active_upload = None
+    if is_generating:
+        active_upload = CurriculumUpload.objects.filter(
+            created_course=course, status='processing',
+        ).order_by('-created_at').first()
 
     context = {
         **request.staff_ctx,
@@ -512,6 +523,8 @@ def course_detail(request, course_id):
         'lessons_without_content': lessons_without_content,
         'total_media': total_media,
         'total_media_pending': total_media_pending,
+        'is_generating': is_generating,
+        'active_upload': active_upload,
         'materials': materials,
         'material_types': TeachingMaterialUpload.MaterialType.choices,
     }
@@ -720,11 +733,6 @@ def curriculum_approve(request, upload_id):
         if not units_data:
             return JsonResponse({'error': 'No units to create'}, status=400)
         
-        # Get generation options
-        generate_steps = data.get('generate_steps', True)
-        generate_media = data.get('generate_media', True)
-        generate_exit_tickets = data.get('generate_exit_tickets', True)
-        
         # Update status to processing
         upload.status = 'processing'
         upload.current_step = 3
@@ -809,41 +817,40 @@ def curriculum_approve(request, upload_id):
         upload.add_log(f"   ✓ Created {units_created} units, {lessons_created} lessons")
         upload.save()
         
-        # Start async content generation if requested
+        # Check if content generation was requested (default: yes)
+        generate_content = data.get('generate_steps', True)
+
+        # Start background content generation for all lessons
         lessons_in_course = Lesson.objects.filter(unit__course=course).count()
-        
-        if generate_steps and lessons_in_course > 0:
+
+        if generate_content and lessons_in_course > 0:
             upload.current_step = 4
             upload.add_log(f"📝 Starting background content generation for {lessons_in_course} lessons...")
-            upload.add_log(f"   This will continue in the background. Refresh to see progress.")
             upload.save()
-            
-            # Start async generation
+
             from apps.dashboard.background_tasks import run_async, generate_all_content_async
             run_async(
-                generate_all_content_async, 
-                course_id=course.id, 
+                generate_all_content_async,
+                course_id=course.id,
                 upload_id=upload.id,
-                generate_media=generate_media
+                generate_media=True,
             )
-            
-            # Return immediately - generation continues in background
+
             return JsonResponse({
                 'success': True,
                 'status': 'processing',
-                'message': f'Content generation started for {lessons_in_course} lessons',
+                'message': f'Course created. Generating content for {lessons_in_course} lessons in the background.',
                 'course_id': course.id,
                 'units_created': units_created,
                 'lessons_created': lessons_created,
             })
         else:
-            # No content generation requested - mark complete
             upload.status = 'completed'
             upload.steps_created = 0
             upload.completed_at = timezone.now()
-            upload.add_log(f"✅ Complete! Course '{course.title}' created (no content generation).")
+            upload.add_log(f"✅ Course '{course.title}' created (no lessons to generate).")
             upload.save()
-            
+
             return JsonResponse({
                 'success': True,
                 'status': 'completed',
@@ -1462,125 +1469,6 @@ def lesson_detail(request, lesson_id):
     return render(request, 'dashboard/curriculum/lesson_detail.html', context)
 
 
-def generate_exit_ticket_for_lesson(lesson, institution) -> int:
-    """
-    Generate exit ticket MCQs for a lesson.
-    Returns the number of questions generated.
-    """
-    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
-    from apps.llm.models import ModelConfig
-    from apps.llm.client import get_llm_client
-    import json
-    
-    # Get LLM config
-    config = ModelConfig.get_for('generation')
-    if not config:
-        logger.error("No active LLM model configured for exit ticket generation")
-        return 0
-    
-    # Build prompt for exit questions (35 for question bank, 10 selected per session)
-    prompt = f"""Generate exactly 35 multiple choice exit ticket questions for this lesson.
-
-Lesson: {lesson.title}
-Objective: {lesson.objective}
-Subject: {lesson.unit.course.title}
-
-REQUIREMENTS:
-1. Generate EXACTLY 35 questions
-2. Each question must have exactly 4 options (A, B, C, D)
-3. Include one correct answer per question
-4. Include a short concept_tag for each question (the specific concept it tests)
-5. Questions should directly assess the lesson objective
-6. Vary question phrasing — avoid repetitive stems
-
-Return as JSON array:
-[
-  {{
-    "question": "What is...",
-    "option_a": "First option",
-    "option_b": "Second option",
-    "option_c": "Third option",
-    "option_d": "Fourth option",
-    "correct_answer": "A",
-    "explanation": "Brief explanation of why A is correct",
-    "difficulty": "easy",
-    "concept_tag": "key concept tested"
-  }}
-]
-
-DIFFICULTY DISTRIBUTION (out of 35):
-- Questions 1-12: easy (recall facts)
-- Questions 13-25: medium (apply concepts)
-- Questions 26-35: hard (analyze/evaluate)
-
-Return ONLY the JSON array, no other text."""
-
-    try:
-        client = get_llm_client(config)
-        
-        system_prompt = "You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text."
-        messages = [{"role": "user", "content": prompt}]
-        
-        response = client.generate(messages, system_prompt, max_tokens=16000)
-        response_text = response.content.strip()
-
-        logger.info(f"Exit ticket response: {len(response_text)} chars, stop={response.stop_reason}")
-
-        from apps.llm.json_utils import parse_llm_json
-        questions_data = parse_llm_json(response_text, expect_array=True)
-
-        if not questions_data or not isinstance(questions_data, list):
-            logger.warning(f"Failed to parse exit ticket JSON for {lesson.title}")
-            return 0
-
-        logger.info(f"Parsed {len(questions_data)} questions for {lesson.title}")
-        
-        # Delete existing exit ticket and questions
-        ExitTicket.objects.filter(lesson=lesson).delete()
-        
-        # Create new exit ticket
-        exit_ticket = ExitTicket.objects.create(
-            lesson=lesson,
-            passing_score=8,
-            time_limit_minutes=15,
-            instructions="Answer 10 questions. You need 8 correct to pass."
-        )
-
-        # Create questions (up to 35 in the bank, 10 selected per session)
-        questions_created = 0
-        for i, q in enumerate(questions_data[:35]):
-            try:
-                ExitTicketQuestion.objects.create(
-                    exit_ticket=exit_ticket,
-                    question_text=q.get('question', ''),
-                    option_a=q.get('option_a', ''),
-                    option_b=q.get('option_b', ''),
-                    option_c=q.get('option_c', ''),
-                    option_d=q.get('option_d', ''),
-                    correct_answer=q.get('correct_answer', 'A')[:1].upper(),
-                    explanation=q.get('explanation', ''),
-                    concept_tag=q.get('concept_tag', ''),
-                    difficulty=q.get('difficulty', 'medium'),
-                    order_index=i
-                )
-                questions_created += 1
-            except Exception as e:
-                logger.warning(f"Failed to create question {i}: {e}")
-        
-        logger.info(f"Created {questions_created} exit questions for {lesson.title}")
-        return questions_created
-        
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error for exit ticket: {e}")
-        logger.error(f"Response was: {response_text[:500] if 'response_text' in dir() else 'N/A'}")
-        return 0
-    except Exception as e:
-        logger.error(f"Exit ticket generation failed: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return 0
-
-
 @teacher_required
 @require_POST
 def exit_question_edit(request, question_id):
@@ -1616,185 +1504,140 @@ def exit_question_edit(request, question_id):
 @teacher_required
 @require_POST
 def lesson_regenerate(request, lesson_id):
-    """Regenerate content, media, and exit questions for a lesson."""
+    """Regenerate full pipeline: steps, media, exit tickets, and skills for a lesson."""
     from apps.curriculum.models import Lesson
     from apps.curriculum.content_generator import LessonContentGenerator
     from apps.tutoring.models import ExitTicket
-    
+
     institution = request.staff_ctx['institution']
-    
+
     lookup = {'id': lesson_id}
     if institution is not None:
         lookup['unit__course__institution'] = institution
     lesson = get_object_or_404(Lesson, **lookup)
-    
+
+    # Mark as generating
+    lesson.content_status = 'generating'
+    lesson.save(update_fields=['content_status'])
+
     try:
-        # Delete existing steps
+        # Delete existing content
         lesson.steps.all().delete()
-        
-        # Delete existing exit ticket
         ExitTicket.objects.filter(lesson=lesson).delete()
-        
-        # Generate new content
+
+        # Step 1: Generate lesson steps
         generator = LessonContentGenerator(institution_id=institution.id)
         result = generator.generate_for_lesson(lesson, save_to_db=True)
-        
-        if result.get('success'):
-            steps_generated = result.get('steps_generated', 0)
-            
-            # Generate media for this lesson
-            media_generated = 0
-            try:
-                from apps.tutoring.image_service import ImageGenerationService
-                
-                for step in lesson.steps.all():
-                    if not step.media:
-                        continue
-                    
-                    images = step.media.get('images', [])
-                    media_updated = False
-                    
-                    for img in images:
-                        if img.get('url'):
-                            continue
-                        
-                        description = img.get('description', '')
-                        if not description:
-                            continue
-                        
-                        service = ImageGenerationService(
-                            lesson=lesson,
-                            institution=institution or lesson.unit.course.institution
-                        )
-                        
-                        img_result = service.get_or_generate_image(
-                            prompt=description,
-                            category=img.get('type', 'diagram')
-                        )
-                        
-                        if img_result and img_result.get('url'):
-                            img['url'] = img_result['url']
-                            img['source'] = 'generated'
-                            media_updated = True
-                            media_generated += 1
-                    
-                    if media_updated:
-                        step.save()
-                        
-            except Exception as e:
-                logger.warning(f"Media generation for {lesson.title}: {e}")
-            
-            # Generate exit questions
-            exit_questions = 0
-            try:
-                exit_questions = generate_exit_ticket_for_lesson(lesson, institution)
-            except Exception as e:
-                logger.warning(f"Exit ticket generation for {lesson.title}: {e}")
-            
-            messages.success(
-                request, 
-                f"Regenerated {steps_generated} steps, {media_generated} images, and {exit_questions} exit questions for '{lesson.title}'"
-            )
-        else:
+
+        if not result.get('success'):
+            lesson.content_status = 'failed'
+            lesson.save(update_fields=['content_status'])
             messages.warning(request, result.get('error', 'Could not regenerate'))
-            
+            return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
+        steps_generated = result.get('steps_generated', 0)
+
+        # Step 2: Generate media
+        media_generated = 0
+        try:
+            from apps.tutoring.image_service import ImageGenerationService
+
+            for step in lesson.steps.all():
+                if not step.media:
+                    continue
+                images = step.media.get('images', [])
+                media_updated = False
+                for img in images:
+                    if img.get('url'):
+                        continue
+                    description = img.get('description', '')
+                    if not description:
+                        continue
+                    service = ImageGenerationService(
+                        lesson=lesson,
+                        institution=institution or lesson.unit.course.institution
+                    )
+                    img_result = service.get_or_generate_image(
+                        prompt=description,
+                        category=img.get('type', 'diagram')
+                    )
+                    if img_result and img_result.get('url'):
+                        img['url'] = img_result['url']
+                        img['source'] = 'generated'
+                        media_updated = True
+                        media_generated += 1
+                if media_updated:
+                    step.save()
+        except Exception as e:
+            logger.warning(f"Media generation for {lesson.title}: {e}")
+
+        # Step 3: Generate exit tickets
+        exit_questions = 0
+        try:
+            from apps.dashboard.background_tasks import generate_exit_ticket_for_lesson
+            exit_questions = generate_exit_ticket_for_lesson(lesson, institution)
+        except Exception as e:
+            logger.warning(f"Exit ticket generation for {lesson.title}: {e}")
+
+        # Step 4: Extract skills
+        skills_extracted = 0
+        try:
+            from apps.tutoring.skill_extraction import SkillExtractionService
+            skill_service = SkillExtractionService(institution_id=institution.id)
+            skills = skill_service.extract_skills_for_lesson(lesson)
+            skills_extracted = len(skills)
+        except Exception as e:
+            logger.warning(f"Skill extraction for {lesson.title}: {e}")
+
+        # Mark as ready
+        lesson.content_status = 'ready'
+        lesson.save(update_fields=['content_status'])
+
+        messages.success(
+            request,
+            f"Regenerated {steps_generated} steps, {media_generated} images, {exit_questions} exit questions, and {skills_extracted} skills for '{lesson.title}'"
+        )
+
     except Exception as e:
         import traceback
         logger.error(f"Regeneration error: {traceback.format_exc()}")
+        lesson.content_status = 'failed'
+        lesson.save(update_fields=['content_status'])
         messages.error(request, f"Error: {str(e)}")
-    
+
     return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
 
 
 @teacher_required
 @require_POST
 def lesson_generate_content(request, lesson_id):
-    """Generate content and media for a lesson that doesn't have any."""
-    from apps.curriculum.models import Lesson
-    from apps.curriculum.content_generator import LessonContentGenerator
-    
+    """Generate full content pipeline for a lesson asynchronously."""
+    from apps.dashboard.background_tasks import run_async, generate_complete_lesson
+
     institution = request.staff_ctx['institution']
-    
+
     lookup = {'id': lesson_id}
     if institution is not None:
         lookup['unit__course__institution'] = institution
     lesson = get_object_or_404(Lesson, **lookup)
-    
-    # Check if already has content
+
+    # Guard: skip if already generating or has content
+    if lesson.content_status == 'generating':
+        messages.info(request, f"'{lesson.title}' is already being generated.")
+        return redirect('dashboard:course_detail', course_id=lesson.unit.course.id)
+
     if lesson.steps.count() >= 5:
         messages.info(request, f"'{lesson.title}' already has {lesson.steps.count()} steps.")
         return redirect('dashboard:course_detail', course_id=lesson.unit.course.id)
-    
-    try:
-        generator = LessonContentGenerator(institution_id=institution.id)
-        result = generator.generate_for_lesson(lesson, save_to_db=True)
-        
-        if result.get('success'):
-            steps_generated = result.get('steps_generated', 0)
-            
-            # Also generate media for this lesson
-            media_generated = 0
-            try:
-                from apps.tutoring.image_service import ImageGenerationService
-                
-                for step in lesson.steps.all():
-                    if not step.media:
-                        continue
-                    
-                    images = step.media.get('images', [])
-                    media_updated = False
-                    
-                    for img in images:
-                        if img.get('url'):  # Already has URL
-                            continue
-                        
-                        description = img.get('description', '')
-                        if not description:
-                            continue
-                        
-                        service = ImageGenerationService(
-                            lesson=lesson,
-                            institution=institution or lesson.unit.course.institution
-                        )
-                        
-                        # Always generate fresh images (don't use potentially mismatched existing ones)
-                        img_result = service.get_or_generate_image(
-                            prompt=description,
-                            category=img.get('type', 'diagram'),
-                            generate_only=True  # Always generate new
-                        )
-                        
-                        if img_result and img_result.get('url'):
-                            img['url'] = img_result['url']
-                            img['source'] = 'generated' if img_result.get('generated') else 'library'
-                            media_updated = True
-                            media_generated += 1
-                    
-                    if media_updated:
-                        step.save()
-                        
-            except Exception as e:
-                logger.warning(f"Media generation for {lesson.title}: {e}")
-            
-            # Generate exit questions
-            exit_questions = 0
-            try:
-                exit_questions = generate_exit_ticket_for_lesson(lesson, institution)
-            except Exception as e:
-                logger.warning(f"Exit ticket generation for {lesson.title}: {e}")
-            
-            messages.success(
-                request, 
-                f"Generated {steps_generated} steps, {media_generated} images, and {exit_questions} exit questions for '{lesson.title}'"
-            )
-        else:
-            messages.warning(request, f"Could not generate: {result.get('error', 'Unknown error')}")
-            
-    except Exception as e:
-        import traceback
-        logger.error(f"Content generation error: {traceback.format_exc()}")
-        messages.error(request, f"Error: {str(e)}")
-    
+
+    # Mark as generating and kick off in background
+    lesson.content_status = 'generating'
+    lesson.save(update_fields=['content_status'])
+
+    institution_id = (institution or lesson.unit.course.institution).id
+    run_async(generate_complete_lesson, lesson.id, institution_id)
+
+    messages.info(request, f"Generating content for '{lesson.title}' in the background...")
     return redirect('dashboard:course_detail', course_id=lesson.unit.course.id)
 
 
@@ -1814,7 +1657,14 @@ def lesson_publish(request, lesson_id):
     # Toggle publish status
     lesson.is_published = not lesson.is_published
     lesson.save()
-    
+
+    # When publishing a lesson, ensure the parent course is also published
+    if lesson.is_published:
+        course = lesson.unit.course
+        if not course.is_published:
+            course.is_published = True
+            course.save(update_fields=['is_published'])
+
     status = "published" if lesson.is_published else "unpublished"
     messages.success(request, f"Lesson '{lesson.title}' {status}.")
     
@@ -1846,30 +1696,85 @@ def step_edit(request, step_id):
     ]
     
     if request.method == 'POST':
-        # Update step content
+        action = request.POST.get('action', '')
+
+        # Always save image description edits if media exists
+        if step.media and step.media.get('images'):
+            images = step.media['images']
+            descriptions_changed = False
+            for i, img in enumerate(images):
+                new_desc = request.POST.get(f'image_description_{i}', '').strip()
+                if new_desc and new_desc != img.get('description', ''):
+                    img['description'] = new_desc
+                    descriptions_changed = True
+            if descriptions_changed:
+                step.save()
+
+        # Handle regenerate media action
+        if action == 'regenerate_media':
+            image_index = int(request.POST.get('image_index', 0))
+            images = step.media.get('images', []) if step.media else []
+            if 0 <= image_index < len(images):
+                img = images[image_index]
+                description = img.get('description', '')
+                if description:
+                    try:
+                        from apps.tutoring.image_service import ImageGenerationService
+                        service = ImageGenerationService(
+                            lesson=lesson,
+                            institution=lesson.unit.course.institution,
+                        )
+                        result = service.get_or_generate_image(
+                            prompt=description,
+                            category=img.get('type', 'diagram'),
+                            generate_only=True,
+                        )
+                        if result and result.get('url'):
+                            img['url'] = result['url']
+                            img['source'] = 'generated'
+                            step.save()
+                            messages.success(request, "Image regenerated successfully.")
+                        else:
+                            messages.warning(request, "Image generation returned no result.")
+                    except Exception as e:
+                        logger.error(f"Image regeneration error: {e}")
+                        messages.error(request, f"Image generation failed: {e}")
+                else:
+                    messages.warning(request, "No image description to generate from.")
+            # Re-render the same page (don't redirect to lesson detail)
+            context = {
+                **request.staff_ctx,
+                'step': step,
+                'lesson': lesson,
+                'total_steps': total_steps,
+                'phases': phases,
+            }
+            return render(request, 'dashboard/curriculum/step_edit.html', context)
+
+        # Normal save — update step content
         step.phase = request.POST.get('phase', step.phase)
         step.step_type = request.POST.get('step_type', step.step_type)
         step.teacher_script = request.POST.get('teacher_script', step.teacher_script)
         step.question = request.POST.get('question', step.question)
         step.expected_answer = request.POST.get('expected_answer', step.expected_answer)
         step.answer_type = request.POST.get('answer_type', step.answer_type)
-        
+
         # Parse choices (one per line)
         choices_text = request.POST.get('choices', '')
         if choices_text.strip():
             step.choices = [c.strip() for c in choices_text.split('\n') if c.strip()]
         else:
             step.choices = []
-        
+
         # Parse hints (one per line)
         hints_text = request.POST.get('hints', '')
         if hints_text.strip():
             step.hints = [h.strip() for h in hints_text.split('\n') if h.strip()]
         else:
             step.hints = []
-        
+
         step.save()
-        
+
         messages.success(request, "Step updated.")
         return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
     
@@ -1893,6 +1798,15 @@ def course_generate_all(request, course_id):
     
     institution = request.staff_ctx['institution']
     course = get_scoped_object_or_404(Course, institution, id=course_id)
+
+    # Guard: skip if any lesson is already generating
+    from apps.curriculum.models import Lesson
+    generating_count = Lesson.objects.filter(
+        unit__course=course, content_status='generating'
+    ).count()
+    if generating_count > 0:
+        messages.info(request, f"Content generation is already in progress ({generating_count} lessons generating).")
+        return redirect('dashboard:course_detail', course_id=course.id)
 
     # Create a new processing record for progress tracking
     upload = CurriculumUpload.objects.create(
@@ -1995,6 +1909,55 @@ def content_progress(request, upload_id):
 
 @teacher_required
 @require_POST
+def cancel_generation(request, upload_id):
+    """Cancel an in-progress 'Generate All' operation."""
+    from apps.dashboard.models import CurriculumUpload
+
+    institution = request.staff_ctx['institution']
+    lookup = {'id': upload_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    upload = get_object_or_404(CurriculumUpload, **lookup)
+
+    upload.is_cancelled = True
+    upload.status = 'completed'
+    upload.add_log("⛔ Generation cancelled by teacher.")
+    upload.save()
+
+    # Reset any lessons still stuck in 'generating' for this course
+    if upload.created_course:
+        Lesson.objects.filter(
+            unit__course=upload.created_course,
+            content_status='generating',
+        ).update(content_status='empty')
+
+    messages.success(request, "Generation cancelled.")
+    return redirect('dashboard:course_detail', course_id=upload.created_course_id)
+
+
+@teacher_required
+@require_POST
+def cancel_lesson_generation(request, lesson_id):
+    """Cancel generation for a single lesson."""
+    institution = request.staff_ctx['institution']
+
+    lookup = {'id': lesson_id}
+    if institution is not None:
+        lookup['unit__course__institution'] = institution
+    lesson = get_object_or_404(Lesson, **lookup)
+
+    if lesson.content_status == 'generating':
+        lesson.content_status = 'empty'
+        lesson.save(update_fields=['content_status'])
+        messages.success(request, f"Cancelled generation for '{lesson.title}'.")
+    else:
+        messages.info(request, f"'{lesson.title}' was not generating.")
+
+    return redirect('dashboard:course_detail', course_id=lesson.unit.course.id)
+
+
+@teacher_required
+@require_POST
 def course_publish_all(request, course_id):
     """Publish all lessons in a course."""
     from apps.curriculum.models import Lesson
@@ -2091,3 +2054,49 @@ def lesson_create(request, unit_id):
         'course': unit.course,
     }
     return render(request, 'dashboard/curriculum/lesson_create.html', context)
+
+
+@teacher_required
+@require_POST
+def course_edit(request, course_id):
+    """Edit course title, description, and grade level."""
+    institution = request.staff_ctx['institution']
+
+    if institution is not None:
+        course = get_object_or_404(Course, id=course_id, institution=institution)
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    title = request.POST.get('title', '').strip()
+    description = request.POST.get('description', '').strip()
+    grade_level = request.POST.get('grade_level', '').strip()
+
+    if not title:
+        messages.error(request, "Course title cannot be empty.")
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    course.title = title
+    course.description = description
+    course.grade_level = grade_level
+    course.save(update_fields=['title', 'description', 'grade_level', 'updated_at'])
+
+    messages.success(request, f"Course updated.")
+    return redirect('dashboard:course_detail', course_id=course.id)
+
+
+@teacher_required
+@require_POST
+def course_delete(request, course_id):
+    """Delete a course and all its units/lessons/steps."""
+    institution = request.staff_ctx['institution']
+
+    if institution is not None:
+        course = get_object_or_404(Course, id=course_id, institution=institution)
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    title = course.title
+    course.delete()
+
+    messages.success(request, f"Course '{title}' deleted.")
+    return redirect('dashboard:curriculum_list')

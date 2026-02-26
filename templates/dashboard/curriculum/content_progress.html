@@ -82,12 +82,18 @@
                 <h2 style="margin: 0; font-size: 1.25rem;">📝 Content Generation</h2>
                 <p style="margin: 0.5rem 0 0 0; color: var(--gray-500);">{{ course.title|default:upload.subject_name }}</p>
             </div>
-            <div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
                 {% if upload.status == 'processing' %}
                 <span class="status-badge processing">
                     <span class="spinner"></span>
                     Processing...
                 </span>
+                <form method="post" action="{% url 'dashboard:cancel_generation' upload.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('Stop generating content? Lessons already completed will be kept.');">
+                        ⛔ Stop Generation
+                    </button>
+                </form>
                 {% elif upload.status == 'completed' %}
                 <span class="status-badge completed">
                     ✓ Complete

@@ -27,6 +27,8 @@ urlpatterns = [
     path('api/curriculum/<int:upload_id>/process/', views.curriculum_process_api, name='curriculum_process_api'),
     
     # Course management
+    path('curriculum/course/<int:course_id>/edit/', views.course_edit, name='course_edit'),
+    path('curriculum/course/<int:course_id>/delete/', views.course_delete, name='course_delete'),
     path('curriculum/course/<int:course_id>/publish-all/', views.course_publish_all, name='course_publish_all'),
     path('curriculum/course/<int:course_id>/unit/create/', views.unit_create, name='unit_create'),
     
@@ -46,6 +48,8 @@ urlpatterns = [
     path('curriculum/course/<int:course_id>/generate-media/', views.course_generate_media, name='course_generate_media'),
     path('curriculum/media-progress/<int:upload_id>/', views.media_progress, name='media_progress'),
     path('curriculum/content-progress/<int:upload_id>/', views.content_progress, name='content_progress'),
+    path('curriculum/cancel-generation/<int:upload_id>/', views.cancel_generation, name='cancel_generation'),
+    path('curriculum/lesson/<int:lesson_id>/cancel/', views.cancel_lesson_generation, name='cancel_lesson_generation'),
     
     # Teaching Materials
     path('materials/process/<int:upload_id>/', views.material_process, name='material_process'),

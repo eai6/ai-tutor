@@ -47,23 +47,26 @@ def run_async(func, *args, **kwargs):
 
 def generate_all_content_async(course_id: int, upload_id: int = None, generate_media: bool = True):
     """
-    Generate content for all lessons in a course (runs in background).
-    
+    Generate content for all lessons in a course using parallel processing.
+
+    Uses ThreadPoolExecutor(max_workers=3) to process lessons concurrently.
+    Each lesson runs the full pipeline: steps -> media -> exit tickets -> skills.
+
     Args:
         course_id: Course to generate content for
         upload_id: Optional CurriculumUpload to update with progress
         generate_media: Whether to also generate media assets
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from apps.curriculum.models import Course, Lesson
-    from apps.curriculum.content_generator import LessonContentGenerator
     from apps.dashboard.models import CurriculumUpload
-    
-    logger.info(f"Starting async content generation for course {course_id}")
-    
+
+    logger.info(f"Starting parallel content generation for course {course_id}")
+
     # Get course
     course = Course.objects.get(id=course_id)
     institution_id = course.institution_id
-    
+
     # Get upload if provided (for progress tracking)
     upload = None
     if upload_id:
@@ -71,125 +74,107 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
             upload = CurriculumUpload.objects.get(id=upload_id)
         except CurriculumUpload.DoesNotExist:
             pass
-    
+
+    # Thread-safe logging
+    _log_lock = threading.Lock()
+
     def log(message):
-        """Log to both logger and upload record."""
+        """Thread-safe log to both logger and upload record."""
         logger.info(message)
         if upload:
-            upload.add_log(message)
-    
-    try:
-        # Initialize generator
-        generator = LessonContentGenerator(institution_id=institution_id)
+            with _log_lock:
+                upload.add_log(message)
 
+    try:
         # Get all lessons
         lessons = Lesson.objects.filter(
             unit__course=course
         ).order_by('unit__order_index', 'order_index')
 
         total = lessons.count()
-        log(f"📝 Phase 1: Generating tutoring content for {total} lessons...")
-        
+
         if upload:
             upload.current_step = 4
             upload.status = 'processing'
             upload.save()
-        
-        success = 0
-        failed = 0
+
+        # Separate lessons that need generation from those that can be skipped
+        to_generate = []
         skipped = 0
-        total_steps = 0
-        
-        for idx, lesson in enumerate(lessons):
-            # Skip if already has content
+        for lesson in lessons:
             existing_steps = lesson.steps.count()
             if existing_steps >= 5:
                 skipped += 1
-                log(f"   [{idx+1}/{total}] ⏭️ {lesson.title} (already has {existing_steps} steps)")
-                continue
-            
-            try:
-                log(f"   [{idx+1}/{total}] 🔄 {lesson.title}...")
-                
-                result = generator.generate_for_lesson(lesson, save_to_db=True)
-                
-                if result.get('success'):
-                    steps = result.get('steps_generated', 0)
-                    total_steps += steps
-                    success += 1
-                    log(f"   [{idx+1}/{total}] ✓ {lesson.title}: {steps} steps")
-                else:
-                    failed += 1
-                    error = result.get('error', 'Unknown error')
-                    log(f"   [{idx+1}/{total}] ⚠️ {lesson.title}: {error}")
-                    
-            except Exception as e:
-                failed += 1
-                log(f"   [{idx+1}/{total}] ❌ {lesson.title}: {str(e)}")
-                logger.error(f"Content generation error: {e}")
-        
-        log(f"")
-        log(f"📊 Content Generation Summary:")
-        log(f"   ✓ Success: {success} lessons ({total_steps} steps)")
-        log(f"   ⏭️ Skipped: {skipped} (already had content)")
-        log(f"   ❌ Failed: {failed}")
-        
-        # Phase 2: Generate media if requested
-        media_generated = 0
-        if generate_media:
-            log(f"")
-            log(f"🖼️ Phase 2: Generating media assets...")
-            
-            try:
-                media_result = generate_media_for_lessons(course_id, upload)
-                media_generated = media_result.get('generated', 0)
-                log(f"   ✓ Generated {media_generated} media assets")
-            except Exception as e:
-                log(f"   ⚠️ Media generation error: {str(e)}")
-                logger.error(f"Media generation error: {e}")
-        
-        # Phase 3: Generate exit tickets
-        exit_tickets_generated = 0
-        log(f"")
-        log(f"📝 Phase 3: Generating exit tickets...")
-        
-        try:
-            exit_result = generate_exit_tickets_for_lessons(course_id, upload)
-            exit_tickets_generated = exit_result.get('generated', 0)
-            log(f"   ✓ Generated exit tickets for {exit_tickets_generated} lessons")
-        except Exception as e:
-            log(f"   ⚠️ Exit ticket generation error: {str(e)}")
-            logger.error(f"Exit ticket generation error: {e}")
-        
-        # Phase 4: Extract skills and build knowledge graph
-        skills_extracted = 0
-        prerequisites_created = 0
-        log(f"")
-        log(f"🧠 Phase 4: Extracting skills and building knowledge graph...")
+                log(f"   ⏭️ {lesson.title} (already has {existing_steps} steps)")
+            else:
+                to_generate.append(lesson.id)
 
-        try:
-            from apps.tutoring.skill_extraction import SkillExtractionService
-            skill_service = SkillExtractionService(institution_id=institution_id)
-            skill_result = skill_service.extract_skills_for_course(course)
-            skills_extracted = skill_result.get('skills_created', 0)
-            prerequisites_created = skill_result.get('prerequisites_created', 0)
-            log(f"   ✓ Extracted {skills_extracted} skills, {prerequisites_created} prerequisites")
-            if skill_result.get('errors'):
-                for error in skill_result['errors'][:5]:
-                    log(f"   ⚠️ {error}")
-        except Exception as e:
-            log(f"   ⚠️ Skill extraction error: {str(e)}")
-            logger.error(f"Skill extraction error: {e}")
+        log(f"📝 Generating content for {len(to_generate)} lessons ({skipped} skipped, {total} total)...")
+        log(f"   Using 2 parallel workers")
+        log(f"")
+
+        # Process lessons in parallel
+        success = 0
+        failed = 0
+        total_steps = 0
+        total_media = 0
+        total_exit = 0
+        total_skills = 0
+
+        cancelled = False
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {
+                executor.submit(
+                    generate_complete_lesson, lesson_id, institution_id, log
+                ): lesson_id
+                for lesson_id in to_generate
+            }
+
+            for future in as_completed(futures):
+                lesson_id = futures[future]
+                try:
+                    result = future.result()
+                    if result.get('success'):
+                        success += 1
+                        total_steps += result.get('steps', 0)
+                        total_media += result.get('media', 0)
+                        total_exit += result.get('exit_questions', 0)
+                        total_skills += result.get('skills', 0)
+                    else:
+                        failed += 1
+                except Exception as e:
+                    failed += 1
+                    log(f"   ❌ Lesson {lesson_id}: {str(e)}")
+                    logger.error(f"Parallel generation error for lesson {lesson_id}: {e}")
+
+                # Check for cancellation after each completed future
+                if upload:
+                    upload.refresh_from_db()
+                    if upload.is_cancelled:
+                        log(f"⛔ Generation cancelled by teacher.")
+                        cancelled = True
+                        # Cancel remaining futures
+                        for f in futures:
+                            f.cancel()
+                        break
+
+        # If cancelled, reset any remaining 'generating' lessons
+        if cancelled:
+            Lesson.objects.filter(
+                unit__course=course,
+                content_status='generating',
+            ).update(content_status='empty')
 
         # Summary
         log(f"")
         log(f"🎉 All Done!")
-        log(f"   📚 {success} lessons with tutoring content")
+        log(f"   📚 {success} lessons with content")
         log(f"   📝 {total_steps} total tutoring steps")
-        if generate_media:
-            log(f"   🖼️ {media_generated} media assets")
-        log(f"   ❓ {exit_tickets_generated} exit tickets")
-        log(f"   🧠 {skills_extracted} skills extracted, {prerequisites_created} prerequisites")
+        log(f"   🖼️ {total_media} media assets")
+        log(f"   ❓ {total_exit} exit tickets")
+        log(f"   🧠 {total_skills} skills extracted")
+        log(f"   ⏭️ {skipped} skipped (already had content)")
+        log(f"   ❌ {failed} failed")
 
         # Update upload record
         if upload:
@@ -204,12 +189,11 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
             'failed': failed,
             'skipped': skipped,
             'total_steps': total_steps,
-            'media_generated': media_generated,
-            'exit_tickets_generated': exit_tickets_generated,
-            'skills_extracted': skills_extracted,
-            'prerequisites_created': prerequisites_created,
+            'media_generated': total_media,
+            'exit_tickets_generated': total_exit,
+            'skills_extracted': total_skills,
         }
-        
+
     except Exception as e:
         log(f"❌ Fatal error: {str(e)}")
         if upload:
@@ -308,14 +292,14 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
         if upload:
             upload.add_log(message)
     
-    # Get LLM config
-    config = ModelConfig.get_for('generation')
+    # Get LLM config (prefer exit_tickets purpose, fallback to any active)
+    config = ModelConfig.get_for('exit_tickets')
     if not config:
         logger.error("No active LLM model configured for exit ticket generation")
         return {'generated': 0, 'failed': 0, 'skipped': 0}
-    
+
     client = get_llm_client(config)
-    
+
     lessons = Lesson.objects.filter(unit__course_id=course_id)
     generated = 0
     failed = 0
@@ -705,6 +689,266 @@ def generate_media_async(course_id: int, upload_id: int = None, force_regenerate
             upload.error_message = str(e)
             upload.save()
         raise
+
+
+def generate_exit_ticket_for_lesson(lesson, institution) -> int:
+    """
+    Generate exit ticket MCQs for a lesson.
+    Returns the number of questions generated.
+    """
+    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+    import json
+
+    # Get LLM config (prefer exit_tickets purpose, fallback to any active)
+    config = ModelConfig.get_for('exit_tickets')
+    if not config:
+        logger.error("No active LLM model configured for exit ticket generation")
+        return 0
+
+    # Build prompt for exit questions (35 for question bank, 10 selected per session)
+    prompt = f"""Generate exactly 35 multiple choice exit ticket questions for this lesson.
+
+Lesson: {lesson.title}
+Objective: {lesson.objective}
+Subject: {lesson.unit.course.title}
+
+REQUIREMENTS:
+1. Generate EXACTLY 35 questions
+2. Each question must have exactly 4 options (A, B, C, D)
+3. Include one correct answer per question
+4. Include a short concept_tag for each question (the specific concept it tests)
+5. Questions should directly assess the lesson objective
+6. Vary question phrasing — avoid repetitive stems
+
+Return as JSON array:
+[
+  {{
+    "question": "What is...",
+    "option_a": "First option",
+    "option_b": "Second option",
+    "option_c": "Third option",
+    "option_d": "Fourth option",
+    "correct_answer": "A",
+    "explanation": "Brief explanation of why A is correct",
+    "difficulty": "easy",
+    "concept_tag": "key concept tested"
+  }}
+]
+
+DIFFICULTY DISTRIBUTION (out of 35):
+- Questions 1-12: easy (recall facts)
+- Questions 13-25: medium (apply concepts)
+- Questions 26-35: hard (analyze/evaluate)
+
+Return ONLY the JSON array, no other text."""
+
+    try:
+        client = get_llm_client(config)
+
+        system_prompt = "You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text."
+        messages = [{"role": "user", "content": prompt}]
+
+        response = client.generate(messages, system_prompt, max_tokens=16000)
+        response_text = response.content.strip()
+
+        logger.info(f"Exit ticket response: {len(response_text)} chars, stop={response.stop_reason}")
+
+        from apps.llm.json_utils import parse_llm_json
+        questions_data = parse_llm_json(response_text, expect_array=True)
+
+        if not questions_data or not isinstance(questions_data, list):
+            logger.warning(f"Failed to parse exit ticket JSON for {lesson.title}")
+            return 0
+
+        logger.info(f"Parsed {len(questions_data)} questions for {lesson.title}")
+
+        # Delete existing exit ticket and questions
+        ExitTicket.objects.filter(lesson=lesson).delete()
+
+        # Create new exit ticket
+        exit_ticket = ExitTicket.objects.create(
+            lesson=lesson,
+            passing_score=8,
+            time_limit_minutes=15,
+            instructions="Answer 10 questions. You need 8 correct to pass."
+        )
+
+        # Create questions (up to 35 in the bank, 10 selected per session)
+        questions_created = 0
+        for i, q in enumerate(questions_data[:35]):
+            try:
+                ExitTicketQuestion.objects.create(
+                    exit_ticket=exit_ticket,
+                    question_text=q.get('question', ''),
+                    option_a=q.get('option_a', ''),
+                    option_b=q.get('option_b', ''),
+                    option_c=q.get('option_c', ''),
+                    option_d=q.get('option_d', ''),
+                    correct_answer=q.get('correct_answer', 'A')[:1].upper(),
+                    explanation=q.get('explanation', ''),
+                    concept_tag=q.get('concept_tag', ''),
+                    difficulty=q.get('difficulty', 'medium'),
+                    order_index=i
+                )
+                questions_created += 1
+            except Exception as e:
+                logger.warning(f"Failed to create question {i}: {e}")
+
+        logger.info(f"Created {questions_created} exit questions for {lesson.title}")
+        return questions_created
+
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parse error for exit ticket: {e}")
+        return 0
+    except Exception as e:
+        logger.error(f"Exit ticket generation failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return 0
+
+
+def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
+    """
+    Atomic function that generates all content for one lesson.
+    Designed to be called from ThreadPoolExecutor.
+
+    Pipeline: steps -> media -> exit tickets -> skills
+    """
+    from apps.curriculum.models import Lesson
+    from apps.curriculum.content_generator import LessonContentGenerator
+
+    # Close DB connection for thread safety
+    connection.close()
+
+    lesson = Lesson.objects.get(id=lesson_id)
+
+    def log(msg):
+        if log_fn:
+            log_fn(msg)
+        else:
+            logger.info(msg)
+
+    # Guard: skip if already generating (another worker or request got here first)
+    if lesson.content_status == 'generating':
+        log(f"   ⏭️ {lesson.title} (already generating, skipping)")
+        return {'lesson': lesson.title, 'success': True, 'skipped': True, 'steps': 0, 'media': 0, 'exit_questions': 0, 'skills': 0}
+
+    # Mark as generating
+    lesson.content_status = 'generating'
+    lesson.save(update_fields=['content_status'])
+
+    def _is_cancelled():
+        """Check if lesson generation was cancelled (status changed externally)."""
+        lesson.refresh_from_db()
+        return lesson.content_status != 'generating'
+
+    try:
+        # Step 1: Generate lesson steps
+        generator = LessonContentGenerator(institution_id=institution_id)
+        result = generator.generate_for_lesson(lesson, save_to_db=True)
+
+        if not result.get('success'):
+            lesson.content_status = 'failed'
+            lesson.save(update_fields=['content_status'])
+            log(f"   ⚠️ {lesson.title}: {result.get('error', 'Unknown error')}")
+            return {'lesson': lesson.title, 'success': False, 'error': result.get('error')}
+
+        steps_generated = result.get('steps_generated', 0)
+        log(f"   ✓ {lesson.title}: {steps_generated} steps")
+
+        # Check cancellation before media
+        if _is_cancelled():
+            log(f"   ⛔ {lesson.title}: cancelled")
+            return {'lesson': lesson.title, 'success': True, 'steps': steps_generated, 'media': 0, 'exit_questions': 0, 'skills': 0}
+
+        # Step 2: Generate media
+        media_generated = 0
+        try:
+            from apps.tutoring.image_service import ImageGenerationService
+            from apps.accounts.models import Institution
+            institution = Institution.objects.get(id=institution_id)
+
+            for step in lesson.steps.all():
+                if not step.media:
+                    continue
+                images = step.media.get('images', [])
+                media_updated = False
+                for img in images:
+                    if img.get('url'):
+                        continue
+                    description = img.get('description', '')
+                    if not description:
+                        continue
+                    service = ImageGenerationService(lesson=lesson, institution=institution)
+                    img_result = service.get_or_generate_image(
+                        prompt=description,
+                        category=img.get('type', 'diagram'),
+                        generate_only=True,
+                    )
+                    if img_result and img_result.get('url'):
+                        img['url'] = img_result['url']
+                        img['source'] = 'generated' if img_result.get('generated') else 'library'
+                        media_updated = True
+                        media_generated += 1
+                if media_updated:
+                    step.save()
+
+            if media_generated:
+                log(f"   ✓ {lesson.title}: {media_generated} media assets")
+        except Exception as e:
+            log(f"   ⚠️ {lesson.title} media: {e}")
+
+        # Check cancellation before exit tickets
+        if _is_cancelled():
+            log(f"   ⛔ {lesson.title}: cancelled")
+            return {'lesson': lesson.title, 'success': True, 'steps': steps_generated, 'media': media_generated, 'exit_questions': 0, 'skills': 0}
+
+        # Step 3: Generate exit tickets
+        exit_questions = 0
+        try:
+            exit_questions = generate_exit_ticket_for_lesson(lesson, None)
+            if exit_questions:
+                log(f"   ✓ {lesson.title}: {exit_questions} exit questions")
+        except Exception as e:
+            log(f"   ⚠️ {lesson.title} exit tickets: {e}")
+
+        # Check cancellation before skills
+        if _is_cancelled():
+            log(f"   ⛔ {lesson.title}: cancelled")
+            return {'lesson': lesson.title, 'success': True, 'steps': steps_generated, 'media': media_generated, 'exit_questions': exit_questions, 'skills': 0}
+
+        # Step 4: Extract skills
+        skills_extracted = 0
+        try:
+            from apps.tutoring.skill_extraction import SkillExtractionService
+            skill_service = SkillExtractionService(institution_id=institution_id)
+            skills = skill_service.extract_skills_for_lesson(lesson)
+            skills_extracted = len(skills)
+            if skills_extracted:
+                log(f"   ✓ {lesson.title}: {skills_extracted} skills")
+        except Exception as e:
+            log(f"   ⚠️ {lesson.title} skills: {e}")
+
+        # Mark as ready
+        lesson.content_status = 'ready'
+        lesson.save(update_fields=['content_status'])
+
+        return {
+            'lesson': lesson.title,
+            'success': True,
+            'steps': steps_generated,
+            'media': media_generated,
+            'exit_questions': exit_questions,
+            'skills': skills_extracted,
+        }
+
+    except Exception as e:
+        logger.error(f"Complete lesson generation failed for {lesson.title}: {e}")
+        lesson.content_status = 'failed'
+        lesson.save(update_fields=['content_status'])
+        return {'lesson': lesson.title, 'success': False, 'error': str(e)}
 
 
 def _detect_figure_category(prompt: str) -> str:

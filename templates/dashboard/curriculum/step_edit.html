@@ -135,14 +135,22 @@
                                 <span style="color: var(--warning);">⏳ Pending</span>
                             </div>
                             {% endif %}
-                            <p style="font-size: 0.875rem; margin: 0.5rem 0 0 0; color: var(--gray-600);">{{ img.description }}</p>
+                            <div style="margin-top: 0.5rem;">
+                                <label style="font-size: 0.8rem; font-weight: 500; color: var(--gray-600);">Image Prompt</label>
+                                <textarea name="image_description_{{ forloop.counter0 }}" class="form-control" rows="2" style="font-size: 0.85rem; min-height: 60px;">{{ img.description }}</textarea>
+                            </div>
+                            <div style="margin-top: 0.5rem;">
+                                <button type="submit" form="regenerate-form-{{ forloop.counter0 }}" class="btn btn-secondary btn-sm">
+                                    🔄 Regenerate Image
+                                </button>
+                                <span style="font-size: 0.75rem; color: var(--gray-500); margin-left: 0.5rem;">May take a few seconds</span>
+                            </div>
                         </div>
                         {% endfor %}
                     {% else %}
                         <p style="color: var(--gray-500); margin: 0;">No media attached to this step.</p>
                     {% endif %}
                 </div>
-                <small>Media is generated using the "Generate Media" button on the course page.</small>
             </div>
             
             <div style="display: flex; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200);">
@@ -152,6 +160,17 @@
         </form>
     </div>
 </div>
+
+{% if step.media and step.media.images %}
+{% for img in step.media.images %}
+<form id="regenerate-form-{{ forloop.counter0 }}" method="post" style="display: none;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="regenerate_media">
+    <input type="hidden" name="image_index" value="{{ forloop.counter0 }}">
+</form>
+{% endfor %}
+{% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -161,6 +180,19 @@ document.querySelectorAll('.phase-option').forEach(option => {
         document.querySelectorAll('.phase-option').forEach(o => o.classList.remove('selected'));
         this.classList.add('selected');
         this.querySelector('input').checked = true;
+    });
+});
+
+// When a regenerate form is submitted, copy textarea values into it
+document.querySelectorAll('form[id^="regenerate-form-"]').forEach(function(form) {
+    form.addEventListener('submit', function() {
+        document.querySelectorAll('textarea[name^="image_description_"]').forEach(function(ta) {
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = ta.name;
+            hidden.value = ta.value;
+            form.appendChild(hidden);
+        });
     });
 });
 </script>

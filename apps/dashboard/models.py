@@ -41,6 +41,7 @@ class CurriculumUpload(models.Model):
         default=Status.PENDING
     )
     error_message = models.TextField(blank=True)
+    is_cancelled = models.BooleanField(default=False)
 
     # Processing state
     current_step = models.IntegerField(default=0)  # Track which step we're on
