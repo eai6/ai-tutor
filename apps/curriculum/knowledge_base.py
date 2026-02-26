@@ -213,23 +213,8 @@ class CurriculumKnowledgeBase:
         # Step 3: Index chunks into vector DB
         result = self._index_chunks(chunks)
 
-        # Step 4: Extract and index figures from PDFs (skip for global KB)
+        # TODO: Re-enable figure extraction once image size/rate limit issues are resolved.
         figures_indexed = 0
-        if file_path.lower().endswith('.pdf') and self.institution_id != self.GLOBAL_INSTITUTION_ID:
-            try:
-                from apps.curriculum.curriculum_parser import extract_figures_from_pdf
-                figures = extract_figures_from_pdf(file_path, self.institution_id)
-                if figures:
-                    fig_result = self._process_and_index_figures(
-                        figures=figures,
-                        subject=subject,
-                        grade_level=grade_level,
-                        source_file=os.path.basename(file_path),
-                        upload_id=curriculum_upload_id,
-                    )
-                    figures_indexed = fig_result.get('figures_indexed', 0)
-            except Exception as e:
-                logger.warning(f"Figure extraction failed for {file_path}: {e}")
 
         return {
             "success": True,
@@ -637,23 +622,10 @@ class CurriculumKnowledgeBase:
         # Index into vector DB
         result = self._index_chunks(chunks)
 
-        # Extract and index figures from PDFs (skip for global KB — too expensive for bulk reference content)
+        # TODO: Re-enable figure extraction once image size/rate limit issues are resolved.
+        # The infrastructure is in place (extract_figures_from_pdf, _process_and_index_figures,
+        # query_for_figure_descriptions) — just uncomment when ready.
         figures_indexed = 0
-        if file_path.lower().endswith('.pdf') and self.institution_id != self.GLOBAL_INSTITUTION_ID:
-            try:
-                from apps.curriculum.curriculum_parser import extract_figures_from_pdf
-                figures = extract_figures_from_pdf(file_path, self.institution_id)
-                if figures:
-                    fig_result = self._process_and_index_figures(
-                        figures=figures,
-                        subject=subject,
-                        grade_level=grade_level,
-                        source_file=source_file,
-                        upload_id=upload_id,
-                    )
-                    figures_indexed = fig_result.get('figures_indexed', 0)
-            except Exception as e:
-                logger.warning(f"Figure extraction failed for {file_path}: {e}")
 
         return {
             "success": True,
