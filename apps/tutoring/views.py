@@ -225,9 +225,7 @@ def lesson_catalog(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def generate_image(request):
-    """Generate an educational image using Gemini Imagen."""
-    import os
-
+    """Generate an educational image using Gemini native generation."""
     try:
         data = json.loads(request.body)
         prompt = data.get("prompt", "").strip()
@@ -251,60 +249,27 @@ def generate_image(request):
         )
         return JsonResponse({"error": safety_result.block_reason}, status=400)
 
-    google_key = os.environ.get('GOOGLE_API_KEY')
-    if not google_key:
-        return JsonResponse({"error": "Image generation not configured"}, status=503)
-
     try:
-        from google import genai
-        from google.genai import types
-        from django.core.files.base import ContentFile
-        from apps.media_library.models import MediaAsset
+        from apps.tutoring.image_service import ImageGenerationService
 
-        client = genai.Client(api_key=google_key)
-
-        full_prompt = f"A high-quality detailed educational illustration, clean lines, vibrant colours, suitable for a secondary school textbook. {prompt}"
-
-        response = client.models.generate_images(
-            model='imagen-4.0-generate-001',
-            prompt=full_prompt,
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
-                safety_filter_level="BLOCK_LOW_AND_ABOVE",
-                person_generation="DONT_ALLOW",
-            ),
-        )
-
-        if not response.generated_images:
-            return JsonResponse({"error": "Image generation was blocked by safety filters"}, status=400)
-
-        image_bytes = response.generated_images[0].image.image_bytes
-
-        # Save as MediaAsset
         institution = get_user_institution(request.user)
-        import hashlib
-        prompt_hash = hashlib.md5(prompt.encode()).hexdigest()[:8]
-        filename = f"generated_{prompt_hash}.png"
+        service = ImageGenerationService(institution=institution)
 
-        media_asset = MediaAsset.objects.create(
-            institution=institution,
-            title=prompt[:100],
-            asset_type='image',
-            alt_text=prompt[:200],
-            caption=f"AI-generated: {prompt[:100]}",
-            tags="ai-generated, educational",
+        if not service.available:
+            return JsonResponse({"error": "Image generation not configured or disabled"}, status=503)
+
+        result = service.get_or_generate_image(
+            prompt=prompt,
+            category=data.get('category', 'illustration'),
         )
 
-        media_asset.file.save(
-            filename,
-            ContentFile(image_bytes),
-            save=True
-        )
+        if not result or not result.get('url'):
+            return JsonResponse({"error": "Image generation failed"}, status=500)
 
         return JsonResponse({
-            "url": media_asset.file.url,
-            "title": media_asset.title,
-            "caption": media_asset.caption,
+            "url": result['url'],
+            "title": result.get('title', ''),
+            "caption": result.get('caption', ''),
         })
 
     except Exception as e:

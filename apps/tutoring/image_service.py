@@ -1,23 +1,27 @@
 """
-Image Generation Service - Gemini Imagen with fallback.
+Image Generation Service — Gemini native image generation.
 
-Supports:
-1. Gemini Imagen generation when GOOGLE_API_KEY available and online
-2. Returns None when unavailable (callers handle gracefully)
+Uses gemini-3-pro-image-preview (multimodal LLM) which produces better
+educational diagrams, labeled visuals, and text-in-image than Imagen.
+
+Set ENABLE_IMAGE_GEN=1 in .env to enable.
 """
 
 import os
 import logging
 import hashlib
+import mimetypes
 from typing import Optional, Dict
 from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 
+GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image'
+
 
 class ImageGenerationService:
     """
-    Generate images with Gemini Imagen.
+    Generate images with Gemini native image generation.
 
     Usage:
         service = ImageGenerationService(lesson)
@@ -31,86 +35,100 @@ class ImageGenerationService:
     def __init__(self, lesson=None, institution=None):
         self.lesson = lesson
         self.institution = institution
-        self.imagen_available = self._check_imagen_available()
+        self.available = self._check_available()
 
-    def _check_imagen_available(self) -> bool:
-        """Check if Gemini Imagen API is available."""
-        # Disabled until image quality is acceptable
-        # Set ENABLE_IMAGEN=1 in .env to re-enable
-        if not os.environ.get('ENABLE_IMAGEN'):
+    def _check_available(self) -> bool:
+        """Check if Gemini image generation is available."""
+        if os.environ.get('DISABLE_IMAGE_GEN'):
             return False
 
-        api_key = os.environ.get('GOOGLE_API_KEY')
+        api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
         if not api_key:
-            logger.info("Imagen not available: No GOOGLE_API_KEY")
+            logger.info("Image generation not available: No GOOGLE_API_KEY or GEMINI_API_KEY")
             return False
 
-        try:
-            import requests
-            response = requests.head(
-                'https://generativelanguage.googleapis.com', timeout=2
-            )
-            return True
-        except Exception:
-            logger.info("Imagen not available: No internet connection")
-            return False
+        return True
 
     def get_or_generate_image(
         self,
         prompt: str,
         category: str = "general",
         textbook_context: str = "",
-        **kwargs  # Ignore extra args for compatibility
+        **kwargs
     ) -> Optional[Dict]:
         """
-        Generate a new image with Gemini Imagen.
+        Generate a new image with Gemini.
 
         Args:
             prompt: Description of the image needed
             category: Type of image (diagram, photo, illustration, etc.)
-            textbook_context: Optional description of the textbook figure style to match
+            textbook_context: Optional description of the textbook figure style
 
         Returns:
             Dict with 'url', 'title', 'caption', 'generated' keys, or None
         """
-        if self.imagen_available:
-            generated = self._generate_with_imagen(prompt, category, textbook_context)
+        if self.available:
+            generated = self._generate_with_gemini(prompt, category, textbook_context)
             if generated:
                 return generated
 
-        logger.warning(f"Imagen unavailable for: {prompt[:50]}...")
+        logger.warning(f"Image generation unavailable for: {prompt[:50]}...")
         return None
 
-    def _generate_with_imagen(self, prompt: str, category: str, textbook_context: str = "") -> Optional[Dict]:
-        """Generate image with Gemini Imagen API."""
+    def _generate_with_gemini(self, prompt: str, category: str, textbook_context: str = "") -> Optional[Dict]:
+        """Generate image with Gemini native image generation."""
         try:
             from google import genai
             from google.genai import types
 
-            client = genai.Client(api_key=os.environ['GOOGLE_API_KEY'])
+            api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
+            client = genai.Client(api_key=api_key)
 
             enhanced_prompt = self._enhance_prompt(prompt, category, textbook_context)
 
-            logger.info(f"Generating Imagen image: {enhanced_prompt[:100]}...")
+            logger.info(f"Generating image with {GEMINI_IMAGE_MODEL}: {enhanced_prompt[:100]}...")
 
-            response = client.models.generate_images(
-                model='imagen-4.0-generate-001',
-                prompt=enhanced_prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    safety_filter_level="BLOCK_LOW_AND_ABOVE",
-                    person_generation="DONT_ALLOW",
+            contents = [
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=enhanced_prompt)],
                 ),
+            ]
+
+            config = types.GenerateContentConfig(
+                image_config=types.ImageConfig(
+                    aspect_ratio="1:1",
+                    image_size="1K",
+                ),
+                response_modalities=["IMAGE", "TEXT"],
             )
 
-            if not response.generated_images:
-                logger.warning("Imagen returned no images (possibly blocked by safety filter)")
+            # Collect image bytes from streamed response
+            image_bytes = None
+            mime_type = None
+
+            for chunk in client.models.generate_content_stream(
+                model=GEMINI_IMAGE_MODEL,
+                contents=contents,
+                config=config,
+            ):
+                if chunk.parts is None:
+                    continue
+                for part in chunk.parts:
+                    if part.inline_data and part.inline_data.data:
+                        image_bytes = part.inline_data.data
+                        mime_type = part.inline_data.mime_type
+
+            if not image_bytes:
+                logger.warning("Gemini returned no image data")
                 return None
 
-            image_bytes = response.generated_images[0].image.image_bytes
+            # Determine file extension from mime type
+            ext = mimetypes.guess_extension(mime_type) if mime_type else '.png'
+            if ext is None:
+                ext = '.png'
 
-            # Save directly from bytes (no URL download needed)
-            saved_url = self._save_generated_image_bytes(image_bytes, prompt)
+            saved_url = self._save_generated_image_bytes(image_bytes, prompt, ext)
 
             return {
                 'url': saved_url,
@@ -121,17 +139,11 @@ class ImageGenerationService:
             }
 
         except Exception as e:
-            logger.error(f"Imagen generation failed: {e}")
+            logger.error(f"Gemini image generation failed: {e}")
             return None
 
     def _enhance_prompt(self, prompt: str, category: str, textbook_context: str = "") -> str:
-        """Enhance prompt for better Imagen 4 results.
-
-        Applies best practices from the Imagen prompt guide:
-        - Subject + context + style structure
-        - Category-specific descriptive language and quality modifiers
-        - Keeps total under 480 tokens
-        """
+        """Enhance prompt for better Gemini image results."""
         from apps.llm.prompts import get_prompt_or_default
         institution_id = self.institution.id if self.institution else None
         context = get_prompt_or_default(
@@ -141,63 +153,59 @@ class ImageGenerationService:
 
         style_map = {
             'diagram': (
-                "A high-quality detailed educational diagram with clear labels, "
+                "Create a detailed educational diagram with clear labels, "
                 "arrows, and annotations on a clean white background. "
-                "Professional, precise, suitable for a textbook. "
+                "Make it precise and suitable for a textbook. "
             ),
             'photo': (
-                "A high-quality 4K photograph, sharp focus, natural lighting, "
-                "taken by a professional photographer. "
+                "Create a high-quality photorealistic image, sharp focus, "
+                "natural lighting. "
             ),
             'illustration': (
-                "A high-quality colorful digital educational illustration, "
-                "clean lines, detailed, vibrant colours, suitable for a "
+                "Create a colorful digital educational illustration with "
+                "clean lines, vibrant colours, suitable for a "
                 "secondary school textbook. "
             ),
             'map': (
-                "A high-quality detailed geographic map with clear labels, "
+                "Create a detailed geographic map with clear labels, "
                 "a legend, compass rose, and distinct colour-coded regions. "
-                "Professional cartographic style. "
+                "Use a professional cartographic style. "
             ),
             'chart': (
-                "A high-quality professional chart with clear axis labels, "
+                "Create a professional chart with clear axis labels, "
                 "a title, distinct colours, and a clean white background. "
-                "Suitable for a textbook or presentation. "
             ),
             'flowchart': (
-                "A high-quality flowchart with clear boxes, directional arrows, "
+                "Create a flowchart with clear boxes, directional arrows, "
                 "and concise labels on a clean white background. "
-                "Professional, easy to follow. "
+                "Make it easy to follow. "
             ),
             'infographic': (
-                "A high-quality detailed educational infographic with icons, "
+                "Create a detailed educational infographic with icons, "
                 "short text labels, vibrant colours, and a clear visual hierarchy. "
             ),
         }
 
         style = style_map.get(category, (
-            "A high-quality detailed educational visual, clear and professional, "
+            "Create a detailed educational visual, clear and professional, "
             "suitable for a secondary school textbook. "
         ))
 
         textbook_style = ""
         if textbook_context:
-            textbook_style = f"In the style of: {textbook_context}. "
+            textbook_style = f"Match this style: {textbook_context}. "
 
-        # Build final prompt: style + context + textbook ref + user prompt
-        # Keep concise to stay under 480 token limit
-        enhanced = f"{style}{context}{textbook_style}{prompt}"
-        return enhanced[:1500]
+        return f"{style}{context}{textbook_style}{prompt}"
 
     def _save_generated_image_bytes(
-        self, image_bytes: bytes, prompt: str
+        self, image_bytes: bytes, prompt: str, ext: str = '.png'
     ) -> Optional[str]:
         """Save generated image bytes to media library."""
         try:
             from apps.media_library.models import MediaAsset
 
             prompt_hash = hashlib.md5(prompt.encode()).hexdigest()[:8]
-            filename = f"generated_{prompt_hash}.png"
+            filename = f"generated_{prompt_hash}{ext}"
 
             asset = MediaAsset.objects.create(
                 institution=self.institution,
