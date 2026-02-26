@@ -177,17 +177,35 @@ def extract_figures_from_pdf(file_path: str, institution_id: int = None) -> List
         return []
 
     # Identify pages with meaningful figures
+    MAX_IMAGE_BYTES = 4_500_000  # Stay under Anthropic's 5MB limit
     pages_with_figures = []
     for page_num in range(len(doc)):
         page = doc[page_num]
         if _has_meaningful_figures(page):
-            # Render page at 100 DPI for vision analysis (lower = fewer tokens)
+            # Render page at 100 DPI for vision analysis
             pix = page.get_pixmap(dpi=100)
             image_bytes = pix.tobytes("png")
+            media_type = 'image/png'
+
+            # If PNG exceeds size limit, fall back to JPEG
+            if len(image_bytes) > MAX_IMAGE_BYTES:
+                image_bytes = pix.tobytes("jpeg")
+                media_type = 'image/jpeg'
+
+            # If still too large, reduce DPI
+            if len(image_bytes) > MAX_IMAGE_BYTES:
+                pix = page.get_pixmap(dpi=72)
+                image_bytes = pix.tobytes("jpeg")
+                media_type = 'image/jpeg'
+
+            if len(image_bytes) > MAX_IMAGE_BYTES:
+                logger.warning(f"Page {page_num + 1} image still too large ({len(image_bytes)} bytes), skipping")
+                continue
+
             pages_with_figures.append({
                 'page_number': page_num + 1,
                 'image_bytes': image_bytes,
-                'media_type': 'image/png',
+                'media_type': media_type,
             })
 
     doc.close()
@@ -235,14 +253,16 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
         List of figure dicts with descriptions and metadata
     """
     import base64
-    from apps.llm.models import ModelConfig
-    from apps.llm.client import get_llm_client
+    import anthropic
 
-    config = ModelConfig.get_for('generation')
-    if not config:
-        raise RuntimeError("No active LLM model configured for figure extraction")
+    # Use Haiku directly for figure extraction — cheapest, fastest, 50k token/min
+    # limit (vs 30k for Sonnet/Opus). Fully multimodal and good enough for
+    # describing figures. We bypass ModelConfig to avoid needing a DB entry.
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY not set for figure extraction")
 
-    client = get_llm_client(config)
+    haiku_client = anthropic.Anthropic(api_key=api_key)
 
     # Build multimodal message with all page images
     content_parts = [
@@ -287,14 +307,15 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
 
     messages = [{"role": "user", "content": content_parts}]
 
-    response = client.generate(
-        messages=messages,
-        system_prompt="You are an expert at analyzing educational documents. Extract figure descriptions precisely. Return only valid JSON.",
+    response = haiku_client.messages.create(
+        model="claude-haiku-4-5-20251001",
         max_tokens=4096,
+        system="You are an expert at analyzing educational documents. Extract figure descriptions precisely. Return only valid JSON.",
+        messages=messages,
     )
 
     # Parse response
-    response_text = response.content.strip()
+    response_text = response.content[0].text.strip()
     if '```' in response_text:
         if '```json' in response_text:
             response_text = response_text.split('```json')[1].split('```')[0]
