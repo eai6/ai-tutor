@@ -1,10 +1,11 @@
 """
 Image Generation Service — Gemini native image generation.
 
-Uses gemini-3-pro-image-preview (multimodal LLM) which produces better
-educational diagrams, labeled visuals, and text-in-image than Imagen.
+Primary: gemini-3-pro-image-preview (Nano Banana Pro) — best quality for
+educational diagrams, labeled visuals, and text-in-image.
+Fallback: gemini-2.5-flash-image (Nano Banana) — used when primary is 503.
 
-Set ENABLE_IMAGE_GEN=1 in .env to enable.
+Set DISABLE_IMAGE_GEN=1 in .env to disable.
 """
 
 import os
@@ -16,7 +17,8 @@ from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 
-GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image'
+PRIMARY_MODEL = 'gemini-2.5-flash-image'
+FALLBACK_MODEL = 'gemini-2.5-flash-image'
 
 
 class ImageGenerationService:
@@ -76,39 +78,48 @@ class ImageGenerationService:
         return None
 
     def _generate_with_gemini(self, prompt: str, category: str, textbook_context: str = "") -> Optional[Dict]:
-        """Generate image with Gemini native image generation."""
+        """Generate image — tries PRIMARY_MODEL, falls back to FALLBACK_MODEL on 503."""
+        from google import genai
+        from google.genai import types
+
+        api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
+        client = genai.Client(api_key=api_key)
+
+        enhanced_prompt = self._enhance_prompt(prompt, category, textbook_context)
+
+        contents = [
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=enhanced_prompt)],
+            ),
+        ]
+
+        config = types.GenerateContentConfig(
+            image_config=types.ImageConfig(
+                aspect_ratio="1:1",
+                image_size="1K",
+            ),
+            response_modalities=["IMAGE", "TEXT"],
+        )
+
+        for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
+            result = self._call_model(client, model, contents, config, prompt)
+            if result is not None:
+                return result
+
+        logger.warning("Both primary and fallback image models failed")
+        return None
+
+    def _call_model(self, client, model: str, contents, config, prompt: str) -> Optional[Dict]:
+        """Stream image from a single model. Returns result dict or None."""
         try:
-            from google import genai
-            from google.genai import types
+            logger.info(f"Generating image with {model}: {prompt[:80]}...")
 
-            api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
-            client = genai.Client(api_key=api_key)
-
-            enhanced_prompt = self._enhance_prompt(prompt, category, textbook_context)
-
-            logger.info(f"Generating image with {GEMINI_IMAGE_MODEL}: {enhanced_prompt[:100]}...")
-
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=enhanced_prompt)],
-                ),
-            ]
-
-            config = types.GenerateContentConfig(
-                image_config=types.ImageConfig(
-                    aspect_ratio="1:1",
-                    image_size="1K",
-                ),
-                response_modalities=["IMAGE", "TEXT"],
-            )
-
-            # Collect image bytes from streamed response
             image_bytes = None
             mime_type = None
 
             for chunk in client.models.generate_content_stream(
-                model=GEMINI_IMAGE_MODEL,
+                model=model,
                 contents=contents,
                 config=config,
             ):
@@ -120,26 +131,31 @@ class ImageGenerationService:
                         mime_type = part.inline_data.mime_type
 
             if not image_bytes:
-                logger.warning("Gemini returned no image data")
+                logger.warning(f"{model}: No image data in response")
                 return None
 
-            # Determine file extension from mime type
             ext = mimetypes.guess_extension(mime_type) if mime_type else '.png'
             if ext is None:
                 ext = '.png'
 
             saved_url = self._save_generated_image_bytes(image_bytes, prompt, ext)
 
+            logger.info(f"Image generated successfully with {model}")
             return {
                 'url': saved_url,
                 'title': prompt[:100],
                 'caption': f"AI-generated: {prompt[:200]}",
                 'alt_text': prompt,
                 'generated': True,
+                'model': model,
             }
 
         except Exception as e:
-            logger.error(f"Gemini image generation failed: {e}")
+            err = str(e)
+            if '503' in err or 'UNAVAILABLE' in err.upper() or 'overloaded' in err.lower():
+                logger.warning(f"{model} unavailable (503), trying fallback...")
+                return None
+            logger.error(f"{model} failed: {err[:300]}")
             return None
 
     def _enhance_prompt(self, prompt: str, category: str, textbook_context: str = "") -> str:
