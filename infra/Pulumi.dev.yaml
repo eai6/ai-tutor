@@ -1,0 +1,8 @@
+config:
+  azure-native:location: eastus
+  # Set secrets via CLI:
+  #   pulumi config set --secret aitutor:db-password "..."
+  #   pulumi config set --secret aitutor:django-secret-key "..."
+  #   pulumi config set --secret aitutor:anthropic-api-key "..."
+  #   pulumi config set --secret aitutor:openai-api-key "..."
+  #   pulumi config set --secret aitutor:google-api-key "..."

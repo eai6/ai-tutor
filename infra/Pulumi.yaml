@@ -1,0 +1,6 @@
+name: aitutor
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: AI Tutor – Azure Container Apps infrastructure

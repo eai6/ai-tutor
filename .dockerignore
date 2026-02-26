@@ -1,0 +1,15 @@
+db.sqlite3
+.env
+__pycache__
+*.pyc
+.git
+media/
+openstax_resources/
+seychelles_package/
+infra/
+.claude/
+*.md
+venv/
+archives/
+design/
+docs/

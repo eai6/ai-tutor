@@ -20,13 +20,15 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 
+from apps.dashboard.views_health import health_check
+
 urlpatterns = [
+    path('health/', health_check),
     path('admin/', admin.site.urls),
     path('', include('apps.accounts.urls')),  # Landing page at root
     path('tutor/', include('apps.tutoring.urls')),
     path('dashboard/', include('apps.dashboard.urls')),
 ]
 
-# Serve media files in development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Always serve media (Azure Files mount in production)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
