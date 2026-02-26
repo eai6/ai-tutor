@@ -99,7 +99,7 @@ class PromptPack(models.Model):
 class ModelConfig(models.Model):
     """
     Configuration for which LLM to use and how to call it.
-    
+
     Design decision: API keys are stored as references (env var names),
     not actual secrets. The runtime looks up the actual key from env.
     """
@@ -108,6 +108,10 @@ class ModelConfig(models.Model):
         OPENAI = 'openai', 'OpenAI (GPT)'
         AZURE_OPENAI = 'azure_openai', 'Azure OpenAI'
         LOCAL_OLLAMA = 'local_ollama', 'Local (Ollama)'
+
+    class Purpose(models.TextChoices):
+        GENERATION = 'generation', 'Content Generation (Curriculum, Lessons)'
+        TUTORING = 'tutoring', 'Student Tutoring'
 
     institution = models.ForeignKey(
         Institution,
@@ -142,7 +146,13 @@ class ModelConfig(models.Model):
     # Generation parameters
     max_tokens = models.PositiveIntegerField(default=1024)
     temperature = models.FloatField(default=0.7)
-    
+
+    purpose = models.CharField(
+        max_length=20,
+        choices=Purpose.choices,
+        default=Purpose.GENERATION,
+    )
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -153,3 +163,11 @@ class ModelConfig(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.model_name} ({self.institution.slug})"
+
+    @classmethod
+    def get_for(cls, purpose: str):
+        """Get active config for a specific purpose, with fallback to any active config."""
+        config = cls.objects.filter(is_active=True, purpose=purpose).first()
+        if not config:
+            config = cls.objects.filter(is_active=True).first()
+        return config

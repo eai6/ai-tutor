@@ -405,26 +405,32 @@ def curriculum_list(request):
         Course.objects.all(), institution
     ).prefetch_related('units__lessons').order_by('grade_level', 'title')
 
-    # Enrich with stats
+    from apps.dashboard.models import TeachingMaterialUpload
+
+    # Enrich with stats + per-course materials
     course_data = []
     for course in courses:
         total_lessons = Lesson.objects.filter(unit__course=course).count()
         published_lessons = Lesson.objects.filter(unit__course=course, is_published=True).count()
+        materials = TeachingMaterialUpload.objects.filter(course=course)
 
         course_data.append({
             'course': course,
             'unit_count': course.units.count(),
             'total_lessons': total_lessons,
             'published_lessons': published_lessons,
+            'materials': materials,
+            'material_count': materials.count(),
         })
 
-    from apps.dashboard.models import TeachingMaterialUpload
-    materials = filter_by_institution(TeachingMaterialUpload.objects.all(), institution)
+    unlinked_materials = TeachingMaterialUpload.objects.filter(
+        institution=institution, course__isnull=True
+    )
 
     context = {
         **request.staff_ctx,
         'courses': course_data,
-        'materials': materials,
+        'unlinked_materials': unlinked_materials,
     }
 
     return render(request, 'dashboard/curriculum/list.html', context)
@@ -1459,7 +1465,7 @@ def generate_exit_ticket_for_lesson(lesson, institution) -> int:
     import json
     
     # Get LLM config
-    config = ModelConfig.objects.filter(is_active=True).first()
+    config = ModelConfig.get_for('generation')
     if not config:
         logger.error("No active LLM model configured for exit ticket generation")
         return 0

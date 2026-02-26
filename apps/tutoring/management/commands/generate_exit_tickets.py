@@ -86,7 +86,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Get LLM client - use first active model config
-        model_config = ModelConfig.objects.filter(is_active=True).first()
+        model_config = ModelConfig.get_for('tutoring')
         if not model_config:
             raise CommandError("No active model config found. Create one in admin.")
         

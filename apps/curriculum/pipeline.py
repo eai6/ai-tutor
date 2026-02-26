@@ -180,12 +180,12 @@ def generate_lesson_structure(
         raise ValueError("No curriculum content available")
     
     # Get LLM client
-    model_config = ModelConfig.objects.filter(is_active=True).first()
+    model_config = ModelConfig.get_for('generation')
     if not model_config:
         raise ValueError("No active LLM model configured")
-    
+
     llm_client = get_llm_client(model_config)
-    
+
     # Generate lesson structure with LLM
     prompt = f"""You are a curriculum design expert. Analyze this {subject} curriculum for {grade_level} students and create a well-organized lesson structure.
 
@@ -223,34 +223,66 @@ Return ONLY valid JSON in this exact format:
     ]
 }}"""
 
+    system_prompt = "You are a curriculum design expert. Create well-structured educational content. Return only valid JSON."
+
     response = llm_client.generate(
         messages=[{"role": "user", "content": prompt}],
-        system_prompt="You are a curriculum design expert. Create well-structured educational content. Return only valid JSON.",
+        system_prompt=system_prompt,
+        max_tokens=8192,
     )
-    
+
     content = response.content.strip()
-    
+    is_truncated = response.stop_reason and response.stop_reason not in ('end_turn', 'stop')
+
+    if is_truncated:
+        logger.warning(f"LLM response may be truncated (stop_reason={response.stop_reason}, length={len(content)})")
+
     # Parse JSON response with better error handling
     content = _clean_json_response(content)
-    
+
     try:
         structure = json.loads(content)
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse error at position {e.pos}: {e.msg}")
         logger.error(f"Content around error: ...{content[max(0, e.pos-50):e.pos+50]}...")
         logger.error(f"Full response length: {len(content)}")
-        
+
         # Try to fix common JSON issues
         structure = _try_fix_json(content)
+
+        # If still broken and response was truncated, retry once with concise prompt
+        if structure is None and is_truncated:
+            logger.warning("Retrying lesson structure generation with concise prompt after truncation")
+            retry_prompt = prompt + (
+                "\n\nIMPORTANT: Keep your response concise. "
+                "Limit to the most important units and lessons. "
+                "You MUST complete the full JSON."
+            )
+            retry_response = llm_client.generate(
+                messages=[{"role": "user", "content": retry_prompt}],
+                system_prompt=system_prompt,
+                max_tokens=8192,
+            )
+            retry_content = _clean_json_response(retry_response.content.strip())
+            try:
+                structure = json.loads(retry_content)
+            except json.JSONDecodeError:
+                structure = _try_fix_json(retry_content)
+
         if structure is None:
             raise ValueError(f"Could not parse LLM response as JSON: {e.msg}")
-    
+
     # Validate and clean
     return _validate_lesson_structure(structure, subject, grade_level)
 
 
-def _clean_json_response(content: str) -> str:
-    """Clean LLM response to get valid JSON."""
+def _clean_json_response(content: str, truncated: bool = False) -> str:
+    """
+    Clean LLM response to get valid JSON.
+
+    If the JSON is truncated (brace_count never reaches 0), returns the raw
+    content so that _repair_truncated_json / _try_fix_json can handle it.
+    """
     # Remove markdown code blocks
     if '```' in content:
         parts = content.split('```')
@@ -261,7 +293,7 @@ def _clean_json_response(content: str) -> str:
             if part.startswith('{'):
                 content = part
                 break
-    
+
     # Find the JSON object boundaries
     if content.startswith('{'):
         brace_count = 0
@@ -276,47 +308,115 @@ def _clean_json_response(content: str) -> str:
                     break
         if end_pos > 0:
             content = content[:end_pos]
-    
+        elif brace_count > 0:
+            # JSON is truncated — braces never balanced
+            logger.warning(f"JSON appears truncated (unclosed braces: {brace_count})")
+
     return content.strip()
+
+
+def _repair_truncated_json(content: str) -> Optional[Dict]:
+    """
+    Attempt to repair JSON that was truncated mid-stream (e.g. stop_reason='max_tokens').
+
+    Uses a stack to track bracket order and closes them correctly.
+    """
+    import re
+
+    text = content.rstrip()
+
+    # If we're inside an unclosed string (odd unescaped quotes), strip back
+    quote_count = 0
+    for i, ch in enumerate(text):
+        if ch == '"' and (i == 0 or text[i-1] != '\\'):
+            quote_count += 1
+    if quote_count % 2 != 0:
+        for pos in range(len(text) - 1, 0, -1):
+            if text[pos] == '"' and (pos == 0 or text[pos-1] != '\\'):
+                text = text[:pos]
+                break
+
+    # Remove trailing comma, colon, or partial key-value
+    text = re.sub(r'[,:]\s*$', '', text.rstrip())
+    # Strip dangling key without value (e.g. `, "title"` or `{ "title"` at end)
+    text = re.sub(r'([{,])\s*"[^"]*"\s*$', r'\1', text.rstrip())
+    text = re.sub(r'[{,]\s*$', '', text.rstrip())
+
+    # Build bracket stack to know closing order
+    stack = []
+    in_string = False
+    escape_next = False
+    for ch in text:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == '\\' and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            stack.append('}')
+        elif ch == '[':
+            stack.append(']')
+        elif ch in ('}', ']') and stack and stack[-1] == ch:
+            stack.pop()
+
+    # Close open brackets in reverse order
+    text += ''.join(reversed(stack))
+
+    # Clean trailing commas before closing brackets
+    text = re.sub(r',(\s*[}\]])', r'\1', text)
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
 
 
 def _try_fix_json(content: str) -> Optional[Dict]:
     """Try to fix common JSON issues and parse."""
     import re
-    
+
+    # Try 0: Repair truncated JSON (most common failure mode)
+    repaired = _repair_truncated_json(content)
+    if repaired:
+        return repaired
+
     # Try 1: Remove trailing commas before } or ]
     fixed = re.sub(r',(\s*[}\]])', r'\1', content)
     try:
         return json.loads(fixed)
     except:
         pass
-    
+
     # Try 2: Fix unescaped quotes in strings (common LLM issue)
-    # This is a simple heuristic - replace \" that aren't already escaped
     try:
         return json.loads(content.replace('\\"', '"').replace('"', '\\"').replace('\\\\"', '"'))
     except:
         pass
-    
+
     # Try 3: Extract just the units array if the outer structure is broken
     units_match = re.search(r'"units"\s*:\s*\[(.*)\]', content, re.DOTALL)
     if units_match:
         try:
             units_json = '[' + units_match.group(1) + ']'
-            # Clean it up
             units_json = re.sub(r',(\s*[}\]])', r'\1', units_json)
             units = json.loads(units_json)
             return {"units": units}
         except:
             pass
-    
+
     # Try 4: Use ast.literal_eval as fallback
     try:
         import ast
         return ast.literal_eval(content)
     except:
         pass
-    
+
     return None
 
 
@@ -411,12 +511,12 @@ def generate_lesson_content(
     curriculum_context = _build_curriculum_context(context)
     
     # Get LLM client
-    model_config = ModelConfig.objects.filter(is_active=True).first()
+    model_config = ModelConfig.get_for('generation')
     if not model_config:
         raise ValueError("No active LLM model configured")
-    
+
     llm_client = get_llm_client(model_config)
-    
+
     # Generate tutoring steps
     prompt = f"""Create a tutoring session for this lesson:
 
@@ -473,32 +573,63 @@ Return JSON in this format:
     "teaching_tips": ["tip1", "tip2"]
 }}"""
 
+    system_prompt = "You are an expert tutor creating engaging, pedagogically sound tutoring content. Return only valid JSON."
+
     response = llm_client.generate(
         messages=[{"role": "user", "content": prompt}],
-        system_prompt="You are an expert tutor creating engaging, pedagogically sound tutoring content. Return only valid JSON.",
+        system_prompt=system_prompt,
+        max_tokens=8192,
     )
-    
+
     content = response.content.strip()
+    is_truncated = response.stop_reason and response.stop_reason not in ('end_turn', 'stop')
+
+    if is_truncated:
+        logger.warning(f"LLM response may be truncated (stop_reason={response.stop_reason}, length={len(content)})")
+
     content = _clean_json_response(content)
-    
+
     try:
         result = json.loads(content)
-        return {
-            "success": True,
-            "lesson_id": lesson.id,
-            "steps": result.get('steps', []),
-            "exit_ticket": result.get('exit_ticket', []),
-            "key_vocabulary": result.get('key_vocabulary', []),
-            "teaching_tips": result.get('teaching_tips', []),
-            "curriculum_context_used": len(context.chunks) > 0,
-        }
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse lesson content: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "raw_response": content[:500],
-        }
+
+        result = _try_fix_json(content)
+
+        # If still broken and response was truncated, retry once
+        if result is None and is_truncated:
+            logger.warning("Retrying lesson content generation after truncation")
+            retry_prompt = prompt + (
+                "\n\nIMPORTANT: Keep your response concise. "
+                "You MUST complete the full JSON."
+            )
+            retry_response = llm_client.generate(
+                messages=[{"role": "user", "content": retry_prompt}],
+                system_prompt=system_prompt,
+                max_tokens=8192,
+            )
+            retry_content = _clean_json_response(retry_response.content.strip())
+            try:
+                result = json.loads(retry_content)
+            except json.JSONDecodeError:
+                result = _try_fix_json(retry_content)
+
+        if result is None:
+            return {
+                "success": False,
+                "error": str(e),
+                "raw_response": content[:500],
+            }
+
+    return {
+        "success": True,
+        "lesson_id": lesson.id,
+        "steps": result.get('steps', []),
+        "exit_ticket": result.get('exit_ticket', []),
+        "key_vocabulary": result.get('key_vocabulary', []),
+        "teaching_tips": result.get('teaching_tips', []),
+        "curriculum_context_used": len(context.chunks) > 0,
+    }
 
 
 def _build_curriculum_context(context) -> str:
@@ -655,18 +786,18 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
         upload.current_step = 2
         upload.add_log("🔢 Step 2: Vectorizing curriculum into knowledge base...")
         upload.save()
-        
+
         try:
             from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
             kb = CurriculumKnowledgeBase(institution_id=institution_id)
-            
+
             index_result = kb.index_curriculum_document(
                 file_path=upload.file_path,
                 subject=upload.subject_name,
                 grade_level=upload.grade_level or 'S1',
                 curriculum_upload_id=upload.id
             )
-            
+
             upload.add_log(f"   ✓ Created {index_result.get('chunks_created', 0)} chunks")
             upload.add_log(f"   ✓ Indexed into vector database")
         except ImportError as e:
@@ -675,9 +806,9 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
         except Exception as e:
             upload.add_log(f"   ⚠️ Vectorization error: {e}")
             upload.add_log("   Continuing without vectorization...")
-        
+
         upload.save()
-        
+
         # ================================================================
         # STEP 3: GENERATE LESSONS
         # ================================================================

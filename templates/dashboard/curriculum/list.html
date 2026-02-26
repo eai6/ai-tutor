@@ -62,6 +62,58 @@
                         </a>
                     </td>
                 </tr>
+                {% if c.material_count %}
+                <tr class="materials-row" id="materials-row-{{ c.course.id }}" style="display: none;">
+                    <td colspan="7" style="padding: 0.5rem 1rem 1rem 2rem; background: var(--gray-50, #f9fafb);">
+                        <table class="table" style="margin: 0; font-size: 0.875rem;">
+                            <thead>
+                                <tr>
+                                    <th style="padding: 0.4rem 0.75rem;">Title</th>
+                                    <th style="padding: 0.4rem 0.75rem;">Type</th>
+                                    <th style="padding: 0.4rem 0.75rem;">Status</th>
+                                    <th style="padding: 0.4rem 0.75rem;">Chunks</th>
+                                    <th style="padding: 0.4rem 0.75rem;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for m in c.materials %}
+                                <tr>
+                                    <td style="padding: 0.4rem 0.75rem;">
+                                        <span style="font-weight: 500;">{{ m.title }}</span>
+                                        {% if m.description %}
+                                        <div style="font-size: 0.75rem; color: var(--gray-500);">{{ m.description|truncatewords:8 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding: 0.4rem 0.75rem;"><span class="badge badge-secondary">{{ m.get_material_type_display }}</span></td>
+                                    <td style="padding: 0.4rem 0.75rem;">
+                                        {% if m.status == 'completed' %}
+                                            <span class="badge badge-success">Completed</span>
+                                        {% elif m.status == 'processing' %}
+                                            <span class="badge badge-warning">Processing</span>
+                                        {% elif m.status == 'failed' %}
+                                            <span class="badge badge-danger">Failed</span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding: 0.4rem 0.75rem;">{{ m.chunks_created }}</td>
+                                    <td style="padding: 0.4rem 0.75rem;">
+                                        <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary">Details</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="7" style="padding: 0.25rem 1rem 0.5rem; border-top: none;">
+                        <button onclick="var row=document.getElementById('materials-row-{{ c.course.id }}'); var isHidden=row.style.display==='none'; row.style.display=isHidden?'table-row':'none'; this.querySelector('.arrow').textContent=isHidden?'▾':'▸'; " style="background: none; border: none; cursor: pointer; font-size: 0.8125rem; color: var(--primary, #4f46e5); padding: 0;">
+                            <span class="arrow">▸</span> Materials ({{ c.material_count }})
+                        </button>
+                    </td>
+                </tr>
+                {% endif %}
                 {% endfor %}
             </tbody>
         </table>
@@ -82,14 +134,13 @@
 </div>
 {% endif %}
 
-<!-- Teaching Materials -->
-{% if materials %}
+{% if unlinked_materials %}
 <div class="card" style="margin-top: 2rem;">
     <div class="card-header">
-        <h2 class="card-title">Teaching Materials ({{ materials|length }})</h2>
+        <h2 class="card-title">Unlinked Materials ({{ unlinked_materials|length }})</h2>
     </div>
     <div class="card-body" style="padding: 0;">
-        <table class="table">
+        <table class="table" style="font-size: 0.875rem;">
             <thead>
                 <tr>
                     <th>Title</th>
@@ -97,17 +148,16 @@
                     <th>Type</th>
                     <th>Status</th>
                     <th>Chunks</th>
-                    <th>Date</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                {% for m in materials %}
+                {% for m in unlinked_materials %}
                 <tr>
                     <td>
                         <span style="font-weight: 500;">{{ m.title }}</span>
                         {% if m.description %}
-                        <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ m.description|truncatewords:10 }}</div>
+                        <div style="font-size: 0.75rem; color: var(--gray-500);">{{ m.description|truncatewords:8 }}</div>
                         {% endif %}
                     </td>
                     <td>{{ m.subject_name }}{% if m.grade_level %} ({{ m.grade_level }}){% endif %}</td>
@@ -124,7 +174,6 @@
                         {% endif %}
                     </td>
                     <td>{{ m.chunks_created }}</td>
-                    <td>{{ m.created_at|date:"M d, Y" }}</td>
                     <td>
                         <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary">Details</a>
                     </td>

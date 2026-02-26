@@ -46,7 +46,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Get LLM client
-        model_config = ModelConfig.objects.filter(is_active=True).first()
+        model_config = ModelConfig.get_for('generation')
         if not model_config:
             self.stderr.write(self.style.ERROR('No active LLM model configured!'))
             self.stderr.write('Create one in Django admin: /admin/llm/modelconfig/')

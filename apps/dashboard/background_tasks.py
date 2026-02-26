@@ -81,12 +81,12 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
     try:
         # Initialize generator
         generator = LessonContentGenerator(institution_id=institution_id)
-        
+
         # Get all lessons
         lessons = Lesson.objects.filter(
             unit__course=course
         ).order_by('unit__order_index', 'order_index')
-        
+
         total = lessons.count()
         log(f"📝 Phase 1: Generating tutoring content for {total} lessons...")
         

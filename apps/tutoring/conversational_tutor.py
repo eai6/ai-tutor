@@ -647,7 +647,7 @@ class ConversationalTutor:
                 from apps.llm.models import ModelConfig
                 from apps.llm.client import get_llm_client
                 
-                config = ModelConfig.objects.filter(is_active=True).first()
+                config = ModelConfig.get_for('tutoring')
                 if config:
                     self._llm_client = get_llm_client(config)
             except Exception as e:
