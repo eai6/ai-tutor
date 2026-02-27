@@ -142,7 +142,7 @@ pg_server = dbforpostgresql.Server(
     server_name=pg_server_name,
     resource_group_name=rg.name,
     location=rg.location,
-    version=dbforpostgresql.ServerVersion.SERVER_VERSION_16,
+    version=dbforpostgresql.PostgresMajorVersion.POSTGRES_MAJOR_VERSION_16,
     administrator_login="aitutoradmin",
     administrator_login_password=db_password,
     storage=dbforpostgresql.StorageArgs(storage_size_gb=32),

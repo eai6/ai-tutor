@@ -1,8 +1,20 @@
 config:
-  azure-native:location: eastus
+  azure-native:location: centralus
   # Set secrets via CLI:
   #   pulumi config set --secret aitutor:db-password "..."
   #   pulumi config set --secret aitutor:django-secret-key "..."
   #   pulumi config set --secret aitutor:anthropic-api-key "..."
   #   pulumi config set --secret aitutor:openai-api-key "..."
   #   pulumi config set --secret aitutor:google-api-key "..."
+
+  aitutor:db-password:
+    secure: v1:p3XibCNf+Wb0T+4a:RDW004H2p4iv7kEbGMe+gy5Nr1gyk1pJz0NOPfpKvP5y
+  aitutor:django-secret-key:
+    secure: v1:xXTZIklX/MaSNFD3:nz3KCZb5tJr+rjDz0afLmdyV6aRKo2qaNpL8P7Meg2OfEV7G/+caWANiEZfQhGPj0bENnfGmTaNxuFVWd+SpdeaUwddjj0J3+Dsbyl8pJrz/qEk=
+  aitutor:anthropic-api-key:
+    secure: v1:bnLszpmqdnAGDBbx:oMAZcNhIyH95CJ1NTnPlfeDoCH75cSZ2kziatHkQnoi/FhSsiRKXwyTUqPbdcBfogwZYzoftQCwuHW+APvqFmkjQylimfPcz7/6c9REP/rhlOI81Z2C8gV+hwTUj8Pdgk6LrV9dTey3LdTjU9Ug+yQ4tPumWLj3oQjx5MA==
+  aitutor:openai-api-key:
+    secure: v1:+BIrRnvHz4LQp3XM:aFLlLSf8ITo9I+yTyY3djRbks1MaIns2xQ2JXwOJqaOm/SuA3ieVxnvsV9w4eUrFS86xjFL3PEqpIOQNoz+r48/GrFaheADmh3vHc6bkjeDnPbJGe5JQalgLIUsW/jbNfVJQAmWGNtKGYasZy4p7XwW+BrxTjkCwzdw0p2DBCeV5v0Wgfz96qsg9iMNi+cpET0CsFEuH8bCz7iA6pIttn4I9/5XfRQLHQxjbZ9KG0asOUdheDN67
+  aitutor:google-api-key:
+    secure: v1:vY9rjPdMt3sD6duc:5NhjyZxLLe8+tsTV3upsUmi88oG8DU5K89vguejA9AWn6VbRWdZLkpRsPwfOsSf/05Ab+SPxlw==
+encryptionsalt: v1:flztXJ5ejqc=:v1:saempBnC06eJd3wy:UxFxSmE6P7A+vqSZbf6B7U+O3DxUZg==
