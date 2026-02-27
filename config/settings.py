@@ -149,6 +149,9 @@ LOGGING = {
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 
+# Embedding backend: 'openai' (API, fast, no PyTorch) or 'local' (sentence-transformers, offline)
+EMBEDDING_BACKEND = os.getenv('EMBEDDING_BACKEND', 'local')
+
 # Auth settings
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/tutor/'

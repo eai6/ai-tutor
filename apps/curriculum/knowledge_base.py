@@ -127,6 +127,7 @@ class CurriculumKnowledgeBase:
         """Initialize ChromaDB client and embedding function."""
         try:
             import chromadb
+            from django.conf import settings as django_settings
 
             # Use the new persistent client API
             self.chroma_client = chromadb.PersistentClient(
@@ -136,12 +137,25 @@ class CurriculumKnowledgeBase:
             # Reuse shared embedding function (load model only once across all instances)
             if CurriculumKnowledgeBase._shared_embedding_fn is None:
                 from chromadb.utils import embedding_functions
-                CurriculumKnowledgeBase._shared_embedding_fn = (
-                    embedding_functions.SentenceTransformerEmbeddingFunction(
-                        model_name="all-MiniLM-L6-v2"  # Fast, good quality
+
+                embedding_backend = getattr(django_settings, 'EMBEDDING_BACKEND', 'local')
+
+                if embedding_backend == 'openai':
+                    api_key = getattr(django_settings, 'OPENAI_API_KEY', '')
+                    CurriculumKnowledgeBase._shared_embedding_fn = (
+                        embedding_functions.OpenAIEmbeddingFunction(
+                            api_key=api_key,
+                            model_name="text-embedding-3-small",
+                        )
                     )
-                )
-                logger.info("Loaded sentence-transformers embedding model (shared singleton)")
+                    logger.info("Using OpenAI embedding API (text-embedding-3-small)")
+                else:
+                    CurriculumKnowledgeBase._shared_embedding_fn = (
+                        embedding_functions.SentenceTransformerEmbeddingFunction(
+                            model_name="all-MiniLM-L6-v2"
+                        )
+                    )
+                    logger.info("Using local sentence-transformers embedding model")
 
             self.embedding_fn = CurriculumKnowledgeBase._shared_embedding_fn
 

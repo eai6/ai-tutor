@@ -221,6 +221,7 @@ container_app = app.ContainerApp(
                     app.EnvironmentVarArgs(name="OPENAI_API_KEY", secret_ref="openai-api-key"),
                     app.EnvironmentVarArgs(name="GOOGLE_API_KEY", secret_ref="google-api-key"),
                     app.EnvironmentVarArgs(name="DEBUG", value="False"),
+                    app.EnvironmentVarArgs(name="EMBEDDING_BACKEND", value="openai"),
                     app.EnvironmentVarArgs(
                         name="ALLOWED_HOSTS",
                         value="*",
