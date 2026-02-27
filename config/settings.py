@@ -112,6 +112,11 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Vector DB root: defaults to MEDIA_ROOT/vectordb, but can be overridden
+# to use fast local storage (e.g., /tmp/vectordb) in production where
+# MEDIA_ROOT is on a slow Azure File Share (SMB) mount.
+VECTORDB_ROOT = os.getenv('VECTORDB_ROOT', os.path.join(MEDIA_ROOT, 'vectordb'))
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

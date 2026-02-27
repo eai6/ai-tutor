@@ -14,4 +14,4 @@ COPY --from=builder /install /usr/local
 COPY . .
 RUN python manage.py collectstatic --noinput
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 4 --timeout 120"]
+CMD ["sh", "-c", "python manage.py migrate && cp -r /app/media/vectordb /tmp/vectordb 2>/dev/null || true && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 4 --timeout 120"]

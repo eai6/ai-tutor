@@ -222,6 +222,7 @@ container_app = app.ContainerApp(
                     app.EnvironmentVarArgs(name="GOOGLE_API_KEY", secret_ref="google-api-key"),
                     app.EnvironmentVarArgs(name="DEBUG", value="False"),
                     app.EnvironmentVarArgs(name="EMBEDDING_BACKEND", value="openai"),
+                    app.EnvironmentVarArgs(name="VECTORDB_ROOT", value="/tmp/vectordb"),
                     app.EnvironmentVarArgs(
                         name="ALLOWED_HOSTS",
                         value="*",

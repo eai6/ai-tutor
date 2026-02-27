@@ -109,8 +109,8 @@ class CurriculumKnowledgeBase:
         if persist_directory is None:
             from django.conf import settings
             persist_directory = os.path.join(
-                getattr(settings, 'MEDIA_ROOT', '/tmp'),
-                'vectordb',
+                getattr(settings, 'VECTORDB_ROOT',
+                        os.path.join(getattr(settings, 'MEDIA_ROOT', '/tmp'), 'vectordb')),
                 f'institution_{institution_id}'
             )
         
