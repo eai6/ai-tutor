@@ -211,8 +211,8 @@ container_app = app.ContainerApp(
                 name="aitutor",
                 image=image,
                 resources=app.ContainerResourcesArgs(
-                    cpu=1.0,
-                    memory="2Gi",
+                    cpu=2.0,
+                    memory="4Gi",
                 ),
                 env=[
                     app.EnvironmentVarArgs(name="DATABASE_URL", secret_ref="database-url"),
@@ -243,7 +243,9 @@ container_app = app.ContainerApp(
                             path="/health/",
                             port=8000,
                         ),
-                        period_seconds=30,
+                        period_seconds=60,
+                        failure_threshold=5,
+                        timeout_seconds=10,
                     ),
                     app.ContainerAppProbeArgs(
                         type=app.Type.READINESS,
@@ -251,7 +253,9 @@ container_app = app.ContainerApp(
                             path="/health/",
                             port=8000,
                         ),
-                        period_seconds=10,
+                        period_seconds=30,
+                        failure_threshold=3,
+                        timeout_seconds=10,
                     ),
                 ],
             ),

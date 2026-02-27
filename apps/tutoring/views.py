@@ -455,10 +455,18 @@ def chat_respond(request, session_id):
     message = safety_result.filtered_content
 
     # Generate response (non-streaming for Azure Container Apps compatibility)
+    import logging
+    import time
+    logger = logging.getLogger('apps')
+    logger.info(f"[respond] Starting for session {session_id}, message: {message[:50]}")
+
     tutor = ConversationalTutor(session)
 
     try:
+        t0 = time.time()
         result = tutor.respond(message)
+        elapsed = time.time() - t0
+        logger.info(f"[respond] Completed in {elapsed:.1f}s, phase={result.phase}")
         return JsonResponse({
             "message": result.content,
             "phase": result.phase,
@@ -468,8 +476,7 @@ def chat_respond(request, session_id):
             "is_complete": result.is_complete,
         })
     except Exception as e:
-        import logging
-        logging.getLogger('apps').error(f"Tutor respond failed: {e}", exc_info=True)
+        logger.error(f"[respond] Failed: {e}", exc_info=True)
         return JsonResponse({"error": "Something went wrong. Please try again."}, status=500)
 
 
