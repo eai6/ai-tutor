@@ -454,19 +454,23 @@ def chat_respond(request, session_id):
     # Use filtered content
     message = safety_result.filtered_content
 
-    # Stream the LLM response via SSE
+    # Generate response (non-streaming for Azure Container Apps compatibility)
     tutor = ConversationalTutor(session)
 
-    def event_stream():
-        for chunk in tutor.respond_stream(message):
-            yield f"data: {chunk}\n\n"
-
-    response = StreamingHttpResponse(
-        event_stream(), content_type='text/event-stream'
-    )
-    response['Cache-Control'] = 'no-cache'
-    response['X-Accel-Buffering'] = 'no'
-    return response
+    try:
+        result = tutor.respond(message)
+        return JsonResponse({
+            "message": result.content,
+            "phase": result.phase,
+            "media": result.media,
+            "show_exit_ticket": result.show_exit_ticket,
+            "exit_ticket": result.exit_ticket_data,
+            "is_complete": result.is_complete,
+        })
+    except Exception as e:
+        import logging
+        logging.getLogger('apps').error(f"Tutor respond failed: {e}", exc_info=True)
+        return JsonResponse({"error": "Something went wrong. Please try again."}, status=500)
 
 
 @login_required

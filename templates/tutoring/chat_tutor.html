@@ -582,72 +582,31 @@ async function sendMessage() {
             body: JSON.stringify({ message: text }),
         });
 
-        // Non-streaming responses (errors, safety blocks) return JSON
-        const contentType = response.headers.get('Content-Type') || '';
-        if (contentType.includes('application/json')) {
-            const data = await response.json();
-            sendBtn.disabled = false;
-            if (data.error) {
-                showTyping(false);
-                addMessage('tutor', data.error);
-                return;
-            }
-            handleResponse(data);
+        const data = await response.json();
+        showTyping(false);
+        sendBtn.disabled = false;
+
+        if (data.error) {
+            addMessage('tutor', data.error);
             return;
         }
 
-        // Streaming SSE response
-        showTyping(false);
-        const streamDiv = createStreamingMessage();
-        let fullContent = '';
+        // Display tutor response
+        addMessage('tutor', data.message, data.media || []);
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-
-            // Parse SSE lines
-            const lines = buffer.split('\n');
-            buffer = lines.pop(); // keep incomplete line in buffer
-
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                try {
-                    const chunk = JSON.parse(line.slice(6));
-
-                    if (chunk.type === 'token') {
-                        fullContent += chunk.content;
-                        updateStreamingMessage(streamDiv, fullContent);
-                    } else if (chunk.type === 'done') {
-                        // Final metadata
-                        updateStreamingMessage(streamDiv, chunk.content || fullContent, chunk.media);
-                        sendBtn.disabled = false;
-
-                        if (chunk.phase) {
-                            phaseBadge.textContent = chunk.phase.replace('_', ' ');
-                        }
-                        if (chunk.show_exit_ticket && chunk.exit_ticket) {
-                            exitTicketData = chunk.exit_ticket;
-                            setTimeout(() => showExitTicket(), 1000);
-                            return;
-                        }
-                        if (chunk.is_complete) {
-                            showCompletion(chunk.content || fullContent);
-                            return;
-                        }
-                        userInput.focus();
-                    }
-                } catch (e) {
-                    // skip malformed chunks
-                }
-            }
+        if (data.phase) {
+            phaseBadge.textContent = data.phase.replace('_', ' ');
         }
-        sendBtn.disabled = false;
+        if (data.show_exit_ticket && data.exit_ticket) {
+            exitTicketData = data.exit_ticket;
+            setTimeout(() => showExitTicket(), 1000);
+            return;
+        }
+        if (data.is_complete) {
+            showCompletion(data.message);
+            return;
+        }
+        userInput.focus();
 
     } catch (error) {
         console.error('Send error:', error);
