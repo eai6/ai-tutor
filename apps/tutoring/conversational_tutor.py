@@ -487,7 +487,16 @@ class ConversationalTutor:
 
         # Mastery-based transition tracking (R10)
         self.instruction_checks_correct = state.get('instruction_checks_correct', 0)
-        
+
+        # Track whether last practice answer was correct (P4-1)
+        self.last_practice_correct = state.get('last_practice_correct', False)
+
+        # Review mode flag (P4-2)
+        self.is_review = state.get('is_review', False)
+
+        # Media deduplication (P2)
+        self.shown_media_urls = set(state.get('shown_media_urls', []))
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -523,6 +532,12 @@ class ConversationalTutor:
             'failed_exit_questions': getattr(self, 'failed_exit_questions', []),
             # Mastery-based transition tracking (R10)
             'instruction_checks_correct': getattr(self, 'instruction_checks_correct', 0),
+            # Track whether last practice answer was correct (P4-1)
+            'last_practice_correct': getattr(self, 'last_practice_correct', False),
+            # Review mode flag (P4-2)
+            'is_review': getattr(self, 'is_review', False),
+            # Media deduplication (P2)
+            'shown_media_urls': list(getattr(self, 'shown_media_urls', set())),
         }
         self.session.save()
     
@@ -730,7 +745,7 @@ class ConversationalTutor:
     
     def resume(self) -> TutorMessage:
         """Resume an existing conversation."""
-        if self.phase == ConversationPhase.COMPLETED:
+        if self.phase == ConversationPhase.COMPLETED and not getattr(self, 'is_review', False):
             return TutorMessage(
                 content="🎉 You've already completed this lesson! Great work!",
                 phase="completed",
@@ -753,7 +768,31 @@ Keep it to 2-3 sentences."""
 
         response = self._generate_response(prompt)
         return self._create_message(response)
-    
+
+    def start_review(self) -> TutorMessage:
+        """Start a review session for a completed lesson.
+
+        Resets phase to PRACTICE, clears practice counters, and returns
+        an opening review message.
+        """
+        self.phase = ConversationPhase.PRACTICE
+        self.practice_correct = 0
+        self.practice_total = 0
+        self.phase_exchange_count = 0
+        self.last_practice_correct = False
+        self.is_review = True
+
+        self._save_state()
+
+        content = (
+            "Let's review! I'll ask you some practice questions on "
+            f"**{self.lesson.title}** to make sure everything stuck. Ready?"
+        )
+        self._save_turn("tutor", content)
+        self.conversation.append({"role": "assistant", "content": content})
+
+        return self._create_message(content)
+
     def respond(self, student_input: str) -> TutorMessage:
         """
         Generate a response to student input.
@@ -796,11 +835,14 @@ Keep it to 2-3 sentences."""
         else:
             # Check if this topic would benefit from a visual
             media = self._get_proactive_media()
-        
+
+        # Deduplicate: skip media already shown in this session
+        media = self._deduplicate_media(media)
+
         # Build media context for the LLM so it knows what's being shown
         if media:
             media_context = self._build_media_context(media)
-        
+
         # Generate response WITH media context so LLM can describe accurately
         response = self._generate_contextual_response(
             student_input, 
@@ -870,6 +912,9 @@ Keep it to 2-3 sentences."""
         else:
             media = self._get_proactive_media()
 
+        # Deduplicate: skip media already shown in this session
+        media = self._deduplicate_media(media)
+
         if media:
             media_context = self._build_media_context(media)
 
@@ -895,6 +940,9 @@ Keep it to 2-3 sentences."""
                 generated = self._generate_visual_aid(visual_need)
                 if generated:
                     media.append(generated)
+
+        # Deduplicate any late-added media
+        media = self._deduplicate_media(media)
 
         # Analyze student response for adaptation
         self._analyze_student_response(student_input, full_response)
@@ -1027,27 +1075,47 @@ YOUR RESPONSE:"""
         })
 
     def _get_proactive_media(self) -> List[Dict]:
-        """Get media that would proactively help with current topic."""
+        """Get media that would proactively help with current topic.
+
+        Gated by phase and exchange cadence to avoid showing images
+        too frequently or during practice/assessment phases.
+        """
+        # Only show proactive media in teaching phases
+        if self.phase not in (
+            ConversationPhase.WARMUP,
+            ConversationPhase.INTRODUCTION,
+            ConversationPhase.INSTRUCTION,
+        ):
+            return []
+
+        # Only trigger on every 3rd exchange within a phase (1st, 4th, 7th, ...)
+        if self.phase_exchange_count % 3 != 1:
+            return []
+
         if self.current_topic_index >= len(self.steps):
             return []
-        
+
         step = self.steps[self.current_topic_index]
-        
+
         if not step.media or 'images' not in step.media:
             return []
-        
+
         media = []
         topic_terms = self._extract_topic_terms()
-        
-        for img in step.media['images'][:1]:
+        if not topic_terms:
+            return []
+
+        for img in step.media['images'][:3]:
             if not img.get('url'):
                 continue
-            
-            # Check if image matches current topic
+
             img_description = f"{img.get('alt', '')} {img.get('caption', '')}".lower()
-            
-            # Require at least one topic term to match
-            if any(term in img_description for term in topic_terms):
+
+            # Compute numeric relevance: fraction of topic terms that match
+            matches = sum(1 for term in topic_terms if term in img_description)
+            relevance = matches / len(topic_terms)
+
+            if relevance >= 0.5:
                 media.append({
                     'type': 'image',
                     'url': img['url'],
@@ -1055,8 +1123,8 @@ YOUR RESPONSE:"""
                     'caption': img.get('caption', ''),
                     'description': img.get('alt', '') or img.get('caption', ''),
                 })
-                break
-        
+                break  # One proactive image per exchange is enough
+
         return media
     
     def _build_media_context(self, media: List[Dict]) -> str:
@@ -1077,7 +1145,17 @@ IMPORTANT: You are showing these images with your response.
 - Describe what the image ACTUALLY shows, not what you wish it showed
 """
         return context
-    
+
+    def _deduplicate_media(self, media: List[Dict]) -> List[Dict]:
+        """Remove media already shown in this session."""
+        unique = []
+        for m in media:
+            url = m.get('url', '')
+            if url and url not in self.shown_media_urls:
+                unique.append(m)
+                self.shown_media_urls.add(url)
+        return unique
+
     def _response_needs_visual(self, response: str) -> bool:
         """Check if the response references a visual that isn't provided."""
         response_lower = response.lower()
@@ -2098,8 +2176,16 @@ WRAPUP PHASE - Goals:
 - Transition: After student summarizes, move to EXIT_TICKET""",
         }
         
-        return instructions.get(self.phase, "Continue the conversation naturally.")
-    
+        result = instructions.get(self.phase, "Continue the conversation naturally.")
+
+        # Append one-shot override if set (e.g., reteach after wrong answer)
+        override = getattr(self, 'phase_instruction_override', None)
+        if override:
+            result += f"\n\n⚠️ IMMEDIATE PRIORITY: {override}"
+            self.phase_instruction_override = None  # consume it
+
+        return result
+
     def _maybe_transition_phase(self):
         """Check if we should transition to next phase."""
         
@@ -2164,6 +2250,30 @@ WRAPUP PHASE - Goals:
                     mastery_met = True
                     logger.info(f"Mastery transition PRACTICE→WRAPUP: {accuracy:.0%} accuracy on {self.practice_total} questions")
 
+        # Gate PRACTICE→WRAPUP: don't transition if last answer was wrong (P4-1)
+        if self.phase == ConversationPhase.PRACTICE and next_phase == ConversationPhase.WRAPUP:
+            last_correct = getattr(self, 'last_practice_correct', True)
+            # Safety valve: always transition after 12 practice exchanges
+            if self.practice_total >= 12:
+                logger.info("Safety valve: forcing PRACTICE→WRAPUP after 12 practice questions")
+            elif (mastery_met or self.phase_exchange_count >= fallback_threshold) and not last_correct:
+                # Mastery met but last answer wrong — stay and reteach
+                logger.info("Delaying PRACTICE→WRAPUP: last answer was incorrect, reteaching")
+                self.phase_instruction_override = (
+                    "The student just got that wrong. Briefly reteach the concept "
+                    "and ask another practice question before moving on."
+                )
+                return
+            elif mastery_met or self.phase_exchange_count >= fallback_threshold:
+                pass  # Allow transition below
+            else:
+                return  # Neither mastery nor fallback reached
+
+            self.phase = next_phase
+            self.phase_exchange_count = 0
+            logger.info(f"Transitioned to phase: {self.phase.value}")
+            return
+
         # Transition if mastery criteria met OR fallback threshold reached
         if mastery_met or self.phase_exchange_count >= fallback_threshold:
             self.phase = next_phase
@@ -2227,9 +2337,12 @@ WRAPUP PHASE - Goals:
             if current_topic not in self.student_strengths:
                 self.student_strengths.append(current_topic)
         
-        # Track practice attempts
+        # Track practice attempts and last-answer correctness
         if self.phase == ConversationPhase.PRACTICE:
             self.practice_total += 1
+            self.last_practice_correct = any(
+                signal in response_lower for signal in success_signals
+            )
 
         # Track comprehension checks in INSTRUCTION (R10)
         if self.phase == ConversationPhase.INSTRUCTION:
@@ -2611,6 +2724,8 @@ Keep it warm and supportive. 3-4 sentences + a question to start the review."""
     
     def _create_message(self, content: str, media: List[Dict] = None) -> TutorMessage:
         """Create a TutorMessage from content."""
+        # Strip [SHOW_MEDIA:...] tags so they don't leak into student chat
+        content = re.sub(r'\[SHOW_MEDIA:[^\]]*\]', '', content).strip()
         return TutorMessage(
             content=content,
             phase=self.phase.value,

@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/chat/start/<int:lesson_id>/', views.chat_start_session, name='chat_start_session'),
     path('api/chat/<int:session_id>/respond/', views.chat_respond, name='chat_respond'),
     path('api/chat/<int:session_id>/exit-ticket/', views.chat_exit_ticket, name='chat_exit_ticket'),
+    path('api/chat/<int:session_id>/review/', views.chat_start_review, name='chat_start_review'),
 
     # Image generation
     path('api/generate-image/', views.generate_image, name='generate_image'),

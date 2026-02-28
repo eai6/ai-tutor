@@ -483,6 +483,32 @@ def chat_respond(request, session_id):
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
+def chat_start_review(request, session_id):
+    """Start a review session for a completed lesson."""
+    from apps.tutoring.conversational_tutor import ConversationalTutor
+
+    session = get_object_or_404(
+        TutorSession,
+        id=session_id,
+        student=request.user,
+    )
+
+    tutor = ConversationalTutor(session)
+    result = tutor.start_review()
+
+    return JsonResponse({
+        "message": result.content,
+        "phase": result.phase,
+        "media": result.media,
+        "show_exit_ticket": False,
+        "exit_ticket": None,
+        "is_complete": False,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
 def chat_exit_ticket(request, session_id):
     """Submit exit ticket answers."""
     from apps.tutoring.conversational_tutor import ConversationalTutor

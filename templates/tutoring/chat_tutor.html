@@ -17,29 +17,48 @@
         </div>
     </header>
 
-    <!-- Chat Messages -->
-    <main class="chat-messages" id="chat-messages">
-        <!-- Messages will be inserted here -->
-        <div class="typing-indicator" id="typing">
-            <span></span><span></span><span></span>
-        </div>
-    </main>
+    <!-- Chat body: flex row with chat column + artifact panel -->
+    <div class="chat-body">
+        <div class="chat-column">
+            <!-- Chat Messages -->
+            <main class="chat-messages" id="chat-messages">
+                <!-- Messages will be inserted here -->
+                <div class="typing-indicator" id="typing">
+                    <span></span><span></span><span></span>
+                </div>
+            </main>
 
-    <!-- Input Area -->
-    <footer class="chat-input-area" id="input-area">
-        <div class="input-wrapper">
-            <textarea
-                id="user-input"
-                placeholder="Type your answer..."
-                autocomplete="off"
-                autofocus
-                rows="1"
-            ></textarea>
-            <button id="send-btn" onclick="sendMessage()" aria-label="Send message">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M18 2L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 2L12 18L9 11L2 8L18 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
+            <!-- Input Area -->
+            <footer class="chat-input-area" id="input-area">
+                <div class="input-wrapper">
+                    <textarea
+                        id="user-input"
+                        placeholder="Type your answer..."
+                        autocomplete="off"
+                        autofocus
+                        rows="1"
+                    ></textarea>
+                    <button id="send-btn" onclick="sendMessage()" aria-label="Send message">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M18 2L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 2L12 18L9 11L2 8L18 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+            </footer>
         </div>
-    </footer>
+
+        <!-- Artifact Panel (desktop only) -->
+        <aside class="artifact-panel" id="artifact-panel">
+            <div class="artifact-header">
+                <span class="artifact-title" id="artifact-title">Image</span>
+                <button class="artifact-close" onclick="closeArtifactPanel()" aria-label="Close panel">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M13.5 4.5L4.5 13.5M4.5 4.5L13.5 13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+            <div class="artifact-body" id="artifact-body">
+                <div class="artifact-placeholder">Images will appear here</div>
+            </div>
+            <div class="artifact-thumbnails" id="artifact-thumbnails"></div>
+        </aside>
+    </div>
 
     <!-- Exit Ticket Modal -->
     <div class="modal" id="exit-modal" style="display: none;">
@@ -59,7 +78,10 @@
             <div class="completion-icon" id="completion-icon">🎉</div>
             <h2 id="completion-title">Lesson Complete!</h2>
             <p id="completion-message"></p>
-            <a href="{% url 'tutoring:catalog' %}" class="cta-btn">Continue Learning</a>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: center; margin-top: 1rem;">
+                <button class="cta-btn" onclick="startReview()" style="border: none; cursor: pointer;">Review Lesson</button>
+                <a href="{% url 'tutoring:catalog' %}" class="cta-btn" style="background: #fff; color: #18181b; border: 2px solid #e4e4e7;">Continue Learning</a>
+            </div>
         </div>
     </div>
 </div>
@@ -98,8 +120,8 @@ body {
 }
 
 .chat-header-inner {
-    max-width: 768px;
-    margin: 0 auto;
+    max-width: 100%;
+    padding: 0 0.5rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -145,6 +167,20 @@ body {
     color: #fff;
     border-radius: 999px;
     text-transform: capitalize;
+}
+
+/* ── Chat Body (flex row: chat + artifact panel) ── */
+.chat-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+.chat-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 /* ── Messages Area ── */
@@ -249,6 +285,112 @@ body {
     margin-top: 0.375rem;
     font-style: italic;
 }
+
+/* Desktop: small inline thumbnail that opens artifact panel */
+.media-panel-trigger {
+    cursor: pointer;
+    display: inline-block;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid #e4e4e7;
+    transition: border-color 0.15s;
+    max-width: 120px;
+}
+.media-panel-trigger:hover { border-color: #a1a1aa; }
+.media-panel-trigger img {
+    display: block;
+    max-width: 120px;
+    height: auto;
+    border-radius: 6px;
+}
+
+/* ── Artifact Panel ── */
+.artifact-panel {
+    width: 420px;
+    max-width: 40vw;
+    border-left: 1px solid #e4e4e7;
+    background: #fff;
+    display: none;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+.artifact-panel.open { display: flex; }
+.artifact-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e4e4e7;
+    flex-shrink: 0;
+}
+.artifact-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #18181b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.artifact-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    color: #71717a;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+.artifact-close:hover { background: #f4f4f5; color: #18181b; }
+.artifact-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: auto;
+}
+.artifact-body img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    object-fit: contain;
+}
+.artifact-body .artifact-caption {
+    font-size: 0.8125rem;
+    color: #71717a;
+    margin-top: 0.5rem;
+    text-align: center;
+    font-style: italic;
+}
+.artifact-placeholder {
+    color: #a1a1aa;
+    font-size: 0.875rem;
+}
+.artifact-thumbnails {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border-top: 1px solid #e4e4e7;
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+.artifact-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    object-fit: cover;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s;
+    flex-shrink: 0;
+}
+.artifact-thumb:hover { border-color: #a1a1aa; }
+.artifact-thumb.active { border-color: #18181b; }
 
 /* ── Typing Indicator ── */
 .typing-indicator {
@@ -437,6 +579,11 @@ body {
 .cta-btn:hover { background: #27272a; }
 
 /* ── Mobile ── */
+@media (max-width: 768px) {
+    .artifact-panel { display: none !important; }
+    .media-panel-trigger { max-width: 100%; border: none; }
+    .media-panel-trigger img { max-width: 100%; }
+}
 @media (max-width: 640px) {
     .chat-messages { padding: 1rem 0.75rem; }
     .chat-input-area { padding: 0.5rem 0.75rem 0.75rem; }
@@ -458,6 +605,58 @@ const typing = document.getElementById('typing');
 const userInput = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
 const phaseBadge = document.getElementById('phase-badge');
+
+// Artifact panel elements & state
+const artifactPanel = document.getElementById('artifact-panel');
+const artifactBody = document.getElementById('artifact-body');
+const artifactTitle = document.getElementById('artifact-title');
+const artifactThumbnails = document.getElementById('artifact-thumbnails');
+const sessionMedia = [];
+
+function isDesktop() { return window.innerWidth > 768; }
+
+function openArtifactPanel(mediaItem) {
+    if (!isDesktop()) return false;
+    artifactTitle.textContent = mediaItem.caption || mediaItem.alt || 'Image';
+    let html = `<div style="display:flex;flex-direction:column;align-items:center;width:100%">`;
+    html += `<img src="${mediaItem.url}" alt="${mediaItem.alt || ''}">`;
+    if (mediaItem.caption) html += `<div class="artifact-caption">${mediaItem.caption}</div>`;
+    html += `</div>`;
+    artifactBody.innerHTML = html;
+    artifactPanel.classList.add('open');
+    addThumbnail(mediaItem);
+    return true;
+}
+
+function closeArtifactPanel() {
+    artifactPanel.classList.remove('open');
+}
+
+function addThumbnail(mediaItem) {
+    // Skip if already in thumbnail strip
+    if (sessionMedia.find(m => m.url === mediaItem.url)) return;
+    sessionMedia.push(mediaItem);
+    const img = document.createElement('img');
+    img.className = 'artifact-thumb';
+    img.src = mediaItem.url;
+    img.alt = mediaItem.alt || '';
+    img.title = mediaItem.caption || mediaItem.alt || 'Image';
+    img.onclick = () => {
+        openArtifactPanel(mediaItem);
+        // Update active state
+        artifactThumbnails.querySelectorAll('.artifact-thumb').forEach(t => t.classList.remove('active'));
+        img.classList.add('active');
+    };
+    // Mark as active
+    artifactThumbnails.querySelectorAll('.artifact-thumb').forEach(t => t.classList.remove('active'));
+    img.classList.add('active');
+    artifactThumbnails.appendChild(img);
+}
+
+// Close panel if window resizes below breakpoint
+window.addEventListener('resize', () => {
+    if (!isDesktop()) closeArtifactPanel();
+});
 
 // Auto-resize textarea
 userInput.addEventListener('input', () => {
@@ -535,26 +734,46 @@ function handleResponse(data) {
 function addMessage(role, content, media = []) {
     const div = document.createElement('div');
     div.className = `message ${role}`;
-    
+
     const avatar = role === 'tutor' ? '🎓' : '👤';
-    
+
     let mediaHtml = '';
     if (media && media.length > 0) {
         mediaHtml = '<div class="message-media">';
         for (const m of media) {
             if (m.type === 'image') {
-                mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}">`;
-                if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
+                if (isDesktop()) {
+                    // Desktop: small clickable thumbnail that opens artifact panel
+                    const idx = sessionMedia.length + mediaHtml.split('media-panel-trigger').length - 1;
+                    mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
+                    // Open in panel immediately
+                    openArtifactPanel(m);
+                } else {
+                    // Mobile: full inline image
+                    mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}">`;
+                    if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
+                }
             }
         }
         mediaHtml += '</div>';
     }
-    
+
     div.innerHTML = `
         <div class="avatar">${avatar}</div>
         <div class="bubble">${marked.parse(content)}${mediaHtml}</div>
     `;
-    
+
+    // Bind click handlers to inline thumbnails (desktop)
+    div.querySelectorAll('.media-panel-trigger').forEach(trigger => {
+        trigger.addEventListener('click', () => {
+            openArtifactPanel({
+                url: trigger.dataset.mediaUrl,
+                alt: trigger.dataset.mediaAlt,
+                caption: trigger.dataset.mediaCaption,
+            });
+        });
+    });
+
     chatMessages.insertBefore(div, typing);
     scrollToBottom();
 }
@@ -634,13 +853,28 @@ function updateStreamingMessage(div, content, media = []) {
         mediaHtml = '<div class="message-media">';
         for (const m of media) {
             if (m.type === 'image') {
-                mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}">`;
-                if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
+                if (isDesktop()) {
+                    mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
+                    openArtifactPanel(m);
+                } else {
+                    mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}">`;
+                    if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
+                }
             }
         }
         mediaHtml += '</div>';
     }
     div.querySelector('.bubble').innerHTML = marked.parse(content) + mediaHtml;
+    // Bind click handlers for inline thumbnails
+    div.querySelectorAll('.media-panel-trigger').forEach(trigger => {
+        trigger.addEventListener('click', () => {
+            openArtifactPanel({
+                url: trigger.dataset.mediaUrl,
+                alt: trigger.dataset.mediaAlt,
+                caption: trigger.dataset.mediaCaption,
+            });
+        });
+    });
     scrollToBottom();
 }
 
@@ -744,6 +978,35 @@ function showCompletion(message) {
     document.getElementById('input-area').style.display = 'none';
     document.getElementById('completion-message').textContent = message || 'Great work!';
     document.getElementById('complete-modal').style.display = 'flex';
+}
+
+async function startReview() {
+    if (!sessionId) return;
+    document.getElementById('complete-modal').style.display = 'none';
+    document.getElementById('input-area').style.display = 'block';
+    showTyping(true);
+
+    try {
+        const response = await fetch(`/tutor/api/chat/${sessionId}/review/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+        });
+        const data = await response.json();
+        showTyping(false);
+
+        if (data.phase) {
+            phaseBadge.textContent = data.phase.replace('_', ' ');
+        }
+        addMessage('tutor', data.message, data.media || []);
+        userInput.focus();
+    } catch (error) {
+        console.error('Review error:', error);
+        showTyping(false);
+        addMessage('tutor', 'Failed to start review. Please refresh.');
+    }
 }
 
 function showTyping(show) {

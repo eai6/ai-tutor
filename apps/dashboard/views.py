@@ -1384,12 +1384,13 @@ def settings_page(request):
         ]
         for fname, label, desc in field_meta:
             current = getattr(prompt_pack, fname, '') if prompt_pack else ''
+            default_value = PROMPT_DEFAULTS.get(fname, '')
             prompt_fields.append({
                 'name': fname,
                 'label': label,
                 'desc': desc,
-                'default': PROMPT_DEFAULTS.get(fname, ''),
-                'current': current or '',
+                'default': default_value,
+                'current': current or default_value,
             })
 
         platform_config = PlatformConfig.load()

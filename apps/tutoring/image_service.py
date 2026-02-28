@@ -1,9 +1,9 @@
 """
 Image Generation Service — Gemini native image generation.
 
-Primary: gemini-3-pro-image-preview (Nano Banana Pro) — best quality for
-educational diagrams, labeled visuals, and text-in-image.
-Fallback: gemini-2.5-flash-image (Nano Banana) — used when primary is 503.
+Primary: gemini-3.1-flash-image-preview — latest model with search grounding
+for factual categories (maps, diagrams, charts, infographics, flowcharts).
+Fallback: gemini-3-pro-image-preview — used when primary is 503.
 
 Set DISABLE_IMAGE_GEN=1 in .env to disable.
 """
@@ -17,8 +17,10 @@ from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 
-PRIMARY_MODEL = 'gemini-2.5-flash-image'
-FALLBACK_MODEL = 'gemini-2.5-flash-image'
+PRIMARY_MODEL = 'gemini-3.1-flash-image-preview'
+FALLBACK_MODEL = 'gemini-3-pro-image-preview'
+
+FACTUAL_CATEGORIES = {'diagram', 'map', 'chart', 'infographic', 'flowchart'}
 
 
 class ImageGenerationService:
@@ -94,38 +96,67 @@ class ImageGenerationService:
             ),
         ]
 
+        # Use 16:9 for factual/spatial categories, 1:1 for others
+        aspect = "16:9" if category in FACTUAL_CATEGORIES else "1:1"
+
         config = types.GenerateContentConfig(
             image_config=types.ImageConfig(
-                aspect_ratio="1:1",
+                aspect_ratio=aspect,
                 image_size="1K",
             ),
             response_modalities=["IMAGE", "TEXT"],
         )
 
+        # Always enable web + image search grounding for factual accuracy
+        tools = None
+        try:
+            tools = [types.Tool(google_search=types.GoogleSearch(
+                search_types=types.SearchTypes(
+                    web_search=types.WebSearch(),
+                    image_search=types.ImageSearch(),
+                )
+            ))]
+            logger.info(f"Search grounding (web+image) enabled for category: {category}")
+        except Exception as e:
+            logger.warning(f"Could not create search grounding tool: {e}")
+
         for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
-            result = self._call_model(client, model, contents, config, prompt)
+            result = self._call_model(client, model, contents, config, prompt, tools=tools)
             if result is not None:
                 return result
 
         logger.warning("Both primary and fallback image models failed")
         return None
 
-    def _call_model(self, client, model: str, contents, config, prompt: str) -> Optional[Dict]:
-        """Stream image from a single model. Returns result dict or None."""
+    def _call_model(self, client, model: str, contents, config, prompt: str, tools=None) -> Optional[Dict]:
+        """Generate image from a single model (non-streaming). Returns result dict or None."""
         try:
             logger.info(f"Generating image with {model}: {prompt[:80]}...")
+
+            kwargs = dict(model=model, contents=contents, config=config)
+            if tools:
+                kwargs['config'] = type(config)(
+                    image_config=config.image_config,
+                    response_modalities=config.response_modalities,
+                    tools=tools,
+                )
+
+            try:
+                response = client.models.generate_content(**kwargs)
+            except Exception as tool_err:
+                if tools:
+                    logger.warning(f"{model}: tools param failed ({tool_err}), retrying without")
+                    response = client.models.generate_content(
+                        model=model, contents=contents, config=config
+                    )
+                else:
+                    raise
 
             image_bytes = None
             mime_type = None
 
-            for chunk in client.models.generate_content_stream(
-                model=model,
-                contents=contents,
-                config=config,
-            ):
-                if chunk.parts is None:
-                    continue
-                for part in chunk.parts:
+            if response.candidates and response.candidates[0].content:
+                for part in response.candidates[0].content.parts:
                     if part.inline_data and part.inline_data.data:
                         image_bytes = part.inline_data.data
                         mime_type = part.inline_data.mime_type

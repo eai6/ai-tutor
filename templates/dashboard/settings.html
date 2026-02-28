@@ -303,19 +303,14 @@
             </div>
             <div class="card-body" id="prompts-body" style="display:none;">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    Leave fields empty to use the built-in default prompt. Expand "View default" to see the actual default used.
+                    Edit the prompts below. They are pre-populated with the built-in defaults.
                 </p>
 
                 {% for pf in prompt_fields %}
                 <div class="form-group" style="margin-bottom:1.5rem;">
                     <label class="form-label" for="{{ pf.name }}">{{ pf.label }}</label>
 
-                    <details style="margin-bottom:0.5rem;">
-                        <summary style="font-size:0.8rem;color:var(--gray-500);cursor:pointer;">View default</summary>
-                        <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:0.75rem;margin-top:0.25rem;font-family:monospace;font-size:0.75rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;color:var(--gray-700);">{{ pf.default }}</div>
-                    </details>
-
-                    <textarea class="form-control" id="{{ pf.name }}" name="{{ pf.name }}" rows="3" style="font-family:monospace;font-size:0.8rem;" placeholder="Leave empty to use the default above">{{ pf.current }}</textarea>
+                    <textarea class="form-control" id="{{ pf.name }}" name="{{ pf.name }}" rows="6" style="font-family:monospace;font-size:0.8rem;">{{ pf.current }}</textarea>
                     <small style="color:var(--gray-500);">{{ pf.desc }}</small>
                 </div>
                 {% endfor %}
