@@ -122,6 +122,7 @@ class ModelConfig(models.Model):
         TUTORING = 'tutoring', 'Student Tutoring'
         EXIT_TICKETS = 'exit_tickets', 'Exit Ticket Generation'
         SKILL_EXTRACTION = 'skill_extraction', 'Skill Extraction'
+        IMAGE_GENERATION = 'image_generation', 'Image Generation'
 
     institution = models.ForeignKey(
         Institution,

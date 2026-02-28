@@ -1378,11 +1378,18 @@ def settings_page(request):
             gen_model = request.POST.get('gen_model', '').strip()
             gen_api_key = request.POST.get('gen_api_key', '').strip()
 
+            img_provider = request.POST.get('img_provider', '').strip()
+            img_model = request.POST.get('img_model', '').strip()
+            img_api_key = request.POST.get('img_api_key', '').strip()
+
             valid_providers = [p[0] for p in ModelConfig.Provider.choices]
-            if tutor_provider not in valid_providers or gen_provider not in valid_providers:
+            all_providers_valid = all(
+                p in valid_providers for p in [tutor_provider, gen_provider, img_provider]
+            )
+            if not all_providers_valid:
                 messages.error(request, "Invalid provider.")
-            elif not tutor_model or not gen_model:
-                messages.error(request, "Model name is required for both purposes.")
+            elif not tutor_model or not gen_model or not img_model:
+                messages.error(request, "Model name is required for all purposes.")
             else:
                 env_var_map = {
                     'anthropic': 'ANTHROPIC_API_KEY',
@@ -1425,7 +1432,28 @@ def settings_page(request):
                     config.set_api_key(gen_api_key)
                     config.save()
 
-                messages.success(request, f"AI models updated — Tutoring: {tutor_provider}/{tutor_model}, Generation: {gen_provider}/{gen_model}.")
+                # Image generation config
+                # If no dedicated key provided, inherit from whichever config shares the same provider
+                img_key_to_use = img_api_key
+                if not img_key_to_use and img_provider == gen_provider:
+                    img_key_to_use = gen_api_key
+                if not img_key_to_use and img_provider == tutor_provider:
+                    img_key_to_use = tutor_api_key
+
+                config = ModelConfig.objects.create(
+                    institution=inst,
+                    name=f"{img_provider.title()} - image_generation",
+                    provider=img_provider,
+                    model_name=img_model,
+                    api_key_env_var=env_var_map.get(img_provider, ''),
+                    purpose='image_generation',
+                    is_active=True,
+                )
+                if img_key_to_use:
+                    config.set_api_key(img_key_to_use)
+                    config.save()
+
+                messages.success(request, f"AI models updated — Tutoring: {tutor_provider}/{tutor_model}, Generation: {gen_provider}/{gen_model}, Image: {img_provider}/{img_model}.")
 
         elif action == 'prompts' and is_superadmin:
             from apps.llm.models import PromptPack
@@ -1494,8 +1522,13 @@ def settings_page(request):
     gen_model = 'gemini-3.1-pro-preview'
     has_gen_db_key = False
     has_gen_env_key = False
+    img_provider = 'google'
+    img_model = 'gemini-3.1-flash-image-preview'
+    has_img_db_key = False
+    has_img_env_key = False
     provider_choices = []
     provider_defaults_json = '{}'
+    img_provider_defaults_json = '{}'
     if is_superadmin:
         from apps.llm.models import ModelConfig
         tutor_config = ModelConfig.objects.filter(is_active=True, purpose='tutoring').first()
@@ -1510,6 +1543,12 @@ def settings_page(request):
             gen_model = gen_config.model_name
             has_gen_db_key = bool(gen_config.api_key_encrypted)
             has_gen_env_key = bool(os.getenv(gen_config.api_key_env_var or '', ''))
+        img_config = ModelConfig.objects.filter(is_active=True, purpose='image_generation').first()
+        if img_config:
+            img_provider = img_config.provider
+            img_model = img_config.model_name
+            has_img_db_key = bool(img_config.api_key_encrypted)
+            has_img_env_key = bool(os.getenv(img_config.api_key_env_var or '', ''))
         provider_choices = ModelConfig.Provider.choices
         provider_defaults_json = json.dumps({
             'anthropic': 'claude-sonnet-4-20250514',
@@ -1517,6 +1556,9 @@ def settings_page(request):
             'google': 'gemini-3.1-pro-preview',
             'azure_openai': 'gpt-4o',
             'local_ollama': 'llama3',
+        })
+        img_provider_defaults_json = json.dumps({
+            'google': 'gemini-3.1-flash-image-preview',
         })
 
     all_timezones = sorted(zoneinfo.available_timezones())
@@ -1538,8 +1580,13 @@ def settings_page(request):
         'gen_model': gen_model,
         'has_gen_db_key': has_gen_db_key,
         'has_gen_env_key': has_gen_env_key,
+        'img_provider': img_provider,
+        'img_model': img_model,
+        'has_img_db_key': has_img_db_key,
+        'has_img_env_key': has_img_env_key,
         'provider_choices': provider_choices,
         'provider_defaults_json': provider_defaults_json,
+        'img_provider_defaults_json': img_provider_defaults_json,
     }
 
     return render(request, 'dashboard/settings.html', context)

@@ -393,6 +393,54 @@
             </div>
         </div>
 
+        {# Card 3: Image Generation #}
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Image Generation Model</h3>
+            </div>
+            <div class="card-body">
+                <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                    Used for AI-generated diagrams, maps, charts, and illustrations. Must be a Gemini image model.
+                </p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="img_provider">Provider</label>
+                        <select class="form-control" id="img_provider" name="img_provider" onchange="onImgProviderChange()">
+                            {% for code, label in provider_choices %}
+                            <option value="{{ code }}" {% if code == img_provider %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="img_model">Model Name</label>
+                        <input type="text" class="form-control" id="img_model" name="img_model" value="{{ img_model }}" placeholder="e.g. gemini-3.1-flash-image-preview">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label" for="img_api_key">API Key</label>
+                    <input type="password" class="form-control" id="img_api_key" name="img_api_key"
+                           placeholder="{% if has_img_db_key %}Key stored in database (leave blank to keep){% elif has_img_env_key %}Using environment variable (leave blank to keep){% else %}Leave blank to use the same key as above{% endif %}">
+                    <small style="color:var(--gray-500);">Leave blank to reuse the Google key from Tutoring or Generation config.</small>
+                </div>
+
+                <div style="margin-top: 1rem; padding: 0.75rem; background: var(--gray-50); border-radius: 8px; font-size: 0.8125rem; color: var(--gray-600);">
+                    <strong>Current:</strong>
+                    {{ img_provider|default:"not configured" }} / {{ img_model|default:"—" }}
+                    &nbsp;&bull;&nbsp;
+                    <strong>Key:</strong>
+                    {% if has_img_db_key %}
+                        <span style="color: var(--success, #16a34a);">Stored in DB</span>
+                    {% elif has_img_env_key %}
+                        <span style="color: var(--success, #16a34a);">From env var</span>
+                    {% else %}
+                        <span style="color: var(--danger, #dc2626);">Not configured</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
         <button type="submit" class="btn btn-primary">Save AI Models</button>
     </form>
 
@@ -434,11 +482,19 @@
 (function() {
     // AI Model — auto-fill model name on provider change (per-purpose)
     var providerDefaults = {{ provider_defaults_json|safe }};
+    var imgProviderDefaults = {{ img_provider_defaults_json|safe }};
     window.onProviderChange = function(prefix) {
         var sel = document.getElementById(prefix + '_provider');
         var modelInput = document.getElementById(prefix + '_model');
         if (sel && modelInput && providerDefaults[sel.value]) {
             modelInput.value = providerDefaults[sel.value];
+        }
+    };
+    window.onImgProviderChange = function() {
+        var sel = document.getElementById('img_provider');
+        var modelInput = document.getElementById('img_model');
+        if (sel && modelInput && imgProviderDefaults[sel.value]) {
+            modelInput.value = imgProviderDefaults[sel.value];
         }
     };
 

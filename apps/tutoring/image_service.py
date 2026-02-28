@@ -17,7 +17,7 @@ from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 
-PRIMARY_MODEL = 'gemini-3.1-flash-image-preview'
+DEFAULT_PRIMARY_MODEL = 'gemini-3.1-flash-image-preview'
 FALLBACK_MODEL = 'gemini-3-pro-image-preview'
 
 FACTUAL_CATEGORIES = {'diagram', 'map', 'chart', 'infographic', 'flowchart'}
@@ -39,16 +39,41 @@ class ImageGenerationService:
     def __init__(self, lesson=None, institution=None):
         self.lesson = lesson
         self.institution = institution
+        self._model_config = None
+        self._load_model_config()
         self.available = self._check_available()
+
+    def _load_model_config(self):
+        """Load image generation config from ModelConfig if available."""
+        try:
+            from apps.llm.models import ModelConfig
+            self._model_config = ModelConfig.objects.filter(
+                is_active=True, purpose='image_generation'
+            ).first()
+        except Exception:
+            pass
+
+    def _get_primary_model(self) -> str:
+        """Get primary model name from config or default."""
+        if self._model_config:
+            return self._model_config.model_name
+        return DEFAULT_PRIMARY_MODEL
+
+    def _get_api_key(self) -> Optional[str]:
+        """Get API key from ModelConfig (encrypted DB → env var fallback)."""
+        if self._model_config:
+            key = self._model_config.get_api_key()
+            if key:
+                return key
+        return os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
 
     def _check_available(self) -> bool:
         """Check if Gemini image generation is available."""
         if os.environ.get('DISABLE_IMAGE_GEN'):
             return False
 
-        api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
-        if not api_key:
-            logger.info("Image generation not available: No GOOGLE_API_KEY or GEMINI_API_KEY")
+        if not self._get_api_key():
+            logger.info("Image generation not available: No API key configured")
             return False
 
         return True
@@ -80,11 +105,11 @@ class ImageGenerationService:
         return None
 
     def _generate_with_gemini(self, prompt: str, category: str, textbook_context: str = "") -> Optional[Dict]:
-        """Generate image — tries PRIMARY_MODEL, falls back to FALLBACK_MODEL on 503."""
+        """Generate image — tries configured model, falls back to FALLBACK_MODEL on 503."""
         from google import genai
         from google.genai import types
 
-        api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
+        api_key = self._get_api_key()
         client = genai.Client(api_key=api_key)
 
         enhanced_prompt = self._enhance_prompt(prompt, category, textbook_context)
@@ -120,7 +145,7 @@ class ImageGenerationService:
         except Exception as e:
             logger.warning(f"Could not create search grounding tool: {e}")
 
-        for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
+        for model in [self._get_primary_model(), FALLBACK_MODEL]:
             result = self._call_model(client, model, contents, config, prompt, tools=tools)
             if result is not None:
                 return result
