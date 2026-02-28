@@ -90,6 +90,14 @@ env = app.ManagedEnvironment(
             shared_key=log_shared_keys.apply(lambda k: k.primary_shared_key),
         ),
     ),
+    workload_profiles=[
+        app.WorkloadProfileArgs(
+            name="dedicated-d4",
+            workload_profile_type="D4",
+            minimum_count=1,
+            maximum_count=1,
+        ),
+    ],
 )
 
 # ── 5. Storage Account + File Share ─────────────────────────────────────────
@@ -183,6 +191,7 @@ container_app = app.ContainerApp(
     container_app_name=container_app_name,
     resource_group_name=rg.name,
     managed_environment_id=env.id,
+    workload_profile_name="dedicated-d4",
     configuration=app.ConfigurationArgs(
         ingress=app.IngressArgs(
             external=True,
@@ -211,8 +220,8 @@ container_app = app.ContainerApp(
                 name="aitutor",
                 image=image,
                 resources=app.ContainerResourcesArgs(
-                    cpu=2.0,
-                    memory="4Gi",
+                    cpu=4.0,
+                    memory="8Gi",
                 ),
                 env=[
                     app.EnvironmentVarArgs(name="DATABASE_URL", secret_ref="database-url"),
@@ -221,7 +230,7 @@ container_app = app.ContainerApp(
                     app.EnvironmentVarArgs(name="OPENAI_API_KEY", secret_ref="openai-api-key"),
                     app.EnvironmentVarArgs(name="GOOGLE_API_KEY", secret_ref="google-api-key"),
                     app.EnvironmentVarArgs(name="DEBUG", value="False"),
-                    app.EnvironmentVarArgs(name="EMBEDDING_BACKEND", value="openai"),
+                    app.EnvironmentVarArgs(name="EMBEDDING_BACKEND", value="local"),
                     app.EnvironmentVarArgs(name="VECTORDB_ROOT", value="/tmp/vectordb"),
                     app.EnvironmentVarArgs(
                         name="ALLOWED_HOSTS",
@@ -229,7 +238,7 @@ container_app = app.ContainerApp(
                     ),
                     app.EnvironmentVarArgs(
                         name="CSRF_TRUSTED_ORIGINS",
-                        value=Output.concat("https://", container_app_name, ".", location, ".azurecontainerapps.io"),
+                        value=Output.concat("https://", container_app_name, ".", env.default_domain),
                     ),
                 ],
                 volume_mounts=[

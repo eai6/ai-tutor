@@ -1,0 +1,14 @@
+encryptionsalt: v1:H3lQ8BSN5mo=:v1:sWeqKcycXSFNN4dV:zf7Mj/b4RQu59cM380KtDvf5zwam+A==
+config:
+  azure-native:location: centralus
+  azure-native:subscriptionId: 656f4091-746b-44ef-8add-6d94eb4a7612
+  aitutor:db-password:
+    secure: v1:S+iYZbEvGPRvcigQ:0bF91eqKcQ+bHAhwLc7WVx+cHxBj1OZ0hTYpAFRlrdv6
+  aitutor:django-secret-key:
+    secure: v1:q2Dg355L/3LmfZQC:9dVBLn2L6NE3O6miV6s18bXyoTalCHy44T+mfdKcATgP5DvFVR9UrzLUFaDGc+grk4MFdnfuuLg9uag1TwfSCSynTrEgA8nZ9djJgEpi74KyPbA=
+  aitutor:anthropic-api-key:
+    secure: v1:Ks2E2NiryAqHbxZI:CWHtf5AOyJX94Se7AyuA4WB7r40x/+dW/xHN0HbmT9KFLwfzarIAsLi0XJa6gnnkN7k3cGeeS49F0I/8vFf+gan280aO1kH1JDWWAjtfje+MIn3nn/5PbLPjljN7T3udMwyepMJaaOxU/fRthy2vMr3KNyG+/rUQwSEEFg==
+  aitutor:openai-api-key:
+    secure: v1:h2m2Kd24YrG4pbBZ:tAAbPirNrnUKQPr9EOz8SDwY0YXB+JgK4Nj0rw5KbfvurMel4C9Gwb1rGoehl6ZeAi7aieL81tH9PPQC3h4gg1Kfg+dOV5swy5fgyC/P4yAQXrH2AqhtX4BFzZk9f2xOEsoo7xs/LPNPg55fBgXzweYznFe/awfi11tGe9BNjkimayfuuy7GjqLUY6yul6Sl34PKl1+b19Pl0kV4TtIaXOJOh1RvURhKxY9kx36ty0wIEGHl7gAX
+  aitutor:google-api-key:
+    secure: v1:+GXti9A1tYEOgRjm:yLXnTL6UW3rmNDWQQyxAD95iWrQolFHMqTcCRLbjpIa/NFIXRPqt0gCiG5CK9h8xAyS0PXvXwQ==
