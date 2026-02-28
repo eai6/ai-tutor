@@ -613,7 +613,12 @@ const artifactTitle = document.getElementById('artifact-title');
 const artifactThumbnails = document.getElementById('artifact-thumbnails');
 const sessionMedia = [];
 
-function isDesktop() { return window.innerWidth > 768; }
+function isDesktop() { return window.matchMedia('(min-width: 769px)').matches; }
+
+// Defense-in-depth: strip [SHOW_MEDIA:...] tags before rendering
+function sanitizeContent(text) {
+    return text.replace(/\[SHOW_MEDIA\s*:[^\]]*\]/gi, '').replace(/ {2,}/g, ' ').trim();
+}
 
 function openArtifactPanel(mediaItem) {
     if (!isDesktop()) return false;
@@ -742,14 +747,11 @@ function addMessage(role, content, media = []) {
         mediaHtml = '<div class="message-media">';
         for (const m of media) {
             if (m.type === 'image') {
-                if (isDesktop()) {
-                    // Desktop: small clickable thumbnail that opens artifact panel
-                    const idx = sessionMedia.length + mediaHtml.split('media-panel-trigger').length - 1;
+                if (isDesktop() && openArtifactPanel(m)) {
+                    // Desktop: small clickable thumbnail + opened in artifact panel
                     mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
-                    // Open in panel immediately
-                    openArtifactPanel(m);
                 } else {
-                    // Mobile: full inline image
+                    // Mobile or panel failed: full inline image
                     mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}">`;
                     if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
                 }
@@ -760,7 +762,7 @@ function addMessage(role, content, media = []) {
 
     div.innerHTML = `
         <div class="avatar">${avatar}</div>
-        <div class="bubble">${marked.parse(content)}${mediaHtml}</div>
+        <div class="bubble">${marked.parse(sanitizeContent(content))}${mediaHtml}</div>
     `;
 
     // Bind click handlers to inline thumbnails (desktop)
@@ -853,9 +855,8 @@ function updateStreamingMessage(div, content, media = []) {
         mediaHtml = '<div class="message-media">';
         for (const m of media) {
             if (m.type === 'image') {
-                if (isDesktop()) {
+                if (isDesktop() && openArtifactPanel(m)) {
                     mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
-                    openArtifactPanel(m);
                 } else {
                     mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}">`;
                     if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
@@ -864,7 +865,7 @@ function updateStreamingMessage(div, content, media = []) {
         }
         mediaHtml += '</div>';
     }
-    div.querySelector('.bubble').innerHTML = marked.parse(content) + mediaHtml;
+    div.querySelector('.bubble').innerHTML = marked.parse(sanitizeContent(content)) + mediaHtml;
     // Bind click handlers for inline thumbnails
     div.querySelectorAll('.media-panel-trigger').forEach(trigger => {
         trigger.addEventListener('click', () => {
