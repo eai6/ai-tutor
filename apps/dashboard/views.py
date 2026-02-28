@@ -346,7 +346,7 @@ def student_detail(request, student_id):
         StudentLessonProgress.objects.filter(student=student),
         institution
     ).select_related('lesson', 'lesson__unit', 'lesson__unit__course').order_by(
-        'lesson__unit__course__name',
+        'lesson__unit__course__title',
         'lesson__unit__order_index',
         'lesson__order_index'
     )
