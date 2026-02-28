@@ -29,6 +29,13 @@ jobs:
           docker push $ACR/aitutor:${{ github.sha }}
           docker push $ACR/aitutor:latest
 
+      - name: Set revision mode to single (auto-deactivate old revisions)
+        run: |
+          az containerapp revision set-mode \
+            --name $APP \
+            --resource-group $RG \
+            --mode single
+
       - name: Deploy to Container App
         run: |
           az containerapp update \
