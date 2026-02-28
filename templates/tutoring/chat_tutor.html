@@ -615,9 +615,13 @@ const sessionMedia = [];
 
 function isDesktop() { return window.matchMedia('(min-width: 769px)').matches; }
 
-// Defense-in-depth: strip [SHOW_MEDIA:...] tags before rendering
+// Defense-in-depth: strip legacy [SHOW_MEDIA:...] and new |||MEDIA:N||| tags before rendering
 function sanitizeContent(text) {
-    return text.replace(/\[SHOW_MEDIA\s*:[^\]]*\]/gi, '').replace(/ {2,}/g, ' ').trim();
+    return text
+        .replace(/\[SHOW_MEDIA\s*:[^\]]*\]/gi, '')
+        .replace(/\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|/g, '')
+        .replace(/ {2,}/g, ' ')
+        .trim();
 }
 
 function openArtifactPanel(mediaItem) {

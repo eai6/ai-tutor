@@ -18,7 +18,10 @@ class Course(models.Model):
     institution = models.ForeignKey(
         Institution,
         on_delete=models.CASCADE,
-        related_name='courses'
+        related_name='courses',
+        null=True,
+        blank=True,
+        help_text="Null = platform-wide course visible to all schools"
     )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)

@@ -21,7 +21,10 @@ class CurriculumUpload(models.Model):
     institution = models.ForeignKey(
         Institution,
         on_delete=models.CASCADE,
-        related_name='curriculum_uploads'
+        related_name='curriculum_uploads',
+        null=True,
+        blank=True,
+        help_text="Null = platform-wide curriculum upload"
     )
     uploaded_by = models.ForeignKey(
         User,

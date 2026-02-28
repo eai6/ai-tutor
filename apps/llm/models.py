@@ -6,7 +6,14 @@ These models let institutions customize:
 2. Which LLM provider/model to use
 """
 
+import base64
+import hashlib
+import os
+
+from cryptography.fernet import Fernet
+from django.conf import settings
 from django.db import models
+
 from apps.accounts.models import Institution
 
 
@@ -106,6 +113,7 @@ class ModelConfig(models.Model):
     class Provider(models.TextChoices):
         ANTHROPIC = 'anthropic', 'Anthropic (Claude)'
         OPENAI = 'openai', 'OpenAI (GPT)'
+        GOOGLE = 'google', 'Google (Gemini)'
         AZURE_OPENAI = 'azure_openai', 'Azure OpenAI'
         LOCAL_OLLAMA = 'local_ollama', 'Local (Ollama)'
 
@@ -144,7 +152,12 @@ class ModelConfig(models.Model):
         default='ANTHROPIC_API_KEY',
         help_text="Environment variable name containing the API key"
     )
-    
+    api_key_encrypted = models.TextField(
+        blank=True,
+        default='',
+        help_text="Fernet-encrypted API key (overrides env var when set)"
+    )
+
     # Generation parameters
     max_tokens = models.PositiveIntegerField(default=1024)
     temperature = models.FloatField(default=0.7)
@@ -164,7 +177,36 @@ class ModelConfig(models.Model):
         verbose_name = "Model Configuration"
 
     def __str__(self):
-        return f"{self.name} - {self.model_name} ({self.institution.slug})"
+        scope = self.institution.slug if self.institution else 'platform'
+        return f"{self.name} - {self.model_name} ({scope})"
+
+    @staticmethod
+    def _get_fernet() -> Fernet:
+        """Derive a Fernet key from Django SECRET_KEY."""
+        digest = hashlib.sha256(settings.SECRET_KEY.encode()).digest()
+        key = base64.urlsafe_b64encode(digest)
+        return Fernet(key)
+
+    def set_api_key(self, raw_key: str):
+        """Encrypt and store an API key."""
+        if not raw_key:
+            self.api_key_encrypted = ''
+            return
+        f = self._get_fernet()
+        self.api_key_encrypted = f.encrypt(raw_key.encode()).decode()
+
+    def get_api_key(self) -> str:
+        """Decrypt stored key, falling back to env var."""
+        if self.api_key_encrypted:
+            try:
+                f = self._get_fernet()
+                return f.decrypt(self.api_key_encrypted.encode()).decode()
+            except Exception:
+                pass
+        # Fallback to environment variable
+        if self.api_key_env_var:
+            return os.getenv(self.api_key_env_var, '')
+        return ''
 
     @classmethod
     def get_for(cls, purpose: str):

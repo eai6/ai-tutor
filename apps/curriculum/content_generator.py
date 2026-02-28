@@ -412,7 +412,12 @@ IMPORTANT GUIDELINES:
 3. Include 3-4 PRACTICE steps with varying difficulty
 4. Include 1-2 EVALUATE steps at the end
 5. Use Seychelles context where natural (SCR currency, local places, local examples)
-6. Media descriptions should be specific enough to generate images
+6. Media descriptions MUST be specific for accurate image generation:
+   - For maps: specify "schematic map" not "satellite view"
+   - For diagrams: specify exactly what should be labelled
+   - NEVER request images of real places as "photos"
+   - Example GOOD: "Schematic cross-section showing three layers of Earth with labels"
+   - Example BAD: "Image of Earth's layers"
 7. Hints should scaffold from general to specific
 8. For MCQ, make distractors plausible but clearly wrong
 

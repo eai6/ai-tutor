@@ -37,6 +37,9 @@
                 <tr>
                     <td>
                         <span style="font-weight: 500;">{{ c.course.title }}</span>
+                        {% if c.is_platform_wide %}
+                        <span class="badge" style="background:#DBEAFE;color:#1E40AF;font-size:0.7rem;margin-left:0.5rem;">Platform</span>
+                        {% endif %}
                         {% if c.course.description %}
                         <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ c.course.description|truncatewords:10 }}</div>
                         {% endif %}
@@ -57,9 +60,15 @@
                         {% endif %}
                     </td>
                     <td>
+                        {% if c.read_only %}
+                        <a href="{% url 'dashboard:course_detail' c.course.id %}" class="btn btn-secondary btn-sm">
+                            View
+                        </a>
+                        {% else %}
                         <a href="{% url 'dashboard:course_detail' c.course.id %}" class="btn btn-secondary btn-sm">
                             Manage
                         </a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% if c.material_count %}

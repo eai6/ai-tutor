@@ -10,6 +10,7 @@ Provides:
 
 import json
 import logging
+import os
 import zoneinfo
 from datetime import timedelta
 from django.shortcuts import render, redirect, get_object_or_404
@@ -400,12 +401,20 @@ def student_detail(request, student_id):
 def curriculum_list(request):
     """List all courses grouped by grade level."""
     institution = request.staff_ctx['institution']
-    
-    courses = filter_by_institution(
-        Course.objects.all(), institution
-    ).prefetch_related('units__lessons').order_by('grade_level', 'title')
+
+    # Include platform-wide courses (institution=None) alongside school courses
+    if institution is not None:
+        courses_qs = Course.objects.filter(
+            Q(institution=institution) | Q(institution__isnull=True)
+        )
+    else:
+        courses_qs = Course.objects.all()
+
+    courses = courses_qs.prefetch_related('units__lessons').order_by('grade_level', 'title')
 
     from apps.dashboard.models import TeachingMaterialUpload
+
+    is_superadmin = request.user.is_staff
 
     # Enrich with stats + per-course materials
     course_data = []
@@ -413,6 +422,7 @@ def curriculum_list(request):
         total_lessons = Lesson.objects.filter(unit__course=course).count()
         published_lessons = Lesson.objects.filter(unit__course=course, is_published=True).count()
         materials = TeachingMaterialUpload.objects.filter(course=course)
+        is_platform_wide = course.institution is None
 
         course_data.append({
             'course': course,
@@ -421,11 +431,17 @@ def curriculum_list(request):
             'published_lessons': published_lessons,
             'materials': materials,
             'material_count': materials.count(),
+            'is_platform_wide': is_platform_wide,
+            'read_only': is_platform_wide and not is_superadmin,
         })
 
-    unlinked_materials = TeachingMaterialUpload.objects.filter(
-        institution=institution, course__isnull=True
-    )
+    if institution is not None:
+        unlinked_materials = TeachingMaterialUpload.objects.filter(
+            Q(institution=institution) | Q(institution__isnull=True),
+            course__isnull=True,
+        )
+    else:
+        unlinked_materials = TeachingMaterialUpload.objects.filter(course__isnull=True)
 
     context = {
         **request.staff_ctx,
@@ -440,11 +456,19 @@ def curriculum_list(request):
 def course_detail(request, course_id):
     """View and manage a course's units and lessons."""
     institution = request.staff_ctx['institution']
+    is_superadmin = request.user.is_staff
 
     if institution is not None:
-        course = get_object_or_404(Course, id=course_id, institution=institution)
+        # Staff can see their school's courses AND platform-wide courses
+        course = get_object_or_404(
+            Course, Q(institution=institution) | Q(institution__isnull=True), id=course_id
+        )
     else:
         course = get_object_or_404(Course, id=course_id)
+
+    # Platform-wide courses are read-only for non-superadmins
+    is_platform_wide = course.institution is None
+    course_read_only = is_platform_wide and not is_superadmin
     
     units = course.units.prefetch_related('lessons', 'lessons__steps').order_by('order_index')
     
@@ -527,6 +551,8 @@ def course_detail(request, course_id):
         'active_upload': active_upload,
         'materials': materials,
         'material_types': TeachingMaterialUpload.MaterialType.choices,
+        'is_platform_wide': is_platform_wide,
+        'course_read_only': course_read_only,
     }
 
     return render(request, 'dashboard/curriculum/course_detail.html', context)
@@ -536,8 +562,9 @@ def course_detail(request, course_id):
 def curriculum_upload(request):
     """Upload curriculum document with optional teaching material attachment."""
     institution = request.staff_ctx['institution']
+    is_superadmin = request.user.is_staff
 
-    if institution is None:
+    if institution is None and not is_superadmin:
         messages.warning(request, "Please select a specific school before uploading curriculum.")
         return redirect('dashboard:curriculum_list')
 
@@ -745,8 +772,11 @@ def curriculum_approve(request, upload_id):
         grade_display = format_grade_display(upload.grade_level)
         course_title = f"{subject} {grade_display}"
 
+        # Use upload's institution (None for platform-wide)
+        course_institution = upload.institution
+
         course, created = Course.objects.update_or_create(
-            institution=institution or upload.institution,
+            institution=course_institution,
             title=course_title,
             defaults={
                 'description': f"{subject} curriculum for {grade_display}",
@@ -1337,6 +1367,66 @@ def settings_page(request):
             except json.JSONDecodeError:
                 messages.error(request, "Invalid data format. Please try again.")
 
+        elif action == 'ai_model' and is_superadmin:
+            from apps.llm.models import ModelConfig
+
+            tutor_provider = request.POST.get('tutor_provider', '').strip()
+            tutor_model = request.POST.get('tutor_model', '').strip()
+            tutor_api_key = request.POST.get('tutor_api_key', '').strip()
+
+            gen_provider = request.POST.get('gen_provider', '').strip()
+            gen_model = request.POST.get('gen_model', '').strip()
+            gen_api_key = request.POST.get('gen_api_key', '').strip()
+
+            valid_providers = [p[0] for p in ModelConfig.Provider.choices]
+            if tutor_provider not in valid_providers or gen_provider not in valid_providers:
+                messages.error(request, "Invalid provider.")
+            elif not tutor_model or not gen_model:
+                messages.error(request, "Model name is required for both purposes.")
+            else:
+                env_var_map = {
+                    'anthropic': 'ANTHROPIC_API_KEY',
+                    'openai': 'OPENAI_API_KEY',
+                    'google': 'GOOGLE_API_KEY',
+                    'azure_openai': 'AZURE_OPENAI_API_KEY',
+                    'local_ollama': '',
+                }
+                inst = institution or Institution.objects.filter(is_active=True).first()
+
+                # Deactivate all existing configs
+                ModelConfig.objects.filter(is_active=True).update(is_active=False)
+
+                # Tutoring config (also used for exit_tickets, skill_extraction)
+                for purpose in ['tutoring', 'exit_tickets', 'skill_extraction']:
+                    config = ModelConfig.objects.create(
+                        institution=inst,
+                        name=f"{tutor_provider.title()} - {purpose}",
+                        provider=tutor_provider,
+                        model_name=tutor_model,
+                        api_key_env_var=env_var_map.get(tutor_provider, ''),
+                        purpose=purpose,
+                        is_active=True,
+                    )
+                    if tutor_api_key:
+                        config.set_api_key(tutor_api_key)
+                        config.save()
+
+                # Generation config
+                config = ModelConfig.objects.create(
+                    institution=inst,
+                    name=f"{gen_provider.title()} - generation",
+                    provider=gen_provider,
+                    model_name=gen_model,
+                    api_key_env_var=env_var_map.get(gen_provider, ''),
+                    purpose='generation',
+                    is_active=True,
+                )
+                if gen_api_key:
+                    config.set_api_key(gen_api_key)
+                    config.save()
+
+                messages.success(request, f"AI models updated — Tutoring: {tutor_provider}/{tutor_model}, Generation: {gen_provider}/{gen_model}.")
+
         elif action == 'prompts' and is_superadmin:
             from apps.llm.models import PromptPack
             prompt_pack = PromptPack.objects.filter(
@@ -1395,6 +1485,40 @@ def settings_page(request):
 
         platform_config = PlatformConfig.load()
 
+    # AI Model config context (superadmin only) — per-purpose
+    tutor_provider = 'google'
+    tutor_model = 'gemini-3.1-pro-preview'
+    has_tutor_db_key = False
+    has_tutor_env_key = False
+    gen_provider = 'google'
+    gen_model = 'gemini-3.1-pro-preview'
+    has_gen_db_key = False
+    has_gen_env_key = False
+    provider_choices = []
+    provider_defaults_json = '{}'
+    if is_superadmin:
+        from apps.llm.models import ModelConfig
+        tutor_config = ModelConfig.objects.filter(is_active=True, purpose='tutoring').first()
+        if tutor_config:
+            tutor_provider = tutor_config.provider
+            tutor_model = tutor_config.model_name
+            has_tutor_db_key = bool(tutor_config.api_key_encrypted)
+            has_tutor_env_key = bool(os.getenv(tutor_config.api_key_env_var or '', ''))
+        gen_config = ModelConfig.objects.filter(is_active=True, purpose='generation').first()
+        if gen_config:
+            gen_provider = gen_config.provider
+            gen_model = gen_config.model_name
+            has_gen_db_key = bool(gen_config.api_key_encrypted)
+            has_gen_env_key = bool(os.getenv(gen_config.api_key_env_var or '', ''))
+        provider_choices = ModelConfig.Provider.choices
+        provider_defaults_json = json.dumps({
+            'anthropic': 'claude-sonnet-4-20250514',
+            'openai': 'gpt-4o',
+            'google': 'gemini-3.1-pro-preview',
+            'azure_openai': 'gpt-4o',
+            'local_ollama': 'llama3',
+        })
+
     all_timezones = sorted(zoneinfo.available_timezones())
     all_schools = Institution.objects.all().order_by('name') if is_superadmin else []
 
@@ -1406,6 +1530,16 @@ def settings_page(request):
         'platform_config': platform_config,
         'all_timezones': all_timezones,
         'all_schools': all_schools,
+        'tutor_provider': tutor_provider,
+        'tutor_model': tutor_model,
+        'has_tutor_db_key': has_tutor_db_key,
+        'has_tutor_env_key': has_tutor_env_key,
+        'gen_provider': gen_provider,
+        'gen_model': gen_model,
+        'has_gen_db_key': has_gen_db_key,
+        'has_gen_env_key': has_gen_env_key,
+        'provider_choices': provider_choices,
+        'provider_defaults_json': provider_defaults_json,
     }
 
     return render(request, 'dashboard/settings.html', context)

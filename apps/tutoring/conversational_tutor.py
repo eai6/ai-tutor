@@ -108,8 +108,8 @@ MINIMISE COGNITIVE LOAD
   with labelled subgoals (Step 1: ..., Step 2: ..., Step 3: ...).
 - Use concrete numbers and visuals before abstract notation.
 - Use dual coding: pair verbal explanations with diagrams, number lines, tables,
-  or visual representations whenever possible. Use [SHOW_MEDIA:title] syntax to
-  display available media assets at the moment they're most useful.
+  or visual representations whenever possible. Use the media catalog IDs to
+  display visual aids at the moment they're most useful. See <media_catalog>.
 - If the student seems overwhelmed, break the current step into even smaller pieces.
 </principle>
 
@@ -261,7 +261,7 @@ a different approach -- no rush."
 - Always end with a question or a prompt for student action.
 - Use short paragraphs. Never produce a wall of text.
 - Use LaTeX or clear notation for mathematical expressions.
-- Use [SHOW_MEDIA:title] to display available media assets at the relevant moment.
+- To show an image, write |||MEDIA:N||| as the VERY LAST line. See <media_catalog>.
 - Do NOT include suggested quick-reply options or response choices in your messages.
   Just ask your question and let the student answer in their own words.
 </format_rules>
@@ -542,19 +542,29 @@ class ConversationalTutor:
         self.session.save()
     
     def _load_conversation(self) -> List[Dict]:
-        """Load conversation history from session turns."""
+        """Load conversation history from session turns.
+
+        Strips legacy [SHOW_MEDIA:...] and new |||MEDIA:N||| tags from
+        historical content so signal pollution doesn't leak into LLM prompts.
+        """
         turns = SessionTurn.objects.filter(
             session=self.session
         ).order_by('created_at')
-        
+
+        _tag_re = re.compile(
+            r'\[SHOW_MEDIA\s*:[^\]]*\]|\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|',
+            re.IGNORECASE,
+        )
+
         conversation = []
         for turn in turns:
             role = "assistant" if turn.role == 'tutor' else "user"
+            content = _tag_re.sub('', turn.content).strip()
             conversation.append({
                 "role": role,
-                "content": turn.content
+                "content": content,
             })
-        
+
         return conversation
     
     def _build_lesson_context(self) -> str:
@@ -798,7 +808,7 @@ Keep it to 2-3 sentences."""
         Generate a response to student input.
 
         This is the main conversation loop.
-        Media selection: LLM chooses via [SHOW_MEDIA:title] tag, parsed after generation.
+        Media selection: LLM signals via |||MEDIA:N||| tail-line, parsed before saving.
         """
         # Save student message
         self._save_turn("student", student_input)
@@ -821,7 +831,7 @@ Keep it to 2-3 sentences."""
         if self.phase == ConversationPhase.EXIT_TICKET:
             return self._handle_exit_ticket()
 
-        # Generate response WITHOUT pre-selected media — LLM picks via [SHOW_MEDIA:title]
+        # Generate response — LLM picks media via |||MEDIA:N||| tail-line signal
         response = self._generate_contextual_response(
             student_input,
             kb_context,
@@ -829,32 +839,32 @@ Keep it to 2-3 sentences."""
             visual_requested=bool(visual_request)
         )
 
-        # Parse [SHOW_MEDIA:title] from LLM output → resolve to actual media
+        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
+        clean_response, parsed_media = self._parse_media_signal(response)
+
+        # Resolve media: signal > visual request fallback > proactive
         media = []
-        parsed = self._parse_show_media_tag(response)
-        if parsed:
-            media = [parsed]
+        if parsed_media:
+            media = [parsed_media]
         elif visual_request:
-            # Student explicitly asked for a visual but LLM didn't tag one
             media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
         elif self._get_proactive_media():
-            # Fallback: proactive media if LLM didn't choose
             media = self._get_proactive_media()[:1]
 
         # Deduplicate & cap at 1
         media = self._deduplicate_media(media)[:1]
 
         # Analyze student response for adaptation
-        self._analyze_student_response(student_input, response)
+        self._analyze_student_response(student_input, clean_response)
 
         # Save state
         self._save_state()
 
-        # Save tutor response
-        self._save_turn("tutor", response)
-        self.conversation.append({"role": "assistant", "content": response})
+        # Save CLEAN tutor response (no signal tags in DB)
+        self._save_turn("tutor", clean_response)
+        self.conversation.append({"role": "assistant", "content": clean_response})
 
-        return self._create_message(response, media=media)
+        return self._create_message(clean_response, media=media)
 
     def _prepare_response(self, student_input: str) -> Optional[Dict]:
         """
@@ -884,7 +894,7 @@ Keep it to 2-3 sentences."""
         if self.phase == ConversationPhase.EXIT_TICKET:
             return None
 
-        # No pre-selected media — LLM picks via [SHOW_MEDIA:title] in its output
+        # No pre-selected media — LLM picks via |||MEDIA:N||| in its output
         return {
             'student_input': student_input,
             'kb_context': kb_context,
@@ -897,14 +907,15 @@ Keep it to 2-3 sentences."""
         """
         Shared post-generation logic for respond() and respond_stream().
 
-        Parses [SHOW_MEDIA:title] from LLM output, resolves media, then runs
+        Parses |||MEDIA:N||| signal from LLM output, resolves media, then runs
         post-processing (concept tracking, state save).
-        Returns metadata dict.
+        Returns metadata dict including clean_content for the done chunk.
         """
-        # Parse [SHOW_MEDIA:title] from LLM output → resolve to actual media
-        parsed = self._parse_show_media_tag(full_response)
-        if parsed:
-            media = [parsed]
+        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
+        clean_content, parsed_media = self._parse_media_signal(full_response)
+
+        if parsed_media:
+            media = [parsed_media]
         elif not media:
             # Fallback: student asked for visual or proactive media
             visual_request = self._detect_visual_request(student_input)
@@ -917,18 +928,19 @@ Keep it to 2-3 sentences."""
         media = self._deduplicate_media(media)[:1]
 
         # Analyze student response for adaptation
-        self._analyze_student_response(student_input, full_response)
+        self._analyze_student_response(student_input, clean_content)
 
         # Save state
         self._save_state()
 
-        # Save tutor response
-        self._save_turn("tutor", full_response)
-        self.conversation.append({"role": "assistant", "content": full_response})
+        # Save CLEAN tutor response (no signal tags in DB)
+        self._save_turn("tutor", clean_content)
+        self.conversation.append({"role": "assistant", "content": clean_content})
 
         return {
             'phase': self.phase.value,
             'media': media,
+            'clean_content': clean_content,
             'show_exit_ticket': False,
             'exit_ticket': None,
             'is_complete': self.phase == ConversationPhase.COMPLETED,
@@ -1042,7 +1054,7 @@ YOUR RESPONSE:"""
 
         yield _json.dumps({
             "type": "done",
-            "content": full_content,
+            "content": metadata.get('clean_content', full_content),
             **metadata,
         })
 
@@ -1924,18 +1936,32 @@ Guide your teaching toward helping the student understand this concept!"""
         return system_prompt
 
     def _build_media_catalog(self) -> str:
-        """Build a catalog of available media titles for the LLM."""
+        """Build a numbered catalog of available media for the LLM.
+
+        Populates self._media_id_map = {int: media_dict} for O(1) lookup
+        when parsing |||MEDIA:N||| signals from LLM output.
+        Deduplicates by URL across both sources.
+        """
         from apps.llm.prompts import get_lesson_media
 
-        entries = []
+        seen_urls = set()
+        media_items = []  # list of (label, media_dict)
 
         # From StepMedia / media library
         try:
             for m in get_lesson_media(self.lesson):
+                url = m.get('url')
                 title = m.get('title', '')
-                mtype = m.get('type', 'image')
-                if title:
-                    entries.append(f"- {title} ({mtype})")
+                if not url or not title or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                media_items.append((title, {
+                    'type': m.get('type', 'image'),
+                    'url': url,
+                    'alt': m.get('alt_text', '') or title,
+                    'caption': m.get('caption', '') or title,
+                    'description': title,
+                }))
         except Exception:
             pass
 
@@ -1944,19 +1970,40 @@ Guide your teaching toward helping the student understand this concept!"""
             if not step.media or 'images' not in step.media:
                 continue
             for img in step.media['images']:
+                url = img.get('url')
+                if not url or url in seen_urls:
+                    continue
                 alt = img.get('alt', '')
                 caption = img.get('caption', '')
                 label = alt or caption
-                if label and label not in '\n'.join(entries):
-                    entries.append(f"- {label} (image)")
+                if not label:
+                    continue
+                seen_urls.add(url)
+                media_items.append((label, {
+                    'type': 'image',
+                    'url': url,
+                    'alt': alt,
+                    'caption': caption,
+                    'description': alt or caption,
+                }))
 
-        if not entries:
+        # Build numbered ID map
+        self._media_id_map = {}
+        if not media_items:
             return ""
 
-        catalog = "\n\nAVAILABLE MEDIA FOR THIS LESSON:\n"
-        catalog += "Display media by including [SHOW_MEDIA:title] in your response.\n"
-        catalog += "\n".join(entries)
-        catalog += "\n\nUse at most ONE [SHOW_MEDIA:title] per response. Only use exact titles from this list."
+        lines = []
+        for idx, (label, media_dict) in enumerate(media_items, start=1):
+            self._media_id_map[idx] = media_dict
+            lines.append(f"  [{idx}] {label}")
+
+        catalog = "\n\n<media_catalog>\n"
+        catalog += "AVAILABLE MEDIA (use ID number to reference):\n"
+        catalog += "\n".join(lines)
+        catalog += "\n\nTo show media, write EXACTLY |||MEDIA:N||| as the LAST line."
+        catalog += "\nDo NOT embed media references anywhere in your response text."
+        catalog += "\nUse at most ONE media item per response."
+        catalog += "\n</media_catalog>"
         return catalog
 
     # =========================================================================
@@ -2735,97 +2782,27 @@ Keep it warm and supportive. 3-4 sentences + a question to start the review."""
             content=content,
         )
     
-    def _parse_show_media_tag(self, text: str) -> Optional[Dict]:
-        """Parse [SHOW_MEDIA:title] from LLM output and resolve to a media item.
+    def _parse_media_signal(self, text: str) -> Tuple[str, Optional[Dict]]:
+        """Parse |||MEDIA:N||| signal from LLM output.
 
-        Returns a single media dict {type, url, alt, caption} or None.
+        Returns (clean_text, media_dict or None).  The signal is always
+        stripped from text so nothing leaks into DB or student chat.
         """
-        from apps.llm.prompts import get_lesson_media
-
-        match = re.search(r'\[SHOW_MEDIA\s*:\s*([^\]]+)\]', text, re.IGNORECASE)
+        match = re.search(r'\|\|\|MEDIA\s*:\s*(\d+)\s*\|\|\|', text)
         if not match:
-            return None
-
-        requested_title = match.group(1).strip()
-        req_lower = requested_title.lower()
-        req_words = set(w for w in req_lower.split() if len(w) > 2)
-
-        candidates = []  # list of (score, media_dict)
-
-        # Search step.media['images']
-        for step in self.steps:
-            if not step.media or 'images' not in step.media:
-                continue
-            for img in step.media['images']:
-                if not img.get('url'):
-                    continue
-                alt = img.get('alt', '')
-                caption = img.get('caption', '')
-                search_text = f"{alt} {caption}".lower()
-
-                # Exact substring match
-                if req_lower in search_text:
-                    score = 1.0
-                else:
-                    # Word overlap fuzzy match
-                    search_words = set(w for w in search_text.split() if len(w) > 2)
-                    if not req_words:
-                        continue
-                    overlap = len(req_words & search_words) / len(req_words)
-                    score = overlap
-
-                if score >= 0.4:
-                    candidates.append((score, {
-                        'type': 'image',
-                        'url': img['url'],
-                        'alt': alt,
-                        'caption': caption,
-                        'description': alt or caption,
-                    }))
-
-        # Search media library via get_lesson_media
-        try:
-            for m in get_lesson_media(self.lesson):
-                title = m.get('title', '')
-                caption = m.get('caption', '') or ''
-                alt_text = m.get('alt_text', '') or ''
-                url = m.get('url')
-                if not url:
-                    continue
-
-                search_text = f"{title} {caption} {alt_text}".lower()
-
-                if req_lower in search_text:
-                    score = 1.0
-                else:
-                    search_words = set(w for w in search_text.split() if len(w) > 2)
-                    if not req_words:
-                        continue
-                    overlap = len(req_words & search_words) / len(req_words)
-                    score = overlap
-
-                if score >= 0.4:
-                    candidates.append((score, {
-                        'type': 'image',
-                        'url': url,
-                        'alt': alt_text or title,
-                        'caption': caption or title,
-                        'description': title,
-                    }))
-        except Exception:
-            pass
-
-        if not candidates:
-            return None
-
-        # Return the highest-scoring match
-        candidates.sort(key=lambda x: x[0], reverse=True)
-        return candidates[0][1]
+            return text, None
+        clean_text = text[:match.start()].rstrip()
+        media_id = int(match.group(1))
+        if media_id == 0:
+            return clean_text, None
+        media_id_map = getattr(self, '_media_id_map', {})
+        return clean_text, media_id_map.get(media_id)
 
     def _create_message(self, content: str, media: List[Dict] = None) -> TutorMessage:
         """Create a TutorMessage from content."""
-        # Strip [SHOW_MEDIA:...] tags so they don't leak into student chat
+        # Defense-in-depth: strip both legacy and new signal tags
         content = re.sub(r'\[SHOW_MEDIA\s*:[^\]]*\]', '', content, flags=re.IGNORECASE)
+        content = re.sub(r'\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|', '', content)
         content = re.sub(r' {2,}', ' ', content)
         content = re.sub(r'\n{3,}', '\n\n', content)
         content = content.strip()

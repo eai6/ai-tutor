@@ -136,7 +136,7 @@ def lesson_catalog(request):
 
     # Get all courses (subjects) for this institution
     courses = Course.objects.filter(
-        institution=institution,
+        Q(institution=institution) | Q(institution__isnull=True),
         is_published=True
     ).prefetch_related(
         'units__lessons'

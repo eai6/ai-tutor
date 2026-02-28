@@ -292,6 +292,110 @@
         <button type="submit" class="btn btn-primary">Save Grade Levels</button>
     </form>
 
+    {# ── AI Model Configuration (superadmin only) — per-purpose ── #}
+    <form method="post" style="margin-top: 2rem;" id="ai-model-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="ai_model">
+
+        {# Card 1: Student Tutoring #}
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Student Tutoring Model</h3>
+            </div>
+            <div class="card-body">
+                <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                    LLM used for live tutoring sessions, exit tickets, and skill extraction.
+                </p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="tutor_provider">Provider</label>
+                        <select class="form-control" id="tutor_provider" name="tutor_provider" onchange="onProviderChange('tutor')">
+                            {% for code, label in provider_choices %}
+                            <option value="{{ code }}" {% if code == tutor_provider %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="tutor_model">Model Name</label>
+                        <input type="text" class="form-control" id="tutor_model" name="tutor_model" value="{{ tutor_model }}" placeholder="e.g. gemini-3.1-pro-preview">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label" for="tutor_api_key">API Key</label>
+                    <input type="password" class="form-control" id="tutor_api_key" name="tutor_api_key"
+                           placeholder="{% if has_tutor_db_key %}Key stored in database (leave blank to keep){% elif has_tutor_env_key %}Using environment variable (leave blank to keep){% else %}Enter API key...{% endif %}">
+                    <small style="color:var(--gray-500);">Leave blank to keep the current key.</small>
+                </div>
+
+                <div style="margin-top: 1rem; padding: 0.75rem; background: var(--gray-50); border-radius: 8px; font-size: 0.8125rem; color: var(--gray-600);">
+                    <strong>Current:</strong>
+                    {{ tutor_provider|default:"not configured" }} / {{ tutor_model|default:"—" }}
+                    &nbsp;&bull;&nbsp;
+                    <strong>Key:</strong>
+                    {% if has_tutor_db_key %}
+                        <span style="color: var(--success, #16a34a);">Stored in DB</span>
+                    {% elif has_tutor_env_key %}
+                        <span style="color: var(--success, #16a34a);">From env var</span>
+                    {% else %}
+                        <span style="color: var(--danger, #dc2626);">Not configured</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# Card 2: Content Generation #}
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Content Generation Model</h3>
+            </div>
+            <div class="card-body">
+                <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                    LLM used for curriculum generation, lesson content, and image generation prompts.
+                </p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="gen_provider">Provider</label>
+                        <select class="form-control" id="gen_provider" name="gen_provider" onchange="onProviderChange('gen')">
+                            {% for code, label in provider_choices %}
+                            <option value="{{ code }}" {% if code == gen_provider %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="gen_model">Model Name</label>
+                        <input type="text" class="form-control" id="gen_model" name="gen_model" value="{{ gen_model }}" placeholder="e.g. gemini-3.1-pro-preview">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label" for="gen_api_key">API Key</label>
+                    <input type="password" class="form-control" id="gen_api_key" name="gen_api_key"
+                           placeholder="{% if has_gen_db_key %}Key stored in database (leave blank to keep){% elif has_gen_env_key %}Using environment variable (leave blank to keep){% else %}Enter API key...{% endif %}">
+                    <small style="color:var(--gray-500);">Leave blank to keep the current key.</small>
+                </div>
+
+                <div style="margin-top: 1rem; padding: 0.75rem; background: var(--gray-50); border-radius: 8px; font-size: 0.8125rem; color: var(--gray-600);">
+                    <strong>Current:</strong>
+                    {{ gen_provider|default:"not configured" }} / {{ gen_model|default:"—" }}
+                    &nbsp;&bull;&nbsp;
+                    <strong>Key:</strong>
+                    {% if has_gen_db_key %}
+                        <span style="color: var(--success, #16a34a);">Stored in DB</span>
+                    {% elif has_gen_env_key %}
+                        <span style="color: var(--success, #16a34a);">From env var</span>
+                    {% else %}
+                        <span style="color: var(--danger, #dc2626);">Not configured</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save AI Models</button>
+    </form>
+
     {# ── AI System Prompts (superadmin only) ── #}
     <form method="post" style="margin-top: 2rem;">
         {% csrf_token %}
@@ -328,6 +432,16 @@
 {% if is_superadmin %}
 <script>
 (function() {
+    // AI Model — auto-fill model name on provider change (per-purpose)
+    var providerDefaults = {{ provider_defaults_json|safe }};
+    window.onProviderChange = function(prefix) {
+        var sel = document.getElementById(prefix + '_provider');
+        var modelInput = document.getElementById(prefix + '_model');
+        if (sel && modelInput && providerDefaults[sel.value]) {
+            modelInput.value = providerDefaults[sel.value];
+        }
+    };
+
     var gradesData = {{ platform_config.grades|safe|default:"[]" }};
 
     function renderTable(type) {

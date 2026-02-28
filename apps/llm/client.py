@@ -43,11 +43,8 @@ class BaseLLMClient(ABC):
         self.api_key = self._get_api_key()
     
     def _get_api_key(self) -> str:
-        """Look up API key from environment variable."""
-        if not self.config.api_key_env_var:
-            return ""
-        key = os.getenv(self.config.api_key_env_var, '')
-        return key
+        """Get API key via ModelConfig (encrypted DB key → env var fallback)."""
+        return self.config.get_api_key()
     
     @abstractmethod
     def generate(
@@ -308,6 +305,124 @@ class OpenAIClient(BaseLLMClient):
         )
 
 
+class GeminiClient(BaseLLMClient):
+    """Client for Google's Gemini API."""
+
+    def __init__(self, config: ModelConfig):
+        super().__init__(config)
+        if not self.api_key:
+            raise ValueError(
+                f"API key not found. Set {self.config.api_key_env_var} environment variable "
+                "or configure a key in AI Model settings."
+            )
+        try:
+            from google import genai
+            self.client = genai.Client(api_key=self.api_key)
+        except ImportError:
+            raise ImportError("google-genai package not installed. Run: pip install google-genai")
+
+    def _build_contents(self, messages):
+        """Map chat messages to Gemini Content objects."""
+        from google.genai import types
+        contents = []
+        for msg in messages:
+            role = 'model' if msg['role'] == 'assistant' else 'user'
+            contents.append(types.Content(
+                role=role,
+                parts=[types.Part(text=msg['content'])],
+            ))
+        return contents
+
+    def _search_tools(self):
+        """Build Google Search grounding tools list."""
+        from google.genai import types
+        try:
+            return [types.Tool(google_search=types.GoogleSearch())]
+        except Exception as e:
+            logger.warning(f"Could not create search grounding tool: {e}")
+            return None
+
+    def generate(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        max_tokens: int | None = None,
+    ) -> LLMResponse:
+        """Call Gemini API with Google Search grounding."""
+        from google.genai import types
+
+        gemini_contents = self._build_contents(messages)
+        tools = self._search_tools()
+
+        config_kwargs = dict(
+            system_instruction=system_prompt,
+            max_output_tokens=max_tokens or self.config.max_tokens,
+            temperature=self.config.temperature,
+        )
+        if tools:
+            config_kwargs['tools'] = tools
+
+        response = self.client.models.generate_content(
+            model=self.config.model_name,
+            contents=gemini_contents,
+            config=types.GenerateContentConfig(**config_kwargs),
+        )
+
+        tokens_in = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
+        tokens_out = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+
+        return LLMResponse(
+            content=response.text or '',
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            model=self.config.model_name,
+            stop_reason='stop',
+        )
+
+    def generate_stream(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+    ) -> Generator[str, None, LLMResponse]:
+        """Stream response from Gemini API with Google Search grounding."""
+        from google.genai import types
+
+        gemini_contents = self._build_contents(messages)
+        tools = self._search_tools()
+
+        config_kwargs = dict(
+            system_instruction=system_prompt,
+            max_output_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+        )
+        if tools:
+            config_kwargs['tools'] = tools
+
+        full_content = ""
+        tokens_in = 0
+        tokens_out = 0
+
+        for chunk in self.client.models.generate_content_stream(
+            model=self.config.model_name,
+            contents=gemini_contents,
+            config=types.GenerateContentConfig(**config_kwargs),
+        ):
+            text = chunk.text or ''
+            full_content += text
+            if chunk.usage_metadata:
+                tokens_in = getattr(chunk.usage_metadata, 'prompt_token_count', 0) or 0
+                tokens_out = getattr(chunk.usage_metadata, 'candidates_token_count', 0) or 0
+            yield text
+
+        return LLMResponse(
+            content=full_content,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            model=self.config.model_name,
+            stop_reason='stop',
+        )
+
+
 class MockLLMClient(BaseLLMClient):
     """
     Mock client for testing without API calls.
@@ -353,7 +468,9 @@ def get_llm_client(config: ModelConfig, use_mock: bool = False) -> BaseLLMClient
         return AnthropicClient(config)
     elif config.provider == ModelConfig.Provider.OPENAI:
         return OpenAIClient(config)
+    elif config.provider == ModelConfig.Provider.GOOGLE:
+        return GeminiClient(config)
     elif config.provider == ModelConfig.Provider.LOCAL_OLLAMA:
         return OllamaClient(config)
-    
+
     raise ValueError(f"Unsupported provider: {config.provider}")

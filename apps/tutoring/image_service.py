@@ -198,6 +198,19 @@ class ImageGenerationService:
             "Educational visual for secondary school students. "
         )
 
+        # Build lesson context for grounding
+        lesson_context = ""
+        if self.lesson:
+            try:
+                course = self.lesson.unit.course
+                lesson_context = (
+                    f"Subject: {course.title}. "
+                    f"Grade: {course.grade_level}. "
+                    f"Lesson: {self.lesson.title}. "
+                )
+            except Exception:
+                pass
+
         style_map = {
             'diagram': (
                 "Create a detailed educational diagram with clear labels, "
@@ -214,9 +227,9 @@ class ImageGenerationService:
                 "secondary school textbook. "
             ),
             'map': (
-                "Create a detailed geographic map with clear labels, "
+                "Create a SCHEMATIC geographic map (NOT a satellite photo). "
+                "Professional cartographic style with clean outlines, "
                 "a legend, compass rose, and distinct colour-coded regions. "
-                "Use a professional cartographic style. "
             ),
             'chart': (
                 "Create a professional chart with clear axis labels, "
@@ -242,7 +255,15 @@ class ImageGenerationService:
         if textbook_context:
             textbook_style = f"Match this style: {textbook_context}. "
 
-        return f"{style}{context}{textbook_style}{prompt}"
+        anti_hallucination = (
+            "\n\nRULES:\n"
+            "1. Do NOT include text labels with made-up or misspelled words. "
+            "If unsure of spelling, omit the label.\n"
+            "2. Do NOT fabricate geographic features, place names, or scientific data.\n"
+            "3. Keep text labels minimal — prefer arrows and colour-coding.\n"
+        )
+
+        return f"{style}{context}{lesson_context}{textbook_style}{prompt}{anti_hallucination}"
 
     def _save_generated_image_bytes(
         self, image_bytes: bytes, prompt: str, ext: str = '.png'
