@@ -265,6 +265,133 @@
         </div>
     </div>
 
+    {# ── Manage Users (superadmin only) ── #}
+    <div style="margin-top: 2rem;">
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Manage Users</h3>
+            </div>
+            <div class="card-body">
+                <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                    All users except yourself. Staff are added via "Invite Staff", students via self-registration.
+                </p>
+
+                {% if all_users %}
+                <div style="overflow-x:auto;">
+                <table class="table" style="margin-bottom:0;">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>School</th>
+                            <th>Status</th>
+                            <th style="width:240px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in all_users %}
+                        <tr>
+                            <td>{{ u.get_full_name|default:"—" }}</td>
+                            <td>{{ u.email }}</td>
+                            <td>
+                                {% if u.is_staff %}
+                                    <span class="badge" style="background:var(--primary);color:#fff;">Super Admin</span>
+                                {% else %}
+                                    {% for m in u.memberships.all %}
+                                        {{ m.get_role_display }}{% if not forloop.last %}, {% endif %}
+                                    {% empty %}
+                                        <span style="color:var(--gray-400);">—</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.is_staff %}
+                                    <span style="color:var(--gray-400);">All</span>
+                                {% else %}
+                                    {% for m in u.memberships.all %}
+                                        {{ m.institution.name }}{% if not forloop.last %}, {% endif %}
+                                    {% empty %}
+                                        <span style="color:var(--gray-400);">—</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.is_active %}
+                                <span class="badge badge-success">Active</span>
+                                {% else %}
+                                <span class="badge badge-danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td style="white-space:nowrap;">
+                                {% if u.is_staff %}
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('Remove Super Admin privileges from {{ u.get_full_name|default:u.email }}?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="toggle_admin">
+                                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                                        <button type="submit" class="btn btn-sm btn-secondary">Demote</button>
+                                    </form>
+                                {% else %}
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('Promote {{ u.get_full_name|default:u.email }} to Super Admin?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="toggle_admin">
+                                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                                        <button type="submit" class="btn btn-sm btn-secondary">Promote</button>
+                                    </form>
+                                    <form method="post" style="display:inline;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="toggle_user">
+                                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                                        <button type="submit" class="btn btn-sm btn-secondary">
+                                            {% if u.is_active %}Deactivate{% else %}Activate{% endif %}
+                                        </button>
+                                    </form>
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('Delete user {{ u.get_full_name|default:u.email }}? This cannot be undone.');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_user">
+                                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                                        <button type="submit" class="btn btn-sm" style="background:var(--danger);color:#fff;">Delete</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                {% else %}
+                <p style="color:var(--gray-500);font-style:italic;">No other users yet.</p>
+                {% endif %}
+
+                {# Create new Super Admin #}
+                <form method="post" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--gray-200);">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_admin">
+                    <p style="font-weight:600;font-size:0.875rem;margin-bottom:0.75rem;">Create Super Admin</p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">First Name</label>
+                            <input type="text" class="form-control" name="admin_first_name" placeholder="First name">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" class="form-control" name="admin_last_name" placeholder="Last name">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="admin_email" placeholder="admin@example.com" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" name="admin_password" placeholder="Min 6 characters" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm" style="margin-top:0.75rem;">Create Admin</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     {# ── Grade Levels (superadmin only) ── #}
     <form method="post" style="margin-top: 2rem;" id="grades-form">
         {% csrf_token %}

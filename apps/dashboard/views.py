@@ -1347,6 +1347,64 @@ def settings_page(request):
             else:
                 messages.error(request, "School name and slug are required.")
 
+        elif action == 'toggle_user' and is_superadmin:
+            user_id = request.POST.get('user_id')
+            if user_id:
+                target = User.objects.filter(id=user_id).first()
+                if target and target != request.user and not target.is_staff:
+                    target.is_active = not target.is_active
+                    target.save(update_fields=['is_active'])
+                    Membership.objects.filter(user=target).update(is_active=target.is_active)
+                    status = "activated" if target.is_active else "deactivated"
+                    messages.success(request, f"User '{target.get_full_name() or target.email}' {status}.")
+                else:
+                    messages.error(request, "Cannot modify this user.")
+
+        elif action == 'delete_user' and is_superadmin:
+            user_id = request.POST.get('user_id')
+            if user_id:
+                target = User.objects.filter(id=user_id).first()
+                if target and target != request.user and not target.is_staff:
+                    name = target.get_full_name() or target.email
+                    target.delete()
+                    messages.success(request, f"User '{name}' deleted.")
+                else:
+                    messages.error(request, "Cannot delete this user.")
+
+        elif action == 'create_admin' and is_superadmin:
+            admin_email = request.POST.get('admin_email', '').strip()
+            admin_first = request.POST.get('admin_first_name', '').strip()
+            admin_last = request.POST.get('admin_last_name', '').strip()
+            admin_password = request.POST.get('admin_password', '').strip()
+            if not admin_email or not admin_password:
+                messages.error(request, "Email and password are required.")
+            elif User.objects.filter(email=admin_email).exists():
+                messages.error(request, f"A user with email '{admin_email}' already exists.")
+            else:
+                new_admin = User.objects.create_user(
+                    username=admin_email,
+                    email=admin_email,
+                    password=admin_password,
+                    first_name=admin_first,
+                    last_name=admin_last,
+                    is_staff=True,
+                )
+                messages.success(request, f"Super Admin '{new_admin.get_full_name() or admin_email}' created.")
+
+        elif action == 'toggle_admin' and is_superadmin:
+            user_id = request.POST.get('user_id')
+            if user_id:
+                target = User.objects.filter(id=user_id).first()
+                if target and target != request.user:
+                    target.is_staff = not target.is_staff
+                    target.save(update_fields=['is_staff'])
+                    if target.is_staff:
+                        messages.success(request, f"'{target.get_full_name() or target.email}' promoted to Super Admin.")
+                    else:
+                        messages.success(request, f"'{target.get_full_name() or target.email}' demoted from Super Admin.")
+                else:
+                    messages.error(request, "Cannot modify your own admin status.")
+
         elif action == 'toggle_school' and is_superadmin:
             school_id = request.POST.get('school_id')
             if school_id:
@@ -1563,6 +1621,11 @@ def settings_page(request):
 
     all_timezones = sorted(zoneinfo.available_timezones())
     all_schools = Institution.objects.all().order_by('name') if is_superadmin else []
+    all_users = (
+        User.objects.exclude(id=request.user.id)
+        .prefetch_related('memberships__institution')
+        .order_by('-is_staff', 'last_name', 'first_name')
+    ) if is_superadmin else []
 
     context = {
         **request.staff_ctx,
@@ -1572,6 +1635,7 @@ def settings_page(request):
         'platform_config': platform_config,
         'all_timezones': all_timezones,
         'all_schools': all_schools,
+        'all_users': all_users,
         'tutor_provider': tutor_provider,
         'tutor_model': tutor_model,
         'has_tutor_db_key': has_tutor_db_key,
