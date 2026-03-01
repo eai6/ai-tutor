@@ -70,7 +70,8 @@ def get_student_progress(user, institution):
     """Get progress for all lessons for a student."""
     progress = StudentLessonProgress.objects.filter(
         student=user,
-        lesson__unit__course__institution=institution
+    ).filter(
+        Q(lesson__unit__course__institution=institution) | Q(lesson__unit__course__institution__isnull=True)
     ).select_related('lesson')
 
     return {p.lesson_id: p for p in progress}
@@ -84,8 +85,9 @@ def lesson_list(request):
         return JsonResponse({"error": "No institution membership"}, status=403)
 
     lessons = Lesson.objects.filter(
-        unit__course__institution=institution,
         is_published=True
+    ).filter(
+        Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
     ).select_related('unit', 'unit__course')
 
     data = [{
@@ -288,9 +290,10 @@ def chat_tutor_interface(request, lesson_id):
         return render(request, 'tutoring/error.html', {"message": "No institution"})
 
     lesson = get_object_or_404(
-        Lesson,
+        Lesson.objects.filter(
+            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
+        ),
         id=lesson_id,
-        unit__course__institution=institution,
         is_published=True
     )
 
@@ -326,9 +329,10 @@ def chat_start_session(request, lesson_id):
         return JsonResponse({"error": "No institution membership"}, status=403)
 
     lesson = get_object_or_404(
-        Lesson,
+        Lesson.objects.filter(
+            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
+        ),
         id=lesson_id,
-        unit__course__institution=institution,
         is_published=True
     )
 

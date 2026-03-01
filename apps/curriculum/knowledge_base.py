@@ -103,7 +103,7 @@ class CurriculumKnowledgeBase:
             institution_id: ID of the institution (for data isolation)
             persist_directory: Where to store the vector DB (default: MEDIA_ROOT/vectordb/)
         """
-        self.institution_id = institution_id
+        self.institution_id = institution_id if institution_id is not None else self.GLOBAL_INSTITUTION_ID
         
         # Set up persistence directory
         if persist_directory is None:
