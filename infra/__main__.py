@@ -95,7 +95,7 @@ env = app.ManagedEnvironment(
             name="dedicated-d4",
             workload_profile_type="D4",
             minimum_count=1,
-            maximum_count=1,
+            maximum_count=2,
         ),
     ],
 )
