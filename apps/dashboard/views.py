@@ -1623,6 +1623,11 @@ def settings_page(request):
     all_schools = Institution.objects.all().order_by('name') if is_superadmin else []
     all_users = (
         User.objects.exclude(id=request.user.id)
+        .filter(
+            Q(is_staff=True) |
+            Q(memberships__role='staff')
+        )
+        .distinct()
         .prefetch_related('memberships__institution')
         .order_by('-is_staff', 'last_name', 'first_name')
     ) if is_superadmin else []
