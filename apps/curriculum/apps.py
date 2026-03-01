@@ -9,9 +9,10 @@ class CurriculumConfig(AppConfig):
     name = 'apps.curriculum'
     
     def ready(self):
-        """Called when Django starts - preload heavy models."""
+        """Called when Django starts - preload heavy models and register signals."""
         import os
-        
+        import apps.curriculum.signals  # noqa: F401 — registers signal handlers
+
         # Only preload in the main process (not in migrations, shell, etc.)
         # Check for RUN_MAIN to avoid double-loading in dev server
         if os.environ.get('RUN_MAIN') == 'true' or not os.environ.get('DJANGO_SETTINGS_MODULE'):

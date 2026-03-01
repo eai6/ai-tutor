@@ -810,6 +810,8 @@ Keep it to 2-3 sentences."""
         This is the main conversation loop.
         Media selection: LLM signals via |||MEDIA:N||| tail-line, parsed before saving.
         """
+        self._step_just_advanced = False
+
         # Save student message
         self._save_turn("student", student_input)
         self.conversation.append({"role": "user", "content": student_input})
@@ -842,12 +844,14 @@ Keep it to 2-3 sentences."""
         # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media = self._parse_media_signal(response)
 
-        # Resolve media: signal > visual request fallback > proactive
+        # Resolve media: signal > visual request > step-transition > proactive
         media = []
         if parsed_media:
             media = [parsed_media]
         elif visual_request:
             media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
+        elif self._step_just_advanced:
+            media = self._get_step_media()[:1]
         elif self._get_proactive_media():
             media = self._get_proactive_media()[:1]
 
@@ -873,6 +877,8 @@ Keep it to 2-3 sentences."""
         Saves student turn, updates counts, builds prompt context, checks
         phase transitions. Returns context dict, or None if exit_ticket phase.
         """
+        self._step_just_advanced = False
+
         # Save student message
         self._save_turn("student", student_input)
         self.conversation.append({"role": "user", "content": student_input})
@@ -917,10 +923,12 @@ Keep it to 2-3 sentences."""
         if parsed_media:
             media = [parsed_media]
         elif not media:
-            # Fallback: student asked for visual or proactive media
+            # Fallback: visual request > step-transition > proactive
             visual_request = self._detect_visual_request(student_input)
             if visual_request:
                 media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
+            elif self._step_just_advanced:
+                media = self._get_step_media()[:1]
             else:
                 media = self._get_proactive_media()[:1]
 
@@ -1064,6 +1072,12 @@ YOUR RESPONSE:"""
         Gated by phase and exchange cadence to avoid showing images
         too frequently or during practice/assessment phases.
         """
+        # Always show current step's media on the first INSTRUCTION exchange
+        if self.phase == ConversationPhase.INSTRUCTION and self.phase_exchange_count == 1:
+            step_media = self._get_step_media()[:1]
+            if step_media:
+                return step_media
+
         # Only show proactive media in teaching phases
         if self.phase not in (
             ConversationPhase.WARMUP,
@@ -1110,7 +1124,13 @@ YOUR RESPONSE:"""
                 break  # One proactive image per exchange is enough
 
         return media
-    
+
+    def _get_step_media(self) -> List[Dict]:
+        """Get all media for the current step. No relevance filtering."""
+        step_media_ids = getattr(self, '_step_media_ids', {}).get(self.current_topic_index, [])
+        media_id_map = getattr(self, '_media_id_map', {})
+        return [media_id_map[mid] for mid in step_media_ids if mid in media_id_map]
+
     def _build_media_context(self, media: List[Dict]) -> str:
         """Build context about what images are being shown for the LLM."""
         if not media:
@@ -1966,7 +1986,9 @@ Guide your teaching toward helping the student understand this concept!"""
             pass
 
         # From step.media JSONField images
-        for step in self.steps:
+        # Track which catalog IDs belong to which step
+        step_media_positions = {}  # {step_index: [position_in_media_items, ...]}
+        for step_idx, step in enumerate(self.steps):
             if not step.media or 'images' not in step.media:
                 continue
             for img in step.media['images']:
@@ -1986,9 +2008,12 @@ Guide your teaching toward helping the student understand this concept!"""
                     'caption': caption,
                     'description': alt or caption,
                 }))
+                # Catalog IDs are 1-indexed; after append, len == future ID
+                step_media_positions.setdefault(step_idx, []).append(len(media_items))
 
         # Build numbered ID map
         self._media_id_map = {}
+        self._step_media_ids = step_media_positions  # {step_index: [catalog_id, ...]}
         if not media_items:
             return ""
 
@@ -2118,6 +2143,13 @@ Guide your teaching toward helping the student understand this concept!"""
             strategies = cur.get('teaching_strategies', [])
             if strategies:
                 guidance += f"Teaching strategies: {'; '.join(str(s) for s in strategies)}\n"
+
+            # Tell LLM which media catalog items belong to this step
+            step_media_ids = getattr(self, '_step_media_ids', {}).get(self.current_topic_index, [])
+            if step_media_ids:
+                id_list = ', '.join(str(mid) for mid in step_media_ids)
+                guidance += f"Media for this step: catalog IDs [{id_list}]. "
+                guidance += "Show one using |||MEDIA:N||| when explaining this step's content.\n"
 
             return guidance
 
@@ -2440,6 +2472,7 @@ WRAPUP PHASE - Goals:
             if self.phase_exchange_count > 0 and self.phase_exchange_count % 2 == 0:
                 if self.current_topic_index < len(self.steps) - 1:
                     self.current_topic_index += 1
+                    self._step_just_advanced = True
     
     def _keyword_concept_coverage_check(self, conversation_text: str):
         """

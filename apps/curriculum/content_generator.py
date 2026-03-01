@@ -310,7 +310,7 @@ Return this exact JSON structure:
             "order_index": 0,
             "phase": "engage",
             "step_type": "teach",
-            "teacher_script": "Welcome! Today we're going to explore [topic]. Let me start with a question - [engaging question related to Seychelles or student life]",
+            "teacher_script": "Welcome! Today we're going to explore [topic]. Take a look at this diagram — it shows [concept]. Notice how [detail]. Let me start with a question - [engaging question related to Seychelles or student life]",
             "question": null,
             "answer_type": "none",
             "expected_answer": null,
@@ -420,6 +420,12 @@ IMPORTANT GUIDELINES:
    - Example BAD: "Image of Earth's layers"
 7. Hints should scaffold from general to specific
 8. For MCQ, make distractors plausible but clearly wrong
+9. When a step has media, the teacher_script MUST explicitly reference it.
+   - Use phrases like: "Let's look at this diagram...", "As you can see in the figure...",
+     "Take a look at the image below..."
+   - The script should describe what the student should notice in the image.
+   - This connects the visual to the explanation — never include media without referring to it.
+   - Steps with "media": null should NOT have media references in the script.
 
 Return ONLY valid JSON, no other text."""
 
