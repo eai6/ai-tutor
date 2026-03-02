@@ -7,77 +7,115 @@ Generates complete tutoring content for lessons including:
 - Educational materials (vocabulary, worked examples, key points)
 - Seychelles-contextualized examples
 
-This module works with the curriculum knowledge base to ensure
-generated content aligns with curriculum objectives and teaching strategies.
+Uses `instructor` library for guaranteed structured output from any LLM provider.
+No manual JSON parsing — Pydantic models define the contract, instructor enforces it.
 """
 
-import json
+import time
 import logging
 from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
+
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class MediaItem:
-    """Media item for a lesson step."""
-    type: str  # diagram, photo, chart, map, illustration
-    description: str  # What to generate/find
-    alt_text: str  # Accessibility
-    caption: str = ""
-    url: str = ""  # Filled after generation
-    source: str = "pending"  # pending, generated, library, external
+# ============================================================================
+# PYDANTIC MODELS — Schema contract for LLM structured output
+# ============================================================================
+
+class MediaImage(BaseModel):
+    """An image to generate for a lesson step."""
+    type: str = Field(description="Image type: diagram, chart, map, or illustration")
+    description: str = Field(description=(
+        "Specific description for image generation. "
+        "For maps: use 'schematic map'. For diagrams: specify labels. "
+        "Never request photos of real places."
+    ))
+    alt_text: str = Field(description="Accessibility text describing the image")
+    caption: str = Field(default="", description="Figure caption")
 
 
-@dataclass
-class VocabularyItem:
-    """Key vocabulary term."""
+class StepMedia(BaseModel):
+    """Media assets for a lesson step."""
+    images: List[MediaImage] = Field(default_factory=list)
+
+
+class VocabItem(BaseModel):
+    """A vocabulary term with definition and example."""
     term: str
     definition: str
     example: str = ""
-    pronunciation: str = ""
 
 
-@dataclass 
-class WorkedExample:
-    """A worked example with step-by-step solution."""
+class WorkedExampleStep(BaseModel):
+    """A single step in a worked example."""
+    step: int
+    action: str
+    explanation: str
+
+
+class WorkedExample(BaseModel):
+    """A complete worked example with step-by-step solution."""
     problem: str
-    steps: List[Dict]  # [{step: 1, action: "...", explanation: "..."}]
+    steps: List[WorkedExampleStep]
     final_answer: str
-    common_errors: List[str] = None
 
 
-@dataclass
-class LessonStepContent:
-    """Complete content for a single lesson step."""
-    order_index: int
-    phase: str  # engage, explore, explain, practice, evaluate
-    step_type: str  # teach, worked_example, practice, quiz, summary
-    
-    # Core content
-    teacher_script: str
-    question: str = ""
-    answer_type: str = "none"
-    expected_answer: str = ""
-    choices: List[str] = None
-    hints: List[str] = None
-    rubric: str = ""
-    
-    # Media
-    media: Dict = None
-    
-    # Educational content
-    educational_content: Dict = None
-    
-    # Curriculum context
-    curriculum_context: Dict = None
+class EducationalContent(BaseModel):
+    """Educational content embedded in a lesson step."""
+    key_vocabulary: Optional[List[VocabItem]] = None
+    key_points: Optional[List[str]] = None
+    seychelles_context: Optional[str] = None
+    worked_example: Optional[WorkedExample] = None
+    common_mistakes: Optional[List[str]] = None
 
+
+class LessonStepSchema(BaseModel):
+    """A single step in the tutoring lesson."""
+    order_index: int = Field(description="Sequential index starting from 0")
+    phase: str = Field(description="5E model phase: engage, explore, explain, practice, or evaluate")
+    step_type: str = Field(description="Step type: teach, worked_example, practice, or quiz")
+    teacher_script: str = Field(description=(
+        "The tutor's dialogue/instruction text. "
+        "If media is included, MUST reference it (e.g. 'Look at this diagram...'). "
+        "If no media, do NOT reference images."
+    ))
+    question: Optional[str] = Field(default=None, description="Question for the student. Required for practice and quiz steps.")
+    answer_type: str = Field(default="none", description="Answer type: none, short_numeric, short_text, multiple_choice, or free_response")
+    expected_answer: Optional[str] = Field(default=None, description="Correct answer. For multiple_choice, the letter (A/B/C/D)")
+    choices: Optional[List[str]] = Field(default=None, description="MCQ options: ['A) ...', 'B) ...', 'C) ...', 'D) ...']")
+    hints: Optional[List[str]] = Field(default=None, description="2-3 hints scaffolded from general to specific")
+    media: Optional[StepMedia] = Field(default=None, description="Media for this step, only if teacher_script references it")
+    educational_content: Optional[EducationalContent] = None
+
+
+class SummaryVocab(BaseModel):
+    term: str
+    definition: str
+
+
+class LessonSummarySchema(BaseModel):
+    """Summary of the lesson."""
+    main_concepts: List[str]
+    key_vocabulary: Optional[List[SummaryVocab]] = None
+    next_steps: str = ""
+
+
+class GeneratedLessonContent(BaseModel):
+    """Complete generated lesson content following the 5E pedagogical model."""
+    steps: List[LessonStepSchema] = Field(description="8-12 lesson steps following the 5E model")
+    lesson_summary: Optional[LessonSummarySchema] = None
+
+
+# ============================================================================
+# LESSON CONTENT GENERATOR
+# ============================================================================
 
 class LessonContentGenerator:
     """
     Generates complete tutoring content for lessons.
-    
+
     Uses the 5E pedagogical model:
     - Engage: Hook student interest
     - Explore: Guided discovery
@@ -85,23 +123,39 @@ class LessonContentGenerator:
     - Practice: Apply knowledge
     - Evaluate: Check understanding
     """
-    
+
     def __init__(self, institution_id: int):
         self.institution_id = institution_id
         self._init_llm_client()
         self._init_knowledge_base()
-    
+
     def _init_llm_client(self):
-        """Initialize LLM client."""
+        """Initialize instructor-wrapped LLM client for structured output."""
+        import instructor
         from apps.llm.models import ModelConfig
-        from apps.llm.client import get_llm_client
-        
+
         config = ModelConfig.get_for('generation')
         if not config:
-            raise ValueError("No active LLM model configured")
+            raise ValueError("No active LLM model configured for generation")
 
-        self.llm_client = get_llm_client(config)
-    
+        self._model_config = config
+        api_key = config.get_api_key()
+
+        # Map our provider names to instructor's expected format
+        PROVIDER_MAP = {
+            'anthropic': 'anthropic',
+            'openai': 'openai',
+            'google': 'google',
+            'local_ollama': 'ollama',
+        }
+        provider = PROVIDER_MAP.get(config.provider, config.provider)
+
+        self.client = instructor.from_provider(
+            f"{provider}/{config.model_name}",
+            api_key=api_key,
+        )
+        print(f"[ContentGen] Instructor client ready: {provider}/{config.model_name}", flush=True)
+
     def _init_knowledge_base(self):
         """Initialize curriculum knowledge base."""
         try:
@@ -112,31 +166,29 @@ class LessonContentGenerator:
             logger.warning(f"Knowledge base not available: {e}")
             self.kb = None
             self.kb_available = False
-    
+
     def generate_for_lesson(self, lesson, save_to_db: bool = True) -> Dict:
         """
         Generate complete content for a lesson.
-        
+
         Args:
             lesson: Lesson model instance
             save_to_db: Whether to save generated steps to database
-        
+
         Returns:
             Dict with generation results
         """
-        from apps.curriculum.models import LessonStep
-        
         logger.info(f"Generating content for: {lesson.title}")
-        
+
         # Get curriculum context
         curriculum_context = self._get_curriculum_context(lesson)
-        
+
         # Generate steps
         steps_data = self._generate_steps(lesson, curriculum_context)
-        
+
         if not steps_data.get('success'):
             return steps_data
-        
+
         # Save to database if requested
         if save_to_db:
             self._save_steps_to_db(lesson, steps_data['steps'])
@@ -149,17 +201,17 @@ class LessonContentGenerator:
             'steps': steps_data.get('steps', []),
             'lesson_summary': steps_data.get('lesson_summary', {}),
         }
-    
+
     def _get_curriculum_context(self, lesson) -> Dict:
         """Get curriculum context from knowledge base."""
         if not self.kb_available:
             return self._default_curriculum_context(lesson)
-        
+
         try:
             unit = lesson.unit
             course = unit.course
             subject = course.title.split()[0] if course else "General"
-            
+
             context = self.kb.query_for_content_generation(
                 lesson_title=lesson.title,
                 lesson_objective=lesson.objective or "",
@@ -167,7 +219,7 @@ class LessonContentGenerator:
                 subject=subject,
                 grade_level=course.grade_level if course else "S1"
             )
-            
+
             # Query for figure descriptions
             figure_descriptions = []
             try:
@@ -198,13 +250,13 @@ class LessonContentGenerator:
         except Exception as e:
             logger.warning(f"Failed to get KB context: {e}")
             return self._default_curriculum_context(lesson)
-    
+
     def _default_curriculum_context(self, lesson) -> Dict:
         """Default context when KB is not available."""
         unit = lesson.unit
         course = unit.course if unit else None
         subject = course.title.split()[0] if course else "General"
-        
+
         return {
             'teaching_strategies': self._default_strategies(subject),
             'objectives': [lesson.objective] if lesson.objective else [],
@@ -212,7 +264,7 @@ class LessonContentGenerator:
             'subject': subject,
             'grade_level': course.grade_level if course else "S1",
         }
-    
+
     def _default_strategies(self, subject: str) -> List[str]:
         """Default teaching strategies by subject."""
         strategies = {
@@ -237,10 +289,10 @@ class LessonContentGenerator:
             "Check for understanding frequently",
             "Provide scaffolded practice"
         ])
-    
+
     def _generate_steps(self, lesson, curriculum_context: Dict) -> Dict:
-        """Generate lesson steps using LLM."""
-        
+        """Generate lesson steps using instructor for guaranteed structured output."""
+
         from apps.curriculum.utils import format_grade_display
         unit = lesson.unit
         course = unit.course
@@ -278,11 +330,12 @@ in what students are actually studying. Align terminology, examples, and depth o
             figures_str = f"""
 TEXTBOOK FIGURES AVAILABLE:
 The following figures exist in the uploaded textbook/teaching materials. Where relevant,
-base your media.images[].description on these figures so generated images match the textbook style.
+base your media descriptions on these figures so generated images match the textbook style.
 
 {chr(10).join(fig_lines)}
 """
 
+        # Prompt focuses on CONTENT, not FORMAT — instructor handles the schema
         prompt = f"""Create a complete tutoring session for this lesson.
 
 LESSON: {lesson.title}
@@ -295,7 +348,13 @@ TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}
 
-Create 8-12 steps following the 5E model. Each step needs complete content.
+Create 8-12 steps following the 5E pedagogical model.
+
+STEP DISTRIBUTION:
+- 2-3 ENGAGE steps to hook interest
+- 2-3 EXPLORE/EXPLAIN steps for instruction
+- 3-4 PRACTICE steps with varying difficulty
+- 1-2 EVALUATE steps at the end
 
 STEP TYPES:
 - teach: Direct instruction (tutor explains)
@@ -303,176 +362,72 @@ STEP TYPES:
 - practice: Student attempts a problem
 - quiz: Assessment question
 
-Return this exact JSON structure:
-{{
-    "steps": [
-        {{
-            "order_index": 0,
-            "phase": "engage",
-            "step_type": "teach",
-            "teacher_script": "Welcome! Today we're going to explore [topic]. Take a look at this diagram — it shows [concept]. Notice how [detail]. Let me start with a question - [engaging question related to Seychelles or student life]",
-            "question": null,
-            "answer_type": "none",
-            "expected_answer": null,
-            "choices": null,
-            "hints": null,
-            "media": {{
-                "images": [
-                    {{
-                        "type": "diagram",
-                        "description": "A clear diagram showing [concept]",
-                        "alt_text": "Diagram illustrating [concept]",
-                        "caption": "Figure 1: [Description]"
-                    }}
-                ]
-            }},
-            "educational_content": {{
-                "key_vocabulary": [
-                    {{"term": "Term", "definition": "Clear definition", "example": "Example in context"}}
-                ],
-                "key_points": ["Main point 1", "Main point 2"],
-                "seychelles_context": "Local example (e.g., using SCR for currency, Mahé for geography)"
-            }}
-        }},
-        {{
-            "order_index": 1,
-            "phase": "explore",
-            "step_type": "teach",
-            "teacher_script": "Let's look at this concept more closely...",
-            "question": null,
-            "answer_type": "none",
-            "expected_answer": null,
-            "choices": null,
-            "hints": null,
-            "media": null,
-            "educational_content": {{
-                "key_points": ["Discovery point"]
-            }}
-        }},
-        {{
-            "order_index": 2,
-            "phase": "explain",
-            "step_type": "worked_example",
-            "teacher_script": "Let me show you how to solve this step by step.",
-            "question": null,
-            "answer_type": "none",
-            "expected_answer": null,
-            "choices": null,
-            "hints": null,
-            "media": null,
-            "educational_content": {{
-                "worked_example": {{
-                    "problem": "Problem statement",
-                    "steps": [
-                        {{"step": 1, "action": "First, we...", "explanation": "Because..."}},
-                        {{"step": 2, "action": "Next, we...", "explanation": "This helps us..."}}
-                    ],
-                    "final_answer": "The answer is..."
-                }},
-                "common_mistakes": ["Don't forget to...", "Watch out for..."]
-            }}
-        }},
-        {{
-            "order_index": 3,
-            "phase": "practice",
-            "step_type": "practice",
-            "teacher_script": "Now it's your turn! Try this problem.",
-            "question": "Clear problem for student to solve",
-            "answer_type": "short_numeric",
-            "expected_answer": "42",
-            "choices": null,
-            "hints": ["Think about what we just learned", "Try breaking it into steps", "Remember the formula"],
-            "media": null,
-            "educational_content": null
-        }},
-        {{
-            "order_index": 4,
-            "phase": "practice",
-            "step_type": "quiz",
-            "teacher_script": "Let's check your understanding with this question.",
-            "question": "Multiple choice question here?",
-            "answer_type": "multiple_choice",
-            "expected_answer": "A",
-            "choices": ["A) Correct answer", "B) Common misconception", "C) Distractor", "D) Distractor"],
-            "hints": ["Think about the definition", "Eliminate obviously wrong answers"],
-            "media": null,
-            "educational_content": null
-        }}
-    ],
-    "lesson_summary": {{
-        "main_concepts": ["Concept 1", "Concept 2"],
-        "key_vocabulary": [{{"term": "...", "definition": "..."}}],
-        "next_steps": "In the next lesson, we'll learn about..."
-    }}
-}}
-
-IMPORTANT GUIDELINES:
-1. Include 2-3 ENGAGE steps to hook interest
-2. Include 2-3 EXPLORE/EXPLAIN steps for instruction
-3. Include 3-4 PRACTICE steps with varying difficulty
-4. Include 1-2 EVALUATE steps at the end
-5. Use Seychelles context where natural (SCR currency, local places, local examples)
-6. Media descriptions MUST be specific for accurate image generation:
+CONTENT GUIDELINES:
+1. Use Seychelles context where natural (SCR currency, local places, local examples)
+2. Media descriptions MUST be specific for accurate image generation:
    - For maps: specify "schematic map" not "satellite view"
    - For diagrams: specify exactly what should be labelled
    - NEVER request images of real places as "photos"
    - Example GOOD: "Schematic cross-section showing three layers of Earth with labels"
    - Example BAD: "Image of Earth's layers"
-7. Hints should scaffold from general to specific
-8. For MCQ, make distractors plausible but clearly wrong
-9. When a step has media, the teacher_script MUST explicitly reference it.
-   - Use phrases like: "Let's look at this diagram...", "As you can see in the figure...",
-     "Take a look at the image below..."
-   - The script should describe what the student should notice in the image.
-   - This connects the visual to the explanation — never include media without referring to it.
-   - Steps with "media": null should NOT have media references in the script.
+3. Hints should scaffold from general to specific
+4. For MCQ, make distractors plausible but clearly wrong
+5. When a step has media, the teacher_script MUST explicitly reference it
+   with phrases like "Let's look at this diagram...", "As you can see in the figure..."
+6. Steps with NO media should NOT have media references in the script"""
 
-Return ONLY valid JSON, no other text."""
+        from apps.llm.prompts import get_prompt_or_default
+        system_prompt = get_prompt_or_default(
+            self.institution_id, 'content_generation_prompt',
+            "You are an expert curriculum designer creating engaging tutoring content for Seychelles secondary students.",
+        )
+
+        print(f"[ContentGen] [{lesson.title}] Calling instructor ({self._model_config.provider}/{self._model_config.model_name})...", flush=True)
+        t0 = time.time()
 
         try:
-            from apps.llm.prompts import get_prompt_or_default
-            content_sys_prompt = get_prompt_or_default(
-                self.institution_id, 'content_generation_prompt',
-                "You are an expert curriculum designer creating engaging tutoring content for Seychelles secondary students. Return only valid JSON.",
-                json_required=True,
+            # Build kwargs per provider
+            create_kwargs = dict(
+                response_model=GeneratedLessonContent,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                max_retries=3,
             )
-            response = self.llm_client.generate(
-                messages=[{"role": "user", "content": prompt}],
-                system_prompt=content_sys_prompt
-            )
-            
-            content = response.content.strip()
-            content = self._clean_json(content)
-            
-            result = json.loads(content)
+            if self._model_config.provider == 'google':
+                # Gemini genai SDK: token limits go inside generation_config dict
+                create_kwargs['generation_config'] = {'max_tokens': 16384}
+            else:
+                create_kwargs['max_tokens'] = 16384
+
+            result = self.client.chat.completions.create(**create_kwargs)
+
+            elapsed = time.time() - t0
+            steps = [step.model_dump() for step in result.steps]
+            summary = result.lesson_summary.model_dump() if result.lesson_summary else {}
+
+            print(f"[ContentGen] [{lesson.title}] ✅ {len(steps)} steps generated in {elapsed:.1f}s", flush=True)
+            logger.info(f"[{lesson.title}] {len(steps)} steps generated in {elapsed:.1f}s")
+
             return {
                 'success': True,
-                'steps': result.get('steps', []),
-                'lesson_summary': result.get('lesson_summary', {}),
+                'steps': steps,
+                'lesson_summary': summary,
             }
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parse error: {e}")
-            # Try to fix the JSON
-            fixed = self._try_fix_json(content)
-            if fixed:
-                return {
-                    'success': True,
-                    'steps': fixed.get('steps', []),
-                    'lesson_summary': fixed.get('lesson_summary', {}),
-                }
-            return {'success': False, 'error': f'Invalid JSON: {e}'}
+
         except Exception as e:
-            logger.error(f"Step generation failed: {e}")
+            elapsed = time.time() - t0
+            print(f"[ContentGen] [{lesson.title}] ❌ Failed after {elapsed:.1f}s: {e}", flush=True)
+            logger.error(f"[{lesson.title}] Instructor generation failed after {elapsed:.1f}s: {e}")
+            import traceback
+            traceback.print_exc()
             return {'success': False, 'error': str(e)}
-    
+
     def _save_steps_to_db(self, lesson, steps: List[Dict]):
         """Save generated steps to database."""
         from apps.curriculum.models import LessonStep
-        
-        # Clear existing steps (optional - could merge instead)
-        # lesson.steps.all().delete()
-        
+
         for step_data in steps:
             step, created = LessonStep.objects.update_or_create(
                 lesson=lesson,
@@ -493,68 +448,8 @@ Return ONLY valid JSON, no other text."""
                     'curriculum_context': step_data.get('curriculum_context'),
                 }
             )
-            
+
             logger.debug(f"{'Created' if created else 'Updated'} step {step.order_index}: {step.step_type}")
-    
-    def _clean_json(self, content: str) -> str:
-        """Clean LLM response to extract JSON."""
-        # Remove markdown code blocks
-        if '```' in content:
-            parts = content.split('```')
-            for part in parts:
-                part = part.strip()
-                if part.startswith('json'):
-                    part = part[4:].strip()
-                if part.startswith('{') or part.startswith('['):
-                    content = part
-                    break
-        
-        # Find JSON boundaries
-        start_char = '{' if '{' in content else '['
-        end_char = '}' if start_char == '{' else ']'
-        
-        start_idx = content.find(start_char)
-        if start_idx == -1:
-            return content
-        
-        # Find matching end
-        count = 0
-        end_idx = start_idx
-        for i, char in enumerate(content[start_idx:], start_idx):
-            if char == start_char:
-                count += 1
-            elif char == end_char:
-                count -= 1
-                if count == 0:
-                    end_idx = i
-                    break
-        
-        return content[start_idx:end_idx + 1]
-    
-    def _try_fix_json(self, content: str) -> Optional[Dict]:
-        """Try to fix common JSON issues."""
-        import re
-        
-        # Remove trailing commas
-        fixed = re.sub(r',(\s*[}\]])', r'\1', content)
-        
-        try:
-            return json.loads(fixed)
-        except:
-            pass
-        
-        # Try to extract steps array
-        steps_match = re.search(r'"steps"\s*:\s*\[(.*?)\]', content, re.DOTALL)
-        if steps_match:
-            try:
-                steps_json = '[' + steps_match.group(1) + ']'
-                steps_json = re.sub(r',(\s*[}\]])', r'\1', steps_json)
-                steps = json.loads(steps_json)
-                return {'steps': steps}
-            except:
-                pass
-        
-        return None
 
 
 # ============================================================================
@@ -564,31 +459,31 @@ Return ONLY valid JSON, no other text."""
 class MediaGenerationService:
     """
     Generates media assets for lesson steps.
-    
+
     Integrates with:
     - DALL-E for image generation
     - Media library for existing assets
     - External sources for videos/diagrams
     """
-    
+
     def __init__(self, institution_id: int):
         self.institution_id = institution_id
-    
+
     def generate_media_for_step(self, step) -> Dict:
         """
         Generate or find media for a lesson step.
-        
+
         Args:
             step: LessonStep instance with media descriptions
-        
+
         Returns:
             Dict with generated/found media URLs
         """
         if not step.media:
             return {'images': [], 'videos': []}
-        
+
         result = {'images': [], 'videos': []}
-        
+
         # Process image requests
         for image_req in step.media.get('images', []):
             if image_req.get('url'):
@@ -605,57 +500,57 @@ class MediaGenerationService:
                     image_req['url'] = generated['url']
                     image_req['source'] = generated['source']
                     result['images'].append(image_req)
-        
+
         return result
-    
+
     def _generate_or_find_image(self, description: str, image_type: str, lesson) -> Optional[Dict]:
         """Generate or find an image matching the description."""
-        
+
         # First, check media library for existing assets
         existing = self._find_in_library(description, lesson)
         if existing:
             return {'url': existing.file.url, 'source': 'library'}
-        
+
         # Generate new image
         try:
             from apps.tutoring.image_service import ImageGenerationService
-            
+
             service = ImageGenerationService(
                 lesson=lesson,
                 institution_id=self.institution_id
             )
-            
+
             result = service.generate_educational_image(
                 prompt=description,
                 style=image_type
             )
-            
+
             if result and result.get('url'):
                 return {'url': result['url'], 'source': 'generated'}
-                
+
         except Exception as e:
             logger.warning(f"Image generation failed: {e}")
-        
+
         return None
-    
+
     def _find_in_library(self, description: str, lesson) -> Optional:
         """Search media library for matching asset."""
         try:
             from apps.media_library.models import MediaAsset
-            
+
             # Simple keyword search
             keywords = description.lower().split()[:5]
-            
+
             for keyword in keywords:
                 if len(keyword) > 3:
                     assets = MediaAsset.objects.filter(
                         institution_id=self.institution_id,
                         tags__icontains=keyword
                     ).first()
-                    
+
                     if assets:
                         return assets
-            
+
             return None
         except:
             return None
@@ -668,19 +563,20 @@ class MediaGenerationService:
 def generate_content_for_unit(unit_id: int, force: bool = False) -> Dict:
     """
     Generate content for all lessons in a unit.
-    
+
     Args:
         unit_id: Unit ID
         force: If True, regenerate even if content exists
     """
     from apps.curriculum.models import Unit, Lesson
-    
+
     unit = Unit.objects.get(id=unit_id)
     lessons = unit.lessons.all()
-    
-    institution_id = unit.course.institution_id
+
+    from apps.accounts.models import Institution
+    institution_id = unit.course.institution_id or Institution.get_global().id
     generator = LessonContentGenerator(institution_id=institution_id)
-    
+
     results = {
         'unit': unit.title,
         'total_lessons': lessons.count(),
@@ -689,7 +585,7 @@ def generate_content_for_unit(unit_id: int, force: bool = False) -> Dict:
         'skipped': 0,
         'details': []
     }
-    
+
     for lesson in lessons:
         # Skip if already has content (unless force)
         if lesson.steps.count() >= 5 and not force:
@@ -700,10 +596,10 @@ def generate_content_for_unit(unit_id: int, force: bool = False) -> Dict:
                 'reason': 'Already has content'
             })
             continue
-        
+
         try:
             result = generator.generate_for_lesson(lesson, save_to_db=True)
-            
+
             if result.get('success'):
                 results['success'] += 1
                 results['details'].append({
@@ -718,7 +614,7 @@ def generate_content_for_unit(unit_id: int, force: bool = False) -> Dict:
                     'status': 'failed',
                     'error': result.get('error', 'Unknown')
                 })
-                
+
         except Exception as e:
             results['failed'] += 1
             results['details'].append({
@@ -726,54 +622,54 @@ def generate_content_for_unit(unit_id: int, force: bool = False) -> Dict:
                 'status': 'failed',
                 'error': str(e)
             })
-    
+
     return results
 
 
 def generate_content_for_course(course_id: int, force: bool = False) -> Dict:
     """
     Generate content for all lessons in a course.
-    
+
     Args:
         course_id: Course ID
         force: If True, regenerate even if content exists
     """
     from apps.curriculum.models import Course
-    
+
     course = Course.objects.get(id=course_id)
     units = course.units.all()
-    
+
     results = {
         'course': course.title,
         'total_units': units.count(),
         'unit_results': []
     }
-    
+
     for unit in units:
         unit_result = generate_content_for_unit(unit.id, force=force)
         results['unit_results'].append(unit_result)
-    
+
     # Aggregate stats
     results['total_lessons'] = sum(u['total_lessons'] for u in results['unit_results'])
     results['total_success'] = sum(u['success'] for u in results['unit_results'])
     results['total_failed'] = sum(u['failed'] for u in results['unit_results'])
     results['total_skipped'] = sum(u['skipped'] for u in results['unit_results'])
-    
+
     return results
 
 
 def generate_content_for_lesson(lesson_id: int, force: bool = False) -> Dict:
     """
     Generate content for a single lesson.
-    
+
     Args:
         lesson_id: Lesson ID
         force: If True, regenerate even if content exists
     """
     from apps.curriculum.models import Lesson
-    
+
     lesson = Lesson.objects.get(id=lesson_id)
-    
+
     # Check existing content
     if lesson.steps.count() >= 5 and not force:
         return {
@@ -781,8 +677,9 @@ def generate_content_for_lesson(lesson_id: int, force: bool = False) -> Dict:
             'lesson': lesson.title,
             'error': 'Already has content. Use force=True to regenerate.'
         }
-    
-    institution_id = lesson.unit.course.institution_id
+
+    from apps.accounts.models import Institution
+    institution_id = lesson.unit.course.institution_id or Institution.get_global().id
     generator = LessonContentGenerator(institution_id=institution_id)
-    
+
     return generator.generate_for_lesson(lesson, save_to_db=True)

@@ -525,17 +525,18 @@ def course_detail(request, course_id):
     total_media_pending = sum(stats['media_pending'] for stats in lesson_stats.values())
     
     # Check if any lesson is currently generating (course-wide generation in progress)
-    is_generating = any(s['content_status'] == 'generating' for s in lesson_stats.values())
-
     from apps.dashboard.models import TeachingMaterialUpload, CurriculumUpload
     materials = TeachingMaterialUpload.objects.filter(course=course)
 
-    # Find the most recent processing upload for the stop button
-    active_upload = None
-    if is_generating:
-        active_upload = CurriculumUpload.objects.filter(
-            created_course=course, status='processing',
-        ).order_by('-created_at').first()
+    # Check both: any lesson with 'generating' status, OR an active upload still processing
+    active_upload = CurriculumUpload.objects.filter(
+        created_course=course, status='processing',
+    ).order_by('-created_at').first()
+
+    is_generating = (
+        any(s['content_status'] == 'generating' for s in lesson_stats.values())
+        or active_upload is not None
+    )
 
     context = {
         **request.staff_ctx,
@@ -854,6 +855,7 @@ def curriculum_approve(request, upload_id):
         lessons_in_course = Lesson.objects.filter(unit__course=course).count()
 
         if generate_content and lessons_in_course > 0:
+            upload.status = 'processing'
             upload.current_step = 4
             upload.add_log(f"📝 Starting background content generation for {lessons_in_course} lessons...")
             upload.save()
@@ -1620,7 +1622,7 @@ def settings_page(request):
         })
 
     all_timezones = sorted(zoneinfo.available_timezones())
-    all_schools = Institution.objects.all().order_by('name') if is_superadmin else []
+    all_schools = Institution.objects.exclude(slug=Institution.GLOBAL_SLUG).order_by('name') if is_superadmin else []
     all_users = (
         User.objects.exclude(id=request.user.id)
         .filter(
@@ -1777,7 +1779,9 @@ def lesson_regenerate(request, lesson_id):
         ExitTicket.objects.filter(lesson=lesson).delete()
 
         # Step 1: Generate lesson steps
-        generator = LessonContentGenerator(institution_id=institution.id)
+        from apps.accounts.models import Institution
+        inst = institution or lesson.unit.course.institution or Institution.get_global()
+        generator = LessonContentGenerator(institution_id=inst.id)
         result = generator.generate_for_lesson(lesson, save_to_db=True)
 
         if not result.get('success'):
@@ -1806,7 +1810,7 @@ def lesson_regenerate(request, lesson_id):
                         continue
                     service = ImageGenerationService(
                         lesson=lesson,
-                        institution=institution or lesson.unit.course.institution
+                        institution=inst
                     )
                     img_result = service.get_or_generate_image(
                         prompt=description,
@@ -1834,7 +1838,7 @@ def lesson_regenerate(request, lesson_id):
         skills_extracted = 0
         try:
             from apps.tutoring.skill_extraction import SkillExtractionService
-            skill_service = SkillExtractionService(institution_id=institution.id)
+            skill_service = SkillExtractionService(institution_id=inst.id)
             skills = skill_service.extract_skills_for_lesson(lesson)
             skills_extracted = len(skills)
         except Exception as e:
@@ -1872,21 +1876,19 @@ def lesson_generate_content(request, lesson_id):
         lookup['unit__course__institution'] = institution
     lesson = get_object_or_404(Lesson, **lookup)
 
-    # Guard: skip if already generating or has content
-    if lesson.content_status == 'generating':
-        messages.info(request, f"'{lesson.title}' is already being generated.")
-        return redirect('dashboard:course_detail', course_id=lesson.unit.course.id)
-
+    # Guard: skip if already has content
     if lesson.steps.count() >= 5:
         messages.info(request, f"'{lesson.title}' already has {lesson.steps.count()} steps.")
         return redirect('dashboard:course_detail', course_id=lesson.unit.course.id)
 
-    # Mark as generating and kick off in background
-    lesson.content_status = 'generating'
-    lesson.save(update_fields=['content_status'])
+    # Reset stuck 'generating' status so the background task can proceed
+    if lesson.content_status == 'generating':
+        lesson.content_status = 'pending'
+        lesson.save(update_fields=['content_status'])
 
-    institution_id = (institution or lesson.unit.course.institution).id
-    run_async(generate_complete_lesson, lesson.id, institution_id)
+    from apps.accounts.models import Institution
+    inst = institution or lesson.unit.course.institution or Institution.get_global()
+    run_async(generate_complete_lesson, lesson.id, inst.id)
 
     messages.info(request, f"Generating content for '{lesson.title}' in the background...")
     return redirect('dashboard:course_detail', course_id=lesson.unit.course.id)
@@ -2354,7 +2356,8 @@ def course_delete(request, course_id):
     if materials.exists():
         try:
             from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
-            kb = CurriculumKnowledgeBase(institution_id=course.institution_id)
+            from apps.accounts.models import Institution
+            kb = CurriculumKnowledgeBase(institution_id=course.institution_id or Institution.get_global().id)
             collection = kb._get_collection()
             if collection:
                 for mat in materials:

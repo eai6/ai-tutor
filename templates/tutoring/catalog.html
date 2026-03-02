@@ -24,15 +24,30 @@
         <div class="empty-card card text-center">
             <div class="empty-icon">📚</div>
             <h2>No subjects available yet</h2>
+            {% if is_staff_viewer %}
+            <p class="text-muted">No published courses found{% if selected_school %} for {{ selected_school.name }}{% endif %}. Publish courses from the <a href="{% url 'dashboard:home' %}">Dashboard</a>.</p>
+            {% else %}
             <p class="text-muted">Your courses are being set up. Check back soon!</p>
+            {% endif %}
         </div>
     </div>
     
     {% else %}
     <!-- Subject Selection -->
     <div class="catalog-header animate-in">
-        <h1>👋 Hello, {{ user.first_name|default:user.username }}!</h1>
+        <h1>Hello, {{ user.first_name|default:user.username }}!</h1>
         <p class="text-muted">Choose a subject to continue learning</p>
+        {% if is_staff_viewer %}
+        <div class="school-switcher">
+            <label for="school-select">Viewing as:</label>
+            <select id="school-select" onchange="switchSchool(this.value)">
+                <option value="all" {% if not selected_school %}selected{% endif %}>All Schools</option>
+                {% for school in all_schools %}
+                <option value="{{ school.id }}" {% if selected_school.id == school.id %}selected{% endif %}>{{ school.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
     </div>
     
     {% if active_sessions %}
@@ -65,7 +80,7 @@
     <!-- Subject Cards -->
     <div class="subjects-grid animate-in" style="animation-delay: 0.1s">
         {% for subject in subjects %}
-        <a href="?subject={{ subject.id }}" class="subject-card card {% if selected_subject.id == subject.id %}active{% endif %}">
+        <a href="?subject={{ subject.id }}{% if selected_school %}&school={{ selected_school.id }}{% endif %}" class="subject-card card {% if selected_subject.id == subject.id %}active{% endif %}">
             <div class="subject-icon">
                 {% if 'Math' in subject.title %}📐{% elif 'Geography' in subject.title %}🌍{% else %}📖{% endif %}
             </div>
@@ -171,11 +186,42 @@
     .catalog-header {
         margin-bottom: 1.5rem;
     }
-    
+
     .catalog-header h1 {
         font-size: 1.75rem;
         font-weight: 800;
         margin-bottom: 0.25rem;
+    }
+
+    /* School Switcher */
+    .school-switcher {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: #EEF2FF;
+        border: 1px solid #C7D2FE;
+        border-radius: var(--radius-md, 8px);
+        width: fit-content;
+    }
+
+    .school-switcher label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #4338CA;
+        white-space: nowrap;
+    }
+
+    .school-switcher select {
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 0.25rem 0.5rem;
+        border: 1px solid #A5B4FC;
+        border-radius: 6px;
+        background: white;
+        color: var(--text-dark);
+        cursor: pointer;
     }
     
     /* Continue Learning Section */
@@ -479,4 +525,20 @@
         }
     }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchSchool(value) {
+    const url = new URL(window.location.href);
+    // Clear subject selection when switching schools
+    url.searchParams.delete('subject');
+    if (value === 'all') {
+        url.searchParams.delete('school');
+    } else {
+        url.searchParams.set('school', value);
+    }
+    window.location.href = url.toString();
+}
+</script>
 {% endblock %}

@@ -177,7 +177,8 @@ class Command(BaseCommand):
         try:
             from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
             course = lesson.unit.course
-            kb = CurriculumKnowledgeBase(institution_id=course.institution_id)
+            from apps.accounts.models import Institution
+            kb = CurriculumKnowledgeBase(institution_id=course.institution_id or Institution.get_global().id)
             exam_questions = kb.query_for_exit_ticket_generation(
                 lesson_title=lesson.title,
                 lesson_objective=lesson.objective or '',
@@ -199,7 +200,8 @@ class Command(BaseCommand):
         )
         
         from apps.llm.prompts import get_prompt_or_default
-        institution_id = lesson.unit.course.institution_id if lesson.unit and lesson.unit.course else None
+        from apps.accounts.models import Institution
+        institution_id = (lesson.unit.course.institution_id if lesson.unit and lesson.unit.course else None) or Institution.get_global().id
         exit_sys_prompt = get_prompt_or_default(
             institution_id, 'exit_ticket_prompt',
             "You are an expert educational assessment designer.",

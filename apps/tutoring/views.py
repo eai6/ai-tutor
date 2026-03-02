@@ -68,11 +68,13 @@ def get_user_institution(user):
 
 def get_student_progress(user, institution):
     """Get progress for all lessons for a student."""
-    progress = StudentLessonProgress.objects.filter(
-        student=user,
-    ).filter(
-        Q(lesson__unit__course__institution=institution) | Q(lesson__unit__course__institution__isnull=True)
-    ).select_related('lesson')
+    progress = StudentLessonProgress.objects.filter(student=user)
+    if institution:
+        progress = progress.filter(
+            Q(lesson__unit__course__institution=institution) | Q(lesson__unit__course__institution__isnull=True)
+        )
+    # If institution is None (super admin "All Schools"), return all progress
+    progress = progress.select_related('lesson')
 
     return {p.lesson_id: p for p in progress}
 
@@ -112,19 +114,42 @@ def lesson_catalog(request):
         })
 
     institution = get_user_institution(request.user)
-    if not institution:
+    is_staff = request.user.is_staff
+
+    if not institution and not is_staff:
         return render(request, 'tutoring/catalog.html', {
             "subjects": [],
             "selected_subject": None,
             "active_sessions": [],
         })
 
+    # Staff school switcher: ?school=all (default) or ?school=<id>
+    all_schools = []
+    selected_school = None
+    viewing_institution = institution  # For regular students, always their own
+    if is_staff:
+        all_schools = list(
+            Institution.objects.exclude(slug=Institution.GLOBAL_SLUG)
+            .filter(is_active=True).order_by('name')
+        )
+        school_param = request.GET.get('school', 'all')
+        if school_param != 'all':
+            try:
+                selected_school = Institution.objects.get(id=int(school_param))
+                viewing_institution = selected_school
+            except (Institution.DoesNotExist, ValueError):
+                pass
+
     # Get active sessions (incomplete) for resume
-    active_sessions = TutorSession.objects.filter(
+    active_sessions_qs = TutorSession.objects.filter(
         student=request.user,
-        institution=institution,
         status=TutorSession.Status.ACTIVE
-    ).select_related('lesson', 'lesson__unit', 'lesson__unit__course').order_by('-started_at')[:5]
+    )
+    if viewing_institution:
+        active_sessions_qs = active_sessions_qs.filter(institution=viewing_institution)
+    active_sessions = active_sessions_qs.select_related(
+        'lesson', 'lesson__unit', 'lesson__unit__course'
+    ).order_by('-started_at')[:5]
 
     active_sessions_data = [{
         'session_id': s.id,
@@ -136,16 +161,18 @@ def lesson_catalog(request):
         'questions_correct': s.engine_state.get('questions_correct', 0) if s.engine_state else 0,
     } for s in active_sessions]
 
-    # Get all courses (subjects) for this institution
-    courses = Course.objects.filter(
-        Q(institution=institution) | Q(institution__isnull=True),
-        is_published=True
-    ).prefetch_related(
-        'units__lessons'
-    ).order_by('title')
+    # Get courses — staff with no specific school sees all, otherwise scoped
+    if viewing_institution:
+        courses = Course.objects.filter(
+            Q(institution=viewing_institution) | Q(institution__isnull=True),
+            is_published=True
+        )
+    else:
+        courses = Course.objects.filter(is_published=True)
+    courses = courses.prefetch_related('units__lessons').order_by('title')
 
     # Get student progress
-    progress_map = get_student_progress(request.user, institution)
+    progress_map = get_student_progress(request.user, viewing_institution)
 
     # Get selected subject from query param
     selected_subject_id = request.GET.get('subject')
@@ -214,11 +241,18 @@ def lesson_catalog(request):
     if not selected_subject and subjects:
         selected_subject = subjects[0]
 
-    return render(request, 'tutoring/catalog.html', {
+    context = {
         "subjects": subjects,
         "selected_subject": selected_subject,
         "active_sessions": active_sessions_data,
-    })
+    }
+    # Staff school switcher
+    if is_staff:
+        context["all_schools"] = all_schools
+        context["selected_school"] = selected_school
+        context["is_staff_viewer"] = True
+
+    return render(request, 'tutoring/catalog.html', context)
 
 
 # ---- Image Generation Endpoint ----
@@ -286,16 +320,20 @@ def generate_image(request):
 def chat_tutor_interface(request, lesson_id):
     """Render the chat-based tutoring interface."""
     institution = get_user_institution(request.user)
-    if not institution:
+    if not institution and not request.user.is_staff:
         return render(request, 'tutoring/error.html', {"message": "No institution"})
 
-    lesson = get_object_or_404(
-        Lesson.objects.filter(
-            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
-        ),
-        id=lesson_id,
-        is_published=True
-    )
+    if institution:
+        lesson = get_object_or_404(
+            Lesson.objects.filter(
+                Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
+            ),
+            id=lesson_id,
+            is_published=True
+        )
+    else:
+        # Super admin — can access any published lesson
+        lesson = get_object_or_404(Lesson, id=lesson_id, is_published=True)
 
     return render(request, 'tutoring/chat_tutor.html', {
         "lesson": lesson,
@@ -325,16 +363,20 @@ def chat_start_session(request, lesson_id):
     RateLimiter.record_message(request.user.id)
 
     institution = get_user_institution(request.user)
-    if not institution:
+    if not institution and not request.user.is_staff:
         return JsonResponse({"error": "No institution membership"}, status=403)
 
-    lesson = get_object_or_404(
-        Lesson.objects.filter(
-            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
-        ),
-        id=lesson_id,
-        is_published=True
-    )
+    if institution:
+        lesson = get_object_or_404(
+            Lesson.objects.filter(
+                Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
+            ),
+            id=lesson_id,
+            is_published=True
+        )
+    else:
+        # Super admin — can access any published lesson
+        lesson = get_object_or_404(Lesson, id=lesson_id, is_published=True)
 
     # Check for existing active session
     existing = TutorSession.objects.filter(
@@ -353,6 +395,9 @@ def chat_start_session(request, lesson_id):
                 "unmet_prerequisites": unmet_prereqs,
             }, status=400)
 
+    # Resolve institution for session creation (super admins use Global)
+    session_institution = institution or lesson.unit.course.institution or Institution.get_global()
+
     if existing:
         session = existing
         tutor = ConversationalTutor(session)
@@ -362,7 +407,7 @@ def chat_start_session(request, lesson_id):
         session = TutorSession.objects.create(
             student=request.user,
             lesson=lesson,
-            institution=institution,
+            institution=session_institution,
             status=TutorSession.Status.ACTIVE,
         )
         tutor = ConversationalTutor(session)

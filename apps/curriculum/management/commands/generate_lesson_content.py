@@ -67,9 +67,10 @@ class Command(BaseCommand):
         if not lessons.exists():
             raise CommandError('No lessons found')
         
-        # Get institution from first lesson
+        # Get institution from first lesson (fallback to Global for platform-wide content)
+        from apps.accounts.models import Institution
         first_lesson = lessons.first()
-        institution_id = first_lesson.unit.course.institution_id
+        institution_id = first_lesson.unit.course.institution_id or Institution.get_global().id
         
         self.stdout.write(f"Found {lessons.count()} lesson(s)")
         self.stdout.write(f"Institution ID: {institution_id}")

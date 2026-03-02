@@ -22,11 +22,27 @@ class Institution(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    GLOBAL_SLUG = 'global'
+
     def __str__(self):
         return self.name
 
     class Meta:
         ordering = ['name']
+
+    @classmethod
+    def get_global(cls):
+        """Get or create the Global institution for platform-wide content.
+
+        Used as a fallback when content is uploaded in "All Schools" mode
+        (institution=None) but downstream operations (media saving, skill
+        extraction) require a non-null institution FK.
+        """
+        institution, _ = cls.objects.get_or_create(
+            slug=cls.GLOBAL_SLUG,
+            defaults={'name': 'Global (All Schools)', 'is_active': True},
+        )
+        return institution
 
 
 class Membership(models.Model):
@@ -161,7 +177,7 @@ class PlatformConfig(models.Model):
     @classmethod
     def get_school_choices(cls):
         """Return school choices. Prefers Institution records, then JSON config, then defaults."""
-        schools = Institution.objects.filter(is_active=True).order_by('name')
+        schools = Institution.objects.filter(is_active=True).exclude(slug=Institution.GLOBAL_SLUG).order_by('name')
         if schools.exists():
             return [(str(inst.id), inst.name) for inst in schools]
         obj = cls.load()

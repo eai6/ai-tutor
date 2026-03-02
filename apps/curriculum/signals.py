@@ -57,7 +57,8 @@ def _cleanup_vectors(course):
             return
 
         from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
-        kb = CurriculumKnowledgeBase(institution_id=course.institution_id)
+        from apps.accounts.models import Institution
+        kb = CurriculumKnowledgeBase(institution_id=course.institution_id or Institution.get_global().id)
         if not kb._chromadb_available:
             return
 

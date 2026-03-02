@@ -18,6 +18,38 @@ from django.db import connection
 logger = logging.getLogger(__name__)
 
 
+def _resolve_institution_id(institution_id=None, course=None, lesson=None):
+    """Resolve institution_id, falling back to Global institution if needed.
+
+    Priority: explicit institution_id → course.institution → Global.
+    Never returns None.
+    """
+    if institution_id:
+        return institution_id
+    if course and course.institution_id:
+        return course.institution_id
+    if lesson and lesson.unit and lesson.unit.course and lesson.unit.course.institution_id:
+        return lesson.unit.course.institution_id
+    from apps.accounts.models import Institution
+    return Institution.get_global().id
+
+
+def _resolve_institution(institution_id=None, course=None, lesson=None):
+    """Resolve Institution object, falling back to Global if needed.
+    Never returns None.
+    """
+    from apps.accounts.models import Institution
+    if institution_id:
+        inst = Institution.objects.filter(id=institution_id).first()
+        if inst:
+            return inst
+    if course and course.institution:
+        return course.institution
+    if lesson and lesson.unit and lesson.unit.course and lesson.unit.course.institution:
+        return lesson.unit.course.institution
+    return Institution.get_global()
+
+
 def run_async(func, *args, **kwargs):
     """
     Run a function in a background thread.
@@ -28,19 +60,23 @@ def run_async(func, *args, **kwargs):
         try:
             # Close any existing DB connections (thread safety)
             connection.close()
-            
+
             # Run the function
             result = func(*args, **kwargs)
+            print(f"[ContentGen] Background task {func.__name__} completed: {result}", flush=True)
             logger.info(f"Background task {func.__name__} completed: {result}")
             return result
         except Exception as e:
+            print(f"[ContentGen] Background task {func.__name__} FAILED: {e}", flush=True)
             logger.error(f"Background task {func.__name__} failed: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            traceback.print_exc()
             raise
-    
+
     thread = threading.Thread(target=wrapper, daemon=True)
     thread.start()
+    print(f"[ContentGen] Started background task: {func.__name__}", flush=True)
     logger.info(f"Started background task: {func.__name__}")
     return thread
 
@@ -65,7 +101,7 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
 
     # Get course
     course = Course.objects.get(id=course_id)
-    institution_id = course.institution_id
+    institution_id = _resolve_institution_id(course=course)
 
     # Get upload if provided (for progress tracking)
     upload = None
@@ -332,7 +368,7 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
             try:
                 from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
                 course = lesson.unit.course
-                kb = CurriculumKnowledgeBase(institution_id=course.institution_id)
+                kb = CurriculumKnowledgeBase(institution_id=_resolve_institution_id(course=course))
 
                 # Get textbook/teaching material context
                 kb_result = kb.query_for_content_generation(
@@ -398,7 +434,7 @@ Return ONLY the JSON array, no other text."""
 
             from apps.llm.prompts import get_prompt_or_default
             system_prompt = get_prompt_or_default(
-                lesson.unit.course.institution_id, 'exit_ticket_prompt',
+                _resolve_institution_id(lesson=lesson), 'exit_ticket_prompt',
                 "You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text.",
                 json_required=True,
             )
@@ -466,14 +502,14 @@ Return ONLY the JSON array, no other text."""
 
                     service = ImageGenerationService(
                         lesson=lesson,
-                        institution=lesson.unit.course.institution,
+                        institution=_resolve_institution(lesson=lesson),
                     )
 
                     # Build textbook context from KB figure descriptions
                     textbook_ctx = ""
                     try:
                         from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
-                        kb = CurriculumKnowledgeBase(institution_id=lesson.unit.course.institution_id)
+                        kb = CurriculumKnowledgeBase(institution_id=_resolve_institution_id(lesson=lesson))
                         fig_descs = kb.query_for_figure_descriptions(
                             topic=lesson.title,
                             subject=lesson.unit.course.title,
@@ -531,8 +567,8 @@ def generate_single_lesson_async(lesson_id: int):
     from apps.curriculum.content_generator import LessonContentGenerator
     
     lesson = Lesson.objects.get(id=lesson_id)
-    institution_id = lesson.unit.course.institution_id
-    
+    institution_id = _resolve_institution_id(lesson=lesson)
+
     generator = LessonContentGenerator(institution_id=institution_id)
     result = generator.generate_for_lesson(lesson, save_to_db=True)
     
@@ -816,6 +852,7 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
 
     Pipeline: steps -> media -> exit tickets -> skills
     """
+    import time
     from apps.curriculum.models import Lesson
     from apps.curriculum.content_generator import LessonContentGenerator
 
@@ -823,14 +860,18 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
     connection.close()
 
     lesson = Lesson.objects.get(id=lesson_id)
+    pipeline_start = time.time()
 
     def log(msg):
+        print(f"[ContentGen] {msg}", flush=True)
         if log_fn:
             log_fn(msg)
         else:
             logger.info(msg)
 
-    # Guard: skip if already generating (another worker or request got here first)
+    log(f"📋 Starting pipeline for '{lesson.title}' (id={lesson_id}, status={lesson.content_status})")
+
+    # Guard: skip if already generating (another worker got here first)
     if lesson.content_status == 'generating':
         log(f"   ⏭️ {lesson.title} (already generating, skipping)")
         return {'lesson': lesson.title, 'success': True, 'skipped': True, 'steps': 0, 'media': 0, 'exit_questions': 0, 'skills': 0}
@@ -846,94 +887,124 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
 
     try:
         # Step 1: Generate lesson steps
+        log(f"   [1/4] Generating lesson steps via LLM...")
+        t0 = time.time()
         generator = LessonContentGenerator(institution_id=institution_id)
         result = generator.generate_for_lesson(lesson, save_to_db=True)
+        elapsed = time.time() - t0
 
         if not result.get('success'):
             lesson.content_status = 'failed'
             lesson.save(update_fields=['content_status'])
-            log(f"   ⚠️ {lesson.title}: {result.get('error', 'Unknown error')}")
+            log(f"   ❌ [1/4] Step generation FAILED after {elapsed:.1f}s: {result.get('error', 'Unknown error')}")
             return {'lesson': lesson.title, 'success': False, 'error': result.get('error')}
 
         steps_generated = result.get('steps_generated', 0)
-        log(f"   ✓ {lesson.title}: {steps_generated} steps")
+        log(f"   ✅ [1/4] {steps_generated} steps generated in {elapsed:.1f}s")
 
         # Check cancellation before media
         if _is_cancelled():
-            log(f"   ⛔ {lesson.title}: cancelled")
+            log(f"   ⛔ {lesson.title}: cancelled before media")
             return {'lesson': lesson.title, 'success': True, 'steps': steps_generated, 'media': 0, 'exit_questions': 0, 'skills': 0}
 
         # Step 2: Generate media
         media_generated = 0
+        log(f"   [2/4] Generating media assets...")
+        t0 = time.time()
         try:
             from apps.tutoring.image_service import ImageGenerationService
-            from apps.accounts.models import Institution
-            institution = Institution.objects.get(id=institution_id)
+            institution = _resolve_institution(institution_id=institution_id, lesson=lesson)
 
+            steps_with_media = 0
             for step in lesson.steps.all():
                 if not step.media:
                     continue
                 images = step.media.get('images', [])
+                if not images:
+                    continue
+                steps_with_media += 1
                 media_updated = False
-                for img in images:
+                for i, img in enumerate(images):
                     if img.get('url'):
+                        log(f"      Step {step.order_index}, img {i}: already has URL, skipping")
                         continue
                     description = img.get('description', '')
                     if not description:
+                        log(f"      Step {step.order_index}, img {i}: no description, skipping")
                         continue
+                    log(f"      Step {step.order_index}, img {i}: generating '{description[:60]}...'")
+                    img_t0 = time.time()
                     service = ImageGenerationService(lesson=lesson, institution=institution)
                     img_result = service.get_or_generate_image(
                         prompt=description,
                         category=img.get('type', 'diagram'),
                         generate_only=True,
                     )
+                    img_elapsed = time.time() - img_t0
                     if img_result and img_result.get('url'):
                         img['url'] = img_result['url']
                         img['source'] = 'generated' if img_result.get('generated') else 'library'
                         media_updated = True
                         media_generated += 1
+                        log(f"      Step {step.order_index}, img {i}: ✅ done in {img_elapsed:.1f}s")
+                    else:
+                        log(f"      Step {step.order_index}, img {i}: ⚠️ no result after {img_elapsed:.1f}s")
                 if media_updated:
                     step.save()
 
-            if media_generated:
-                log(f"   ✓ {lesson.title}: {media_generated} media assets")
+            elapsed = time.time() - t0
+            log(f"   ✅ [2/4] {media_generated} media assets from {steps_with_media} steps in {elapsed:.1f}s")
         except Exception as e:
-            log(f"   ⚠️ {lesson.title} media: {e}")
+            elapsed = time.time() - t0
+            log(f"   ⚠️ [2/4] Media generation error after {elapsed:.1f}s: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
         # Check cancellation before exit tickets
         if _is_cancelled():
-            log(f"   ⛔ {lesson.title}: cancelled")
+            log(f"   ⛔ {lesson.title}: cancelled before exit tickets")
             return {'lesson': lesson.title, 'success': True, 'steps': steps_generated, 'media': media_generated, 'exit_questions': 0, 'skills': 0}
 
         # Step 3: Generate exit tickets
         exit_questions = 0
+        log(f"   [3/4] Generating exit ticket questions...")
+        t0 = time.time()
         try:
             exit_questions = generate_exit_ticket_for_lesson(lesson, None)
-            if exit_questions:
-                log(f"   ✓ {lesson.title}: {exit_questions} exit questions")
+            elapsed = time.time() - t0
+            log(f"   ✅ [3/4] {exit_questions} exit questions in {elapsed:.1f}s")
         except Exception as e:
-            log(f"   ⚠️ {lesson.title} exit tickets: {e}")
+            elapsed = time.time() - t0
+            log(f"   ⚠️ [3/4] Exit ticket error after {elapsed:.1f}s: {e}")
 
         # Check cancellation before skills
         if _is_cancelled():
-            log(f"   ⛔ {lesson.title}: cancelled")
+            log(f"   ⛔ {lesson.title}: cancelled before skills")
             return {'lesson': lesson.title, 'success': True, 'steps': steps_generated, 'media': media_generated, 'exit_questions': exit_questions, 'skills': 0}
 
         # Step 4: Extract skills
         skills_extracted = 0
+        log(f"   [4/4] Extracting skills...")
+        t0 = time.time()
         try:
             from apps.tutoring.skill_extraction import SkillExtractionService
-            skill_service = SkillExtractionService(institution_id=institution_id)
+            resolved_inst_id = _resolve_institution_id(institution_id=institution_id, lesson=lesson)
+            skill_service = SkillExtractionService(institution_id=resolved_inst_id)
             skills = skill_service.extract_skills_for_lesson(lesson)
             skills_extracted = len(skills)
-            if skills_extracted:
-                log(f"   ✓ {lesson.title}: {skills_extracted} skills")
+            elapsed = time.time() - t0
+            log(f"   ✅ [4/4] {skills_extracted} skills in {elapsed:.1f}s")
         except Exception as e:
-            log(f"   ⚠️ {lesson.title} skills: {e}")
+            elapsed = time.time() - t0
+            log(f"   ⚠️ [4/4] Skill extraction error after {elapsed:.1f}s: {e}")
 
         # Mark as ready
         lesson.content_status = 'ready'
         lesson.save(update_fields=['content_status'])
+
+        total_elapsed = time.time() - pipeline_start
+        log(f"🎉 Pipeline COMPLETE for '{lesson.title}' in {total_elapsed:.1f}s "
+            f"(steps={steps_generated}, media={media_generated}, exit={exit_questions}, skills={skills_extracted})")
 
         return {
             'lesson': lesson.title,
@@ -945,7 +1016,10 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
         }
 
     except Exception as e:
-        logger.error(f"Complete lesson generation failed for {lesson.title}: {e}")
+        total_elapsed = time.time() - pipeline_start
+        log(f"💥 Pipeline FAILED for '{lesson.title}' after {total_elapsed:.1f}s: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         lesson.content_status = 'failed'
         lesson.save(update_fields=['content_status'])
         return {'lesson': lesson.title, 'success': False, 'error': str(e)}

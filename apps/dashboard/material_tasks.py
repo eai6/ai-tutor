@@ -32,7 +32,8 @@ def process_teaching_material(upload_id: int):
         upload.add_log("Starting processing...")
 
         # Index into knowledge base
-        kb = CurriculumKnowledgeBase(institution_id=upload.institution_id)
+        from apps.accounts.models import Institution
+        kb = CurriculumKnowledgeBase(institution_id=upload.institution_id or Institution.get_global().id)
 
         upload.add_log(f"Extracting text from {upload.original_filename}...")
 

@@ -423,20 +423,24 @@ class SkillLinkingService:
 def extract_skills_for_new_lesson(lesson: Lesson):
     """
     Utility function to extract skills for a newly generated lesson.
-    
+
     Call this after content generation completes.
     """
-    service = SkillExtractionService(lesson.institution.id)
+    from apps.accounts.models import Institution
+    inst_id = lesson.unit.course.institution_id if lesson.unit.course.institution else Institution.get_global().id
+    service = SkillExtractionService(inst_id)
     return service.extract_skills_for_lesson(lesson)
 
 
 def extract_skills_for_course(course: Course):
     """
     Utility function to extract skills for all lessons in a course.
-    
+
     Useful for batch processing existing content.
     """
-    service = SkillExtractionService(course.institution.id)
+    from apps.accounts.models import Institution
+    inst_id = course.institution_id or Institution.get_global().id
+    service = SkillExtractionService(inst_id)
     return service.extract_skills_for_course(course)
 
 

@@ -760,7 +760,8 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
         upload.add_log("🚀 Starting curriculum pipeline...")
         upload.save()
         
-        institution_id = upload.institution_id
+        from apps.accounts.models import Institution
+        institution_id = upload.institution_id or Institution.get_global().id
         
         # ================================================================
         # STEP 1: PARSE

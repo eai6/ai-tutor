@@ -111,7 +111,7 @@ class CurriculumKnowledgeBase:
             persist_directory = os.path.join(
                 getattr(settings, 'VECTORDB_ROOT',
                         os.path.join(getattr(settings, 'MEDIA_ROOT', '/tmp'), 'vectordb')),
-                f'institution_{institution_id}'
+                f'institution_{self.institution_id}'
             )
         
         self.persist_directory = persist_directory
