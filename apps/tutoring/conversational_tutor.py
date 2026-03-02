@@ -238,9 +238,11 @@ SESSION FLOW (adapt timing to student pace)
    quick recall question related to a prerequisite of today's lesson.
 2. INTRODUCTION (2-3 exchanges): State the learning objective. Connect to prior
    knowledge. Preview what the student will be able to do by the end.
-3. INSTRUCTION (4-6 exchanges): Direct instruction with immediate comprehension
-   checks. Show worked examples with labelled subgoals. Alternate explanation
-   and student response every 2-3 sentences.
+3. INSTRUCTION (6-10 exchanges): For each concept:
+   a) Teach the concept with direct instruction + worked example
+   b) Ask a practice check question
+   c) Only advance to next concept when student answers correctly
+   If the student fails the concept check, reteach briefly and re-ask.
 4. PRACTICE (4-6 exchanges): Student solves problems with decreasing support.
    Mix in interleaved review questions if provided. Track accuracy.
 5. WRAPUP (1-2 exchanges): Summarise key takeaways. Preview next session.
@@ -497,6 +499,9 @@ class ConversationalTutor:
         # Media deduplication (P2)
         self.shown_media_urls = set(state.get('shown_media_urls', []))
 
+        # Concept-boundary gating
+        self.concept_boundary_attempts = state.get('concept_boundary_attempts', 0)
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -538,6 +543,8 @@ class ConversationalTutor:
             'is_review': getattr(self, 'is_review', False),
             # Media deduplication (P2)
             'shown_media_urls': list(getattr(self, 'shown_media_urls', set())),
+            # Concept-boundary gating
+            'concept_boundary_attempts': getattr(self, 'concept_boundary_attempts', 0),
         }
         self.session.save()
     
@@ -583,24 +590,54 @@ class ConversationalTutor:
         all_common_mistakes = []
         all_seychelles_context = []
 
-        # Extract key concepts from steps
-        for i, step in enumerate(self.steps):
-            content_preview = step.teacher_script[:200] if step.teacher_script else ""
-            hints = [h for h in [step.hint_1, step.hint_2, step.hint_3] if h]
+        # Check if steps have concept_tags
+        has_concept_tags = any(
+            getattr(s, 'concept_tag', '') for s in self.steps
+        )
 
-            if step.step_type == 'teach':
-                context_parts.append(f"  {i+1}. [TEACH] {content_preview}...")
-            elif step.step_type == 'practice':
-                question = step.question[:100] if step.question else content_preview[:100]
-                context_parts.append(f"  {i+1}. [PRACTICE] {question}...")
-                if step.expected_answer:
-                    context_parts.append(f"      Expected: {step.expected_answer}")
-                if hints:
-                    context_parts.append(f"      Hints: {' → '.join(h[:80] for h in hints)}")
-            elif step.step_type == 'worked_example':
-                context_parts.append(f"  {i+1}. [EXAMPLE] {content_preview}...")
+        # Extract key concepts from steps — concept-grouped if tags exist
+        if has_concept_tags:
+            blocks = self._get_concept_blocks()
+            for block in blocks:
+                tag = block['tag']
+                if tag:
+                    context_parts.append(f"  --- Concept: {tag} ---")
+                for idx in block['step_indices']:
+                    step = self.steps[idx]
+                    content_preview = step.teacher_script[:200] if step.teacher_script else ""
+                    hints = [h for h in [step.hint_1, step.hint_2, step.hint_3] if h]
+                    label = step.step_type.upper()
+                    if step.step_type == 'practice':
+                        question = step.question[:100] if step.question else content_preview[:100]
+                        context_parts.append(f"  {idx+1}. [PRACTICE] {question}...")
+                        if step.expected_answer:
+                            context_parts.append(f"      Expected: {step.expected_answer}")
+                        if hints:
+                            context_parts.append(f"      Hints: {' → '.join(h[:80] for h in hints)}")
+                    elif step.step_type == 'worked_example':
+                        context_parts.append(f"  {idx+1}. [EXAMPLE] {content_preview}...")
+                    else:
+                        context_parts.append(f"  {idx+1}. [{label}] {content_preview}...")
+        else:
+            # Flat list for legacy lessons without concept_tags
+            for i, step in enumerate(self.steps):
+                content_preview = step.teacher_script[:200] if step.teacher_script else ""
+                hints = [h for h in [step.hint_1, step.hint_2, step.hint_3] if h]
 
-            # Gather educational materials
+                if step.step_type == 'teach':
+                    context_parts.append(f"  {i+1}. [TEACH] {content_preview}...")
+                elif step.step_type == 'practice':
+                    question = step.question[:100] if step.question else content_preview[:100]
+                    context_parts.append(f"  {i+1}. [PRACTICE] {question}...")
+                    if step.expected_answer:
+                        context_parts.append(f"      Expected: {step.expected_answer}")
+                    if hints:
+                        context_parts.append(f"      Hints: {' → '.join(h[:80] for h in hints)}")
+                elif step.step_type == 'worked_example':
+                    context_parts.append(f"  {i+1}. [EXAMPLE] {content_preview}...")
+
+        # Gather educational materials from all steps
+        for step in self.steps:
             ed = step.educational_content if isinstance(step.educational_content, dict) else {}
             vocab = ed.get('key_vocabulary', [])
             if vocab:
@@ -2151,6 +2188,20 @@ Guide your teaching toward helping the student understand this concept!"""
                 guidance += f"Media for this step: catalog IDs [{id_list}]. "
                 guidance += "Show one using |||MEDIA:N||| when explaining this step's content.\n"
 
+            # Concept block position info
+            concept_tag = getattr(step, 'concept_tag', '') or ''
+            if concept_tag:
+                block = self._get_current_concept_block()
+                if block:
+                    pos = block['step_indices'].index(self.current_topic_index) + 1
+                    total = len(block['step_indices'])
+                    guidance += f"\nConcept block: step {pos}/{total} in '{concept_tag}'\n"
+                    if self._is_at_concept_boundary():
+                        guidance += (
+                            "⚠️ CONCEPT GATE: Student must answer the practice check "
+                            "correctly before you move to the next concept.\n"
+                        )
+
             return guidance
 
         return "All planned topics covered. Move to wrap-up."
@@ -2311,7 +2362,7 @@ WRAPUP PHASE - Goals:
         fallback_transitions = {
             ConversationPhase.WARMUP: (2, ConversationPhase.INTRODUCTION),
             ConversationPhase.INTRODUCTION: (3, ConversationPhase.INSTRUCTION),
-            ConversationPhase.INSTRUCTION: (8, ConversationPhase.PRACTICE),
+            ConversationPhase.INSTRUCTION: (12, ConversationPhase.PRACTICE),
             ConversationPhase.PRACTICE: (7, ConversationPhase.WRAPUP),
             ConversationPhase.WRAPUP: (2, ConversationPhase.EXIT_TICKET),
         }
@@ -2405,9 +2456,87 @@ WRAPUP PHASE - Goals:
                 logger.info(f"Transitioned to phase: {self.phase.value}")
     
     # =========================================================================
+    # CONCEPT-BOUNDARY HELPERS
+    # =========================================================================
+
+    def _get_concept_blocks(self) -> List[Dict]:
+        """Group lesson steps by concept_tag into blocks with practice indices.
+
+        Returns list of dicts:
+            [{'tag': 'relief_rainfall', 'step_indices': [2,3,4], 'practice_indices': [4]}, ...]
+        Empty-tag steps are each their own block (preserves old behavior).
+        """
+        blocks = []
+        current_tag = None
+        current_block = None
+
+        for i, step in enumerate(self.steps):
+            tag = getattr(step, 'concept_tag', '') or ''
+            if not tag:
+                # Empty tag = standalone block
+                blocks.append({
+                    'tag': '',
+                    'step_indices': [i],
+                    'practice_indices': [i] if step.step_type in ('practice', 'quiz') else [],
+                })
+                current_tag = None
+                current_block = None
+            elif tag != current_tag:
+                # New concept block
+                current_block = {
+                    'tag': tag,
+                    'step_indices': [i],
+                    'practice_indices': [i] if step.step_type in ('practice', 'quiz') else [],
+                }
+                blocks.append(current_block)
+                current_tag = tag
+            else:
+                # Same concept block
+                current_block['step_indices'].append(i)
+                if step.step_type in ('practice', 'quiz'):
+                    current_block['practice_indices'].append(i)
+
+        return blocks
+
+    def _is_at_concept_boundary(self) -> bool:
+        """Return True if the next step has a different (non-empty) concept_tag.
+
+        Returns False for empty-tag lessons (backward compat).
+        """
+        if self.current_topic_index >= len(self.steps) - 1:
+            return False
+
+        current_step = self.steps[self.current_topic_index]
+        next_step = self.steps[self.current_topic_index + 1]
+
+        current_tag = getattr(current_step, 'concept_tag', '') or ''
+        next_tag = getattr(next_step, 'concept_tag', '') or ''
+
+        # Only gate when both tags are non-empty and different
+        if not current_tag or not next_tag:
+            return False
+
+        return current_tag != next_tag
+
+    def _current_concept_practice_passed(self) -> bool:
+        """Check if the student answered the current concept block's practice correctly.
+
+        Uses the success signals from the most recent tutor response.
+        """
+        return getattr(self, 'last_practice_correct', False)
+
+    def _get_current_concept_block(self) -> Optional[Dict]:
+        """Get the concept block containing the current step index."""
+        blocks = self._get_concept_blocks()
+        for block in blocks:
+            if self.current_topic_index in block['step_indices']:
+                return block
+        return None
+
+    # =========================================================================
     # STUDENT ANALYSIS
     # =========================================================================
-    
+
     def _analyze_student_response(self, student_input: str, tutor_response: str):
         """Analyze student response to adapt future instruction and track concept coverage."""
         input_lower = student_input.lower()
@@ -2471,8 +2600,36 @@ WRAPUP PHASE - Goals:
         if self.phase in [ConversationPhase.INSTRUCTION, ConversationPhase.PRACTICE]:
             if self.phase_exchange_count > 0 and self.phase_exchange_count % 2 == 0:
                 if self.current_topic_index < len(self.steps) - 1:
-                    self.current_topic_index += 1
-                    self._step_just_advanced = True
+                    # Check concept boundary gating
+                    if self._is_at_concept_boundary():
+                        boundary_attempts = getattr(self, 'concept_boundary_attempts', 0)
+                        if self._current_concept_practice_passed():
+                            # Passed — cross boundary, reset attempts
+                            self.concept_boundary_attempts = 0
+                            self.current_topic_index += 1
+                            self._step_just_advanced = True
+                            logger.info(f"Concept boundary crossed at step {self.current_topic_index}")
+                        elif boundary_attempts >= 4:
+                            # Safety valve — advance anyway after 4 failed attempts
+                            self.concept_boundary_attempts = 0
+                            self.current_topic_index += 1
+                            self._step_just_advanced = True
+                            logger.info(f"Safety valve: forced concept boundary crossing after {boundary_attempts} attempts")
+                        else:
+                            # Block — reteach and re-ask
+                            self.concept_boundary_attempts = boundary_attempts + 1
+                            block = self._get_current_concept_block()
+                            tag = block['tag'] if block else 'this concept'
+                            self.phase_instruction_override = (
+                                f"The student has NOT yet demonstrated understanding of '{tag}'. "
+                                f"Briefly reteach the key idea and ask the practice question again. "
+                                f"Do NOT move to the next concept until they answer correctly."
+                            )
+                            logger.info(f"Concept boundary blocked (attempt {self.concept_boundary_attempts}): {tag}")
+                    else:
+                        # No boundary or empty tags — advance normally
+                        self.current_topic_index += 1
+                        self._step_just_advanced = True
     
     def _keyword_concept_coverage_check(self, conversation_text: str):
         """

@@ -76,6 +76,12 @@ class LessonStepSchema(BaseModel):
     order_index: int = Field(description="Sequential index starting from 0")
     phase: str = Field(description="5E model phase: engage, explore, explain, practice, or evaluate")
     step_type: str = Field(description="Step type: teach, worked_example, practice, or quiz")
+    concept_tag: str = Field(default="", description=(
+        "Concept grouping tag. All steps teaching or practicing the SAME concept "
+        "share the same tag (e.g. 'relief_rainfall', 'pythagorean_theorem'). "
+        "ENGAGE and EVALUATE steps may use '' (empty). "
+        "Each concept block must end with a practice or quiz step."
+    ))
     teacher_script: str = Field(description=(
         "The tutor's dialogue/instruction text. "
         "If media is included, MUST reference it (e.g. 'Look at this diagram...'). "
@@ -104,7 +110,7 @@ class LessonSummarySchema(BaseModel):
 
 class GeneratedLessonContent(BaseModel):
     """Complete generated lesson content following the 5E pedagogical model."""
-    steps: List[LessonStepSchema] = Field(description="8-12 lesson steps following the 5E model")
+    steps: List[LessonStepSchema] = Field(description="12-18 concept-grouped lesson steps")
     lesson_summary: Optional[LessonSummarySchema] = None
 
 
@@ -348,18 +354,26 @@ TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}
 
-Create 8-12 steps following the 5E pedagogical model.
+Create 12-18 CONCEPT-GROUPED steps. The student must master each concept before moving to the next.
 
-STEP DISTRIBUTION:
-- 2-3 ENGAGE steps to hook interest
-- 2-3 EXPLORE/EXPLAIN steps for instruction
-- 3-4 PRACTICE steps with varying difficulty
-- 1-2 EVALUATE steps at the end
+STRUCTURE:
+1-2 ENGAGE steps (concept_tag = "")
+Then FOR EACH CONCEPT (2-4 concepts):
+  1-2 teach steps → 0-1 worked_example → 1 practice step
+  All steps in the same concept share the SAME concept_tag (e.g. "relief_rainfall")
+  The practice step MUST have question, expected_answer, and hints
+1-2 EVALUATE steps at the end (concept_tag = "")
+
+concept_tag RULES:
+- Use lowercase_with_underscores, descriptive of the concept (e.g. "pythagorean_theorem", "convection_currents")
+- ALL steps teaching/practicing the SAME concept share the SAME tag
+- ENGAGE and EVALUATE steps use "" (empty string)
+- Each concept block MUST end with a practice or quiz step
 
 STEP TYPES:
 - teach: Direct instruction (tutor explains)
 - worked_example: Step-by-step problem solving
-- practice: Student attempts a problem
+- practice: Student attempts a problem (MUST have question + expected_answer + hints)
 - quiz: Assessment question
 
 CONTENT GUIDELINES:
@@ -435,6 +449,7 @@ CONTENT GUIDELINES:
                 defaults={
                     'phase': step_data.get('phase', ''),
                     'step_type': step_data.get('step_type', 'teach'),
+                    'concept_tag': step_data.get('concept_tag', ''),
                     'teacher_script': step_data.get('teacher_script', ''),
                     'question': step_data.get('question') or '',
                     'answer_type': step_data.get('answer_type', 'none'),

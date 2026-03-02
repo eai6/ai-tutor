@@ -299,6 +299,12 @@ class LessonStep(models.Model):
         blank=True,
         help_text="Pedagogical phase: engage, explore, explain, practice, evaluate"
     )
+    concept_tag = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text="Groups steps by concept — all steps teaching/practicing the same concept share a tag"
+    )
 
     class Meta:
         ordering = ['order_index']
