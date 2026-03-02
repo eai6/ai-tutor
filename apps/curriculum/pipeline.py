@@ -17,9 +17,60 @@ import json
 import logging
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
+
+from pydantic import BaseModel, Field
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# STRUCTURED OUTPUT SCHEMAS
+# =============================================================================
+
+class LessonSchema(BaseModel):
+    """A single lesson in a unit."""
+    title: str = Field(description="Short lesson title (3-8 words)")
+    objective: str = Field(description="Students will be able to [specific, measurable outcome]")
+    key_concepts: List[str] = Field(default_factory=list, description="Key concepts covered")
+
+
+class UnitSchema(BaseModel):
+    """A unit containing multiple lessons."""
+    title: str = Field(description="Clear unit title")
+    description: str = Field(default="", description="Brief description of what this unit covers")
+    lessons: List[LessonSchema] = Field(description="Lessons in this unit")
+
+
+class LessonStructureResult(BaseModel):
+    """Complete curriculum structure with units and lessons."""
+    units: List[UnitSchema] = Field(description="4-8 logical units based on major topics")
+
+
+class ExitTicketQuestion(BaseModel):
+    """An exit ticket question."""
+    question: str
+    correct_answer: str
+    distractors: List[str] = Field(default_factory=list)
+
+
+class TutoringStep(BaseModel):
+    """A single step in a tutoring session."""
+    phase: str = Field(description="5E phase: engage, explore, explain, practice, or evaluate")
+    step_type: str = Field(description="Step type: teach, question, or reflect")
+    content: str = Field(description="What the tutor says/shows")
+    question: Optional[str] = Field(default=None, description="Question to ask (for question type)")
+    expected_answer: Optional[str] = Field(default=None, description="Correct answer")
+    hints: Optional[List[str]] = Field(default=None, description="Hints if student struggles")
+    media_suggestion: Optional[str] = Field(default=None, description="Description of helpful image/diagram")
+
+
+class LessonContentResult(BaseModel):
+    """Generated tutoring content for a lesson."""
+    steps: List[TutoringStep] = Field(description="Tutoring session steps")
+    exit_ticket: List[ExitTicketQuestion] = Field(default_factory=list)
+    key_vocabulary: List[str] = Field(default_factory=list)
+    teaching_tips: List[str] = Field(default_factory=list)
 
 
 # ============================================================================
@@ -125,6 +176,32 @@ def vectorize_curriculum(
     )
 
 
+def _get_instructor_client():
+    """Get an instructor-wrapped client for structured curriculum generation."""
+    try:
+        import instructor
+        from apps.llm.models import ModelConfig
+
+        config = ModelConfig.get_for('generation')
+        if not config:
+            return None, None
+        PROVIDER_MAP = {
+            'anthropic': 'anthropic',
+            'openai': 'openai',
+            'google': 'google',
+            'local_ollama': 'ollama',
+        }
+        provider = PROVIDER_MAP.get(config.provider, config.provider)
+        client = instructor.from_provider(
+            f"{provider}/{config.model_name}",
+            api_key=config.get_api_key(),
+        )
+        return client, config
+    except Exception as e:
+        logger.warning(f"Could not create instructor client for pipeline: {e}")
+        return None, None
+
+
 # ============================================================================
 # STEP 3: GENERATE LESSONS (Query KB + LLM)
 # ============================================================================
@@ -137,24 +214,23 @@ def generate_lesson_structure(
 ) -> Dict:
     """
     Generate structured lessons from the curriculum.
-    
-    Uses:
-    1. Query knowledge base for curriculum context
-    2. LLM to structure into units and lessons
-    
+
+    Uses instructor for structured output. Falls back to raw LLM + JSON
+    repair if instructor is unavailable.
+
     Args:
         subject: Subject name
         grade_level: Grade level
         institution_id: Institution ID
         extracted_text: Optional raw text (if KB not yet indexed)
-    
+
     Returns:
         Dict with units and lessons structure
     """
     from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
-    
+
     # Query knowledge base for context
     kb = CurriculumKnowledgeBase(institution_id=institution_id)
     kb_results = kb.query_for_lesson_generation(
@@ -162,7 +238,7 @@ def generate_lesson_structure(
         grade_level=grade_level,
         n_results=30
     )
-    
+
     # Build context from KB results
     kb_context = ""
     if kb_results.chunks:
@@ -170,24 +246,15 @@ def generate_lesson_structure(
             f"[{c.get('section', 'Content')}]\n{c.get('content', '')}"
             for c in kb_results.chunks[:20]
         ])
-    
+
     # If no KB context, use raw text
     if not kb_context and extracted_text:
-        # Truncate if needed
         kb_context = extracted_text[:40000]
-    
+
     if not kb_context:
         raise ValueError("No curriculum content available")
-    
-    # Get LLM client
-    model_config = ModelConfig.get_for('generation')
-    if not model_config:
-        raise ValueError("No active LLM model configured")
 
-    llm_client = get_llm_client(model_config)
-
-    # Generate lesson structure with LLM
-    prompt = f"""You are a curriculum design expert. Analyze this {subject} curriculum for {grade_level} students and create a well-organized lesson structure.
+    prompt = f"""Analyze this {subject} curriculum for {grade_level} students and create a well-organized lesson structure.
 
 === CURRICULUM CONTENT ===
 {kb_context}
@@ -203,74 +270,48 @@ REQUIREMENTS:
 
 For {subject}, organize by these strands where applicable:
 - Mathematics: Number, Algebra, Geometry, Measurement, Data/Statistics
-- Geography: Physical Geography, Human Geography, Map Skills, Regional Studies  
-- Science: Life Science, Physical Science, Earth Science
+- Geography: Physical Geography, Human Geography, Map Skills, Regional Studies
+- Science: Life Science, Physical Science, Earth Science"""
 
-Return ONLY valid JSON in this exact format:
-{{
-    "units": [
-        {{
-            "title": "Clear Unit Title",
-            "description": "Brief description of what this unit covers",
-            "lessons": [
-                {{
-                    "title": "Short Lesson Title",
-                    "objective": "Students will be able to [specific, measurable outcome]",
-                    "key_concepts": ["concept1", "concept2"]
-                }}
-            ]
-        }}
-    ]
-}}"""
+    system_prompt = "You are a curriculum design expert. Create well-structured educational content."
 
-    system_prompt = "You are a curriculum design expert. Create well-structured educational content. Return only valid JSON."
+    client, config = _get_instructor_client()
+    if client:
+        create_kwargs = dict(
+            response_model=LessonStructureResult,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            max_retries=3,
+        )
+        if config and config.provider == 'google':
+            create_kwargs['generation_config'] = {'max_tokens': 8192}
+        else:
+            create_kwargs['max_tokens'] = 8192
 
-    response = llm_client.generate(
-        messages=[{"role": "user", "content": prompt}],
-        system_prompt=system_prompt,
-        max_tokens=8192,
-    )
+        result = client.chat.completions.create(**create_kwargs)
+        structure = result.model_dump()
+    else:
+        # Fallback: raw LLM + JSON repair
+        logger.warning("Instructor unavailable for lesson structure, using raw LLM")
+        model_config = ModelConfig.get_for('generation')
+        if not model_config:
+            raise ValueError("No active LLM model configured")
+        llm_client = get_llm_client(model_config)
 
-    content = response.content.strip()
-    is_truncated = response.stop_reason and response.stop_reason not in ('end_turn', 'stop')
-
-    if is_truncated:
-        logger.warning(f"LLM response may be truncated (stop_reason={response.stop_reason}, length={len(content)})")
-
-    # Parse JSON response with better error handling
-    content = _clean_json_response(content)
-
-    try:
-        structure = json.loads(content)
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error at position {e.pos}: {e.msg}")
-        logger.error(f"Content around error: ...{content[max(0, e.pos-50):e.pos+50]}...")
-        logger.error(f"Full response length: {len(content)}")
-
-        # Try to fix common JSON issues
-        structure = _try_fix_json(content)
-
-        # If still broken and response was truncated, retry once with concise prompt
-        if structure is None and is_truncated:
-            logger.warning("Retrying lesson structure generation with concise prompt after truncation")
-            retry_prompt = prompt + (
-                "\n\nIMPORTANT: Keep your response concise. "
-                "Limit to the most important units and lessons. "
-                "You MUST complete the full JSON."
-            )
-            retry_response = llm_client.generate(
-                messages=[{"role": "user", "content": retry_prompt}],
-                system_prompt=system_prompt,
-                max_tokens=8192,
-            )
-            retry_content = _clean_json_response(retry_response.content.strip())
-            try:
-                structure = json.loads(retry_content)
-            except json.JSONDecodeError:
-                structure = _try_fix_json(retry_content)
-
-        if structure is None:
-            raise ValueError(f"Could not parse LLM response as JSON: {e.msg}")
+        response = llm_client.generate(
+            messages=[{"role": "user", "content": prompt + "\n\nReturn ONLY valid JSON."}],
+            system_prompt=system_prompt,
+            max_tokens=8192,
+        )
+        content = _clean_json_response(response.content.strip())
+        try:
+            structure = json.loads(content)
+        except json.JSONDecodeError as e:
+            structure = _try_fix_json(content)
+            if structure is None:
+                raise ValueError(f"Could not parse LLM response as JSON: {e.msg}")
 
     # Validate and clean
     return _validate_lesson_structure(structure, subject, grade_level)
@@ -491,12 +532,12 @@ def generate_lesson_content(
     from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
-    
+
     # Get unit info
     unit = lesson.unit
     course = unit.course
     subject = course.title.split()[0] if course else "General"
-    
+
     # Query knowledge base for rich context
     kb = CurriculumKnowledgeBase(institution_id=institution_id)
     context = kb.query_for_content_generation(
@@ -506,18 +547,10 @@ def generate_lesson_content(
         subject=subject,
         grade_level=course.grade_level if course else "S1"
     )
-    
+
     # Build curriculum context for LLM
     curriculum_context = _build_curriculum_context(context)
-    
-    # Get LLM client
-    model_config = ModelConfig.get_for('generation')
-    if not model_config:
-        raise ValueError("No active LLM model configured")
 
-    llm_client = get_llm_client(model_config)
-
-    # Generate tutoring steps
     prompt = f"""Create a tutoring session for this lesson:
 
 LESSON: {lesson.title}
@@ -533,7 +566,7 @@ Create a tutoring session with these phases:
 
 1. ENGAGE (1-2 steps): Hook the student with a question or scenario
 2. EXPLORE (2-3 steps): Guide discovery through examples
-3. EXPLAIN (2-3 steps): Direct instruction with clear explanations  
+3. EXPLAIN (2-3 steps): Direct instruction with clear explanations
 4. PRACTICE (2-4 steps): Practice questions with feedback
 5. EXIT TICKET (2-3 questions): Check understanding
 
@@ -542,94 +575,76 @@ For each step, provide:
 - content: What the tutor says/shows
 - question: (for question type) The question to ask
 - expected_answer: (for question type) What correct answer looks like
-- hints: (for question type) Array of hints if student struggles
+- hints: (for question type) Array of hints if student struggles"""
 
-Return JSON in this format:
-{{
-    "steps": [
-        {{
-            "phase": "engage",
-            "step_type": "teach",
-            "content": "Welcome! Today we'll learn about...",
-            "media_suggestion": "Optional: description of helpful image/diagram"
-        }},
-        {{
-            "phase": "practice",
-            "step_type": "question",
-            "content": "Let's try this problem...",
-            "question": "What is 2 + 2?",
-            "expected_answer": "4",
-            "hints": ["Think about counting...", "Use your fingers"]
-        }}
-    ],
-    "exit_ticket": [
-        {{
-            "question": "What did you learn today about X?",
-            "correct_answer": "...",
-            "distractors": ["wrong1", "wrong2", "wrong3"]
-        }}
-    ],
-    "key_vocabulary": ["term1", "term2"],
-    "teaching_tips": ["tip1", "tip2"]
-}}"""
+    system_prompt = "You are an expert tutor creating engaging, pedagogically sound tutoring content."
 
-    system_prompt = "You are an expert tutor creating engaging, pedagogically sound tutoring content. Return only valid JSON."
-
-    response = llm_client.generate(
-        messages=[{"role": "user", "content": prompt}],
-        system_prompt=system_prompt,
-        max_tokens=8192,
-    )
-
-    content = response.content.strip()
-    is_truncated = response.stop_reason and response.stop_reason not in ('end_turn', 'stop')
-
-    if is_truncated:
-        logger.warning(f"LLM response may be truncated (stop_reason={response.stop_reason}, length={len(content)})")
-
-    content = _clean_json_response(content)
-
-    try:
-        result = json.loads(content)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse lesson content: {e}")
-
-        result = _try_fix_json(content)
-
-        # If still broken and response was truncated, retry once
-        if result is None and is_truncated:
-            logger.warning("Retrying lesson content generation after truncation")
-            retry_prompt = prompt + (
-                "\n\nIMPORTANT: Keep your response concise. "
-                "You MUST complete the full JSON."
+    client, config = _get_instructor_client()
+    if client:
+        try:
+            create_kwargs = dict(
+                response_model=LessonContentResult,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                max_retries=3,
             )
-            retry_response = llm_client.generate(
-                messages=[{"role": "user", "content": retry_prompt}],
-                system_prompt=system_prompt,
-                max_tokens=8192,
-            )
-            retry_content = _clean_json_response(retry_response.content.strip())
-            try:
-                result = json.loads(retry_content)
-            except json.JSONDecodeError:
-                result = _try_fix_json(retry_content)
+            if config and config.provider == 'google':
+                create_kwargs['generation_config'] = {'max_tokens': 8192}
+            else:
+                create_kwargs['max_tokens'] = 8192
 
-        if result is None:
+            result = client.chat.completions.create(**create_kwargs)
+            return {
+                "success": True,
+                "lesson_id": lesson.id,
+                "steps": [s.model_dump() for s in result.steps],
+                "exit_ticket": [q.model_dump() for q in result.exit_ticket],
+                "key_vocabulary": result.key_vocabulary,
+                "teaching_tips": result.teaching_tips,
+                "curriculum_context_used": len(context.chunks) > 0,
+            }
+        except Exception as e:
+            logger.error(f"Instructor lesson content generation failed: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "raw_response": content[:500],
             }
+    else:
+        # Fallback: raw LLM + JSON repair
+        logger.warning("Instructor unavailable for lesson content, using raw LLM")
+        model_config = ModelConfig.get_for('generation')
+        if not model_config:
+            raise ValueError("No active LLM model configured")
+        llm_client = get_llm_client(model_config)
 
-    return {
-        "success": True,
-        "lesson_id": lesson.id,
-        "steps": result.get('steps', []),
-        "exit_ticket": result.get('exit_ticket', []),
-        "key_vocabulary": result.get('key_vocabulary', []),
-        "teaching_tips": result.get('teaching_tips', []),
-        "curriculum_context_used": len(context.chunks) > 0,
-    }
+        response = llm_client.generate(
+            messages=[{"role": "user", "content": prompt + "\n\nReturn ONLY valid JSON."}],
+            system_prompt=system_prompt,
+            max_tokens=8192,
+        )
+        content = _clean_json_response(response.content.strip())
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError as e:
+            parsed = _try_fix_json(content)
+            if parsed is None:
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "raw_response": content[:500],
+                }
+
+        return {
+            "success": True,
+            "lesson_id": lesson.id,
+            "steps": parsed.get('steps', []),
+            "exit_ticket": parsed.get('exit_ticket', []),
+            "key_vocabulary": parsed.get('key_vocabulary', []),
+            "teaching_tips": parsed.get('teaching_tips', []),
+            "curriculum_context_used": len(context.chunks) > 0,
+        }
 
 
 def _build_curriculum_context(context) -> str:

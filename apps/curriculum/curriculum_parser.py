@@ -13,11 +13,36 @@ import re
 import os
 import json
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Literal
 from dataclasses import dataclass, asdict
+
+from pydantic import BaseModel, Field
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# STRUCTURED OUTPUT SCHEMAS
+# =============================================================================
+
+class FigureDescription(BaseModel):
+    """A single figure extracted from a PDF page."""
+    page_number: int = Field(description="The page number where this figure appears")
+    figure_number: str = Field(description="The figure label, e.g. 'Figure 3.2' or 'unlabeled'")
+    figure_type: Literal["diagram", "chart", "graph", "map", "illustration", "photo", "table"] = Field(
+        description="Type of visual element"
+    )
+    description: str = Field(description="Detailed 2-4 sentence description specific enough to recreate the figure")
+    educational_context: str = Field(description="What concept this figure teaches or illustrates")
+
+
+class FigureExtractionResult(BaseModel):
+    """List of figures extracted from PDF pages."""
+    figures: List[FigureDescription] = Field(
+        default_factory=list,
+        description="List of figures found. Empty if no figures on the pages.",
+    )
 
 
 # ============================================================================
@@ -246,6 +271,8 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
     """
     Use LLM vision to extract figure descriptions from rendered page images.
 
+    Uses instructor for structured output with Anthropic Haiku.
+
     Args:
         pages_data: List of dicts with page_number, image_bytes, media_type
 
@@ -253,6 +280,7 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
         List of figure dicts with descriptions and metadata
     """
     import base64
+    import instructor
     import anthropic
 
     # Use Haiku directly for figure extraction — cheapest, fastest, 50k token/min
@@ -262,7 +290,7 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY not set for figure extraction")
 
-    haiku_client = anthropic.Anthropic(api_key=api_key)
+    client = instructor.from_anthropic(anthropic.Anthropic(api_key=api_key))
 
     # Build multimodal message with all page images
     content_parts = [
@@ -271,21 +299,10 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
             "text": (
                 "Analyze the following PDF page images and extract ALL figures, diagrams, "
                 "charts, maps, illustrations, and visual elements (NOT decorative borders or "
-                "page numbers). For each figure found, provide a JSON description.\n\n"
-                "Return a JSON array with one object per figure:\n"
-                "[\n"
-                '  {\n'
-                '    "page_number": 5,\n'
-                '    "figure_number": "Figure 3.2",\n'
-                '    "figure_type": "diagram",\n'
-                '    "description": "Detailed 2-4 sentence description specific enough to recreate the figure.",\n'
-                '    "educational_context": "What concept this figure teaches or illustrates."\n'
-                '  }\n'
-                "]\n\n"
+                "page numbers).\n\n"
                 "figure_type must be one of: diagram, chart, graph, map, illustration, photo, table\n"
-                "If a figure has no label, use \"unlabeled\" for figure_number.\n"
-                "If no figures are found on a page, omit that page from results.\n"
-                "Return ONLY the JSON array, no other text."
+                "If a figure has no label, use 'unlabeled' for figure_number.\n"
+                "If no figures are found on a page, omit that page from results."
             ),
         }
     ]
@@ -305,50 +322,26 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
             },
         })
 
-    messages = [{"role": "user", "content": content_parts}]
-
-    response = haiku_client.messages.create(
+    result = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=4096,
-        system="You are an expert at analyzing educational documents. Extract figure descriptions precisely. Return only valid JSON.",
-        messages=messages,
+        system="You are an expert at analyzing educational documents. Extract figure descriptions precisely.",
+        messages=[{"role": "user", "content": content_parts}],
+        response_model=FigureExtractionResult,
+        max_retries=2,
     )
-
-    # Parse response
-    response_text = response.content[0].text.strip()
-    if '```' in response_text:
-        if '```json' in response_text:
-            response_text = response_text.split('```json')[1].split('```')[0]
-        else:
-            parts = response_text.split('```')
-            if len(parts) >= 2:
-                response_text = parts[1]
-        response_text = response_text.strip()
-
-    try:
-        figures = json.loads(response_text)
-    except json.JSONDecodeError:
-        # Try to find JSON array in response
-        match = re.search(r'\[[\s\S]*\]', response_text)
-        if match:
-            figures = json.loads(match.group())
-        else:
-            logger.warning(f"Could not parse figure extraction response: {response_text[:200]}")
-            return []
-
-    if not isinstance(figures, list):
-        return []
 
     # Attach page image bytes to each figure for later storage
     page_data_by_num = {p['page_number']: p for p in pages_data}
     results = []
-    for fig in figures:
-        page_num = fig.get('page_number')
+    for fig in result.figures:
+        fig_dict = fig.model_dump()
+        page_num = fig_dict.get('page_number')
         page_info = page_data_by_num.get(page_num)
         if page_info:
-            fig['page_image_bytes'] = page_info['image_bytes']
-            fig['page_image_media_type'] = page_info['media_type']
-        results.append(fig)
+            fig_dict['page_image_bytes'] = page_info['image_bytes']
+            fig_dict['page_image_media_type'] = page_info['media_type']
+        results.append(fig_dict)
 
     return results
 

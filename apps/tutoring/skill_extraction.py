@@ -13,6 +13,7 @@ import logging
 import re
 from typing import List, Dict, Optional, Tuple
 
+from pydantic import BaseModel, Field
 from django.db import transaction
 
 from apps.curriculum.models import Course, Unit, Lesson, LessonStep
@@ -21,6 +22,28 @@ from apps.llm.models import ModelConfig
 from apps.llm.client import get_llm_client
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# STRUCTURED OUTPUT SCHEMAS
+# =============================================================================
+
+class SkillData(BaseModel):
+    """A single extracted skill."""
+    code: str = Field(description="Snake_case skill code prefixed with subject abbreviation, e.g. geo_identify_fault_types")
+    name: str = Field(description="Human-readable skill name")
+    description: str = Field(default="", description="Detailed description of the skill")
+    difficulty: float = Field(default=0.5, ge=0.0, le=1.0, description="Difficulty from 0.0 (easy) to 1.0 (hard)")
+    bloom_level: str = Field(default="understand", description="Bloom's taxonomy level")
+    importance: float = Field(default=0.5, ge=0.0, le=1.0, description="Importance from 0.0 to 1.0")
+    prerequisites: List[str] = Field(default_factory=list, description="Codes of prerequisite skills")
+    tags: List[str] = Field(default_factory=list, description="Topic tags")
+
+
+class SkillExtractionResult(BaseModel):
+    """Complete skill extraction output for a lesson."""
+    skills: List[SkillData] = Field(description="2-5 atomic skills extracted from the lesson")
+    lesson_prerequisites: List[str] = Field(default_factory=list, description="Titles of prerequisite lessons")
 
 
 class SkillExtractionService:
@@ -102,7 +125,8 @@ Return JSON:
     def __init__(self, institution_id: int):
         self.institution_id = institution_id
         self._llm_client = None
-    
+        self._instructor_client = None
+
     @property
     def llm_client(self):
         """Lazy load LLM client."""
@@ -111,6 +135,29 @@ Return JSON:
             if config:
                 self._llm_client = get_llm_client(config)
         return self._llm_client
+
+    @property
+    def instructor_client(self):
+        """Lazy load instructor-wrapped client for structured output."""
+        if self._instructor_client is None:
+            try:
+                import instructor
+                config = ModelConfig.get_for('skill_extraction')
+                if config:
+                    PROVIDER_MAP = {
+                        'anthropic': 'anthropic',
+                        'openai': 'openai',
+                        'google': 'google',
+                        'local_ollama': 'ollama',
+                    }
+                    provider = PROVIDER_MAP.get(config.provider, config.provider)
+                    self._instructor_client = instructor.from_provider(
+                        f"{provider}/{config.model_name}",
+                        api_key=config.get_api_key(),
+                    )
+            except Exception as e:
+                logger.error(f"Could not load instructor client for skill extraction: {e}")
+        return self._instructor_client
     
     def extract_skills_for_lesson(self, lesson: Lesson) -> List[Skill]:
         """
@@ -168,30 +215,44 @@ Return JSON:
             figure_context=figure_context,
         )
         
-        # Call LLM
+        # Call LLM with structured output
         try:
-            response = self.llm_client.generate(
-                messages=[{"role": "user", "content": prompt}],
-                system_prompt="You are an expert curriculum analyst. Extract skills precisely and return valid JSON only."
-            )
-            
-            # Parse response
-            result = self._parse_llm_response(response.content)
-            
-            if not result or 'skills' not in result:
-                logger.warning(f"No skills extracted for lesson {lesson.id}")
-                return []
-            
+            if self.instructor_client:
+                result = self.instructor_client.chat.completions.create(
+                    response_model=SkillExtractionResult,
+                    messages=[
+                        {"role": "system", "content": "You are an expert curriculum analyst. Extract skills precisely."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_retries=3,
+                    max_tokens=4096,
+                )
+                skills_data = [s.model_dump() for s in result.skills]
+                prereq_titles = result.lesson_prerequisites
+            else:
+                # Fallback: raw LLM + manual parse
+                logger.warning("Instructor unavailable for skill extraction, using raw LLM")
+                response = self.llm_client.generate(
+                    messages=[{"role": "user", "content": prompt}],
+                    system_prompt="You are an expert curriculum analyst. Extract skills precisely and return valid JSON only."
+                )
+                parsed = self._parse_llm_response(response.content)
+                if not parsed or 'skills' not in parsed:
+                    logger.warning(f"No skills extracted for lesson {lesson.id}")
+                    return []
+                skills_data = parsed['skills']
+                prereq_titles = parsed.get('lesson_prerequisites', [])
+
             # Create skills
-            skills = self._create_skills(lesson, result['skills'])
-            
+            skills = self._create_skills(lesson, skills_data)
+
             # Create lesson prerequisites
-            if 'lesson_prerequisites' in result:
-                self._create_lesson_prerequisites(lesson, result['lesson_prerequisites'])
-            
+            if prereq_titles:
+                self._create_lesson_prerequisites(lesson, prereq_titles)
+
             logger.info(f"Extracted {len(skills)} skills for lesson '{lesson.title}'")
             return skills
-            
+
         except Exception as e:
             logger.error(f"Error extracting skills for lesson {lesson.id}: {e}")
             return []

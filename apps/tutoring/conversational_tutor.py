@@ -27,6 +27,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
+from pydantic import BaseModel, Field
 from django.utils import timezone
 from django.conf import settings
 
@@ -34,6 +35,23 @@ from apps.curriculum.models import Lesson, LessonStep
 from apps.tutoring.models import TutorSession, SessionTurn, StudentLessonProgress
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# STRUCTURED OUTPUT SCHEMAS
+# =============================================================================
+
+class EvaluationResult(BaseModel):
+    """LLM-returned evaluation of whether a student answered correctly."""
+    correct: bool = Field(description="True if the student answered correctly, False otherwise")
+
+
+class ConceptCoverageResult(BaseModel):
+    """LLM-returned list of exit ticket concept indices that were meaningfully covered."""
+    covered_indices: List[int] = Field(
+        default_factory=list,
+        description="List of 1-based concept numbers that were meaningfully covered, e.g. [1, 3]. Empty if none covered.",
+    )
 
 
 # =============================================================================
@@ -361,6 +379,7 @@ class ConversationalTutor:
         
         # Initialize services
         self._llm_client = None
+        self._instructor_client = None
         self._knowledge_base = None
 
         # Skill assessment and personalization (R2, R3)
@@ -728,14 +747,39 @@ class ConversationalTutor:
             try:
                 from apps.llm.models import ModelConfig
                 from apps.llm.client import get_llm_client
-                
+
                 config = ModelConfig.get_for('tutoring')
                 if config:
                     self._llm_client = get_llm_client(config)
             except Exception as e:
                 logger.error(f"Could not load LLM client: {e}")
         return self._llm_client
-    
+
+    @property
+    def instructor_client(self):
+        """Lazy load instructor-wrapped client for structured LLM output."""
+        if self._instructor_client is None:
+            try:
+                import instructor
+                from apps.llm.models import ModelConfig
+
+                config = ModelConfig.get_for('tutoring')
+                if config:
+                    PROVIDER_MAP = {
+                        'anthropic': 'anthropic',
+                        'openai': 'openai',
+                        'google': 'google',
+                        'local_ollama': 'ollama',
+                    }
+                    provider = PROVIDER_MAP.get(config.provider, config.provider)
+                    self._instructor_client = instructor.from_provider(
+                        f"{provider}/{config.model_name}",
+                        api_key=config.get_api_key(),
+                    )
+            except Exception as e:
+                logger.error(f"Could not load instructor client: {e}")
+        return self._instructor_client
+
     @property
     def knowledge_base(self):
         """Lazy load knowledge base."""
@@ -908,8 +952,8 @@ Keep it to 2-3 sentences."""
             media = [parsed_media]
         elif visual_request:
             media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
-        elif self.step_exchange_count <= 1 and self._get_step_media():
-            # First exchange on this step — auto-attach step media
+        elif self.step_exchange_count <= 2 and self._get_step_media():
+            # Early exchanges on this step — auto-attach step media
             media = self._get_step_media()[:1]
         elif self._get_proactive_media():
             media = self._get_proactive_media()[:1]
@@ -987,8 +1031,8 @@ Keep it to 2-3 sentences."""
             visual_request = self._detect_visual_request(student_input)
             if visual_request:
                 media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
-            elif self.step_exchange_count <= 1 and self._get_step_media():
-                # First exchange on this step — auto-attach step media
+            elif self.step_exchange_count <= 2 and self._get_step_media():
+                # Early exchanges on this step — auto-attach step media
                 media = self._get_step_media()[:1]
             else:
                 media = self._get_proactive_media()[:1]
@@ -1096,16 +1140,17 @@ Keep it to 2-3 sentences."""
         and _finalize_response(), so this method only handles cadence-based
         proactive media.
         """
-        # Only show proactive media in teaching phases
+        # Only show proactive media in teaching/practice phases
         if self.phase not in (
             ConversationPhase.WARMUP,
             ConversationPhase.INTRODUCTION,
             ConversationPhase.INSTRUCTION,
+            ConversationPhase.PRACTICE,
         ):
             return []
 
-        # Only trigger on every 3rd exchange within a phase (1st, 4th, 7th, ...)
-        if self.phase_exchange_count % 3 != 1:
+        # Trigger on odd exchanges within a phase (1st, 3rd, 5th, ...)
+        if self.phase_exchange_count % 2 != 1:
             return []
 
         if self.current_topic_index >= len(self.steps):
@@ -1131,7 +1176,7 @@ Keep it to 2-3 sentences."""
             matches = sum(1 for term in topic_terms if term in img_description)
             relevance = matches / len(topic_terms)
 
-            if relevance >= 0.5:
+            if relevance >= 0.3:
                 media.append({
                     'type': 'image',
                     'url': img['url'],
@@ -1779,6 +1824,15 @@ End with a question. Keep it to 3-4 sentences max."""
         worked_example_block = self._build_worked_example_block()
         interleaved_block = self._build_interleaved_practice_block()
 
+        # Build media reminder if current step has media available
+        media_reminder = ""
+        step_media_ids = getattr(self, '_step_media_ids', {}).get(self.current_topic_index, [])
+        if step_media_ids:
+            media_reminder = (
+                f"\n14. MEDIA AVAILABLE for this step — show it by writing "
+                f"|||MEDIA:{step_media_ids[0]}||| as the VERY LAST line of your response"
+            )
+
         return f"""CONVERSATION CONTEXT:
 {self._format_recent_conversation(5)}
 
@@ -1818,7 +1872,7 @@ Generate your response following these rules:
 10. Watch for COMMON MISTAKES listed in the directive and address them proactively
 11. Weave in local Seychelles context where relevant to make the lesson relatable
 12. END with a question or "Try this:" prompt
-13. Keep it concise (2-4 sentences + question)
+13. Keep it concise (2-4 sentences + question){media_reminder}
 
 YOUR RESPONSE:"""
 
@@ -2353,6 +2407,7 @@ WRAPUP PHASE - Goals:
                     if not uncovered or self.phase == ConversationPhase.PRACTICE:
                         self.phase = next_phase
                         self.phase_exchange_count = 0
+                        self.step_exchange_count = 0
                         logger.info(f"Remediation: Transitioned to phase: {self.phase.value}")
             return
         
@@ -2415,6 +2470,7 @@ WRAPUP PHASE - Goals:
 
             self.phase = next_phase
             self.phase_exchange_count = 0
+            self.step_exchange_count = 0
             logger.info(f"Transitioned to phase: {self.phase.value}")
             return
 
@@ -2422,6 +2478,7 @@ WRAPUP PHASE - Goals:
         if mastery_met or self.phase_exchange_count >= fallback_threshold:
             self.phase = next_phase
             self.phase_exchange_count = 0
+            self.step_exchange_count = 0
             # Reset instruction checks when leaving INSTRUCTION
             if next_phase == ConversationPhase.PRACTICE:
                 self.instruction_checks_correct = 0
@@ -2448,14 +2505,7 @@ WRAPUP PHASE - Goals:
                 summary += f"  - {c['question'][:100]}...\n"
         
         return summary
-        
-        if self.phase in transitions:
-            threshold, next_phase = transitions[self.phase]
-            if self.phase_exchange_count >= threshold:
-                self.phase = next_phase
-                self.phase_exchange_count = 0
-                logger.info(f"Transitioned to phase: {self.phase.value}")
-    
+
     # =========================================================================
     # CONCEPT-BOUNDARY HELPERS
     # =========================================================================
@@ -2551,24 +2601,31 @@ WRAPUP PHASE - Goals:
             if current_topic not in self.student_struggles:
                 self.student_struggles.append(current_topic)
         
-        # Detect success (if tutor praised them)
-        success_signals = ["correct", "excellent", "great", "perfect", "well done", "good job", "exactly", "right"]
-        if any(signal in response_lower for signal in success_signals):
+        # Evaluate correctness: LLM during INSTRUCTION/PRACTICE, keyword fallback otherwise
+        if self.phase in (ConversationPhase.INSTRUCTION, ConversationPhase.PRACTICE):
+            eval_result = self._llm_evaluate_response(student_input, tutor_response)
+        else:
+            eval_result = self._keyword_evaluate_response(tutor_response)
+        is_correct = eval_result['correct']
+
+        # Detect success — update strength tracking
+        if is_correct:
             self.practice_correct += 1
             current_topic = self._get_current_topic()[:50]
             if current_topic not in self.student_strengths:
                 self.student_strengths.append(current_topic)
-        
+
         # Track practice attempts and last-answer correctness
         if self.phase == ConversationPhase.PRACTICE:
             self.practice_total += 1
-            self.last_practice_correct = any(
-                signal in response_lower for signal in success_signals
-            )
+        # Update last_practice_correct during INSTRUCTION too — concept boundary
+        # gating uses this flag to decide whether the student can cross boundaries.
+        if self.phase in (ConversationPhase.INSTRUCTION, ConversationPhase.PRACTICE):
+            self.last_practice_correct = is_correct
 
         # Track comprehension checks in INSTRUCTION (R10)
         if self.phase == ConversationPhase.INSTRUCTION:
-            if any(signal in response_lower for signal in success_signals):
+            if is_correct:
                 self.instruction_checks_correct = getattr(self, 'instruction_checks_correct', 0) + 1
 
         # Record skill practice via SkillAssessmentService (R2)
@@ -2576,13 +2633,9 @@ WRAPUP PHASE - Goals:
             if self.lesson_skills and self.skill_assessment_service:
                 current_skill = self._get_current_skill()
                 if current_skill:
-                    was_correct = any(
-                        signal in response_lower
-                        for signal in success_signals
-                    )
                     self.skill_assessment_service.record_practice(
                         skill=current_skill,
-                        was_correct=was_correct,
+                        was_correct=is_correct,
                         lesson_step=self.steps[self.current_topic_index] if self.current_topic_index < len(self.steps) else None,
                         practice_type='remediation' if self.is_remediation else 'initial',
                         hints_used=0,
@@ -2599,7 +2652,7 @@ WRAPUP PHASE - Goals:
 
         # Advance topic based on step-type completion criteria
         if self.phase in [ConversationPhase.INSTRUCTION, ConversationPhase.PRACTICE]:
-            should_advance = self._should_advance_step(student_input, tutor_response)
+            should_advance = self._should_advance_step(is_correct)
             if should_advance and self.current_topic_index < len(self.steps) - 1:
                     # Check concept boundary gating
                     if self._is_at_concept_boundary():
@@ -2634,8 +2687,67 @@ WRAPUP PHASE - Goals:
                         self.current_topic_index += 1
                         self.step_exchange_count = 0
                         self._step_just_advanced = True
-    
-    def _should_advance_step(self, student_input: str, tutor_response: str) -> bool:
+
+    def _llm_evaluate_response(self, student_input: str, tutor_response: str) -> dict:
+        """Use LLM to semantically evaluate whether the student answered correctly.
+
+        Uses instructor for structured output — returns a validated EvaluationResult.
+        Falls back to keyword matching if the instructor client is unavailable or fails.
+        """
+        if not self.instructor_client:
+            return self._keyword_evaluate_response(tutor_response)
+
+        # Get current step context
+        step = None
+        if self.current_topic_index < len(self.steps):
+            step = self.steps[self.current_topic_index]
+
+        step_context = ""
+        if step:
+            if step.question:
+                step_context += f"Question asked: {step.question}\n"
+            if step.expected_answer:
+                step_context += f"Expected answer: {step.expected_answer}\n"
+            if step.rubric:
+                step_context += f"Rubric: {step.rubric}\n"
+
+        prompt = f"""Evaluate whether the student answered correctly based on the tutor's response.
+
+{step_context}
+Student said: {student_input[:500]}
+
+Tutor replied: {tutor_response[:500]}
+
+Did the student answer correctly?"""
+
+        try:
+            result = self.instructor_client.chat.completions.create(
+                response_model=EvaluationResult,
+                messages=[
+                    {"role": "system", "content": "You are a grading assistant. Evaluate student answers."},
+                    {"role": "user", "content": prompt},
+                ],
+                max_retries=2,
+                max_tokens=50,
+            )
+            logger.info(f"LLM evaluation: {'correct' if result.correct else 'incorrect'} (step {self.current_topic_index})")
+            return {"correct": result.correct}
+        except Exception as e:
+            logger.warning(f"LLM evaluation failed, falling back to keywords: {e}")
+
+        return self._keyword_evaluate_response(tutor_response)
+
+    def _keyword_evaluate_response(self, tutor_response: str) -> dict:
+        """Keyword-based correctness check (fallback for LLM evaluator)."""
+        response_lower = tutor_response.lower()
+        success_signals = [
+            "correct", "excellent", "great", "perfect", "well done",
+            "good job", "exactly", "right",
+        ]
+        is_correct = any(s in response_lower for s in success_signals)
+        return {"correct": is_correct}
+
+    def _should_advance_step(self, student_correct: bool) -> bool:
         """Determine if the current step is complete based on step type.
 
         | Step Type       | Advance When                                          |
@@ -2662,14 +2774,7 @@ WRAPUP PHASE - Goals:
             return exchanges >= 2
 
         if step_type in ('practice', 'quiz'):
-            # Check if student got it right (success signals in tutor response)
-            response_lower = tutor_response.lower()
-            success_signals = [
-                "correct", "excellent", "great", "perfect", "well done",
-                "good job", "exactly", "right",
-            ]
-            answered_correctly = any(s in response_lower for s in success_signals)
-            if answered_correctly:
+            if student_correct:
                 return True
             # Max attempts exhausted (4 exchanges on this practice step)
             return exchanges >= 4
@@ -2728,6 +2833,10 @@ WRAPUP PHASE - Goals:
         if not uncovered:
             return
 
+        if not self.instructor_client:
+            self._keyword_concept_coverage_check(conversation_text)
+            return
+
         # Build concept list for LLM
         concept_descriptions = []
         for i, concept in enumerate(uncovered):
@@ -2744,19 +2853,22 @@ CONVERSATION EXCERPT:
 UNCOVERED CONCEPTS:
 {chr(10).join(concept_descriptions)}
 
-Return ONLY a JSON list of concept numbers that were meaningfully covered, e.g. [1, 3].
-If none were covered, return [].
-"""
+Which concept numbers were meaningfully covered?"""
+
         try:
-            response = self._generate_response(prompt)
-            # Parse the JSON list from the response
-            match = re.search(r'\[[\d,\s]*\]', response)
-            if match:
-                covered_indices = json.loads(match.group())
-                for idx in covered_indices:
-                    if 1 <= idx <= len(uncovered):
-                        uncovered[idx - 1]['covered'] = True
-                        logger.info(f"Concept covered (LLM): {uncovered[idx-1]['question'][:50]}...")
+            result = self.instructor_client.chat.completions.create(
+                response_model=ConceptCoverageResult,
+                messages=[
+                    {"role": "system", "content": "You are an educational assessment assistant. Identify which concepts were covered."},
+                    {"role": "user", "content": prompt},
+                ],
+                max_retries=2,
+                max_tokens=100,
+            )
+            for idx in result.covered_indices:
+                if 1 <= idx <= len(uncovered):
+                    uncovered[idx - 1]['covered'] = True
+                    logger.info(f"Concept covered (LLM): {uncovered[idx-1]['question'][:50]}...")
         except Exception as e:
             logger.warning(f"LLM concept coverage check failed, using keyword fallback: {e}")
             self._keyword_concept_coverage_check(conversation_text)

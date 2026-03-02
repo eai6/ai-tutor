@@ -10,14 +10,28 @@ Design principle: Be generous with correct answers (normalize spacing,
 case, etc.) but accurate. When in doubt, use the LLM grader.
 """
 
+import logging
 import re
 import json
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Literal
 from enum import Enum
+
+from pydantic import BaseModel, Field
 
 from apps.curriculum.models import LessonStep
 from apps.llm.client import BaseLLMClient, LLMResponse
+
+logger = logging.getLogger(__name__)
+
+
+class GradingLLMResult(BaseModel):
+    """Structured LLM grading output."""
+    result: Literal["correct", "partial", "incorrect"] = Field(
+        description="The grading result: correct, partial, or incorrect"
+    )
+    score: float = Field(description="Score from 0.0 to 1.0", ge=0.0, le=1.0)
+    feedback: str = Field(description="Brief, encouraging feedback for the student")
 
 
 class GradeResult(Enum):
@@ -147,6 +161,31 @@ def grade_true_false(student_answer: str, expected_answer: str) -> GradingOutcom
         )
 
 
+def _get_instructor_client():
+    """Get an instructor-wrapped client for structured grading output."""
+    try:
+        import instructor
+        from apps.llm.models import ModelConfig
+
+        config = ModelConfig.get_for('tutoring')
+        if not config:
+            return None
+        PROVIDER_MAP = {
+            'anthropic': 'anthropic',
+            'openai': 'openai',
+            'google': 'google',
+            'local_ollama': 'ollama',
+        }
+        provider = PROVIDER_MAP.get(config.provider, config.provider)
+        return instructor.from_provider(
+            f"{provider}/{config.model_name}",
+            api_key=config.get_api_key(),
+        )
+    except Exception as e:
+        logger.warning(f"Could not create instructor client for grading: {e}")
+        return None
+
+
 def grade_with_llm(
     student_answer: str,
     expected_answer: str,
@@ -157,8 +196,9 @@ def grade_with_llm(
 ) -> GradingOutcome:
     """
     Use LLM to grade free-text answers against a rubric.
-    
-    Returns structured grading with score and feedback.
+
+    Uses instructor for structured output. Falls back to raw LLM + json.loads
+    if instructor is unavailable.
     """
     grading_prompt = f"""You are grading a student's answer. Be encouraging but accurate.
 
@@ -171,47 +211,54 @@ GRADING RUBRIC:
 
 STUDENT'S ANSWER: {student_answer}
 
-Grade this answer and respond in this exact JSON format:
-{{
-    "result": "correct" or "partial" or "incorrect",
-    "score": 0.0 to 1.0,
-    "feedback": "Brief, encouraging feedback for the student"
-}}
-
 Be generous with partial credit if the student shows understanding.
-Respond ONLY with the JSON, no other text.
-"""
-    
+Grade this answer."""
+
+    result_map = {
+        "correct": GradeResult.CORRECT,
+        "partial": GradeResult.PARTIAL,
+        "incorrect": GradeResult.INCORRECT,
+    }
+
     try:
         from apps.llm.prompts import get_prompt_or_default
         grading_sys_prompt = get_prompt_or_default(
             institution_id, 'grading_prompt',
-            "You are a fair, encouraging grader. Respond only with valid JSON.",
-            json_required=True,
+            "You are a fair, encouraging grader.",
         )
+
+        client = _get_instructor_client()
+        if client:
+            result = client.chat.completions.create(
+                response_model=GradingLLMResult,
+                messages=[
+                    {"role": "system", "content": grading_sys_prompt},
+                    {"role": "user", "content": grading_prompt},
+                ],
+                max_retries=2,
+                max_tokens=200,
+            )
+            return GradingOutcome(
+                result=result_map.get(result.result, GradeResult.INCORRECT),
+                feedback=result.feedback,
+                score=result.score,
+            )
+
+        # Fallback: raw LLM call if instructor unavailable
+        logger.warning("Instructor unavailable for grading, using raw LLM call")
         response = llm_client.generate(
-            messages=[{"role": "user", "content": grading_prompt}],
+            messages=[{"role": "user", "content": grading_prompt + '\n\nRespond ONLY with JSON: {"result": "correct"|"partial"|"incorrect", "score": 0.0-1.0, "feedback": "..."}'}],
             system_prompt=grading_sys_prompt,
         )
-        
-        # Parse LLM response
         result_data = json.loads(response.content)
-        
-        result_map = {
-            "correct": GradeResult.CORRECT,
-            "partial": GradeResult.PARTIAL,
-            "incorrect": GradeResult.INCORRECT,
-        }
-        
         return GradingOutcome(
             result=result_map.get(result_data["result"], GradeResult.INCORRECT),
             feedback=result_data.get("feedback", ""),
             score=float(result_data.get("score", 0.0)),
-            details={"llm_response": response.content, "tokens_used": response.tokens_in + response.tokens_out},
         )
-        
-    except (json.JSONDecodeError, KeyError) as e:
-        # Fallback if LLM doesn't return valid JSON
+
+    except Exception as e:
+        logger.warning(f"LLM grading failed: {e}")
         return GradingOutcome(
             result=GradeResult.PARTIAL,
             feedback="Let me take another look at your answer...",
