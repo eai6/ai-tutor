@@ -231,6 +231,21 @@ HOW TO GIVE FEEDBACK ON ANSWERS
    - Never show the answer and move on silently.
 </feedback_protocol>
 
+<principle id="follow_script">
+FOLLOW THE LESSON SCRIPT
+- Each lesson has pre-generated steps with specific content, questions, and media.
+  The CURRENT TEACHING GUIDANCE in every prompt is your script for THIS exchange.
+- For TEACH steps: deliver the provided teaching content using the teacher script.
+  Do not paraphrase loosely or skip key points. Explain it clearly, then ask a
+  comprehension check.
+- For PRACTICE/QUIZ steps: ask the EXACT question provided — do not rephrase it or
+  invent your own question. Grade the student's answer against the expected answer.
+- For WORKED_EXAMPLE steps: walk through the provided example step by step.
+- Do NOT skip ahead to future steps. Do NOT read ahead in the lesson context and
+  jump to a later concept. Stay on the current step until it is complete.
+- When media is attached to a step, show it using the provided |||MEDIA:N||| signal.
+</principle>
+
 <session_structure>
 SESSION FLOW (adapt timing to student pace)
 1. WARMUP (1-2 exchanges): Retrieval practice on a previously learned skill.
@@ -502,6 +517,9 @@ class ConversationalTutor:
         # Concept-boundary gating
         self.concept_boundary_attempts = state.get('concept_boundary_attempts', 0)
 
+        # Step-level exchange tracking
+        self.step_exchange_count = state.get('step_exchange_count', 0)
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -545,6 +563,8 @@ class ConversationalTutor:
             'shown_media_urls': list(getattr(self, 'shown_media_urls', set())),
             # Concept-boundary gating
             'concept_boundary_attempts': getattr(self, 'concept_boundary_attempts', 0),
+            # Step-level exchange tracking
+            'step_exchange_count': getattr(self, 'step_exchange_count', 0),
         }
         self.session.save()
     
@@ -582,7 +602,7 @@ class ConversationalTutor:
             f"UNIT: {self.lesson.unit.title}",
             f"COURSE: {self.lesson.unit.course.title}",
             "",
-            "KEY CONCEPTS TO COVER:",
+            "LESSON OVERVIEW (for reference — follow the CURRENT STEP DIRECTIVE, not this overview):",
         ]
 
         # Collect educational materials across all steps
@@ -856,6 +876,7 @@ Keep it to 2-3 sentences."""
         # Update counts
         self.exchange_count += 1
         self.phase_exchange_count += 1
+        self.step_exchange_count += 1
 
         # Check if student is requesting a visual
         visual_request = self._detect_visual_request(student_input)
@@ -881,13 +902,14 @@ Keep it to 2-3 sentences."""
         # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media = self._parse_media_signal(response)
 
-        # Resolve media: signal > visual request > step-transition > proactive
+        # Resolve media: signal > visual request > first-exchange-on-step > proactive
         media = []
         if parsed_media:
             media = [parsed_media]
         elif visual_request:
             media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
-        elif self._step_just_advanced:
+        elif self.step_exchange_count <= 1 and self._get_step_media():
+            # First exchange on this step — auto-attach step media
             media = self._get_step_media()[:1]
         elif self._get_proactive_media():
             media = self._get_proactive_media()[:1]
@@ -923,6 +945,7 @@ Keep it to 2-3 sentences."""
         # Update counts
         self.exchange_count += 1
         self.phase_exchange_count += 1
+        self.step_exchange_count += 1
 
         # Check if student is requesting a visual
         visual_request = self._detect_visual_request(student_input)
@@ -960,11 +983,12 @@ Keep it to 2-3 sentences."""
         if parsed_media:
             media = [parsed_media]
         elif not media:
-            # Fallback: visual request > step-transition > proactive
+            # Fallback: visual request > first-exchange-on-step > proactive
             visual_request = self._detect_visual_request(student_input)
             if visual_request:
                 media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
-            elif self._step_just_advanced:
+            elif self.step_exchange_count <= 1 and self._get_step_media():
+                # First exchange on this step — auto-attach step media
                 media = self._get_step_media()[:1]
             else:
                 media = self._get_proactive_media()[:1]
@@ -1017,62 +1041,22 @@ Keep it to 2-3 sentences."""
             })
             return
 
-        # Build the prompt (same as _generate_contextual_response)
-        current_guidance = self._get_current_guidance()
-        phase_instructions = self._get_phase_instructions()
-        concept_coverage = self._get_concept_coverage_summary()
-        next_concept = self._get_next_uncovered_concept()
-        student_profile = self._build_student_profile_block()
-        worked_example_block = self._build_worked_example_block()
-        interleaved_block = self._build_interleaved_practice_block()
-
+        # Build the prompt (shared with _generate_contextual_response)
         visual_instructions = ""
         if ctx['media_context']:
             visual_instructions = f"\n{ctx['media_context']}\n"
         elif ctx['visual_requested']:
-            visual_instructions = "\n⚠️ VISUAL REQUESTED BUT NOT AVAILABLE:\nThe student asked for a visual, but no matching image was found.\n- Acknowledge their request\n- Provide a clear verbal description instead\n- Continue with the lesson\n"
+            visual_instructions = (
+                "\n⚠️ VISUAL REQUESTED BUT NOT AVAILABLE:\n"
+                "The student asked for a visual, but no matching image was found.\n"
+                "- Acknowledge their request\n"
+                "- Provide a clear verbal description instead\n"
+                "- Continue with the lesson\n"
+            )
 
-        prompt = f"""CONVERSATION CONTEXT:
-{self._format_recent_conversation(5)}
-
-STUDENT JUST SAID: "{ctx['student_input']}"
-
-LESSON CONTEXT:
-{self.lesson_context}
-
-CURRICULUM KNOWLEDGE:
-{ctx['kb_context']}
-
-CURRENT TEACHING GUIDANCE:
-{current_guidance}
-{visual_instructions}
-{worked_example_block}
-{concept_coverage}
-
-{next_concept}
-
-{interleaved_block}
-
-PHASE: {self.phase.value.upper()}
-{phase_instructions}
-
-{student_profile}
-
-Generate your response following these rules:
-1. RESPOND to what the student said (acknowledge their answer)
-2. If correct: praise specifically, then advance to the next concept
-3. If incorrect: encourage, give a hint, ask a simpler question
-4. If confused: simplify, use an example
-5. PRIORITIZE teaching uncovered exit ticket concepts
-6. If an image is being shown, DESCRIBE WHAT IT ACTUALLY SHOWS
-7. Use KEY VOCABULARY terms naturally
-8. Watch for COMMON MISTAKES and address them proactively
-9. Weave in local Seychelles context where relevant
-10. Use the full HINT LADDER for progressive scaffolding
-11. END with a question or "Try this:" prompt
-12. Keep it concise (2-4 sentences + question)
-
-YOUR RESPONSE:"""
+        prompt = self._build_response_prompt(
+            ctx['student_input'], ctx['kb_context'], visual_instructions
+        )
 
         # Stream from LLM
         full_content = ""
@@ -1108,13 +1092,10 @@ YOUR RESPONSE:"""
 
         Gated by phase and exchange cadence to avoid showing images
         too frequently or during practice/assessment phases.
+        Note: first-exchange-on-step media is handled upstream in respond()
+        and _finalize_response(), so this method only handles cadence-based
+        proactive media.
         """
-        # Always show current step's media on the first INSTRUCTION exchange
-        if self.phase == ConversationPhase.INSTRUCTION and self.phase_exchange_count == 1:
-            step_media = self._get_step_media()[:1]
-            if step_media:
-                return step_media
-
         # Only show proactive media in teaching phases
         if self.phase not in (
             ConversationPhase.WARMUP,
@@ -1779,49 +1760,26 @@ End with a question. Keep it to 3-4 sentences max."""
             logger.warning(f"Failed to build interleaved practice block: {e}")
             return ""
 
-    def _generate_contextual_response(
+    def _build_response_prompt(
         self,
         student_input: str,
         kb_context: str,
-        media_context: str = "",
-        visual_requested: bool = False
+        visual_instructions: str = "",
     ) -> str:
-        """Generate a response based on student input and context."""
-        
-        # Get current step guidance
+        """Build the LLM user prompt for generating a tutoring response.
+
+        Shared by _generate_contextual_response() and respond_stream()
+        to prevent the two copies from diverging.
+        """
         current_guidance = self._get_current_guidance()
-        
-        # Build phase-specific instructions
         phase_instructions = self._get_phase_instructions()
-        
-        # Get concept coverage status - CRITICAL for guiding instruction
         concept_coverage = self._get_concept_coverage_summary()
-        
-        # Get the next uncovered concept to focus on
         next_concept = self._get_next_uncovered_concept()
-        
-        # Build visual instructions
-        visual_instructions = ""
-        if media_context:
-            visual_instructions = f"""
-{media_context}
-"""
-        elif visual_requested:
-            visual_instructions = """
-⚠️ VISUAL REQUESTED BUT NOT AVAILABLE:
-The student asked for a visual, but no matching image was found.
-- Acknowledge their request
-- Provide a clear verbal description instead
-- Suggest they could sketch it themselves
-- Continue with the lesson
-"""
-        
-        # Build enriched context blocks (R11, R14, R6)
         student_profile = self._build_student_profile_block()
         worked_example_block = self._build_worked_example_block()
         interleaved_block = self._build_interleaved_practice_block()
 
-        prompt = f"""CONVERSATION CONTEXT:
+        return f"""CONVERSATION CONTEXT:
 {self._format_recent_conversation(5)}
 
 STUDENT JUST SAID: "{student_input}"
@@ -1832,7 +1790,7 @@ LESSON CONTEXT:
 CURRICULUM KNOWLEDGE:
 {kb_context}
 
-CURRENT TEACHING GUIDANCE:
+CURRENT STEP DIRECTIVE (follow this exactly):
 {current_guidance}
 {visual_instructions}
 {worked_example_block}
@@ -1848,21 +1806,43 @@ PHASE: {self.phase.value.upper()}
 {student_profile}
 
 Generate your response following these rules:
-1. RESPOND to what the student said (acknowledge their answer)
-2. If correct: praise specifically, then advance to the next concept
-3. If incorrect: encourage, give a hint, ask a simpler question
-4. If confused: simplify, use an example
-5. PRIORITIZE teaching uncovered exit ticket concepts
-6. If an image is being shown, DESCRIBE WHAT IT ACTUALLY SHOWS - don't make up features
-7. Use KEY VOCABULARY terms naturally in your explanation — introduce and define them
-8. Watch for COMMON MISTAKES listed in the guidance and address them proactively
-9. Weave in local Seychelles context where relevant to make the lesson relatable
-10. Use the full HINT LADDER (hint 1 → 2 → 3) for progressive scaffolding — don't jump to the answer
-11. END with a question or "Try this:" prompt
-12. Keep it concise (2-4 sentences + question)
+1. EXECUTE the CURRENT STEP DIRECTIVE above — deliver its content, ask its question, or walk through its example
+2. Do NOT skip ahead, invent your own questions, or deviate from the current step
+3. For PRACTICE/QUIZ steps: ask the EXACT question provided, then grade the answer
+4. RESPOND to what the student said (acknowledge their answer)
+5. If correct: praise specifically, then continue the current step or prepare for the next
+6. If incorrect: encourage, give a hint from the HINT LADDER, ask again
+7. If confused: simplify, use an example from the step content
+8. If an image is being shown, DESCRIBE WHAT IT ACTUALLY SHOWS - don't make up features
+9. Use KEY VOCABULARY terms naturally in your explanation — introduce and define them
+10. Watch for COMMON MISTAKES listed in the directive and address them proactively
+11. Weave in local Seychelles context where relevant to make the lesson relatable
+12. END with a question or "Try this:" prompt
+13. Keep it concise (2-4 sentences + question)
 
 YOUR RESPONSE:"""
 
+    def _generate_contextual_response(
+        self,
+        student_input: str,
+        kb_context: str,
+        media_context: str = "",
+        visual_requested: bool = False
+    ) -> str:
+        """Generate a response based on student input and context."""
+        visual_instructions = ""
+        if media_context:
+            visual_instructions = f"\n{media_context}\n"
+        elif visual_requested:
+            visual_instructions = (
+                "\n⚠️ VISUAL REQUESTED BUT NOT AVAILABLE:\n"
+                "The student asked for a visual, but no matching image was found.\n"
+                "- Acknowledge their request\n"
+                "- Provide a clear verbal description instead\n"
+                "- Continue with the lesson\n"
+            )
+
+        prompt = self._build_response_prompt(student_input, kb_context, visual_instructions)
         return self._generate_response(prompt)
     
     def _get_next_uncovered_concept(self) -> str:
@@ -1901,19 +1881,19 @@ Guide your teaching to help them truly understand this concept!"""
         
         # Normal flow - get any uncovered concept
         uncovered = self._get_uncovered_concepts()
-        
+
         if not uncovered:
             return "All exit ticket concepts have been covered! Focus on reinforcement and practice."
-        
+
         # Get the first uncovered concept
         concept = uncovered[0]
-        
-        return f"""PRIORITY CONCEPT TO TEACH NEXT:
+
+        return f"""UPCOMING EXIT TICKET CONCEPT (for awareness):
 Question students will face: "{concept['question']}"
 Correct answer: "{concept['correct_text']}"
 Key understanding needed: "{concept.get('explanation', 'Understand this concept thoroughly')}"
 
-Guide your teaching toward helping the student understand this concept!"""
+Follow the current step; this concept will be covered in sequence."""
     
     def _generate_response(self, prompt: str) -> str:
         """Call the LLM to generate a response."""
@@ -2121,90 +2101,111 @@ Guide your teaching toward helping the student understand this concept!"""
             return "Previous topics not available."
     
     def _get_current_guidance(self) -> str:
-        """Get guidance from current lesson step."""
-        if self.current_topic_index < len(self.steps):
-            step = self.steps[self.current_topic_index]
+        """Get step-type-aware guidance with full content for the current lesson step."""
+        if self.current_topic_index >= len(self.steps):
+            return "All planned topics covered. Move to wrap-up."
 
-            guidance = f"Current topic: {step.step_type}\n"
-            guidance += f"Content: {step.teacher_script[:300]}...\n" if step.teacher_script else ""
+        step = self.steps[self.current_topic_index]
+        step_num = self.current_topic_index + 1
+        total_steps = len(self.steps)
+        step_type = (step.step_type or 'teach').upper()
+        teacher_script = (step.teacher_script or '')[:2000]
 
+        parts = [f"=== CURRENT STEP: {step_num}/{total_steps} [{step_type}] ==="]
+
+        # Step-type-specific task directive + content
+        if step.step_type == 'teach':
+            parts.append("YOUR TASK: Deliver this teaching content. Explain clearly, then ask a comprehension check.")
+            parts.append(f"\nCONTENT TO TEACH:\n{teacher_script}")
+        elif step.step_type == 'worked_example':
+            parts.append("YOUR TASK: Walk through this worked example step by step, then ask the student to explain a step back.")
+            parts.append(f"\nEXAMPLE:\n{teacher_script}")
+        elif step.step_type in ('practice', 'quiz'):
+            parts.append("YOUR TASK: Ask the EXACT question below verbatim, then grade the student's answer against the expected answer.")
             if step.question:
-                guidance += f"Suggested question: {step.question}\n"
+                parts.append(f"\nQUESTION (ask verbatim): {step.question}")
             if step.expected_answer:
-                guidance += f"Expected answer: {step.expected_answer}\n"
-
-            # Full hint ladder
-            hints = [h for h in [step.hint_1, step.hint_2, step.hint_3] if h]
-            if hints:
-                guidance += "Hint ladder (use progressively if student is stuck):\n"
-                for j, hint in enumerate(hints, 1):
-                    guidance += f"  Hint {j}: {hint}\n"
-
-            # Rubric for grading
-            if step.rubric:
-                guidance += f"Rubric: {step.rubric[:200]}\n"
-
-            # Answer type and choices
+                parts.append(f"EXPECTED ANSWER: {step.expected_answer}")
             if step.answer_type and step.answer_type != 'none':
-                guidance += f"Answer type: {step.answer_type}\n"
+                parts.append(f"ANSWER TYPE: {step.answer_type}")
             if step.choices:
-                guidance += f"Choices: {step.choices}\n"
+                parts.append(f"CHOICES: {step.choices}")
+        elif step.step_type == 'summary':
+            parts.append("YOUR TASK: Summarize the key takeaways, then confirm the student understands.")
+            if teacher_script:
+                parts.append(f"\nSUMMARY POINTS:\n{teacher_script}")
+        else:
+            # Fallback for any other step type
+            parts.append(f"YOUR TASK: Deliver this content and check understanding.")
+            if teacher_script:
+                parts.append(f"\nCONTENT:\n{teacher_script}")
 
-            # Educational content for this step
-            ed = step.educational_content if isinstance(step.educational_content, dict) else {}
+        # Hint ladder (for practice/quiz steps, or any step with hints)
+        hints = [h for h in [step.hint_1, step.hint_2, step.hint_3] if h]
+        if hints:
+            parts.append("\nHINT LADDER (use progressively if student is stuck):")
+            for j, hint in enumerate(hints, 1):
+                parts.append(f"  Hint {j}: {hint}")
 
-            vocab = ed.get('key_vocabulary', [])
-            if vocab:
-                terms = []
-                for t in vocab:
-                    terms.append(t.get('term', str(t)) if isinstance(t, dict) else str(t))
-                guidance += f"Key vocabulary: {', '.join(terms)}\n"
+        # Rubric for grading
+        if step.rubric:
+            parts.append(f"\nRUBRIC: {step.rubric[:300]}")
 
-            mistakes = ed.get('common_mistakes', [])
-            if mistakes:
-                items = []
-                for m in mistakes:
-                    items.append(m.get('mistake', m.get('description', str(m))) if isinstance(m, dict) else str(m))
-                guidance += f"Common mistakes: {'; '.join(items)}\n"
+        # Media for this step
+        step_media_ids = getattr(self, '_step_media_ids', {}).get(self.current_topic_index, [])
+        if step_media_ids:
+            id_list = ', '.join(str(mid) for mid in step_media_ids)
+            parts.append(f"\nMEDIA: Show |||MEDIA:{step_media_ids[0]}||| when explaining this content. (Available IDs: [{id_list}])")
 
-            sey_ctx = ed.get('seychelles_context', '')
-            if sey_ctx:
-                guidance += f"Seychelles context: {sey_ctx[:200]}\n"
+        # Educational content
+        ed = step.educational_content if isinstance(step.educational_content, dict) else {}
 
-            key_points = ed.get('key_points', [])
-            if key_points:
-                guidance += f"Key points: {'; '.join(str(p) for p in key_points)}\n"
+        vocab = ed.get('key_vocabulary', [])
+        if vocab:
+            terms = []
+            for t in vocab:
+                terms.append(t.get('term', str(t)) if isinstance(t, dict) else str(t))
+            parts.append(f"\nKEY VOCABULARY: {', '.join(terms)}")
 
-            # Teaching strategies from curriculum context
-            cur = step.curriculum_context if isinstance(step.curriculum_context, dict) else {}
-            strategies = cur.get('teaching_strategies', [])
-            if strategies:
-                guidance += f"Teaching strategies: {'; '.join(str(s) for s in strategies)}\n"
+        mistakes = ed.get('common_mistakes', [])
+        if mistakes:
+            items = []
+            for m in mistakes:
+                items.append(m.get('mistake', m.get('description', str(m))) if isinstance(m, dict) else str(m))
+            parts.append(f"COMMON MISTAKES: {'; '.join(items)}")
 
-            # Tell LLM which media catalog items belong to this step
-            step_media_ids = getattr(self, '_step_media_ids', {}).get(self.current_topic_index, [])
-            if step_media_ids:
-                id_list = ', '.join(str(mid) for mid in step_media_ids)
-                guidance += f"Media for this step: catalog IDs [{id_list}]. "
-                guidance += "Show one using |||MEDIA:N||| when explaining this step's content.\n"
+        sey_ctx = ed.get('seychelles_context', '')
+        if sey_ctx:
+            parts.append(f"SEYCHELLES CONTEXT: {sey_ctx[:200]}")
 
-            # Concept block position info
-            concept_tag = getattr(step, 'concept_tag', '') or ''
-            if concept_tag:
-                block = self._get_current_concept_block()
-                if block:
-                    pos = block['step_indices'].index(self.current_topic_index) + 1
-                    total = len(block['step_indices'])
-                    guidance += f"\nConcept block: step {pos}/{total} in '{concept_tag}'\n"
-                    if self._is_at_concept_boundary():
-                        guidance += (
-                            "⚠️ CONCEPT GATE: Student must answer the practice check "
-                            "correctly before you move to the next concept.\n"
-                        )
+        key_points = ed.get('key_points', [])
+        if key_points:
+            parts.append(f"KEY POINTS: {'; '.join(str(p) for p in key_points)}")
 
-            return guidance
+        # Teaching strategies from curriculum context
+        cur = step.curriculum_context if isinstance(step.curriculum_context, dict) else {}
+        strategies = cur.get('teaching_strategies', [])
+        if strategies:
+            parts.append(f"TEACHING STRATEGIES: {'; '.join(str(s) for s in strategies)}")
 
-        return "All planned topics covered. Move to wrap-up."
+        # Concept block position info
+        concept_tag = getattr(step, 'concept_tag', '') or ''
+        if concept_tag:
+            block = self._get_current_concept_block()
+            if block:
+                pos = block['step_indices'].index(self.current_topic_index) + 1
+                total = len(block['step_indices'])
+                parts.append(f"\nCONCEPT BLOCK: step {pos}/{total} in '{concept_tag}'")
+                if self._is_at_concept_boundary():
+                    parts.append(
+                        "CONCEPT GATE: Student must answer the practice check "
+                        "correctly before you move to the next concept."
+                    )
+
+        # Step exchange info
+        parts.append(f"\nExchanges on this step: {self.step_exchange_count}")
+
+        return "\n".join(parts)
     
     def _get_current_topic(self) -> str:
         """Get the current topic being discussed."""
@@ -2596,10 +2597,10 @@ WRAPUP PHASE - Goals:
         else:
             self._keyword_concept_coverage_check(combined_text)
 
-        # Advance topic if making progress
+        # Advance topic based on step-type completion criteria
         if self.phase in [ConversationPhase.INSTRUCTION, ConversationPhase.PRACTICE]:
-            if self.phase_exchange_count > 0 and self.phase_exchange_count % 2 == 0:
-                if self.current_topic_index < len(self.steps) - 1:
+            should_advance = self._should_advance_step(student_input, tutor_response)
+            if should_advance and self.current_topic_index < len(self.steps) - 1:
                     # Check concept boundary gating
                     if self._is_at_concept_boundary():
                         boundary_attempts = getattr(self, 'concept_boundary_attempts', 0)
@@ -2607,12 +2608,14 @@ WRAPUP PHASE - Goals:
                             # Passed — cross boundary, reset attempts
                             self.concept_boundary_attempts = 0
                             self.current_topic_index += 1
+                            self.step_exchange_count = 0
                             self._step_just_advanced = True
                             logger.info(f"Concept boundary crossed at step {self.current_topic_index}")
                         elif boundary_attempts >= 4:
                             # Safety valve — advance anyway after 4 failed attempts
                             self.concept_boundary_attempts = 0
                             self.current_topic_index += 1
+                            self.step_exchange_count = 0
                             self._step_just_advanced = True
                             logger.info(f"Safety valve: forced concept boundary crossing after {boundary_attempts} attempts")
                         else:
@@ -2629,8 +2632,54 @@ WRAPUP PHASE - Goals:
                     else:
                         # No boundary or empty tags — advance normally
                         self.current_topic_index += 1
+                        self.step_exchange_count = 0
                         self._step_just_advanced = True
     
+    def _should_advance_step(self, student_input: str, tutor_response: str) -> bool:
+        """Determine if the current step is complete based on step type.
+
+        | Step Type       | Advance When                                          |
+        |-----------------|-------------------------------------------------------|
+        | teach           | 2+ exchanges (content delivered + student responded)   |
+        | worked_example  | 2+ exchanges                                          |
+        | practice / quiz | Correct answer detected OR max attempts (4) exhausted  |
+        | summary         | 1+ exchange                                           |
+        | Safety valve    | 6 exchanges on ANY step type                          |
+        """
+        if self.current_topic_index >= len(self.steps):
+            return False
+
+        step = self.steps[self.current_topic_index]
+        step_type = step.step_type or 'teach'
+        exchanges = self.step_exchange_count
+
+        # Safety valve: always advance after 6 exchanges on any step
+        if exchanges >= 6:
+            logger.info(f"Safety valve: advancing step {self.current_topic_index} after {exchanges} exchanges")
+            return True
+
+        if step_type in ('teach', 'worked_example'):
+            return exchanges >= 2
+
+        if step_type in ('practice', 'quiz'):
+            # Check if student got it right (success signals in tutor response)
+            response_lower = tutor_response.lower()
+            success_signals = [
+                "correct", "excellent", "great", "perfect", "well done",
+                "good job", "exactly", "right",
+            ]
+            answered_correctly = any(s in response_lower for s in success_signals)
+            if answered_correctly:
+                return True
+            # Max attempts exhausted (4 exchanges on this practice step)
+            return exchanges >= 4
+
+        if step_type == 'summary':
+            return exchanges >= 1
+
+        # Unknown step type — fallback to 2 exchanges
+        return exchanges >= 2
+
     def _keyword_concept_coverage_check(self, conversation_text: str):
         """
         Check concept coverage using keyword matching (fast fallback for R12).
