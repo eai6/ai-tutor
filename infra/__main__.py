@@ -240,6 +240,8 @@ container_app = app.ContainerApp(
                         name="CSRF_TRUSTED_ORIGINS",
                         value=Output.concat("https://", container_app_name, ".", env.default_domain),
                     ),
+                    app.EnvironmentVarArgs(name="POSTHOG_DISABLED", value="true"),
+                    app.EnvironmentVarArgs(name="INSTRUCTOR_TELEMETRY", value="false"),
                 ],
                 volume_mounts=[
                     app.VolumeMountArgs(
