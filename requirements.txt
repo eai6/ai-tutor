@@ -48,7 +48,7 @@ ipython==9.10.0
 ipython_pygments_lexers==1.1.1
 jedi==0.19.2
 Jinja2==3.1.6
-jiter==0.13.0
+jiter>=0.6.1,<0.12
 joblib==1.5.3
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
