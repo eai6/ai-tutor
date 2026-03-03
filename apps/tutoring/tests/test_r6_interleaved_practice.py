@@ -1,11 +1,11 @@
-"""Tests for R6: InterleavedPracticeService wired into PRACTICE phase."""
+"""Tests for R6: InterleavedPracticeService wired into practice/quiz steps."""
 
 from unittest.mock import patch, MagicMock
 from apps.tutoring.tests.fixtures import BaseTutoringTestCase
 
 
 class TestR6InterleavedPractice(BaseTutoringTestCase):
-    """Test that interleaved review questions are injected during PRACTICE."""
+    """Test that interleaved review questions are injected during practice/quiz steps."""
 
     def test_tutor_has_interleaved_practice_method(self):
         """ConversationalTutor should have _build_interleaved_practice_block."""
@@ -16,20 +16,21 @@ class TestR6InterleavedPractice(BaseTutoringTestCase):
         self.assertTrue(hasattr(tutor, '_build_interleaved_practice_block'))
 
     def test_interleaved_block_empty_outside_practice(self):
-        """Block should be empty when not in PRACTICE phase."""
-        from apps.tutoring.conversational_tutor import ConversationalTutor, ConversationPhase
+        """Block should be empty when not on a practice/quiz step."""
+        from apps.tutoring.conversational_tutor import ConversationalTutor, SessionState
 
-        session = self._create_session(engine_state={'phase': 'instruction'})
+        session = self._create_session(engine_state={'session_state': 'tutoring'})
         tutor = ConversationalTutor(session)
-        self.assertEqual(tutor.phase, ConversationPhase.INSTRUCTION)
+        self.assertEqual(tutor.session_state, SessionState.TUTORING)
 
+        # With current_topic_index pointing at a teach step, block should be empty
         block = tutor._build_interleaved_practice_block()
         self.assertEqual(block, "")
 
     @patch('apps.tutoring.personalization.InterleavedPracticeService')
-    def test_interleaved_block_in_practice_phase(self, mock_svc_cls):
-        """Block should contain review questions during PRACTICE phase."""
-        from apps.tutoring.conversational_tutor import ConversationalTutor, ConversationPhase
+    def test_interleaved_block_in_practice_step(self, mock_svc_cls):
+        """Block should contain review questions during a practice step."""
+        from apps.tutoring.conversational_tutor import ConversationalTutor, SessionState
 
         # Build mock return data matching actual structure: item['type'] == 'review', item['step']
         mock_step = MagicMock()
@@ -49,7 +50,11 @@ class TestR6InterleavedPractice(BaseTutoringTestCase):
         ]
         mock_svc_cls.return_value = mock_svc
 
-        session = self._create_session(engine_state={'phase': 'practice'})
+        # Point current_topic_index at a practice step (step2 is index 1)
+        session = self._create_session(engine_state={
+            'session_state': 'tutoring',
+            'current_topic_index': 1,
+        })
         tutor = ConversationalTutor(session)
 
         block = tutor._build_interleaved_practice_block()
@@ -71,7 +76,11 @@ class TestR6InterleavedPractice(BaseTutoringTestCase):
         ]
         mock_svc_cls.return_value = mock_svc
 
-        session = self._create_session(engine_state={'phase': 'practice'})
+        # Point current_topic_index at a practice step (step2 is index 1)
+        session = self._create_session(engine_state={
+            'session_state': 'tutoring',
+            'current_topic_index': 1,
+        })
         tutor = ConversationalTutor(session)
 
         block1 = tutor._build_interleaved_practice_block()
@@ -88,7 +97,11 @@ class TestR6InterleavedPractice(BaseTutoringTestCase):
         """Block should return empty string if service fails."""
         from apps.tutoring.conversational_tutor import ConversationalTutor
 
-        session = self._create_session(engine_state={'phase': 'practice'})
+        # Point current_topic_index at a practice step (step2 is index 1)
+        session = self._create_session(engine_state={
+            'session_state': 'tutoring',
+            'current_topic_index': 1,
+        })
         tutor = ConversationalTutor(session)
 
         with patch('apps.tutoring.personalization.InterleavedPracticeService') as mock_cls:

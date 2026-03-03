@@ -392,6 +392,27 @@ body {
 .artifact-thumb:hover { border-color: #a1a1aa; }
 .artifact-thumb.active { border-color: #18181b; }
 
+/* ── History Separator ── */
+.history-separator {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    max-width: 768px;
+    width: 100%;
+    margin: 0.5rem auto;
+    color: #a1a1aa;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.history-separator::before,
+.history-separator::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e4e4e7;
+}
+
 /* ── Typing Indicator ── */
 .typing-indicator {
     display: none;
@@ -606,6 +627,16 @@ const userInput = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
 const phaseBadge = document.getElementById('phase-badge');
 
+// Phase label mapping (5E model phases + session states)
+const phaseLabels = {
+    engage: 'Engage', explore: 'Explore', explain: 'Explain',
+    practice: 'Practice', evaluate: 'Evaluate',
+    exit_ticket: 'Exit Quiz', completed: 'Completed',
+};
+function phaseLabel(phase) {
+    return phaseLabels[phase] || phase.replace('_', ' ');
+}
+
 // Artifact panel elements & state
 const artifactPanel = document.getElementById('artifact-panel');
 const artifactBody = document.getElementById('artifact-body');
@@ -682,9 +713,26 @@ userInput.addEventListener('keydown', e => {
     }
 });
 
+function renderHistory(history) {
+    if (!history || history.length === 0) return;
+
+    // Render each prior turn
+    for (const turn of history) {
+        const role = turn.role === 'student' ? 'student' : 'tutor';
+        addMessage(role, turn.content);
+    }
+
+    // Add a visual separator between history and new messages
+    const sep = document.createElement('div');
+    sep.className = 'history-separator';
+    sep.innerHTML = '<span>earlier messages</span>';
+    chatMessages.insertBefore(sep, typing);
+    scrollToBottom();
+}
+
 async function startSession() {
     showTyping(true);
-    
+
     try {
         const response = await fetch(`/tutor/api/chat/start/${lessonId}/`, {
             method: 'POST',
@@ -693,22 +741,38 @@ async function startSession() {
                 'X-CSRFToken': getCookie('csrftoken'),
             },
         });
-        
+
         const data = await response.json();
-        
+
         if (data.error) {
             showTyping(false);
-            addMessage('tutor', '❌ ' + data.error);
+            addMessage('tutor', data.error);
             return;
         }
-        
+
         sessionId = data.session_id;
+
+        // Render conversation history if present (resume or completed)
+        if (data.history && data.history.length > 0) {
+            renderHistory(data.history);
+        }
+
+        // For completed sessions with review available, show completion modal
+        if (data.review_available) {
+            showTyping(false);
+            if (data.phase) {
+                phaseBadge.textContent = phaseLabel(data.phase);
+            }
+            showCompletion(data.message);
+            return;
+        }
+
         handleResponse(data);
-        
+
     } catch (error) {
         console.error('Start error:', error);
         showTyping(false);
-        addMessage('tutor', '❌ Failed to start. Please refresh.');
+        addMessage('tutor', 'Failed to start. Please refresh.');
     }
 }
 
@@ -717,7 +781,7 @@ function handleResponse(data) {
     
     // Update phase badge
     if (data.phase) {
-        phaseBadge.textContent = data.phase.replace('_', ' ');
+        phaseBadge.textContent = phaseLabel(data.phase);
     }
     
     // Add tutor message
@@ -820,7 +884,7 @@ async function sendMessage() {
         addMessage('tutor', data.message, data.media || []);
 
         if (data.phase) {
-            phaseBadge.textContent = data.phase.replace('_', ' ');
+            phaseBadge.textContent = phaseLabel(data.phase);
         }
         if (data.show_exit_ticket && data.exit_ticket) {
             exitTicketData = data.exit_ticket;
@@ -1003,7 +1067,7 @@ async function startReview() {
         showTyping(false);
 
         if (data.phase) {
-            phaseBadge.textContent = data.phase.replace('_', ' ');
+            phaseBadge.textContent = phaseLabel(data.phase);
         }
         addMessage('tutor', data.message, data.media || []);
         userInput.focus();

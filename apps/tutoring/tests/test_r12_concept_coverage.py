@@ -1,7 +1,8 @@
 """Tests for R12: LLM-based concept coverage assessment."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, PropertyMock
 from apps.tutoring.tests.fixtures import BaseTutoringTestCase
+from apps.tutoring.conversational_tutor import ConceptCoverageResult
 
 
 class TestR12ConceptCoverage(BaseTutoringTestCase):
@@ -73,9 +74,8 @@ class TestR12ConceptCoverage(BaseTutoringTestCase):
         tutor._keyword_concept_coverage_check("unrelated text")
         self.assertTrue(tutor.exit_ticket_concepts[0]['covered'])
 
-    @patch('apps.tutoring.conversational_tutor.ConversationalTutor._generate_response')
-    def test_llm_coverage_marks_concepts(self, mock_gen):
-        """LLM check should mark concepts based on LLM's JSON response."""
+    def test_llm_coverage_marks_concepts(self):
+        """LLM check should mark concepts based on instructor structured response."""
         tutor = self._make_tutor()
 
         tutor.exit_ticket_concepts = [
@@ -83,15 +83,17 @@ class TestR12ConceptCoverage(BaseTutoringTestCase):
             {'id': 2, 'question': 'Q2 about oceans', 'covered': False},
         ]
 
-        mock_gen.return_value = "Based on the conversation, [1] was covered."
+        # Mock instructor_client to return a ConceptCoverageResult indicating concept 1 covered
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = ConceptCoverageResult(covered_indices=[1])
+        tutor._instructor_client = mock_client
 
         tutor._llm_concept_coverage_check("We discussed mountain formation extensively.")
 
         self.assertTrue(tutor.exit_ticket_concepts[0]['covered'])
         self.assertFalse(tutor.exit_ticket_concepts[1]['covered'])
 
-    @patch('apps.tutoring.conversational_tutor.ConversationalTutor._generate_response')
-    def test_llm_coverage_fallback_on_error(self, mock_gen):
+    def test_llm_coverage_fallback_on_error(self):
         """LLM check should fall back to keyword matching on error."""
         tutor = self._make_tutor()
 
@@ -105,7 +107,10 @@ class TestR12ConceptCoverage(BaseTutoringTestCase):
             }
         ]
 
-        mock_gen.side_effect = Exception("LLM error")
+        # Mock instructor_client so that chat.completions.create raises an exception
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = Exception("LLM error")
+        tutor._instructor_client = mock_client
 
         # Text with matching keywords - should still work via fallback
         tutor._llm_concept_coverage_check(

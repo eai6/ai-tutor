@@ -59,11 +59,14 @@ class TestR2SkillAssessmentWiring(BaseTutoringTestCase):
 
     def test_analyze_student_response_records_skill_on_success(self):
         """_analyze_student_response should call skill_assessment_service.record_practice."""
-        from apps.tutoring.conversational_tutor import ConversationalTutor, ConversationPhase
+        from apps.tutoring.conversational_tutor import ConversationalTutor, SessionState
 
-        session = self._create_session(engine_state={'phase': 'practice'})
+        session = self._create_session(engine_state={
+            'session_state': 'tutoring',
+            'current_topic_index': 1,
+        })
         tutor = ConversationalTutor(session)
-        tutor.phase = ConversationPhase.PRACTICE
+        tutor.session_state = SessionState.TUTORING
 
         mock_svc = MagicMock()
         tutor._skill_assessment_service = mock_svc
@@ -82,11 +85,14 @@ class TestR2SkillAssessmentWiring(BaseTutoringTestCase):
 
     def test_analyze_student_response_records_incorrect(self):
         """_analyze_student_response should record was_correct=False on incorrect answers."""
-        from apps.tutoring.conversational_tutor import ConversationalTutor, ConversationPhase
+        from apps.tutoring.conversational_tutor import ConversationalTutor, SessionState
 
-        session = self._create_session(engine_state={'phase': 'practice'})
+        session = self._create_session(engine_state={
+            'session_state': 'tutoring',
+            'current_topic_index': 1,
+        })
         tutor = ConversationalTutor(session)
-        tutor.phase = ConversationPhase.PRACTICE
+        tutor.session_state = SessionState.TUTORING
 
         mock_svc = MagicMock()
         tutor._skill_assessment_service = mock_svc
@@ -104,14 +110,17 @@ class TestR2SkillAssessmentWiring(BaseTutoringTestCase):
 
     def test_conversational_tutor_graceful_without_skills(self):
         """ConversationalTutor should work even when no skills exist for lesson."""
-        from apps.tutoring.conversational_tutor import ConversationalTutor, ConversationPhase
+        from apps.tutoring.conversational_tutor import ConversationalTutor, SessionState
 
         # Remove skill-lesson associations
         self.skill1.lessons.remove(self.lesson)
         self.skill2.lessons.remove(self.lesson)
 
         try:
-            session = self._create_session(engine_state={'phase': 'practice'})
+            session = self._create_session(engine_state={
+                'session_state': 'tutoring',
+                'current_topic_index': 1,
+            })
             tutor = ConversationalTutor(session)
 
             # Should not raise
@@ -120,4 +129,3 @@ class TestR2SkillAssessmentWiring(BaseTutoringTestCase):
             # Restore
             self.skill1.lessons.add(self.lesson)
             self.skill2.lessons.add(self.lesson)
-

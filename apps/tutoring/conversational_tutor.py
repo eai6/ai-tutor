@@ -46,6 +46,13 @@ class EvaluationResult(BaseModel):
     correct: bool = Field(description="True if the student answered correctly, False otherwise")
 
 
+class StepEvaluationResult(BaseModel):
+    """Merged evaluator: answer correctness + step completion in one call."""
+    answer_correct: bool = Field(description="Did the student answer correctly?")
+    step_complete: bool = Field(description="Is this step done — ready to advance?")
+    reasoning: str = Field(default="", description="Brief explanation (for logging)")
+
+
 class ConceptCoverageResult(BaseModel):
     """LLM-returned list of exit ticket concept indices that were meaningfully covered."""
     covered_indices: List[int] = Field(
@@ -265,22 +272,16 @@ FOLLOW THE LESSON SCRIPT
 </principle>
 
 <session_structure>
-SESSION FLOW (adapt timing to student pace)
-1. WARMUP (1-2 exchanges): Retrieval practice on a previously learned skill.
-   If [WARMUP RETRIEVAL] questions are provided, use them. Otherwise, ask a
-   quick recall question related to a prerequisite of today's lesson.
-2. INTRODUCTION (2-3 exchanges): State the learning objective. Connect to prior
-   knowledge. Preview what the student will be able to do by the end.
-3. INSTRUCTION (6-10 exchanges): For each concept:
-   a) Teach the concept with direct instruction + worked example
-   b) Ask a practice check question
-   c) Only advance to next concept when student answers correctly
-   If the student fails the concept check, reteach briefly and re-ask.
-4. PRACTICE (4-6 exchanges): Student solves problems with decreasing support.
-   Mix in interleaved review questions if provided. Track accuracy.
-5. WRAPUP (1-2 exchanges): Summarise key takeaways. Preview next session.
-   Check concept coverage before proceeding to exit ticket.
-6. EXIT TICKET: Present assessment. No hints, no scaffolding.
+SESSION FLOW
+You follow a sequence of lesson steps. Each step has a type and a 5E phase
+(engage, explore, explain, practice, evaluate).
+Execute the CURRENT STEP DIRECTIVE completely before the system advances you.
+For teach steps: deliver the content, ask a comprehension check.
+For practice/quiz: ask the exact question, grade the answer.
+For worked_example: walk through step by step.
+For summary: state key takeaways, confirm understanding.
+Do NOT skip ahead or rush. The system controls advancement.
+After all steps are complete, the system will trigger the EXIT TICKET.
 </session_structure>
 
 <safety>
@@ -308,14 +309,11 @@ a different approach -- no rush."
 # DATA STRUCTURES
 # =============================================================================
 
-class ConversationPhase(Enum):
-    WARMUP = "warmup"
-    INTRODUCTION = "introduction"  
-    INSTRUCTION = "instruction"
-    PRACTICE = "practice"
-    WRAPUP = "wrapup"
-    EXIT_TICKET = "exit_ticket"
-    COMPLETED = "completed"
+class SessionState(Enum):
+    """Minimal session state — steps are the single source of truth."""
+    TUTORING = "tutoring"        # Working through lesson steps
+    EXIT_TICKET = "exit_ticket"  # Exit ticket modal active
+    COMPLETED = "completed"      # Session finished
 
 
 @dataclass
@@ -498,34 +496,38 @@ class ConversationalTutor:
         return selected[:count]
     
     def _load_state(self):
-        """Load session state."""
+        """Load session state (backward compatible with old phase-based state)."""
         state = self.session.engine_state or {}
-        
-        phase_str = state.get('phase', 'warmup')
-        try:
-            self.phase = ConversationPhase(phase_str)
-        except ValueError:
-            self.phase = ConversationPhase.WARMUP
-        
+
+        # Load session_state — backward compat: map old phase values
+        state_str = state.get('session_state', state.get('phase', 'tutoring'))
+        if state_str in ('warmup', 'introduction', 'instruction', 'practice', 'wrapup'):
+            self.session_state = SessionState.TUTORING
+        elif state_str == 'exit_ticket':
+            self.session_state = SessionState.EXIT_TICKET
+        elif state_str == 'completed':
+            self.session_state = SessionState.COMPLETED
+        else:
+            try:
+                self.session_state = SessionState(state_str)
+            except ValueError:
+                self.session_state = SessionState.TUTORING
+
         self.exchange_count = state.get('exchange_count', 0)
-        self.phase_exchange_count = state.get('phase_exchange_count', 0)
         self.concepts_covered = state.get('concepts_covered', [])
         self.student_struggles = state.get('student_struggles', [])
         self.student_strengths = state.get('student_strengths', [])
         self.current_topic_index = state.get('current_topic_index', 0)
         self.practice_correct = state.get('practice_correct', 0)
         self.practice_total = state.get('practice_total', 0)
-        
+
         # Remediation state
         self.is_remediation = state.get('is_remediation', False)
         self.remediation_attempt = state.get('remediation_attempt', 0)
         self.failed_exit_questions = state.get('failed_exit_questions', [])
 
-        # Mastery-based transition tracking (R10)
-        self.instruction_checks_correct = state.get('instruction_checks_correct', 0)
-
-        # Track whether last practice answer was correct (P4-1)
-        self.last_practice_correct = state.get('last_practice_correct', False)
+        # Track whether last answer was correct
+        self.last_answer_correct = state.get('last_practice_correct', False)
 
         # Review mode flag (P4-2)
         self.is_review = state.get('is_review', False)
@@ -538,6 +540,9 @@ class ConversationalTutor:
 
         # Step-level exchange tracking
         self.step_exchange_count = state.get('step_exchange_count', 0)
+
+        # Step media delivery flag
+        self._step_needs_media = state.get('step_needs_media', False)
 
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
@@ -557,9 +562,9 @@ class ConversationalTutor:
         ]
 
         self.session.engine_state = {
-            'phase': self.phase.value,
+            'session_state': self.session_state.value,
+            'display_phase': self._get_display_phase(),
             'exchange_count': self.exchange_count,
-            'phase_exchange_count': self.phase_exchange_count,
             'concepts_covered': self.concepts_covered,
             'student_struggles': self.student_struggles,
             'student_strengths': self.student_strengths,
@@ -572,10 +577,8 @@ class ConversationalTutor:
             'is_remediation': getattr(self, 'is_remediation', False),
             'remediation_attempt': getattr(self, 'remediation_attempt', 0),
             'failed_exit_questions': getattr(self, 'failed_exit_questions', []),
-            # Mastery-based transition tracking (R10)
-            'instruction_checks_correct': getattr(self, 'instruction_checks_correct', 0),
-            # Track whether last practice answer was correct (P4-1)
-            'last_practice_correct': getattr(self, 'last_practice_correct', False),
+            # Track whether last answer was correct
+            'last_practice_correct': getattr(self, 'last_answer_correct', False),
             # Review mode flag (P4-2)
             'is_review': getattr(self, 'is_review', False),
             # Media deduplication (P2)
@@ -584,6 +587,8 @@ class ConversationalTutor:
             'concept_boundary_attempts': getattr(self, 'concept_boundary_attempts', 0),
             # Step-level exchange tracking
             'step_exchange_count': getattr(self, 'step_exchange_count', 0),
+            # Step media delivery flag
+            'step_needs_media': getattr(self, '_step_needs_media', False),
         }
         self.session.save()
     
@@ -856,18 +861,18 @@ class ConversationalTutor:
     
     def resume(self) -> TutorMessage:
         """Resume an existing conversation."""
-        if self.phase == ConversationPhase.COMPLETED and not getattr(self, 'is_review', False):
+        if self.session_state == SessionState.COMPLETED and not self.is_review:
             return TutorMessage(
-                content="🎉 You've already completed this lesson! Great work!",
+                content="You've already completed this lesson! Great work!",
                 phase="completed",
                 is_complete=True,
             )
-        
+
         # Generate a "welcome back" message
         last_exchange = self.conversation[-1] if self.conversation else None
-        
+
         prompt = f"""The student is returning to continue the lesson.
-        
+
 Last message in conversation: {last_exchange['content'][:200] if last_exchange else 'None'}
 
 Generate a brief, warm welcome back message that:
@@ -878,31 +883,87 @@ Generate a brief, warm welcome back message that:
 Keep it to 2-3 sentences."""
 
         response = self._generate_response(prompt)
+
+        # Persist the welcome-back message so it survives future resumes
+        self._save_turn("tutor", response)
+        self.conversation.append({"role": "assistant", "content": response})
+
         return self._create_message(response)
 
     def start_review(self) -> TutorMessage:
         """Start a review session for a completed lesson.
 
-        Resets phase to PRACTICE, clears practice counters, and returns
-        an opening review message.
+        Re-activates the session so chat_respond allows messages through,
+        uses RemediationService to identify weak skills, and starts an
+        instruction-phase remediation flow.
         """
-        self.phase = ConversationPhase.PRACTICE
+        # Bug fix: re-activate so chat_respond doesn't block with "already complete"
+        self.session.status = TutorSession.Status.ACTIVE
+        self.session.ended_at = None
+
+        # Use remediation system for targeted review
+        self.session_state = SessionState.TUTORING
         self.practice_correct = 0
         self.practice_total = 0
-        self.phase_exchange_count = 0
-        self.last_practice_correct = False
+        self.last_answer_correct = False
         self.is_review = True
+        self.is_remediation = True
+
+        # Use RemediationService to identify weak skills
+        weak_skills = []
+        try:
+            from apps.tutoring.personalization import RemediationService
+            remediation_service = RemediationService(self.student, self.lesson)
+            self._remediation_plan = remediation_service.get_remediation_plan(
+                exit_ticket_score=0.8,  # They passed, reviewing for mastery
+            )
+            if self._remediation_plan and self._remediation_plan.get('weak_skills'):
+                weak_skills = [s.name for s in self._remediation_plan['weak_skills'][:5]]
+            elif self._remediation_plan and self._remediation_plan.get('prerequisite_gaps'):
+                weak_skills = [s.name for s in self._remediation_plan['prerequisite_gaps'][:5]]
+        except Exception as e:
+            logger.warning(f"Failed to get remediation plan for review: {e}")
+            self._remediation_plan = None
 
         self._save_state()
+        self.session.save()
 
-        content = (
-            "Let's review! I'll ask you some practice questions on "
-            f"**{self.lesson.title}** to make sure everything stuck. Ready?"
-        )
+        # Generate a targeted opening message
+        content = self._generate_review_opening(weak_skills)
         self._save_turn("tutor", content)
         self.conversation.append({"role": "assistant", "content": content})
 
         return self._create_message(content)
+
+    def _generate_review_opening(self, weak_skills: list) -> str:
+        """Generate a review opening that references specific weak areas."""
+        if weak_skills:
+            skills_text = ", ".join(weak_skills[:3])
+            prompt = f"""The student has completed this lesson and is returning to review it.
+They want to strengthen their understanding.
+
+Lesson: {self.lesson.title}
+Areas to focus on: {skills_text}
+
+Generate a warm, encouraging opening that:
+1. Welcomes them back for review
+2. Mentions the specific areas we'll focus on: {skills_text}
+3. Starts with a question about one of these areas
+
+Keep it to 3-4 sentences. Be specific about what we'll review."""
+        else:
+            prompt = f"""The student has completed this lesson and is returning to review it.
+
+Lesson: {self.lesson.title}
+
+Generate a warm, encouraging opening that:
+1. Welcomes them back for review
+2. Says we'll go through the key concepts again
+3. Starts with a question about the main topic
+
+Keep it to 3-4 sentences."""
+
+        return self._generate_response(prompt)
 
     def respond(self, student_input: str) -> TutorMessage:
         """
@@ -919,21 +980,17 @@ Keep it to 2-3 sentences."""
 
         # Update counts
         self.exchange_count += 1
-        self.phase_exchange_count += 1
         self.step_exchange_count += 1
+
+        # Check if exit ticket phase
+        if self.session_state == SessionState.EXIT_TICKET:
+            return self._handle_exit_ticket()
 
         # Check if student is requesting a visual
         visual_request = self._detect_visual_request(student_input)
 
         # Get curriculum context from knowledge base
         kb_context = self._get_knowledge_context(student_input)
-
-        # Check if we should transition phases
-        self._maybe_transition_phase()
-
-        # Generate response based on current phase
-        if self.phase == ConversationPhase.EXIT_TICKET:
-            return self._handle_exit_ticket()
 
         # Generate response — LLM picks media via |||MEDIA:N||| tail-line signal
         response = self._generate_contextual_response(
@@ -946,15 +1003,16 @@ Keep it to 2-3 sentences."""
         # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media = self._parse_media_signal(response)
 
-        # Resolve media: signal > visual request > first-exchange-on-step > proactive
+        # Resolve media: signal > visual request > step-needs-media > proactive
         media = []
         if parsed_media:
             media = [parsed_media]
         elif visual_request:
             media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
-        elif self.step_exchange_count <= 2 and self._get_step_media():
-            # Early exchanges on this step — auto-attach step media
+        elif getattr(self, '_step_needs_media', False) and self._get_step_media():
+            # Deterministic: first exchange of a new step — auto-attach step media
             media = self._get_step_media()[:1]
+            self._step_needs_media = False
         elif self._get_proactive_media():
             media = self._get_proactive_media()[:1]
 
@@ -963,6 +1021,31 @@ Keep it to 2-3 sentences."""
 
         # Analyze student response for adaptation
         self._analyze_student_response(student_input, clean_response)
+
+        # Check if all steps complete — trigger exit ticket
+        if self.current_topic_index >= len(self.steps) and self.session_state == SessionState.TUTORING:
+            self.session_state = SessionState.EXIT_TICKET
+            self._save_state()
+            # Save tutor response first, then return exit ticket
+            self._save_turn("tutor", clean_response)
+            self.conversation.append({"role": "assistant", "content": clean_response})
+            return self._handle_exit_ticket()
+
+        # Remediation: check if all failed concepts re-covered
+        if getattr(self, 'is_remediation', False) and self._remediation_steps_complete():
+            self.session_state = SessionState.EXIT_TICKET
+            self._save_state()
+            self._save_turn("tutor", clean_response)
+            self.conversation.append({"role": "assistant", "content": clean_response})
+            return self._handle_exit_ticket()
+
+        # Remediation safety valve: force exit ticket after 15 remediation exchanges
+        if getattr(self, 'is_remediation', False) and self.exchange_count >= 15:
+            self.session_state = SessionState.EXIT_TICKET
+            self._save_state()
+            self._save_turn("tutor", clean_response)
+            self.conversation.append({"role": "assistant", "content": clean_response})
+            return self._handle_exit_ticket()
 
         # Save state
         self._save_state()
@@ -977,8 +1060,8 @@ Keep it to 2-3 sentences."""
         """
         Shared pre-generation logic for respond() and respond_stream().
 
-        Saves student turn, updates counts, builds prompt context, checks
-        phase transitions. Returns context dict, or None if exit_ticket phase.
+        Saves student turn, updates counts, builds prompt context.
+        Returns context dict, or None if exit_ticket phase.
         """
         self._step_just_advanced = False
 
@@ -988,7 +1071,6 @@ Keep it to 2-3 sentences."""
 
         # Update counts
         self.exchange_count += 1
-        self.phase_exchange_count += 1
         self.step_exchange_count += 1
 
         # Check if student is requesting a visual
@@ -997,11 +1079,8 @@ Keep it to 2-3 sentences."""
         # Get curriculum context from knowledge base
         kb_context = self._get_knowledge_context(student_input)
 
-        # Check if we should transition phases
-        self._maybe_transition_phase()
-
         # Exit ticket is handled separately (non-streamable)
-        if self.phase == ConversationPhase.EXIT_TICKET:
+        if self.session_state == SessionState.EXIT_TICKET:
             return None
 
         # No pre-selected media — LLM picks via |||MEDIA:N||| in its output
@@ -1027,13 +1106,13 @@ Keep it to 2-3 sentences."""
         if parsed_media:
             media = [parsed_media]
         elif not media:
-            # Fallback: visual request > first-exchange-on-step > proactive
+            # Fallback: visual request > step-needs-media > proactive
             visual_request = self._detect_visual_request(student_input)
             if visual_request:
                 media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
-            elif self.step_exchange_count <= 2 and self._get_step_media():
-                # Early exchanges on this step — auto-attach step media
+            elif getattr(self, '_step_needs_media', False) and self._get_step_media():
                 media = self._get_step_media()[:1]
+                self._step_needs_media = False
             else:
                 media = self._get_proactive_media()[:1]
 
@@ -1043,6 +1122,30 @@ Keep it to 2-3 sentences."""
         # Analyze student response for adaptation
         self._analyze_student_response(student_input, clean_content)
 
+        # Check if all steps complete — trigger exit ticket
+        show_exit_ticket = False
+        exit_ticket = None
+        if self.current_topic_index >= len(self.steps) and self.session_state == SessionState.TUTORING:
+            self.session_state = SessionState.EXIT_TICKET
+            show_exit_ticket = True
+
+        # Remediation: check if all failed concepts re-covered
+        if (not show_exit_ticket and getattr(self, 'is_remediation', False)
+                and self._remediation_steps_complete()):
+            self.session_state = SessionState.EXIT_TICKET
+            show_exit_ticket = True
+
+        # Remediation safety valve
+        if (not show_exit_ticket and getattr(self, 'is_remediation', False)
+                and self.exchange_count >= 15):
+            self.session_state = SessionState.EXIT_TICKET
+            show_exit_ticket = True
+
+        if show_exit_ticket:
+            et_msg = self._handle_exit_ticket()
+            exit_ticket = et_msg.exit_ticket_data
+            show_exit_ticket = et_msg.show_exit_ticket
+
         # Save state
         self._save_state()
 
@@ -1051,12 +1154,12 @@ Keep it to 2-3 sentences."""
         self.conversation.append({"role": "assistant", "content": clean_content})
 
         return {
-            'phase': self.phase.value,
+            'phase': self._get_display_phase(),
             'media': media,
             'clean_content': clean_content,
-            'show_exit_ticket': False,
-            'exit_ticket': None,
-            'is_complete': self.phase == ConversationPhase.COMPLETED,
+            'show_exit_ticket': show_exit_ticket,
+            'exit_ticket': exit_ticket,
+            'is_complete': self.session_state == SessionState.COMPLETED,
         }
 
     def respond_stream(self, student_input: str):
@@ -1140,17 +1243,12 @@ Keep it to 2-3 sentences."""
         and _finalize_response(), so this method only handles cadence-based
         proactive media.
         """
-        # Only show proactive media in teaching/practice phases
-        if self.phase not in (
-            ConversationPhase.WARMUP,
-            ConversationPhase.INTRODUCTION,
-            ConversationPhase.INSTRUCTION,
-            ConversationPhase.PRACTICE,
-        ):
+        # Only show proactive media during tutoring
+        if self.session_state != SessionState.TUTORING:
             return []
 
-        # Trigger on odd exchanges within a phase (1st, 3rd, 5th, ...)
-        if self.phase_exchange_count % 2 != 1:
+        # Trigger on odd exchanges within a step (1st, 3rd, 5th, ...)
+        if self.step_exchange_count % 2 != 1:
             return []
 
         if self.current_topic_index >= len(self.steps):
@@ -1633,7 +1731,15 @@ End with a question. Keep it to 3-4 sentences max."""
         self.conversation.append({"role": "assistant", "content": response})
         self._save_state()
 
-        return self._create_message(response)
+        msg = self._create_message(response)
+
+        # Auto-attach step 0 media to opening message
+        if self.steps and not msg.media:
+            step_media = self._get_step_media()
+            if step_media:
+                msg.media = self._deduplicate_media(step_media[:1])
+
+        return msg
     
     def _build_student_profile_block(self) -> str:
         """Build [STUDENT PROFILE] context block with mastery data (R11)."""
@@ -1702,8 +1808,9 @@ End with a question. Keep it to 3-4 sentences max."""
             return ""
 
     def _build_worked_example_block(self) -> str:
-        """Build [WORKED EXAMPLE] context block for INSTRUCTION phase (R14)."""
-        if self.phase != ConversationPhase.INSTRUCTION:
+        """Build [WORKED EXAMPLE] context block for teach/worked_example steps (R14)."""
+        step = self.steps[self.current_topic_index] if self.current_topic_index < len(self.steps) else None
+        if not step or step.step_type not in ('teach', 'worked_example'):
             return ""
 
         if self.current_topic_index >= len(self.steps):
@@ -1754,8 +1861,9 @@ End with a question. Keep it to 3-4 sentences max."""
         return "\n".join(lines)
 
     def _build_interleaved_practice_block(self) -> str:
-        """Build [INTERLEAVED PRACTICE] context block for PRACTICE phase (R6)."""
-        if self.phase != ConversationPhase.PRACTICE:
+        """Build [INTERLEAVED PRACTICE] context block for practice/quiz steps (R6)."""
+        step = self.steps[self.current_topic_index] if self.current_topic_index < len(self.steps) else None
+        if not step or step.step_type not in ('practice', 'quiz'):
             return ""
 
         # Use cached block if available
@@ -1817,12 +1925,18 @@ End with a question. Keep it to 3-4 sentences max."""
         to prevent the two copies from diverging.
         """
         current_guidance = self._get_current_guidance()
-        phase_instructions = self._get_phase_instructions()
+        step_phase_instructions = self._get_step_phase_instructions()
         concept_coverage = self._get_concept_coverage_summary()
         next_concept = self._get_next_uncovered_concept()
         student_profile = self._build_student_profile_block()
         worked_example_block = self._build_worked_example_block()
         interleaved_block = self._build_interleaved_practice_block()
+
+        # Step progress indicator
+        step_num = min(self.current_topic_index + 1, len(self.steps))
+        total_steps = len(self.steps)
+        display_phase = self._get_display_phase().upper()
+        step_progress = f"STEP PROGRESS: {step_num}/{total_steps} | Phase: {display_phase}"
 
         # Build media reminder if current step has media available
         media_reminder = ""
@@ -1854,8 +1968,8 @@ CURRENT STEP DIRECTIVE (follow this exactly):
 
 {interleaved_block}
 
-PHASE: {self.phase.value.upper()}
-{phase_instructions}
+{step_progress}
+{step_phase_instructions}
 
 {student_profile}
 
@@ -2205,11 +2319,15 @@ Follow the current step; this concept will be covered in sequence."""
         if step.rubric:
             parts.append(f"\nRUBRIC: {step.rubric[:300]}")
 
-        # Media for this step
+        # Media for this step — strengthened to REQUIRED
         step_media_ids = getattr(self, '_step_media_ids', {}).get(self.current_topic_index, [])
         if step_media_ids:
-            id_list = ', '.join(str(mid) for mid in step_media_ids)
-            parts.append(f"\nMEDIA: Show |||MEDIA:{step_media_ids[0]}||| when explaining this content. (Available IDs: [{id_list}])")
+            media_dict = getattr(self, '_media_id_map', {}).get(step_media_ids[0], {})
+            media_desc = media_dict.get('alt', '') or media_dict.get('caption', '')
+            parts.append(f"\nMEDIA (REQUIRED): Write |||MEDIA:{step_media_ids[0]}||| as the LAST line.")
+            if media_desc:
+                parts.append(f"The image shows: {media_desc}")
+                parts.append("Reference this image in your explanation — describe what the student should observe.")
 
         # Educational content
         ed = step.educational_content if isinstance(step.educational_content, dict) else {}
@@ -2284,206 +2402,153 @@ Follow the current step; this concept will be covered in sequence."""
         return "\n".join(formatted) if formatted else "Conversation just started."
     
     # =========================================================================
-    # PHASE MANAGEMENT
+    # SESSION STATE & STEP EVALUATION
     # =========================================================================
-    
-    def _get_phase_instructions(self) -> str:
-        """Get instructions specific to current phase."""
-        # Get uncovered concepts count
-        uncovered_count = len(self._get_uncovered_concepts())
-        total_concepts = len(self.exit_ticket_concepts)
-        
-        # Check if we're in remediation mode
+
+    def _get_display_phase(self) -> str:
+        """Get the display phase from the current step's 5E phase label."""
+        if self.session_state == SessionState.TUTORING:
+            if self.current_topic_index < len(self.steps):
+                step = self.steps[self.current_topic_index]
+                return getattr(step, 'phase', '') or 'explain'
+            return 'explain'
+        return self.session_state.value  # "exit_ticket" or "completed"
+
+    def _evaluate_step(self, student_input: str, tutor_response: str) -> Optional[StepEvaluationResult]:
+        """Merged LLM evaluator: answer correctness + step completion in one call.
+
+        Step-type-specific prompts:
+        - teach: complete when content delivered + comprehension check answered correctly
+        - worked_example: complete when example walked through + student explained a step back
+        - practice/quiz: complete when answered correctly OR exhausted max_attempts
+        - summary: complete when key points stated + student acknowledged
+        """
+        if not self.instructor_client:
+            return None
+
+        if self.current_topic_index >= len(self.steps):
+            return None
+
+        step = self.steps[self.current_topic_index]
+        step_type = step.step_type or 'teach'
+
+        # Build step context
+        step_context_parts = [f"Step type: {step_type}"]
+        if step.teacher_script:
+            step_context_parts.append(f"Teacher script: {step.teacher_script[:500]}")
+        if step.question:
+            step_context_parts.append(f"Question: {step.question}")
+        if step.expected_answer:
+            step_context_parts.append(f"Expected answer: {step.expected_answer}")
+        step_context_parts.append(f"Exchanges on this step: {self.step_exchange_count}")
+
+        # Step-type-specific completion criteria
+        criteria = {
+            'teach': "Complete when the teaching content has been delivered AND the student answered a comprehension check correctly.",
+            'worked_example': "Complete when the example has been walked through AND the student explained a step back correctly.",
+            'practice': "Complete when the student answered the question correctly.",
+            'quiz': "Complete when the student answered the question correctly.",
+            'summary': "Complete when the key points have been stated AND the student acknowledged understanding.",
+        }
+        completion_criteria = criteria.get(step_type, criteria['teach'])
+
+        # Last 4 conversation turns for context
+        recent = self.conversation[-(4*2):] if len(self.conversation) > 4 else self.conversation
+        convo_text = "\n".join(
+            f"{'TUTOR' if m['role'] == 'assistant' else 'STUDENT'}: {m['content'][:200]}"
+            for m in recent
+        )
+
+        prompt = f"""Evaluate this tutoring exchange.
+
+STEP CONTEXT:
+{chr(10).join(step_context_parts)}
+
+COMPLETION CRITERIA: {completion_criteria}
+
+RECENT CONVERSATION:
+{convo_text}
+
+STUDENT JUST SAID: {student_input[:500]}
+TUTOR REPLIED: {tutor_response[:500]}
+
+1. Did the student answer correctly (if a question was asked)?
+2. Is this step complete — should the system advance to the next step?"""
+
+        try:
+            result = self.instructor_client.chat.completions.create(
+                response_model=StepEvaluationResult,
+                messages=[
+                    {"role": "system", "content": "You are a tutoring step evaluator. Assess answer correctness and step completion."},
+                    {"role": "user", "content": prompt},
+                ],
+                max_retries=2,
+                max_tokens=150,
+            )
+            logger.info(
+                f"Step eval [{step_type}] step={self.current_topic_index}: "
+                f"correct={result.answer_correct}, complete={result.step_complete}, "
+                f"reason={result.reasoning[:80]}"
+            )
+            return result
+        except Exception as e:
+            logger.warning(f"Step evaluation failed: {e}")
+            return None
+
+    def _get_step_phase_instructions(self) -> str:
+        """Minimal step-context instructions (replaces _get_phase_instructions).
+
+        Returns remediation guidance when in remediation mode,
+        light context for engage/summary phases, empty otherwise.
+        """
         is_remediation = getattr(self, 'is_remediation', False)
         failed_count = len(getattr(self, 'failed_exit_questions', []))
         attempt = getattr(self, 'remediation_attempt', 0)
-        
+
         if is_remediation:
-            # Build prerequisite gap context from remediation plan (R5)
             prereq_gap_context = ""
             remediation_plan = getattr(self, '_remediation_plan', None)
             if remediation_plan and remediation_plan.get('prerequisite_gaps'):
                 gap_names = [s.name for s in remediation_plan['prerequisite_gaps'][:5]]
                 prereq_gap_context = f"""
 PREREQUISITE GAPS DETECTED:
-The student may be struggling because they have gaps in these prerequisite skills:
 {chr(10).join(f'  - {name}' for name in gap_names)}
 Address these gaps FIRST before re-teaching the failed concepts.
 """
-            # Special remediation instructions
             return f"""
-🎯 REMEDIATION MODE (Attempt #{attempt})
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-The student failed the exit ticket and is reviewing the {failed_count} concepts they got wrong.
+REMEDIATION MODE (Attempt #{attempt})
+The student failed the exit ticket and is reviewing {failed_count} concepts they got wrong.
 {prereq_gap_context}
-YOUR GOALS:
-1. Focus ONLY on the concepts they missed - don't re-teach everything
-2. Use DIFFERENT explanations than before - they didn't understand the first time
-3. Use more examples, analogies, and visual descriptions
-4. Break concepts into smaller steps
-5. Check understanding frequently with mini-questions
-6. Be encouraging - failing is part of learning!
+Focus ONLY on missed concepts. Use DIFFERENT explanations than before.
+Break concepts into smaller steps. Be encouraging."""
 
-PHASE: {self.phase.value.upper()}
-Concepts to re-teach: {uncovered_count} remaining
+        # Light context based on step position
+        if self.current_topic_index < len(self.steps):
+            step = self.steps[self.current_topic_index]
+            phase = getattr(step, 'phase', '') or ''
 
-After covering all failed concepts, move to a short practice phase, then back to exit ticket.
-Keep the remediation focused and efficient - aim for understanding, not speed."""
-        
-        # Normal phase instructions
-        instructions = {
-            ConversationPhase.WARMUP: """
-WARMUP PHASE - Goals:
-- Build rapport and confidence
-- Review one concept from previous learning
-- Transition: After 1-2 successful exchanges, move to INTRODUCTION""",
-            
-            ConversationPhase.INTRODUCTION: f"""
-INTRODUCTION PHASE - Goals:
-- Hook student interest with real-world relevance
-- Find out what they already know
-- Preview what they'll learn: There are {total_concepts} key concepts to master
-- Transition: After student shows interest/engagement, move to INSTRUCTION""",
-            
-            ConversationPhase.INSTRUCTION: f"""
-INSTRUCTION PHASE - Goals:
-- Teach the EXIT TICKET CONCEPTS through questions, not lectures
-- Focus on uncovered concepts: {uncovered_count} of {total_concepts} still need to be taught
-- Use worked examples that directly relate to exit ticket questions
-- Show diagrams/media when available
-- Check understanding before moving to next concept
-- Transition: After covering key concepts (aim for all {total_concepts}), move to PRACTICE""",
-            
-            ConversationPhase.PRACTICE: f"""
-PRACTICE PHASE - Goals:
-- Have student practice problems similar to EXIT TICKET questions
-- Concepts still uncovered: {uncovered_count} - prioritize these!
-- Scaffold with hints if they struggle
-- Track correct/incorrect responses
-- Make sure student can answer questions like the ones on the exit ticket
-- Transition: After 3-5 practice exchanges AND most concepts covered, move to WRAPUP""",
-            
-            ConversationPhase.WRAPUP: f"""
-WRAPUP PHASE - Goals:
-- Have student summarize what they learned
-- Review any EXIT TICKET concepts that seem weak
-- Concepts covered: {total_concepts - uncovered_count}/{total_concepts}
-- Praise their effort specifically
-- Prepare them for the exit quiz
-- Transition: After student summarizes, move to EXIT_TICKET""",
-        }
-        
-        result = instructions.get(self.phase, "Continue the conversation naturally.")
+            if phase == 'engage' or self.current_topic_index <= 1:
+                return "Build rapport, connect to prior knowledge, preview the lesson."
 
-        # Append one-shot override if set (e.g., reteach after wrong answer)
-        override = getattr(self, 'phase_instruction_override', None)
-        if override:
-            result += f"\n\n⚠️ IMMEDIATE PRIORITY: {override}"
-            self.phase_instruction_override = None  # consume it
+            if step.step_type == 'summary' or phase == 'evaluate':
+                return "Summarize key takeaways. Prepare student for the exit quiz."
 
-        return result
+        return ""  # The step directive is sufficient
 
-    def _maybe_transition_phase(self):
-        """Check if we should transition to next phase."""
-        
-        # Check if we're in remediation mode
-        is_remediation = getattr(self, 'is_remediation', False)
-        
-        if is_remediation:
-            # Shorter remediation flow: INSTRUCTION → PRACTICE → EXIT_TICKET
-            remediation_transitions = {
-                ConversationPhase.INSTRUCTION: (4, ConversationPhase.PRACTICE),  # Shorter instruction
-                ConversationPhase.PRACTICE: (3, ConversationPhase.EXIT_TICKET),  # Shorter practice, skip wrapup
-            }
-            
-            if self.phase in remediation_transitions:
-                threshold, next_phase = remediation_transitions[self.phase]
-                
-                # Check if all failed concepts are now covered
-                uncovered = self._get_uncovered_concepts()
-                
-                if self.phase_exchange_count >= threshold:
-                    if not uncovered or self.phase == ConversationPhase.PRACTICE:
-                        self.phase = next_phase
-                        self.phase_exchange_count = 0
-                        self.step_exchange_count = 0
-                        logger.info(f"Remediation: Transitioned to phase: {self.phase.value}")
-            return
-        
-        # Mastery-based transitions with exchange-count fallbacks (R10)
-        # INSTRUCTION → PRACTICE: when 2+ comprehension checks correct (fallback: 8 exchanges)
-        # PRACTICE → WRAPUP: when ≥70% accuracy on 3+ questions (fallback: 7 exchanges)
-        # Other transitions remain exchange-count based
-        fallback_transitions = {
-            ConversationPhase.WARMUP: (2, ConversationPhase.INTRODUCTION),
-            ConversationPhase.INTRODUCTION: (3, ConversationPhase.INSTRUCTION),
-            ConversationPhase.INSTRUCTION: (12, ConversationPhase.PRACTICE),
-            ConversationPhase.PRACTICE: (7, ConversationPhase.WRAPUP),
-            ConversationPhase.WRAPUP: (2, ConversationPhase.EXIT_TICKET),
-        }
+    def _remediation_steps_complete(self) -> bool:
+        """Check if all failed exit ticket concepts have been re-covered during remediation."""
+        if not getattr(self, 'is_remediation', False):
+            return False
 
-        if self.phase not in fallback_transitions:
-            return
+        failed_ids = {fq['id'] for fq in getattr(self, 'failed_exit_questions', [])}
+        if not failed_ids:
+            return True
 
-        fallback_threshold, next_phase = fallback_transitions[self.phase]
+        for concept in self.exit_ticket_concepts:
+            if concept['id'] in failed_ids and not concept.get('covered'):
+                return False
+        return True
 
-        # Special check before exit ticket: ensure concepts are covered
-        if next_phase == ConversationPhase.EXIT_TICKET:
-            uncovered = self._get_uncovered_concepts()
-            if uncovered and self.phase_exchange_count < fallback_threshold + 3:
-                logger.info(f"Delaying exit ticket - {len(uncovered)} concepts uncovered")
-                return
-
-        # Check mastery-based criteria first (R10)
-        mastery_met = False
-        if self.phase == ConversationPhase.INSTRUCTION:
-            checks_correct = getattr(self, 'instruction_checks_correct', 0)
-            if checks_correct >= 2:
-                mastery_met = True
-                logger.info(f"Mastery transition INSTRUCTION→PRACTICE: {checks_correct} checks correct")
-        elif self.phase == ConversationPhase.PRACTICE:
-            if self.practice_total >= 3:
-                accuracy = self.practice_correct / self.practice_total
-                if accuracy >= 0.7:
-                    mastery_met = True
-                    logger.info(f"Mastery transition PRACTICE→WRAPUP: {accuracy:.0%} accuracy on {self.practice_total} questions")
-
-        # Gate PRACTICE→WRAPUP: don't transition if last answer was wrong (P4-1)
-        if self.phase == ConversationPhase.PRACTICE and next_phase == ConversationPhase.WRAPUP:
-            last_correct = getattr(self, 'last_practice_correct', True)
-            # Safety valve: always transition after 12 practice exchanges
-            if self.practice_total >= 12:
-                logger.info("Safety valve: forcing PRACTICE→WRAPUP after 12 practice questions")
-            elif (mastery_met or self.phase_exchange_count >= fallback_threshold) and not last_correct:
-                # Mastery met but last answer wrong — stay and reteach
-                logger.info("Delaying PRACTICE→WRAPUP: last answer was incorrect, reteaching")
-                self.phase_instruction_override = (
-                    "The student just got that wrong. Briefly reteach the concept "
-                    "and ask another practice question before moving on."
-                )
-                return
-            elif mastery_met or self.phase_exchange_count >= fallback_threshold:
-                pass  # Allow transition below
-            else:
-                return  # Neither mastery nor fallback reached
-
-            self.phase = next_phase
-            self.phase_exchange_count = 0
-            self.step_exchange_count = 0
-            logger.info(f"Transitioned to phase: {self.phase.value}")
-            return
-
-        # Transition if mastery criteria met OR fallback threshold reached
-        if mastery_met or self.phase_exchange_count >= fallback_threshold:
-            self.phase = next_phase
-            self.phase_exchange_count = 0
-            self.step_exchange_count = 0
-            # Reset instruction checks when leaving INSTRUCTION
-            if next_phase == ConversationPhase.PRACTICE:
-                self.instruction_checks_correct = 0
-            logger.info(f"Transitioned to phase: {self.phase.value}")
-    
     def _get_uncovered_concepts(self) -> List[Dict]:
         """Get list of exit ticket concepts not yet covered."""
         return [c for c in self.exit_ticket_concepts if not c.get('covered')]
@@ -2574,7 +2639,7 @@ WRAPUP PHASE - Goals:
 
         Uses the success signals from the most recent tutor response.
         """
-        return getattr(self, 'last_practice_correct', False)
+        return getattr(self, 'last_answer_correct', False)
 
     def _get_current_concept_block(self) -> Optional[Dict]:
         """Get the concept block containing the current step index."""
@@ -2593,16 +2658,19 @@ WRAPUP PHASE - Goals:
         input_lower = student_input.lower()
         response_lower = tutor_response.lower()
         combined_text = f"{input_lower} {response_lower}"
-        
+
         # Detect confusion
         confusion_signals = ["i don't know", "confused", "don't understand", "help", "?", "not sure", "what"]
         if any(signal in input_lower for signal in confusion_signals):
             current_topic = self._get_current_topic()[:50]
             if current_topic not in self.student_struggles:
                 self.student_struggles.append(current_topic)
-        
-        # Evaluate correctness: LLM during INSTRUCTION/PRACTICE, keyword fallback otherwise
-        if self.phase in (ConversationPhase.INSTRUCTION, ConversationPhase.PRACTICE):
+
+        # Evaluate correctness: LLM for evaluable step types, keyword fallback otherwise
+        current_step = self.steps[self.current_topic_index] if self.current_topic_index < len(self.steps) else None
+        step_type = (current_step.step_type or 'teach') if current_step else 'teach'
+
+        if step_type in ('practice', 'quiz', 'teach', 'worked_example'):
             eval_result = self._llm_evaluate_response(student_input, tutor_response)
         else:
             eval_result = self._keyword_evaluate_response(tutor_response)
@@ -2615,18 +2683,12 @@ WRAPUP PHASE - Goals:
             if current_topic not in self.student_strengths:
                 self.student_strengths.append(current_topic)
 
-        # Track practice attempts and last-answer correctness
-        if self.phase == ConversationPhase.PRACTICE:
+        # Track practice attempts
+        if step_type in ('practice', 'quiz'):
             self.practice_total += 1
-        # Update last_practice_correct during INSTRUCTION too — concept boundary
-        # gating uses this flag to decide whether the student can cross boundaries.
-        if self.phase in (ConversationPhase.INSTRUCTION, ConversationPhase.PRACTICE):
-            self.last_practice_correct = is_correct
 
-        # Track comprehension checks in INSTRUCTION (R10)
-        if self.phase == ConversationPhase.INSTRUCTION:
-            if is_correct:
-                self.instruction_checks_correct = getattr(self, 'instruction_checks_correct', 0) + 1
+        # Update last_answer_correct for concept boundary gating
+        self.last_answer_correct = is_correct
 
         # Record skill practice via SkillAssessmentService (R2)
         try:
@@ -2636,7 +2698,7 @@ WRAPUP PHASE - Goals:
                     self.skill_assessment_service.record_practice(
                         skill=current_skill,
                         was_correct=is_correct,
-                        lesson_step=self.steps[self.current_topic_index] if self.current_topic_index < len(self.steps) else None,
+                        lesson_step=current_step,
                         practice_type='remediation' if self.is_remediation else 'initial',
                         hints_used=0,
                     )
@@ -2644,49 +2706,47 @@ WRAPUP PHASE - Goals:
             logger.warning(f"Failed to record skill practice: {e}")
 
         # CRITICAL: Track exit ticket concept coverage
-        # Use LLM-based assessment every 2 exchanges; keyword fallback otherwise (R12)
         if self.exchange_count > 0 and self.exchange_count % 2 == 0:
             self._llm_concept_coverage_check(combined_text)
         else:
             self._keyword_concept_coverage_check(combined_text)
 
-        # Advance topic based on step-type completion criteria
-        if self.phase in [ConversationPhase.INSTRUCTION, ConversationPhase.PRACTICE]:
-            should_advance = self._should_advance_step(is_correct)
+        # Advance topic based on step-type completion criteria (only during TUTORING)
+        if self.session_state == SessionState.TUTORING:
+            should_advance = self._should_advance_step(student_input, tutor_response, is_correct)
             if should_advance and self.current_topic_index < len(self.steps) - 1:
-                    # Check concept boundary gating
-                    if self._is_at_concept_boundary():
-                        boundary_attempts = getattr(self, 'concept_boundary_attempts', 0)
-                        if self._current_concept_practice_passed():
-                            # Passed — cross boundary, reset attempts
-                            self.concept_boundary_attempts = 0
-                            self.current_topic_index += 1
-                            self.step_exchange_count = 0
-                            self._step_just_advanced = True
-                            logger.info(f"Concept boundary crossed at step {self.current_topic_index}")
-                        elif boundary_attempts >= 4:
-                            # Safety valve — advance anyway after 4 failed attempts
-                            self.concept_boundary_attempts = 0
-                            self.current_topic_index += 1
-                            self.step_exchange_count = 0
-                            self._step_just_advanced = True
-                            logger.info(f"Safety valve: forced concept boundary crossing after {boundary_attempts} attempts")
-                        else:
-                            # Block — reteach and re-ask
-                            self.concept_boundary_attempts = boundary_attempts + 1
-                            block = self._get_current_concept_block()
-                            tag = block['tag'] if block else 'this concept'
-                            self.phase_instruction_override = (
-                                f"The student has NOT yet demonstrated understanding of '{tag}'. "
-                                f"Briefly reteach the key idea and ask the practice question again. "
-                                f"Do NOT move to the next concept until they answer correctly."
-                            )
-                            logger.info(f"Concept boundary blocked (attempt {self.concept_boundary_attempts}): {tag}")
-                    else:
-                        # No boundary or empty tags — advance normally
+                # Check concept boundary gating
+                if self._is_at_concept_boundary():
+                    boundary_attempts = getattr(self, 'concept_boundary_attempts', 0)
+                    if self._current_concept_practice_passed():
+                        self.concept_boundary_attempts = 0
                         self.current_topic_index += 1
                         self.step_exchange_count = 0
                         self._step_just_advanced = True
+                        self._step_needs_media = True
+                        logger.info(f"Concept boundary crossed at step {self.current_topic_index}")
+                    elif boundary_attempts >= 4:
+                        self.concept_boundary_attempts = 0
+                        self.current_topic_index += 1
+                        self.step_exchange_count = 0
+                        self._step_just_advanced = True
+                        self._step_needs_media = True
+                        logger.info(f"Safety valve: forced concept boundary crossing after {boundary_attempts} attempts")
+                    else:
+                        self.concept_boundary_attempts = boundary_attempts + 1
+                        block = self._get_current_concept_block()
+                        tag = block['tag'] if block else 'this concept'
+                        logger.info(f"Concept boundary blocked (attempt {self.concept_boundary_attempts}): {tag}")
+                else:
+                    # No boundary or empty tags — advance normally
+                    self.current_topic_index += 1
+                    self.step_exchange_count = 0
+                    self._step_just_advanced = True
+                    self._step_needs_media = True
+            elif should_advance and self.current_topic_index >= len(self.steps) - 1:
+                # Last step complete — mark index past end so exit ticket triggers
+                self.current_topic_index = len(self.steps)
+                self._step_just_advanced = True
 
     def _llm_evaluate_response(self, student_input: str, tutor_response: str) -> dict:
         """Use LLM to semantically evaluate whether the student answered correctly.
@@ -2747,16 +2807,17 @@ Did the student answer correctly?"""
         is_correct = any(s in response_lower for s in success_signals)
         return {"correct": is_correct}
 
-    def _should_advance_step(self, student_correct: bool) -> bool:
-        """Determine if the current step is complete based on step type.
+    def _should_advance_step(self, student_input: str, tutor_response: str, is_correct: bool) -> bool:
+        """Determine if the current step is complete using merged LLM evaluator.
 
-        | Step Type       | Advance When                                          |
-        |-----------------|-------------------------------------------------------|
-        | teach           | 2+ exchanges (content delivered + student responded)   |
-        | worked_example  | 2+ exchanges                                          |
-        | practice / quiz | Correct answer detected OR max attempts (4) exhausted  |
-        | summary         | 1+ exchange                                           |
-        | Safety valve    | 6 exchanges on ANY step type                          |
+        Safety valves (hard rules, not LLM):
+        | Rule                  | Threshold                                        |
+        |-----------------------|--------------------------------------------------|
+        | Hard cap (any step)   | 8 exchanges -> force advance                     |
+        | Min exchanges before  | teach/worked_example: 2, practice/quiz/summary: 1 |
+        | Practice fast-path    | correct answer -> immediate advance               |
+        | Practice attempt cap  | max_attempts + 2 exchanges -> force advance       |
+        | Evaluator failure     | Fall back to exchange-count rules                 |
         """
         if self.current_topic_index >= len(self.steps):
             return False
@@ -2765,24 +2826,41 @@ Did the student answer correctly?"""
         step_type = step.step_type or 'teach'
         exchanges = self.step_exchange_count
 
-        # Safety valve: always advance after 6 exchanges on any step
-        if exchanges >= 6:
-            logger.info(f"Safety valve: advancing step {self.current_topic_index} after {exchanges} exchanges")
+        # 1. Hard cap: always advance after 8 exchanges on any step
+        if exchanges >= 8:
+            logger.info(f"Hard cap: advancing step {self.current_topic_index} after {exchanges} exchanges")
             return True
 
-        if step_type in ('teach', 'worked_example'):
-            return exchanges >= 2
+        # 2. Min exchange floor
+        min_exchanges = {'teach': 2, 'worked_example': 2}.get(step_type, 1)
+        if exchanges < min_exchanges:
+            return False
 
+        # 3. Practice fast-path: correct answer -> immediate advance
+        if step_type in ('practice', 'quiz') and is_correct:
+            logger.info(f"Practice fast-path: correct answer on step {self.current_topic_index}")
+            return True
+
+        # 4. Practice attempt cap
         if step_type in ('practice', 'quiz'):
-            if student_correct:
+            max_attempts = getattr(step, 'max_attempts', 3) or 3
+            if exchanges >= max_attempts + 2:
+                logger.info(f"Practice attempt cap: advancing step {self.current_topic_index} after {exchanges} exchanges")
                 return True
-            # Max attempts exhausted (4 exchanges on this practice step)
-            return exchanges >= 4
 
+        # 5. Call merged LLM evaluator
+        eval_result = self._evaluate_step(student_input, tutor_response)
+        if eval_result is not None:
+            return eval_result.step_complete
+
+        # 6. Fallback to exchange-count rules if evaluator fails
+        logger.info(f"Evaluator fallback for step {self.current_topic_index} ({step_type})")
+        if step_type in ('teach', 'worked_example'):
+            return exchanges >= 3
+        if step_type in ('practice', 'quiz'):
+            return is_correct or exchanges >= 4
         if step_type == 'summary':
             return exchanges >= 1
-
-        # Unknown step type — fallback to 2 exchanges
         return exchanges >= 2
 
     def _keyword_concept_coverage_check(self, conversation_text: str):
@@ -2926,7 +3004,7 @@ Which concept numbers were meaningfully covered?"""
     
     def _complete_session(self) -> TutorMessage:
         """Complete the tutoring session."""
-        self.phase = ConversationPhase.COMPLETED
+        self.session_state = SessionState.COMPLETED
         self.session.status = TutorSession.Status.COMPLETED
         self.session.ended_at = timezone.now()
         self.session.mastery_achieved = True
@@ -3004,7 +3082,7 @@ Which concept numbers were meaningfully covered?"""
     
     def _complete_session_with_results(self, results: List[Dict], score: int) -> TutorMessage:
         """Complete the session with exit ticket results."""
-        self.phase = ConversationPhase.COMPLETED
+        self.session_state = SessionState.COMPLETED
         self.session.status = TutorSession.Status.COMPLETED
         self.session.ended_at = timezone.now()
         self.session.mastery_achieved = True
@@ -3064,9 +3142,9 @@ Which concept numbers were meaningfully covered?"""
             if concept['id'] in failed_ids:
                 concept['covered'] = False
 
-        # Reset to instruction phase for targeted review
-        self.phase = ConversationPhase.INSTRUCTION
-        self.phase_exchange_count = 0
+        # Reset to tutoring state for targeted review
+        self.session_state = SessionState.TUTORING
+        self.exchange_count = 0  # Reset for remediation safety valve
         
         # Save state with remediation info
         self._save_state()
@@ -3159,7 +3237,7 @@ Keep it warm and supportive. 3-4 sentences + a question to start the review."""
         content = content.strip()
         return TutorMessage(
             content=content,
-            phase=self.phase.value,
+            phase=self._get_display_phase(),
             media=media or [],
-            expects_response=self.phase != ConversationPhase.COMPLETED,
+            expects_response=self.session_state != SessionState.COMPLETED,
         )

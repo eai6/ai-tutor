@@ -12,11 +12,37 @@ from django.db.models import Count, Q
 
 from apps.accounts.models import Institution, Membership
 from apps.curriculum.models import Course, Lesson, LessonStep
-from apps.tutoring.models import TutorSession, StudentLessonProgress
+from apps.tutoring.models import TutorSession, SessionTurn, StudentLessonProgress
 
 
 import logging
+import re
 logger = logging.getLogger(__name__)
+
+# Regex to strip media signal tags from history content
+_MEDIA_TAG_RE = re.compile(
+    r'\[SHOW_MEDIA\s*:[^\]]*\]|\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|',
+    re.IGNORECASE,
+)
+
+
+def _build_session_history(session):
+    """Build a list of {role, content} dicts from SessionTurn records.
+
+    Skips system turns and strips media signal tags from content.
+    """
+    turns = SessionTurn.objects.filter(session=session).order_by('created_at')
+    history = []
+    for turn in turns:
+        if turn.role == 'system':
+            continue
+        content = _MEDIA_TAG_RE.sub('', turn.content).strip()
+        if content:
+            history.append({
+                'role': turn.role,  # 'tutor' or 'student'
+                'content': content,
+            })
+    return history
 
 
 def check_lesson_prerequisites(student, lesson):
@@ -157,7 +183,7 @@ def lesson_catalog(request):
         'lesson_title': s.lesson.title,
         'course_title': s.lesson.unit.course.title,
         'started_at': s.started_at,
-        'phase': s.engine_state.get('phase', 'retrieval') if s.engine_state else 'retrieval',
+        'phase': (s.engine_state.get('display_phase') or s.engine_state.get('phase', 'explain')) if s.engine_state else 'explain',
         'questions_correct': s.engine_state.get('questions_correct', 0) if s.engine_state else 0,
     } for s in active_sessions]
 
@@ -385,8 +411,17 @@ def chat_start_session(request, lesson_id):
         status=TutorSession.Status.ACTIVE
     ).first()
 
-    # Prerequisite gating -- only for new sessions, not resume (R7)
+    # If no active session, check for a completed one (for review)
+    completed_session = None
     if not existing:
+        completed_session = TutorSession.objects.filter(
+            student=request.user,
+            lesson=lesson,
+            status=TutorSession.Status.COMPLETED
+        ).order_by('-ended_at').first()
+
+    # Prerequisite gating -- only for brand-new sessions (R7)
+    if not existing and not completed_session:
         prereqs_met, unmet_prereqs = check_lesson_prerequisites(request.user, lesson)
         if not prereqs_met:
             return JsonResponse({
@@ -399,9 +434,40 @@ def chat_start_session(request, lesson_id):
     session_institution = institution or lesson.unit.course.institution or Institution.get_global()
 
     if existing:
+        # Resume active session — include conversation history
         session = existing
+        history = _build_session_history(session)
         tutor = ConversationalTutor(session)
         response = tutor.resume()
+
+        return JsonResponse({
+            "session_id": session.id,
+            "message": response.content,
+            "phase": response.phase,
+            "media": response.media,
+            "show_exit_ticket": response.show_exit_ticket,
+            "exit_ticket": response.exit_ticket_data,
+            "is_complete": response.is_complete,
+            "history": history,
+        })
+
+    elif completed_session:
+        # Completed session — return history + review available
+        session = completed_session
+        history = _build_session_history(session)
+
+        return JsonResponse({
+            "session_id": session.id,
+            "message": "You've already completed this lesson! You can review it to strengthen your understanding.",
+            "phase": "completed",
+            "media": [],
+            "show_exit_ticket": False,
+            "exit_ticket": None,
+            "is_complete": True,
+            "review_available": True,
+            "history": history,
+        })
+
     else:
         # Create new session
         session = TutorSession.objects.create(
@@ -413,15 +479,15 @@ def chat_start_session(request, lesson_id):
         tutor = ConversationalTutor(session)
         response = tutor.start()
 
-    return JsonResponse({
-        "session_id": session.id,
-        "message": response.content,
-        "phase": response.phase,
-        "media": response.media,
-        "show_exit_ticket": response.show_exit_ticket,
-        "exit_ticket": response.exit_ticket_data,
-        "is_complete": response.is_complete,
-    })
+        return JsonResponse({
+            "session_id": session.id,
+            "message": response.content,
+            "phase": response.phase,
+            "media": response.media,
+            "show_exit_ticket": response.show_exit_ticket,
+            "exit_ticket": response.exit_ticket_data,
+            "is_complete": response.is_complete,
+        })
 
 
 @login_required

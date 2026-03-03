@@ -61,10 +61,13 @@
                 <div class="session-lesson">{{ session.lesson_title }}</div>
                 <div class="session-meta">
                     <span class="session-phase">
-                        {% if session.phase == 'retrieval' %}📝 Warm-up
-                        {% elif session.phase == 'instruction' %}📖 Learning
+                        {% if session.phase == 'engage' %}💡 Engage
+                        {% elif session.phase == 'explore' %}🔍 Explore
+                        {% elif session.phase == 'explain' %}📖 Explain
                         {% elif session.phase == 'practice' %}✏️ Practice
+                        {% elif session.phase == 'evaluate' %}🎯 Evaluate
                         {% elif session.phase == 'exit_ticket' %}🎯 Quiz ({{ session.questions_correct }}/10)
+                        {% elif session.phase == 'completed' %}✅ Completed
                         {% else %}📝 In Progress
                         {% endif %}
                     </span>
@@ -129,7 +132,7 @@
                     </div>
                     <div class="lesson-meta">
                         <span class="time">⏱️ {{ lesson.estimated_minutes }} min</span>
-                        <span class="arrow">→</span>
+                        <span class="arrow">{% if lesson.status == 'completed' %}Review &rarr;{% else %}&rarr;{% endif %}</span>
                     </div>
                 </a>
                 {% endfor %}

@@ -14,7 +14,7 @@ class TestR5RemediationWiring(BaseTutoringTestCase):
 
         mock_gen.return_value = "Let's review the concepts you missed."
 
-        session = self._create_session(engine_state={'phase': 'exit_ticket'})
+        session = self._create_session(engine_state={'session_state': 'exit_ticket'})
         tutor = ConversationalTutor(session)
         tutor.exit_ticket_concepts = [
             {'id': 1, 'question': 'Q1', 'covered': True},
@@ -47,7 +47,7 @@ class TestR5RemediationWiring(BaseTutoringTestCase):
 
         mock_gen.return_value = "Let's review."
 
-        session = self._create_session(engine_state={'phase': 'exit_ticket'})
+        session = self._create_session(engine_state={'session_state': 'exit_ticket'})
         tutor = ConversationalTutor(session)
         tutor.exit_ticket_concepts = [{'id': 1, 'question': 'Q1', 'covered': True}]
 
@@ -77,7 +77,7 @@ class TestR5RemediationWiring(BaseTutoringTestCase):
 
         mock_gen.return_value = "Let's review."
 
-        session = self._create_session(engine_state={'phase': 'exit_ticket'})
+        session = self._create_session(engine_state={'session_state': 'exit_ticket'})
         tutor = ConversationalTutor(session)
         tutor.exit_ticket_concepts = [{'id': 1, 'question': 'Q1', 'covered': True}]
 
@@ -94,28 +94,19 @@ class TestR5RemediationWiring(BaseTutoringTestCase):
             self.assertIsNotNone(result)
             self.assertIsNone(tutor._remediation_plan)
 
-    def test_phase_instructions_include_prereq_gaps(self):
-        """Remediation phase instructions should include prerequisite gap info."""
-        from apps.tutoring.conversational_tutor import ConversationalTutor, ConversationPhase
+    def test_remediation_state_loads_from_engine_state(self):
+        """Remediation state flags should load correctly from engine state."""
+        from apps.tutoring.conversational_tutor import ConversationalTutor, SessionState
 
         session = self._create_session(engine_state={
-            'phase': 'instruction',
+            'session_state': 'tutoring',
             'is_remediation': True,
             'remediation_attempt': 1,
             'failed_exit_questions': [{'id': 1, 'question': 'Q1'}],
         })
         tutor = ConversationalTutor(session)
 
-        # Simulate a remediation plan with prerequisite gaps
-        mock_skill = MagicMock()
-        mock_skill.name = 'Earth Layers'
-        tutor._remediation_plan = {
-            'needs_remediation': True,
-            'prerequisite_gaps': [mock_skill],
-            'weak_skills': [],
-        }
-
-        instructions = tutor._get_phase_instructions()
-        self.assertIn('REMEDIATION MODE', instructions)
-        self.assertIn('PREREQUISITE GAPS', instructions)
-        self.assertIn('Earth Layers', instructions)
+        self.assertEqual(tutor.session_state, SessionState.TUTORING)
+        self.assertTrue(tutor.is_remediation)
+        self.assertEqual(tutor.remediation_attempt, 1)
+        self.assertEqual(tutor.failed_exit_questions, [{'id': 1, 'question': 'Q1'}])
