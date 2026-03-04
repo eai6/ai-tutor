@@ -64,6 +64,11 @@ urlpatterns = [
     # Settings
     path('settings/', views.settings_page, name='settings'),
 
+    # Safety / Flagged sessions
+    path('flagged/', views.flagged_sessions, name='flagged_sessions'),
+    path('flagged/<int:session_id>/', views.flagged_session_detail, name='flagged_session_detail'),
+    path('flagged/<int:session_id>/resolve/', views.resolve_flag, name='resolve_flag'),
+
     # School picker
     path('switch-school/', views.switch_school, name='switch_school'),
 ]

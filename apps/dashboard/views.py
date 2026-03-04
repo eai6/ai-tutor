@@ -50,12 +50,17 @@ def get_staff_context(request):
         else:
             institution = None  # aggregated mode
 
+        flag_qs = TutorSession.objects.filter(is_flagged=True, flag_reviewed=False)
+        if institution is not None:
+            flag_qs = flag_qs.filter(institution=institution)
+
         return {
             'membership': None,
             'institution': institution,
             'role': 'superadmin',
             'all_schools': all_schools,
             'is_aggregated': institution is None,
+            'unreviewed_flag_count': flag_qs.count(),
         }
 
     # Regular staff — may belong to multiple schools
@@ -80,12 +85,17 @@ def get_staff_context(request):
 
     membership = next((m for m in memberships if m.institution == institution), memberships[0])
 
+    flag_qs = TutorSession.objects.filter(
+        is_flagged=True, flag_reviewed=False, institution=institution
+    )
+
     return {
         'membership': membership,
         'institution': institution,
         'role': 'staff',
         'all_schools': staff_schools if len(staff_schools) > 1 else [],
         'is_aggregated': False,
+        'unreviewed_flag_count': flag_qs.count(),
     }
 
 
@@ -2383,3 +2393,81 @@ def course_delete(request, course_id):
 
     messages.success(request, f"Course '{title}' and its teaching materials deleted.")
     return redirect('dashboard:curriculum_list')
+
+
+# ============================================================================
+# Flagged Sessions (Safety)
+# ============================================================================
+
+@staff_required
+def flagged_sessions(request):
+    """List flagged tutoring sessions for staff review."""
+    institution = request.staff_ctx['institution']
+    status_filter = request.GET.get('status', 'unreviewed')
+
+    qs = TutorSession.objects.filter(is_flagged=True)
+    qs = filter_by_institution(qs, institution)
+
+    if status_filter == 'unreviewed':
+        qs = qs.filter(flag_reviewed=False)
+    elif status_filter == 'reviewed':
+        qs = qs.filter(flag_reviewed=True)
+    # 'all' → no extra filter
+
+    qs = qs.select_related('student', 'lesson', 'reviewed_by').order_by('-flagged_at')
+
+    total_flagged = filter_by_institution(
+        TutorSession.objects.filter(is_flagged=True), institution
+    ).count()
+    unreviewed_count = filter_by_institution(
+        TutorSession.objects.filter(is_flagged=True, flag_reviewed=False), institution
+    ).count()
+
+    paginator = Paginator(qs, 25)
+    page = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'dashboard/flagged_sessions.html', {
+        **request.staff_ctx,
+        'sessions': page,
+        'status_filter': status_filter,
+        'total_flagged': total_flagged,
+        'unreviewed_count': unreviewed_count,
+    })
+
+
+@staff_required
+def flagged_session_detail(request, session_id):
+    """View transcript of a flagged session with highlighted flagged turns."""
+    institution = request.staff_ctx['institution']
+
+    qs = TutorSession.objects.filter(is_flagged=True)
+    qs = filter_by_institution(qs, institution)
+    session = get_object_or_404(qs.select_related('student', 'lesson', 'reviewed_by'), id=session_id)
+
+    from apps.tutoring.models import SessionTurn
+    turns = SessionTurn.objects.filter(session=session).order_by('created_at')
+
+    return render(request, 'dashboard/flagged_session_detail.html', {
+        **request.staff_ctx,
+        'session': session,
+        'turns': turns,
+    })
+
+
+@staff_required
+@require_POST
+def resolve_flag(request, session_id):
+    """Mark a flagged session as reviewed."""
+    institution = request.staff_ctx['institution']
+
+    qs = TutorSession.objects.filter(is_flagged=True)
+    qs = filter_by_institution(qs, institution)
+    session = get_object_or_404(qs, id=session_id)
+
+    session.flag_reviewed = True
+    session.reviewed_by = request.user
+    session.reviewed_at = timezone.now()
+    session.save(update_fields=['flag_reviewed', 'reviewed_by', 'reviewed_at'])
+
+    messages.success(request, "Flag resolved.")
+    return redirect('dashboard:flagged_session_detail', session_id=session.id)

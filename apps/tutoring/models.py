@@ -74,6 +74,20 @@ class TutorSession(models.Model):
     # Optional summary (generated at end)
     summary = models.TextField(blank=True)
 
+    # Safety flagging
+    is_flagged = models.BooleanField(default=False)
+    flag_reason = models.TextField(blank=True)
+    flagged_at = models.DateTimeField(null=True, blank=True)
+    flag_reviewed = models.BooleanField(default=False)
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_flags'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ['-started_at']
         verbose_name = "Tutor Session"
@@ -118,6 +132,10 @@ class SessionTurn(models.Model):
     
     # Flexible metadata (hints used, attempts, grading result, etc.)
     metadata = models.JSONField(default=dict, blank=True)
+
+    # Safety flagging
+    is_flagged = models.BooleanField(default=False)
+    flag_type = models.CharField(max_length=50, blank=True)
 
     class Meta:
         ordering = ['created_at']

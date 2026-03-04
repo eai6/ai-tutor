@@ -1,0 +1,67 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Flagged Session - {{ session.student.first_name }} {{ session.student.last_name }}{% endblock %}
+{% block page_title %}Flagged Session{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+    <a href="{% url 'dashboard:flagged_sessions' %}" class="btn btn-secondary btn-sm">&larr; Back to Flagged Chats</a>
+</div>
+
+<!-- Session Info Card -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-body">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h3 style="margin-bottom: 0.25rem;">{{ session.student.first_name }} {{ session.student.last_name }}</h3>
+                <p style="color: var(--gray-500); margin-bottom: 0.5rem; font-size: 0.875rem;">{{ session.lesson.title }}</p>
+                <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                    <span class="badge badge-danger" style="font-size: 0.8125rem;">{{ session.flag_reason }}</span>
+                    {% if session.flagged_at %}
+                    <span style="font-size: 0.8125rem; color: var(--gray-500);">Flagged {{ session.flagged_at|timesince }} ago</span>
+                    {% endif %}
+                    {% if session.flag_reviewed %}
+                        <span class="badge badge-success">Reviewed by {{ session.reviewed_by.first_name }} {{ session.reviewed_by.last_name }}</span>
+                    {% else %}
+                        <span class="badge badge-warning">Unreviewed</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if not session.flag_reviewed %}
+            <form method="post" action="{% url 'dashboard:resolve_flag' session.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Mark as Reviewed</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Transcript -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Transcript</h2>
+        <span style="font-size: 0.8125rem; color: var(--gray-500);">{{ turns|length }} messages</span>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% for turn in turns %}
+        {% if turn.role != 'system' %}
+        <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--gray-200); {% if turn.is_flagged %}border-left: 4px solid var(--danger); background: #FEF2F2;{% endif %}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-weight: 600; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.03em; {% if turn.role == 'student' %}color: var(--primary);{% else %}color: var(--gray-500);{% endif %}">
+                        {{ turn.role }}
+                    </span>
+                    {% if turn.is_flagged %}
+                    <span class="badge badge-danger">{{ turn.flag_type }}</span>
+                    {% endif %}
+                </div>
+                <span style="font-size: 0.75rem; color: var(--gray-500);">{{ turn.created_at|date:"M d, Y H:i" }}</span>
+            </div>
+            <div style="font-size: 0.9375rem; line-height: 1.6; white-space: pre-wrap;">{{ turn.content }}</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

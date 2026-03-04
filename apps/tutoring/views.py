@@ -4,11 +4,13 @@ Tutoring Views - Web endpoints for the chat-based conversational tutor.
 
 import json
 from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages as django_messages
 from django.db.models import Count, Q
+from django.utils import timezone
 
 from apps.accounts.models import Institution, Membership
 from apps.curriculum.models import Course, Lesson, LessonStep
@@ -27,21 +29,28 @@ _MEDIA_TAG_RE = re.compile(
 
 
 def _build_session_history(session):
-    """Build a list of {role, content} dicts from SessionTurn records.
+    """Build a list of {role, content, media?} dicts from SessionTurn records.
 
     Skips system turns and strips media signal tags from content.
+    Attaches media from engine_state turn_media map for artifact panel on resume.
     """
     turns = SessionTurn.objects.filter(session=session).order_by('created_at')
+    engine_state = session.engine_state or {}
+    turn_media = engine_state.get('turn_media', {})
+
     history = []
+    idx = 0
     for turn in turns:
         if turn.role == 'system':
             continue
         content = _MEDIA_TAG_RE.sub('', turn.content).strip()
         if content:
-            history.append({
-                'role': turn.role,  # 'tutor' or 'student'
-                'content': content,
-            })
+            entry = {'role': turn.role, 'content': content}
+            media = turn_media.get(str(idx))
+            if media:
+                entry['media'] = [media]
+            history.append(entry)
+        idx += 1
     return history
 
 
@@ -200,6 +209,24 @@ def lesson_catalog(request):
     # Get student progress
     progress_map = get_student_progress(request.user, viewing_institution)
 
+    # Prereq data: batch-fetch all direct prerequisites (1 query)
+    from apps.tutoring.skills_models import LessonPrerequisite
+    all_lesson_ids = []
+    for course in courses:
+        for unit in course.units.all():
+            for lesson in unit.lessons.filter(is_published=True):
+                all_lesson_ids.append(lesson.id)
+
+    prereqs_qs = LessonPrerequisite.objects.filter(
+        lesson_id__in=all_lesson_ids, is_direct=True
+    ).select_related('prerequisite')
+
+    prereq_map = {}  # {lesson_id: [prereq_lesson, ...]}
+    for p in prereqs_qs:
+        prereq_map.setdefault(p.lesson_id, []).append(p.prerequisite)
+
+    mastered_ids = {lid for lid, prog in progress_map.items() if prog.mastery_level == 'mastered'}
+
     # Get selected subject from query param
     selected_subject_id = request.GET.get('subject')
     selected_subject = None
@@ -231,12 +258,20 @@ def lesson_catalog(request):
                 else:
                     status = 'not_started'
 
+                # Check prerequisites
+                unmet = [
+                    pr for pr in prereq_map.get(lesson.id, [])
+                    if pr.id not in mastered_ids
+                ]
+
                 unit_lessons.append({
                     'id': lesson.id,
                     'title': lesson.title,
                     'objective': lesson.objective,
                     'estimated_minutes': lesson.estimated_minutes,
                     'status': status,
+                    'locked': len(unmet) > 0,
+                    'unmet_prerequisites': [{'id': u.id, 'title': u.title} for u in unmet],
                 })
 
             if unit_lessons:
@@ -360,6 +395,21 @@ def chat_tutor_interface(request, lesson_id):
     else:
         # Super admin — can access any published lesson
         lesson = get_object_or_404(Lesson, id=lesson_id, is_published=True)
+
+    # Prerequisite check — only block if no existing session
+    has_session = TutorSession.objects.filter(
+        student=request.user, lesson=lesson,
+        status__in=[TutorSession.Status.ACTIVE, TutorSession.Status.COMPLETED],
+    ).exists()
+    if not has_session:
+        prereqs_met, unmet = check_lesson_prerequisites(request.user, lesson)
+        if not prereqs_met:
+            names = ', '.join(u['lesson_title'] for u in unmet)
+            django_messages.warning(
+                request,
+                f"You need to complete these prerequisites first: {names}"
+            )
+            return redirect('tutoring:catalog')
 
     return render(request, 'tutoring/chat_tutor.html', {
         "lesson": lesson,
@@ -554,6 +604,20 @@ def chat_respond(request, session_id):
             severity='warning' if not safety_result.blocked else 'critical',
             request=request,
         )
+        # Flag the session
+        if not session.is_flagged:
+            session.is_flagged = True
+            session.flag_reason = ', '.join(f.value for f in safety_result.flags)
+            session.flagged_at = timezone.now()
+            session.save(update_fields=['is_flagged', 'flag_reason', 'flagged_at'])
+        # Flag the student turn (find most recent student turn)
+        student_turn = SessionTurn.objects.filter(
+            session=session, role='student'
+        ).order_by('-created_at').first()
+        if student_turn:
+            student_turn.is_flagged = True
+            student_turn.flag_type = safety_result.flags[0].value
+            student_turn.save(update_fields=['is_flagged', 'flag_type'])
 
     if safety_result.blocked:
         safe_response = ContentSafetyFilter.get_safe_response(safety_result.flags[0])
@@ -582,6 +646,35 @@ def chat_respond(request, session_id):
         result = tutor.respond(message)
         elapsed = time.time() - t0
         logger.info(f"[respond] Completed in {elapsed:.1f}s, phase={result.phase}")
+
+        # Safety check LLM response
+        ai_safety = ContentSafetyFilter.check_content(result.content, context="ai_output")
+        if ai_safety.flags:
+            SafetyAuditLog.log(
+                'ai_content_flagged',
+                user=request.user,
+                session_id=session.id,
+                details={
+                    'flags': [f.value for f in ai_safety.flags],
+                    'warnings': ai_safety.warnings,
+                    'source': 'ai_output',
+                },
+                severity='warning',
+                request=request,
+            )
+            if not session.is_flagged:
+                session.is_flagged = True
+                session.flag_reason = 'AI output: ' + ', '.join(f.value for f in ai_safety.flags)
+                session.flagged_at = timezone.now()
+                session.save(update_fields=['is_flagged', 'flag_reason', 'flagged_at'])
+            tutor_turn = SessionTurn.objects.filter(
+                session=session, role='tutor'
+            ).order_by('-created_at').first()
+            if tutor_turn:
+                tutor_turn.is_flagged = True
+                tutor_turn.flag_type = ai_safety.flags[0].value
+                tutor_turn.save(update_fields=['is_flagged', 'flag_type'])
+
         return JsonResponse({
             "message": result.content,
             "phase": result.phase,

@@ -116,6 +116,20 @@
             </div>
             <div class="lessons-list">
                 {% for lesson in unit.lessons %}
+                {% if lesson.locked %}
+                <div class="lesson-item status-locked" onclick="showPrereqModal(this)" data-prereqs='[{% for p in lesson.unmet_prerequisites %}{"title":"{{ p.title }}"}{% if not forloop.last %},{% endif %}{% endfor %}]'>
+                    <div class="lesson-status-icon">
+                        <span class="icon-locked">🔒</span>
+                    </div>
+                    <div class="lesson-info">
+                        <h4>{{ lesson.title }}</h4>
+                        <p class="locked-hint">Complete prerequisites to unlock</p>
+                    </div>
+                    <div class="lesson-meta">
+                        <span class="time">⏱️ {{ lesson.estimated_minutes }} min</span>
+                    </div>
+                </div>
+                {% else %}
                 <a href="{% url 'tutoring:tutor_interface' lesson.id %}" class="lesson-item status-{{ lesson.status }}">
                     <div class="lesson-status-icon">
                         {% if lesson.status == 'completed' %}
@@ -135,6 +149,7 @@
                         <span class="arrow">{% if lesson.status == 'completed' %}Review &rarr;{% else %}&rarr;{% endif %}</span>
                     </div>
                 </a>
+                {% endif %}
                 {% endfor %}
             </div>
         </div>
@@ -517,12 +532,68 @@
         margin-bottom: 0.5rem;
     }
     
+    /* Locked lessons */
+    .status-locked {
+        opacity: 0.55;
+        cursor: pointer;
+    }
+    .status-locked .lesson-status-icon {
+        background: #D1D5DB;
+        color: #6B7280;
+    }
+    .status-locked .lesson-info h4 {
+        color: #9CA3AF;
+    }
+    .locked-hint {
+        color: #9CA3AF !important;
+        font-style: italic;
+    }
+    .status-locked:hover {
+        opacity: 0.7;
+        background: #F3F4F6;
+    }
+
+    /* Prereq modal */
+    .prereq-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.4);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 200;
+        padding: 1rem;
+    }
+    .prereq-modal {
+        background: #fff;
+        border-radius: 1rem;
+        max-width: 400px;
+        width: 100%;
+        padding: 2rem;
+        box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+        text-align: center;
+    }
+    .prereq-modal h3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+    }
+    .prereq-modal ul {
+        text-align: left;
+        margin: 1rem 0 1.5rem 1.5rem;
+        color: var(--text-dark);
+    }
+    .prereq-modal li {
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+
     /* Mobile adjustments */
     @media (max-width: 600px) {
         .lesson-info p {
             display: none;
         }
-        
+
         .lesson-meta .time {
             display: none;
         }
@@ -534,7 +605,6 @@
 <script>
 function switchSchool(value) {
     const url = new URL(window.location.href);
-    // Clear subject selection when switching schools
     url.searchParams.delete('subject');
     if (value === 'all') {
         url.searchParams.delete('school');
@@ -542,6 +612,24 @@ function switchSchool(value) {
         url.searchParams.set('school', value);
     }
     window.location.href = url.toString();
+}
+
+function showPrereqModal(el) {
+    let prereqs;
+    try { prereqs = JSON.parse(el.dataset.prereqs); } catch { prereqs = []; }
+    const list = prereqs.map(p => `<li>${p.title}</li>`).join('');
+    const overlay = document.createElement('div');
+    overlay.className = 'prereq-overlay';
+    overlay.innerHTML = `
+        <div class="prereq-modal">
+            <h3>🔒 Lesson Locked</h3>
+            <p style="color:#6B7280;">Complete these lessons first:</p>
+            <ul>${list}</ul>
+            <button class="btn btn-primary" onclick="this.closest('.prereq-overlay').remove()">Got it</button>
+        </div>
+    `;
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
 }
 </script>
 {% endblock %}

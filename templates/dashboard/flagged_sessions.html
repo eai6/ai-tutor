@@ -1,0 +1,95 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Flagged Chats{% endblock %}
+{% block page_title %}Flagged Chats{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="stats-grid" style="grid-template-columns: repeat(2, 1fr); max-width: 400px;">
+    <div class="stat-card">
+        <div class="stat-label">Total Flagged</div>
+        <div class="stat-value">{{ total_flagged }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Unreviewed</div>
+        <div class="stat-value" style="color: {% if unreviewed_count %}var(--danger){% else %}var(--success){% endif %}">{{ unreviewed_count }}</div>
+    </div>
+</div>
+
+<!-- Tab bar -->
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+    <a href="?status=all" class="btn {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All</a>
+    <a href="?status=unreviewed" class="btn {% if status_filter == 'unreviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Unreviewed</a>
+    <a href="?status=reviewed" class="btn {% if status_filter == 'reviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Reviewed</a>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if sessions %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Lesson</th>
+                    <th>Flag Reason</th>
+                    <th>Flagged At</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in sessions %}
+                <tr>
+                    <td>
+                        <div style="font-weight: 500;">{{ s.student.first_name }} {{ s.student.last_name }}</div>
+                        <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ s.student.username }}</div>
+                    </td>
+                    <td>{{ s.lesson.title }}</td>
+                    <td style="max-width: 200px;">
+                        <span style="font-size: 0.8125rem; color: var(--danger);">{{ s.flag_reason|truncatewords:10 }}</span>
+                    </td>
+                    <td style="font-size: 0.875rem;">
+                        {% if s.flagged_at %}{{ s.flagged_at|timesince }} ago{% else %}&mdash;{% endif %}
+                    </td>
+                    <td>
+                        {% if s.flag_reviewed %}
+                            <span class="badge badge-success">Reviewed</span>
+                        {% else %}
+                            <span class="badge badge-danger">Unreviewed</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn-secondary btn-sm">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        {% if sessions.has_other_pages %}
+        <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: center; gap: 0.5rem;">
+            {% if sessions.has_previous %}
+                <a href="?status={{ status_filter }}&page={{ sessions.previous_page_number }}" class="btn btn-secondary btn-sm">&larr; Previous</a>
+            {% endif %}
+            <span style="padding: 0.5rem 1rem; color: var(--gray-500);">
+                Page {{ sessions.number }} of {{ sessions.paginator.num_pages }}
+            </span>
+            {% if sessions.has_next %}
+                <a href="?status={{ status_filter }}&page={{ sessions.next_page_number }}" class="btn btn-secondary btn-sm">Next &rarr;</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h3>No Flagged Sessions</h3>
+            <p>No flagged chat sessions found for this filter.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -716,10 +716,10 @@ userInput.addEventListener('keydown', e => {
 function renderHistory(history) {
     if (!history || history.length === 0) return;
 
-    // Render each prior turn
+    // Render each prior turn (with media for artifact panel on resume)
     for (const turn of history) {
         const role = turn.role === 'student' ? 'student' : 'tutor';
-        addMessage(role, turn.content);
+        addMessage(role, turn.content, turn.media || []);
     }
 
     // Add a visual separator between history and new messages
@@ -746,7 +746,13 @@ async function startSession() {
 
         if (data.error) {
             showTyping(false);
-            addMessage('tutor', data.error);
+            if (data.error === 'prerequisite_not_met') {
+                const names = (data.unmet_prerequisites || []).map(p => p.lesson_title).join(', ');
+                addMessage('tutor', `🔒 **This lesson is locked.**\n\nYou need to complete these prerequisites first:\n\n${(data.unmet_prerequisites || []).map(p => '- ' + p.lesson_title).join('\n')}`);
+                document.getElementById('input-area').style.display = 'none';
+            } else {
+                addMessage('tutor', data.error);
+            }
             return;
         }
 
