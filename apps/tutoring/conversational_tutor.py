@@ -541,8 +541,8 @@ class ConversationalTutor:
         # Step-level exchange tracking
         self.step_exchange_count = state.get('step_exchange_count', 0)
 
-        # Step media delivery flag
-        self._step_needs_media = state.get('step_needs_media', False)
+        # Turn media for resume (artifact panel)
+        self._turn_media = state.get('turn_media', {})
 
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
@@ -587,8 +587,8 @@ class ConversationalTutor:
             'concept_boundary_attempts': getattr(self, 'concept_boundary_attempts', 0),
             # Step-level exchange tracking
             'step_exchange_count': getattr(self, 'step_exchange_count', 0),
-            # Step media delivery flag
-            'step_needs_media': getattr(self, '_step_needs_media', False),
+            # Turn media for resume (artifact panel)
+            'turn_media': getattr(self, '_turn_media', {}),
         }
         self.session.save()
     
@@ -868,27 +868,44 @@ class ConversationalTutor:
                 is_complete=True,
             )
 
-        # Generate a "welcome back" message
+        # Generate a "welcome back" message with step directive so LLM can reference media
         last_exchange = self.conversation[-1] if self.conversation else None
+        current_guidance = self._get_current_guidance()
+        media_catalog = self._build_media_catalog()
 
         prompt = f"""The student is returning to continue the lesson.
 
 Last message in conversation: {last_exchange['content'][:200] if last_exchange else 'None'}
 
+{current_guidance}
+
+{media_catalog}
+
 Generate a brief, warm welcome back message that:
 1. Acknowledges they're returning
 2. Briefly reminds them where they were
 3. Asks a question to re-engage them
+4. If media is available for the current step, reference the image and write |||MEDIA:N||| as the LAST line
 
 Keep it to 2-3 sentences."""
 
         response = self._generate_response(prompt)
 
-        # Persist the welcome-back message so it survives future resumes
-        self._save_turn("tutor", response)
-        self.conversation.append({"role": "assistant", "content": response})
+        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
+        clean_response, parsed_media = self._parse_media_signal(response)
+        media = [parsed_media] if parsed_media else []
 
-        return self._create_message(response)
+        # Record media for this turn (for resume artifact panel)
+        if media:
+            turn_index = len(self.conversation)  # index before appending
+            self._turn_media[str(turn_index)] = media[0]
+
+        # Persist the welcome-back message so it survives future resumes
+        self._save_turn("tutor", clean_response)
+        self.conversation.append({"role": "assistant", "content": clean_response})
+        self._save_state()
+
+        return self._create_message(clean_response, media=media)
 
     def start_review(self) -> TutorMessage:
         """Start a review session for a completed lesson.
@@ -1003,24 +1020,16 @@ Keep it to 3-4 sentences."""
         # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media = self._parse_media_signal(response)
 
-        # Resolve media: signal > visual request > step-needs-media > proactive
-        media = []
-        if parsed_media:
-            media = [parsed_media]
-        elif visual_request:
-            media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
-        elif getattr(self, '_step_needs_media', False) and self._get_step_media():
-            # Deterministic: first exchange of a new step — auto-attach step media
-            media = self._get_step_media()[:1]
-            self._step_needs_media = False
-        elif self._get_proactive_media():
-            media = self._get_proactive_media()[:1]
-
-        # Deduplicate & cap at 1
-        media = self._deduplicate_media(media)[:1]
+        # Media ONLY from LLM signal — no fallback auto-attach
+        media = [parsed_media] if parsed_media else []
 
         # Analyze student response for adaptation
         self._analyze_student_response(student_input, clean_response)
+
+        # Record media for this turn (for resume artifact panel)
+        if media:
+            turn_index = len(self.conversation)  # index before appending
+            self._turn_media[str(turn_index)] = media[0]
 
         # Check if all steps complete — trigger exit ticket
         if self.current_topic_index >= len(self.steps) and self.session_state == SessionState.TUTORING:
@@ -1103,21 +1112,13 @@ Keep it to 3-4 sentences."""
         # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
         clean_content, parsed_media = self._parse_media_signal(full_response)
 
-        if parsed_media:
-            media = [parsed_media]
-        elif not media:
-            # Fallback: visual request > step-needs-media > proactive
-            visual_request = self._detect_visual_request(student_input)
-            if visual_request:
-                media = self._find_matching_media(student_input, min_relevance=0.3)[:1]
-            elif getattr(self, '_step_needs_media', False) and self._get_step_media():
-                media = self._get_step_media()[:1]
-                self._step_needs_media = False
-            else:
-                media = self._get_proactive_media()[:1]
+        # Media ONLY from LLM signal — no fallback auto-attach
+        media = [parsed_media] if parsed_media else []
 
-        # Deduplicate & cap at 1
-        media = self._deduplicate_media(media)[:1]
+        # Record media for this turn (for resume artifact panel)
+        if media:
+            turn_index = len(self.conversation)  # index before appending
+            self._turn_media[str(turn_index)] = media[0]
 
         # Analyze student response for adaptation
         self._analyze_student_response(student_input, clean_content)
@@ -1709,6 +1710,10 @@ Keep it to 3-4 sentences + question."""
         if not retrieval_block:
             retrieval_context = self._get_retrieval_context()
 
+        # Include step directive + media catalog so LLM can reference media
+        current_guidance = self._get_current_guidance()
+        media_catalog = self._build_media_catalog()
+
         prompt = f"""Generate an opening message for this tutoring session.
 
 {self.lesson_context}
@@ -1717,30 +1722,36 @@ Keep it to 3-4 sentences + question."""
 
 {retrieval_block if retrieval_block else f"PREVIOUS KNOWLEDGE TO REVIEW:\\n{retrieval_context}"}
 
+{current_guidance}
+
+{media_catalog}
+
 Generate a warm, engaging opening that:
 1. Greets the student warmly
 2. If retrieval questions are provided above, present one as a warmup activity
 3. Otherwise, asks what they already know about today's topic
+4. If media is available for this step, reference the image in your text and write |||MEDIA:N||| as the LAST line
 
 End with a question. Keep it to 3-4 sentences max."""
 
         response = self._generate_response(prompt)
 
+        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
+        clean_response, parsed_media = self._parse_media_signal(response)
+        media = [parsed_media] if parsed_media else []
+
+        # Record media for this turn (for resume artifact panel)
+        if media:
+            turn_index = len(self.conversation)  # index before appending
+            self._turn_media[str(turn_index)] = media[0]
+
         # Save
-        self._save_turn("tutor", response)
-        self.conversation.append({"role": "assistant", "content": response})
+        self._save_turn("tutor", clean_response)
+        self.conversation.append({"role": "assistant", "content": clean_response})
         self._save_state()
 
-        msg = self._create_message(response)
+        return self._create_message(clean_response, media=media)
 
-        # Auto-attach step 0 media to opening message
-        if self.steps and not msg.media:
-            step_media = self._get_step_media()
-            if step_media:
-                msg.media = self._deduplicate_media(step_media[:1])
-
-        return msg
-    
     def _build_student_profile_block(self) -> str:
         """Build [STUDENT PROFILE] context block with mastery data (R11)."""
         try:
@@ -2723,14 +2734,12 @@ Break concepts into smaller steps. Be encouraging."""
                         self.current_topic_index += 1
                         self.step_exchange_count = 0
                         self._step_just_advanced = True
-                        self._step_needs_media = True
                         logger.info(f"Concept boundary crossed at step {self.current_topic_index}")
                     elif boundary_attempts >= 4:
                         self.concept_boundary_attempts = 0
                         self.current_topic_index += 1
                         self.step_exchange_count = 0
                         self._step_just_advanced = True
-                        self._step_needs_media = True
                         logger.info(f"Safety valve: forced concept boundary crossing after {boundary_attempts} attempts")
                     else:
                         self.concept_boundary_attempts = boundary_attempts + 1
@@ -2742,7 +2751,6 @@ Break concepts into smaller steps. Be encouraging."""
                     self.current_topic_index += 1
                     self.step_exchange_count = 0
                     self._step_just_advanced = True
-                    self._step_needs_media = True
             elif should_advance and self.current_topic_index >= len(self.steps) - 1:
                 # Last step complete — mark index past end so exit ticket triggers
                 self.current_topic_index = len(self.steps)

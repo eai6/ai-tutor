@@ -54,7 +54,7 @@ class CurriculumUpload(models.Model):
     # Results
     created_course = models.ForeignKey(
         'curriculum.Course',
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True
     )
@@ -117,7 +117,7 @@ class TeachingMaterialUpload(models.Model):
     )
     course = models.ForeignKey(
         'curriculum.Course',
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='teaching_materials'

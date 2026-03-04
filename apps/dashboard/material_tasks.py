@@ -53,6 +53,11 @@ def process_teaching_material(upload_id: int):
         upload.figures_extracted = figures_indexed
         upload.status = 'completed'
         upload.completed_at = timezone.now()
+
+        # Auto-link to matching course if not already linked
+        if not upload.course:
+            upload.course = _find_matching_course(upload)
+
         upload.save()
 
         figures_msg = f", {figures_indexed} figures extracted" if figures_indexed else ""
@@ -74,3 +79,42 @@ def process_teaching_material(upload_id: int):
         upload.add_log(f"FAILED: {e}")
         logger.error(f"Teaching material processing failed for upload {upload_id}: {e}")
         raise
+
+
+def _find_matching_course(upload):
+    """Find a course matching this material's subject and institution."""
+    import re
+    from apps.curriculum.models import Course
+    from django.db.models import Q
+
+    raw = (upload.subject_name or '').split('(')[0].strip()  # "Geography1 (S1,...)" → "Geography1"
+    # Strip trailing digits: "Geography1" → "Geography"
+    subject = re.sub(r'\d+$', '', raw).strip()
+    if not subject:
+        return None
+
+    q = Q(title__icontains=subject)
+    if upload.institution_id:
+        q &= Q(institution_id=upload.institution_id)
+    else:
+        q &= Q(institution__isnull=True)
+
+    return Course.objects.filter(q).first()
+
+
+def link_unlinked_materials():
+    """Link all unlinked teaching materials to matching courses. Idempotent."""
+    from apps.dashboard.models import TeachingMaterialUpload
+
+    unlinked = TeachingMaterialUpload.objects.filter(course__isnull=True)
+    linked = 0
+    for upload in unlinked:
+        course = _find_matching_course(upload)
+        if course:
+            upload.course = course
+            upload.save(update_fields=['course'])
+            linked += 1
+            logger.info(f"Linked '{upload.title}' → '{course.title}'")
+
+    logger.info(f"Linked {linked}/{unlinked.count()} unlinked materials")
+    return linked
