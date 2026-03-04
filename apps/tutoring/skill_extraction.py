@@ -408,6 +408,10 @@ Return JSON:
                     defaults={'strength': 1.0, 'is_direct': True}
                 )
     
+    def detect_course_prerequisites(self, course: Course) -> int:
+        """Run cross-lesson prerequisite detection from existing skills. No LLM call."""
+        return self._detect_lesson_prerequisites(course)
+
     def _detect_lesson_prerequisites(self, course: Course) -> int:
         """
         Detect prerequisite relationships between lessons based on skills.

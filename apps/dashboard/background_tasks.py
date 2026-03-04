@@ -201,6 +201,17 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
                 content_status='generating',
             ).update(content_status='empty')
 
+        # Course-level prerequisite detection (uses skill graph, no LLM)
+        prereqs_created = 0
+        try:
+            from apps.tutoring.skill_extraction import SkillExtractionService
+            skill_service = SkillExtractionService(institution_id=institution_id)
+            prereqs_created = skill_service.detect_course_prerequisites(course)
+            log(f"🔗 Detected {prereqs_created} lesson prerequisites from skill graph")
+        except Exception as e:
+            log(f"⚠️ Prerequisite detection error: {e}")
+            logger.error(f"Prerequisite detection error for course {course_id}: {e}")
+
         # Summary
         log(f"")
         log(f"🎉 All Done!")
@@ -209,6 +220,7 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
         log(f"   🖼️ {total_media} media assets")
         log(f"   ❓ {total_exit} exit tickets")
         log(f"   🧠 {total_skills} skills extracted")
+        log(f"   🔗 {prereqs_created} prerequisites detected")
         log(f"   ⏭️ {skipped} skipped (already had content)")
         log(f"   ❌ {failed} failed")
 

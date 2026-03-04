@@ -1715,18 +1715,30 @@ def lesson_detail(request, lesson_id):
         lesson=lesson,
         status='completed'
     ).values('student').distinct().count()
-    
+
+    # Prerequisites
+    from apps.tutoring.skills_models import LessonPrerequisite
+    course = lesson.unit.course
+    prerequisites = LessonPrerequisite.objects.filter(
+        lesson=lesson, is_direct=True
+    ).select_related('prerequisite')
+    available_lessons = Lesson.objects.filter(
+        unit__course=course, is_published=True
+    ).exclude(id=lesson.id).order_by('unit__order_index', 'order_index')
+
     context = {
         **request.staff_ctx,
         'lesson': lesson,
         'unit': lesson.unit,
-        'course': lesson.unit.course,
+        'course': course,
         'steps': steps,
         'media_count': media_count,
         'exit_ticket': exit_ticket,
         'exit_questions': exit_questions,
         'exit_ticket_count': exit_ticket_count,
         'students_completed': students_completed,
+        'prerequisites': prerequisites,
+        'available_lessons': available_lessons,
     }
     
     return render(request, 'dashboard/curriculum/lesson_detail.html', context)
@@ -1762,6 +1774,43 @@ def exit_question_edit(request, question_id):
             setattr(question, field, value)
     question.save()
     return JsonResponse({'success': True})
+
+
+@teacher_required
+@require_POST
+def lesson_prerequisite_edit(request, lesson_id):
+    """Add or remove a lesson prerequisite via AJAX."""
+    from apps.tutoring.skills_models import LessonPrerequisite
+
+    institution = request.staff_ctx['institution']
+    lookup = {'id': lesson_id}
+    if institution is not None:
+        lookup['unit__course__institution'] = institution
+    lesson = get_object_or_404(Lesson, **lookup)
+
+    data = json.loads(request.body) if request.body else {}
+    action = data.get('action')
+    prereq_id = data.get('prerequisite_id')
+
+    if not prereq_id:
+        return JsonResponse({'success': False, 'error': 'Missing prerequisite_id'}, status=400)
+
+    if action == 'add':
+        prereq_lesson = get_object_or_404(Lesson, id=prereq_id, unit__course=lesson.unit.course)
+        LessonPrerequisite.objects.get_or_create(
+            lesson=lesson,
+            prerequisite=prereq_lesson,
+            defaults={'strength': 1.0, 'is_direct': True},
+        )
+        return JsonResponse({'success': True})
+
+    elif action == 'delete':
+        LessonPrerequisite.objects.filter(
+            lesson=lesson, prerequisite_id=prereq_id
+        ).delete()
+        return JsonResponse({'success': True})
+
+    return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
 
 
 @teacher_required
@@ -1851,6 +1900,8 @@ def lesson_regenerate(request, lesson_id):
             skill_service = SkillExtractionService(institution_id=inst.id)
             skills = skill_service.extract_skills_for_lesson(lesson)
             skills_extracted = len(skills)
+            # Also update course-level prerequisites (uses skill graph, no LLM)
+            skill_service.detect_course_prerequisites(lesson.unit.course)
         except Exception as e:
             logger.warning(f"Skill extraction for {lesson.title}: {e}")
 

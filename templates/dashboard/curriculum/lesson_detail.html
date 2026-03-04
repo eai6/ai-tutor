@@ -227,6 +227,35 @@
     </div>
 </div>
 
+<!-- Prerequisites -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 class="card-title" style="margin: 0;">Prerequisites ({{ prerequisites|length }})</h3>
+    </div>
+    <div class="card-body">
+        <div id="prereq-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+            {% for p in prerequisites %}
+            <span class="prereq-pill" data-prereq-id="{{ p.prerequisite.id }}" style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: #eff6ff; border-radius: 9999px; font-size: 0.875rem;">
+                {{ p.prerequisite.title }}
+                <button type="button" onclick="removePrereq(this, {{ p.prerequisite.id }})" style="background: none; border: none; cursor: pointer; color: var(--gray-400); font-size: 1rem; line-height: 1; padding: 0;" title="Remove prerequisite">&times;</button>
+            </span>
+            {% empty %}
+            <span id="prereq-empty" style="color: var(--gray-500); font-size: 0.875rem;">No prerequisites. Students can start this lesson immediately.</span>
+            {% endfor %}
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="prereq-select" style="flex: 1; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
+                <option value="">-- Select a lesson --</option>
+                {% for al in available_lessons %}
+                <option value="{{ al.id }}">{{ al.unit.title }} &rsaquo; {{ al.title }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="btn btn-primary btn-sm" onclick="addPrereq()">Add</button>
+        </div>
+    </div>
+</div>
+
 <!-- Lesson Steps -->
 <div class="card">
     <div class="card-header">
@@ -576,6 +605,81 @@ function deleteQuestion(btn) {
             if (header && header.textContent.includes('Exit Ticket')) {
                 header.textContent = `📝 Exit Ticket Question Bank (${remaining} questions)`;
             }
+        }
+    });
+}
+
+/* Prerequisite management */
+const PREREQ_URL = '{% url "dashboard:lesson_prerequisite_edit" lesson.id %}';
+function _csrf() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+}
+
+function addPrereq() {
+    const sel = document.getElementById('prereq-select');
+    const prereqId = sel.value;
+    if (!prereqId) return;
+    const label = sel.options[sel.selectedIndex].text;
+
+    fetch(PREREQ_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': _csrf()},
+        body: JSON.stringify({action: 'add', prerequisite_id: parseInt(prereqId)})
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp.success) {
+            // Remove empty state text
+            const empty = document.getElementById('prereq-empty');
+            if (empty) empty.remove();
+
+            // Add pill
+            const list = document.getElementById('prereq-list');
+            const pill = document.createElement('span');
+            pill.className = 'prereq-pill';
+            pill.dataset.prereqId = prereqId;
+            pill.style = 'display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: #eff6ff; border-radius: 9999px; font-size: 0.875rem;';
+            pill.innerHTML = `${label.split(' › ').pop()} <button type="button" onclick="removePrereq(this, ${prereqId})" style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:1rem;line-height:1;padding:0;" title="Remove prerequisite">&times;</button>`;
+            list.appendChild(pill);
+
+            sel.value = '';
+            _updatePrereqCount();
+        }
+    });
+}
+
+function removePrereq(btn, prereqId) {
+    fetch(PREREQ_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': _csrf()},
+        body: JSON.stringify({action: 'delete', prerequisite_id: prereqId})
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp.success) {
+            btn.closest('.prereq-pill').remove();
+            _updatePrereqCount();
+            // Show empty state if none left
+            if (!document.querySelectorAll('.prereq-pill').length) {
+                const list = document.getElementById('prereq-list');
+                const empty = document.createElement('span');
+                empty.id = 'prereq-empty';
+                empty.style = 'color: var(--gray-500); font-size: 0.875rem;';
+                empty.textContent = 'No prerequisites. Students can start this lesson immediately.';
+                list.appendChild(empty);
+            }
+        }
+    });
+}
+
+function _updatePrereqCount() {
+    const count = document.querySelectorAll('.prereq-pill').length;
+    const header = document.querySelector('.card-title');
+    // Find the prerequisites header specifically
+    document.querySelectorAll('.card-title').forEach(h => {
+        if (h.textContent.includes('Prerequisites')) {
+            h.textContent = `Prerequisites (${count})`;
         }
     });
 }
