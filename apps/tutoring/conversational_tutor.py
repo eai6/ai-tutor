@@ -1904,13 +1904,19 @@ End with a question. Keep it to 2-3 sentences max."""
         display_phase = self._get_display_phase().upper()
         step_progress = f"STEP PROGRESS: {step_num}/{total_steps} | Phase: {display_phase}"
 
-        # Build media reminder if current step has media available
+        # Build media reminder — always present so LLM never claims it can't show images
         media_reminder = ""
         step_media_ids = getattr(self, '_step_media_ids', {}).get(self.current_topic_index, [])
         if step_media_ids:
             media_reminder = (
                 f"\n14. MEDIA AVAILABLE for this step — show it by writing "
                 f"|||MEDIA:{step_media_ids[0]}||| as the VERY LAST line of your response"
+            )
+        else:
+            media_reminder = (
+                "\n14. If a diagram or visual would help explain this concept, you CAN generate one — "
+                "write |||GENERATE:category:description||| as the VERY LAST line. "
+                "Never say you cannot show images."
             )
 
         return f"""CONVERSATION CONTEXT:
@@ -1947,7 +1953,7 @@ Generate your response following these rules:
 5. If correct: praise specifically, then continue the current step or prepare for the next
 6. If incorrect: encourage, give a hint from the HINT LADDER, ask again
 7. If confused: simplify, use an example from the step content
-8. If an image is being shown, DESCRIBE WHAT IT ACTUALLY SHOWS - don't make up features
+8. If the student asks to see an image/figure/diagram, show one using |||MEDIA:N||| or |||GENERATE:category:description||| — never say you cannot show images
 9. Use KEY VOCABULARY terms naturally in your explanation — introduce and define them
 10. Watch for COMMON MISTAKES listed in the directive and address them proactively
 11. Weave in local Seychelles context where relevant to make the lesson relatable
