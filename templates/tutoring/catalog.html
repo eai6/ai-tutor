@@ -36,7 +36,7 @@
     <!-- Subject Selection -->
     <div class="catalog-header animate-in">
         <h1>Hello, {{ user.first_name|default:user.username }}!</h1>
-        <p class="text-muted">Choose a subject to continue learning</p>
+        <p class="text-muted">Choose a subject to continue learning{% if student_grade %} &mdash; {{ student_grade }}{% endif %}</p>
         {% if is_staff_viewer %}
         <div class="school-switcher">
             <label for="school-select">Viewing as:</label>
@@ -50,6 +50,44 @@
         {% endif %}
     </div>
     
+    <!-- Gamification Stats Bar -->
+    <div class="gamification-bar card animate-in" id="gamification-bar" style="display:none; animation-delay:0.03s">
+        <div class="gbar-left">
+            <span class="gbar-level" id="gbar-level">Lv 1</span>
+            <div class="gbar-xp-wrap">
+                <div class="gbar-xp-track"><div class="gbar-xp-fill" id="gbar-xp-fill" style="width:0%"></div></div>
+                <span class="gbar-xp-text" id="gbar-xp-text">0/1000 XP</span>
+            </div>
+            <span class="gbar-streak" id="gbar-streak" style="display:none"></span>
+        </div>
+        <div class="gbar-right">
+            <button class="gbar-btn" id="personality-btn" onclick="openPersonalityModal()">Select Tutor Style</button>
+            <button class="gbar-btn" onclick="openLeaderboardModal()">Leaderboard</button>
+        </div>
+    </div>
+
+    <!-- Personality Picker Modal -->
+    <div class="modal-overlay" id="personality-overlay" style="display:none" onclick="if(event.target===this)closePersonalityModal()">
+        <div class="modal-box">
+            <h3>Choose Your Tutor Style</h3>
+            <p class="text-muted" style="margin-bottom:1rem;">Pick a personality that makes learning fun for you!</p>
+            <div class="personality-grid" id="personality-grid"></div>
+            <button class="btn btn-secondary" style="margin-top:1rem;width:100%" onclick="closePersonalityModal()">Close</button>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div class="modal-overlay" id="leaderboard-overlay" style="display:none" onclick="if(event.target===this)closeLeaderboardModal()">
+        <div class="modal-box">
+            <h3>Leaderboard</h3>
+            <div id="leaderboard-body" style="margin-top:1rem;max-height:400px;overflow-y:auto;"></div>
+            <button class="btn btn-secondary" style="margin-top:1rem;width:100%" onclick="closeLeaderboardModal()">Close</button>
+        </div>
+    </div>
+
+    <!-- Achievement Toast Container -->
+    <div id="achievement-toasts" style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;display:flex;flex-direction:column-reverse;gap:0.5rem;"></div>
+
     {% if active_sessions %}
     <!-- Continue Learning Section -->
     <div class="continue-section animate-in" style="animation-delay: 0.05s">
@@ -88,7 +126,7 @@
                 {% if 'Math' in subject.title %}📐{% elif 'Geography' in subject.title %}🌍{% else %}📖{% endif %}
             </div>
             <div class="subject-info">
-                <h3>{{ subject.title }}</h3>
+                <h3>{{ subject.title }}{% if subject.grade_display %} <span class="grade-badge">{{ subject.grade_display }}</span>{% endif %}</h3>
                 <div class="subject-progress">
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: {{ subject.progress_percent }}%"></div>
@@ -162,6 +200,16 @@
 
 {% block extra_css %}
 <style>
+    .grade-badge {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.15rem 0.45rem;
+        background: #e0e7ff;
+        color: #4338ca;
+        border-radius: 999px;
+        vertical-align: middle;
+        margin-left: 0.25rem;
+    }
     .catalog-container {
         max-width: 900px;
         margin: 0 auto;
@@ -588,6 +636,93 @@
         font-weight: 500;
     }
 
+    /* ── Gamification Bar ── */
+    .gamification-bar {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1.25rem;
+        margin-bottom: 1.5rem;
+        gap: 1rem;
+        flex-wrap: wrap;
+        background: linear-gradient(135deg, #EDE9FE 0%, #F3E8FF 100%);
+        border: 1px solid #C4B5FD;
+    }
+    .gbar-left { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .gbar-right { display: flex; align-items: center; gap: 0.5rem; }
+    .gbar-level {
+        font-weight: 800; font-size: 0.9rem;
+        background: linear-gradient(135deg, #7C3AED, #A855F7);
+        color: #fff; padding: 0.2rem 0.6rem; border-radius: 999px;
+    }
+    .gbar-xp-wrap { display: flex; align-items: center; gap: 0.5rem; }
+    .gbar-xp-track {
+        width: 120px; height: 8px; background: rgba(0,0,0,0.1);
+        border-radius: 4px; overflow: hidden;
+    }
+    .gbar-xp-fill {
+        height: 100%; border-radius: 4px; transition: width 0.5s ease;
+        background: linear-gradient(90deg, #7C3AED, #A855F7);
+    }
+    .gbar-xp-text { font-size: 0.78rem; font-weight: 600; color: #6D28D9; }
+    .gbar-streak { font-size: 0.85rem; font-weight: 600; }
+    .gbar-btn {
+        font-size: 0.8rem; font-weight: 600; padding: 0.35rem 0.75rem;
+        border-radius: 999px; border: 1.5px solid #C4B5FD; background: #fff;
+        color: #6D28D9; cursor: pointer; transition: all 0.15s ease;
+    }
+    .gbar-btn:hover { background: #EDE9FE; }
+
+    /* ── Modal overlays ── */
+    .modal-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+        backdrop-filter: blur(4px); display: flex; align-items: center;
+        justify-content: center; z-index: 300; padding: 1rem;
+    }
+    .modal-box {
+        background: #fff; border-radius: 1rem; max-width: 480px; width: 100%;
+        padding: 2rem; box-shadow: 0 25px 50px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;
+    }
+    .modal-box h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.25rem; }
+
+    /* ── Personality picker ── */
+    .personality-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .personality-card {
+        border: 2px solid #E5E7EB; border-radius: 0.75rem; padding: 1rem;
+        text-align: center; cursor: pointer; transition: all 0.15s ease; background: #fff;
+    }
+    .personality-card:hover { border-color: #A855F7; background: #FAF5FF; }
+    .personality-card.selected { border-color: #7C3AED; background: #EDE9FE; }
+    .personality-card .p-emoji { font-size: 2rem; margin-bottom: 0.25rem; }
+    .personality-card .p-name { font-weight: 700; font-size: 0.95rem; }
+    .personality-card .p-desc { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem; }
+    .personality-card .p-check { font-size: 0.8rem; color: #7C3AED; font-weight: 600; margin-top: 0.4rem; }
+
+    /* ── Leaderboard ── */
+    .lb-row {
+        display: flex; align-items: center; gap: 0.75rem;
+        padding: 0.6rem 0.75rem; border-radius: 0.5rem;
+        font-size: 0.9rem; border-bottom: 1px solid #F3F4F6;
+    }
+    .lb-row.is-you { background: #EDE9FE; font-weight: 700; }
+    .lb-rank { width: 2rem; text-align: center; font-weight: 700; color: var(--text-muted); }
+    .lb-name { flex: 1; }
+    .lb-xp { font-weight: 700; color: #6D28D9; }
+
+    /* ── Achievement toasts ── */
+    .achievement-toast {
+        background: #fff; border-radius: 0.75rem; padding: 1rem 1.25rem;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15); display: flex; gap: 0.75rem;
+        align-items: center; min-width: 280px; max-width: 360px;
+        animation: slideUp 0.3s ease;
+    }
+    .achievement-toast .at-emoji { font-size: 1.75rem; }
+    .achievement-toast .at-body { flex: 1; }
+    .achievement-toast .at-label { font-size: 0.7rem; font-weight: 700; color: #A855F7; text-transform: uppercase; letter-spacing: 0.5px; }
+    .achievement-toast .at-name { font-weight: 700; font-size: 0.95rem; }
+    .achievement-toast .at-desc { font-size: 0.78rem; color: var(--text-muted); }
+    @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
     /* Mobile adjustments */
     @media (max-width: 600px) {
         .lesson-info p {
@@ -597,6 +732,10 @@
         .lesson-meta .time {
             display: none;
         }
+
+        .gamification-bar { flex-direction: column; align-items: stretch; }
+        .gbar-right { justify-content: center; }
+        .personality-grid { grid-template-columns: 1fr; }
     }
 </style>
 {% endblock %}
@@ -631,5 +770,145 @@ function showPrereqModal(el) {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
 }
+
+/* ── Gamification ── */
+let gamData = null;
+
+function getCookie(name) {
+    let v = null;
+    document.cookie.split(';').forEach(c => {
+        c = c.trim();
+        if (c.startsWith(name + '=')) v = decodeURIComponent(c.substring(name.length + 1));
+    });
+    return v;
+}
+
+async function loadGamification() {
+    try {
+        const res = await fetch('/tutor/api/gamification/');
+        if (!res.ok) return;
+        gamData = await res.json();
+        renderGamBar();
+        showAchievementToasts(gamData.new_achievements || []);
+    } catch(e) { console.warn('Gamification load failed:', e); }
+}
+
+function renderGamBar() {
+    if (!gamData) return;
+    const bar = document.getElementById('gamification-bar');
+    bar.style.display = '';
+
+    document.getElementById('gbar-level').textContent = 'Lv ' + gamData.level;
+    const pct = Math.min(100, (gamData.xp_in_level / gamData.xp_to_next_level) * 100);
+    document.getElementById('gbar-xp-fill').style.width = pct + '%';
+    document.getElementById('gbar-xp-text').textContent = gamData.xp_in_level + '/' + gamData.xp_to_next_level + ' XP';
+
+    const streakEl = document.getElementById('gbar-streak');
+    if (gamData.streak_days > 0) {
+        streakEl.style.display = '';
+        streakEl.textContent = '🔥 ' + gamData.streak_days + ' day streak';
+    }
+
+    // Personality button
+    const btn = document.getElementById('personality-btn');
+    if (gamData.selected_personality) {
+        btn.textContent = gamData.selected_personality.emoji + ' ' + gamData.selected_personality.name;
+    }
+}
+
+/* Personality Modal */
+function openPersonalityModal() {
+    const grid = document.getElementById('personality-grid');
+    const currentId = gamData?.selected_personality?.id || null;
+    grid.innerHTML = '';
+    (gamData?.personalities || []).forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'personality-card' + (p.id === currentId ? ' selected' : '');
+        card.innerHTML = `
+            <div class="p-emoji">${p.emoji || '🤖'}</div>
+            <div class="p-name">${p.name}</div>
+            <div class="p-desc">${p.description}</div>
+            ${p.id === currentId ? '<div class="p-check">Selected ✓</div>' : ''}
+        `;
+        card.addEventListener('click', () => selectPersonality(p.id));
+        grid.appendChild(card);
+    });
+    document.getElementById('personality-overlay').style.display = 'flex';
+}
+
+function closePersonalityModal() {
+    document.getElementById('personality-overlay').style.display = 'none';
+}
+
+async function selectPersonality(pid) {
+    try {
+        const res = await fetch('/tutor/api/personality/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ personality_id: pid }),
+        });
+        const data = await res.json();
+        if (data.selected) {
+            gamData.selected_personality = data.selected;
+        } else {
+            gamData.selected_personality = null;
+        }
+        renderGamBar();
+        closePersonalityModal();
+    } catch(e) { console.error('Set personality failed:', e); }
+}
+
+/* Leaderboard Modal */
+async function openLeaderboardModal() {
+    document.getElementById('leaderboard-overlay').style.display = 'flex';
+    const body = document.getElementById('leaderboard-body');
+    body.innerHTML = '<p style="text-align:center;color:var(--text-muted);">Loading...</p>';
+    try {
+        const res = await fetch('/tutor/api/leaderboard/');
+        const data = await res.json();
+        if (!data.leaderboard || data.leaderboard.length === 0) {
+            body.innerHTML = '<p style="text-align:center;color:var(--text-muted);">No data yet. Complete lessons to appear!</p>';
+            return;
+        }
+        body.innerHTML = data.leaderboard.map(e =>
+            `<div class="lb-row ${e.is_you ? 'is-you' : ''}">
+                <span class="lb-rank">${e.rank <= 3 ? ['🥇','🥈','🥉'][e.rank-1] : '#'+e.rank}</span>
+                <span class="lb-name">${e.name}${e.is_you ? ' (You)' : ''}</span>
+                <span class="lb-xp">${e.xp.toLocaleString()} XP</span>
+            </div>`
+        ).join('');
+    } catch(e) {
+        body.innerHTML = '<p style="text-align:center;color:#ef4444;">Failed to load leaderboard.</p>';
+    }
+}
+
+function closeLeaderboardModal() {
+    document.getElementById('leaderboard-overlay').style.display = 'none';
+}
+
+/* Achievement Toasts */
+function showAchievementToasts(achievements) {
+    const container = document.getElementById('achievement-toasts');
+    achievements.forEach((a, i) => {
+        setTimeout(() => {
+            const toast = document.createElement('div');
+            toast.className = 'achievement-toast';
+            toast.innerHTML = `
+                <span class="at-emoji">${a.emoji || '🏆'}</span>
+                <div class="at-body">
+                    <div class="at-label">Achievement Unlocked!</div>
+                    <div class="at-name">${a.name}</div>
+                    <div class="at-desc">${a.description}</div>
+                </div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 4000);
+        }, i * 800);
+    });
+}
+
+{% if user.is_authenticated %}
+document.addEventListener('DOMContentLoaded', loadGamification);
+{% endif %}
 </script>
 {% endblock %}

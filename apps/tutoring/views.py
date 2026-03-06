@@ -12,7 +12,7 @@ from django.contrib import messages as django_messages
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from apps.accounts.models import Institution, Membership
+from apps.accounts.models import Institution, Membership, StudentProfile, TutorPersonality
 from apps.curriculum.models import Course, Lesson, LessonStep
 from apps.tutoring.models import TutorSession, SessionTurn, StudentLessonProgress
 
@@ -206,6 +206,20 @@ def lesson_catalog(request):
         courses = Course.objects.filter(is_published=True)
     courses = courses.prefetch_related('units__lessons').order_by('title')
 
+    # Grade-based filtering: students only see courses matching their grade level
+    from apps.curriculum.utils import parse_grade_level_string
+    student_grade = ''
+    if hasattr(request.user, 'student_profile'):
+        student_grade = request.user.student_profile.grade_level or ''
+
+    if student_grade and not is_staff:
+        filtered = []
+        for course in courses:
+            course_grades = parse_grade_level_string(course.grade_level)
+            if not course_grades or student_grade in course_grades:
+                filtered.append(course)
+        courses = filtered
+
     # Get student progress
     progress_map = get_student_progress(request.user, viewing_institution)
 
@@ -280,6 +294,7 @@ def lesson_catalog(request):
                     'lessons': unit_lessons,
                 })
 
+        from apps.curriculum.utils import format_grade_display
         subject_data = {
             'id': course.id,
             'title': course.title,
@@ -289,6 +304,7 @@ def lesson_catalog(request):
             'in_progress_lessons': in_progress_lessons,
             'progress_percent': int((completed_lessons / total_lessons * 100)) if total_lessons > 0 else 0,
             'units': units_data,
+            'grade_display': format_grade_display(course.grade_level),
         }
 
         # Only add courses that have at least 1 published lesson
@@ -306,6 +322,7 @@ def lesson_catalog(request):
         "subjects": subjects,
         "selected_subject": selected_subject,
         "active_sessions": active_sessions_data,
+        "student_grade": student_grade,
     }
     # Staff school switcher
     if is_staff:
@@ -498,6 +515,8 @@ def chat_start_session(request, lesson_id):
             "show_exit_ticket": response.show_exit_ticket,
             "exit_ticket": response.exit_ticket_data,
             "is_complete": response.is_complete,
+            "step_number": response.step_number,
+            "total_steps": response.total_steps,
             "history": history,
         })
 
@@ -537,6 +556,8 @@ def chat_start_session(request, lesson_id):
             "show_exit_ticket": response.show_exit_ticket,
             "exit_ticket": response.exit_ticket_data,
             "is_complete": response.is_complete,
+            "step_number": response.step_number,
+            "total_steps": response.total_steps,
         })
 
 
@@ -682,6 +703,8 @@ def chat_respond(request, session_id):
             "show_exit_ticket": result.show_exit_ticket,
             "exit_ticket": result.exit_ticket_data,
             "is_complete": result.is_complete,
+            "step_number": result.step_number,
+            "total_steps": result.total_steps,
         })
     except Exception as e:
         logger.error(f"[respond] Failed: {e}", exc_info=True)
@@ -711,6 +734,8 @@ def chat_start_review(request, session_id):
         "show_exit_ticket": False,
         "exit_ticket": None,
         "is_complete": False,
+        "step_number": result.step_number,
+        "total_steps": result.total_steps,
     })
 
 
@@ -742,3 +767,226 @@ def chat_exit_ticket(request, session_id):
         "exit_ticket": response.exit_ticket_data,
         "is_complete": response.is_complete,
     })
+
+
+# =============================================================================
+# AUDIO — STT (transcribe) + TTS (speak)
+# =============================================================================
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def transcribe_audio(request, session_id):
+    """Transcribe uploaded audio to text via faster-whisper."""
+    from apps.safety import RateLimiter
+
+    # Validate session ownership
+    session = get_object_or_404(TutorSession, id=session_id, student=request.user)
+
+    # Rate limit
+    allowed, reason = RateLimiter.check_rate_limit(request.user.id)
+    if not allowed:
+        return JsonResponse({"error": reason}, status=429)
+    RateLimiter.record_message(request.user.id)
+
+    audio_file = request.FILES.get("audio")
+    if not audio_file:
+        return JsonResponse({"error": "No audio file provided"}, status=400)
+
+    # 10 MB max
+    if audio_file.size > 10 * 1024 * 1024:
+        return JsonResponse({"error": "Audio file too large (10MB max)"}, status=400)
+
+    from apps.tutoring.audio_service import transcribe
+    text = transcribe(audio_file.read(), audio_file.content_type or "audio/webm")
+
+    if not text:
+        return JsonResponse({"error": "Could not transcribe audio"}, status=422)
+
+    return JsonResponse({"text": text})
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def speak_text(request):
+    """Synthesize text to WAV audio via Piper TTS."""
+    from apps.safety import RateLimiter
+
+    allowed, reason = RateLimiter.check_rate_limit(request.user.id)
+    if not allowed:
+        return JsonResponse({"error": reason}, status=429)
+    RateLimiter.record_message(request.user.id)
+
+    try:
+        data = json.loads(request.body)
+        text = data.get("text", "").strip()
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    if not text:
+        return JsonResponse({"error": "Text required"}, status=400)
+    if len(text) > 2000:
+        return JsonResponse({"error": "Text too long (2000 char max)"}, status=400)
+
+    from django.http import HttpResponse
+    from apps.tutoring.audio_service import synthesize
+    wav_bytes = synthesize(text)
+
+    if not wav_bytes:
+        return JsonResponse({"error": "TTS unavailable"}, status=503)
+
+    return HttpResponse(wav_bytes, content_type="audio/wav")
+
+
+# =============================================================================
+# PERSONALITY SELECTION
+# =============================================================================
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def set_personality(request):
+    """Set or clear the student's tutor personality preference."""
+    try:
+        data = json.loads(request.body)
+        personality_id = data.get('personality_id')
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+
+    if personality_id:
+        personality = TutorPersonality.objects.filter(id=personality_id, is_active=True).first()
+        if not personality:
+            return JsonResponse({"error": "Personality not found"}, status=404)
+        profile.tutor_personality = personality
+    else:
+        profile.tutor_personality = None
+    profile.save(update_fields=['tutor_personality'])
+
+    return JsonResponse({
+        "selected": {
+            "id": profile.tutor_personality.id,
+            "name": profile.tutor_personality.name,
+            "emoji": profile.tutor_personality.emoji,
+        } if profile.tutor_personality else None
+    })
+
+
+# =============================================================================
+# GAMIFICATION DATA
+# =============================================================================
+
+@login_required
+@require_http_methods(["GET"])
+def get_gamification_data(request):
+    """Return XP, level, streak, achievements, and personality data for the current student."""
+    from apps.tutoring.skills_models import StudentKnowledgeProfile, StudentAchievement, Achievement
+
+    # Aggregate XP across all courses
+    profiles = StudentKnowledgeProfile.objects.filter(student=request.user)
+    total_xp = sum(p.total_xp for p in profiles)
+    level = (total_xp // 1000) + 1
+    xp_in_level = total_xp % 1000
+    max_streak = max((p.current_streak_days for p in profiles), default=0)
+
+    # Unseen achievements — mark them seen
+    new_achievements = []
+    unseen = StudentAchievement.objects.filter(
+        student=request.user, is_seen=False
+    ).select_related('achievement')
+    for sa in unseen:
+        new_achievements.append({
+            'name': sa.achievement.name,
+            'emoji': sa.achievement.emoji,
+            'description': sa.achievement.description,
+        })
+    unseen.update(is_seen=True)
+
+    # All earned achievements
+    all_earned = StudentAchievement.objects.filter(
+        student=request.user
+    ).select_related('achievement').order_by('-earned_at')
+    earned_list = [{
+        'code': sa.achievement.code,
+        'name': sa.achievement.name,
+        'emoji': sa.achievement.emoji,
+        'description': sa.achievement.description,
+        'earned_at': sa.earned_at.isoformat(),
+    } for sa in all_earned]
+
+    # Active personalities + student's current pick
+    personalities = list(
+        TutorPersonality.objects.filter(is_active=True).values('id', 'name', 'emoji', 'description')
+    )
+    selected_personality = None
+    profile = StudentProfile.objects.select_related('tutor_personality').filter(user=request.user).first()
+    if profile and profile.tutor_personality:
+        selected_personality = {
+            'id': profile.tutor_personality.id,
+            'name': profile.tutor_personality.name,
+            'emoji': profile.tutor_personality.emoji,
+        }
+
+    return JsonResponse({
+        'total_xp': total_xp,
+        'level': level,
+        'xp_in_level': xp_in_level,
+        'xp_to_next_level': 1000,
+        'streak_days': max_streak,
+        'new_achievements': new_achievements,
+        'achievements': earned_list,
+        'personalities': personalities,
+        'selected_personality': selected_personality,
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def leaderboard(request):
+    """Return top 50 students by XP within the user's institution, anonymized."""
+    from apps.tutoring.skills_models import StudentKnowledgeProfile
+    from django.db.models import Sum
+    from django.contrib.auth.models import User
+
+    # Get the student's institution(s)
+    memberships = Membership.objects.filter(user=request.user, role='student')
+    institution_ids = list(memberships.values_list('institution_id', flat=True))
+
+    if institution_ids:
+        student_ids = Membership.objects.filter(
+            institution_id__in=institution_ids, role='student'
+        ).values_list('user_id', flat=True)
+    else:
+        student_ids = [request.user.id]
+
+    # Aggregate XP per student
+    rankings = (
+        StudentKnowledgeProfile.objects
+        .filter(student_id__in=student_ids)
+        .values('student_id')
+        .annotate(xp=Sum('total_xp'))
+        .order_by('-xp')[:50]
+    )
+
+    # Fetch user names for anonymization
+    user_ids = [r['student_id'] for r in rankings]
+    users = {u.id: u for u in User.objects.filter(id__in=user_ids)}
+
+    entries = []
+    for rank, r in enumerate(rankings, 1):
+        user = users.get(r['student_id'])
+        if user:
+            last_initial = f" {user.last_name[0]}." if user.last_name else ""
+            name = f"{user.first_name}{last_initial}" if user.first_name else user.username
+        else:
+            name = "Unknown"
+        entries.append({
+            'rank': rank,
+            'name': name,
+            'xp': r['xp'] or 0,
+            'is_you': r['student_id'] == request.user.id,
+        })
+
+    return JsonResponse({'leaderboard': entries})

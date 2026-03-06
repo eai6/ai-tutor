@@ -680,11 +680,67 @@ class StudentKnowledgeProfile(models.Model):
     def add_xp(self, amount: int, reason: str = ""):
         """Add XP and check for level up."""
         self.total_xp += amount
-        
+
         # Simple leveling: 1000 XP per level
         new_level = (self.total_xp // 1000) + 1
         leveled_up = new_level > self.level
         self.level = new_level
-        
+
         self.save()
         return leveled_up
+
+
+# =============================================================================
+# ACHIEVEMENTS & BADGES
+# =============================================================================
+
+class Achievement(models.Model):
+    """Defines an earnable achievement / badge."""
+
+    class Category(models.TextChoices):
+        MILESTONE = 'milestone', 'Milestone'
+        STREAK = 'streak', 'Streak'
+        MASTERY = 'mastery', 'Mastery'
+        SPECIAL = 'special', 'Special'
+
+    class TriggerType(models.TextChoices):
+        FIRST_LESSON = 'first_lesson', 'First Lesson Completed'
+        LESSONS_COMPLETED = 'lessons_completed', 'Lessons Completed'
+        STREAK_DAYS = 'streak_days', 'Streak Days'
+        XP_THRESHOLD = 'xp_threshold', 'XP Threshold'
+        LEVEL_REACHED = 'level_reached', 'Level Reached'
+        PERFECT_SCORE = 'perfect_score', 'Perfect Exit-Ticket Score'
+        EXIT_TICKET_PASS = 'exit_ticket_pass', 'Exit Ticket Passed'
+
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=100)
+    description = models.CharField(max_length=255)
+    emoji = models.CharField(max_length=10, default='')
+    category = models.CharField(max_length=20, choices=Category.choices, default=Category.MILESTONE)
+    trigger_type = models.CharField(max_length=30, choices=TriggerType.choices)
+    trigger_value = models.IntegerField(default=0)
+    xp_reward = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'name']
+
+    def __str__(self):
+        return f"{self.emoji} {self.name}" if self.emoji else self.name
+
+
+class StudentAchievement(models.Model):
+    """Records when a student earns an achievement."""
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='achievements')
+    achievement = models.ForeignKey(Achievement, on_delete=models.CASCADE, related_name='earned_by')
+    earned_at = models.DateTimeField(auto_now_add=True)
+    context = models.JSONField(default=dict, blank=True)
+    is_seen = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ['student', 'achievement']
+        ordering = ['-earned_at']
+
+    def __str__(self):
+        return f"{self.student.username} — {self.achievement.name}"

@@ -13,7 +13,16 @@
             <div class="header-center">
                 <h1 class="lesson-name">{{ lesson.title }}</h1>
                 <span class="phase-badge" id="phase-badge">Starting...</span>
+                <span class="step-progress" id="step-progress"></span>
             </div>
+            <button class="audio-toggle" id="audio-toggle" onclick="toggleAudioMode()" title="Toggle audio mode">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <path class="audio-on-icon" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                    <line class="audio-off-icon" x1="23" y1="9" x2="17" y2="15" style="display:none"/>
+                    <line class="audio-off-icon" x1="17" y1="9" x2="23" y2="15" style="display:none"/>
+                </svg>
+            </button>
         </div>
     </header>
 
@@ -38,6 +47,13 @@
                         autofocus
                         rows="1"
                     ></textarea>
+                    <button id="mic-btn" class="mic-btn" onclick="toggleRecording()" aria-label="Record audio" style="display:none">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                    </button>
                     <button id="send-btn" onclick="sendMessage()" aria-label="Send message">
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M18 2L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 2L12 18L9 11L2 8L18 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
@@ -49,15 +65,52 @@
         <aside class="artifact-panel" id="artifact-panel">
             <div class="artifact-header">
                 <span class="artifact-title" id="artifact-title">Image</span>
-                <button class="artifact-close" onclick="closeArtifactPanel()" aria-label="Close panel">
-                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M13.5 4.5L4.5 13.5M4.5 4.5L13.5 13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                </button>
+                <div class="artifact-header-actions">
+                    <button class="artifact-zoom-btn" onclick="artifactZoom(0.25)" title="Zoom in" aria-label="Zoom in">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    </button>
+                    <button class="artifact-zoom-btn" onclick="artifactZoom(-0.25)" title="Zoom out" aria-label="Zoom out">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    </button>
+                    <button class="artifact-zoom-btn" onclick="artifactZoomReset()" title="Reset zoom" aria-label="Reset zoom">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    </button>
+                    <button class="artifact-expand-btn" id="artifact-expand" onclick="toggleArtifactExpand()" title="Expand panel" aria-label="Expand panel">
+                        <svg class="expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                        <svg class="collapse-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                    </button>
+                    <button class="artifact-close" onclick="closeArtifactPanel()" aria-label="Close panel">
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M13.5 4.5L4.5 13.5M4.5 4.5L13.5 13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    </button>
+                </div>
             </div>
             <div class="artifact-body" id="artifact-body">
                 <div class="artifact-placeholder">Images will appear here</div>
             </div>
             <div class="artifact-thumbnails" id="artifact-thumbnails"></div>
         </aside>
+    </div>
+
+    <!-- Fullscreen Image Lightbox (mobile + desktop double-click) -->
+    <div class="lightbox" id="lightbox" style="display:none" onclick="closeLightbox(event)">
+        <div class="lightbox-controls">
+            <button class="lightbox-btn" onclick="lightboxZoom(0.25)" aria-label="Zoom in">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            </button>
+            <button class="lightbox-btn" onclick="lightboxZoom(-0.25)" aria-label="Zoom out">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            </button>
+            <button class="lightbox-btn" onclick="lightboxZoomReset()" aria-label="Reset">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            </button>
+            <button class="lightbox-btn" onclick="closeLightbox()" aria-label="Close">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="lightbox-body" id="lightbox-body">
+            <img id="lightbox-img" src="" alt="" draggable="false">
+        </div>
+        <div class="lightbox-caption" id="lightbox-caption"></div>
     </div>
 
     <!-- Exit Ticket Modal -->
@@ -78,6 +131,12 @@
             <div class="completion-icon" id="completion-icon">🎉</div>
             <h2 id="completion-title">Lesson Complete!</h2>
             <p id="completion-message"></p>
+            <!-- Gamification XP display -->
+            <div id="completion-xp" style="display:none; margin:1rem 0;">
+                <div id="xp-earned-text" style="font-size:1.5rem; font-weight:800; color:#7C3AED; animation: xpPulse 0.6s ease;"></div>
+                <div id="level-up-banner" style="display:none; margin-top:0.5rem; padding:0.4rem 0.8rem; background:linear-gradient(135deg,#7C3AED,#A855F7); color:#fff; border-radius:999px; font-weight:700; font-size:0.85rem; display:inline-block;"></div>
+                <div id="completion-badges" style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap; margin-top:0.75rem;"></div>
+            </div>
             <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: center; margin-top: 1rem;">
                 <button class="cta-btn" onclick="startReview()" style="border: none; cursor: pointer;">Review Lesson</button>
                 <a href="{% url 'tutoring:catalog' %}" class="cta-btn" style="background: #fff; color: #18181b; border: 2px solid #e4e4e7;">Continue Learning</a>
@@ -168,6 +227,16 @@ body {
     border-radius: 999px;
     text-transform: capitalize;
 }
+.step-progress {
+    flex-shrink: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    background: #e4e4e7;
+    color: #52525b;
+    border-radius: 999px;
+}
+.step-progress:empty { display: none; }
 
 /* ── Chat Body (flex row: chat + artifact panel) ── */
 .chat-body {
@@ -251,6 +320,28 @@ body {
     border-radius: 1rem 1rem 0.25rem 1rem;
 }
 
+/* Replay button on tutor bubbles */
+.bubble-wrapper { position: relative; min-width: 0; }
+.replay-btn {
+    display: flex;
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: #f4f4f5;
+    color: #71717a;
+    border-radius: 50%;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    opacity: 0.6;
+}
+.replay-btn:hover { background: #18181b; color: #fff; opacity: 1; }
+
 .bubble p { margin-bottom: 0.625rem; }
 .bubble p:last-child { margin-bottom: 0; }
 .bubble strong { font-weight: 600; }
@@ -313,14 +404,26 @@ body {
     display: none;
     flex-direction: column;
     flex-shrink: 0;
+    transition: width 0.25s ease, max-width 0.25s ease;
 }
 .artifact-panel.open { display: flex; }
+.artifact-panel.expanded {
+    width: 70vw;
+    max-width: 70vw;
+}
 .artifact-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #e4e4e7;
+    flex-shrink: 0;
+    gap: 0.5rem;
+}
+.artifact-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
     flex-shrink: 0;
 }
 .artifact-title {
@@ -330,7 +433,10 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
 }
+.artifact-zoom-btn,
+.artifact-expand-btn,
 .artifact-close {
     display: flex;
     align-items: center;
@@ -345,6 +451,8 @@ body {
     transition: background 0.15s;
     flex-shrink: 0;
 }
+.artifact-zoom-btn:hover,
+.artifact-expand-btn:hover,
 .artifact-close:hover { background: #f4f4f5; color: #18181b; }
 .artifact-body {
     flex: 1;
@@ -353,12 +461,77 @@ body {
     justify-content: center;
     padding: 1rem;
     overflow: auto;
+    cursor: grab;
+    position: relative;
 }
+.artifact-body.dragging { cursor: grabbing; }
 .artifact-body img {
     max-width: 100%;
     max-height: 100%;
     border-radius: 8px;
     object-fit: contain;
+    transform-origin: center center;
+    transition: transform 0.15s ease;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* ── Lightbox ── */
+.lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+}
+.lightbox-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    flex-shrink: 0;
+}
+.lightbox-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.lightbox-btn:hover { background: rgba(255,255,255,0.3); }
+.lightbox-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    cursor: grab;
+    padding: 1rem;
+}
+.lightbox-body.dragging { cursor: grabbing; }
+.lightbox-body img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+    transform-origin: center center;
+    transition: transform 0.15s ease;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+.lightbox-caption {
+    text-align: center;
+    color: #a1a1aa;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem 1rem;
+    font-style: italic;
 }
 .artifact-body .artifact-caption {
     font-size: 0.8125rem;
@@ -585,6 +758,8 @@ body {
 /* Completion */
 .completion { text-align: center; }
 .completion-icon { font-size: 3.5rem; margin-bottom: 0.75rem; }
+@keyframes xpPulse { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+.badge-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.6rem; background: #EDE9FE; border: 1px solid #C4B5FD; border-radius: 999px; font-size: 0.78rem; font-weight: 600; color: #6D28D9; }
 
 .cta-btn {
     display: inline-block;
@@ -598,6 +773,56 @@ body {
     transition: background 0.15s;
 }
 .cta-btn:hover { background: #27272a; }
+
+/* ── Audio Mode ── */
+.audio-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #71717a;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.audio-toggle:hover { background: #f4f4f5; color: #18181b; }
+.audio-toggle.active { background: #18181b; color: #fff; }
+.audio-toggle.active:hover { background: #27272a; }
+
+.mic-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    color: #71717a;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+.mic-btn:hover { background: #f4f4f5; color: #18181b; }
+.mic-btn.recording {
+    background: #ef4444;
+    color: #fff;
+    animation: pulse-red 1.5s infinite;
+}
+@keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+}
+
+.bubble.speaking {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
 
 /* ── Mobile ── */
 @media (max-width: 768px) {
@@ -626,6 +851,7 @@ const typing = document.getElementById('typing');
 const userInput = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
 const phaseBadge = document.getElementById('phase-badge');
+const stepProgress = document.getElementById('step-progress');
 
 // Phase label mapping (5E model phases + session states)
 const phaseLabels = {
@@ -635,6 +861,16 @@ const phaseLabels = {
 };
 function phaseLabel(phase) {
     return phaseLabels[phase] || phase.replace('_', ' ');
+}
+
+function updateStepProgress(data) {
+    if (data.step_number && data.total_steps) {
+        if (data.phase === 'exit_ticket' || data.phase === 'completed') {
+            stepProgress.textContent = '';
+        } else {
+            stepProgress.textContent = data.step_number + '/' + data.total_steps;
+        }
+    }
 }
 
 // Artifact panel elements & state
@@ -651,6 +887,7 @@ function sanitizeContent(text) {
     return text
         .replace(/\[SHOW_MEDIA\s*:[^\]]*\]/gi, '')
         .replace(/\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|/g, '')
+        .replace(/\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|/g, '')
         .replace(/ {2,}/g, ' ')
         .trim();
 }
@@ -669,7 +906,10 @@ function openArtifactPanel(mediaItem) {
 }
 
 function closeArtifactPanel() {
-    artifactPanel.classList.remove('open');
+    artifactPanel.classList.remove('open', 'expanded');
+    document.querySelector('.expand-icon').style.display = '';
+    document.querySelector('.collapse-icon').style.display = 'none';
+    artifactZoomReset();
 }
 
 function addThumbnail(mediaItem) {
@@ -713,14 +953,18 @@ userInput.addEventListener('keydown', e => {
     }
 });
 
+let suppressAudio = false;  // true during history replay to prevent TTS
+
 function renderHistory(history) {
     if (!history || history.length === 0) return;
 
-    // Render each prior turn (with media for artifact panel on resume)
+    // Suppress TTS for history replay
+    suppressAudio = true;
     for (const turn of history) {
         const role = turn.role === 'student' ? 'student' : 'tutor';
         addMessage(role, turn.content, turn.media || []);
     }
+    suppressAudio = false;
 
     // Add a visual separator between history and new messages
     const sep = document.createElement('div');
@@ -784,12 +1028,13 @@ async function startSession() {
 
 function handleResponse(data) {
     showTyping(false);
-    
-    // Update phase badge
+
+    // Update phase badge + step progress
     if (data.phase) {
         phaseBadge.textContent = phaseLabel(data.phase);
     }
-    
+    updateStepProgress(data);
+
     // Add tutor message
     addMessage('tutor', data.message, data.media);
     
@@ -820,13 +1065,13 @@ function addMessage(role, content, media = []) {
     if (media && media.length > 0) {
         mediaHtml = '<div class="message-media">';
         for (const m of media) {
-            if (m.type === 'image') {
+            if (m.type === 'image' || m.type === 'diagram' || m.type === 'chart' || m.type === 'illustration') {
                 if (isDesktop() && openArtifactPanel(m)) {
                     // Desktop: small clickable thumbnail + opened in artifact panel
                     mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
                 } else {
-                    // Mobile or panel failed: full inline image
-                    mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}">`;
+                    // Mobile or panel failed: full inline image (tap to open lightbox)
+                    mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}" class="inline-media-img" data-caption="${m.caption || ''}" style="cursor:pointer">`;
                     if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
                 }
             }
@@ -834,10 +1079,27 @@ function addMessage(role, content, media = []) {
         mediaHtml += '</div>';
     }
 
+    const replayBtn = role === 'tutor'
+        ? `<button class="replay-btn" aria-label="Replay audio" title="Replay audio"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button>`
+        : '';
+
     div.innerHTML = `
         <div class="avatar">${avatar}</div>
-        <div class="bubble">${marked.parse(sanitizeContent(content))}${mediaHtml}</div>
+        <div class="bubble-wrapper">
+            <div class="bubble">${marked.parse(sanitizeContent(content))}${mediaHtml}</div>
+            ${replayBtn}
+        </div>
     `;
+
+    // Bind replay button (always works, even with audio mode off)
+    const rBtn = div.querySelector('.replay-btn');
+    if (rBtn) {
+        const plainText = content.replace(/[#*_`~\[\]()>|\\-]/g, '').replace(/!\[.*?\]\(.*?\)/g, '').trim();
+        rBtn.addEventListener('click', () => {
+            const bubble = div.querySelector('.bubble');
+            speakResponse(plainText, bubble, true);
+        });
+    }
 
     // Bind click handlers to inline thumbnails (desktop)
     div.querySelectorAll('.media-panel-trigger').forEach(trigger => {
@@ -850,13 +1112,24 @@ function addMessage(role, content, media = []) {
         });
     });
 
+    // Bind tap-to-lightbox on mobile inline images
+    div.querySelectorAll('.inline-media-img').forEach(img => {
+        img.addEventListener('click', () => {
+            openLightbox(img.src, img.alt, img.dataset.caption);
+        });
+    });
+
     chatMessages.insertBefore(div, typing);
     scrollToBottom();
 }
 
+let isSending = false;
+
 async function sendMessage() {
     const text = userInput.value.trim();
-    if (!text || !sessionId) return;
+    if (!text || !sessionId || isSending) return;
+
+    isSending = true;
 
     // Add student message
     addMessage('student', text);
@@ -880,6 +1153,7 @@ async function sendMessage() {
         const data = await response.json();
         showTyping(false);
         sendBtn.disabled = false;
+        isSending = false;
 
         if (data.error) {
             addMessage('tutor', data.error);
@@ -892,6 +1166,7 @@ async function sendMessage() {
         if (data.phase) {
             phaseBadge.textContent = phaseLabel(data.phase);
         }
+        updateStepProgress(data);
         if (data.show_exit_ticket && data.exit_ticket) {
             exitTicketData = data.exit_ticket;
             setTimeout(() => showExitTicket(), 1000);
@@ -907,6 +1182,7 @@ async function sendMessage() {
         console.error('Send error:', error);
         showTyping(false);
         sendBtn.disabled = false;
+        isSending = false;
         addMessage('tutor', 'Something went wrong. Please try again.');
     }
 }
@@ -928,7 +1204,7 @@ function updateStreamingMessage(div, content, media = []) {
     if (media && media.length > 0) {
         mediaHtml = '<div class="message-media">';
         for (const m of media) {
-            if (m.type === 'image') {
+            if (m.type === 'image' || m.type === 'diagram' || m.type === 'chart' || m.type === 'illustration') {
                 if (isDesktop() && openArtifactPanel(m)) {
                     mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
                 } else {
@@ -1019,7 +1295,8 @@ async function submitExitTicket() {
         setTimeout(() => {
             document.getElementById('exit-modal').style.display = 'none';
             if (data.is_complete) {
-                showCompletion(data.message);
+                const gam = data.exit_ticket && data.exit_ticket.gamification ? data.exit_ticket.gamification : null;
+                showCompletion(data.message, gam);
             } else {
                 // Failed - show message and let them try again
                 document.getElementById('input-area').style.display = 'block';
@@ -1049,9 +1326,36 @@ function showExitResults(results) {
     });
 }
 
-function showCompletion(message) {
+function showCompletion(message, gamification) {
     document.getElementById('input-area').style.display = 'none';
     document.getElementById('completion-message').textContent = message || 'Great work!';
+
+    // Show gamification data if available
+    const xpSection = document.getElementById('completion-xp');
+    if (gamification && gamification.xp_earned > 0) {
+        xpSection.style.display = 'block';
+        document.getElementById('xp-earned-text').textContent = '+' + gamification.xp_earned + ' XP Earned!';
+
+        const lvBanner = document.getElementById('level-up-banner');
+        if (gamification.leveled_up) {
+            lvBanner.style.display = 'inline-block';
+            lvBanner.textContent = '⬆ Level Up!';
+        } else {
+            lvBanner.style.display = 'none';
+        }
+
+        const badgesEl = document.getElementById('completion-badges');
+        badgesEl.innerHTML = '';
+        (gamification.achievements || []).forEach(a => {
+            const chip = document.createElement('span');
+            chip.className = 'badge-chip';
+            chip.textContent = (a.emoji || '🏆') + ' ' + a.name;
+            badgesEl.appendChild(chip);
+        });
+    } else {
+        xpSection.style.display = 'none';
+    }
+
     document.getElementById('complete-modal').style.display = 'flex';
 }
 
@@ -1075,6 +1379,7 @@ async function startReview() {
         if (data.phase) {
             phaseBadge.textContent = phaseLabel(data.phase);
         }
+        updateStepProgress(data);
         addMessage('tutor', data.message, data.media || []);
         userInput.focus();
     } catch (error) {
@@ -1107,5 +1412,306 @@ function getCookie(name) {
     }
     return value;
 }
+
+// =============================================================================
+// ARTIFACT PANEL — EXPAND + ZOOM + PAN
+// =============================================================================
+
+let artifactScale = 1;
+let artifactTranslateX = 0;
+let artifactTranslateY = 0;
+
+function toggleArtifactExpand() {
+    const panel = document.getElementById('artifact-panel');
+    const expanded = panel.classList.toggle('expanded');
+    document.querySelector('.expand-icon').style.display = expanded ? 'none' : '';
+    document.querySelector('.collapse-icon').style.display = expanded ? '' : 'none';
+}
+
+function artifactZoom(delta) {
+    artifactScale = Math.max(0.25, Math.min(5, artifactScale + delta));
+    applyArtifactTransform();
+}
+
+function artifactZoomReset() {
+    artifactScale = 1;
+    artifactTranslateX = 0;
+    artifactTranslateY = 0;
+    applyArtifactTransform();
+}
+
+function applyArtifactTransform() {
+    const img = artifactBody.querySelector('img');
+    if (img) img.style.transform = `translate(${artifactTranslateX}px, ${artifactTranslateY}px) scale(${artifactScale})`;
+}
+
+// Scroll-wheel zoom on artifact panel
+artifactBody.addEventListener('wheel', (e) => {
+    if (!artifactBody.querySelector('img')) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.15 : 0.15;
+    artifactScale = Math.max(0.25, Math.min(5, artifactScale + delta));
+    applyArtifactTransform();
+}, { passive: false });
+
+// Drag-to-pan on artifact panel
+(function initArtifactPan() {
+    let dragging = false, startX, startY, origTX, origTY;
+    artifactBody.addEventListener('pointerdown', (e) => {
+        if (!artifactBody.querySelector('img') || artifactScale <= 1) return;
+        dragging = true;
+        startX = e.clientX; startY = e.clientY;
+        origTX = artifactTranslateX; origTY = artifactTranslateY;
+        artifactBody.classList.add('dragging');
+        artifactBody.setPointerCapture(e.pointerId);
+    });
+    artifactBody.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        artifactTranslateX = origTX + (e.clientX - startX);
+        artifactTranslateY = origTY + (e.clientY - startY);
+        applyArtifactTransform();
+    });
+    artifactBody.addEventListener('pointerup', () => { dragging = false; artifactBody.classList.remove('dragging'); });
+    artifactBody.addEventListener('pointercancel', () => { dragging = false; artifactBody.classList.remove('dragging'); });
+})();
+
+// Reset zoom when a new image is loaded in artifact panel
+const _origOpenArtifactPanel = openArtifactPanel;
+openArtifactPanel = function(mediaItem) {
+    artifactZoomReset();
+    return _origOpenArtifactPanel(mediaItem);
+};
+
+// Double-click artifact image → open lightbox
+artifactBody.addEventListener('dblclick', () => {
+    const img = artifactBody.querySelector('img');
+    if (img) openLightbox(img.src, img.alt, document.getElementById('artifact-title').textContent);
+});
+
+// =============================================================================
+// FULLSCREEN LIGHTBOX — ZOOM + PAN
+// =============================================================================
+
+let lbScale = 1, lbTX = 0, lbTY = 0;
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+const lightboxBody = document.getElementById('lightbox-body');
+const lightboxCaption = document.getElementById('lightbox-caption');
+
+function openLightbox(src, alt, caption) {
+    lbScale = 1; lbTX = 0; lbTY = 0;
+    lightboxImg.src = src;
+    lightboxImg.alt = alt || '';
+    lightboxCaption.textContent = caption || '';
+    applyLightboxTransform();
+    lightbox.style.display = 'flex';
+}
+
+function closeLightbox(e) {
+    if (e && e.target !== lightbox && e.target !== lightboxBody) return;
+    lightbox.style.display = 'none';
+    lightboxImg.src = '';
+}
+
+function lightboxZoom(delta) {
+    lbScale = Math.max(0.25, Math.min(5, lbScale + delta));
+    applyLightboxTransform();
+}
+
+function lightboxZoomReset() {
+    lbScale = 1; lbTX = 0; lbTY = 0;
+    applyLightboxTransform();
+}
+
+function applyLightboxTransform() {
+    lightboxImg.style.transform = `translate(${lbTX}px, ${lbTY}px) scale(${lbScale})`;
+}
+
+// Scroll-wheel zoom on lightbox
+lightboxBody.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.15 : 0.15;
+    lbScale = Math.max(0.25, Math.min(5, lbScale + delta));
+    applyLightboxTransform();
+}, { passive: false });
+
+// Drag-to-pan on lightbox
+(function initLightboxPan() {
+    let dragging = false, startX, startY, origTX, origTY;
+    lightboxBody.addEventListener('pointerdown', (e) => {
+        if (e.target !== lightboxImg) return;
+        dragging = true;
+        startX = e.clientX; startY = e.clientY;
+        origTX = lbTX; origTY = lbTY;
+        lightboxBody.classList.add('dragging');
+        lightboxBody.setPointerCapture(e.pointerId);
+    });
+    lightboxBody.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        lbTX = origTX + (e.clientX - startX);
+        lbTY = origTY + (e.clientY - startY);
+        applyLightboxTransform();
+    });
+    lightboxBody.addEventListener('pointerup', () => { dragging = false; lightboxBody.classList.remove('dragging'); });
+    lightboxBody.addEventListener('pointercancel', () => { dragging = false; lightboxBody.classList.remove('dragging'); });
+})();
+
+// Escape key closes lightbox
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lightbox.style.display !== 'none') closeLightbox();
+});
+
+// =============================================================================
+// AUDIO MODE — TTS + STT
+// =============================================================================
+
+let audioMode = localStorage.getItem('audioMode') === 'true';
+let mediaRecorder = null;
+let audioChunks = [];
+const audioToggle = document.getElementById('audio-toggle');
+const micBtn = document.getElementById('mic-btn');
+
+// Initialize audio mode state on load
+(function initAudioMode() {
+    if (audioMode) {
+        audioToggle.classList.add('active');
+        micBtn.style.display = 'flex';
+        setAudioToggleIcon(true);
+    }
+})();
+
+function toggleAudioMode() {
+    audioMode = !audioMode;
+    localStorage.setItem('audioMode', audioMode);
+    audioToggle.classList.toggle('active', audioMode);
+    micBtn.style.display = audioMode ? 'flex' : 'none';
+    setAudioToggleIcon(audioMode);
+}
+
+function setAudioToggleIcon(on) {
+    audioToggle.querySelectorAll('.audio-on-icon').forEach(el => el.style.display = on ? '' : 'none');
+    audioToggle.querySelectorAll('.audio-off-icon').forEach(el => el.style.display = on ? 'none' : '');
+}
+
+let currentAudio = null;
+let currentSpeakingBubble = null;
+
+function stopCurrentAudio() {
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.onended = null;
+        URL.revokeObjectURL(currentAudio.src);
+        currentAudio = null;
+    }
+    if (currentSpeakingBubble) {
+        currentSpeakingBubble.classList.remove('speaking');
+        currentSpeakingBubble = null;
+    }
+}
+
+async function speakResponse(text, bubbleEl, force = false) {
+    if ((!audioMode && !force) || !text) return;
+    stopCurrentAudio();
+    try {
+        const resp = await fetch('/tutor/api/speak/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ text: text.slice(0, 2000) }),
+        });
+        if (!resp.ok) return;
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        currentAudio = audio;
+        currentSpeakingBubble = bubbleEl;
+        if (bubbleEl) bubbleEl.classList.add('speaking');
+        audio.onended = () => {
+            if (bubbleEl) bubbleEl.classList.remove('speaking');
+            URL.revokeObjectURL(url);
+            if (currentAudio === audio) {
+                currentAudio = null;
+                currentSpeakingBubble = null;
+            }
+        };
+        audio.play();
+    } catch (e) {
+        console.error('TTS error:', e);
+    }
+}
+
+async function toggleRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        return;
+    }
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { channelCount: 1, sampleRate: 16000 }
+        });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream, {
+            mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus' : 'audio/webm'
+        });
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+            stream.getTracks().forEach(t => t.stop());
+            micBtn.classList.remove('recording');
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            transcribeAudio(blob);
+        };
+        mediaRecorder.start();
+        micBtn.classList.add('recording');
+    } catch (e) {
+        console.error('Mic access denied:', e);
+    }
+}
+
+async function transcribeAudio(blob) {
+    if (!sessionId) return;
+    showTyping(true);
+    sendBtn.disabled = true;
+    micBtn.disabled = true;
+    try {
+        const form = new FormData();
+        form.append('audio', blob, 'recording.webm');
+        const resp = await fetch(`/tutor/api/chat/${sessionId}/transcribe/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: form,
+        });
+        const data = await resp.json();
+        showTyping(false);
+        micBtn.disabled = false;
+        sendBtn.disabled = false;
+        if (data.text) {
+            userInput.value = data.text;
+            sendMessage();
+        } else {
+            addMessage('tutor', "I couldn't hear that clearly. Could you try again?");
+        }
+    } catch (e) {
+        console.error('Transcribe error:', e);
+        showTyping(false);
+        micBtn.disabled = false;
+        sendBtn.disabled = false;
+    }
+}
+
+// Patch: after tutor message renders, auto-speak ONLY the latest live message
+// (skip history replay, skip student messages)
+const _origAddMessage = addMessage;
+addMessage = function(role, content, media) {
+    _origAddMessage(role, content, media);
+    if (role === 'tutor' && audioMode && content && !suppressAudio) {
+        const msgs = chatMessages.querySelectorAll('.message.tutor .bubble');
+        const bubbleEl = msgs[msgs.length - 1];
+        const plainText = content.replace(/[#*_`~\[\]()>|\\-]/g, '').replace(/!\[.*?\]\(.*?\)/g, '').trim();
+        speakResponse(plainText, bubbleEl);
+    }
+};
 </script>
 {% endblock %}

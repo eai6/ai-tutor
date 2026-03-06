@@ -86,9 +86,9 @@ immediately have the student practice with corrective feedback.
 ACTIVE OVER PASSIVE
 - Keep explanations to a MINIMUM EFFECTIVE DOSE: explain just enough for the
   student to attempt a problem, then immediately get them doing something.
-- Never present more than 3 sentences of explanation without prompting the
-  student to respond -- even a comprehension check like "In your own words,
-  what is the first step?"
+- Never present more than 1-2 sentences of explanation without prompting the
+  student to respond. Keep each turn under 50 words -- even a comprehension
+  check like "In your own words, what is the first step?"
 - The student should be DOING something (answering, computing, explaining back,
   choosing, comparing) at least 60% of interaction turns.
 - If you find yourself writing a long explanation, STOP. Break it into a short
@@ -128,7 +128,7 @@ MASTERY BEFORE ADVANCEMENT
 
 <principle id="cognitive_load">
 MINIMISE COGNITIVE LOAD
-- Present ONE idea at a time. Short paragraphs (2-3 sentences max).
+- Present ONE idea at a time. One to two sentences maximum per idea.
 - Before asking the student to solve a new type of problem, show a WORKED EXAMPLE
   with labelled subgoals (Step 1: ..., Step 2: ..., Step 3: ...).
 - Use concrete numbers and visuals before abstract notation.
@@ -293,11 +293,18 @@ a different approach -- no rush."
 </safety>
 
 <format_rules>
-- Respond in 2-4 sentences maximum per turn.
+- Respond in 1-2 sentences + a question, ~50 words total. No lists in one turn.
 - Always end with a question or a prompt for student action.
-- Use short paragraphs. Never produce a wall of text.
+- Never produce a wall of text.
 - Use LaTeX or clear notation for mathematical expressions.
 - To show an image, write |||MEDIA:N||| as the VERY LAST line. See <media_catalog>.
+- If no media in the catalog fits what you need, you may request on-the-fly generation:
+  Write |||GENERATE:category:description||| as the LAST line.
+  Categories: diagram, chart, map, illustration, flowchart, infographic.
+  Description: Clear, specific, educational description of the image needed.
+  Example: |||GENERATE:diagram:labeled diagram showing the water cycle with evaporation, condensation, and precipitation arrows|||
+  Use GENERATE sparingly — only when a visual truly aids understanding and nothing in the catalog fits.
+  Never use GENERATE for decorative images.
 - Do NOT include suggested quick-reply options or response choices in your messages.
   Just ask your question and let the student answer in their own words.
 </format_rules>
@@ -332,6 +339,10 @@ class TutorMessage:
     show_exit_ticket: bool = False
     exit_ticket_data: Optional[Dict] = None
     
+    # Step progress
+    step_number: int = 0
+    total_steps: int = 0
+
     # Metadata
     skills_covered: List[str] = field(default_factory=list)
     tokens_used: int = 0
@@ -378,6 +389,7 @@ class ConversationalTutor:
         # Initialize services
         self._llm_client = None
         self._instructor_client = None
+        self._instructor_provider = None
         self._knowledge_base = None
 
         # Skill assessment and personalization (R2, R3)
@@ -603,7 +615,7 @@ class ConversationalTutor:
         ).order_by('created_at')
 
         _tag_re = re.compile(
-            r'\[SHOW_MEDIA\s*:[^\]]*\]|\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|',
+            r'\[SHOW_MEDIA\s*:[^\]]*\]|\|\|\|MEDIA\s*:\s*\d+\s*\|\|\||\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|',
             re.IGNORECASE,
         )
 
@@ -777,6 +789,7 @@ class ConversationalTutor:
                         'local_ollama': 'ollama',
                     }
                     provider = PROVIDER_MAP.get(config.provider, config.provider)
+                    self._instructor_provider = config.provider  # store for max_tokens handling
                     self._instructor_client = instructor.from_provider(
                         f"{provider}/{config.model_name}",
                         api_key=config.get_api_key(),
@@ -887,13 +900,28 @@ Generate a brief, warm welcome back message that:
 3. Asks a question to re-engage them
 4. If media is available for the current step, reference the image and write |||MEDIA:N||| as the LAST line
 
-Keep it to 2-3 sentences."""
+Keep it to 1-2 sentences + question, under 50 words."""
 
         response = self._generate_response(prompt)
 
-        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
-        clean_response, parsed_media = self._parse_media_signal(response)
+        # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
+        clean_response, parsed_media, gen_request = self._parse_media_signal(response)
         media = [parsed_media] if parsed_media else []
+
+        # On-the-fly image generation via safety pipeline
+        if not media and gen_request:
+            generated = self._safe_generate_image(gen_request['category'], gen_request['description'])
+            if generated:
+                media = [generated]
+
+        # Fallback: if resume message references visual content but no signal emitted
+        if not media:
+            visual_refs = ['diagram', 'figure', 'image', 'picture', 'illustration', 'chart', 'graph', 'map']
+            if any(ref in clean_response.lower() for ref in visual_refs):
+                step_media = self._get_step_media()
+                if step_media:
+                    media = [step_media[0]]
+                    logger.info(f"Auto-attached step media on resume (visual reference fallback)")
 
         # Record media for this turn (for resume artifact panel)
         if media:
@@ -967,7 +995,7 @@ Generate a warm, encouraging opening that:
 2. Mentions the specific areas we'll focus on: {skills_text}
 3. Starts with a question about one of these areas
 
-Keep it to 3-4 sentences. Be specific about what we'll review."""
+Keep it to 2-3 sentences. Be specific about what we'll review."""
         else:
             prompt = f"""The student has completed this lesson and is returning to review it.
 
@@ -978,7 +1006,7 @@ Generate a warm, encouraging opening that:
 2. Says we'll go through the key concepts again
 3. Starts with a question about the main topic
 
-Keep it to 3-4 sentences."""
+Keep it to 2-3 sentences."""
 
         return self._generate_response(prompt)
 
@@ -1017,11 +1045,23 @@ Keep it to 3-4 sentences."""
             visual_requested=bool(visual_request)
         )
 
-        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
-        clean_response, parsed_media = self._parse_media_signal(response)
-
-        # Media ONLY from LLM signal — no fallback auto-attach
+        # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
+        clean_response, parsed_media, gen_request = self._parse_media_signal(response)
         media = [parsed_media] if parsed_media else []
+
+        # On-the-fly image generation via safety pipeline
+        if not media and gen_request:
+            generated = self._safe_generate_image(gen_request['category'], gen_request['description'])
+            if generated:
+                media = [generated]
+
+        # Fallback: if tutor references visual content but no signal emitted
+        if not media:
+            visual_refs = ['diagram', 'figure', 'image', 'picture', 'illustration', 'chart', 'graph', 'map']
+            if any(ref in clean_response.lower() for ref in visual_refs):
+                step_media = self._get_step_media()
+                if step_media:
+                    media = [step_media[0]]
 
         # Analyze student response for adaptation
         self._analyze_student_response(student_input, clean_response)
@@ -1109,11 +1149,27 @@ Keep it to 3-4 sentences."""
         post-processing (concept tracking, state save).
         Returns metadata dict including clean_content for the done chunk.
         """
-        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
-        clean_content, parsed_media = self._parse_media_signal(full_response)
+        # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
+        clean_content, parsed_media, gen_request = self._parse_media_signal(full_response)
 
-        # Media ONLY from LLM signal — no fallback auto-attach
+        # Media from LLM signal, with fallback for phantom references
         media = [parsed_media] if parsed_media else []
+
+        # On-the-fly image generation via safety pipeline
+        if not media and gen_request:
+            generated = self._safe_generate_image(gen_request['category'], gen_request['description'])
+            if generated:
+                media = [generated]
+
+        # Fallback: if tutor references visual content but no signal was emitted,
+        # auto-attach the current step's media to avoid "look at the diagram" with no diagram
+        if not media:
+            visual_refs = ['diagram', 'figure', 'image', 'picture', 'illustration', 'chart', 'graph', 'map']
+            if any(ref in clean_content.lower() for ref in visual_refs):
+                step_media = self._get_step_media()
+                if step_media:
+                    media = [step_media[0]]
+                    logger.info(f"Auto-attached step media (visual reference fallback): {step_media[0].get('alt', '')[:50]}")
 
         # Record media for this turn (for resume artifact panel)
         if media:
@@ -1154,6 +1210,8 @@ Keep it to 3-4 sentences."""
         self._save_turn("tutor", clean_content)
         self.conversation.append({"role": "assistant", "content": clean_content})
 
+        step_num = min(self.current_topic_index + 1, len(self.steps)) if self.steps else 0
+        total = len(self.steps)
         return {
             'phase': self._get_display_phase(),
             'media': media,
@@ -1161,6 +1219,8 @@ Keep it to 3-4 sentences."""
             'show_exit_ticket': show_exit_ticket,
             'exit_ticket': exit_ticket,
             'is_complete': self.session_state == SessionState.COMPLETED,
+            'step_number': step_num,
+            'total_steps': total,
         }
 
     def respond_stream(self, student_input: str):
@@ -1346,33 +1406,6 @@ IMPORTANT: You are showing these images with your response.
         
         return None
     
-    def _handle_visual_request(
-        self, 
-        student_input: str, 
-        trigger: str, 
-        kb_context: str
-    ) -> Tuple[str, List[Dict]]:
-        """Handle a request for visual aid."""
-        media = []
-        
-        # First, check if we have existing media that matches
-        existing_media = self._find_matching_media(student_input)
-        if existing_media:
-            media = existing_media
-            response = self._generate_visual_explanation(student_input, kb_context, has_image=True)
-            return response, media
-        
-        # Try to generate a new image
-        generated = self._generate_visual_aid(student_input)
-        if generated:
-            media = [generated]
-            response = self._generate_visual_explanation(student_input, kb_context, has_image=True)
-            return response, media
-        
-        # Fallback: describe it verbally
-        response = self._generate_visual_explanation(student_input, kb_context, has_image=False)
-        return response, media
-    
     def _find_matching_media(self, query: str, min_relevance: float = 0.4) -> List[Dict]:
         """
         Find existing media that STRONGLY matches the query.
@@ -1459,117 +1492,23 @@ IMPORTANT: You are showing these images with your response.
         
         return list(set(terms))[:10]  # Limit to 10 unique terms
     
-    def _generate_visual_aid(self, request: str) -> Optional[Dict]:
-        """Generate a visual aid using Gemini Imagen."""
-        # Image safety check
+    def _safe_generate_image(self, category: str, description: str) -> Optional[Dict]:
+        """Generate image on-the-fly with full 3-layer safety pipeline."""
         try:
-            from apps.safety import ImageSafetyFilter, SafetyAuditLog
-            safety_result = ImageSafetyFilter.check_image_request(
-                request, lesson_title=self.lesson.title
-            )
-            if safety_result.blocked:
-                SafetyAuditLog.log(
-                    'image_blocked',
-                    user=self.student,
-                    session_id=self.session.id,
-                    details={'prompt': request[:200], 'reason': safety_result.block_reason},
-                    severity='warning',
-                )
-                logger.warning(f"Image request blocked: {request[:50]}...")
-                return None
-        except Exception as e:
-            logger.warning(f"Image safety check failed (allowing): {e}")
+            from apps.safety.image_safety_pipeline import ImageSafetyPipeline
 
-        try:
-            from apps.tutoring.image_service import ImageGenerationService
-            
-            service = ImageGenerationService(
+            pipeline = ImageSafetyPipeline(
+                instructor_client=self.instructor_client,
+                provider=getattr(self, '_instructor_provider', None),
                 lesson=self.lesson,
-                institution=self.session.institution
+                session=self.session,
+                student=self.student,
             )
-            
-            # Determine the type of visual
-            request_lower = request.lower()
-            if 'diagram' in request_lower:
-                category = 'diagram'
-            elif 'graph' in request_lower or 'chart' in request_lower:
-                category = 'chart'
-            elif 'map' in request_lower:
-                category = 'map'
-            else:
-                category = 'diagram'
-            
-            # Build a good prompt from the lesson context
-            prompt = self._build_image_prompt(request)
-            
-            result = service.get_or_generate_image(prompt, category)
-            
-            if result:
-                logger.info(f"Generated visual aid: {result.get('url', 'unknown')}")
-                return {
-                    'type': 'image',
-                    'url': result['url'],
-                    'alt': result.get('alt_text', prompt),
-                    'caption': result.get('caption', f"Diagram: {prompt[:100]}"),
-                }
-            
+            return pipeline.run(description, category)
         except Exception as e:
-            logger.warning(f"Could not generate visual aid: {e}")
-        
-        return None
-    
-    def _build_image_prompt(self, request: str) -> str:
-        """Build a detailed prompt for image generation."""
-        # Get current topic context
-        current_topic = self._get_current_topic()
-        
-        prompt_parts = [
-            f"Educational diagram for secondary school: {self.lesson.title}.",
-            f"Topic: {current_topic[:100]}.",
-            f"Student asked for: {request[:100]}.",
-        ]
-        
-        # Add Seychelles context if relevant
-        if any(word in self.lesson.title.lower() for word in ['geography', 'map', 'climate', 'island']):
-            prompt_parts.append("Context: Seychelles islands in the Indian Ocean.")
-        
-        return " ".join(prompt_parts)
-    
-    def _generate_visual_explanation(
-        self, 
-        student_input: str, 
-        kb_context: str, 
-        has_image: bool
-    ) -> str:
-        """Generate explanation to accompany visual (or explain why we can't show one)."""
-        if has_image:
-            prompt = f"""The student asked: "{student_input}"
+            logger.error(f"Safe image generation failed: {e}")
+            return None
 
-I'm showing them a relevant image/diagram.
-
-Generate a brief response that:
-1. Acknowledges their request positively
-2. Points out key things to notice in the diagram
-3. Asks a question about what they see
-
-Keep it to 2-3 sentences + question."""
-        else:
-            prompt = f"""The student asked: "{student_input}"
-
-I don't have an image to show right now, but I should help them visualize this.
-
-Generate a response that:
-1. Acknowledges their request
-2. Provides a clear verbal description to help them visualize
-3. Suggests they could draw it themselves
-4. Asks a question to check understanding
-
-LESSON CONTEXT: {self.lesson_context[:500]}
-
-Keep it to 3-4 sentences + question."""
-        
-        return self._generate_response(prompt)
-    
     def _get_relevant_media_for_response(self, response: str) -> List[Dict]:
         """
         Intelligently select media that would enhance the tutor's response.
@@ -1623,10 +1562,9 @@ Keep it to 3-4 sentences + question."""
         
         # If no existing media matches well, try to generate one
         if not media and should_show_media:
-            # Determine what visual would help
             visual_need = self._determine_visual_need(response)
             if visual_need:
-                generated = self._generate_visual_aid(visual_need)
+                generated = self._safe_generate_image('diagram', visual_need)
                 if generated:
                     media.append(generated)
         
@@ -1732,13 +1670,28 @@ Generate a warm, engaging opening that:
 3. Otherwise, asks what they already know about today's topic
 4. If media is available for this step, reference the image in your text and write |||MEDIA:N||| as the LAST line
 
-End with a question. Keep it to 3-4 sentences max."""
+End with a question. Keep it to 2-3 sentences max."""
 
         response = self._generate_response(prompt)
 
-        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
-        clean_response, parsed_media = self._parse_media_signal(response)
+        # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
+        clean_response, parsed_media, gen_request = self._parse_media_signal(response)
         media = [parsed_media] if parsed_media else []
+
+        # On-the-fly image generation via safety pipeline
+        if not media and gen_request:
+            generated = self._safe_generate_image(gen_request['category'], gen_request['description'])
+            if generated:
+                media = [generated]
+
+        # Fallback: if opening references visual content but no signal emitted
+        if not media:
+            visual_refs = ['diagram', 'figure', 'image', 'picture', 'illustration', 'chart', 'graph', 'map']
+            if any(ref in clean_response.lower() for ref in visual_refs):
+                step_media = self._get_step_media()
+                if step_media:
+                    media = [step_media[0]]
+                    logger.info(f"Auto-attached step media in opening (visual reference fallback)")
 
         # Record media for this turn (for resume artifact panel)
         if media:
@@ -1997,7 +1950,7 @@ Generate your response following these rules:
 10. Watch for COMMON MISTAKES listed in the directive and address them proactively
 11. Weave in local Seychelles context where relevant to make the lesson relatable
 12. END with a question or "Try this:" prompt
-13. Keep it concise (2-4 sentences + question){media_reminder}
+13. Keep it concise (1-2 sentences + question, under 50 words){media_reminder}
 
 YOUR RESPONSE:"""
 
@@ -2115,11 +2068,14 @@ Follow the current step; this concept will be covered in sequence."""
 
         # Get grade level from course or student profile
         grade_level = "secondary school"
+        personality_prompt = None
         try:
             from apps.accounts.models import StudentProfile
-            profile = StudentProfile.objects.filter(user=self.student).first()
+            profile = StudentProfile.objects.select_related('tutor_personality').filter(user=self.student).first()
             if profile and profile.grade_level:
                 grade_level = profile.grade_level
+            if profile and profile.tutor_personality and profile.tutor_personality.is_active:
+                personality_prompt = profile.tutor_personality.system_prompt_modifier
         except Exception:
             pass
 
@@ -2146,6 +2102,10 @@ Follow the current step; this concept will be covered in sequence."""
 
         system_prompt = template.format_map(template_vars)
 
+        # Inject tutor personality modifier if student has one selected
+        if personality_prompt:
+            system_prompt += f"\n\n<personality>\n{personality_prompt}\n</personality>"
+
         # Append media catalog so the LLM knows what figures are available
         system_prompt += self._build_media_catalog()
 
@@ -2160,17 +2120,16 @@ Follow the current step; this concept will be covered in sequence."""
         """
         from apps.llm.prompts import get_lesson_media
 
-        seen_urls = set()
+        seen_urls = {}  # url -> 1-indexed catalog position
         media_items = []  # list of (label, media_dict)
 
-        # From StepMedia / media library
+        # From LessonStep.media JSON via get_lesson_media()
         try:
             for m in get_lesson_media(self.lesson):
                 url = m.get('url')
                 title = m.get('title', '')
                 if not url or not title or url in seen_urls:
                     continue
-                seen_urls.add(url)
                 media_items.append((title, {
                     'type': m.get('type', 'image'),
                     'url': url,
@@ -2178,25 +2137,29 @@ Follow the current step; this concept will be covered in sequence."""
                     'caption': m.get('caption', '') or title,
                     'description': title,
                 }))
+                seen_urls[url] = len(media_items)  # 1-indexed catalog ID
         except Exception:
             pass
 
         # From step.media JSONField images
         # Track which catalog IDs belong to which step
-        step_media_positions = {}  # {step_index: [position_in_media_items, ...]}
+        step_media_positions = {}  # {step_index: [catalog_id, ...]}
         for step_idx, step in enumerate(self.steps):
             if not step.media or 'images' not in step.media:
                 continue
             for img in step.media['images']:
                 url = img.get('url')
-                if not url or url in seen_urls:
+                if not url:
+                    continue
+                # If URL already in catalog (from get_lesson_media), reuse its ID
+                if url in seen_urls:
+                    step_media_positions.setdefault(step_idx, []).append(seen_urls[url])
                     continue
                 alt = img.get('alt', '')
                 caption = img.get('caption', '')
                 label = alt or caption
                 if not label:
                     continue
-                seen_urls.add(url)
                 media_items.append((label, {
                     'type': 'image',
                     'url': url,
@@ -2204,14 +2167,20 @@ Follow the current step; this concept will be covered in sequence."""
                     'caption': caption,
                     'description': alt or caption,
                 }))
-                # Catalog IDs are 1-indexed; after append, len == future ID
+                seen_urls[url] = len(media_items)  # 1-indexed catalog ID
                 step_media_positions.setdefault(step_idx, []).append(len(media_items))
 
         # Build numbered ID map
         self._media_id_map = {}
         self._step_media_ids = step_media_positions  # {step_index: [catalog_id, ...]}
         if not media_items:
-            return ""
+            return (
+                "\n\n<media_catalog>\n"
+                "No pre-made media available for this lesson.\n"
+                "If a visual would help the student, generate one:\n"
+                "|||GENERATE:category:description||| (as the LAST line)\n"
+                "</media_catalog>"
+            )
 
         lines = []
         for idx, (label, media_dict) in enumerate(media_items, start=1):
@@ -2224,6 +2193,8 @@ Follow the current step; this concept will be covered in sequence."""
         catalog += "\n\nTo show media, write EXACTLY |||MEDIA:N||| as the LAST line."
         catalog += "\nDo NOT embed media references anywhere in your response text."
         catalog += "\nUse at most ONE media item per response."
+        catalog += "\n\nIf none of the above media fits what you need, you may generate a new image:"
+        catalog += "\n|||GENERATE:category:description||| (as the LAST line)"
         catalog += "\n</media_catalog>"
         return catalog
 
@@ -2487,15 +2458,19 @@ TUTOR REPLIED: {tutor_response[:500]}
 2. Is this step complete — should the system advance to the next step?"""
 
         try:
-            result = self.instructor_client.chat.completions.create(
+            create_kwargs = dict(
                 response_model=StepEvaluationResult,
                 messages=[
                     {"role": "system", "content": "You are a tutoring step evaluator. Assess answer correctness and step completion."},
                     {"role": "user", "content": prompt},
                 ],
                 max_retries=2,
-                max_tokens=150,
             )
+            if getattr(self, '_instructor_provider', None) == 'google':
+                create_kwargs['generation_config'] = {'max_tokens': 1024}
+            else:
+                create_kwargs['max_tokens'] = 150
+            result = self.instructor_client.chat.completions.create(**create_kwargs)
             logger.info(
                 f"Step eval [{step_type}] step={self.current_topic_index}: "
                 f"correct={result.answer_correct}, complete={result.step_complete}, "
@@ -2677,15 +2652,19 @@ Break concepts into smaller steps. Be encouraging."""
             if current_topic not in self.student_struggles:
                 self.student_struggles.append(current_topic)
 
-        # Evaluate correctness: LLM for evaluable step types, keyword fallback otherwise
+        # Single LLM evaluation: correctness + step completion in one call
+        # (Replaces separate _llm_evaluate_response + _evaluate_step calls)
         current_step = self.steps[self.current_topic_index] if self.current_topic_index < len(self.steps) else None
         step_type = (current_step.step_type or 'teach') if current_step else 'teach'
 
-        if step_type in ('practice', 'quiz', 'teach', 'worked_example'):
-            eval_result = self._llm_evaluate_response(student_input, tutor_response)
+        step_eval_result = None
+        if step_type in ('practice', 'quiz', 'teach', 'worked_example') and self.instructor_client:
+            step_eval_result = self._evaluate_step(student_input, tutor_response)
+
+        if step_eval_result is not None:
+            is_correct = step_eval_result.answer_correct
         else:
-            eval_result = self._keyword_evaluate_response(tutor_response)
-        is_correct = eval_result['correct']
+            is_correct = self._keyword_evaluate_response(tutor_response)['correct']
 
         # Detect success — update strength tracking
         if is_correct:
@@ -2716,15 +2695,12 @@ Break concepts into smaller steps. Be encouraging."""
         except Exception as e:
             logger.warning(f"Failed to record skill practice: {e}")
 
-        # CRITICAL: Track exit ticket concept coverage
-        if self.exchange_count > 0 and self.exchange_count % 2 == 0:
-            self._llm_concept_coverage_check(combined_text)
-        else:
-            self._keyword_concept_coverage_check(combined_text)
+        # Track exit ticket concept coverage (keyword-only — no extra LLM call)
+        self._keyword_concept_coverage_check(combined_text)
 
         # Advance topic based on step-type completion criteria (only during TUTORING)
         if self.session_state == SessionState.TUTORING:
-            should_advance = self._should_advance_step(student_input, tutor_response, is_correct)
+            should_advance = self._should_advance_step(student_input, tutor_response, is_correct, step_eval_result)
             if should_advance and self.current_topic_index < len(self.steps) - 1:
                 # Check concept boundary gating
                 if self._is_at_concept_boundary():
@@ -2789,15 +2765,19 @@ Tutor replied: {tutor_response[:500]}
 Did the student answer correctly?"""
 
         try:
-            result = self.instructor_client.chat.completions.create(
+            create_kwargs = dict(
                 response_model=EvaluationResult,
                 messages=[
                     {"role": "system", "content": "You are a grading assistant. Evaluate student answers."},
                     {"role": "user", "content": prompt},
                 ],
                 max_retries=2,
-                max_tokens=50,
             )
+            if getattr(self, '_instructor_provider', None) == 'google':
+                create_kwargs['generation_config'] = {'max_tokens': 1024}
+            else:
+                create_kwargs['max_tokens'] = 50
+            result = self.instructor_client.chat.completions.create(**create_kwargs)
             logger.info(f"LLM evaluation: {'correct' if result.correct else 'incorrect'} (step {self.current_topic_index})")
             return {"correct": result.correct}
         except Exception as e:
@@ -2815,8 +2795,12 @@ Did the student answer correctly?"""
         is_correct = any(s in response_lower for s in success_signals)
         return {"correct": is_correct}
 
-    def _should_advance_step(self, student_input: str, tutor_response: str, is_correct: bool) -> bool:
+    def _should_advance_step(self, student_input: str, tutor_response: str, is_correct: bool, eval_result=None) -> bool:
         """Determine if the current step is complete using merged LLM evaluator.
+
+        Args:
+            eval_result: Pre-computed StepEvaluationResult from _analyze_student_response.
+                         If provided, avoids a redundant _evaluate_step() LLM call.
 
         Safety valves (hard rules, not LLM):
         | Rule                  | Threshold                                        |
@@ -2856,8 +2840,9 @@ Did the student answer correctly?"""
                 logger.info(f"Practice attempt cap: advancing step {self.current_topic_index} after {exchanges} exchanges")
                 return True
 
-        # 5. Call merged LLM evaluator
-        eval_result = self._evaluate_step(student_input, tutor_response)
+        # 5. Use pre-computed eval result or call LLM evaluator
+        if eval_result is None:
+            eval_result = self._evaluate_step(student_input, tutor_response)
         if eval_result is not None:
             return eval_result.step_complete
 
@@ -2942,15 +2927,19 @@ UNCOVERED CONCEPTS:
 Which concept numbers were meaningfully covered?"""
 
         try:
-            result = self.instructor_client.chat.completions.create(
+            create_kwargs = dict(
                 response_model=ConceptCoverageResult,
                 messages=[
                     {"role": "system", "content": "You are an educational assessment assistant. Identify which concepts were covered."},
                     {"role": "user", "content": prompt},
                 ],
                 max_retries=2,
-                max_tokens=100,
             )
+            if getattr(self, '_instructor_provider', None) == 'google':
+                create_kwargs['generation_config'] = {'max_tokens': 1024}
+            else:
+                create_kwargs['max_tokens'] = 100
+            result = self.instructor_client.chat.completions.create(**create_kwargs)
             for idx in result.covered_indices:
                 if 1 <= idx <= len(uncovered):
                     uncovered[idx - 1]['covered'] = True
@@ -3096,7 +3085,7 @@ Which concept numbers were meaningfully covered?"""
         self.session.mastery_achieved = True
         self._save_state()
         self.session.save()
-        
+
         # Update progress
         progress, _ = StudentLessonProgress.objects.get_or_create(
             student=self.student,
@@ -3105,12 +3094,76 @@ Which concept numbers were meaningfully covered?"""
         )
         progress.mastery_level = 'mastered'
         progress.save()
-        
+
+        # ── Gamification: XP + streak + achievements ──
+        xp_earned = 0
+        leveled_up = False
+        earned_achievements = []
+        try:
+            from apps.tutoring.skills_models import StudentKnowledgeProfile
+            from apps.tutoring.achievements import check_and_award
+            from datetime import date
+
+            course = self.lesson.unit.course
+            profile, _ = StudentKnowledgeProfile.objects.get_or_create(
+                student=self.student, course=course
+            )
+
+            # Update streak
+            today = date.today()
+            if profile.last_activity:
+                last_date = profile.last_activity.date()
+                delta = (today - last_date).days
+                if delta == 1:
+                    profile.current_streak_days += 1
+                elif delta > 1:
+                    profile.current_streak_days = 1
+                # delta == 0 means same day, no change
+            else:
+                profile.current_streak_days = 1
+            profile.longest_streak_days = max(profile.longest_streak_days, profile.current_streak_days)
+            profile.last_activity = timezone.now()
+            profile.save(update_fields=['current_streak_days', 'longest_streak_days', 'last_activity'])
+
+            # Award XP
+            total = len(results)
+            xp_earned += 50  # exit ticket pass
+            if total > 0 and score == total:
+                xp_earned += 25  # perfect score bonus
+            xp_earned += 100  # lesson mastery
+            leveled_up = profile.add_xp(xp_earned, reason='lesson_complete')
+
+            # Check achievements
+            ctx = {'score': score, 'total': total}
+            earned_achievements += check_and_award(self.student, 'exit_ticket_pass', ctx)
+            if total > 0 and score == total:
+                earned_achievements += check_and_award(self.student, 'perfect_score', ctx)
+            earned_achievements += check_and_award(self.student, 'first_lesson', ctx)
+            earned_achievements += check_and_award(self.student, 'lessons_completed', ctx)
+            earned_achievements += check_and_award(self.student, 'streak_days', ctx)
+            earned_achievements += check_and_award(self.student, 'xp_threshold', ctx)
+            earned_achievements += check_and_award(self.student, 'level_reached', ctx)
+        except Exception as e:
+            logger.warning(f"Gamification error in _complete_session_with_results: {e}")
+
+        # Build gamification payload for frontend
+        gamification = {
+            'xp_earned': xp_earned,
+            'leveled_up': leveled_up,
+            'achievements': [
+                {'name': a.name, 'emoji': a.emoji, 'description': a.description}
+                for a in earned_achievements
+            ],
+        }
+
         return TutorMessage(
             content=f"🎉 Excellent! You scored {score}/{len(results)}! You've mastered this lesson!",
             phase="completed",
             is_complete=True,
-            exit_ticket_data={'results': results, 'score': score, 'passed': True},
+            exit_ticket_data={
+                'results': results, 'score': score, 'passed': True,
+                'gamification': gamification,
+            },
         )
     
     def _start_remediation(
@@ -3203,7 +3256,7 @@ Generate an encouraging message that:
 3. Reassures them this is normal - learning takes practice
 4. Starts with a question about one of the concepts they missed
 
-Keep it warm and supportive. 3-4 sentences + a question to start the review."""
+Keep it warm and supportive. 2-3 sentences + a question to start the review."""
 
         return self._generate_response(prompt)
     
@@ -3219,33 +3272,52 @@ Keep it warm and supportive. 3-4 sentences + a question to start the review."""
             content=content,
         )
     
-    def _parse_media_signal(self, text: str) -> Tuple[str, Optional[Dict]]:
-        """Parse |||MEDIA:N||| signal from LLM output.
+    def _parse_media_signal(self, text: str) -> Tuple[str, Optional[Dict], Optional[Dict]]:
+        """Parse |||MEDIA:N||| or |||GENERATE:category:description||| from LLM output.
 
-        Returns (clean_text, media_dict or None).  The signal is always
-        stripped from text so nothing leaks into DB or student chat.
+        Returns (clean_text, media_dict or None, generate_request or None).
+        Signals are always stripped so nothing leaks into DB or student chat.
         """
+        # Check for existing media signal
         match = re.search(r'\|\|\|MEDIA\s*:\s*(\d+)\s*\|\|\|', text)
-        if not match:
-            return text, None
-        clean_text = text[:match.start()].rstrip()
-        media_id = int(match.group(1))
-        if media_id == 0:
-            return clean_text, None
-        media_id_map = getattr(self, '_media_id_map', {})
-        return clean_text, media_id_map.get(media_id)
+        if match:
+            clean_text = text[:match.start()].rstrip()
+            media_id = int(match.group(1))
+            if media_id == 0:
+                return clean_text, None, None
+            media_id_map = getattr(self, '_media_id_map', {})
+            return clean_text, media_id_map.get(media_id), None
+
+        # Check for generation signal
+        gen_match = re.search(r'\|\|\|GENERATE\s*:\s*(\w+)\s*:\s*(.+?)\s*\|\|\|', text)
+        if gen_match:
+            clean_text = text[:gen_match.start()].rstrip()
+            category = gen_match.group(1).lower()
+            description = gen_match.group(2).strip()
+            return clean_text, None, {
+                'generate': True,
+                'category': category,
+                'description': description,
+            }
+
+        return text, None, None
 
     def _create_message(self, content: str, media: List[Dict] = None) -> TutorMessage:
         """Create a TutorMessage from content."""
-        # Defense-in-depth: strip both legacy and new signal tags
+        # Defense-in-depth: strip legacy, MEDIA, and GENERATE signal tags
         content = re.sub(r'\[SHOW_MEDIA\s*:[^\]]*\]', '', content, flags=re.IGNORECASE)
         content = re.sub(r'\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|', '', content)
+        content = re.sub(r'\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|', '', content)
         content = re.sub(r' {2,}', ' ', content)
         content = re.sub(r'\n{3,}', '\n\n', content)
         content = content.strip()
+        step_num = min(self.current_topic_index + 1, len(self.steps)) if self.steps else 0
+        total = len(self.steps)
         return TutorMessage(
             content=content,
             phase=self._get_display_phase(),
             media=media or [],
             expects_response=self.session_state != SessionState.COMPLETED,
+            step_number=step_num,
+            total_steps=total,
         )

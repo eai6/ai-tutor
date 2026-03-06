@@ -571,6 +571,73 @@
         <button type="submit" class="btn btn-primary">Save AI Models</button>
     </form>
 
+    {# ── Tutor Personalities (superadmin only) ── #}
+    <div class="card" style="margin-top: 2rem; margin-bottom: 1.5rem;">
+        <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('personalities-body').style.display=document.getElementById('personalities-body').style.display==='none'?'block':'none'">
+            <h3 class="card-title">Tutor Personalities <small style="font-weight:normal;color:var(--gray-500);">(click to expand)</small></h3>
+        </div>
+        <div class="card-body" id="personalities-body" style="display:none;">
+            <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                Configure personality options that students can choose from. Each personality modifies the tutor's tone.
+            </p>
+            {% if personalities %}
+            <table class="table" style="width:100%;margin-bottom:1.5rem;">
+                <thead>
+                    <tr>
+                        <th>Emoji</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in personalities %}
+                    <tr>
+                        <td>{{ p.emoji }}</td>
+                        <td><strong>{{ p.name }}</strong></td>
+                        <td style="font-size:0.85rem;color:var(--gray-500);">{{ p.description|truncatechars:60 }}</td>
+                        <td>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="toggle_personality">
+                                <input type="hidden" name="personality_id" value="{{ p.id }}">
+                                <button type="submit" class="btn btn-sm {% if p.is_active %}btn-success{% else %}btn-secondary{% endif %}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">
+                                    {% if p.is_active %}Active{% else %}Inactive{% endif %}
+                                </button>
+                            </form>
+                        </td>
+                        <td>
+                            <form method="post" style="display:inline;" onsubmit="return confirm('Delete personality \'{{ p.name }}\'?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_personality">
+                                <input type="hidden" name="personality_id" value="{{ p.id }}">
+                                <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.2rem 0.5rem;">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color:var(--gray-400);font-style:italic;margin-bottom:1rem;">No personalities configured. Add one below or run <code>python manage.py seed_gamification</code>.</p>
+            {% endif %}
+
+            <h4 style="font-size:0.95rem;margin-bottom:0.75rem;">Add New Personality</h4>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_personality">
+                <div style="display:grid;grid-template-columns:60px 1fr;gap:0.5rem;margin-bottom:0.5rem;">
+                    <input type="text" name="personality_emoji" placeholder="😊" maxlength="10" style="text-align:center;font-size:1.5rem;padding:0.3rem;">
+                    <input type="text" name="personality_name" placeholder="Name (e.g. Friendly)" required maxlength="50">
+                </div>
+                <input type="text" name="personality_description" placeholder="Short description shown to students" maxlength="200" style="width:100%;margin-bottom:0.5rem;">
+                <textarea name="personality_prompt" placeholder="System prompt modifier (injected into the tutor's system prompt)" required rows="3" style="width:100%;margin-bottom:0.75rem;"></textarea>
+                <button type="submit" class="btn btn-primary btn-sm">Add Personality</button>
+            </form>
+        </div>
+    </div>
+
     {# ── AI System Prompts (superadmin only) ── #}
     <form method="post" style="margin-top: 2rem;">
         {% csrf_token %}

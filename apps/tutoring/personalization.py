@@ -532,6 +532,14 @@ class SkillAssessmentService:
                 xp = 2  # Effort reward
 
             profile.add_xp(xp, reason='practice')
+
+            # Check XP / level achievements
+            try:
+                from apps.tutoring.achievements import check_and_award
+                check_and_award(self.student, 'xp_threshold')
+                check_and_award(self.student, 'level_reached')
+            except Exception:
+                pass
         except Exception as e:
             logger.warning(f"Failed to award XP: {e}")
 

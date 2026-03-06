@@ -483,9 +483,8 @@ def course_detail(request, course_id):
     units = course.units.prefetch_related('lessons', 'lessons__steps').order_by('order_index')
     
     # Get progress stats and content stats per lesson
-    from apps.media_library.models import StepMedia
     from apps.tutoring.models import ExitTicket
-    
+
     lesson_stats = {}
     for unit in units:
         for lesson in unit.lessons.all():
@@ -1135,12 +1134,58 @@ def class_list(request):
             students_by_grade[grade] = []
         students_by_grade[grade].append(m.user)
     
+    # Build next-grade map for promote buttons in template
+    grade_order = ['S1', 'S2', 'S3', 'S4', 'S5']
+    next_grade_map = {}
+    for i, g in enumerate(grade_order):
+        next_grade_map[g] = grade_order[i + 1] if i < len(grade_order) - 1 else 'Graduate'
+
     context = {
         **request.staff_ctx,
         'students_by_grade': students_by_grade,
+        'next_grade_map': next_grade_map,
     }
-    
+
     return render(request, 'dashboard/classes/list.html', context)
+
+
+@teacher_required
+@require_POST
+def promote_students(request):
+    """Bulk promote students to the next grade level."""
+    student_ids = request.POST.getlist('student_ids')
+    from_grade = request.POST.get('from_grade', '')
+
+    GRADE_ORDER = ['S1', 'S2', 'S3', 'S4', 'S5']
+
+    if from_grade not in GRADE_ORDER:
+        messages.error(request, f"Invalid grade: {from_grade}")
+        return redirect('dashboard:class_list')
+
+    idx = GRADE_ORDER.index(from_grade)
+
+    if not student_ids:
+        messages.warning(request, "No students selected.")
+        return redirect('dashboard:class_list')
+
+    if idx >= len(GRADE_ORDER) - 1:
+        # S5 graduation: mark as graduated (empty grade)
+        updated = StudentProfile.objects.filter(
+            user_id__in=student_ids, grade_level=from_grade
+        ).update(grade_level='')
+        # Deactivate memberships
+        Membership.objects.filter(
+            user_id__in=student_ids, role='student', is_active=True
+        ).update(is_active=False)
+        messages.success(request, f"Graduated {updated} student(s) from {from_grade}.")
+    else:
+        next_grade = GRADE_ORDER[idx + 1]
+        updated = StudentProfile.objects.filter(
+            user_id__in=student_ids, grade_level=from_grade
+        ).update(grade_level=next_grade)
+        messages.success(request, f"Promoted {updated} student(s) from {from_grade} to {next_grade}.")
+
+    return redirect('dashboard:class_list')
 
 
 # ============================================================================
@@ -1525,6 +1570,42 @@ def settings_page(request):
 
                 messages.success(request, f"AI models updated — Tutoring: {tutor_provider}/{tutor_model}, Generation: {gen_provider}/{gen_model}, Image: {img_provider}/{img_model}.")
 
+        elif action == 'add_personality' and is_superadmin:
+            from apps.accounts.models import TutorPersonality
+            p_name = request.POST.get('personality_name', '').strip()
+            p_emoji = request.POST.get('personality_emoji', '').strip()
+            p_desc = request.POST.get('personality_description', '').strip()
+            p_prompt = request.POST.get('personality_prompt', '').strip()
+            if not p_name or not p_prompt:
+                messages.error(request, "Name and prompt modifier are required.")
+            elif TutorPersonality.objects.filter(name=p_name).exists():
+                messages.error(request, f"A personality named '{p_name}' already exists.")
+            else:
+                TutorPersonality.objects.create(
+                    name=p_name, emoji=p_emoji,
+                    description=p_desc, system_prompt_modifier=p_prompt,
+                )
+                messages.success(request, f"Personality '{p_name}' created.")
+
+        elif action == 'toggle_personality' and is_superadmin:
+            from apps.accounts.models import TutorPersonality
+            pid = request.POST.get('personality_id')
+            p = TutorPersonality.objects.filter(id=pid).first()
+            if p:
+                p.is_active = not p.is_active
+                p.save(update_fields=['is_active'])
+                status = "activated" if p.is_active else "deactivated"
+                messages.success(request, f"Personality '{p.name}' {status}.")
+
+        elif action == 'delete_personality' and is_superadmin:
+            from apps.accounts.models import TutorPersonality
+            pid = request.POST.get('personality_id')
+            p = TutorPersonality.objects.filter(id=pid).first()
+            if p:
+                name = p.name
+                p.delete()
+                messages.success(request, f"Personality '{name}' deleted.")
+
         elif action == 'prompts' and is_superadmin:
             from apps.llm.models import PromptPack
             prompt_pack = PromptPack.objects.filter(
@@ -1631,6 +1712,12 @@ def settings_page(request):
             'google': 'gemini-3.1-flash-image-preview',
         })
 
+    # Tutor personalities (superadmin)
+    personalities = []
+    if is_superadmin:
+        from apps.accounts.models import TutorPersonality
+        personalities = TutorPersonality.objects.all()
+
     all_timezones = sorted(zoneinfo.available_timezones())
     all_schools = Institution.objects.exclude(slug=Institution.GLOBAL_SLUG).order_by('name') if is_superadmin else []
     all_users = (
@@ -1668,6 +1755,7 @@ def settings_page(request):
         'provider_choices': provider_choices,
         'provider_defaults_json': provider_defaults_json,
         'img_provider_defaults_json': img_provider_defaults_json,
+        'personalities': personalities,
     }
 
     return render(request, 'dashboard/settings.html', context)
@@ -1682,10 +1770,9 @@ def lesson_detail(request, lesson_id):
     """Review lesson steps, media, and exit ticket."""
     from apps.curriculum.models import Lesson, LessonStep
     from apps.tutoring.models import ExitTicket, TutorSession
-    from apps.media_library.models import StepMedia
-    
+
     institution = request.staff_ctx['institution']
-    
+
     lookup = {'id': lesson_id}
     if institution is not None:
         lookup['unit__course__institution'] = institution
@@ -2055,7 +2142,95 @@ def step_edit(request, step_id):
                         messages.error(request, f"Image generation failed: {e}")
                 else:
                     messages.warning(request, "No image description to generate from.")
-            # Re-render the same page (don't redirect to lesson detail)
+            context = {
+                **request.staff_ctx,
+                'step': step,
+                'lesson': lesson,
+                'total_steps': total_steps,
+                'phases': phases,
+            }
+            return render(request, 'dashboard/curriculum/step_edit.html', context)
+
+        # Handle upload image action
+        if action == 'upload_image':
+            uploaded = request.FILES.get('image')
+            if uploaded:
+                from apps.media_library.models import MediaAsset
+                institution = lesson.unit.course.institution
+                asset = MediaAsset.objects.create(
+                    institution=institution,
+                    title=request.POST.get('image_alt', '') or uploaded.name,
+                    asset_type='image',
+                    file=uploaded,
+                    alt_text=request.POST.get('image_alt', ''),
+                    caption=request.POST.get('image_caption', ''),
+                )
+                if not step.media:
+                    step.media = {'images': []}
+                if 'images' not in step.media:
+                    step.media['images'] = []
+                step.media['images'].append({
+                    'url': asset.file.url,
+                    'alt': asset.alt_text,
+                    'caption': asset.caption,
+                    'description': asset.alt_text or asset.title,
+                    'type': 'diagram',
+                    'source': 'uploaded',
+                })
+                step.save()
+                messages.success(request, "Image uploaded successfully.")
+            else:
+                messages.warning(request, "No file selected.")
+            context = {
+                **request.staff_ctx,
+                'step': step,
+                'lesson': lesson,
+                'total_steps': total_steps,
+                'phases': phases,
+            }
+            return render(request, 'dashboard/curriculum/step_edit.html', context)
+
+        # Handle replace image action
+        if action == 'replace_image':
+            image_index = int(request.POST.get('image_index', 0))
+            uploaded = request.FILES.get('image')
+            images = step.media.get('images', []) if step.media else []
+            if uploaded and 0 <= image_index < len(images):
+                from apps.media_library.models import MediaAsset
+                institution = lesson.unit.course.institution
+                asset = MediaAsset.objects.create(
+                    institution=institution,
+                    title=images[image_index].get('description', '') or uploaded.name,
+                    asset_type='image',
+                    file=uploaded,
+                    alt_text=images[image_index].get('alt', ''),
+                    caption=images[image_index].get('caption', ''),
+                )
+                images[image_index]['url'] = asset.file.url
+                images[image_index]['source'] = 'uploaded'
+                step.save()
+                messages.success(request, "Image replaced successfully.")
+            else:
+                messages.warning(request, "No file selected or invalid image index.")
+            context = {
+                **request.staff_ctx,
+                'step': step,
+                'lesson': lesson,
+                'total_steps': total_steps,
+                'phases': phases,
+            }
+            return render(request, 'dashboard/curriculum/step_edit.html', context)
+
+        # Handle delete image action
+        if action == 'delete_image':
+            image_index = int(request.POST.get('image_index', 0))
+            images = step.media.get('images', []) if step.media else []
+            if 0 <= image_index < len(images):
+                images.pop(image_index)
+                step.save()
+                messages.success(request, "Image removed.")
+            else:
+                messages.warning(request, "Invalid image index.")
             context = {
                 **request.staff_ctx,
                 'step': step,

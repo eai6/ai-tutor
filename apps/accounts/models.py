@@ -86,6 +86,24 @@ class Membership(models.Model):
         return self.role == self.Role.STAFF
 
 
+class TutorPersonality(models.Model):
+    """Configurable tutor personality that modifies the AI tutor's tone."""
+    name = models.CharField(max_length=50, unique=True)
+    description = models.CharField(max_length=200, blank=True)
+    emoji = models.CharField(max_length=10, default='')
+    system_prompt_modifier = models.TextField()
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'name']
+
+    def __str__(self):
+        return f"{self.emoji} {self.name}" if self.emoji else self.name
+
+
 class StudentProfile(models.Model):
     """
     Extended profile for students with school and grade information.
@@ -134,9 +152,13 @@ class StudentProfile(models.Model):
         blank=True,
         help_text="Current grade level"
     )
+    tutor_personality = models.ForeignKey(
+        'TutorPersonality', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='students',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return f"{self.user.username} - {self.get_school_display()} ({self.grade_level})"
     

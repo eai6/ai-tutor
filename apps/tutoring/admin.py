@@ -7,6 +7,7 @@ from .models import (
     TutorSession, SessionTurn, StudentLessonProgress,
     ExitTicket, ExitTicketQuestion, ExitTicketAttempt
 )
+from .skills_models import Achievement, StudentAchievement
 
 
 # ============================================================================
@@ -89,3 +90,23 @@ class ExitTicketAttemptAdmin(admin.ModelAdmin):
     list_filter = ['passed', 'exit_ticket__lesson__unit__course']
     search_fields = ['student__username', 'exit_ticket__lesson__title']
     readonly_fields = ['student', 'exit_ticket', 'session', 'score', 'passed', 'answers', 'started_at', 'completed_at']
+
+
+# ============================================================================
+# Achievement Admin
+# ============================================================================
+
+@admin.register(Achievement)
+class AchievementAdmin(admin.ModelAdmin):
+    list_display = ['emoji', 'name', 'category', 'trigger_type', 'trigger_value', 'xp_reward', 'is_active', 'sort_order']
+    list_filter = ['category', 'trigger_type', 'is_active']
+    list_editable = ['is_active', 'sort_order']
+    search_fields = ['name', 'code']
+
+
+@admin.register(StudentAchievement)
+class StudentAchievementAdmin(admin.ModelAdmin):
+    list_display = ['student', 'achievement', 'earned_at', 'is_seen']
+    list_filter = ['achievement', 'is_seen']
+    search_fields = ['student__username', 'achievement__name']
+    raw_id_fields = ['student']

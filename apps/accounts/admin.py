@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Institution, Membership, StudentProfile
+from .models import Institution, Membership, StudentProfile, TutorPersonality
 
 
 @admin.register(Institution)
@@ -20,7 +20,15 @@ class MembershipAdmin(admin.ModelAdmin):
 
 @admin.register(StudentProfile)
 class StudentProfileAdmin(admin.ModelAdmin):
-    list_display = ['user', 'school', 'grade_level', 'created_at']
-    list_filter = ['school', 'grade_level']
+    list_display = ['user', 'school', 'grade_level', 'tutor_personality', 'created_at']
+    list_filter = ['school', 'grade_level', 'tutor_personality']
     search_fields = ['user__username', 'user__first_name', 'user__last_name']
     raw_id_fields = ['user']
+
+
+@admin.register(TutorPersonality)
+class TutorPersonalityAdmin(admin.ModelAdmin):
+    list_display = ['emoji', 'name', 'description', 'is_active', 'sort_order']
+    list_filter = ['is_active']
+    list_editable = ['is_active', 'sort_order']
+    search_fields = ['name']
