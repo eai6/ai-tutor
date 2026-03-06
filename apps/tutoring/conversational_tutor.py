@@ -298,13 +298,15 @@ a different approach -- no rush."
 - Never produce a wall of text.
 - Use LaTeX or clear notation for mathematical expressions.
 - To show an image, write |||MEDIA:N||| as the VERY LAST line. See <media_catalog>.
-- If no media in the catalog fits what you need, you may request on-the-fly generation:
+- You CAN show images and figures. An external system generates them for you.
+  If no media in the catalog fits what you need, request on-the-fly generation:
   Write |||GENERATE:category:description||| as the LAST line.
   Categories: diagram, chart, map, illustration, flowchart, infographic.
   Description: Clear, specific, educational description of the image needed.
   Example: |||GENERATE:diagram:labeled diagram showing the water cycle with evaporation, condensation, and precipitation arrows|||
   Use GENERATE sparingly — only when a visual truly aids understanding and nothing in the catalog fits.
   Never use GENERATE for decorative images.
+  IMPORTANT: Never tell the student you cannot show images or figures. You CAN — just use |||MEDIA:N||| or |||GENERATE:...||| as described.
 - Do NOT include suggested quick-reply options or response choices in your messages.
   Just ask your question and let the student answer in their own words.
 </format_rules>
@@ -2177,8 +2179,10 @@ Follow the current step; this concept will be covered in sequence."""
             return (
                 "\n\n<media_catalog>\n"
                 "No pre-made media available for this lesson.\n"
+                "You CAN still show images — an external system generates them for you.\n"
                 "If a visual would help the student, generate one:\n"
                 "|||GENERATE:category:description||| (as the LAST line)\n"
+                "Never tell the student you cannot show images or figures.\n"
                 "</media_catalog>"
             )
 
