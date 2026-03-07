@@ -829,6 +829,28 @@ def speak_text(request):
     if len(text) > 2000:
         return JsonResponse({"error": "Text too long (2000 char max)"}, status=400)
 
+    # Strip emojis/icons so TTS doesn't try to read them aloud
+    import re
+    text = re.sub(
+        r'[\U0001F600-\U0001F64F'   # emoticons
+        r'\U0001F300-\U0001F5FF'     # symbols & pictographs
+        r'\U0001F680-\U0001F6FF'     # transport & map
+        r'\U0001F1E0-\U0001F1FF'     # flags
+        r'\U0001F900-\U0001F9FF'     # supplemental symbols
+        r'\U0001FA00-\U0001FA6F'     # chess symbols
+        r'\U0001FA70-\U0001FAFF'     # symbols extended-A
+        r'\U00002702-\U000027B0'     # dingbats
+        r'\U0000FE00-\U0000FE0F'     # variation selectors
+        r'\U0000200D'                # zero-width joiner
+        r'\U000023E9-\U000023F3'     # misc symbols
+        r'\U00002600-\U000026FF'     # misc symbols
+        r'\U00002700-\U000027BF'     # dingbats
+        r']+', '', text
+    ).strip()
+
+    if not text:
+        return JsonResponse({"error": "Text required"}, status=400)
+
     from django.http import HttpResponse
     from apps.tutoring.audio_service import synthesize
     wav_bytes = synthesize(text)
