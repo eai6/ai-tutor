@@ -130,7 +130,7 @@ sympy==1.14.0
 tenacity==9.1.4
 threadpoolctl==3.6.0
 tokenizers==0.22.2
-torch==2.10.0
+# torch installed separately in Dockerfile (CPU-only)
 tornado==6.5.4
 tqdm==4.67.3
 traitlets==5.14.3
@@ -147,6 +147,9 @@ wcwidth==0.6.0
 websocket-client==1.9.0
 websockets==16.0
 zipp==3.23.0
+# Audio — TTS + STT
+piper-tts>=1.4.0
+faster-whisper>=1.1.0
 # Production
 gunicorn>=22.0.0
 psycopg2-binary>=2.9.9
