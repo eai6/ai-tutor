@@ -58,6 +58,7 @@ urlpatterns = [
 
     # Classes
     path('classes/', views.class_list, name='class_list'),
+    path('classes/promote/', views.promote_students, name='promote_students'),
     
     # Reports
     path('reports/', views.reports_overview, name='reports'),

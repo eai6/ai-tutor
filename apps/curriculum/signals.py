@@ -142,50 +142,44 @@ def _cleanup_exit_ticket_images(course):
 
 
 def _cleanup_orphaned_media_assets(course):
-    """Delete MediaAssets only used by this course's lesson steps."""
+    """Delete MediaAssets whose URLs don't appear in any LessonStep.media JSON."""
     try:
         from apps.curriculum.models import LessonStep
-        from apps.media_library.models import MediaAsset, StepMedia
+        from apps.media_library.models import MediaAsset
 
-        # Find all MediaAsset IDs linked to this course's steps
-        course_step_ids = LessonStep.objects.filter(
-            lesson__unit__course=course
-        ).values_list('id', flat=True)
+        # Collect all image URLs referenced by ANY step (not just this course)
+        all_referenced_urls = set()
+        for step in LessonStep.objects.filter(media__isnull=False):
+            if not step.media:
+                continue
+            for img in step.media.get('images', []):
+                url = img.get('url', '')
+                if url:
+                    all_referenced_urls.add(url)
 
-        course_asset_ids = set(
-            StepMedia.objects.filter(lesson_step_id__in=course_step_ids)
-            .values_list('media_asset_id', flat=True)
-            .distinct()
-        )
-
-        if not course_asset_ids:
-            return
-
-        # Find which of those are also used by steps OUTSIDE this course
-        shared_asset_ids = set(
-            StepMedia.objects.filter(media_asset_id__in=course_asset_ids)
-            .exclude(lesson_step_id__in=course_step_ids)
-            .values_list('media_asset_id', flat=True)
-            .distinct()
-        )
-
-        # Orphans = used ONLY by this course
-        orphan_ids = course_asset_ids - shared_asset_ids
-
-        if not orphan_ids:
+        # Find MediaAssets belonging to this course's institution that are orphaned
+        institution = course.institution
+        if not institution:
             return
 
         count = 0
-        for asset in MediaAsset.objects.filter(id__in=orphan_ids):
-            if asset.file:
+        for asset in MediaAsset.objects.filter(institution=institution):
+            if not asset.file:
+                continue
+            try:
+                asset_url = asset.file.url
+            except Exception:
+                continue
+            if asset_url not in all_referenced_urls:
                 try:
                     asset.file.delete(save=False)
                 except Exception as e:
                     logger.warning(f"Failed to delete media file {asset.file.name}: {e}")
-            asset.delete()
-            count += 1
+                asset.delete()
+                count += 1
 
-        logger.info(f"Deleted {count} orphaned media assets (course {course.id})")
+        if count:
+            logger.info(f"Deleted {count} orphaned media assets (course {course.id})")
     except Exception as e:
         logger.error(f"Media asset cleanup failed for course {course.id}: {e}")
 

@@ -1,13 +1,12 @@
 """
-Media Library app - MediaAsset and StepMedia models.
+Media Library app - MediaAsset model for storing generated/uploaded images.
 
-Simple approach: upload assets to a library, then attach them to lesson steps.
-This allows reuse of media across multiple lessons.
+MediaAsset provides file storage for images used by lesson steps.
+Lesson steps reference images via their LessonStep.media JSONField.
 """
 
 from django.db import models
 from apps.accounts.models import Institution
-from apps.curriculum.models import LessonStep
 
 
 def media_upload_path(instance, filename):
@@ -56,40 +55,3 @@ class MediaAsset(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.asset_type})"
-
-
-class StepMedia(models.Model):
-    """
-    Attaches a media asset to a lesson step with placement info.
-    """
-    class Placement(models.TextChoices):
-        TOP = 'top', 'Above content'
-        INLINE = 'inline', 'Inline with content'
-        SIDE = 'side', 'Side panel'
-
-    lesson_step = models.ForeignKey(
-        LessonStep,
-        on_delete=models.CASCADE,
-        related_name='media_attachments'
-    )
-    media_asset = models.ForeignKey(
-        MediaAsset,
-        on_delete=models.CASCADE,
-        related_name='step_usages'
-    )
-    placement = models.CharField(
-        max_length=10,
-        choices=Placement.choices,
-        default=Placement.TOP
-    )
-    order_index = models.PositiveIntegerField(
-        default=0,
-        help_text="Order when multiple media attached to same step"
-    )
-
-    class Meta:
-        ordering = ['order_index']
-        verbose_name = "Step Media Attachment"
-
-    def __str__(self):
-        return f"{self.media_asset.title} on {self.lesson_step}"

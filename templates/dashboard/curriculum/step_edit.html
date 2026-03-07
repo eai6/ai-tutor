@@ -127,29 +127,47 @@
                             <img src="{{ img.url }}" alt="{{ img.description }}">
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <strong>{{ img.type|default:"Image" }}</strong>
-                                <span style="color: var(--success);">✓ Generated</span>
+                                {% if img.source == 'uploaded' %}
+                                <span style="color: var(--primary);">Uploaded</span>
+                                {% else %}
+                                <span style="color: var(--success);">Generated</span>
+                                {% endif %}
                             </div>
                             {% else %}
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <strong>{{ img.type|default:"Image" }}</strong>
-                                <span style="color: var(--warning);">⏳ Pending</span>
+                                <span style="color: var(--warning);">Pending</span>
                             </div>
                             {% endif %}
                             <div style="margin-top: 0.5rem;">
                                 <label style="font-size: 0.8rem; font-weight: 500; color: var(--gray-600);">Image Prompt</label>
                                 <textarea name="image_description_{{ forloop.counter0 }}" class="form-control" rows="2" style="font-size: 0.85rem; min-height: 60px;">{{ img.description }}</textarea>
                             </div>
-                            <div style="margin-top: 0.5rem;">
+                            <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                 <button type="submit" form="regenerate-form-{{ forloop.counter0 }}" class="btn btn-secondary btn-sm">
-                                    🔄 Regenerate Image
+                                    Regenerate
                                 </button>
-                                <span style="font-size: 0.75rem; color: var(--gray-500); margin-left: 0.5rem;">May take a few seconds</span>
+                                <label class="btn btn-secondary btn-sm" style="margin: 0; cursor: pointer;">
+                                    Replace
+                                    <input type="file" accept="image/*" style="display: none;" onchange="submitImageAction(this, 'replace_image', {{ forloop.counter0 }})">
+                                </label>
+                                <button type="button" class="btn btn-sm" style="color: var(--danger); border-color: var(--danger);" onclick="confirmDeleteImage({{ forloop.counter0 }})">
+                                    Delete
+                                </button>
                             </div>
                         </div>
                         {% endfor %}
                     {% else %}
                         <p style="color: var(--gray-500); margin: 0;">No media attached to this step.</p>
                     {% endif %}
+
+                    <div style="margin-top: 0.75rem; padding-top: 0.75rem; {% if step.media and step.media.images %}border-top: 1px solid var(--gray-200);{% endif %}">
+                        <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
+                            + Add Image
+                            <input type="file" accept="image/*" style="display: none;" onchange="submitImageAction(this, 'upload_image')">
+                        </label>
+                        <span style="font-size: 0.75rem; color: var(--gray-500); margin-left: 0.5rem;">Upload a custom image for this step</span>
+                    </div>
                 </div>
             </div>
             
@@ -170,6 +188,16 @@
 </form>
 {% endfor %}
 {% endif %}
+
+<!-- Hidden form for image actions (upload/replace/delete) -->
+<form id="image-action-form" method="post" enctype="multipart/form-data" style="display: none;">
+    {% csrf_token %}
+    <input type="hidden" name="action" id="image-action-type" value="">
+    <input type="hidden" name="image_index" id="image-action-index" value="">
+    <input type="hidden" name="image_alt" id="image-action-alt" value="">
+    <input type="hidden" name="image_caption" id="image-action-caption" value="">
+    <input type="file" name="image" id="image-action-file" accept="image/*">
+</form>
 
 {% endblock %}
 
@@ -195,5 +223,28 @@ document.querySelectorAll('form[id^="regenerate-form-"]').forEach(function(form)
         });
     });
 });
+
+function submitImageAction(fileInput, action, imageIndex) {
+    var file = fileInput.files[0];
+    if (!file) return;
+
+    var form = document.getElementById('image-action-form');
+    var dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById('image-action-file').files = dt.files;
+    document.getElementById('image-action-type').value = action;
+    document.getElementById('image-action-index').value = imageIndex !== undefined ? imageIndex : '';
+    document.getElementById('image-action-alt').value = file.name.replace(/\.[^/.]+$/, '');
+    document.getElementById('image-action-caption').value = '';
+    form.submit();
+}
+
+function confirmDeleteImage(imageIndex) {
+    if (!confirm('Remove this image from the step?')) return;
+    var form = document.getElementById('image-action-form');
+    document.getElementById('image-action-type').value = 'delete_image';
+    document.getElementById('image-action-index').value = imageIndex;
+    form.submit();
+}
 </script>
 {% endblock %}

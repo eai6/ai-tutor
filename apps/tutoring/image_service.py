@@ -83,6 +83,7 @@ class ImageGenerationService:
         prompt: str,
         category: str = "general",
         textbook_context: str = "",
+        include_bytes: bool = False,
         **kwargs
     ) -> Optional[Dict]:
         """
@@ -92,19 +93,26 @@ class ImageGenerationService:
             prompt: Description of the image needed
             category: Type of image (diagram, photo, illustration, etc.)
             textbook_context: Optional description of the textbook figure style
+            include_bytes: If True, include '_raw_bytes' key with raw image data
 
         Returns:
             Dict with 'url', 'title', 'caption', 'generated' keys, or None
         """
         if self.available:
-            generated = self._generate_with_gemini(prompt, category, textbook_context)
+            generated = self._generate_with_gemini(
+                prompt, category, textbook_context,
+                include_bytes=include_bytes,
+            )
             if generated:
                 return generated
 
         logger.warning(f"Image generation unavailable for: {prompt[:50]}...")
         return None
 
-    def _generate_with_gemini(self, prompt: str, category: str, textbook_context: str = "") -> Optional[Dict]:
+    def _generate_with_gemini(
+        self, prompt: str, category: str, textbook_context: str = "",
+        include_bytes: bool = False,
+    ) -> Optional[Dict]:
         """Generate image — tries configured model, falls back to FALLBACK_MODEL on 503."""
         from google import genai
         from google.genai import types
@@ -146,14 +154,20 @@ class ImageGenerationService:
             logger.warning(f"Could not create search grounding tool: {e}")
 
         for model in [self._get_primary_model(), FALLBACK_MODEL]:
-            result = self._call_model(client, model, contents, config, prompt, tools=tools)
+            result = self._call_model(
+                client, model, contents, config, prompt,
+                tools=tools, include_bytes=include_bytes,
+            )
             if result is not None:
                 return result
 
         logger.warning("Both primary and fallback image models failed")
         return None
 
-    def _call_model(self, client, model: str, contents, config, prompt: str, tools=None) -> Optional[Dict]:
+    def _call_model(
+        self, client, model: str, contents, config, prompt: str,
+        tools=None, include_bytes: bool = False,
+    ) -> Optional[Dict]:
         """Generate image from a single model (non-streaming). Returns result dict or None."""
         try:
             logger.info(f"Generating image with {model}: {prompt[:80]}...")
@@ -197,7 +211,7 @@ class ImageGenerationService:
             saved_url = self._save_generated_image_bytes(image_bytes, prompt, ext)
 
             logger.info(f"Image generated successfully with {model}")
-            return {
+            result = {
                 'url': saved_url,
                 'title': prompt[:100],
                 'caption': f"AI-generated: {prompt[:200]}",
@@ -205,6 +219,11 @@ class ImageGenerationService:
                 'generated': True,
                 'model': model,
             }
+
+            if include_bytes:
+                result['_raw_bytes'] = image_bytes
+
+            return result
 
         except Exception as e:
             err = str(e)

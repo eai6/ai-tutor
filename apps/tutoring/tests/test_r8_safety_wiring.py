@@ -106,6 +106,8 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
         mock_result.show_exit_ticket = False
         mock_result.exit_ticket_data = None
         mock_result.is_complete = False
+        mock_result.step_number = 1
+        mock_result.total_steps = 5
         mock_respond.return_value = mock_result
 
         session = self._create_session()

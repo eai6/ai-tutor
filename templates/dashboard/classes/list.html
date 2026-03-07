@@ -11,10 +11,10 @@
 {% if students_by_grade %}
     {% for grade, students in students_by_grade.items %}
     <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
                 <h2 class="card-title">
-                    {% if grade == 'Unknown' %}
+                    {% if grade == 'Unknown' or grade == '' %}
                         Unassigned
                     {% else %}
                         {{ grade }}
@@ -24,11 +24,33 @@
                     {{ students|length }} student{{ students|length|pluralize }}
                 </p>
             </div>
+            {% with next=next_grade_map|default_if_none:"" %}
+            {% if grade != 'Unknown' and grade != '' and next %}
+            <button type="button" class="btn btn-primary btn-sm" onclick="togglePromoteForm('{{ grade }}')">
+                {% for g, ng in next_grade_map.items %}{% if g == grade %}{% if ng == 'Graduate' %}Graduate{% else %}Promote to {{ ng }}{% endif %}{% endif %}{% endfor %}
+            </button>
+            {% endif %}
+            {% endwith %}
         </div>
+        <form method="post" action="{% url 'dashboard:promote_students' %}" id="promote-form-{{ grade }}" style="display:none;">
+            {% csrf_token %}
+            <input type="hidden" name="from_grade" value="{{ grade }}">
+            <div style="padding: 0.75rem 1rem; background: #eff6ff; border-bottom: 1px solid #dbeafe; display: flex; align-items: center; gap: 0.75rem;">
+                <label style="font-size: 0.875rem; font-weight: 500; color: #1e40af;">
+                    <input type="checkbox" onchange="toggleAllStudents(this, '{{ grade }}')" style="margin-right: 0.25rem;">
+                    Select All
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    {% for g, ng in next_grade_map.items %}{% if g == grade %}{% if ng == 'Graduate' %}Confirm Graduation{% else %}Confirm Promotion{% endif %}{% endif %}{% endfor %}
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="togglePromoteForm('{{ grade }}')">Cancel</button>
+            </div>
+        </form>
         <div class="card-body" style="padding: 0;">
             <table class="table">
                 <thead>
                     <tr>
+                        <th style="width: 40px;" class="promote-col promote-col-{{ grade }}" hidden></th>
                         <th>Student</th>
                         <th>Email</th>
                         <th></th>
@@ -37,6 +59,9 @@
                 <tbody>
                     {% for student in students %}
                     <tr>
+                        <td class="promote-col promote-col-{{ grade }}" hidden>
+                            <input type="checkbox" name="student_ids" value="{{ student.id }}" form="promote-form-{{ grade }}">
+                        </td>
                         <td>
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
                                 <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem;">
@@ -67,4 +92,19 @@
     </div>
 </div>
 {% endif %}
+
+<script>
+function togglePromoteForm(grade) {
+    const form = document.getElementById('promote-form-' + grade);
+    const cols = document.querySelectorAll('.promote-col-' + grade);
+    const isVisible = form.style.display !== 'none';
+    form.style.display = isVisible ? 'none' : 'block';
+    cols.forEach(col => col.hidden = isVisible);
+}
+
+function toggleAllStudents(selectAllCb, grade) {
+    const checkboxes = document.querySelectorAll('#promote-form-' + grade + ' ~ .card-body input[name="student_ids"], .promote-col-' + grade + ' input[name="student_ids"]');
+    checkboxes.forEach(cb => cb.checked = selectAllCb.checked);
+}
+</script>
 {% endblock %}

@@ -98,25 +98,24 @@ class AssembledPrompt:
 
 
 def get_lesson_media(lesson: Lesson) -> List[dict]:
-    """Get all media assets for a lesson."""
-    from apps.media_library.models import StepMedia
-    
+    """Get media catalog from lesson steps' media JSON."""
     media_list = []
-    attachments = StepMedia.objects.filter(
-        lesson_step__lesson=lesson
-    ).select_related('media_asset').order_by('lesson_step__order_index', 'order_index')
-    
-    for att in attachments:
-        asset = att.media_asset
-        media_list.append({
-            'title': asset.title,
-            'type': asset.asset_type,
-            'url': asset.file.url if asset.file else None,
-            'caption': asset.caption,
-            'alt_text': asset.alt_text,
-            'step_title': att.lesson_step.teacher_script[:50] if att.lesson_step else '',
-        })
-    
+    seen_urls = set()
+    for step in lesson.steps.filter(media__isnull=False).order_by('order_index'):
+        if not step.media:
+            continue
+        images = step.media.get('images', [])
+        for img in images:
+            url = img.get('url', '')
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                media_list.append({
+                    'title': img.get('alt', '') or img.get('caption', '') or step.title,
+                    'type': 'diagram',
+                    'url': url,
+                    'caption': img.get('caption', ''),
+                    'alt_text': img.get('alt', ''),
+                })
     return media_list
 
 

@@ -1,8 +1,6 @@
 # media_library
 
-Reusable media asset management with lesson step attachments.
-
-Provides a library of media files (images, audio, video, PDFs) that can be uploaded per institution and attached to lesson steps with placement and ordering controls.
+File storage for images used by lesson steps.
 
 ---
 
@@ -10,7 +8,7 @@ Provides a library of media files (images, audio, video, PDFs) that can be uploa
 
 ### MediaAsset
 
-A reusable media file scoped to an institution.
+A reusable media file scoped to an institution. Used by `ImageGenerationService` to store generated images and by teachers uploading custom images via the step edit page.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -28,38 +26,18 @@ def media_upload_path(instance, filename):
     return f"media/{instance.institution.slug}/{filename}"
 ```
 
-Files are organized by institution slug to prevent collisions and enable per-school media browsing.
-
-### StepMedia
-
-Attachment of a `MediaAsset` to a `LessonStep` with placement and ordering.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `lesson_step` | ForeignKey(LessonStep) | The step this media is attached to |
-| `media_asset` | ForeignKey(MediaAsset) | The media file |
-| `placement` | CharField | `top` (above content), `inline` (within text), `side` (side panel) |
-| `order_index` | PositiveIntegerField | Order when multiple media are attached to the same step |
-
 ---
 
-## Relationship to LessonStep.media JSON
+## How Media Works
 
-There are two ways media is associated with lesson steps:
+All lesson step media is stored in `LessonStep.media` JSONField (a dict with an `images` list). Each image entry has `url`, `alt`, `caption`, `description`, `type`, and `source` fields.
 
-1. **`LessonStep.media` JSONField** -- Used by the content generator to store media descriptions and generated image URLs inline. This is the primary mechanism during content generation.
+`MediaAsset` provides the underlying file storage. When an image is generated or uploaded, a `MediaAsset` record is created and the resulting file URL is written into the step's media JSON.
 
-2. **`StepMedia` model** -- Used by the media library for explicit, reusable attachments with placement control. This is for manually curated media.
+### Media sources
+- **Content generation pipeline**: `content_generator.py` writes image descriptions into `LessonStep.media`, then `ImageGenerationService` generates the images and updates the URLs.
+- **Teacher upload/replace**: Teachers can upload or replace images on the step edit page. Creates a `MediaAsset` and adds/updates the URL in the step's media JSON.
+- **Regenerate**: Teachers can regenerate AI images from the step edit page using the image prompt/description.
 
-The `StepMedia` model via `media_attachments` related name allows querying attached library assets:
-```python
-step.media_attachments.all()  # StepMedia objects with placement info
-```
-
----
-
-## Architecture Decisions
-
-- **Institution-scoped uploads** -- Files are organized under `media/<institution_slug>/` to prevent cross-school file access.
-- **Dual media system** -- JSON-based inline media (for generated content) coexists with the relational `StepMedia` model (for curated library assets). This supports both automated and manual workflows.
-- **Placement options** -- `top`, `inline`, `side` allow teachers to control how media appears relative to the step content in the tutoring interface.
+### Cleanup
+When a course is deleted, `_cleanup_orphaned_media_assets()` in `apps/curriculum/signals.py` deletes `MediaAsset` records whose file URLs are not referenced by any `LessonStep.media` JSON.

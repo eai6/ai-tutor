@@ -107,10 +107,11 @@ class ContentSafetyFilter:
     ]
     
     # Off-topic patterns (for educational context)
+    # Negative lookahead permits educational qualifiers after the matched term.
     OFF_TOPIC_PATTERNS = [
-        r'\b(dating|relationship|boyfriend|girlfriend)\b',
-        r'\b(gambling|betting|casino)\b',
-        r'\b(drugs|alcohol|smoking)\b(?!\s*(education|awareness|prevention))',
+        r'\b(dating|relationship|boyfriend|girlfriend)\b(?!\s*(?:in\s+)?(?:history|literature|novel|social|culture))',
+        r'\b(gambling|betting|casino)\b(?!\s*(?:math|probabil|statistic|economics|history))',
+        r'\b(drugs?|alcohol|smoking|tobacco)\b(?!\s*(?:education|awareness|prevention|abuse|addiction|policy|law|health|effect|impact|class|lesson|program|campaign|research|study|science|chemistry|biology|medicine|pharmacol))',
     ]
     
     @classmethod
@@ -522,16 +523,20 @@ class SafetyAuditLog:
 class ImageSafetyFilter:
     """
     Safety filter specifically for image generation requests.
-    Checks for inappropriate content before generating images.
+
+    Layer 0 (this class) is a minimal regex pre-filter that only blocks
+    unambiguously inappropriate content (sexual, explicit).  Contextual
+    terms like "blood", "weapon", "drug" are intentionally left to the
+    LLM-based Layer 1 (ImageSafetyPipeline.validate_prompt) which can
+    understand educational context far more robustly than regex.
     """
 
+    # Only the most clearly inappropriate terms — no educational ambiguity.
+    # Uses prefix matching (\w*) so "pornographic", "mutilation" etc. are caught.
     BLOCKED_IMAGE_PATTERNS = [
-        r'\b(nude|naked|sexual|explicit|pornograph|erotic)\b',
-        r'\b(violence|gore|blood|gruesome|mutilat)\b',
-        r'\b(weapon|gun|knife|bomb|explosive)\b',
-        r'\b(drug|cocaine|heroin|meth)\b',
-        r'\b(celebrity|famous\s+person|real\s+person)\b',
-        r'\b(scary|horror|frightening|terrifying|creepy)\b',
+        r'\b(nude|naked|sexual|explicit|pornograph\w*|erotic|hentai)\b',
+        r'\b(gore|gruesome|mutilat\w*|dismember\w*)\b',
+        r'\b(cocaine|heroin|methamphetamine|fentanyl)\b',
     ]
 
     @classmethod
@@ -539,18 +544,18 @@ class ImageSafetyFilter:
         cls, prompt: str, lesson_title: str = "", subject: str = ""
     ) -> SafetyCheckResult:
         """
-        Check an image generation request for safety issues.
+        Minimal regex pre-filter for image generation requests.
 
-        1. Runs standard ContentSafetyFilter.check_content() first
-        2. Checks image-specific blocked patterns
-        3. Returns SafetyCheckResult
+        Only blocks unambiguously inappropriate content. Everything else
+        (blood, weapon, drug, horror, celebrity, etc.) passes through to
+        Layer 1 LLM validation for contextual judgment.
         """
         # Standard content safety check first
         result = ContentSafetyFilter.check_content(prompt, context="student_input")
         if result.blocked:
             return result
 
-        # Image-specific pattern checks
+        # Minimal regex — only clearly inappropriate terms
         prompt_lower = prompt.lower()
         for pattern in cls.BLOCKED_IMAGE_PATTERNS:
             if re.search(pattern, prompt_lower):
@@ -558,7 +563,7 @@ class ImageSafetyFilter:
                     is_safe=False,
                     flags=[ContentFlag.INAPPROPRIATE],
                     filtered_content=prompt,
-                    warnings=[f"Image request contains inappropriate content"],
+                    warnings=["Image request contains inappropriate content"],
                     blocked=True,
                     block_reason="This image request contains content that isn't appropriate for an educational setting. Please describe an educational image instead.",
                 )

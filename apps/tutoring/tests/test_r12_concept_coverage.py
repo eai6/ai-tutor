@@ -120,24 +120,23 @@ class TestR12ConceptCoverage(BaseTutoringTestCase):
         # Keyword fallback should have marked it
         self.assertTrue(tutor.exit_ticket_concepts[0]['covered'])
 
-    def test_analyze_uses_llm_on_even_exchanges(self):
-        """_analyze_student_response should use LLM check on even exchange counts."""
+    def test_analyze_always_uses_keyword_coverage(self):
+        """_analyze_student_response should always use keyword coverage check.
+
+        After the P7 refactor (remove phase system), concept coverage tracking
+        uses keyword-only on every exchange to avoid extra LLM calls — the
+        step evaluation LLM call already handles correctness assessment.
+        """
         tutor = self._make_tutor(exchange_count=2)
 
-        with patch.object(tutor, '_llm_concept_coverage_check') as mock_llm:
-            with patch.object(tutor, '_keyword_concept_coverage_check') as mock_kw:
-                tutor._analyze_student_response("test", "Great job!")
+        with patch.object(tutor, '_keyword_concept_coverage_check') as mock_kw:
+            tutor._analyze_student_response("test", "Great job!")
+            mock_kw.assert_called_once()
 
-                mock_llm.assert_called_once()
-                mock_kw.assert_not_called()
-
-    def test_analyze_uses_keyword_on_odd_exchanges(self):
-        """_analyze_student_response should use keyword check on odd exchange counts."""
+    def test_analyze_keyword_coverage_on_odd_exchanges(self):
+        """_analyze_student_response should use keyword check on odd exchanges too."""
         tutor = self._make_tutor(exchange_count=1)
 
-        with patch.object(tutor, '_llm_concept_coverage_check') as mock_llm:
-            with patch.object(tutor, '_keyword_concept_coverage_check') as mock_kw:
-                tutor._analyze_student_response("test", "response")
-
-                mock_kw.assert_called_once()
-                mock_llm.assert_not_called()
+        with patch.object(tutor, '_keyword_concept_coverage_check') as mock_kw:
+            tutor._analyze_student_response("test", "response")
+            mock_kw.assert_called_once()
