@@ -2,13 +2,14 @@
 FROM python:3.12-slim AS builder
 WORKDIR /build
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
-# CPU-only torch (saves ~1.5GB vs CUDA version)
+# CPU-only torch first (saves ~1.5GB vs CUDA version), then all other deps
 RUN pip install --no-cache-dir --prefix=/install \
     torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Pre-download Whisper tiny model for STT
 RUN PYTHONPATH=/install/lib/python3.12/site-packages \
+    LD_LIBRARY_PATH=/install/lib/python3.12/site-packages/ctranslate2:/install/lib \
     python -c "from faster_whisper import WhisperModel; WhisperModel('tiny', device='cpu', compute_type='int8')"
 
 # Pre-download Piper voice model for TTS (ONNX + JSON config)
