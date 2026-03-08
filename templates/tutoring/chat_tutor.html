@@ -823,6 +823,19 @@ body {
     outline: 2px solid #6366f1;
     outline-offset: 2px;
 }
+.tts-word {
+    transition: background-color 0.12s ease, color 0.12s ease;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+.tts-word.active {
+    background-color: #6366f1;
+    color: #fff;
+}
+.tts-word.spoken {
+    background-color: #e0e7ff;
+    color: #3730a3;
+}
 
 /* ── Mobile ── */
 @media (max-width: 768px) {
@@ -1596,9 +1609,90 @@ function setAudioToggleIcon(on) {
 let currentAudio = null;
 let currentSpeakingBubble = null;
 let speakGeneration = 0;  // Guards against overlapping fetches
+let currentRAF = null;    // requestAnimationFrame ID for word highlighting
+
+// ── Word-wrapping utilities ──
+
+const TTS_SKIP_TAGS = new Set(['CODE', 'PRE', 'IMG', 'SVG', 'VIDEO', 'AUDIO', 'IFRAME']);
+
+function wrapBubbleWords(bubbleEl) {
+    const spans = [];
+    const walker = document.createTreeWalker(bubbleEl, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+            let p = node.parentElement;
+            while (p && p !== bubbleEl) {
+                if (TTS_SKIP_TAGS.has(p.tagName)) return NodeFilter.FILTER_REJECT;
+                p = p.parentElement;
+            }
+            return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        }
+    });
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+    for (const tNode of textNodes) {
+        const parts = tNode.textContent.split(/(\s+)/);
+        const frag = document.createDocumentFragment();
+        for (const part of parts) {
+            if (/^\s+$/.test(part)) {
+                frag.appendChild(document.createTextNode(part));
+            } else if (part) {
+                const span = document.createElement('span');
+                span.className = 'tts-word';
+                span.textContent = part;
+                frag.appendChild(span);
+                spans.push(span);
+            }
+        }
+        tNode.parentNode.replaceChild(frag, tNode);
+    }
+    return spans;
+}
+
+function unwrapBubbleWords(bubbleEl) {
+    bubbleEl.querySelectorAll('.tts-word').forEach(span => {
+        span.replaceWith(document.createTextNode(span.textContent));
+    });
+    bubbleEl.normalize();
+}
+
+function matchTimingsToSpans(wordTimings, wordSpans) {
+    // Sequential greedy match with 3-word lookahead
+    const matched = [];
+    let si = 0;
+    for (const wt of wordTimings) {
+        const target = wt.word.toLowerCase().replace(/[^\w]/g, '');
+        if (!target) continue;
+        // Look ahead up to 3 spans for a match
+        let found = false;
+        for (let look = 0; look < 3 && si + look < wordSpans.length; look++) {
+            const spanText = wordSpans[si + look].textContent.toLowerCase().replace(/[^\w]/g, '');
+            if (spanText === target || spanText.startsWith(target) || target.startsWith(spanText)) {
+                // Fill skipped spans with this timing (handles punctuation merges)
+                for (let k = 0; k <= look; k++) {
+                    matched.push({ span: wordSpans[si + k], start: wt.start, end: wt.end });
+                }
+                si += look + 1;
+                found = true;
+                break;
+            }
+        }
+        if (!found && si < wordSpans.length) {
+            matched.push({ span: wordSpans[si], start: wt.start, end: wt.end });
+            si++;
+        }
+    }
+    return matched;
+}
+
+// ── Audio control ──
 
 function stopCurrentAudio() {
     speakGeneration++;  // Invalidate any in-flight fetch
+    if (currentRAF) {
+        cancelAnimationFrame(currentRAF);
+        currentRAF = null;
+    }
     if (currentAudio) {
         currentAudio.pause();
         currentAudio.onended = null;
@@ -1607,6 +1701,7 @@ function stopCurrentAudio() {
     }
     if (currentSpeakingBubble) {
         currentSpeakingBubble.classList.remove('speaking');
+        unwrapBubbleWords(currentSpeakingBubble);
         currentSpeakingBubble = null;
     }
 }
@@ -1624,26 +1719,118 @@ async function speakResponse(text, bubbleEl, force = false) {
             },
             body: JSON.stringify({ text: text.slice(0, 2000) }),
         });
-        if (myGen !== speakGeneration) return;  // Superseded — discard
+        if (myGen !== speakGeneration) return;
         if (!resp.ok) return;
-        const contentType = resp.headers.get('content-type') || 'audio/wav';
-        const data = await resp.arrayBuffer();
-        if (myGen !== speakGeneration) return;  // Superseded — discard
-        const blob = new Blob([data], { type: contentType });
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        currentAudio = audio;
-        currentSpeakingBubble = bubbleEl;
-        if (bubbleEl) bubbleEl.classList.add('speaking');
-        audio.onended = () => {
-            if (bubbleEl) bubbleEl.classList.remove('speaking');
-            URL.revokeObjectURL(url);
-            if (currentAudio === audio) {
-                currentAudio = null;
-                currentSpeakingBubble = null;
+
+        const contentType = resp.headers.get('content-type') || '';
+        const isJSON = contentType.includes('application/json');
+
+        if (isJSON) {
+            // ── ElevenLabs path: word-level highlighting ──
+            const data = await resp.json();
+            if (myGen !== speakGeneration) return;
+
+            const audioBytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0));
+            const blob = new Blob([audioBytes], { type: data.content_type || 'audio/mpeg' });
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+
+            currentAudio = audio;
+            currentSpeakingBubble = bubbleEl;
+            if (bubbleEl) bubbleEl.classList.add('speaking');
+
+            // Wrap words and match timings
+            const wordSpans = bubbleEl ? wrapBubbleWords(bubbleEl) : [];
+            const matched = matchTimingsToSpans(data.word_timings || [], wordSpans);
+            let lastActiveIdx = -1;
+
+            function highlightLoop() {
+                if (currentAudio !== audio) return;
+                const t = audio.currentTime;
+                let newIdx = -1;
+                for (let i = 0; i < matched.length; i++) {
+                    if (t >= matched[i].start && t < matched[i].end) { newIdx = i; break; }
+                }
+                // If past the last matched word's start, highlight the last one
+                if (newIdx === -1 && matched.length && t >= matched[matched.length - 1].start) {
+                    newIdx = matched.length - 1;
+                }
+                if (newIdx !== lastActiveIdx) {
+                    if (lastActiveIdx >= 0 && lastActiveIdx < matched.length) {
+                        matched[lastActiveIdx].span.classList.remove('active');
+                        matched[lastActiveIdx].span.classList.add('spoken');
+                    }
+                    if (newIdx >= 0) {
+                        matched[newIdx].span.classList.add('active');
+                        matched[newIdx].span.classList.remove('spoken');
+                        // Mark all prior as spoken
+                        for (let j = lastActiveIdx + 1; j < newIdx; j++) {
+                            if (j >= 0) {
+                                matched[j].span.classList.remove('active');
+                                matched[j].span.classList.add('spoken');
+                            }
+                        }
+                    }
+                    lastActiveIdx = newIdx;
+                }
+                currentRAF = requestAnimationFrame(highlightLoop);
             }
-        };
-        audio.play();
+
+            audio.onplaying = () => { currentRAF = requestAnimationFrame(highlightLoop); };
+            audio.onended = () => {
+                if (currentRAF) { cancelAnimationFrame(currentRAF); currentRAF = null; }
+                // Mark all spoken, then unwrap after a brief pause
+                matched.forEach(m => { m.span.classList.remove('active'); m.span.classList.add('spoken'); });
+                setTimeout(() => {
+                    if (bubbleEl) {
+                        bubbleEl.classList.remove('speaking');
+                        unwrapBubbleWords(bubbleEl);
+                    }
+                    URL.revokeObjectURL(url);
+                    if (currentAudio === audio) { currentAudio = null; currentSpeakingBubble = null; }
+                }, 400);
+            };
+
+            try {
+                await audio.play();
+            } catch (playErr) {
+                console.warn('Autoplay blocked, will retry on user interaction');
+                const retry = () => {
+                    if (currentAudio === audio) audio.play().catch(() => {});
+                    document.removeEventListener('click', retry);
+                    document.removeEventListener('keydown', retry);
+                };
+                document.addEventListener('click', retry, { once: true });
+                document.addEventListener('keydown', retry, { once: true });
+            }
+        } else {
+            // ── Piper/fallback path: bubble outline only ──
+            const rawData = await resp.arrayBuffer();
+            if (myGen !== speakGeneration) return;
+            const blob = new Blob([rawData], { type: contentType || 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            currentAudio = audio;
+            currentSpeakingBubble = bubbleEl;
+            if (bubbleEl) bubbleEl.classList.add('speaking');
+            audio.onended = () => {
+                if (bubbleEl) bubbleEl.classList.remove('speaking');
+                URL.revokeObjectURL(url);
+                if (currentAudio === audio) { currentAudio = null; currentSpeakingBubble = null; }
+            };
+            try {
+                await audio.play();
+            } catch (playErr) {
+                console.warn('Autoplay blocked, will retry on user interaction');
+                const retry = () => {
+                    if (currentAudio === audio) audio.play().catch(() => {});
+                    document.removeEventListener('click', retry);
+                    document.removeEventListener('keydown', retry);
+                };
+                document.addEventListener('click', retry, { once: true });
+                document.addEventListener('keydown', retry, { once: true });
+            }
+        }
     } catch (e) {
         console.error('TTS error:', e);
     }

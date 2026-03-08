@@ -872,8 +872,18 @@ def speak_text(request):
     if not text:
         return JsonResponse({"error": "Text required"}, status=400)
 
+    # Try timestamp-enriched synthesis first (ElevenLabs only)
+    from apps.tutoring.audio_service import synthesize, synthesize_with_timestamps
+    ts_result = synthesize_with_timestamps(text)
+    if ts_result:
+        return JsonResponse({
+            'audio_base64': ts_result['audio_base64'],
+            'content_type': ts_result['content_type'],
+            'word_timings': ts_result['word_timings'],
+        })
+
+    # Fallback: raw audio bytes (Piper or ElevenLabs failure)
     from django.http import HttpResponse
-    from apps.tutoring.audio_service import synthesize
     audio_bytes, content_type = synthesize(text)
 
     if not audio_bytes:

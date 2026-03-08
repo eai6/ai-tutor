@@ -47,6 +47,77 @@ def synthesize(text: str) -> tuple[bytes | None, str]:
     return _synthesize_piper(text), 'audio/wav'
 
 
+def synthesize_with_timestamps(text: str) -> dict | None:
+    """Synthesize with word-level timing data (ElevenLabs only).
+
+    Returns {audio_base64, content_type, word_timings} or None if unavailable.
+    word_timings is a list of {word, start, end} dicts.
+    """
+    if DISABLE_TTS or settings.TTS_BACKEND != 'elevenlabs':
+        return None
+    if not text or not text.strip():
+        return None
+    try:
+        client = _get_elevenlabs_client()
+        response = client.text_to_speech.convert_with_timestamps(
+            voice_id=settings.ELEVENLABS_VOICE_ID,
+            text=text,
+            model_id=settings.ELEVENLABS_MODEL_ID,
+            output_format="mp3_44100_128",
+        )
+        alignment = response.alignment
+        if not alignment or not alignment.characters:
+            return None
+        word_timings = _chars_to_words(alignment)
+        return {
+            'audio_base64': response.audio_base_64,
+            'content_type': 'audio/mpeg',
+            'word_timings': word_timings,
+        }
+    except Exception:
+        logger.exception("[TTS] ElevenLabs timestamp synthesis failed")
+        return None
+
+
+def _chars_to_words(alignment) -> list[dict]:
+    """Convert character-level alignment to word-level timings.
+
+    Returns [{word, start, end}, ...] for each whitespace-delimited word.
+    """
+    chars = alignment.characters
+    starts = alignment.character_start_times_seconds
+    ends = alignment.character_end_times_seconds
+
+    words = []
+    current_word = []
+    word_start = None
+
+    for i, ch in enumerate(chars):
+        if ch.isspace():
+            if current_word:
+                words.append({
+                    'word': ''.join(current_word),
+                    'start': word_start,
+                    'end': ends[i - 1],
+                })
+                current_word = []
+                word_start = None
+        else:
+            if not current_word:
+                word_start = starts[i]
+            current_word.append(ch)
+
+    # Flush last word
+    if current_word:
+        words.append({
+            'word': ''.join(current_word),
+            'start': word_start,
+            'end': ends[len(chars) - 1],
+        })
+
+    return words
+
+
 # =============================================================================
 # STT — faster-whisper (local)
 # =============================================================================
