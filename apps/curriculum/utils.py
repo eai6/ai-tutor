@@ -9,8 +9,20 @@ import re
 from typing import List
 
 
+def _expand_grade_range(token: str) -> List[str]:
+    """Expand a dash range like 'S1-S3' into ['S1', 'S2', 'S3'].
+
+    Falls through to literal if the pattern doesn't match.
+    """
+    m = re.match(r'^([A-Za-z]*)(\d+)-\1(\d+)$', token)
+    if m:
+        prefix, start, end = m.group(1), int(m.group(2)), int(m.group(3))
+        return [f"{prefix}{n}" for n in range(start, end + 1)]
+    return [token]
+
+
 def parse_grade_level_string(csv: str) -> List[str]:
-    """Parse a comma-separated grade string into a list.
+    """Parse a comma-separated grade string into a list, expanding dash ranges.
 
     >>> parse_grade_level_string("S1,S2,S3")
     ['S1', 'S2', 'S3']
@@ -18,10 +30,19 @@ def parse_grade_level_string(csv: str) -> List[str]:
     []
     >>> parse_grade_level_string("S2")
     ['S2']
+    >>> parse_grade_level_string("S1-S3")
+    ['S1', 'S2', 'S3']
+    >>> parse_grade_level_string("S1-S3,S5")
+    ['S1', 'S2', 'S3', 'S5']
     """
     if not csv or not csv.strip():
         return []
-    return [g.strip() for g in csv.split(',') if g.strip()]
+    result = []
+    for token in csv.split(','):
+        token = token.strip()
+        if token:
+            result.extend(_expand_grade_range(token))
+    return result
 
 
 def format_grade_display(csv: str) -> str:

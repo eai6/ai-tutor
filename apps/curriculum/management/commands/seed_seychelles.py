@@ -232,6 +232,7 @@ class Command(BaseCommand):
             {
                 'title': 'S1: Introduction to Geography',
                 'order_index': 0,
+                'grade_level': 'S1',
                 'lessons': [
                     {'title': 'What is Geography?', 'objective': 'Understand geography as study of earth, inhabitants, and their relationships', 'terminal_objectives': ['Define geography', 'Know fundamental concepts: location, pattern, process', 'Understand human-environment interaction']},
                     {'title': 'Physical and Human Geography', 'objective': 'Distinguish between physical and human geography themes', 'terminal_objectives': ['Identify physical geography topics', 'Identify human geography topics', 'Understand importance of graphicacy']},
@@ -241,6 +242,7 @@ class Command(BaseCommand):
             {
                 'title': 'S1: Map Skills',
                 'order_index': 1,
+                'grade_level': 'S1',
                 'lessons': [
                     {'title': 'Types of Maps', 'objective': 'Understand different types of maps and uses', 'terminal_objectives': ['Identify physical, political, thematic maps', 'Read map symbols', 'Understand scale']},
                     {'title': 'Grid References', 'objective': 'Use four-figure and six-figure grid references', 'terminal_objectives': ['Give 4-figure grid references', 'Give 6-figure grid references', 'Locate places on Seychelles maps']},
@@ -250,6 +252,7 @@ class Command(BaseCommand):
             {
                 'title': 'S1: Weather and Climate',
                 'order_index': 2,
+                'grade_level': 'S1',
                 'lessons': [
                     {'title': 'Weather vs Climate', 'objective': 'Distinguish between weather and climate', 'terminal_objectives': ['Define weather', 'Define climate', 'Identify weather elements']},
                     {'title': 'Weather Instruments', 'objective': 'Describe weather instruments and measurements', 'terminal_objectives': ['Describe Stevenson Screen', 'Use thermometer, barometer, rain gauge', 'Calculate mean temperature']},
@@ -259,6 +262,7 @@ class Command(BaseCommand):
             {
                 'title': 'S1: Climate Change',
                 'order_index': 3,
+                'grade_level': 'S1',
                 'lessons': [
                     {'title': 'What is Climate Change?', 'objective': 'Understand climate change and its causes', 'terminal_objectives': ['Define climate change', 'Explain greenhouse effect', 'Identify human causes']},
                     {'title': 'Effects of Climate Change', 'objective': 'Recognise effects of climate change', 'terminal_objectives': ['Describe sea level rise (critical for Seychelles)', 'Describe weather pattern changes', 'Describe ecosystem impacts']},
@@ -268,6 +272,7 @@ class Command(BaseCommand):
             {
                 'title': 'S1: Population Studies',
                 'order_index': 4,
+                'grade_level': 'S1',
                 'lessons': [
                     {'title': 'Population Terminology', 'objective': 'Understand population terminology', 'terminal_objectives': ['Define birth rate, death rate, natural increase', 'Define life expectancy, infant mortality', 'Calculate natural increase']},
                     {'title': 'Population Pyramids', 'objective': 'Recognise features of population pyramids', 'terminal_objectives': ['Identify pyramid features', 'Interpret different pyramid types', 'Describe Seychelles population pyramid']},
@@ -277,6 +282,7 @@ class Command(BaseCommand):
             {
                 'title': 'S2: Settlement Studies',
                 'order_index': 5,
+                'grade_level': 'S2',
                 'lessons': [
                     {'title': 'Types of Settlements', 'objective': 'Distinguish between villages, towns, cities', 'terminal_objectives': ['Define rural and urban', 'Classify by size and services', 'Identify Victoria as only city']},
                     {'title': 'Settlement Patterns', 'objective': 'Know settlement patterns in Seychelles', 'terminal_objectives': ['Identify linear patterns', 'Identify nucleated patterns', 'Identify dispersed patterns']},
@@ -286,6 +292,7 @@ class Command(BaseCommand):
             {
                 'title': 'S2: Plate Tectonics',
                 'order_index': 6,
+                'grade_level': 'S2',
                 'lessons': [
                     {'title': 'Structure of the Earth', 'objective': 'Describe internal structure of Earth', 'terminal_objectives': ['Describe crust, mantle, core', 'Understand plate division', 'Know continental drift theory']},
                     {'title': 'Plate Boundaries', 'objective': 'Understand three types of plate margins', 'terminal_objectives': ['Define constructive boundaries', 'Define destructive boundaries', 'Define conservative boundaries']},
@@ -296,6 +303,7 @@ class Command(BaseCommand):
             {
                 'title': 'S2: Tropical Ecosystems',
                 'order_index': 7,
+                'grade_level': 'S2',
                 'lessons': [
                     {'title': 'Tropical Rainforests', 'objective': 'Know features of tropical rainforest ecosystems', 'terminal_objectives': ['Describe climate characteristics', 'Describe vegetation structure', 'Explain plant and animal adaptations']},
                     {'title': 'Hot Deserts', 'objective': 'Know features of hot desert ecosystems', 'terminal_objectives': ['Describe desert climate', 'Describe vegetation adaptations', 'Explain animal adaptations']},
@@ -305,6 +313,7 @@ class Command(BaseCommand):
             {
                 'title': 'S3: Industry and Fishing',
                 'order_index': 8,
+                'grade_level': 'S3',
                 'lessons': [
                     {'title': 'Types of Industry', 'objective': 'Know different types of industry', 'terminal_objectives': ['Define primary, secondary, tertiary, quaternary', 'Give Seychelles examples', 'Understand industrial system']},
                     {'title': 'Fishing in Seychelles', 'objective': 'Recognise importance of fishing to Seychelles', 'terminal_objectives': ['Know types of fishing', 'Understand geographic advantages', 'Describe economic importance']},
@@ -314,6 +323,7 @@ class Command(BaseCommand):
             {
                 'title': 'S3: Coastal Landforms',
                 'order_index': 9,
+                'grade_level': 'S3',
                 'lessons': [
                     {'title': 'Wave Action', 'objective': 'Explain wave formation and characteristics', 'terminal_objectives': ['Explain wave formation', 'Describe wave structure', 'Explain swash and backwash']},
                     {'title': 'Erosional Landforms', 'objective': 'Describe coastal erosion features', 'terminal_objectives': ['Explain cliff formation', 'Explain caves, arches, stacks', 'Identify Seychelles examples']},
@@ -345,6 +355,7 @@ class Command(BaseCommand):
             {
                 'title': 'Number: Whole Numbers',
                 'order_index': 0,
+                'grade_level': 'S1,S2,S3,S4,S5',
                 'lessons': [
                     {'title': 'Place Value and Estimation', 'objective': 'Make estimates of numbers and quantities', 'terminal_objectives': ['Understand place value', 'Round numbers', 'Check validity of calculations']},
                     {'title': 'Factors, Multiples, and Primes', 'objective': 'Apply multiples, factors, prime numbers in problem solving', 'terminal_objectives': ['Find factors and multiples', 'Identify prime numbers', 'Find HCF and LCM']},
@@ -354,6 +365,7 @@ class Command(BaseCommand):
             {
                 'title': 'Fractions',
                 'order_index': 1,
+                'grade_level': 'S1,S2,S3,S4,S5',
                 'lessons': [
                     {'title': 'Equivalent Fractions', 'objective': 'Find equivalent fractions and simplify', 'terminal_objectives': ['Find equivalent fractions', 'Simplify to lowest terms', 'Convert improper to mixed']},
                     {'title': 'Adding and Subtracting Fractions', 'objective': 'Add and subtract fractions confidently', 'terminal_objectives': ['Add with same denominator', 'Add with different denominators', 'Subtract fractions']},
@@ -363,6 +375,7 @@ class Command(BaseCommand):
             {
                 'title': 'Decimals',
                 'order_index': 2,
+                'grade_level': 'S1,S2,S3,S4,S5',
                 'lessons': [
                     {'title': 'Decimal Place Value', 'objective': 'Demonstrate understanding of decimal place value', 'terminal_objectives': ['Read and write decimals', 'Order decimals', 'Round decimals']},
                     {'title': 'Operations with Decimals', 'objective': 'Perform four operations on decimals', 'terminal_objectives': ['Add and subtract', 'Multiply decimals', 'Divide decimals']},
@@ -371,6 +384,7 @@ class Command(BaseCommand):
             {
                 'title': 'Percentages',
                 'order_index': 3,
+                'grade_level': 'S1,S2,S3,S4,S5',
                 'lessons': [
                     {'title': 'Understanding Percentages', 'objective': 'Appreciate use of percentage in everyday life', 'terminal_objectives': ['Convert between %, fractions, decimals', 'Calculate % of quantity', 'Express as percentage']},
                     {'title': 'Percentage Increase and Decrease', 'objective': 'Work out percentage changes', 'terminal_objectives': ['Calculate increase', 'Calculate decrease', 'Find original value']},
@@ -380,6 +394,7 @@ class Command(BaseCommand):
             {
                 'title': 'Ratio and Proportion',
                 'order_index': 4,
+                'grade_level': 'S1,S2,S3,S4,S5',
                 'lessons': [
                     {'title': 'Understanding Ratio', 'objective': 'Demonstrate understanding of ratio notation', 'terminal_objectives': ['Write ratios', 'Simplify ratios', 'Find equivalent ratios']},
                     {'title': 'Dividing in a Ratio', 'objective': 'Solve problems involving proportional division', 'terminal_objectives': ['Divide in given ratio', 'Solve sharing problems', 'Find missing parts']},
@@ -389,6 +404,7 @@ class Command(BaseCommand):
             {
                 'title': 'Algebra',
                 'order_index': 5,
+                'grade_level': 'S1,S2,S3,S4,S5',
                 'lessons': [
                     {'title': 'Algebraic Expressions', 'objective': 'Form algebraic expressions', 'terminal_objectives': ['Use letters for unknowns', 'Write expressions', 'Simplify expressions']},
                     {'title': 'Solving Equations', 'objective': 'Construct and solve simple equations', 'terminal_objectives': ['Solve one-step equations', 'Solve two-step equations', 'Solve with unknowns on both sides']},
@@ -398,6 +414,7 @@ class Command(BaseCommand):
             {
                 'title': 'Geometry: 2D Shapes',
                 'order_index': 6,
+                'grade_level': 'S1,S2,S3,S4,S5',
                 'lessons': [
                     {'title': 'Triangles', 'objective': 'Understand properties of triangles', 'terminal_objectives': ['Classify triangles', 'Know angle sum = 180°', 'Construct triangles']},
                     {'title': 'Quadrilaterals', 'objective': 'Understand properties of quadrilaterals', 'terminal_objectives': ['Identify types', 'Know angle sum = 360°', 'Use properties']},
@@ -408,6 +425,7 @@ class Command(BaseCommand):
             {
                 'title': 'Measures',
                 'order_index': 7,
+                'grade_level': 'S1,S2,S3,S4,S5',
                 'lessons': [
                     {'title': 'Units of Measurement', 'objective': 'Convert between units', 'terminal_objectives': ['Convert length units', 'Convert mass units', 'Convert capacity units']},
                     {'title': 'Perimeter and Area', 'objective': 'Calculate perimeter and area', 'terminal_objectives': ['Calculate perimeter', 'Calculate area of shapes', 'Calculate compound areas']},
@@ -417,6 +435,7 @@ class Command(BaseCommand):
             {
                 'title': 'Statistics',
                 'order_index': 8,
+                'grade_level': 'S1,S2,S3,S4,S5',
                 'lessons': [
                     {'title': 'Collecting Data', 'objective': 'Collect and organise data', 'terminal_objectives': ['Use tally charts', 'Create frequency tables', 'Group data']},
                     {'title': 'Averages and Range', 'objective': 'Calculate mean, median, mode, range', 'terminal_objectives': ['Calculate mean', 'Find median and mode', 'Calculate range']},
@@ -436,7 +455,10 @@ class Command(BaseCommand):
             unit, _ = Unit.objects.update_or_create(
                 course=course,
                 title=unit_data['title'],
-                defaults={'order_index': unit_data['order_index']}
+                defaults={
+                    'order_index': unit_data['order_index'],
+                    'grade_level': unit_data.get('grade_level', ''),
+                }
             )
             
             for i, lesson_data in enumerate(unit_data['lessons']):

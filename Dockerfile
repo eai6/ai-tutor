@@ -26,4 +26,4 @@ COPY --from=builder /models/piper /models/piper
 COPY . .
 RUN python manage.py collectstatic --noinput
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate && python manage.py seed_gamification && cp -r /app/media/vectordb /tmp/vectordb 2>/dev/null || true && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 4 --timeout 120"]
+CMD ["sh", "-c", "python manage.py migrate && python manage.py seed_gamification && python manage.py backfill_progress && python manage.py classify_unit_grades && cp -r /app/media/vectordb /tmp/vectordb 2>/dev/null || true && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 4 --timeout 120"]

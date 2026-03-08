@@ -61,9 +61,19 @@
             <span class="gbar-streak" id="gbar-streak" style="display:none"></span>
         </div>
         <div class="gbar-right">
+            <button class="gbar-btn" id="trophies-btn" onclick="toggleTrophyCase()">Trophies</button>
             <button class="gbar-btn" id="personality-btn" onclick="openPersonalityModal()">Select Tutor Style</button>
             <button class="gbar-btn" onclick="openLeaderboardModal()">Leaderboard</button>
         </div>
+    </div>
+
+    <!-- Trophy Case (collapsible) -->
+    <div class="trophy-case card animate-in" id="trophy-case" style="display:none; animation-delay:0.04s">
+        <div class="trophy-header">
+            <h3 id="trophy-header-text">Achievements</h3>
+            <button class="trophy-close" onclick="toggleTrophyCase()">&times;</button>
+        </div>
+        <div class="trophy-grid" id="trophy-grid"></div>
     </div>
 
     <!-- Personality Picker Modal -->
@@ -709,6 +719,48 @@
     .lb-name { flex: 1; }
     .lb-xp { font-weight: 700; color: #6D28D9; }
 
+    /* ── Trophy Case ── */
+    .trophy-case {
+        margin-bottom: 1.5rem; padding: 1.25rem;
+        background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+        border: 1px solid #FCD34D;
+    }
+    .trophy-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 1rem;
+    }
+    .trophy-header h3 { font-size: 1rem; font-weight: 700; margin: 0; }
+    .trophy-close {
+        background: none; border: none; font-size: 1.25rem; cursor: pointer;
+        color: var(--text-muted); line-height: 1;
+    }
+    .trophy-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem;
+    }
+    .trophy-item {
+        text-align: center; padding: 0.75rem 0.5rem; border-radius: 0.75rem;
+        background: #fff; border: 1.5px solid #E5E7EB; transition: all 0.15s ease;
+    }
+    .trophy-item.earned {
+        border-color: #F59E0B; background: #FFFBEB;
+    }
+    .trophy-item.locked { opacity: 0.55; }
+    .trophy-emoji { font-size: 1.75rem; margin-bottom: 0.25rem; }
+    .trophy-name { font-size: 0.78rem; font-weight: 700; margin-bottom: 0.15rem; }
+    .trophy-desc { font-size: 0.68rem; color: var(--text-muted); }
+    .trophy-progress {
+        font-size: 0.68rem; font-weight: 600; color: #D97706; margin-top: 0.25rem;
+    }
+
+    /* ── Leaderboard extras ── */
+    .lb-level {
+        font-size: 0.7rem; font-weight: 700; background: #EDE9FE;
+        color: #7C3AED; padding: 0.1rem 0.4rem; border-radius: 999px;
+    }
+    .lb-streak {
+        font-size: 0.75rem; color: #EA580C; font-weight: 600; white-space: nowrap;
+    }
+
     /* ── Achievement toasts ── */
     .achievement-toast {
         background: #fff; border-radius: 0.75rem; padding: 1rem 1.25rem;
@@ -734,8 +786,9 @@
         }
 
         .gamification-bar { flex-direction: column; align-items: stretch; }
-        .gbar-right { justify-content: center; }
+        .gbar-right { justify-content: center; flex-wrap: wrap; }
         .personality-grid { grid-template-columns: 1fr; }
+        .trophy-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
     }
 </style>
 {% endblock %}
@@ -814,6 +867,45 @@ function renderGamBar() {
     if (gamData.selected_personality) {
         btn.textContent = gamData.selected_personality.emoji + ' ' + gamData.selected_personality.name;
     }
+
+    // Trophies button with count
+    const allAch = gamData.all_achievements || [];
+    const earnedCount = allAch.filter(a => a.earned).length;
+    document.getElementById('trophies-btn').textContent = 'Trophies (' + earnedCount + '/' + allAch.length + ')';
+}
+
+/* Trophy Case */
+function toggleTrophyCase() {
+    const el = document.getElementById('trophy-case');
+    el.style.display = el.style.display === 'none' ? '' : 'none';
+    if (el.style.display !== 'none') renderTrophyCase();
+}
+
+function renderTrophyCase() {
+    if (!gamData) return;
+    const grid = document.getElementById('trophy-grid');
+    const allAch = gamData.all_achievements || [];
+    const earnedCount = allAch.filter(a => a.earned).length;
+    document.getElementById('trophy-header-text').textContent = 'Achievements (' + earnedCount + '/' + allAch.length + ')';
+
+    grid.innerHTML = allAch.map(a => {
+        const earned = a.earned;
+        let progressHtml = '';
+        if (!earned && a.current !== undefined && a.trigger_value > 0) {
+            const cur = a.current || 0;
+            let label = cur + '/' + a.trigger_value;
+            if (a.trigger_type === 'streak_days') label += ' days';
+            else if (a.trigger_type === 'xp_threshold') label += ' XP';
+            else if (a.trigger_type === 'level_reached') label = 'Lv ' + cur + '/' + a.trigger_value;
+            progressHtml = '<div class="trophy-progress">' + label + '</div>';
+        }
+        return '<div class="trophy-item ' + (earned ? 'earned' : 'locked') + '">' +
+            '<div class="trophy-emoji">' + (earned ? (a.emoji || '🏆') : '🔒') + '</div>' +
+            '<div class="trophy-name">' + a.name + '</div>' +
+            '<div class="trophy-desc">' + a.description + '</div>' +
+            progressHtml +
+        '</div>';
+    }).join('');
 }
 
 /* Personality Modal */
@@ -873,7 +965,9 @@ async function openLeaderboardModal() {
         body.innerHTML = data.leaderboard.map(e =>
             `<div class="lb-row ${e.is_you ? 'is-you' : ''}">
                 <span class="lb-rank">${e.rank <= 3 ? ['🥇','🥈','🥉'][e.rank-1] : '#'+e.rank}</span>
+                <span class="lb-level">Lv ${e.level || 1}</span>
                 <span class="lb-name">${e.name}${e.is_you ? ' (You)' : ''}</span>
+                ${e.streak ? '<span class="lb-streak">🔥' + e.streak + 'd</span>' : ''}
                 <span class="lb-xp">${e.xp.toLocaleString()} XP</span>
             </div>`
         ).join('');
@@ -893,6 +987,7 @@ function showAchievementToasts(achievements) {
         setTimeout(() => {
             const toast = document.createElement('div');
             toast.className = 'achievement-toast';
+            toast.style.cursor = 'pointer';
             toast.innerHTML = `
                 <span class="at-emoji">${a.emoji || '🏆'}</span>
                 <div class="at-body">
@@ -901,8 +996,10 @@ function showAchievementToasts(achievements) {
                     <div class="at-desc">${a.description}</div>
                 </div>
             `;
+            const dismiss = () => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); };
+            toast.addEventListener('click', dismiss);
             container.appendChild(toast);
-            setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 4000);
+            setTimeout(dismiss, 6000);
         }, i * 800);
     });
 }

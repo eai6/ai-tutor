@@ -203,9 +203,15 @@ def dashboard_home(request):
         in_progress=Count('id', filter=Q(mastery_level='in_progress')),
     )
 
+    # Total available published lessons (true denominator for mastery %)
+    total_available_lessons = filter_by_institution(
+        Lesson.objects.filter(is_published=True), institution, field='unit__course__institution'
+    ).count()
+
     avg_mastery = 0
-    if progress_stats['total'] > 0:
-        avg_mastery = round((progress_stats['mastered'] / progress_stats['total']) * 100)
+    denominator = total_available_lessons * max(total_students, 1)
+    if denominator > 0:
+        avg_mastery = round((progress_stats['mastered'] / denominator) * 100)
 
     # Students at risk (started but no activity in 7 days)
     at_risk_students = filter_by_institution(
@@ -288,36 +294,38 @@ def student_list(request):
         institution
     ).select_related('user').order_by('user__last_name', 'user__first_name')
 
+    # Total available published lessons (denominator for all students)
+    total_available = filter_by_institution(
+        Lesson.objects.filter(is_published=True), institution, field='unit__course__institution'
+    ).count()
+
     # Enrich with progress data
     student_data = []
     for membership in students:
         user = membership.user
 
         # Get progress stats
-        progress = filter_by_institution(
-            StudentLessonProgress.objects.filter(student=user),
+        mastered_count = filter_by_institution(
+            StudentLessonProgress.objects.filter(student=user, mastery_level='mastered'),
             institution
-        ).aggregate(
-            total=Count('id'),
-            mastered=Count('id', filter=Q(mastery_level='mastered')),
-        )
+        ).count()
 
         # Get recent session
         last_session = filter_by_institution(
             TutorSession.objects.filter(student=user),
             institution
         ).order_by('-started_at').first()
-        
+
         # Get profile
         profile = getattr(user, 'student_profile', None)
-        
+
         student_data.append({
             'user': user,
             'profile': profile,
-            'lessons_mastered': progress['mastered'] or 0,
-            'lessons_total': progress['total'] or 0,
+            'lessons_mastered': mastered_count,
+            'lessons_total': total_available,
             'last_active': last_session.started_at if last_session else None,
-            'mastery_pct': round((progress['mastered'] / progress['total']) * 100) if progress['total'] else 0,
+            'mastery_pct': round((mastered_count / total_available) * 100) if total_available else 0,
         })
     
     # Pagination
@@ -375,21 +383,43 @@ def student_detail(request, student_id):
         'in_progress_lessons': progress_list.filter(mastery_level='in_progress').count(),
     }
     
+    # Get total published lessons per course for true denominator
+    course_lesson_counts = {}
+    courses_qs = filter_by_institution(
+        Course.objects.filter(is_published=True), institution
+    ).prefetch_related('units__lessons')
+    for course in courses_qs:
+        count = 0
+        for unit in course.units.all():
+            count += unit.lessons.filter(is_published=True).count()
+        if count > 0:
+            course_lesson_counts[course.id] = {'course': course, 'count': count}
+
     # Group progress by course
     courses_progress = {}
     for p in progress_list:
         course = p.lesson.unit.course
         if course.id not in courses_progress:
+            total_in_course = course_lesson_counts.get(course.id, {}).get('count', 0)
             courses_progress[course.id] = {
                 'course': course,
                 'lessons': [],
                 'mastered': 0,
-                'total': 0,
+                'total': total_in_course,
             }
         courses_progress[course.id]['lessons'].append(p)
-        courses_progress[course.id]['total'] += 1
         if p.mastery_level == 'mastered':
             courses_progress[course.id]['mastered'] += 1
+
+    # Add courses that have no progress records yet
+    for cid, info in course_lesson_counts.items():
+        if cid not in courses_progress:
+            courses_progress[cid] = {
+                'course': info['course'],
+                'lessons': [],
+                'mastered': 0,
+                'total': info['count'],
+            }
     
     context = {
         **request.staff_ctx,

@@ -53,6 +53,11 @@ class Unit(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     order_index = models.PositiveIntegerField(default=0)
+    grade_level = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Target grade level(s), e.g. 'S1', 'S1,S2'. Empty = visible to all grades in the course."
+    )
 
     class Meta:
         ordering = ['order_index']

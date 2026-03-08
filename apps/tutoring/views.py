@@ -254,6 +254,11 @@ def lesson_catalog(request):
 
         units_data = []
         for unit in course.units.all().order_by('order_index'):
+            # Skip units not matching student's grade
+            if student_grade and not is_staff:
+                unit_grades = parse_grade_level_string(unit.grade_level)
+                if unit_grades and student_grade not in unit_grades:
+                    continue
             unit_lessons = []
             for lesson in unit.lessons.filter(is_published=True).order_by('order_index'):
                 total_lessons += 1
@@ -295,6 +300,11 @@ def lesson_catalog(request):
                 })
 
         from apps.curriculum.utils import format_grade_display
+        # Show student's grade if filtering is active, otherwise full course range
+        if student_grade and not is_staff:
+            grade_display = student_grade
+        else:
+            grade_display = format_grade_display(course.grade_level)
         subject_data = {
             'id': course.id,
             'title': course.title,
@@ -304,7 +314,7 @@ def lesson_catalog(request):
             'in_progress_lessons': in_progress_lessons,
             'progress_percent': int((completed_lessons / total_lessons * 100)) if total_lessons > 0 else 0,
             'units': units_data,
-            'grade_display': format_grade_display(course.grade_level),
+            'grade_display': grade_display,
         }
 
         # Only add courses that have at least 1 published lesson
@@ -545,6 +555,17 @@ def chat_start_session(request, lesson_id):
             institution=session_institution,
             status=TutorSession.Status.ACTIVE,
         )
+
+        # Ensure a progress record exists (won't downgrade if already mastered)
+        StudentLessonProgress.objects.get_or_create(
+            student=request.user,
+            lesson=lesson,
+            defaults={
+                'institution': session_institution,
+                'mastery_level': 'in_progress',
+            },
+        )
+
         tutor = ConversationalTutor(session)
         response = tutor.start()
 
@@ -938,6 +959,37 @@ def get_gamification_data(request):
         'earned_at': sa.earned_at.isoformat(),
     } for sa in all_earned]
 
+    # All active achievements (for trophy case with progress hints)
+    all_achievements_qs = Achievement.objects.filter(is_active=True).order_by('sort_order', 'name')
+    earned_codes = {sa.achievement.code for sa in all_earned}
+    mastered_lessons_count = StudentLessonProgress.objects.filter(
+        student=request.user, mastery_level='mastered'
+    ).count()
+
+    all_achievements_list = []
+    for ach in all_achievements_qs:
+        entry = {
+            'code': ach.code,
+            'name': ach.name,
+            'emoji': ach.emoji,
+            'description': ach.description,
+            'category': ach.category,
+            'trigger_type': ach.trigger_type,
+            'trigger_value': ach.trigger_value,
+            'earned': ach.code in earned_codes,
+        }
+        # Add current progress for unearned achievements
+        if not entry['earned']:
+            if ach.trigger_type == 'lessons_completed':
+                entry['current'] = mastered_lessons_count
+            elif ach.trigger_type == 'streak_days':
+                entry['current'] = max_streak
+            elif ach.trigger_type == 'xp_threshold':
+                entry['current'] = total_xp
+            elif ach.trigger_type == 'level_reached':
+                entry['current'] = level
+        all_achievements_list.append(entry)
+
     # Active personalities + student's current pick
     personalities = list(
         TutorPersonality.objects.filter(is_active=True).values('id', 'name', 'emoji', 'description')
@@ -959,6 +1011,8 @@ def get_gamification_data(request):
         'streak_days': max_streak,
         'new_achievements': new_achievements,
         'achievements': earned_list,
+        'all_achievements': all_achievements_list,
+        'mastered_lessons_count': mastered_lessons_count,
         'personalities': personalities,
         'selected_personality': selected_personality,
     })
@@ -996,6 +1050,16 @@ def leaderboard(request):
     user_ids = [r['student_id'] for r in rankings]
     users = {u.id: u for u in User.objects.filter(id__in=user_ids)}
 
+    # Get per-student max streak
+    from django.db.models import Max
+    streak_map = dict(
+        StudentKnowledgeProfile.objects
+        .filter(student_id__in=user_ids)
+        .values('student_id')
+        .annotate(max_streak=Max('current_streak_days'))
+        .values_list('student_id', 'max_streak')
+    )
+
     entries = []
     for rank, r in enumerate(rankings, 1):
         user = users.get(r['student_id'])
@@ -1004,10 +1068,13 @@ def leaderboard(request):
             name = f"{user.first_name}{last_initial}" if user.first_name else user.username
         else:
             name = "Unknown"
+        xp = r['xp'] or 0
         entries.append({
             'rank': rank,
             'name': name,
-            'xp': r['xp'] or 0,
+            'xp': xp,
+            'level': (xp // 1000) + 1,
+            'streak': streak_map.get(r['student_id'], 0) or 0,
             'is_you': r['student_id'] == request.user.id,
         })
 

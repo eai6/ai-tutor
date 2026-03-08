@@ -39,6 +39,7 @@ class UnitSchema(BaseModel):
     """A unit containing multiple lessons."""
     title: str = Field(description="Clear unit title")
     description: str = Field(default="", description="Brief description of what this unit covers")
+    grade_level: str = Field(default="", description="Target grade level(s), e.g. 'S1' or 'S1,S2'")
     lessons: List[LessonSchema] = Field(description="Lessons in this unit")
 
 
@@ -267,6 +268,9 @@ REQUIREMENTS:
 2. Each unit should have 8-20 LESSONS covering specific skills or concepts
 3. Lesson titles should be SHORT (3-8 words), clear, action-oriented
 4. Each lesson should teach ONE specific concept that can be covered in ~40 minutes
+5. Each unit MUST include a "grade_level" field (e.g. "S1", "S2") indicating the target grade
+6. Group lessons by grade level first, then by topic within each grade
+7. Unit titles should include the grade prefix (e.g. "S1: Map Skills", "S2: Algebra")
 
 For {subject}, organize by these strands where applicable:
 - Mathematics: Number, Algebra, Geometry, Measurement, Data/Statistics
@@ -490,6 +494,7 @@ def _validate_lesson_structure(structure: Dict, subject: str, grade_level: str) 
             validated_units.append({
                 "title": unit_title,
                 "description": unit.get('description', ''),
+                "grade_level": unit.get('grade_level', ''),
                 "lessons": validated_lessons,
             })
     
@@ -962,6 +967,7 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                 defaults={
                     'description': unit_data.get('description', ''),
                     'order_index': unit_idx,
+                    'grade_level': unit_data.get('grade_level', ''),
                 }
             )
             
