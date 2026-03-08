@@ -144,11 +144,11 @@ class ImageSafetyPipeline:
             b64 = base64.standard_b64encode(image_bytes).decode()
 
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=[
                     types.Content(role="user", parts=[
                         types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
-                        types.Part.from_text(
+                        types.Part.from_text(text=
                             "Describe this image in detail. List all objects, text, "
                             "and notable features. Is it an educational diagram? "
                             "Respond in JSON: {\"description\": \"...\", "

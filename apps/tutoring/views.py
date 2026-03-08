@@ -831,7 +831,7 @@ def transcribe_audio(request, session_id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def speak_text(request):
-    """Synthesize text to WAV audio via Piper TTS."""
+    """Synthesize text to audio via configured TTS backend."""
     from apps.safety import RateLimiter
 
     allowed, reason = RateLimiter.check_rate_limit(request.user.id)
@@ -874,12 +874,12 @@ def speak_text(request):
 
     from django.http import HttpResponse
     from apps.tutoring.audio_service import synthesize
-    wav_bytes = synthesize(text)
+    audio_bytes, content_type = synthesize(text)
 
-    if not wav_bytes:
+    if not audio_bytes:
         return JsonResponse({"error": "TTS unavailable"}, status=503)
 
-    return HttpResponse(wav_bytes, content_type="audio/wav")
+    return HttpResponse(audio_bytes, content_type=content_type)
 
 
 # =============================================================================

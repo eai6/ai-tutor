@@ -34,6 +34,7 @@ django_secret_key = config.require_secret("django-secret-key")
 anthropic_api_key = config.require_secret("anthropic-api-key")
 openai_api_key = config.require_secret("openai-api-key")
 google_api_key = config.require_secret("google-api-key")
+elevenlabs_api_key = config.require_secret("elevenlabs-api-key")
 
 # ── 1. Resource Group ───────────────────────────────────────────────────────
 rg = resources.ResourceGroup(
@@ -212,6 +213,7 @@ container_app = app.ContainerApp(
             app.SecretArgs(name="anthropic-api-key", value=anthropic_api_key),
             app.SecretArgs(name="openai-api-key", value=openai_api_key),
             app.SecretArgs(name="google-api-key", value=google_api_key),
+            app.SecretArgs(name="elevenlabs-api-key", value=elevenlabs_api_key),
         ],
     ),
     template=app.TemplateArgs(
@@ -240,6 +242,9 @@ container_app = app.ContainerApp(
                         name="CSRF_TRUSTED_ORIGINS",
                         value=Output.concat("https://", container_app_name, ".", env.default_domain),
                     ),
+                    app.EnvironmentVarArgs(name="TTS_BACKEND", value="elevenlabs"),
+                    app.EnvironmentVarArgs(name="STT_BACKEND", value="elevenlabs"),
+                    app.EnvironmentVarArgs(name="ELEVENLABS_API_KEY", secret_ref="elevenlabs-api-key"),
                     app.EnvironmentVarArgs(name="POSTHOG_DISABLED", value="true"),
                     app.EnvironmentVarArgs(name="INSTRUCTOR_TELEMETRY", value="false"),
                 ],

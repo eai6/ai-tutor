@@ -157,6 +157,13 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 # Embedding backend: 'openai' (API, fast, no PyTorch) or 'local' (sentence-transformers, offline)
 EMBEDDING_BACKEND = os.getenv('EMBEDDING_BACKEND', 'local')
 
+# Speech backends: configurable TTS/STT with local defaults
+TTS_BACKEND = os.getenv('TTS_BACKEND', 'piper')        # 'piper' or 'elevenlabs'
+STT_BACKEND = os.getenv('STT_BACKEND', 'whisper')       # 'whisper' or 'elevenlabs'
+ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY', '')
+ELEVENLABS_VOICE_ID = os.getenv('ELEVENLABS_VOICE_ID', '2vbhUP8zyKg4dEZaTWGn')
+ELEVENLABS_MODEL_ID = os.getenv('ELEVENLABS_MODEL_ID', 'eleven_multilingual_v2')
+
 # Auth settings
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/tutor/'

@@ -1595,8 +1595,10 @@ function setAudioToggleIcon(on) {
 
 let currentAudio = null;
 let currentSpeakingBubble = null;
+let speakGeneration = 0;  // Guards against overlapping fetches
 
 function stopCurrentAudio() {
+    speakGeneration++;  // Invalidate any in-flight fetch
     if (currentAudio) {
         currentAudio.pause();
         currentAudio.onended = null;
@@ -1612,6 +1614,7 @@ function stopCurrentAudio() {
 async function speakResponse(text, bubbleEl, force = false) {
     if ((!audioMode && !force) || !text) return;
     stopCurrentAudio();
+    const myGen = speakGeneration;
     try {
         const resp = await fetch('/tutor/api/speak/', {
             method: 'POST',
@@ -1621,8 +1624,12 @@ async function speakResponse(text, bubbleEl, force = false) {
             },
             body: JSON.stringify({ text: text.slice(0, 2000) }),
         });
+        if (myGen !== speakGeneration) return;  // Superseded — discard
         if (!resp.ok) return;
-        const blob = await resp.blob();
+        const contentType = resp.headers.get('content-type') || 'audio/wav';
+        const data = await resp.arrayBuffer();
+        if (myGen !== speakGeneration) return;  // Superseded — discard
+        const blob = new Blob([data], { type: contentType });
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         currentAudio = audio;

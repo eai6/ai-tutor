@@ -12,3 +12,5 @@ config:
     secure: v1:h2m2Kd24YrG4pbBZ:tAAbPirNrnUKQPr9EOz8SDwY0YXB+JgK4Nj0rw5KbfvurMel4C9Gwb1rGoehl6ZeAi7aieL81tH9PPQC3h4gg1Kfg+dOV5swy5fgyC/P4yAQXrH2AqhtX4BFzZk9f2xOEsoo7xs/LPNPg55fBgXzweYznFe/awfi11tGe9BNjkimayfuuy7GjqLUY6yul6Sl34PKl1+b19Pl0kV4TtIaXOJOh1RvURhKxY9kx36ty0wIEGHl7gAX
   aitutor:google-api-key:
     secure: v1:+GXti9A1tYEOgRjm:yLXnTL6UW3rmNDWQQyxAD95iWrQolFHMqTcCRLbjpIa/NFIXRPqt0gCiG5CK9h8xAyS0PXvXwQ==
+  aitutor:elevenlabs-api-key:
+    secure: v1:Ka2PrnsMS+3vT/fi:gVocY1bUSRB1O90kw0wPIQsiZaTmCh6Iicr/LAhIwDHjjeFs69OoigkdSPWn5uXxpe6jyIRCHE62YHcwbZOIICuVyg==
