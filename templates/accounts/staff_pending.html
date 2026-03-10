@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Account Pending - AI Tutor{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card card animate-in">
+        <div class="auth-header">
+            <div class="auth-icon" style="color: #10B981; font-size: 4rem;">&#10003;</div>
+            <h1>Account Created!</h1>
+        </div>
+
+        <div class="pending-message">
+            <p>Your teacher account has been created and is <strong>pending approval</strong> by an administrator.</p>
+            <p>You'll be able to sign in once your account is approved.</p>
+        </div>
+
+        <div class="auth-footer">
+            <a href="{% url 'accounts:staff_login' %}" class="btn btn-primary btn-full">Go to Sign In</a>
+            <p style="margin-top: 1rem;"><a href="{% url 'accounts:landing' %}">← Back to home</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .auth-container {
+        max-width: 480px;
+        margin: 2rem auto;
+    }
+
+    .auth-card {
+        padding: 2.5rem;
+        text-align: center;
+    }
+
+    .auth-header {
+        margin-bottom: 1.5rem;
+    }
+
+    .auth-header h1 {
+        font-size: 1.75rem;
+        font-weight: 800;
+    }
+
+    .pending-message {
+        background: #FFFBEB;
+        border: 1px solid #FDE68A;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        color: #92400E;
+        line-height: 1.6;
+    }
+
+    .pending-message p + p {
+        margin-top: 0.75rem;
+    }
+
+    .btn-full {
+        display: block;
+        width: 100%;
+        padding: 1rem;
+        font-size: 1.1rem;
+        text-align: center;
+    }
+
+    .auth-footer a:not(.btn) {
+        color: var(--primary);
+        font-weight: 700;
+        text-decoration: none;
+    }
+</style>
+{% endblock %}

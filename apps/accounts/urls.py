@@ -17,6 +17,7 @@ urlpatterns = [
     
     # Staff (Teacher/Admin) auth
     path('staff/login/', views.staff_login, name='staff_login'),
+    path('staff/register/', views.staff_self_register, name='staff_self_register'),
     path('staff/register/<str:token>/', views.staff_register, name='staff_register'),
     
     # Staff invitation (admin only)

@@ -201,18 +201,114 @@ def staff_login(request):
                     'username': username,
                 })
         else:
+            # Check if this is a pending teacher (inactive, never logged in)
+            try:
+                pending_user = User.objects.get(username=username)
+                if not pending_user.is_active and pending_user.last_login is None and \
+                   Membership.objects.filter(user=pending_user, role='staff').exists():
+                    return render(request, 'accounts/staff_login.html', {
+                        'error': "Your account is pending approval by an administrator.",
+                        'username': username,
+                    })
+            except User.DoesNotExist:
+                pass
+
             return render(request, 'accounts/staff_login.html', {
                 'error': "Invalid username or password.",
                 'username': username,
             })
-    
+
     return render(request, 'accounts/staff_login.html')
+
+
+def staff_self_register(request):
+    """Teacher self-registration (pending admin approval)."""
+    if request.user.is_authenticated:
+        return redirect_by_role(request.user)
+
+    school_choices = PlatformConfig.get_school_choices()
+
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        school = request.POST.get('school', '')
+        password = request.POST.get('password', '')
+        password_confirm = request.POST.get('password_confirm', '')
+
+        errors = []
+
+        if not first_name:
+            errors.append("Please enter your first name.")
+
+        if not username or len(username) < 3:
+            errors.append("Username must be at least 3 characters.")
+
+        if User.objects.filter(username=username).exists():
+            errors.append("Username already taken.")
+
+        if not email:
+            errors.append("Email is required for teacher accounts.")
+        elif User.objects.filter(email=email).exists():
+            errors.append("Email already registered.")
+
+        if len(password) < 8:
+            errors.append("Password must be at least 8 characters.")
+
+        if password != password_confirm:
+            errors.append("Passwords don't match.")
+
+        if not school:
+            errors.append("Please select your school.")
+
+        if errors:
+            return render(request, 'accounts/staff_self_register.html', {
+                'errors': errors,
+                'first_name': first_name,
+                'last_name': last_name,
+                'username': username,
+                'email': email,
+                'school': school,
+                'school_choices': school_choices,
+            })
+
+        # Create user (inactive — pending approval)
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            is_active=False,
+        )
+
+        # Resolve institution
+        institution = Institution.objects.filter(id=school, is_active=True).first()
+        if not institution:
+            institution = Institution.objects.filter(slug=school, is_active=True).first()
+        if not institution:
+            institution = Institution.objects.filter(is_active=True).first()
+
+        if institution:
+            Membership.objects.create(
+                user=user,
+                institution=institution,
+                role='staff',
+                is_active=False,
+            )
+
+        return render(request, 'accounts/staff_pending.html')
+
+    return render(request, 'accounts/staff_self_register.html', {
+        'school_choices': school_choices,
+    })
 
 
 def staff_register(request, token=None):
     """
     Teacher/Admin registration via invitation token.
-    Teachers cannot self-register - they must be invited.
+    Invited teachers are pre-approved and skip the pending state.
     """
     if request.user.is_authenticated:
         return redirect_by_role(request.user)

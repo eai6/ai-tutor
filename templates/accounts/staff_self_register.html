@@ -1,16 +1,16 @@
 {% extends 'base.html' %}
 
-{% block title %}Student Registration - AI Tutor{% endblock %}
+{% block title %}Create Teacher Account - AI Tutor{% endblock %}
 
 {% block content %}
 <div class="auth-container">
     <div class="auth-card card animate-in">
         <div class="auth-header">
-            <div class="auth-icon">🎓</div>
-            <h1>Create Student Account</h1>
-            <p class="text-muted">Join AI Tutor and start learning today!</p>
+            <div class="auth-icon">👩‍🏫</div>
+            <h1>Create Teacher Account</h1>
+            <p class="text-muted">Your account will be reviewed by an administrator</p>
         </div>
-        
+
         {% if errors %}
         <div class="alert alert-error">
             <ul style="margin: 0; padding-left: 1.25rem;">
@@ -20,110 +20,99 @@
             </ul>
         </div>
         {% endif %}
-        
+
         <form method="post" class="auth-form">
             {% csrf_token %}
-            
+
             <div class="form-row">
                 <div class="form-group">
                     <label for="first_name">First Name</label>
-                    <input 
-                        type="text" 
-                        id="first_name" 
-                        name="first_name" 
+                    <input
+                        type="text"
+                        id="first_name"
+                        name="first_name"
                         value="{{ first_name|default:'' }}"
                         placeholder="Your first name"
                         required
                         autofocus
                     >
                 </div>
-                
+
                 <div class="form-group">
                     <label for="last_name">Last Name</label>
-                    <input 
-                        type="text" 
-                        id="last_name" 
-                        name="last_name" 
+                    <input
+                        type="text"
+                        id="last_name"
+                        name="last_name"
                         value="{{ last_name|default:'' }}"
                         placeholder="Your last name"
                     >
                 </div>
             </div>
-            
+
             <div class="form-group">
                 <label for="username">Username</label>
-                <input 
-                    type="text" 
-                    id="username" 
-                    name="username" 
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
                     value="{{ username|default:'' }}"
                     placeholder="Choose a username"
                     required
                 >
             </div>
-            
+
             <div class="form-group">
-                <label for="email">Email (Optional)</label>
-                <input 
-                    type="email" 
-                    id="email" 
-                    name="email" 
+                <label for="email">Email</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
                     value="{{ email|default:'' }}"
                     placeholder="your.email@example.com"
-                >
-            </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="school">School</label>
-                    <select id="school" name="school" required>
-                        <option value="">Select your school</option>
-                        {% for code, name in school_choices %}
-                        <option value="{{ code }}" {% if school == code %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="grade_level">Grade Level</label>
-                    <select id="grade_level" name="grade_level" required>
-                        <option value="">Select grade</option>
-                        {% for code, name in grade_choices %}
-                        <option value="{{ code }}" {% if grade_level == code %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    placeholder="At least 6 characters"
                     required
                 >
             </div>
-            
+
+            <div class="form-group">
+                <label for="school">School</label>
+                <select id="school" name="school" required>
+                    <option value="">Select your school</option>
+                    {% for code, name in school_choices %}
+                    <option value="{{ code }}" {% if school == code %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="At least 8 characters"
+                    required
+                >
+            </div>
+
             <div class="form-group">
                 <label for="password_confirm">Confirm Password</label>
-                <input 
-                    type="password" 
-                    id="password_confirm" 
-                    name="password_confirm" 
+                <input
+                    type="password"
+                    id="password_confirm"
+                    name="password_confirm"
                     placeholder="Re-enter your password"
                     required
                 >
             </div>
-            
+
             <button type="submit" class="btn btn-primary btn-full">
-                Create Account →
+                Create Account
             </button>
         </form>
-        
+
         <div class="auth-footer">
-            <p>Already have an account? <a href="{% url 'accounts:student_login' %}">Sign in</a></p>
+            <p>Already have an account? <a href="{% url 'accounts:staff_login' %}">Sign in</a></p>
             <p style="margin-top: 0.5rem;"><a href="{% url 'accounts:landing' %}">← Back to home</a></p>
         </div>
     </div>
@@ -141,47 +130,47 @@
     .auth-card {
         padding: 2.5rem;
     }
-    
+
     .auth-header {
         text-align: center;
         margin-bottom: 2rem;
     }
-    
+
     .auth-icon {
         font-size: 3rem;
         margin-bottom: 1rem;
     }
-    
+
     .auth-header h1 {
         font-size: 1.75rem;
         font-weight: 800;
         margin-bottom: 0.5rem;
     }
-    
+
     .auth-form {
         display: flex;
         flex-direction: column;
         gap: 1rem;
     }
-    
+
     .form-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
     }
-    
+
     .form-group {
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
     }
-    
+
     .form-group label {
         font-weight: 700;
         font-size: 0.875rem;
         color: var(--text-dark);
     }
-    
+
     .form-group input,
     .form-group select {
         padding: 0.75rem 1rem;
@@ -191,46 +180,46 @@
         font-size: 1rem;
         transition: all 0.2s ease;
     }
-    
+
     .form-group input:focus,
     .form-group select:focus {
         outline: none;
         border-color: var(--primary);
         background: white;
     }
-    
+
     .btn-full {
         width: 100%;
         padding: 1rem;
         font-size: 1.1rem;
         margin-top: 0.5rem;
     }
-    
+
     .auth-footer {
         text-align: center;
         margin-top: 1.5rem;
         padding-top: 1.5rem;
         border-top: 1px solid rgba(0,0,0,0.08);
     }
-    
+
     .auth-footer a {
         color: var(--primary);
         font-weight: 700;
         text-decoration: none;
     }
-    
+
     .alert {
         padding: 1rem;
         border-radius: var(--radius-sm);
         margin-bottom: 1.5rem;
     }
-    
+
     .alert-error {
         background: #FEF5F5;
         color: var(--error);
         border-left: 3px solid var(--error);
     }
-    
+
     @media (max-width: 500px) {
         .form-row {
             grid-template-columns: 1fr;

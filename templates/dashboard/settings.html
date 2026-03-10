@@ -319,6 +319,8 @@
                             <td>
                                 {% if u.is_active %}
                                 <span class="badge badge-success">Active</span>
+                                {% elif not u.last_login %}
+                                <span class="badge" style="background:#F59E0B;color:#fff;">Pending</span>
                                 {% else %}
                                 <span class="badge badge-danger">Inactive</span>
                                 {% endif %}
@@ -342,9 +344,13 @@
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="toggle_user">
                                         <input type="hidden" name="user_id" value="{{ u.id }}">
+                                        {% if not u.is_active and not u.last_login %}
+                                        <button type="submit" class="btn btn-sm" style="background:#10B981;color:#fff;">Approve</button>
+                                        {% else %}
                                         <button type="submit" class="btn btn-sm btn-secondary">
                                             {% if u.is_active %}Deactivate{% else %}Activate{% endif %}
                                         </button>
+                                        {% endif %}
                                     </form>
                                     <form method="post" style="display:inline;" onsubmit="return confirm('Delete user {{ u.get_full_name|default:u.email }}? This cannot be undone.');">
                                         {% csrf_token %}

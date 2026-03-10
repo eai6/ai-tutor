@@ -50,10 +50,8 @@
         </form>
         
         <div class="auth-footer">
-            <div class="info-box">
-                <p><strong>Don't have an account?</strong></p>
-                <p>Teachers and administrators must be invited by a school admin. Please contact your school's IT administrator.</p>
-            </div>
+            <p><strong>Don't have an account?</strong> <a href="{% url 'accounts:staff_self_register' %}">Create Account</a></p>
+            <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--gray-500);">Your account will need admin approval before you can sign in.</p>
             <p style="margin-top: 1rem;"><a href="{% url 'accounts:landing' %}">← Back to home</a></p>
         </div>
     </div>
