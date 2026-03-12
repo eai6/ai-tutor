@@ -1173,6 +1173,9 @@ async function sendMessage() {
             return;
         }
 
+        // Stop any in-flight TTS before showing new message
+        stopCurrentAudio();
+
         // Display tutor response
         addMessage('tutor', data.message, data.media || []);
 
@@ -1599,6 +1602,9 @@ function toggleAudioMode() {
     audioToggle.classList.toggle('active', audioMode);
     micBtn.style.display = audioMode ? 'flex' : 'none';
     setAudioToggleIcon(audioMode);
+    if (!audioMode) {
+        stopCurrentAudio();
+    }
 }
 
 function setAudioToggleIcon(on) {
@@ -1710,6 +1716,8 @@ async function speakResponse(text, bubbleEl, force = false) {
     if ((!audioMode && !force) || !text) return;
     stopCurrentAudio();
     const myGen = speakGeneration;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     try {
         const resp = await fetch('/tutor/api/speak/', {
             method: 'POST',
@@ -1718,7 +1726,9 @@ async function speakResponse(text, bubbleEl, force = false) {
                 'X-CSRFToken': getCookie('csrftoken'),
             },
             body: JSON.stringify({ text: text.slice(0, 2000) }),
+            signal: controller.signal,
         });
+        clearTimeout(timeout);
         if (myGen !== speakGeneration) return;
         if (!resp.ok) return;
 
@@ -1777,6 +1787,12 @@ async function speakResponse(text, bubbleEl, force = false) {
             }
 
             audio.onplaying = () => { currentRAF = requestAnimationFrame(highlightLoop); };
+            audio.onerror = () => {
+                if (currentRAF) { cancelAnimationFrame(currentRAF); currentRAF = null; }
+                if (bubbleEl) { bubbleEl.classList.remove('speaking'); unwrapBubbleWords(bubbleEl); }
+                URL.revokeObjectURL(url);
+                if (currentAudio === audio) { currentAudio = null; currentSpeakingBubble = null; }
+            };
             audio.onended = () => {
                 if (currentRAF) { cancelAnimationFrame(currentRAF); currentRAF = null; }
                 // Mark all spoken, then unwrap after a brief pause
@@ -1813,6 +1829,11 @@ async function speakResponse(text, bubbleEl, force = false) {
             currentAudio = audio;
             currentSpeakingBubble = bubbleEl;
             if (bubbleEl) bubbleEl.classList.add('speaking');
+            audio.onerror = () => {
+                if (bubbleEl) bubbleEl.classList.remove('speaking');
+                URL.revokeObjectURL(url);
+                if (currentAudio === audio) { currentAudio = null; currentSpeakingBubble = null; }
+            };
             audio.onended = () => {
                 if (bubbleEl) bubbleEl.classList.remove('speaking');
                 URL.revokeObjectURL(url);
@@ -1832,6 +1853,7 @@ async function speakResponse(text, bubbleEl, force = false) {
             }
         }
     } catch (e) {
+        clearTimeout(timeout);
         console.error('TTS error:', e);
     }
 }

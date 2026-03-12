@@ -87,3 +87,47 @@ class TestR9SystemPrompt(BaseTutoringTestCase):
             # Verify the system_prompt kwarg passed to generate
             call_kwargs = mock_llm.generate.call_args[1]
             self.assertEqual(call_kwargs['system_prompt'], 'CUSTOM PROMPT')
+
+    def test_prompt_contains_formatting_guidance(self):
+        """Format rules should include bold key terms and list guidance."""
+        from apps.tutoring.conversational_tutor import TUTOR_SYSTEM_PROMPT_TEMPLATE
+        self.assertIn('**bold**', TUTOR_SYSTEM_PROMPT_TEMPLATE)
+        self.assertIn('key terms', TUTOR_SYSTEM_PROMPT_TEMPLATE)
+
+    def test_opening_prompt_states_learning_objective(self):
+        """_generate_opening prompt should instruct stating the learning objective."""
+        from apps.tutoring.conversational_tutor import ConversationalTutor
+
+        session = self._create_session()
+        tutor = ConversationalTutor(session)
+
+        # Mock _generate_response to capture the prompt
+        captured_prompt = {}
+        original_generate = tutor._generate_response
+
+        def capture_prompt(prompt, **kwargs):
+            captured_prompt['text'] = prompt
+            return "Hello! Today we'll learn about plate boundaries."
+
+        tutor._generate_response = capture_prompt
+        tutor._generate_opening()
+
+        self.assertIn('learning objective', captured_prompt['text'].lower())
+
+    def test_opening_prompt_recalls_prior_knowledge(self):
+        """_generate_opening prompt should instruct recalling prior knowledge."""
+        from apps.tutoring.conversational_tutor import ConversationalTutor
+
+        session = self._create_session()
+        tutor = ConversationalTutor(session)
+
+        captured_prompt = {}
+
+        def capture_prompt(prompt, **kwargs):
+            captured_prompt['text'] = prompt
+            return "Hello! Today we'll learn about plate boundaries."
+
+        tutor._generate_response = capture_prompt
+        tutor._generate_opening()
+
+        self.assertIn('prior knowledge', captured_prompt['text'].lower())

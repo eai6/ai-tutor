@@ -65,6 +65,11 @@
             <button class="gbar-btn" id="personality-btn" onclick="openPersonalityModal()">Select Tutor Style</button>
             <button class="gbar-btn" onclick="openLeaderboardModal()">Leaderboard</button>
         </div>
+        <div class="gbar-stats" id="gbar-stats" style="display:none">
+            <span class="gbar-stat" id="gbar-lessons">Lessons: 0</span>
+            <span class="gbar-stat" id="gbar-hours">Hours: 0</span>
+            <span class="gbar-stat" id="gbar-accuracy" style="display:none">Accuracy: —</span>
+        </div>
     </div>
 
     <!-- Trophy Case (collapsible) -->
@@ -157,11 +162,17 @@
         </div>
         
         {% for unit in selected_subject.units %}
-        <div class="unit-card card">
-            <div class="unit-header">
-                <h3>{{ unit.title }}</h3>
+        <div class="unit-card card{% if not forloop.first %} collapsed{% endif %}">
+            <div class="unit-header" onclick="toggleUnit(this)">
+                <div class="unit-header-left">
+                    <span class="unit-toggle-icon">▼</span>
+                    <h3>Unit {{ forloop.counter }}: {{ unit.title }}</h3>
+                </div>
                 <span class="lesson-count">{{ unit.lessons|length }} lessons</span>
             </div>
+            {% if unit.description %}
+            <p class="unit-description">{{ unit.description }}</p>
+            {% endif %}
             <div class="lessons-list">
                 {% for lesson in unit.lessons %}
                 {% if lesson.locked %}
@@ -170,7 +181,7 @@
                         <span class="icon-locked">🔒</span>
                     </div>
                     <div class="lesson-info">
-                        <h4>{{ lesson.title }}</h4>
+                        <h4>{{ forloop.counter }}. {{ lesson.title }}</h4>
                         <p class="locked-hint">Complete prerequisites to unlock</p>
                     </div>
                     <div class="lesson-meta">
@@ -189,7 +200,7 @@
                         {% endif %}
                     </div>
                     <div class="lesson-info">
-                        <h4>{{ lesson.title }}</h4>
+                        <h4>{{ forloop.counter }}. {{ lesson.title }}</h4>
                         <p>{{ lesson.objective }}</p>
                     </div>
                     <div class="lesson-meta">
@@ -462,8 +473,46 @@
         padding: 1rem 1.5rem;
         background: var(--bg-warm);
         border-bottom: 1px solid rgba(0,0,0,0.05);
+        cursor: pointer;
+        user-select: none;
     }
-    
+
+    .unit-header:hover {
+        background: #f0ebe4;
+    }
+
+    .unit-header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .unit-toggle-icon {
+        font-size: 0.7rem;
+        transition: transform 0.2s ease;
+        color: var(--text-muted);
+    }
+
+    .unit-card.collapsed .unit-toggle-icon {
+        transform: rotate(-90deg);
+    }
+
+    .unit-card.collapsed .lessons-list {
+        display: none;
+    }
+
+    .unit-card.collapsed .unit-description {
+        display: none;
+    }
+
+    .unit-description {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        padding: 0.5rem 1.5rem;
+        margin: 0;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+
     .unit-header h3 {
         font-size: 1rem;
         font-weight: 700;
@@ -676,6 +725,15 @@
     }
     .gbar-xp-text { font-size: 0.78rem; font-weight: 600; color: #6D28D9; }
     .gbar-streak { font-size: 0.85rem; font-weight: 600; }
+    .gbar-stats {
+        display: flex; align-items: center; gap: 1rem;
+        width: 100%; padding-top: 0.5rem;
+        border-top: 1px solid rgba(0,0,0,0.08);
+        margin-top: 0.25rem;
+    }
+    .gbar-stat {
+        font-size: 0.78rem; font-weight: 600; color: #6D28D9;
+    }
     .gbar-btn {
         font-size: 0.8rem; font-weight: 600; padding: 0.35rem 0.75rem;
         border-radius: 999px; border: 1.5px solid #C4B5FD; background: #fff;
@@ -824,6 +882,12 @@ function showPrereqModal(el) {
     document.body.appendChild(overlay);
 }
 
+/* ── Unit collapse/expand ── */
+function toggleUnit(headerEl) {
+    const card = headerEl.closest('.unit-card');
+    card.classList.toggle('collapsed');
+}
+
 /* ── Gamification ── */
 let gamData = null;
 
@@ -872,6 +936,20 @@ function renderGamBar() {
     const allAch = gamData.all_achievements || [];
     const earnedCount = allAch.filter(a => a.earned).length;
     document.getElementById('trophies-btn').textContent = 'Trophies (' + earnedCount + '/' + allAch.length + ')';
+
+    // Analytics stats row
+    const statsEl = document.getElementById('gbar-stats');
+    const lessons = gamData.mastered_lessons_count || 0;
+    const mins = gamData.total_practice_minutes || 0;
+    const hours = (mins / 60).toFixed(1);
+    document.getElementById('gbar-lessons').textContent = 'Lessons: ' + lessons;
+    document.getElementById('gbar-hours').textContent = 'Hours: ' + hours;
+    const accEl = document.getElementById('gbar-accuracy');
+    if (gamData.quiz_accuracy !== null && gamData.quiz_accuracy !== undefined) {
+        accEl.textContent = 'Accuracy: ' + gamData.quiz_accuracy + '%';
+        accEl.style.display = '';
+    }
+    statsEl.style.display = '';
 }
 
 /* Trophy Case */

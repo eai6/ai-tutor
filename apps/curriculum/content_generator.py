@@ -388,7 +388,15 @@ CONTENT GUIDELINES:
 4. For MCQ, make distractors plausible but clearly wrong
 5. When a step has media, the teacher_script MUST explicitly reference it
    with phrases like "Let's look at this diagram...", "As you can see in the figure..."
-6. Steps with NO media should NOT have media references in the script"""
+6. Steps with NO media should NOT have media references in the script
+7. Questions must be CLEAR and UNAMBIGUOUS — the student should know exactly what is
+   being asked and what form the answer should take
+8. Practice/quiz questions should require APPLICATION or CONCEPTUAL understanding,
+   not just recall or looking through text. Ask "why", "how", "what would happen if",
+   "compare", "explain" rather than "what is" or "which one"
+9. The expected_answer MUST directly and completely answer the question as phrased.
+   If the question asks "which is smallest", the expected_answer must name the smallest
+   item, not just explain a comparison method"""
 
         from apps.llm.prompts import get_prompt_or_default
         system_prompt = get_prompt_or_default(

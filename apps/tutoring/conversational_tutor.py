@@ -293,9 +293,13 @@ a different approach -- no rush."
 </safety>
 
 <format_rules>
-- Respond in 1-2 sentences + a question, ~50 words total. No lists in one turn.
+- STRICT LIMIT: Respond in 1-2 sentences + a question, ~60 words max. If your draft
+  is longer, deliver the explanation first, wait for the student to respond, then continue.
 - Always end with a question or a prompt for student action.
 - Never produce a wall of text.
+- Use **bold** for key terms and vocabulary words being introduced.
+- When listing steps or comparing items, use a numbered list or bullet points — but
+  keep each item to one line.
 - Use LaTeX or clear notation for mathematical expressions.
 - To show an image, write |||MEDIA:N||| as the VERY LAST line. See <media_catalog>.
 - You CAN show images and figures. An external system generates them for you.
@@ -1668,9 +1672,11 @@ IMPORTANT: You are showing these images with your response.
 
 Generate a warm, engaging opening that:
 1. Greets the student warmly
-2. If retrieval questions are provided above, present one as a warmup activity
-3. Otherwise, asks what they already know about today's topic
-4. If media is available for this step, reference the image in your text and write |||MEDIA:N||| as the LAST line
+2. Clearly states today's learning objective so the student knows what they will learn
+3. Briefly recalls relevant prior knowledge: mention 1-2 key concepts from earlier lessons that today's topic builds on, to activate the student's memory
+4. If retrieval questions are provided above, present one as a warmup activity
+5. Otherwise, asks what they already know about today's topic
+6. If media is available for this step, reference the image in your text and write |||MEDIA:N||| as the LAST line
 
 End with a question. Keep it to 2-3 sentences max."""
 
@@ -2758,6 +2764,9 @@ Break concepts into smaller steps. Be encouraging."""
 
         step_context = ""
         if step:
+            step_context += f"Step type: {step.step_type}\n"
+            if step.answer_type:
+                step_context += f"Answer type: {step.answer_type}\n"
             if step.question:
                 step_context += f"Question asked: {step.question}\n"
             if step.expected_answer:
@@ -2765,20 +2774,22 @@ Break concepts into smaller steps. Be encouraging."""
             if step.rubric:
                 step_context += f"Rubric: {step.rubric}\n"
 
-        prompt = f"""Evaluate whether the student answered correctly based on the tutor's response.
+        prompt = f"""Evaluate whether the student answered correctly.
 
 {step_context}
 Student said: {student_input[:500]}
 
 Tutor replied: {tutor_response[:500]}
 
-Did the student answer correctly?"""
+Judge the student's answer against the expected answer SEMANTICALLY — the student does not need
+to use the exact same words, but their answer must convey the correct meaning. If the question
+asks for a specific item (e.g. "which is smallest"), the answer must identify that item."""
 
         try:
             create_kwargs = dict(
                 response_model=EvaluationResult,
                 messages=[
-                    {"role": "system", "content": "You are a grading assistant. Evaluate student answers."},
+                    {"role": "system", "content": "You are a grading assistant. Evaluate student answers semantically against the expected answer and rubric. Focus on whether the student demonstrates correct understanding, not on exact wording."},
                     {"role": "user", "content": prompt},
                 ],
                 max_retries=2,
@@ -2796,13 +2807,25 @@ Did the student answer correctly?"""
         return self._keyword_evaluate_response(tutor_response)
 
     def _keyword_evaluate_response(self, tutor_response: str) -> dict:
-        """Keyword-based correctness check (fallback for LLM evaluator)."""
+        """Keyword-based correctness check (fallback for LLM evaluator).
+
+        Checks negative signals first to avoid false positives from phrases
+        like 'not quite right' matching the word 'right'.
+        """
         response_lower = tutor_response.lower()
-        success_signals = [
-            "correct", "excellent", "great", "perfect", "well done",
-            "good job", "exactly", "right",
+        negative_signals = [
+            "not correct", "not quite", "incorrect", "not right",
+            "try again", "not exactly", "that's wrong", "think again",
+            "not the answer", "let's try", "let's reconsider",
         ]
-        is_correct = any(s in response_lower for s in success_signals)
+        if any(s in response_lower for s in negative_signals):
+            return {"correct": False}
+        positive_signals = [
+            "correct", "excellent", "great job", "perfect",
+            "well done", "good job", "exactly right", "that's right",
+            "you got it", "nice work", "spot on",
+        ]
+        is_correct = any(s in response_lower for s in positive_signals)
         return {"correct": is_correct}
 
     def _should_advance_step(self, student_input: str, tutor_response: str, is_correct: bool, eval_result=None) -> bool:

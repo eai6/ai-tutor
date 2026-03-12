@@ -296,6 +296,8 @@ def lesson_catalog(request):
             if unit_lessons:
                 units_data.append({
                     'title': unit.title,
+                    'description': unit.description,
+                    'order_index': unit.order_index,
                     'lessons': unit_lessons,
                 })
 
@@ -1013,6 +1015,20 @@ def get_gamification_data(request):
             'emoji': profile.tutor_personality.emoji,
         }
 
+    # Analytics: practice time, sessions, quiz accuracy
+    total_practice_minutes = sum(p.total_practice_time_minutes for p in profiles)
+    total_sessions = sum(p.total_sessions for p in profiles)
+
+    # Quiz accuracy: average best_score across completed lessons
+    completed_progress = StudentLessonProgress.objects.filter(
+        student=request.user, mastery_level='mastered'
+    )
+    scores = [
+        p.best_score for p in completed_progress
+        if p.best_score is not None
+    ]
+    quiz_accuracy = round(sum(scores) / len(scores)) if scores else None
+
     return JsonResponse({
         'total_xp': total_xp,
         'level': level,
@@ -1023,6 +1039,9 @@ def get_gamification_data(request):
         'achievements': earned_list,
         'all_achievements': all_achievements_list,
         'mastered_lessons_count': mastered_lessons_count,
+        'total_practice_minutes': total_practice_minutes,
+        'total_sessions': total_sessions,
+        'quiz_accuracy': quiz_accuracy,
         'personalities': personalities,
         'selected_personality': selected_personality,
     })
