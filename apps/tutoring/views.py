@@ -440,8 +440,16 @@ def chat_tutor_interface(request, lesson_id):
             )
             return redirect('tutoring:catalog')
 
+    # Detect math lessons for KaTeX rendering
+    course_title = (lesson.unit.course.title or '').lower()
+    is_math_lesson = any(
+        kw in course_title
+        for kw in ('math', 'maths', 'mathematics', 'algebra', 'geometry', 'calculus')
+    )
+
     return render(request, 'tutoring/chat_tutor.html', {
         "lesson": lesson,
+        "is_math_lesson": is_math_lesson,
     })
 
 

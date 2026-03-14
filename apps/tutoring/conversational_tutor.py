@@ -216,6 +216,18 @@ MOTIVATE AND CELEBRATE
   what builds real understanding."
 </principle>
 
+<principle id="grade_calibration">
+CALIBRATE TO STUDENT LEVEL
+- You are teaching {grade_level} students. Adapt your tone, vocabulary, and examples
+  to match their maturity and expected prior knowledge.
+- For senior secondary students (S3-S5), do NOT use primary-school-level analogies
+  (e.g., "have you ever split food?") unless the student demonstrates they need them.
+- If the step content seems too basic for the student's grade, acknowledge their prior
+  knowledge, deliver the core concept efficiently, and add grade-appropriate depth.
+- For introductory/review lessons at higher grades, open with a diagnostic question
+  to gauge prior knowledge before spending time on basics.
+</principle>
+
 <principle id="expertise_reversal">
 FADE SCAFFOLDING AS MASTERY GROWS
 - First encounter: full worked example -> guided practice -> independent practice.
@@ -254,6 +266,19 @@ HOW TO GIVE FEEDBACK ON ANSWERS
    - Ask them to explain each step back to you in their own words.
    - Then give ONE more similar problem to confirm they can now do it.
    - Never show the answer and move on silently.
+
+6. MISCONCEPTION DETECTED (any attempt):
+   - If you identify a systematic misconception (not just a careless error), you MUST:
+     a. Name the misconception clearly.
+     b. Explain WHY the approach fails -- what principle it violates.
+     c. Show the correct first step toward the right method.
+   - Only THEN ask the student to try again using the correct approach.
+   - Do NOT just say "that's a common mistake" and repeat a worked example.
+
+CRITICAL: When a student asks for a hint, NEVER repeat a worked example that has
+already been shown. Instead, provide the next-level hint from the HINT LADDER.
+If no hints are defined, ask a leading question that narrows the student's thinking
+toward the answer.
 </feedback_protocol>
 
 <principle id="follow_script">
@@ -404,6 +429,9 @@ class ConversationalTutor:
         self._personalization = None
         self._remediation_plan = None
         self._interleaved_practice_block_cache = None
+
+        # Cache student grade level for grade-calibrated delivery (Issue 3)
+        self._student_grade_level = self._load_student_grade_level()
     
     def _load_exit_ticket_concepts(self) -> List[Dict]:
         """
@@ -513,6 +541,17 @@ class ConversationalTutor:
         random.shuffle(selected)
         return selected[:count]
     
+    def _load_student_grade_level(self) -> str:
+        """Load student's grade level from profile for grade-calibrated delivery."""
+        try:
+            from apps.accounts.models import StudentProfile
+            profile = StudentProfile.objects.filter(user=self.student).first()
+            if profile and profile.grade_level:
+                return profile.grade_level
+        except Exception:
+            pass
+        return ""
+
     def _load_state(self):
         """Load session state (backward compatible with old phase-based state)."""
         state = self.session.engine_state or {}
@@ -562,6 +601,9 @@ class ConversationalTutor:
         # Turn media for resume (artifact panel)
         self._turn_media = state.get('turn_media', {})
 
+        # Worked example deduplication (Issue 1)
+        self.shown_worked_example_indices = set(state.get('shown_worked_example_indices', []))
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -607,6 +649,8 @@ class ConversationalTutor:
             'step_exchange_count': getattr(self, 'step_exchange_count', 0),
             # Turn media for resume (artifact panel)
             'turn_media': getattr(self, '_turn_media', {}),
+            # Worked example deduplication (Issue 1)
+            'shown_worked_example_indices': list(getattr(self, 'shown_worked_example_indices', set())),
         }
         self.session.save()
     
@@ -1780,12 +1824,20 @@ End with a question. Keep it to 2-3 sentences max."""
             return ""
 
     def _build_worked_example_block(self) -> str:
-        """Build [WORKED EXAMPLE] context block for teach/worked_example steps (R14)."""
+        """Build [WORKED EXAMPLE] context block for teach/worked_example steps (R14).
+
+        Tracks which step indices have already had their worked example presented
+        to prevent the LLM from repeating the same example verbatim.
+        """
         step = self.steps[self.current_topic_index] if self.current_topic_index < len(self.steps) else None
         if not step or step.step_type not in ('teach', 'worked_example'):
             return ""
 
         if self.current_topic_index >= len(self.steps):
+            return ""
+
+        # Skip if this step's worked example was already presented
+        if self.current_topic_index in self.shown_worked_example_indices:
             return ""
 
         step = self.steps[self.current_topic_index]
@@ -1801,6 +1853,9 @@ End with a question. Keep it to 2-3 sentences max."""
 
         if not worked_example:
             return ""
+
+        # Mark this step's worked example as shown
+        self.shown_worked_example_indices.add(self.current_topic_index)
 
         lines = [
             "[WORKED EXAMPLE]",
@@ -1885,6 +1940,44 @@ End with a question. Keep it to 2-3 sentences max."""
             logger.warning(f"Failed to build interleaved practice block: {e}")
             return ""
 
+    def _build_hint_request_block(self, student_input: str) -> str:
+        """Detect explicit hint requests and return a graduated hint instruction.
+
+        Hint level escalates based on step_exchange_count:
+        - 1st hint request → Level 1: leading question / nudge
+        - 2nd hint request → Level 2: partial step / structured hint
+        - 3rd+ hint request → Level 3: full scaffold (but not full answer)
+        """
+        hint_keywords = [
+            'hint', 'help me', "i'm stuck", "i am stuck", "don't understand",
+            "do not understand", 'clue', 'guide me', 'confused', 'not sure how',
+            'can you help', 'show me how', "don't get it", "don't know how",
+        ]
+        input_lower = student_input.lower()
+        if not any(kw in input_lower for kw in hint_keywords):
+            return ""
+
+        # Determine hint level from exchange count on this step
+        if self.step_exchange_count <= 1:
+            level = 1
+            level_desc = "a leading question or nudge that points toward the answer"
+        elif self.step_exchange_count <= 3:
+            level = 2
+            level_desc = "a partial step or structured hint (e.g., 'Try converting X to Y')"
+        else:
+            level = 3
+            level_desc = "a full scaffold showing the method step by step, but still ask the student to compute the final answer"
+
+        return (
+            f"\nHINT REQUEST DETECTED: The student explicitly asked for help.\n"
+            f"Provide HINT LEVEL {level}: {level_desc}.\n"
+            f"Do NOT repeat a worked example that has already been shown.\n"
+            f"Do NOT give the full answer directly.\n"
+            f"If a HINT LADDER is defined above, use hint {level} from it.\n"
+            f"If no hints are defined, provide a leading question that narrows "
+            f"the student's thinking toward the answer.\n"
+        )
+
     def _build_response_prompt(
         self,
         student_input: str,
@@ -1903,6 +1996,9 @@ End with a question. Keep it to 2-3 sentences max."""
         student_profile = self._build_student_profile_block()
         worked_example_block = self._build_worked_example_block()
         interleaved_block = self._build_interleaved_practice_block()
+
+        # Detect explicit hint requests and inject graduated hint instruction
+        hint_block = self._build_hint_request_block(student_input)
 
         # Step progress indicator
         step_num = min(self.current_topic_index + 1, len(self.steps))
@@ -1940,6 +2036,7 @@ CURRENT STEP DIRECTIVE (follow this exactly):
 {current_guidance}
 {visual_instructions}
 {worked_example_block}
+{hint_block}
 {concept_coverage}
 
 {next_concept}
@@ -2120,6 +2217,19 @@ Follow the current step; this concept will be covered in sequence."""
         if personality_prompt:
             system_prompt += f"\n\n<personality>\n{personality_prompt}\n</personality>"
 
+        # Append LaTeX instruction for math lessons
+        course_title = (self.lesson.unit.course.title or '').lower()
+        if any(kw in course_title for kw in ('math', 'maths', 'mathematics', 'algebra', 'geometry', 'calculus')):
+            system_prompt += (
+                "\n\n<math_notation>"
+                "\nFor ALL mathematical expressions, use LaTeX notation so fractions render properly:"
+                "\n- Inline: $\\frac{1}{2}$, $\\frac{3}{4} + \\frac{1}{2}$"
+                "\n- Display: $$\\frac{1}{4} + \\frac{1}{2} = \\frac{3}{4}$$"
+                "\n- ALWAYS use \\frac{}{} for fractions instead of plain text '1/2'."
+                "\n- Use $...$ for inline math and $$...$$ for display math."
+                "\n</math_notation>"
+            )
+
         # Append media catalog so the LLM knows what figures are available
         system_prompt += self._build_media_catalog()
 
@@ -2284,7 +2394,14 @@ Follow the current step; this concept will be covered in sequence."""
             parts.append("YOUR TASK: Deliver this teaching content. Explain clearly, then ask a comprehension check.")
             parts.append(f"\nCONTENT TO TEACH:\n{teacher_script}")
         elif step.step_type == 'worked_example':
-            parts.append("YOUR TASK: Walk through this worked example step by step, then ask the student to explain a step back.")
+            if self.current_topic_index in self.shown_worked_example_indices and self.step_exchange_count > 0:
+                parts.append(
+                    "YOUR TASK: The worked example has ALREADY been presented. "
+                    "Do NOT repeat it. Instead, ask the student a follow-up question "
+                    "about one of the steps, or give them a similar problem for guided practice."
+                )
+            else:
+                parts.append("YOUR TASK: Walk through this worked example step by step, then ask the student to explain a step back.")
             parts.append(f"\nEXAMPLE:\n{teacher_script}")
         elif step.step_type in ('practice', 'quiz'):
             parts.append("YOUR TASK: Ask the EXACT question below verbatim, then grade the student's answer against the expected answer.")
@@ -2371,6 +2488,15 @@ Follow the current step; this concept will be covered in sequence."""
                         "CONCEPT GATE: Student must answer the practice check "
                         "correctly before you move to the next concept."
                     )
+
+        # Grade calibration note for senior students
+        grade = self._student_grade_level
+        if grade and grade.upper() in ('S3', 'S4', 'S5'):
+            parts.append(
+                f"\nGRADE NOTE: This student is in {grade}. If the content above seems "
+                "too basic, adapt it upward — deliver the core idea efficiently and "
+                "add grade-appropriate challenge."
+            )
 
         # Step exchange info
         parts.append(f"\nExchanges on this step: {self.step_exchange_count}")
