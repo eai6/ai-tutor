@@ -8,18 +8,16 @@ from django.test import TestCase
 class TestTranscribe(TestCase):
     """Unit tests for audio_service.transcribe()."""
 
-    @patch.dict(os.environ, {"DISABLE_STT": "1"})
+    @patch("apps.tutoring.audio_service.DISABLE_STT", True)
     def test_transcribe_disabled_returns_none(self):
         from apps.tutoring.audio_service import transcribe
         result = transcribe(b"fake audio", "audio/webm")
         self.assertIsNone(result)
 
+    @patch("apps.tutoring.audio_service.DISABLE_STT", False)
     @patch("apps.tutoring.audio_service._get_whisper_model")
     def test_transcribe_returns_text(self, mock_get_model):
         """transcribe() joins segment texts and returns a string."""
-        # Clear env to ensure not disabled
-        os.environ.pop("DISABLE_STT", None)
-
         seg1 = MagicMock()
         seg1.text = " Hello "
         seg2 = MagicMock()
@@ -32,9 +30,9 @@ class TestTranscribe(TestCase):
         result = transcribe(b"fake audio bytes", "audio/webm")
         self.assertEqual(result, "Hello world")
 
+    @patch("apps.tutoring.audio_service.DISABLE_STT", False)
     @patch("apps.tutoring.audio_service._get_whisper_model")
     def test_transcribe_empty_segments_returns_none(self, mock_get_model):
-        os.environ.pop("DISABLE_STT", None)
         mock_model = MagicMock()
         mock_model.transcribe.return_value = ([], MagicMock())
         mock_get_model.return_value = mock_model
@@ -43,19 +41,19 @@ class TestTranscribe(TestCase):
         result = transcribe(b"silence", "audio/webm")
         self.assertIsNone(result)
 
+    @patch("apps.tutoring.audio_service.DISABLE_STT", False)
     @patch("apps.tutoring.audio_service._get_whisper_model")
     def test_transcribe_exception_returns_none(self, mock_get_model):
-        os.environ.pop("DISABLE_STT", None)
         mock_get_model.side_effect = RuntimeError("model load failed")
 
         from apps.tutoring.audio_service import transcribe
         result = transcribe(b"audio", "audio/webm")
         self.assertIsNone(result)
 
+    @patch("apps.tutoring.audio_service.DISABLE_STT", False)
     @patch("apps.tutoring.audio_service._get_whisper_model")
     def test_transcribe_wav_suffix(self, mock_get_model):
         """content_type=audio/wav should use .wav suffix (temp file)."""
-        os.environ.pop("DISABLE_STT", None)
         seg = MagicMock()
         seg.text = "test"
         mock_model = MagicMock()
@@ -71,26 +69,29 @@ class TestTranscribe(TestCase):
 
 
 class TestSynthesize(TestCase):
-    """Unit tests for audio_service.synthesize()."""
+    """Unit tests for audio_service.synthesize().
 
-    @patch.dict(os.environ, {"DISABLE_TTS": "1"})
+    synthesize() returns (bytes | None, content_type_str).
+    """
+
+    @patch("apps.tutoring.audio_service.DISABLE_TTS", True)
     def test_synthesize_disabled_returns_none(self):
         from apps.tutoring.audio_service import synthesize
-        result = synthesize("Hello world")
-        self.assertIsNone(result)
+        audio_bytes, content_type = synthesize("Hello world")
+        self.assertIsNone(audio_bytes)
 
+    @patch("apps.tutoring.audio_service.DISABLE_TTS", False)
     def test_synthesize_empty_text_returns_none(self):
-        os.environ.pop("DISABLE_TTS", None)
         from apps.tutoring.audio_service import synthesize
-        self.assertIsNone(synthesize(""))
-        self.assertIsNone(synthesize("   "))
-        self.assertIsNone(synthesize(None))
+        audio_bytes, _ = synthesize("")
+        self.assertIsNone(audio_bytes)
+        audio_bytes2, _ = synthesize("   ")
+        self.assertIsNone(audio_bytes2)
 
+    @patch("apps.tutoring.audio_service.DISABLE_TTS", False)
     @patch("apps.tutoring.audio_service._get_piper_voice")
     def test_synthesize_returns_wav_bytes(self, mock_get_voice):
         """synthesize() should return bytes starting with RIFF WAV header."""
-        os.environ.pop("DISABLE_TTS", None)
-
         mock_voice = MagicMock()
 
         # synthesize_wav(text, wav_file) writes PCM frames into the wave.Wave_write
@@ -104,18 +105,19 @@ class TestSynthesize(TestCase):
         mock_get_voice.return_value = mock_voice
 
         from apps.tutoring.audio_service import synthesize
-        result = synthesize("Hello world")
+        audio_bytes, content_type = synthesize("Hello world")
 
-        self.assertIsNotNone(result)
-        self.assertIsInstance(result, bytes)
+        self.assertIsNotNone(audio_bytes)
+        self.assertIsInstance(audio_bytes, bytes)
         # WAV files start with RIFF header
-        self.assertTrue(result[:4] == b"RIFF")
+        self.assertTrue(audio_bytes[:4] == b"RIFF")
+        self.assertEqual(content_type, "audio/wav")
 
+    @patch("apps.tutoring.audio_service.DISABLE_TTS", False)
     @patch("apps.tutoring.audio_service._get_piper_voice")
     def test_synthesize_exception_returns_none(self, mock_get_voice):
-        os.environ.pop("DISABLE_TTS", None)
         mock_get_voice.side_effect = RuntimeError("piper load failed")
 
         from apps.tutoring.audio_service import synthesize
-        result = synthesize("Hello")
-        self.assertIsNone(result)
+        audio_bytes, _ = synthesize("Hello")
+        self.assertIsNone(audio_bytes)

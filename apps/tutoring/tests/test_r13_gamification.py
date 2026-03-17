@@ -120,3 +120,40 @@ class TestR13Gamification(BaseTutoringTestCase):
         with patch.object(StudentKnowledgeProfile.objects, 'get_or_create', side_effect=Exception("DB error")):
             # Should not raise
             svc._award_practice_xp(self.course, was_correct=True, hints_used=0)
+
+
+class TestGamificationAPI(BaseTutoringTestCase):
+    """Test the gamification API returns analytics data."""
+
+    def setUp(self):
+        self.factory = __import__('django.test', fromlist=['RequestFactory']).RequestFactory()
+
+    def test_gamification_returns_analytics_fields(self):
+        """API should return total_practice_minutes, mastered_lessons_count, quiz_accuracy."""
+        from django.test import RequestFactory
+        from apps.tutoring.views import get_gamification_data
+
+        # Create a profile with some data
+        profile = StudentKnowledgeProfile.objects.create(
+            student=self.student_user,
+            course=self.course,
+            total_xp=500,
+            total_practice_time_minutes=45,
+            total_sessions=3,
+            current_streak_days=2,
+        )
+
+        factory = RequestFactory()
+        request = factory.get('/tutor/api/gamification/')
+        request.user = self.student_user
+
+        response = get_gamification_data(request)
+        import json
+        data = json.loads(response.content)
+
+        self.assertIn('total_practice_minutes', data)
+        self.assertEqual(data['total_practice_minutes'], 45)
+        self.assertIn('total_sessions', data)
+        self.assertEqual(data['total_sessions'], 3)
+        self.assertIn('mastered_lessons_count', data)
+        self.assertIn('quiz_accuracy', data)

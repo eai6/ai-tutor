@@ -133,10 +133,11 @@ class TestSpeakTextEndpoint(BaseTutoringTestCase):
 
     @patch("apps.safety.RateLimiter.record_message")
     @patch("apps.safety.RateLimiter.check_rate_limit", return_value=(True, None))
+    @patch("apps.tutoring.audio_service.synthesize_with_timestamps", return_value=None)
     @patch("apps.tutoring.audio_service.synthesize")
-    def test_speak_success(self, mock_synth, mock_rate, mock_record):
-        # Fake WAV bytes
-        mock_synth.return_value = b"RIFF" + b"\x00" * 100
+    def test_speak_success(self, mock_synth, mock_ts, mock_rate, mock_record):
+        # Fake WAV bytes — synthesize returns (bytes, content_type)
+        mock_synth.return_value = (b"RIFF" + b"\x00" * 100, "audio/wav")
         response = self._post({"text": "Hello student"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "audio/wav")
@@ -157,8 +158,9 @@ class TestSpeakTextEndpoint(BaseTutoringTestCase):
 
     @patch("apps.safety.RateLimiter.record_message")
     @patch("apps.safety.RateLimiter.check_rate_limit", return_value=(True, None))
-    @patch("apps.tutoring.audio_service.synthesize", return_value=None)
-    def test_speak_tts_unavailable(self, mock_synth, mock_rate, mock_record):
+    @patch("apps.tutoring.audio_service.synthesize_with_timestamps", return_value=None)
+    @patch("apps.tutoring.audio_service.synthesize", return_value=(None, "audio/wav"))
+    def test_speak_tts_unavailable(self, mock_synth, mock_ts, mock_rate, mock_record):
         response = self._post({"text": "Hello"})
         self.assertEqual(response.status_code, 503)
 
@@ -200,13 +202,13 @@ class TestConcisePrompts(BaseTutoringTestCase):
     """Verify tutor prompts were tightened to shorter sentence limits."""
 
     def test_system_prompt_has_concise_format_rules(self):
-        """The format_rules should specify 1-2 sentences + ~50 words."""
+        """The format_rules should specify 1-2 sentences + ~60 words max."""
         session = self._create_session()
         from apps.tutoring.conversational_tutor import ConversationalTutor
         tutor = ConversationalTutor(session)
         prompt = tutor._build_system_prompt()
         self.assertIn("1-2 sentences", prompt)
-        self.assertIn("50 words", prompt)
+        self.assertIn("60 words", prompt)
 
     def test_active_learning_principle_tightened(self):
         session = self._create_session()
