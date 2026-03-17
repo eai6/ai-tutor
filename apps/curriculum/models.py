@@ -37,6 +37,12 @@ class Course(models.Model):
     class Meta:
         ordering = ['title']
 
+    MATH_KEYWORDS = ('math', 'maths', 'mathematics', 'algebra', 'geometry', 'calculus')
+
+    @property
+    def is_math(self):
+        return any(kw in (self.title or '').lower() for kw in self.MATH_KEYWORDS)
+
     def __str__(self):
         return self.title
 

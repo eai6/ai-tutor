@@ -2218,8 +2218,7 @@ Follow the current step; this concept will be covered in sequence."""
             system_prompt += f"\n\n<personality>\n{personality_prompt}\n</personality>"
 
         # Append LaTeX instruction for math lessons
-        course_title = (self.lesson.unit.course.title or '').lower()
-        if any(kw in course_title for kw in ('math', 'maths', 'mathematics', 'algebra', 'geometry', 'calculus')):
+        if self.lesson.unit.course.is_math:
             system_prompt += (
                 "\n\n<math_notation>"
                 "\nFor ALL mathematical expressions, use LaTeX notation so fractions render properly:"
@@ -3252,6 +3251,10 @@ Which concept numbers were meaningfully covered?"""
             defaults={'institution': self.session.institution}
         )
         progress.mastery_level = 'mastered'
+        total_questions = len(results) or 1
+        score_pct = round(score / total_questions * 100, 1)
+        if progress.best_score is None or score_pct > progress.best_score:
+            progress.best_score = score_pct
         progress.save()
 
         # ── Gamification: XP + streak + achievements ──
