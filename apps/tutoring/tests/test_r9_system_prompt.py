@@ -114,8 +114,8 @@ class TestR9SystemPrompt(BaseTutoringTestCase):
 
         self.assertIn('learning objective', captured_prompt['text'].lower())
 
-    def test_opening_prompt_recalls_prior_knowledge(self):
-        """_generate_opening prompt should instruct recalling prior knowledge."""
+    def test_opening_prompt_handles_prior_knowledge_conditionally(self):
+        """_generate_opening should only recall prior knowledge when prior lessons exist."""
         from apps.tutoring.conversational_tutor import ConversationalTutor
 
         session = self._create_session()
@@ -130,4 +130,6 @@ class TestR9SystemPrompt(BaseTutoringTestCase):
         tutor._generate_response = capture_prompt
         tutor._generate_opening()
 
-        self.assertIn('prior knowledge', captured_prompt['text'].lower())
+        # First lesson in unit: should NOT reference prior lessons
+        prompt_lower = captured_prompt['text'].lower()
+        self.assertIn('do not reference prior lessons', prompt_lower)

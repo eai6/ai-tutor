@@ -87,7 +87,7 @@ ACTIVE OVER PASSIVE
 - Keep explanations to a MINIMUM EFFECTIVE DOSE: explain just enough for the
   student to attempt a problem, then immediately get them doing something.
 - Never present more than 1-2 sentences of explanation without prompting the
-  student to respond. Keep each turn under 50 words -- even a comprehension
+  student to respond. Keep each turn under ~60 words -- even a comprehension
   check like "In your own words, what is the first step?"
 - The student should be DOING something (answering, computing, explaining back,
   choosing, comparing) at least 60% of interaction turns.
@@ -222,10 +222,11 @@ CALIBRATE TO STUDENT LEVEL
   to match their maturity and expected prior knowledge.
 - For senior secondary students (S3-S5), do NOT use primary-school-level analogies
   (e.g., "have you ever split food?") unless the student demonstrates they need them.
-- If the step content seems too basic for the student's grade, acknowledge their prior
-  knowledge, deliver the core concept efficiently, and add grade-appropriate depth.
-- For introductory/review lessons at higher grades, open with a diagnostic question
-  to gauge prior knowledge before spending time on basics.
+- If the step content seems too basic for the student's grade and the student
+  demonstrates prior knowledge, acknowledge it, deliver the core concept efficiently,
+  and add grade-appropriate depth.
+- If the student has completed prior lessons in this unit, you may open with a brief
+  diagnostic question to gauge retention before spending time on basics.
 </principle>
 
 <principle id="expertise_reversal">
@@ -950,9 +951,9 @@ Generate a brief, warm welcome back message that:
 3. Asks a question to re-engage them
 4. If media is available for the current step, reference the image and write |||MEDIA:N||| as the LAST line
 
-Keep it to 1-2 sentences + question, under 50 words."""
+Keep it to 1-2 sentences + question, ~60 words max."""
 
-        response = self._generate_response(prompt)
+        response = self._generate_response(prompt, fallback_context="resume")
 
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media, gen_request = self._parse_media_signal(response)
@@ -978,10 +979,11 @@ Keep it to 1-2 sentences + question, under 50 words."""
             turn_index = len(self.conversation)  # index before appending
             self._turn_media[str(turn_index)] = media[0]
 
-        # Persist the welcome-back message so it survives future resumes
-        self._save_turn("tutor", clean_response)
-        self.conversation.append({"role": "assistant", "content": clean_response})
-        self._save_state()
+        # Don't persist fallback messages — they pollute conversation history (Fix 2)
+        if not self._last_response_was_fallback:
+            self._save_turn("tutor", clean_response)
+            self.conversation.append({"role": "assistant", "content": clean_response})
+            self._save_state()
 
         return self._create_message(clean_response, media=media)
 
@@ -1702,6 +1704,25 @@ IMPORTANT: You are showing these images with your response.
         current_guidance = self._get_current_guidance()
         media_catalog = self._build_media_catalog()
 
+        # Determine if student has actual prior knowledge (Fix 3)
+        has_prior = bool(retrieval_block) or (
+            retrieval_context
+            and "first lesson" not in retrieval_context.lower()
+            and "not available" not in retrieval_context.lower()
+        )
+
+        if has_prior:
+            prior_instruction = (
+                "3. Briefly recall 1-2 key concepts from earlier lessons "
+                "that today's topic builds on, to activate the student's memory"
+            )
+        else:
+            prior_instruction = (
+                "3. This is the student's first lesson on this topic — do NOT "
+                "reference prior lessons. Instead, connect the topic to everyday "
+                "experiences the student can relate to"
+            )
+
         prompt = f"""Generate an opening message for this tutoring session.
 
 {self.lesson_context}
@@ -1717,14 +1738,14 @@ IMPORTANT: You are showing these images with your response.
 Generate a warm, engaging opening that:
 1. Greets the student warmly
 2. Clearly states today's learning objective so the student knows what they will learn
-3. Briefly recalls relevant prior knowledge: mention 1-2 key concepts from earlier lessons that today's topic builds on, to activate the student's memory
+{prior_instruction}
 4. If retrieval questions are provided above, present one as a warmup activity
-5. Otherwise, asks what they already know about today's topic
+5. Otherwise, present a brief warm-up question related to today's topic
 6. If media is available for this step, reference the image in your text and write |||MEDIA:N||| as the LAST line
 
 End with a question. Keep it to 2-3 sentences max."""
 
-        response = self._generate_response(prompt)
+        response = self._generate_response(prompt, fallback_context="opening")
 
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media, gen_request = self._parse_media_signal(response)
@@ -2061,7 +2082,7 @@ Generate your response following these rules:
 10. Watch for COMMON MISTAKES listed in the directive and address them proactively
 11. Weave in local Seychelles context where relevant to make the lesson relatable
 12. END with a question or "Try this:" prompt
-13. Keep it concise (1-2 sentences + question, under 50 words){media_reminder}
+13. Keep it concise (1-2 sentences + question, ~60 words max){media_reminder}
 
 YOUR RESPONSE:"""
 
@@ -2138,36 +2159,81 @@ Key understanding needed: "{concept.get('explanation', 'Understand this concept 
 
 Follow the current step; this concept will be covered in sequence."""
     
-    def _generate_response(self, prompt: str) -> str:
+    def _generate_response(self, prompt: str, fallback_context: str = "conversation") -> str:
         """Call the LLM to generate a response."""
+        self._last_response_was_fallback = False
+
         if not self.llm_client:
-            # Fallback response if no LLM
-            return self._fallback_response()
-        
+            logger.warning(
+                f"No LLM client available for session={self.session.id} "
+                f"lesson='{self.lesson.title}'"
+            )
+            return self._fallback_response(fallback_context)
+
         try:
             # Build messages
             messages = [{"role": "user", "content": prompt}]
-            
+
             # Call LLM (max_tokens and temperature come from ModelConfig)
             response = self.llm_client.generate(
                 messages=messages,
                 system_prompt=self._build_system_prompt(),
             )
-            
+
             return response.content.strip()
-            
+
         except Exception as e:
-            logger.error(f"LLM generation failed: {e}")
-            return self._fallback_response()
-    
-    def _fallback_response(self) -> str:
-        """Fallback response when LLM is unavailable."""
-        fallbacks = [
-            "That's interesting! Let me think about that. Can you tell me more about your reasoning?",
-            "Good effort! Let's explore this together. What do you think the first step should be?",
-            "I see what you're thinking. Let's break this down - what's the key concept here?",
-        ]
-        return random.choice(fallbacks)
+            logger.error(
+                f"LLM generation failed for session={self.session.id} "
+                f"lesson='{self.lesson.title}': {e}",
+                exc_info=True,
+            )
+            return self._fallback_response(fallback_context)
+
+    def _fallback_response(self, context: str = "conversation") -> str:
+        """Context-aware fallback when LLM is unavailable.
+
+        The tutor must LEAD — fallbacks present concrete questions from
+        lesson content, never ask open-ended "what do you know?" questions.
+        """
+        self._last_response_was_fallback = True
+
+        if context == "opening":
+            question = self._get_opening_fallback_question()
+            return (
+                f"Welcome! Before we start {self.lesson.title}, "
+                f"let's review what you already know — {question}"
+            )
+        elif context == "resume":
+            question = self._get_resume_fallback_question()
+            return (
+                f"Welcome back! Let's continue with {self.lesson.title}. "
+                f"Let us review what we covered last time — {question}"
+            )
+        else:
+            fallbacks = [
+                "Let's work through this step by step. Try this: what is the first thing you notice?",
+                "Let me help you think through this. Start by identifying the key information given.",
+                "Let's break this down. What operation or method do you think applies here?",
+            ]
+            return random.choice(fallbacks)
+
+    def _get_opening_fallback_question(self) -> str:
+        """Get a practice question from early steps for opening fallback."""
+        for step in self.steps[:5]:
+            if step.step_type in ('practice', 'quiz') and step.question:
+                return step.question
+        if self.steps and self.steps[0].teacher_script:
+            return f"what do you think {self.lesson.title} is about?"
+        return f"what comes to mind when you hear '{self.lesson.title}'?"
+
+    def _get_resume_fallback_question(self) -> str:
+        """Get a review question from already-covered steps for resume fallback."""
+        for i in range(min(self.current_topic_index, len(self.steps)) - 1, -1, -1):
+            step = self.steps[i]
+            if step.step_type in ('practice', 'quiz') and step.question:
+                return step.question
+        return f"can you explain in your own words what we learned about {self.lesson.title} so far?"
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt with session-specific context (R9)."""
@@ -2354,24 +2420,36 @@ Follow the current step; this concept will be covered in sequence."""
             return "Standard curriculum context."
     
     def _get_retrieval_context(self) -> str:
-        """Get context for retrieval practice from previous lessons."""
+        """Get context for retrieval practice from previous lessons.
+
+        Only includes lessons the student has actually started or completed,
+        verified via StudentLessonProgress records (Fix 4).
+        """
         try:
-            # Get previous lessons in this unit
+            # Only include lessons the student has actually worked on
+            completed_ids = set(
+                StudentLessonProgress.objects.filter(
+                    student=self.student,
+                    lesson__unit=self.lesson.unit,
+                    lesson__order_index__lt=self.lesson.order_index,
+                    mastery_level__in=['in_progress', 'mastered'],
+                ).values_list('lesson_id', flat=True)
+            )
+
             previous_lessons = Lesson.objects.filter(
-                unit=self.lesson.unit,
-                order_index__lt=self.lesson.order_index,
-                is_published=True
+                id__in=completed_ids,
+                is_published=True,
             ).order_by('-order_index')[:2]
-            
+
             if not previous_lessons:
                 return "This is the first lesson in the unit - no previous topics to review."
-            
+
             context_parts = ["Previous topics the student has learned:"]
             for lesson in previous_lessons:
                 context_parts.append(f"- {lesson.title}: {lesson.objective}")
-            
+
             return "\n".join(context_parts)
-            
+
         except Exception as e:
             logger.warning(f"Could not get retrieval context: {e}")
             return "Previous topics not available."
