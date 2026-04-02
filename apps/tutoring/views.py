@@ -732,6 +732,11 @@ def chat_respond(request, session_id):
             "is_complete": result.is_complete,
             "step_number": result.step_number,
             "total_steps": result.total_steps,
+            # In-conversation gamification
+            "is_correct": result.is_correct,
+            "streak_count": result.streak_count,
+            "practice_score": result.practice_score,
+            "milestone": result.milestone,
         })
     except Exception as e:
         logger.error(f"[respond] Failed: {e}", exc_info=True)
@@ -763,6 +768,47 @@ def chat_start_review(request, session_id):
         "is_complete": False,
         "step_number": result.step_number,
         "total_steps": result.total_steps,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def chat_difficulty_signal(request, session_id):
+    """Handle student difficulty signal (too easy / too hard)."""
+    session = get_object_or_404(
+        TutorSession,
+        id=session_id,
+        student=request.user,
+    )
+
+    try:
+        data = json.loads(request.body)
+        signal = data.get("signal", "").strip()
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    if signal not in ("too_easy", "too_hard", "reset"):
+        return JsonResponse({"error": "Invalid signal"}, status=400)
+
+    state = session.engine_state or {}
+    current_level = state.get('difficulty_level', 0)
+
+    if signal == "too_easy":
+        current_level = min(current_level + 1, 2)
+    elif signal == "too_hard":
+        current_level = max(current_level - 1, -2)
+    else:
+        current_level = 0
+
+    state['difficulty_level'] = current_level
+    session.engine_state = state
+    session.save(update_fields=['engine_state'])
+
+    return JsonResponse({
+        "ok": True,
+        "signal": signal,
+        "difficulty_level": current_level,
     })
 
 

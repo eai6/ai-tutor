@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/chat/<int:session_id>/respond/', views.chat_respond, name='chat_respond'),
     path('api/chat/<int:session_id>/exit-ticket/', views.chat_exit_ticket, name='chat_exit_ticket'),
     path('api/chat/<int:session_id>/review/', views.chat_start_review, name='chat_start_review'),
+    path('api/chat/<int:session_id>/difficulty-signal/', views.chat_difficulty_signal, name='chat_difficulty_signal'),
 
     # Audio — STT + TTS
     path('api/chat/<int:session_id>/transcribe/', views.transcribe_audio, name='transcribe_audio'),

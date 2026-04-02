@@ -374,6 +374,12 @@ class TutorMessage:
     step_number: int = 0
     total_steps: int = 0
 
+    # In-conversation gamification
+    is_correct: bool = False
+    streak_count: int = 0
+    practice_score: str = ""
+    milestone: Optional[str] = None
+
     # Metadata
     skills_covered: List[str] = field(default_factory=list)
     tokens_used: int = 0
@@ -604,6 +610,12 @@ class ConversationalTutor:
         # Worked example deduplication (Issue 1)
         self.shown_worked_example_indices = set(state.get('shown_worked_example_indices', []))
 
+        # Difficulty signal (ZPD adjustment)
+        self.difficulty_level = state.get('difficulty_level', 0)
+
+        # Correct-answer streak for in-conversation gamification
+        self._correct_streak = state.get('correct_streak', 0)
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -651,6 +663,10 @@ class ConversationalTutor:
             'turn_media': getattr(self, '_turn_media', {}),
             # Worked example deduplication (Issue 1)
             'shown_worked_example_indices': list(getattr(self, 'shown_worked_example_indices', set())),
+            # Difficulty signal (ZPD adjustment)
+            'difficulty_level': getattr(self, 'difficulty_level', 0),
+            # Correct-answer streak for in-conversation gamification
+            'correct_streak': getattr(self, '_correct_streak', 0),
         }
         self.session.save()
     
@@ -1823,6 +1839,44 @@ End with a question. Keep it to 2-3 sentences max."""
             logger.warning(f"Failed to build student profile block: {e}")
             return ""
 
+    def _build_difficulty_signal_block(self) -> str:
+        """Build [DIFFICULTY ADJUSTMENT] context block based on student signal.
+
+        The difficulty_level ranges from -2 (too hard) to +2 (too easy).
+        Returns an empty string when level is 0 (no adjustment needed).
+        """
+        level = getattr(self, 'difficulty_level', 0)
+        if level == 0:
+            return ""
+
+        if level >= 1:
+            intensity = "moderately" if level == 1 else "significantly"
+            return f"""[DIFFICULTY ADJUSTMENT]
+The student has signaled this material is TOO EASY for them (confidence level: {level}/2).
+Apply the expertise_reversal principle {intensity}:
+- SKIP intermediate explanation steps — do NOT ask the student to explain basic sub-steps they clearly understand.
+- Go straight to independent practice with NO worked examples or hints unless they ask.
+- If the student answers correctly, do NOT ask follow-up comprehension questions on the same point — move forward.
+- Offer HARDER variants: more complex numbers, multi-step problems, or edge cases.
+- Use concise, peer-level language — no over-scaffolding.
+- If they get it right on the first try, acknowledge briefly and advance: "Solid. Let's try something harder."
+CRITICAL: When the student answers correctly, do NOT revert to asking them to explain intermediate steps. Trust their demonstrated competence.
+[/DIFFICULTY ADJUSTMENT]"""
+
+        else:
+            intensity = "moderately" if level == -1 else "significantly"
+            return f"""[DIFFICULTY ADJUSTMENT]
+The student has signaled this material is TOO HARD for them (struggle level: {abs(level)}/2).
+Apply the cognitive_load and targeted_remediation principles {intensity}:
+- Break the current concept into SMALLER sub-steps than the directive specifies.
+- Use a fully worked example BEFORE asking the student to try independently.
+- Use simpler numbers, shorter problems, and more concrete/real-world examples.
+- Provide MORE scaffolding: after each sub-step, check understanding before proceeding.
+- If they struggle, offer a hint proactively rather than waiting for a second attempt.
+- Be extra encouraging — normalize difficulty: "This is a tough one. Let's break it down together."
+- Consider whether a prerequisite gap is the real issue.
+[/DIFFICULTY ADJUSTMENT]"""
+
     def _build_worked_example_block(self) -> str:
         """Build [WORKED EXAMPLE] context block for teach/worked_example steps (R14).
 
@@ -1994,6 +2048,7 @@ End with a question. Keep it to 2-3 sentences max."""
         concept_coverage = self._get_concept_coverage_summary()
         next_concept = self._get_next_uncovered_concept()
         student_profile = self._build_student_profile_block()
+        difficulty_block = self._build_difficulty_signal_block()
         worked_example_block = self._build_worked_example_block()
         interleaved_block = self._build_interleaved_practice_block()
 
@@ -2047,6 +2102,8 @@ CURRENT STEP DIRECTIVE (follow this exactly):
 {step_phase_instructions}
 
 {student_profile}
+
+{difficulty_block}
 
 Generate your response following these rules:
 1. EXECUTE the CURRENT STEP DIRECTIVE above — deliver its content, ask its question, or walk through its example
@@ -2821,6 +2878,12 @@ Break concepts into smaller steps. Be encouraging."""
         # Update last_answer_correct for concept boundary gating
         self.last_answer_correct = is_correct
 
+        # Update correct-answer streak for in-conversation gamification
+        if is_correct:
+            self._correct_streak = getattr(self, '_correct_streak', 0) + 1
+        else:
+            self._correct_streak = 0
+
         # Record skill practice via SkillAssessmentService (R2)
         try:
             if self.lesson_skills and self.skill_assessment_service:
@@ -3464,6 +3527,29 @@ Keep it warm and supportive. 2-3 sentences + a question to start the review."""
 
         return text, None, None
 
+    def _check_milestone(self) -> Optional[str]:
+        """Check if the student hit a milestone worth celebrating."""
+        step_num = min(self.current_topic_index + 1, len(self.steps)) if self.steps else 0
+        total = len(self.steps)
+        streak = getattr(self, '_correct_streak', 0)
+
+        if streak >= 5:
+            return "streak_5"
+        if streak >= 3:
+            return "streak_3"
+
+        if getattr(self, '_step_just_advanced', False) and total > 2:
+            if step_num == (total + 1) // 2:
+                return "halfway"
+            if step_num == total:
+                return "final_step"
+
+        if (self.practice_total >= 3
+                and self.practice_correct == self.practice_total):
+            return "perfect_run"
+
+        return None
+
     def _create_message(self, content: str, media: List[Dict] = None) -> TutorMessage:
         """Create a TutorMessage from content."""
         # Defense-in-depth: strip legacy, MEDIA, and GENERATE signal tags
@@ -3482,4 +3568,8 @@ Keep it warm and supportive. 2-3 sentences + a question to start the review."""
             expects_response=self.session_state != SessionState.COMPLETED,
             step_number=step_num,
             total_steps=total,
+            is_correct=getattr(self, 'last_answer_correct', False),
+            streak_count=getattr(self, '_correct_streak', 0),
+            practice_score=f"{self.practice_correct}/{self.practice_total}" if self.practice_total > 0 else "",
+            milestone=self._check_milestone(),
         )
