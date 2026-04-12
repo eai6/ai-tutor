@@ -7,7 +7,7 @@ from .models import (
     TutorSession, SessionTurn, StudentLessonProgress,
     ExitTicket, ExitTicketQuestion, ExitTicketAttempt
 )
-from .skills_models import Achievement, StudentAchievement
+from .skills_models import Achievement, StudentAchievement, Skill
 
 
 # ============================================================================
@@ -95,6 +95,14 @@ class ExitTicketAttemptAdmin(admin.ModelAdmin):
 # ============================================================================
 # Achievement Admin
 # ============================================================================
+
+@admin.register(Skill)
+class SkillAdmin(admin.ModelAdmin):
+    list_display = ['code', 'name', 'course', 'bloom_level', 'is_enabling_objective', 'difficulty', 'created_at']
+    list_filter = ['is_enabling_objective', 'bloom_level', 'difficulty', 'course']
+    search_fields = ['name', 'code', 'enabling_objective_text']
+    readonly_fields = ['created_at']
+
 
 @admin.register(Achievement)
 class AchievementAdmin(admin.ModelAdmin):

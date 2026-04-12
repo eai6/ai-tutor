@@ -211,6 +211,9 @@ class LessonContentGenerator:
             # Auto-generate exit ticket after content generation
             exit_ticket_result = self._generate_exit_ticket(lesson)
 
+            # Create skills from enabling objectives (P1.2 — links EOs to SM-2 tracking)
+            self._extract_eo_skills(lesson)
+
         return {
             'success': True,
             'lesson_id': lesson.id,
@@ -542,6 +545,17 @@ CONTENT GUIDELINES:
             )
 
             logger.debug(f"{'Created' if created else 'Updated'} step {step.order_index}: {step.step_type}")
+
+    def _extract_eo_skills(self, lesson):
+        """Create Skill records from enabling objectives for SM-2 mastery tracking."""
+        try:
+            from apps.tutoring.skill_extraction import SkillExtractionService
+            service = SkillExtractionService(self.institution_id)
+            skills = service.create_skills_from_enabling_objectives(lesson)
+            if skills:
+                print(f"[ContentGen] [{lesson.title}] EO skills: {len(skills)} created", flush=True)
+        except Exception as e:
+            logger.warning(f"EO skill extraction failed for {lesson.title}: {e}")
 
     def _generate_exit_ticket(self, lesson) -> Dict:
         """Generate a mixed-format exit ticket for a lesson after content generation."""

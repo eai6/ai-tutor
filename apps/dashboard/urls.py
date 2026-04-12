@@ -63,6 +63,7 @@ urlpatterns = [
     
     # Reports
     path('reports/', views.reports_overview, name='reports'),
+    path('class/<int:course_id>/readiness/', views.class_readiness_report, name='class_readiness'),
     
     # Settings
     path('settings/', views.settings_page, name='settings'),

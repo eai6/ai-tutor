@@ -408,6 +408,94 @@ Return JSON:
                     defaults={'strength': 1.0, 'is_direct': True}
                 )
     
+    # =========================================================================
+    # ENABLING OBJECTIVE → SKILL CREATION
+    # =========================================================================
+
+    BLOOM_VERB_MAP = {
+        'define': 'remember', 'state': 'remember', 'list': 'remember',
+        'name': 'remember', 'recall': 'remember', 'identify': 'remember',
+        'describe': 'understand', 'explain': 'understand', 'discuss': 'understand',
+        'compare': 'understand', 'distinguish': 'understand', 'interpret': 'understand',
+        'apply': 'apply', 'calculate': 'apply', 'demonstrate': 'apply',
+        'use': 'apply', 'solve': 'apply', 'construct': 'apply',
+        'analyze': 'analyze', 'examine': 'analyze', 'differentiate': 'analyze',
+        'evaluate': 'evaluate', 'assess': 'evaluate', 'justify': 'evaluate',
+        'create': 'create', 'design': 'create', 'develop': 'create',
+    }
+
+    BLOOM_DIFFICULTY = {
+        'remember': ('foundational', 0.2),
+        'understand': ('foundational', 0.35),
+        'apply': ('intermediate', 0.5),
+        'analyze': ('intermediate', 0.65),
+        'evaluate': ('advanced', 0.8),
+        'create': ('advanced', 0.9),
+    }
+
+    def _infer_bloom_level(self, objective_text: str) -> str:
+        """Infer Bloom's taxonomy level from the action verb in an enabling objective."""
+        first_word = objective_text.strip().split()[0].lower().rstrip('s') if objective_text.strip() else ''
+        return self.BLOOM_VERB_MAP.get(first_word, 'understand')
+
+    def create_skills_from_enabling_objectives(self, lesson: Lesson) -> List[Skill]:
+        """Create Skill records from a lesson's enabling objectives.
+
+        Each enabling objective becomes a first-class Skill with SM-2 tracking,
+        Bloom level inference, and lesson linkage. No LLM call needed — purely
+        deterministic from the syllabus data.
+        """
+        enabling_objectives = lesson.enabling_objectives or []
+        if not enabling_objectives:
+            return []
+
+        created_skills = []
+        course = lesson.unit.course
+
+        for eo_text in enabling_objectives:
+            eo_text = eo_text.strip()
+            if not eo_text:
+                continue
+
+            # Generate deterministic code from text
+            slug = re.sub(r'[^a-z0-9]+', '_', eo_text[:60].lower()).strip('_')
+            code = f"eo_{slug}"
+
+            # Infer Bloom level and difficulty from action verb
+            bloom = self._infer_bloom_level(eo_text)
+            difficulty_label, difficulty_score = self.BLOOM_DIFFICULTY.get(bloom, ('intermediate', 0.5))
+
+            skill, created = Skill.objects.get_or_create(
+                institution_id=self.institution_id,
+                code=code,
+                defaults={
+                    'name': eo_text[:200],
+                    'description': f"Enabling objective: {eo_text}",
+                    'enabling_objective_text': eo_text,
+                    'is_enabling_objective': True,
+                    'course': course,
+                    'unit': lesson.unit,
+                    'primary_lesson': lesson,
+                    'difficulty': difficulty_label,
+                    'difficulty_score': difficulty_score,
+                    'bloom_level': bloom,
+                    'importance': 0.8,  # EOs are high-importance by definition
+                    'tags': ['enabling_objective'],
+                }
+            )
+
+            if not created and not skill.is_enabling_objective:
+                # Update existing skill to mark as EO
+                skill.enabling_objective_text = eo_text
+                skill.is_enabling_objective = True
+                skill.save(update_fields=['enabling_objective_text', 'is_enabling_objective'])
+
+            skill.lessons.add(lesson)
+            created_skills.append(skill)
+
+        logger.info(f"Created {len(created_skills)} EO skills for lesson '{lesson.title}'")
+        return created_skills
+
     def detect_course_prerequisites(self, course: Course) -> int:
         """Run cross-lesson prerequisite detection from existing skills. No LLM call."""
         return self._detect_lesson_prerequisites(course)

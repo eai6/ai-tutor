@@ -3095,6 +3095,23 @@ Break concepts into smaller steps. Be encouraging."""
         except Exception as e:
             logger.warning(f"Failed to record skill practice: {e}")
 
+        # Record EO-linked skill practice (P1.2 enabling objective mastery)
+        try:
+            if self.skill_assessment_service and current_step:
+                eo_text = getattr(current_step, 'enabling_objective', '')
+                if eo_text:
+                    eo_skill = self._get_eo_skill(eo_text)
+                    if eo_skill:
+                        self.skill_assessment_service.record_practice(
+                            skill=eo_skill,
+                            was_correct=is_correct,
+                            lesson_step=current_step,
+                            practice_type='remediation' if self.is_remediation else 'initial',
+                            hints_used=0,
+                        )
+        except Exception as e:
+            logger.warning(f"Failed to record EO skill practice: {e}")
+
         # Track exit ticket concept coverage (keyword-only — no extra LLM call)
         self._keyword_concept_coverage_check(combined_text)
 
@@ -3135,6 +3152,15 @@ Break concepts into smaller steps. Be encouraging."""
                 self._mark_step_objective_covered(self.current_topic_index)
                 self.current_topic_index = len(self.steps)
                 self._step_just_advanced = True
+
+    def _get_eo_skill(self, eo_text: str):
+        """Look up the Skill linked to an enabling objective text."""
+        from apps.tutoring.skills_models import Skill
+        return Skill.objects.filter(
+            enabling_objective_text=eo_text.strip(),
+            is_enabling_objective=True,
+            course=self.lesson.unit.course,
+        ).first()
 
     def _mark_step_objective_covered(self, step_index: int):
         """Mark the enabling objective of the given step as covered (P1.2)."""
@@ -3541,6 +3567,22 @@ Which concept numbers were meaningfully covered?"""
                 student_answer = raw_answer
 
             is_correct = self._grade_exit_question(q, student_answer)
+
+            # Record EO-skill practice from exit ticket (P1.2)
+            try:
+                concept = getattr(q, 'concept_tag', '') or ''
+                if concept and self.skill_assessment_service:
+                    eo_skill = self._get_eo_skill(concept)
+                    if eo_skill:
+                        self.skill_assessment_service.record_practice(
+                            skill=eo_skill,
+                            was_correct=is_correct,
+                            practice_type='initial',
+                            hints_used=0,
+                        )
+            except Exception:
+                pass
+
             if is_correct:
                 correct += 1
             else:

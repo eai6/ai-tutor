@@ -138,6 +138,18 @@ class Skill(models.Model):
         default='understand'
     )
     
+    # Enabling Objective linkage
+    enabling_objective_text = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Source enabling objective text from syllabus (if this skill was derived from an EO)"
+    )
+    is_enabling_objective = models.BooleanField(
+        default=False,
+        help_text="True if this skill was auto-created from a curriculum enabling objective"
+    )
+
     # Metadata
     tags = models.JSONField(
         default=list,

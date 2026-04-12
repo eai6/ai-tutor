@@ -1271,6 +1271,127 @@ def reports_overview(request):
     return render(request, 'dashboard/reports/overview.html', context)
 
 
+@teacher_required
+def class_readiness_report(request, course_id):
+    """Class readiness report showing enabling objective mastery across students (P2.4)."""
+    from apps.curriculum.models import Course
+    from apps.tutoring.skills_models import Skill, StudentSkillMastery
+    from apps.tutoring.models import TutorSession
+    from django.db.models import Avg, Count, Q
+
+    institution = request.staff_ctx['institution']
+
+    lookup = {'id': course_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    course = get_object_or_404(Course, **lookup)
+
+    # Get all EO skills for this course
+    eo_skills = Skill.objects.filter(
+        course=course,
+        is_enabling_objective=True,
+    ).select_related('unit', 'primary_lesson').order_by('unit__order_index', 'primary_lesson__order_index')
+
+    # Get all students who have sessions in this course
+    student_ids = TutorSession.objects.filter(
+        lesson__unit__course=course,
+    ).values_list('student_id', flat=True).distinct()
+    total_students = len(set(student_ids))
+
+    # Build mastery data for each EO skill
+    mastery_threshold = 0.8  # Consider "mastered" at 80%
+    struggle_threshold = 0.4
+
+    objectives_data = []
+    total_mastered_pct = 0
+
+    for skill in eo_skills:
+        masteries = StudentSkillMastery.objects.filter(
+            skill=skill,
+            student_id__in=student_ids,
+        )
+        total_with_data = masteries.count()
+        mastered = masteries.filter(mastery_level__gte=mastery_threshold).count()
+        struggling = masteries.filter(mastery_level__lt=struggle_threshold).count()
+        avg_mastery = masteries.aggregate(avg=Avg('mastery_level'))['avg'] or 0
+
+        mastered_pct = (mastered / total_students * 100) if total_students > 0 else 0
+        struggling_pct = (struggling / total_students * 100) if total_students > 0 else 0
+        total_mastered_pct += mastered_pct
+
+        # Determine color: green (>70% mastered), yellow (40-70%), red (<40%)
+        if mastered_pct >= 70:
+            color = 'green'
+        elif mastered_pct >= 40:
+            color = 'yellow'
+        else:
+            color = 'red'
+
+        objectives_data.append({
+            'skill': skill,
+            'unit_title': skill.unit.title if skill.unit else '',
+            'lesson_title': skill.primary_lesson.title if skill.primary_lesson else '',
+            'objective_text': skill.enabling_objective_text,
+            'bloom_level': skill.bloom_level,
+            'total_with_data': total_with_data,
+            'mastered': mastered,
+            'struggling': struggling,
+            'mastered_pct': round(mastered_pct),
+            'struggling_pct': round(struggling_pct),
+            'avg_mastery': round(avg_mastery * 100),
+            'color': color,
+        })
+
+    # Class readiness score
+    class_readiness = round(total_mastered_pct / len(eo_skills)) if eo_skills else 0
+
+    # Generate recommendation
+    struggling_objectives = [o for o in objectives_data if o['color'] == 'red']
+    if not struggling_objectives:
+        recommendation = "Class is ready to move on — strong mastery across all objectives."
+        recommendation_type = 'success'
+    elif len(struggling_objectives) <= 2:
+        names = ', '.join(f"'{o['objective_text'][:60]}'" for o in struggling_objectives[:2])
+        recommendation = f"Consider revisiting: {names} before moving forward."
+        recommendation_type = 'warning'
+    else:
+        recommendation = f"{len(struggling_objectives)} objectives need attention. Consider revisiting this unit."
+        recommendation_type = 'danger'
+
+    # Individual student gaps (students with mastery < 0.5 on any EO)
+    student_gaps = []
+    if eo_skills.exists():
+        from django.contrib.auth.models import User
+        for student_id in student_ids:
+            weak_skills = StudentSkillMastery.objects.filter(
+                student_id=student_id,
+                skill__in=eo_skills,
+                mastery_level__lt=0.5,
+            ).select_related('skill')
+            if weak_skills.exists():
+                student = User.objects.filter(id=student_id).first()
+                student_gaps.append({
+                    'student': student,
+                    'weak_count': weak_skills.count(),
+                    'weak_objectives': [ws.skill.enabling_objective_text[:80] for ws in weak_skills[:5]],
+                })
+        student_gaps.sort(key=lambda x: -x['weak_count'])
+
+    context = {
+        **request.staff_ctx,
+        'course': course,
+        'objectives_data': objectives_data,
+        'total_students': total_students,
+        'total_objectives': len(eo_skills),
+        'class_readiness': class_readiness,
+        'recommendation': recommendation,
+        'recommendation_type': recommendation_type,
+        'student_gaps': student_gaps[:20],
+    }
+
+    return render(request, 'dashboard/class_readiness.html', context)
+
+
 # ============================================================================
 # Teaching Materials
 # ============================================================================
