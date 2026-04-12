@@ -342,6 +342,16 @@ a different approach -- no rush."
 - NEVER say "which of these", "which one of the following", or reference a list of
   options you haven't actually written out. If your question requires choices, either
   list them explicitly or rephrase as an open-ended question instead.
+- To show interactive content (data tables, comparison charts, diagrams), wrap HTML in:
+  |||ARTIFACT:html|||
+  <table style="width:100%;border-collapse:collapse">
+    <tr><th style="padding:8px;border:1px solid #ddd">Header</th></tr>
+    <tr><td style="padding:8px;border:1px solid #ddd">Data</td></tr>
+  </table>
+  |||/ARTIFACT|||
+  Use this for data tables, comparison charts, or visual aids that enhance understanding.
+  Keep HTML simple — use inline styles only, no external resources.
+  Use artifacts when a table or structured visualization would be clearer than plain text.
 </format_rules>
 
 </system_prompt>"""
@@ -383,6 +393,9 @@ class TutorMessage:
     streak_count: int = 0
     practice_score: str = ""
     milestone: Optional[str] = None
+
+    # Rich HTML artifact (rendered in sandboxed iframe)
+    artifact_html: Optional[str] = None
 
     # Metadata
     skills_covered: List[str] = field(default_factory=list)
@@ -1021,6 +1034,7 @@ Keep it to 1-2 sentences + question, ~60 words max."""
 
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media, gen_request = self._parse_media_signal(response)
+        clean_response, artifact_html = self._parse_artifact_signal(clean_response)
         media = [parsed_media] if parsed_media else []
 
         # On-the-fly image generation via safety pipeline
@@ -1049,7 +1063,7 @@ Keep it to 1-2 sentences + question, ~60 words max."""
             self.conversation.append({"role": "assistant", "content": clean_response})
             self._save_state()
 
-        return self._create_message(clean_response, media=media)
+        return self._create_message(clean_response, media=media, artifact_html=artifact_html)
 
     def start_review(self) -> TutorMessage:
         """Start a review session for a completed lesson.
@@ -1163,6 +1177,7 @@ Keep it to 2-3 sentences."""
 
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media, gen_request = self._parse_media_signal(response)
+        clean_response, artifact_html = self._parse_artifact_signal(clean_response)
         media = [parsed_media] if parsed_media else []
 
         # On-the-fly image generation via safety pipeline
@@ -1219,7 +1234,7 @@ Keep it to 2-3 sentences."""
         self._save_turn("tutor", clean_response)
         self.conversation.append({"role": "assistant", "content": clean_response})
 
-        return self._create_message(clean_response, media=media)
+        return self._create_message(clean_response, media=media, artifact_html=artifact_html)
 
     def _prepare_response(self, student_input: str) -> Optional[Dict]:
         """
@@ -1814,6 +1829,7 @@ IMPORTANT: Any question you ask must be complete and self-contained. Never say "
 
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media, gen_request = self._parse_media_signal(response)
+        clean_response, artifact_html = self._parse_artifact_signal(clean_response)
         media = [parsed_media] if parsed_media else []
 
         # On-the-fly image generation via safety pipeline
@@ -1841,7 +1857,7 @@ IMPORTANT: Any question you ask must be complete and self-contained. Never say "
         self.conversation.append({"role": "assistant", "content": clean_response})
         self._save_state()
 
-        return self._create_message(clean_response, media=media)
+        return self._create_message(clean_response, media=media, artifact_html=artifact_html)
 
     def _build_student_profile_block(self) -> str:
         """Build [STUDENT PROFILE] context block with mastery data (R11)."""
@@ -3812,12 +3828,54 @@ Keep it warm and supportive. 2-3 sentences + a question to start the review."""
 
         return None
 
-    def _create_message(self, content: str, media: List[Dict] = None) -> TutorMessage:
+    def _parse_artifact_signal(self, text: str) -> Tuple[str, Optional[str]]:
+        """Parse |||ARTIFACT:html|||...|||/ARTIFACT||| from LLM output.
+
+        Returns (clean_text, artifact_html_or_None).
+        """
+        pattern = r'\|\|\|ARTIFACT:html\|\|\|(.*?)\|\|\|/ARTIFACT\|\|\|'
+        match = re.search(pattern, text, re.DOTALL)
+        if match:
+            clean_text = text[:match.start()].rstrip() + text[match.end():].lstrip()
+            artifact_html = match.group(1).strip()
+            return clean_text, self._sanitize_artifact_html(artifact_html)
+        return text, None
+
+    _SAFE_TAGS = frozenset(
+        'div span table thead tbody tr th td p h1 h2 h3 h4 h5 h6 '
+        'ul ol li strong em b i br hr sup sub code pre '
+        'figure figcaption caption '
+        'svg path circle rect line text g polyline polygon'.split()
+    )
+    _SAFE_ATTRS = frozenset(
+        'class style id colspan rowspan width height viewBox '
+        'd cx cy r x y x1 y1 x2 y2 fill stroke stroke-width '
+        'font-size text-anchor transform points xmlns'.split()
+    )
+
+    def _sanitize_artifact_html(self, html: str) -> str:
+        """Defense-in-depth: strip dangerous tags/attributes from artifact HTML.
+
+        Primary security is the frontend sandboxed iframe; this is belt-and-suspenders.
+        """
+        # Strip script, iframe, object, embed, form, link tags entirely
+        html = re.sub(r'<\s*script[^>]*>.*?</\s*script\s*>', '', html, flags=re.DOTALL | re.IGNORECASE)
+        html = re.sub(r'<\s*iframe[^>]*>.*?</\s*iframe\s*>', '', html, flags=re.DOTALL | re.IGNORECASE)
+        html = re.sub(r'<\s*/?(object|embed|form|link|meta|base)\b[^>]*>', '', html, flags=re.IGNORECASE)
+        # Strip event handler attributes (onclick, onerror, onload, etc.)
+        html = re.sub(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', '', html, flags=re.IGNORECASE)
+        html = re.sub(r'\s+on\w+\s*=\s*\S+', '', html, flags=re.IGNORECASE)
+        # Strip javascript: URLs
+        html = re.sub(r'href\s*=\s*["\']javascript:[^"\']*["\']', '', html, flags=re.IGNORECASE)
+        return html.strip()
+
+    def _create_message(self, content: str, media: List[Dict] = None, artifact_html: str = None) -> TutorMessage:
         """Create a TutorMessage from content."""
-        # Defense-in-depth: strip legacy, MEDIA, and GENERATE signal tags
+        # Defense-in-depth: strip legacy, MEDIA, GENERATE, and ARTIFACT signal tags
         content = re.sub(r'\[SHOW_MEDIA\s*:[^\]]*\]', '', content, flags=re.IGNORECASE)
         content = re.sub(r'\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|', '', content)
         content = re.sub(r'\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|', '', content)
+        content = re.sub(r'\|\|\|ARTIFACT:html\|\|\|.*?\|\|\|/ARTIFACT\|\|\|', '', content, flags=re.DOTALL)
         content = re.sub(r' {2,}', ' ', content)
         content = re.sub(r'\n{3,}', '\n\n', content)
         content = content.strip()
@@ -3827,6 +3885,7 @@ Keep it warm and supportive. 2-3 sentences + a question to start the review."""
             content=content,
             phase=self._get_display_phase(),
             media=media or [],
+            artifact_html=artifact_html,
             expects_response=self.session_state != SessionState.COMPLETED,
             step_number=step_num,
             total_steps=total,

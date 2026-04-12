@@ -112,6 +112,7 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
         mock_result.streak_count = 0
         mock_result.practice_score = ""
         mock_result.milestone = None
+        mock_result.artifact_html = None
         mock_respond.return_value = mock_result
 
         session = self._create_session()

@@ -737,6 +737,8 @@ def chat_respond(request, session_id):
             "streak_count": result.streak_count,
             "practice_score": result.practice_score,
             "milestone": result.milestone,
+            # Rich HTML artifact (rendered in sandboxed iframe)
+            "artifact_html": getattr(result, 'artifact_html', None),
         })
     except Exception as e:
         logger.error(f"[respond] Failed: {e}", exc_info=True)
@@ -768,6 +770,7 @@ def chat_start_review(request, session_id):
         "is_complete": False,
         "step_number": result.step_number,
         "total_steps": result.total_steps,
+        "artifact_html": getattr(result, 'artifact_html', None),
     })
 
 

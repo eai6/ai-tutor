@@ -730,14 +730,54 @@ body {
 .modal-subtitle { color: #71717a; margin-bottom: 1.5rem; font-size: 0.9375rem; }
 
 /* Exit Ticket */
+.exit-progress {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #fff;
+    padding: 0.75rem 0;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #e4e4e7;
+}
+.exit-progress-text { font-size: 0.8125rem; font-weight: 600; color: #71717a; margin-bottom: 0.375rem; }
+.exit-progress-bar { height: 4px; background: #e4e4e7; border-radius: 999px; overflow: hidden; }
+.exit-progress-fill { height: 100%; background: #10b981; border-radius: 999px; transition: width 0.3s ease; }
+
+.exit-section { margin-bottom: 2rem; }
+.exit-section:last-of-type { margin-bottom: 1rem; }
+.exit-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+.section-letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    font-weight: 800;
+    font-size: 0.875rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+.section-letter-A { background: #3b82f6; }
+.section-letter-B { background: #ec4899; }
+.section-letter-C { background: #8b5cf6; }
+.section-letter-D { background: #059669; }
+.section-name { font-size: 1rem; font-weight: 700; color: #18181b; }
+.section-instruction { font-size: 0.8125rem; color: #71717a; font-style: italic; margin: 0.25rem 0 1rem 2.75rem; }
+
 .exit-question {
     margin-bottom: 1.5rem;
     padding-bottom: 1.5rem;
-    border-bottom: 1px solid #e4e4e7;
+    border-bottom: 1px solid #f4f4f5;
 }
-.exit-question:last-of-type { border-bottom: none; }
+.exit-question:last-of-type { border-bottom: none; padding-bottom: 0; }
 .question-num { font-size: 0.8125rem; font-weight: 700; color: #71717a; margin-bottom: 0.375rem; }
-.question-text { font-weight: 500; margin-bottom: 0.75rem; }
+.question-text { font-weight: 500; margin-bottom: 0.75rem; line-height: 1.5; }
 
 .options { display: flex; flex-direction: column; gap: 0.375rem; }
 .option {
@@ -865,6 +905,24 @@ body {
     border-radius: 0.375rem;
     font-size: 0.875rem;
 }
+
+/* ── Rich HTML Artifact Rendering ── */
+.artifact-inline {
+    margin: 0.75rem 0 0.25rem;
+    border: 1px solid #e4e4e7;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #fff;
+}
+.artifact-inline iframe { display: block; }
+.data-description-rich {
+    margin-bottom: 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #f8fafc;
+}
+.data-description-rich iframe { display: block; }
 
 .submit-btn {
     width: 100%;
@@ -1058,6 +1116,17 @@ body {
     .artifact-panel { display: none !important; }
     .media-panel-trigger { max-width: 100%; border: none; }
     .media-panel-trigger img { max-width: 100%; }
+    /* Exit ticket mobile */
+    .modal { padding: 0; }
+    .modal-content.exit-ticket { border-radius: 0; max-width: 100%; max-height: 100vh; padding: 1rem; }
+    .option { min-height: 48px; padding: 0.75rem 1rem; font-size: 1rem; }
+    .exit-blank-input { width: 100%; max-width: 160px; font-size: 16px; padding: 0.5rem; }
+    .matching-row { flex-direction: column; align-items: stretch; gap: 0.375rem; }
+    .matching-arrow { display: none; }
+    .matching-left { text-align: center; }
+    .matching-select { width: 100%; font-size: 16px; padding: 0.625rem; }
+    .exit-textarea { font-size: 16px; min-height: 100px; }
+    .section-instruction { margin-left: 0; }
 }
 @media (max-width: 640px) {
     .chat-messages { padding: 1rem 0.75rem; }
@@ -1069,6 +1138,7 @@ body {
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 {% if is_math_lesson %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.css" integrity="sha384-/L6i+LN3dyoaK2jYG5ZLh5u13cjdsPDcFOSNJeFBFa/KgVXR5kOfTdiN3ft1uMAq" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.js" integrity="sha384-H6s1ZrH2CKpFpqR680poRdStIRJGXty7fSkxAcIfxwl9iu6A4BOPtTk7vQ58Ovio" crossorigin="anonymous"></script>
@@ -1079,6 +1149,17 @@ const lessonId = {{ lesson.id }};
 let sessionId = null;
 let exitTicketData = null;
 let exitAnswers = {};
+
+// Auto-resize sandboxed artifact iframes via postMessage
+window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'resize' && e.data.height) {
+        document.querySelectorAll('iframe[sandbox]').forEach(iframe => {
+            if (iframe.contentWindow === e.source) {
+                iframe.style.height = Math.min(e.data.height + 4, 600) + 'px';
+            }
+        });
+    }
+});
 
 const chatMessages = document.getElementById('chat-messages');
 const typing = document.getElementById('typing');
@@ -1139,8 +1220,18 @@ function sanitizeContent(text) {
         .replace(/\[SHOW_MEDIA\s*:[^\]]*\]/gi, '')
         .replace(/\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|/g, '')
         .replace(/\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|/g, '')
+        .replace(/\|\|\|ARTIFACT:html\|\|\|[\s\S]*?\|\|\|\/ARTIFACT\|\|\|/g, '')
         .replace(/ {2,}/g, ' ')
         .trim();
+}
+
+function renderArtifactIframe(html) {
+    if (!html) return '';
+    const clean = window.DOMPurify ? DOMPurify.sanitize(html) : html;
+    const resizeScript = '<script>new ResizeObserver(()=>{parent.postMessage({type:"resize",height:document.body.scrollHeight},"*")}).observe(document.body)<\/script>';
+    const wrappedHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;color:#18181b}table{width:100%;border-collapse:collapse;margin:8px 0}th,td{padding:8px 12px;border:1px solid #e4e4e7;text-align:left}th{background:#f4f4f5;font-weight:600}tr:nth-child(even){background:#fafafa}svg{max-width:100%}</style></head><body>${clean}${resizeScript}</body></html>`;
+    const escaped = wrappedHtml.replace(/"/g, '&quot;');
+    return `<div class="artifact-inline"><iframe sandbox="allow-scripts" srcdoc="${escaped}" style="width:100%;min-height:200px;border:none;border-radius:0.5rem;"></iframe></div>`;
 }
 
 function openArtifactPanel(mediaItem) {
@@ -1287,8 +1378,8 @@ function handleResponse(data) {
     updateStepProgress(data);
 
     // Add tutor message
-    addMessage('tutor', data.message, data.media);
-    
+    addMessage('tutor', data.message, data.media, data.artifact_html);
+
     // Handle exit ticket
     if (data.show_exit_ticket && data.exit_ticket) {
         exitTicketData = data.exit_ticket;
@@ -1306,7 +1397,7 @@ function handleResponse(data) {
     userInput.focus();
 }
 
-function addMessage(role, content, media = []) {
+function addMessage(role, content, media = [], artifactHtml = null) {
     const div = document.createElement('div');
     div.className = `message ${role}`;
 
@@ -1318,16 +1409,26 @@ function addMessage(role, content, media = []) {
         for (const m of media) {
             if (m.type === 'image' || m.type === 'diagram' || m.type === 'chart' || m.type === 'illustration') {
                 if (isDesktop() && openArtifactPanel(m)) {
-                    // Desktop: small clickable thumbnail + opened in artifact panel
                     mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
                 } else {
-                    // Mobile or panel failed: full inline image (tap to open lightbox)
                     mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}" class="inline-media-img" data-caption="${m.caption || ''}" style="cursor:pointer">`;
                     if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
                 }
             }
         }
         mediaHtml += '</div>';
+    }
+
+    // Rich HTML artifact rendering (sandboxed iframe)
+    let artifactBlock = '';
+    if (artifactHtml) {
+        if (isDesktop()) {
+            artifactTitle.textContent = 'Interactive Content';
+            artifactBody.innerHTML = renderArtifactIframe(artifactHtml);
+            artifactPanel.classList.add('open');
+        } else {
+            artifactBlock = renderArtifactIframe(artifactHtml);
+        }
     }
 
     const replayBtn = role === 'tutor'
@@ -1337,7 +1438,7 @@ function addMessage(role, content, media = []) {
     div.innerHTML = `
         <div class="avatar">${avatar}</div>
         <div class="bubble-wrapper">
-            <div class="bubble">${marked.parse(sanitizeContent(content))}${mediaHtml}</div>
+            <div class="bubble">${marked.parse(sanitizeContent(content))}${mediaHtml}${artifactBlock}</div>
             ${replayBtn}
         </div>
     `;
@@ -1418,7 +1519,7 @@ async function sendMessage() {
         stopCurrentAudio();
 
         // Display tutor response
-        addMessage('tutor', data.message, data.media || []);
+        addMessage('tutor', data.message, data.media || [], data.artifact_html);
 
         // In-conversation gamification
         if (data.is_correct) showCorrectFeedback(data.streak_count);
@@ -1565,66 +1666,117 @@ function updateStreamingMessage(div, content, media = []) {
     scrollToBottom();
 }
 
+const EXIT_SECTIONS = [
+    { key: 'mcq', letter: 'A', name: 'Multiple Choice', instruction: 'Choose the best answer for each question.' },
+    { key: 'fill_in_blank', letter: 'B', name: 'Fill in the Blanks', instruction: 'Complete each sentence by filling in the missing word(s).' },
+    { key: 'matching', letter: 'C', name: 'Matching', instruction: 'Match each item on the left with its correct pair on the right.' },
+    { key: 'written', letter: 'D', name: 'Written Response', instruction: 'Write your answer in the space provided.' },
+];
+
 function showExitTicket() {
     if (!exitTicketData) return;
-
     document.getElementById('input-area').style.display = 'none';
 
     const container = document.getElementById('exit-questions');
     container.innerHTML = '';
 
-    exitTicketData.questions.forEach((q, i) => {
-        const div = document.createElement('div');
-        div.className = 'exit-question';
+    // Progress indicator
+    const totalQ = exitTicketData.questions.length;
+    container.innerHTML = `<div class="exit-progress">
+        <div class="exit-progress-text" id="exit-progress-text">0 of ${totalQ} answered</div>
+        <div class="exit-progress-bar"><div class="exit-progress-fill" id="exit-progress-fill" style="width:0%"></div></div>
+    </div>`;
+
+    // Group questions by section (keep original flat index for grading)
+    const buckets = { mcq: [], fill_in_blank: [], matching: [], written: [] };
+    exitTicketData.questions.forEach((q, origIdx) => {
         const qType = q.question_type || 'mcq';
-        let bodyHTML = '';
+        const bucket = (qType === 'short_answer' || qType === 'data_interpretation') ? 'written' : qType;
+        if (buckets[bucket]) buckets[bucket].push({ q, origIdx });
+        else buckets.mcq.push({ q, origIdx }); // fallback
+    });
 
-        if (qType === 'mcq') {
-            bodyHTML = `<div class="options" data-q="${i}">
-                ${(q.options || []).map(opt => `
-                    <div class="option" data-letter="${opt.letter}" onclick="selectOption(${i}, '${opt.letter}', this)">
-                        <span class="letter">${opt.letter}</span>
-                        <span>${opt.text}</span>
-                    </div>
-                `).join('')}
-            </div>`;
-        } else if (qType === 'fill_in_blank') {
-            const ad = q.answer_data || {};
-            const tpl = (ad.text_template || '').replace(/___/g, () =>
-                `<input type="text" class="exit-blank-input" data-q="${i}" data-blank-idx placeholder="..." oninput="collectBlankAnswer(${i})">`
-            );
-            bodyHTML = `<div class="fill-blank-body" data-q="${i}">${tpl}</div>`;
-        } else if (qType === 'matching') {
-            const ad = q.answer_data || {};
-            const pairs = ad.pairs || [];
-            const allRights = pairs.map(p => p.right).concat(ad.distractor_rights || []);
-            allRights.sort(() => Math.random() - 0.5);
-            const optionsHTML = allRights.map(r => `<option value="${r}">${r}</option>`).join('');
-            bodyHTML = `<div class="matching-body" data-q="${i}">
-                ${pairs.map((p, pi) => `
-                    <div class="matching-row">
-                        <span class="matching-left">${p.left}</span>
-                        <span class="matching-arrow">&rarr;</span>
-                        <select class="matching-select" data-q="${i}" data-pair="${pi}" onchange="collectMatchingAnswer(${i})">
-                            <option value="">Select...</option>
-                            ${optionsHTML}
-                        </select>
-                    </div>
-                `).join('')}
-            </div>`;
-        } else if (qType === 'short_answer' || qType === 'data_interpretation') {
-            const ad = q.answer_data || {};
-            const dataDesc = ad.data_description ? `<div class="data-description">${ad.data_description}</div>` : '';
-            bodyHTML = `${dataDesc}
-            <textarea class="exit-textarea" data-q="${i}" rows="3" placeholder="Type your answer..." oninput="collectTextAnswer(${i}, this)"></textarea>`;
-        }
+    // Render sections
+    EXIT_SECTIONS.forEach(sec => {
+        const items = buckets[sec.key];
+        if (!items || items.length === 0) return;
 
-        div.innerHTML = `
-            <div class="question-num">Question ${i + 1} <span class="q-type-badge q-type-${qType}">${qType.replace(/_/g, ' ')}</span></div>
-            <div class="question-text">${q.question}</div>
-            ${bodyHTML}
+        const sectionDiv = document.createElement('div');
+        sectionDiv.className = 'exit-section';
+        sectionDiv.innerHTML = `
+            <div class="exit-section-header">
+                <span class="section-letter section-letter-${sec.letter}">${sec.letter}</span>
+                <span class="section-name">${sec.name}</span>
+            </div>
+            <p class="section-instruction">${sec.instruction}</p>
         `;
-        container.appendChild(div);
+
+        items.forEach((item, secIdx) => {
+            const { q, origIdx } = item;
+            const qType = q.question_type || 'mcq';
+            const qLabel = `${sec.letter}${secIdx + 1}`;
+            const div = document.createElement('div');
+            div.className = 'exit-question';
+            div.setAttribute('data-original-q', origIdx);
+
+            let bodyHTML = '';
+            if (qType === 'mcq') {
+                bodyHTML = `<div class="options" data-q="${origIdx}">
+                    ${(q.options || []).map(opt => `
+                        <div class="option" data-letter="${opt.letter}" onclick="selectOption(${origIdx}, '${opt.letter}', this)">
+                            <span class="letter">${opt.letter}</span>
+                            <span>${opt.text}</span>
+                        </div>
+                    `).join('')}
+                </div>`;
+            } else if (qType === 'fill_in_blank') {
+                const ad = q.answer_data || {};
+                const tpl = (ad.text_template || '').replace(/___/g, () =>
+                    `<input type="text" class="exit-blank-input" data-q="${origIdx}" placeholder="..." oninput="collectBlankAnswer(${origIdx})">`
+                );
+                bodyHTML = `<div class="fill-blank-body" data-q="${origIdx}">${tpl}</div>`;
+            } else if (qType === 'matching') {
+                const ad = q.answer_data || {};
+                const pairs = ad.pairs || [];
+                const allRights = pairs.map(p => p.right).concat(ad.distractor_rights || []);
+                allRights.sort(() => Math.random() - 0.5);
+                const optionsHTML = allRights.map(r => `<option value="${r}">${r}</option>`).join('');
+                bodyHTML = `<div class="matching-body" data-q="${origIdx}">
+                    ${pairs.map((p, pi) => `
+                        <div class="matching-row">
+                            <span class="matching-left">${p.left}</span>
+                            <span class="matching-arrow">&rarr;</span>
+                            <select class="matching-select" data-q="${origIdx}" data-pair="${pi}" onchange="collectMatchingAnswer(${origIdx})">
+                                <option value="">Select...</option>
+                                ${optionsHTML}
+                            </select>
+                        </div>
+                    `).join('')}
+                </div>`;
+            } else if (qType === 'short_answer' || qType === 'data_interpretation') {
+                const ad = q.answer_data || {};
+                let dataDesc = '';
+                if (ad.data_description) {
+                    if (/<[a-z][\s\S]*>/i.test(ad.data_description) && window.DOMPurify) {
+                        const clean = DOMPurify.sanitize(ad.data_description);
+                        dataDesc = `<div class="data-description-rich"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:150px;border:none;"></iframe></div>`;
+                    } else {
+                        dataDesc = `<div class="data-description">${ad.data_description}</div>`;
+                    }
+                }
+                bodyHTML = `${dataDesc}
+                <textarea class="exit-textarea" data-q="${origIdx}" rows="3" placeholder="Type your answer..." oninput="collectTextAnswer(${origIdx}, this)"></textarea>`;
+            }
+
+            div.innerHTML = `
+                <div class="question-num">${qLabel}</div>
+                <div class="question-text">${q.question}</div>
+                ${bodyHTML}
+            `;
+            sectionDiv.appendChild(div);
+        });
+
+        container.appendChild(sectionDiv);
     });
 
     document.getElementById('exit-modal').style.display = 'flex';
@@ -1658,6 +1810,9 @@ function collectMatchingAnswer(qIndex) {
 
 function collectTextAnswer(qIndex, el) {
     exitAnswers[qIndex] = el.value.trim();
+    // Auto-grow textarea
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
     checkExitSubmitReady();
 }
 
@@ -1673,6 +1828,11 @@ function checkExitSubmitReady() {
         }
     }
     document.getElementById('submit-exit').disabled = answered < total;
+    // Update progress indicator
+    const progText = document.getElementById('exit-progress-text');
+    const progFill = document.getElementById('exit-progress-fill');
+    if (progText) progText.textContent = `${answered} of ${total} answered`;
+    if (progFill) progFill.style.width = `${(answered / total) * 100}%`;
 }
 
 async function submitExitTicket() {
@@ -1717,8 +1877,11 @@ async function submitExitTicket() {
 function showExitResults(results) {
     results.forEach(r => {
         const qType = r.question_type || 'mcq';
+        const qDiv = document.querySelector(`.exit-question[data-original-q="${r.index}"]`);
+        if (!qDiv) return;
+
         if (qType === 'mcq') {
-            const options = document.querySelector(`[data-q="${r.index}"].options`);
+            const options = qDiv.querySelector('.options');
             if (!options) return;
             options.querySelectorAll('.option').forEach(opt => {
                 const letter = opt.dataset.letter;
@@ -1726,9 +1889,6 @@ function showExitResults(results) {
                 else if (letter === r.selected && !r.is_correct) opt.classList.add('incorrect');
             });
         } else {
-            // For non-MCQ: show a result indicator on the question container
-            const qDiv = document.querySelectorAll('.exit-question')[r.index];
-            if (!qDiv) return;
             const indicator = document.createElement('div');
             indicator.className = r.is_correct ? 'exit-result-correct' : 'exit-result-incorrect';
             indicator.textContent = r.is_correct ? 'Correct!' : `Incorrect. ${r.explanation || ''}`;
