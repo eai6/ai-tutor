@@ -33,6 +33,10 @@ class LessonSchema(BaseModel):
     title: str = Field(description="Short lesson title (3-8 words)")
     objective: str = Field(description="Students will be able to [specific, measurable outcome]")
     key_concepts: List[str] = Field(default_factory=list, description="Key concepts covered")
+    enabling_objectives: List[str] = Field(
+        default_factory=list,
+        description="Specific enabling objectives (granular teaching steps) for this lesson"
+    )
 
 
 class UnitSchema(BaseModel):
@@ -40,6 +44,14 @@ class UnitSchema(BaseModel):
     title: str = Field(description="Clear unit title")
     description: str = Field(default="", description="Brief description of what this unit covers")
     grade_level: str = Field(default="", description="Target grade level(s), e.g. 'S1' or 'S1,S2'")
+    terminal_objectives: List[str] = Field(
+        default_factory=list,
+        description="Unit-level terminal objectives — what students must achieve by end of unit"
+    )
+    enabling_objectives: List[str] = Field(
+        default_factory=list,
+        description="Unit-level enabling objectives — all granular teaching steps"
+    )
     lessons: List[LessonSchema] = Field(description="Lessons in this unit")
 
 
@@ -271,6 +283,17 @@ REQUIREMENTS:
 5. Each unit MUST include a "grade_level" field (e.g. "S1", "S2") indicating the target grade
 6. Group lessons by grade level first, then by topic within each grade
 7. Unit titles should include the grade prefix (e.g. "S1: Map Skills", "S2: Algebra")
+
+OBJECTIVES EXTRACTION (CRITICAL):
+8. Each unit MUST have "terminal_objectives" — broad outcomes students must achieve by end of unit.
+   Extract these from the curriculum document (look for numbered objectives, learning outcomes, or
+   "students should be able to" statements at the unit/topic level).
+9. Each unit MUST have "enabling_objectives" — the granular, specific teaching steps from the
+   Teaching/Learning Scheme table. These are more detailed than terminal objectives (typically
+   20-40 per unit). Look for action verbs: define, state, explain, describe, identify, compare.
+10. Each lesson MUST have "enabling_objectives" — the specific enabling objectives this lesson
+    covers (a subset of the unit's enabling objectives). Each enabling objective should appear
+    in exactly one lesson.
 
 For {subject}, organize by these strands where applicable:
 - Mathematics: Number, Algebra, Geometry, Measurement, Data/Statistics
@@ -968,6 +991,8 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                     'description': unit_data.get('description', ''),
                     'order_index': unit_idx,
                     'grade_level': unit_data.get('grade_level', ''),
+                    'terminal_objectives': unit_data.get('terminal_objectives', []),
+                    'enabling_objectives': unit_data.get('enabling_objectives', []),
                 }
             )
             
@@ -985,6 +1010,7 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                         'order_index': lesson_idx,
                         'estimated_minutes': 40,
                         'is_published': False,
+                        'enabling_objectives': lesson_data.get('enabling_objectives', []),
                         'metadata': {
                             'key_concepts': lesson_data.get('key_concepts', []),
                             'from_curriculum_upload': upload.id,

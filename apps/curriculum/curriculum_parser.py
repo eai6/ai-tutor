@@ -834,10 +834,14 @@ Extract the curriculum structure as JSON with this format:
     "units": [
         {{
             "title": "Unit title",
+            "grade_level": "S2",
+            "terminal_objectives": ["Broad outcome 1", "Broad outcome 2"],
+            "enabling_objectives": ["Define term X", "State that Y", "Explain why Z"],
             "lessons": [
                 {{
                     "title": "Lesson title (short, clear name)",
-                    "objective": "What students will learn/be able to do"
+                    "objective": "What students will learn/be able to do",
+                    "enabling_objectives": ["Define term X", "State that Y"]
                 }}
             ]
         }}
@@ -849,9 +853,13 @@ GUIDELINES:
 2. Each unit should have 3-15 lessons
 3. Each lesson should cover ONE main concept or skill
 4. Lesson titles should be clear and student-friendly (not "Objective 1.2")
-5. If you find terminal objectives or learning outcomes, convert each into a lesson
-6. If the document has numbered sections, use those as units
-7. Extract as many lessons as you can find - don't skip content
+5. If you find terminal objectives or learning outcomes, extract them as unit terminal_objectives
+6. Extract enabling objectives (granular teaching steps with action verbs: define, state,
+   explain, describe, identify, compare) and assign each to the relevant lesson
+7. If the document has numbered sections, use those as units
+8. Extract as many lessons as you can find - don't skip content
+9. Each unit MUST have a grade_level field (e.g. "S1", "S2", "S3") based on the document content
+10. If the document covers multiple grade levels, create separate units per grade
 
 Return ONLY valid JSON, no explanation or markdown."""
 
@@ -883,21 +891,24 @@ Return ONLY valid JSON, no explanation or markdown."""
                 lessons.append({
                     "title": lesson_data.get('title', f'Lesson {j+1}'),
                     "objective": lesson_data.get('objective', ''),
-                    "enabling_objectives": [],
+                    "enabling_objectives": lesson_data.get('enabling_objectives', []),
                     "teaching_strategies": ["Discussion", "Practice", "Examples"],
                     "resources": ["Textbook", "Whiteboard"],
                     "assessment_methods": ["Written work", "Oral questioning"],
                     "estimated_minutes": 40,
                     "order": j + 1
                 })
-            
+
             if lessons:  # Only add units that have lessons
                 units.append({
                     "number": i + 1,
                     "title": unit_data.get('title', f'Unit {i+1}'),
+                    "grade_level": unit_data.get('grade_level', grade_level),
                     "duration": "Multiple periods",
                     "introduction": f"{unit_data.get('title', '')} for {subject}",
-                    "terminal_objectives": [l['objective'] for l in lessons if l['objective']],
+                    "terminal_objectives": unit_data.get('terminal_objectives',
+                        [l['objective'] for l in lessons if l['objective']]),
+                    "enabling_objectives": unit_data.get('enabling_objectives', []),
                     "lessons": lessons
                 })
         

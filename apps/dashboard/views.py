@@ -2085,6 +2085,16 @@ def lesson_publish(request, lesson_id):
         lookup['unit__course__institution'] = institution
     lesson = get_object_or_404(Lesson, **lookup)
     
+    # Gate: tier_3/tier_4 content requires teacher approval before publishing
+    if not lesson.is_published and lesson.content_quality in ('tier_3', 'tier_4'):
+        if not lesson.teacher_approved:
+            messages.warning(
+                request,
+                f"This lesson has {lesson.get_content_quality_display()} content. "
+                f"Please review and approve it before publishing."
+            )
+            return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
     # Toggle publish status
     lesson.is_published = not lesson.is_published
     lesson.save()
@@ -2098,7 +2108,28 @@ def lesson_publish(request, lesson_id):
 
     status = "published" if lesson.is_published else "unpublished"
     messages.success(request, f"Lesson '{lesson.title}' {status}.")
-    
+
+    return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
+
+@teacher_required
+def lesson_approve(request, lesson_id):
+    """Approve lesson content for student access (required for tier_3/tier_4)."""
+    from apps.curriculum.models import Lesson
+
+    institution = request.staff_ctx['institution']
+
+    lookup = {'id': lesson_id}
+    if institution is not None:
+        lookup['unit__course__institution'] = institution
+    lesson = get_object_or_404(Lesson, **lookup)
+
+    lesson.teacher_approved = True
+    lesson.teacher_approved_at = timezone.now()
+    lesson.teacher_approved_by = request.user
+    lesson.save(update_fields=['teacher_approved', 'teacher_approved_at', 'teacher_approved_by'])
+
+    messages.success(request, f"Lesson '{lesson.title}' approved. You can now publish it.")
     return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
 
 

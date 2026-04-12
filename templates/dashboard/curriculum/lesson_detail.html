@@ -173,10 +173,31 @@
                     {% else %}
                         <span class="lesson-meta-item" style="color: var(--warning);">Draft</span>
                     {% endif %}
+                    <!-- Content Quality Tier Badge -->
+                    {% if lesson.content_quality == 'tier_1' %}
+                        <span class="lesson-meta-item" style="background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600;">Tier 1 - Fully Resourced</span>
+                    {% elif lesson.content_quality == 'tier_2' %}
+                        <span class="lesson-meta-item" style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600;">Tier 2 - Syllabus + Exam</span>
+                    {% elif lesson.content_quality == 'tier_3' %}
+                        <span class="lesson-meta-item" style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600;">Tier 3 - Syllabus Only</span>
+                    {% elif lesson.content_quality == 'tier_4' %}
+                        <span class="lesson-meta-item" style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600;">Tier 4 - Framework Only</span>
+                    {% endif %}
+                    {% if lesson.teacher_approved %}
+                        <span class="lesson-meta-item" style="color: var(--success);">✓ Approved</span>
+                    {% endif %}
                 </div>
             </div>
             <div class="action-buttons">
                 {% if not lesson.is_published %}
+                    {% if lesson.content_quality in 'tier_3,tier_4' and not lesson.teacher_approved %}
+                    <form method="post" action="{% url 'dashboard:lesson_approve' lesson.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm" style="background: #f59e0b; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-weight: 600; cursor: pointer;">
+                            Approve Content
+                        </button>
+                    </form>
+                    {% endif %}
                 <form method="post" action="{% url 'dashboard:lesson_publish' lesson.id %}" style="display: inline;">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="publish">
