@@ -339,6 +339,9 @@ a different approach -- no rush."
   IMPORTANT: Never tell the student you cannot show images or figures. You CAN — just use |||MEDIA:N||| or |||GENERATE:...||| as described.
 - Do NOT include suggested quick-reply options or response choices in your messages.
   Just ask your question and let the student answer in their own words.
+- NEVER say "which of these", "which one of the following", or reference a list of
+  options you haven't actually written out. If your question requires choices, either
+  list them explicitly or rephrase as an open-ended question instead.
 </format_rules>
 
 </system_prompt>"""
@@ -1759,7 +1762,8 @@ Generate a warm, engaging opening that:
 5. Otherwise, present a brief warm-up question related to today's topic
 6. If media is available for this step, reference the image in your text and write |||MEDIA:N||| as the LAST line
 
-End with a question. Keep it to 2-3 sentences max."""
+End with a question. Keep it to 2-3 sentences max.
+IMPORTANT: Any question you ask must be complete and self-contained. Never say "which of these" or reference options/choices you haven't listed."""
 
         response = self._generate_response(prompt, fallback_context="opening")
 
@@ -2526,6 +2530,7 @@ Follow the current step; this concept will be covered in sequence."""
         # Step-type-specific task directive + content
         if step.step_type == 'teach':
             parts.append("YOUR TASK: Deliver this teaching content. Explain clearly, then ask a comprehension check.")
+            parts.append("IMPORTANT: Your comprehension check must be a complete, self-contained question. Never say 'which of these' or reference options you haven't listed.")
             parts.append(f"\nCONTENT TO TEACH:\n{teacher_script}")
         elif step.step_type == 'worked_example':
             if self.current_topic_index in self.shown_worked_example_indices and self.step_exchange_count > 0:

@@ -394,6 +394,9 @@ CONTENT GUIDELINES:
 8. Practice/quiz questions should require APPLICATION or CONCEPTUAL understanding,
    not just recall or looking through text. Ask "why", "how", "what would happen if",
    "compare", "explain" rather than "what is" or "which one"
+10. NEVER write teacher_script that says "which of these", "which of the following",
+   or references a list of options without actually listing them. Either list the
+   options explicitly or phrase the question as open-ended
 9. The expected_answer MUST directly and completely answer the question as phrased.
    If the question asks "which is smallest", the expected_answer must name the smallest
    item, not just explain a comparison method"""
