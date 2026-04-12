@@ -208,6 +208,9 @@ class LessonContentGenerator:
         if save_to_db:
             self._save_steps_to_db(lesson, steps_data['steps'])
 
+            # Auto-generate exit ticket after content generation
+            exit_ticket_result = self._generate_exit_ticket(lesson)
+
         return {
             'success': True,
             'lesson_id': lesson.id,
@@ -215,6 +218,7 @@ class LessonContentGenerator:
             'steps_generated': len(steps_data.get('steps', [])),
             'steps': steps_data.get('steps', []),
             'lesson_summary': steps_data.get('lesson_summary', {}),
+            'exit_ticket_generated': exit_ticket_result.get('success', False) if save_to_db else False,
         }
 
     def _get_curriculum_context(self, lesson) -> Dict:
@@ -538,6 +542,151 @@ CONTENT GUIDELINES:
             )
 
             logger.debug(f"{'Created' if created else 'Updated'} step {step.order_index}: {step.step_type}")
+
+    def _generate_exit_ticket(self, lesson) -> Dict:
+        """Generate a mixed-format exit ticket for a lesson after content generation."""
+        try:
+            result = generate_exit_ticket_for_lesson(lesson, self.institution_id)
+            if result.get('success'):
+                print(f"[ContentGen] [{lesson.title}] Exit ticket: {result['questions_created']} questions", flush=True)
+            else:
+                print(f"[ContentGen] [{lesson.title}] Exit ticket failed: {result.get('error')}", flush=True)
+            return result
+        except Exception as e:
+            logger.warning(f"Exit ticket generation failed for {lesson.title}: {e}")
+            return {'success': False, 'error': str(e)}
+
+
+def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
+    """
+    Generate a mixed-format exit ticket question bank for a lesson.
+
+    Standalone function usable from both the content pipeline and management commands.
+    Generates 35 questions (20 MCQ + 5 fill-in-blank + 4 matching + 3 short-answer +
+    3 data-interpretation) and saves them to the database.
+    """
+    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+    from apps.tutoring.management.commands.generate_exit_tickets import EXIT_TICKET_PROMPT
+
+    if institution_id is None:
+        from apps.accounts.models import Institution
+        institution_id = lesson.unit.course.institution_id or Institution.get_global().id
+
+    # Skip if already has exit ticket with enough questions
+    existing = ExitTicket.objects.filter(lesson=lesson).first()
+    if existing and existing.questions.count() >= 10:
+        return {'success': True, 'skipped': True, 'questions_created': 0}
+
+    # Get LLM client
+    model_config = ModelConfig.get_for('exit_tickets') or ModelConfig.get_for('tutoring')
+    if not model_config:
+        return {'success': False, 'error': 'No LLM model configured'}
+    llm_client = get_llm_client(model_config)
+
+    subject = lesson.unit.course.title if lesson.unit and lesson.unit.course else "General"
+
+    # KB context for grounding
+    exam_context = ""
+    try:
+        from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+        kb = CurriculumKnowledgeBase(institution_id=institution_id)
+        exam_questions = kb.query_for_exit_ticket_generation(
+            lesson_title=lesson.title,
+            lesson_objective=lesson.objective or '',
+            subject=subject,
+            grade_level=lesson.unit.course.grade_level or '',
+            n_results=5,
+        )
+        exam_context = kb.format_exam_questions_for_prompt(exam_questions)
+        if exam_context:
+            exam_context = "\n\n" + exam_context + "\n"
+    except Exception as e:
+        logger.warning(f"KB query failed for exit ticket: {e}")
+
+    # Seychelles context
+    seychelles_context = ""
+    try:
+        from apps.curriculum.models import SeychellesContext
+        entries = SeychellesContext.objects.filter(is_active=True)
+        # Filter by subject — use Python-level check for SQLite compat
+        entries = [e for e in entries.values('title', 'content', 'subject_tags')
+                   if subject.lower() in (e.get('subject_tags') or [])][:8]
+        if entries:
+            lines = "\n".join(f"- {e['title']}: {e['content']}" for e in entries)
+            seychelles_context = f"\nSEYCHELLES CONTEXT (use these real facts):\n{lines}\n"
+    except Exception:
+        pass
+
+    prompt = EXIT_TICKET_PROMPT.format(
+        lesson_title=lesson.title,
+        lesson_objective=lesson.objective or '',
+        subject=subject,
+        exam_context=exam_context,
+        seychelles_context=seychelles_context,
+    )
+
+    from apps.llm.prompts import get_prompt_or_default
+    exit_sys_prompt = get_prompt_or_default(
+        institution_id, 'exit_ticket_prompt',
+        "You are an expert educational assessment designer.",
+        json_required=True,
+    )
+
+    try:
+        messages = [{"role": "user", "content": prompt}]
+        response = llm_client.generate(messages, system_prompt=exit_sys_prompt, max_tokens=16000)
+
+        from apps.llm.json_utils import parse_llm_json
+        questions = parse_llm_json(response.content, expect_array=True)
+
+        if not questions or not isinstance(questions, list) or len(questions) < 10:
+            return {'success': False, 'error': f'Insufficient questions: {len(questions) if questions else 0}'}
+
+        questions = questions[:35]
+
+        # Save to database
+        from django.db import transaction
+        with transaction.atomic():
+            if existing:
+                existing.delete()
+
+            exit_ticket = ExitTicket.objects.create(
+                lesson=lesson,
+                passing_score=8,
+                time_limit_minutes=15,
+                instructions=f"Answer 10 questions about {lesson.title}. You need 8 correct to pass.",
+            )
+
+            for i, q in enumerate(questions):
+                q_type = q.get('question_type', 'mcq')
+                kwargs = {
+                    'exit_ticket': exit_ticket,
+                    'question_type': q_type,
+                    'question_text': q.get('question', ''),
+                    'explanation': q.get('explanation', ''),
+                    'concept_tag': q.get('concept_tag', ''),
+                    'difficulty': q.get('difficulty', 'medium'),
+                    'order_index': i,
+                }
+                if q_type == 'mcq':
+                    kwargs.update({
+                        'option_a': q.get('option_a', ''),
+                        'option_b': q.get('option_b', ''),
+                        'option_c': q.get('option_c', ''),
+                        'option_d': q.get('option_d', ''),
+                        'correct_answer': q.get('correct', ''),
+                    })
+                else:
+                    kwargs['answer_data'] = q.get('answer_data', {})
+                ExitTicketQuestion.objects.create(**kwargs)
+
+        return {'success': True, 'questions_created': len(questions)}
+
+    except Exception as e:
+        logger.error(f"Exit ticket generation failed for {lesson.title}: {e}")
+        return {'success': False, 'error': str(e)}
 
 
 # ============================================================================

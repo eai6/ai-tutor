@@ -7,14 +7,10 @@ Usage:
     python manage.py generate_exit_tickets --all
 """
 
-import json
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
 
 from apps.curriculum.models import Lesson, Course
-from apps.tutoring.models import ExitTicket, ExitTicketQuestion
-from apps.llm.client import get_llm_client
-from apps.llm.models import ModelConfig
+from apps.tutoring.models import ExitTicket
 
 
 EXIT_TICKET_PROMPT = """Generate a mixed-format question bank (35 questions) for a summative assessment (exit ticket) on this lesson.
@@ -92,13 +88,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # Get LLM client - use first active model config
-        model_config = ModelConfig.get_for('tutoring')
-        if not model_config:
-            raise CommandError("No active model config found. Create one in admin.")
-        
-        llm_client = get_llm_client(model_config)
-        
         # Determine which lessons to process
         if options['lesson']:
             lessons = Lesson.objects.filter(id=options['lesson'])
@@ -128,124 +117,35 @@ class Command(BaseCommand):
                 continue
             
             try:
-                questions = self._generate_questions(llm_client, lesson)
-                
                 if options['dry_run']:
-                    self.stdout.write(self.style.SUCCESS(f"  ✓ Would generate {len(questions)} questions"))
-                    for i, q in enumerate(questions[:3]):
-                        self.stdout.write(f"    Q{i+1}: {q['question'][:60]}...")
+                    self.stdout.write(self.style.SUCCESS(f"  ✓ Would generate exit ticket"))
                     continue
-                
-                # Save to database
-                with transaction.atomic():
-                    # Delete existing if overwriting
-                    if existing:
-                        existing.delete()
-                    
-                    # Create exit ticket
-                    exit_ticket = ExitTicket.objects.create(
-                        lesson=lesson,
-                        passing_score=8,
-                        time_limit_minutes=15,
-                        instructions=f"Answer 10 questions about {lesson.title}. You need 8 correct to pass."
-                    )
 
-                    # Create questions (up to 35 in the bank, 10 selected per session)
-                    for i, q in enumerate(questions):
-                        q_type = q.get('question_type', 'mcq')
-                        kwargs = {
-                            'exit_ticket': exit_ticket,
-                            'question_type': q_type,
-                            'question_text': q['question'],
-                            'explanation': q.get('explanation', ''),
-                            'concept_tag': q.get('concept_tag', ''),
-                            'difficulty': q.get('difficulty', 'medium'),
-                            'order_index': i,
-                        }
-                        if q_type == 'mcq':
-                            kwargs.update({
-                                'option_a': q.get('option_a', ''),
-                                'option_b': q.get('option_b', ''),
-                                'option_c': q.get('option_c', ''),
-                                'option_d': q.get('option_d', ''),
-                                'correct_answer': q.get('correct', ''),
-                            })
-                        else:
-                            kwargs['answer_data'] = q.get('answer_data', {})
-                        ExitTicketQuestion.objects.create(**kwargs)
-                    
-                    self.stdout.write(self.style.SUCCESS(f"  ✓ Created exit ticket with {len(questions)} questions"))
-                    
+                # Use the shared generation function
+                from apps.curriculum.content_generator import generate_exit_ticket_for_lesson
+                from apps.accounts.models import Institution
+                institution_id = (lesson.unit.course.institution_id
+                                  if lesson.unit and lesson.unit.course else None)
+                institution_id = institution_id or Institution.get_global().id
+
+                # Delete existing if overwriting
+                if existing and options['overwrite']:
+                    existing.delete()
+
+                result = generate_exit_ticket_for_lesson(lesson, institution_id)
+
+                if result.get('success'):
+                    count = result.get('questions_created', 0)
+                    if result.get('skipped'):
+                        self.stdout.write(self.style.WARNING(f"  ⏭️  Skipped (already has exit ticket)"))
+                    else:
+                        self.stdout.write(self.style.SUCCESS(f"  ✓ Created exit ticket with {count} questions"))
+                else:
+                    self.stdout.write(self.style.ERROR(f"  ✗ Error: {result.get('error')}"))
+
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"  ✗ Error: {e}"))
-        
+
         self.stdout.write(self.style.SUCCESS("\nDone!"))
 
-    def _generate_questions(self, llm_client, lesson) -> list:
-        """Generate 10 MCQ questions using AI, grounded in real exam questions when available."""
-        subject = lesson.unit.course.title if lesson.unit and lesson.unit.course else "General"
-
-        # Query KB for real exam questions to ground the generation
-        exam_context = ""
-        try:
-            from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
-            course = lesson.unit.course
-            from apps.accounts.models import Institution
-            kb = CurriculumKnowledgeBase(institution_id=course.institution_id or Institution.get_global().id)
-            exam_questions = kb.query_for_exit_ticket_generation(
-                lesson_title=lesson.title,
-                lesson_objective=lesson.objective or '',
-                subject=subject,
-                grade_level=course.grade_level or '',
-                n_results=5,
-            )
-            exam_context = kb.format_exam_questions_for_prompt(exam_questions)
-            if exam_context:
-                exam_context = "\n\n" + exam_context + "\n"
-        except Exception as e:
-            self.stderr.write(f"  KB query failed (continuing without): {e}")
-
-        # Get Seychelles context for grounding (P1.5)
-        seychelles_context = ""
-        try:
-            from apps.curriculum.models import SeychellesContext
-            entries = SeychellesContext.objects.filter(
-                is_active=True,
-                subject_tags__contains=subject.lower(),
-            ).values('title', 'content')[:8]
-            if entries:
-                lines = "\n".join(f"- {e['title']}: {e['content']}" for e in entries)
-                seychelles_context = f"\nSEYCHELLES CONTEXT (use these real facts):\n{lines}\n"
-        except Exception:
-            pass
-
-        prompt = EXIT_TICKET_PROMPT.format(
-            lesson_title=lesson.title,
-            lesson_objective=lesson.objective,
-            subject=subject,
-            exam_context=exam_context,
-            seychelles_context=seychelles_context,
-        )
-        
-        from apps.llm.prompts import get_prompt_or_default
-        from apps.accounts.models import Institution
-        institution_id = (lesson.unit.course.institution_id if lesson.unit and lesson.unit.course else None) or Institution.get_global().id
-        exit_sys_prompt = get_prompt_or_default(
-            institution_id, 'exit_ticket_prompt',
-            "You are an expert educational assessment designer.",
-            json_required=True,
-        )
-        messages = [{"role": "user", "content": prompt}]
-        response = llm_client.generate(messages, system_prompt=exit_sys_prompt, max_tokens=16000)
-
-        # Parse JSON from response (with automatic truncation repair)
-        from apps.llm.json_utils import parse_llm_json
-        questions = parse_llm_json(response.content, expect_array=True)
-
-        if not questions or not isinstance(questions, list):
-            raise ValueError(f"Failed to parse questions from LLM response ({len(response.content)} chars, stop={response.stop_reason})")
-
-        if len(questions) < 10:
-            raise ValueError(f"Only {len(questions)} questions generated, need at least 10")
-
-        return questions[:35]
+    # Exit ticket generation logic is in apps.curriculum.content_generator.generate_exit_ticket_for_lesson()
