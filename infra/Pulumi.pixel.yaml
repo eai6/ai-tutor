@@ -14,3 +14,4 @@ config:
     secure: v1:+GXti9A1tYEOgRjm:yLXnTL6UW3rmNDWQQyxAD95iWrQolFHMqTcCRLbjpIa/NFIXRPqt0gCiG5CK9h8xAyS0PXvXwQ==
   aitutor:elevenlabs-api-key:
     secure: v1:Ka2PrnsMS+3vT/fi:gVocY1bUSRB1O90kw0wPIQsiZaTmCh6Iicr/LAhIwDHjjeFs69OoigkdSPWn5uXxpe6jyIRCHE62YHcwbZOIICuVyg==
+  aitutor:custom-domain: ai-tutor.wbg.edwardamoah.com

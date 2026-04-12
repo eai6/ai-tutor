@@ -27,6 +27,7 @@ config = Config("aitutor")
 az_config = Config("azure-native")
 stack = pulumi.get_stack()
 location = az_config.require("location")
+custom_domain = config.get("custom-domain")  # e.g. "ai-tutor.wbg.edwardamoah.com"
 
 # ── Secrets from Pulumi config ──────────────────────────────────────────────
 db_password = config.require_secret("db-password")
@@ -100,6 +101,21 @@ env = app.ManagedEnvironment(
         ),
     ],
 )
+
+# ── 4b. Managed Certificate (for custom domain) ──────────────────────────
+managed_cert = None
+if custom_domain:
+    managed_cert = app.ManagedCertificate(
+        f"{custom_domain}-cert",
+        managed_certificate_name=f"{custom_domain}-aitutor--260302081454",
+        environment_name=env.name,
+        resource_group_name=rg.name,
+        location=rg.location,
+        properties=app.ManagedCertificatePropertiesArgs(
+            subject_name=custom_domain,
+            domain_control_validation=app.ManagedCertificateDomainControlValidation.CNAME,
+        ),
+    )
 
 # ── 5. Storage Account + File Share ─────────────────────────────────────────
 storage_account_name = f"aitutor{stack}sa"
@@ -198,6 +214,13 @@ container_app = app.ContainerApp(
             external=True,
             target_port=8000,
             transport=app.IngressTransportMethod.AUTO,
+            custom_domains=[
+                app.CustomDomainArgs(
+                    name=custom_domain,
+                    certificate_id=managed_cert.id,
+                    binding_type=app.BindingType.SNI_ENABLED,
+                ),
+            ] if custom_domain and managed_cert else None,
         ),
         registries=[
             app.RegistryCredentialsArgs(
@@ -240,7 +263,10 @@ container_app = app.ContainerApp(
                     ),
                     app.EnvironmentVarArgs(
                         name="CSRF_TRUSTED_ORIGINS",
-                        value=Output.concat("https://", container_app_name, ".", env.default_domain),
+                        value=Output.concat(
+                            "https://", container_app_name, ".", env.default_domain,
+                            f",https://{custom_domain}" if custom_domain else "",
+                        ),
                     ),
                     app.EnvironmentVarArgs(name="TTS_BACKEND", value="elevenlabs"),
                     app.EnvironmentVarArgs(name="STT_BACKEND", value="elevenlabs"),
@@ -290,7 +316,7 @@ container_app = app.ContainerApp(
             ),
         ],
     ),
-    opts=pulumi.ResourceOptions(depends_on=[env_storage, pg_firewall]),
+    opts=pulumi.ResourceOptions(depends_on=[env_storage, pg_firewall] + ([managed_cert] if managed_cert else [])),
 )
 
 # ── Exports ─────────────────────────────────────────────────────────────────
