@@ -524,24 +524,55 @@ def extract_from_image(file_path: str) -> str:
 # ============================================================================
 
 def detect_subject(text: str, provided_subject: str = "") -> str:
-    """Detect the subject from text content."""
-    text_lower = text.lower()
-    
+    """Detect the subject from text content using weighted keyword scoring.
+
+    More robust than simple keyword matching — uses multiple keywords per subject
+    with scoring to handle documents that mention multiple subjects.
+    """
     if provided_subject:
         return provided_subject
-    
-    if 'mathematics' in text_lower or 'algebra' in text_lower or 'arithmetic' in text_lower:
-        return 'Mathematics'
-    elif 'geography' in text_lower or 'map skills' in text_lower or 'settlement' in text_lower:
-        return 'Geography'
-    elif 'biology' in text_lower or 'organism' in text_lower:
-        return 'Biology'
-    elif 'physics' in text_lower or 'mechanics' in text_lower:
-        return 'Physics'
-    elif 'chemistry' in text_lower or 'elements' in text_lower:
-        return 'Chemistry'
-    else:
-        return 'General'
+
+    text_lower = text[:10000].lower()  # Only scan first 10k chars for efficiency
+
+    # Weighted keyword sets — score-based detection handles ambiguous documents
+    subject_keywords = {
+        'Mathematics': [
+            'mathematics', 'algebra', 'arithmetic', 'equation', 'fraction',
+            'geometry', 'trigonometry', 'calculus', 'polynomial', 'quadratic',
+            'integer', 'decimal', 'percentage', 'multiplication', 'division',
+            'perimeter', 'pythagoras', 'histogram', 'probability',
+        ],
+        'Geography': [
+            'geography', 'map skills', 'settlement', 'population', 'climate',
+            'topographic', 'contour', 'erosion', 'tectonic', 'latitude',
+            'longitude', 'hemisphere', 'migration', 'urbanisation', 'development',
+        ],
+        'Biology': [
+            'biology', 'organism', 'cell', 'photosynthesis', 'ecosystem',
+            'genetics', 'evolution', 'anatomy', 'respiration', 'reproduction',
+        ],
+        'Physics': [
+            'physics', 'mechanics', 'velocity', 'acceleration', 'force',
+            'energy', 'electricity', 'magnetism', 'waves', 'thermodynamics',
+        ],
+        'Chemistry': [
+            'chemistry', 'element', 'compound', 'molecule', 'reaction',
+            'acid', 'periodic table', 'bonding', 'oxidation', 'titration',
+        ],
+        'Science': [
+            'science', 'scientific method', 'hypothesis', 'experiment',
+            'observation', 'laboratory',
+        ],
+    }
+
+    scores = {}
+    for subject, keywords in subject_keywords.items():
+        scores[subject] = sum(1 for kw in keywords if kw in text_lower)
+
+    best_subject = max(scores, key=scores.get)
+    if scores[best_subject] >= 2:
+        return best_subject
+    return 'General'
 
 
 # ============================================================================

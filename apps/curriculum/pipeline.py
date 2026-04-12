@@ -373,6 +373,22 @@ def generate_lesson_structure(
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
 
+    # For Mathematics: try dedicated parser first (extracts K/S/A coded objectives)
+    if subject.lower() in ('mathematics', 'maths', 'math') and extracted_text:
+        try:
+            from apps.curriculum.curriculum_parser import parse_mathematics_curriculum
+            math_result = parse_mathematics_curriculum(extracted_text, grade_level)
+            if math_result.units and sum(len(u.get('lessons', [])) for u in math_result.units) >= 5:
+                logger.info(f"Math parser extracted {len(math_result.units)} strands with lessons")
+                return {
+                    'subject': subject,
+                    'grade_level': grade_level,
+                    'units': math_result.units,
+                    'total_lessons': sum(len(u.get('lessons', [])) for u in math_result.units),
+                }
+        except Exception as e:
+            logger.warning(f"Math-specific parser failed, falling back to LLM: {e}")
+
     # Query knowledge base for context
     kb = CurriculumKnowledgeBase(institution_id=institution_id)
     kb_results = kb.query_for_lesson_generation(

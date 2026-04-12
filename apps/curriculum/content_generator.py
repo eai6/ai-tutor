@@ -634,12 +634,15 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
                 desc = fig.get('description', '')
                 if desc:
                     fig_lines.append(f"- [{fig.get('figure_type', 'figure').upper()}] {desc[:200]}" +
-                                     (f" (image: {url})" if url else ""))
+                                     (f" (image_url: {url})" if url else ""))
             if fig_lines:
                 figure_context = (
                     "\nAVAILABLE FIGURES FROM TEXTBOOKS/WORKSHEETS:\n"
                     + "\n".join(fig_lines)
-                    + "\nFor DATA_INTERPRETATION questions, you can reference these figures in data_description.\n"
+                    + "\nFor DATA_INTERPRETATION questions, use these figures in data_description as HTML:\n"
+                    + "  <img src='IMAGE_URL' style='max-width:100%;margin:8px 0' alt='DESCRIPTION'>\n"
+                    + "  followed by the question text.\n"
+                    + "For other question types, reference the figure content in question text.\n"
                 )
     except Exception:
         pass

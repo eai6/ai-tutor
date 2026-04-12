@@ -351,7 +351,8 @@ a different approach -- no rush."
   |||/ARTIFACT|||
   Use this for data tables, comparison charts, or visual aids that enhance understanding.
   Keep HTML simple — use inline styles only, no external resources.
-  Use artifacts when a table or structured visualization would be clearer than plain text.
+  You CAN include <img> tags referencing uploaded textbook/worksheet figures if available in the media catalog.
+  Use artifacts when a table, diagram, or structured visualization would be clearer than plain text.
 </format_rules>
 
 </system_prompt>"""
@@ -2532,6 +2533,36 @@ Follow the current step; this concept will be covered in sequence."""
                 }))
                 seen_urls[url] = len(media_items)  # 1-indexed catalog ID
                 step_media_positions.setdefault(step_idx, []).append(len(media_items))
+
+        # From KB figure descriptions (textbook/worksheet figures)
+        try:
+            from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+            from apps.accounts.models import Institution
+            course = self.lesson.unit.course
+            institution_id = course.institution_id or Institution.get_global().id
+            kb = CurriculumKnowledgeBase(institution_id=institution_id)
+            subject = course.title.split()[0] if course else 'General'
+            figures = kb.query_for_figure_descriptions(
+                topic=f"{self.lesson.title} {self.lesson.objective or ''}",
+                subject=subject,
+                n_results=5,
+            )
+            for fig in (figures or []):
+                url = fig.get('image_url', '')
+                desc = fig.get('description', '')
+                if not url or not desc or url in seen_urls:
+                    continue
+                label = f"[{fig.get('figure_type', 'figure').upper()}] {desc[:100]}"
+                media_items.append((label, {
+                    'type': fig.get('figure_type', 'image'),
+                    'url': url,
+                    'alt': desc[:200],
+                    'caption': f"From textbook/worksheet (p.{fig.get('figure_page', '?')})",
+                    'description': desc,
+                }))
+                seen_urls[url] = len(media_items)
+        except Exception as e:
+            logger.debug(f"KB figure query for media catalog: {e}")
 
         # Build numbered ID map
         self._media_id_map = {}
