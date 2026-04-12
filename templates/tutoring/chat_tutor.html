@@ -40,6 +40,16 @@
                 </div>
             </main>
 
+            <!-- Difficulty Signal Buttons -->
+            <div class="difficulty-controls" id="difficulty-controls">
+                <button class="difficulty-btn too-hard" id="btn-too-hard" onclick="sendDifficultySignal('too_hard')" title="This is too difficult for me">
+                    Too hard?
+                </button>
+                <button class="difficulty-btn too-easy" id="btn-too-easy" onclick="sendDifficultySignal('too_easy')" title="This is too easy for me">
+                    Too easy?
+                </button>
+            </div>
+
             <!-- Input Area -->
             <footer class="chat-input-area" id="input-area">
                 <div class="input-wrapper">
@@ -795,6 +805,95 @@ body {
 }
 .cta-btn:hover { background: #27272a; }
 
+/* ── Difficulty Signal Buttons ── */
+.difficulty-controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.375rem 1rem;
+    max-width: 768px;
+    margin: 0 auto;
+}
+.difficulty-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.875rem;
+    border: 1.5px solid #e4e4e7;
+    border-radius: 999px;
+    background: #fff;
+    color: #71717a;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.difficulty-btn:hover { border-color: #a1a1aa; color: #18181b; }
+.difficulty-btn.active.too-easy { border-color: #7C3AED; background: #EDE9FE; color: #7C3AED; }
+.difficulty-btn.active.too-hard { border-color: #F59E0B; background: #FEF3C7; color: #D97706; }
+
+/* ── In-Conversation Gamification ── */
+.message.tutor .bubble.correct-glow {
+    box-shadow: 0 0 0 2px #10b981, 0 0 12px rgba(16, 185, 129, 0.2);
+    transition: box-shadow 0.3s ease;
+}
+.streak-celebration {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    max-width: 768px;
+    margin: 0.25rem auto;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #D97706;
+    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+    border-radius: 999px;
+    animation: celebrationPop 0.4s ease;
+    transition: opacity 0.5s;
+}
+.streak-celebration.fade-out { opacity: 0; }
+.streak-emoji { font-size: 1.125rem; }
+@keyframes celebrationPop {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+.milestone-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.625rem 1.25rem;
+    max-width: 768px;
+    margin: 0.5rem auto;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #7C3AED;
+    background: linear-gradient(135deg, #EDE9FE, #DDD6FE);
+    border-radius: 0.75rem;
+    border: 1px solid #C4B5FD;
+    animation: celebrationPop 0.4s ease;
+}
+.difficulty-feedback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    max-width: 768px;
+    margin: 0.25rem auto;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #7C3AED;
+    background: #EDE9FE;
+    border-radius: 999px;
+    animation: celebrationPop 0.25s ease;
+    transition: opacity 0.5s;
+}
+.difficulty-feedback.fade-out { opacity: 0; }
+
 /* ── Audio Mode ── */
 .audio-toggle {
     display: flex;
@@ -1225,6 +1324,10 @@ async function sendMessage() {
         // Display tutor response
         addMessage('tutor', data.message, data.media || []);
 
+        // In-conversation gamification
+        if (data.is_correct) showCorrectFeedback(data.streak_count);
+        if (data.milestone) showMilestone(data.milestone, data.step_number, data.total_steps);
+
         if (data.phase) {
             phaseBadge.textContent = phaseLabel(data.phase);
         }
@@ -1247,6 +1350,79 @@ async function sendMessage() {
         isSending = false;
         addMessage('tutor', 'Something went wrong. Please try again.');
     }
+}
+
+// ── Difficulty Signal ──
+let currentDifficultyLevel = 0;
+
+async function sendDifficultySignal(signal) {
+    if (!sessionId) return;
+    try {
+        const response = await fetch(`/tutor/api/chat/${sessionId}/difficulty-signal/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ signal }),
+        });
+        const data = await response.json();
+        if (data.ok) {
+            currentDifficultyLevel = data.difficulty_level;
+            updateDifficultyButtons();
+            const label = signal === 'too_easy' ? 'Turning up the challenge' : 'Slowing things down for you';
+            showDifficultyFeedback(label, signal);
+        }
+    } catch (e) { console.error('Difficulty signal error:', e); }
+}
+
+function updateDifficultyButtons() {
+    document.getElementById('btn-too-easy').classList.toggle('active', currentDifficultyLevel > 0);
+    document.getElementById('btn-too-hard').classList.toggle('active', currentDifficultyLevel < 0);
+}
+
+function showDifficultyFeedback(label, signal) {
+    const div = document.createElement('div');
+    div.className = 'difficulty-feedback';
+    div.innerHTML = `<span>${signal === 'too_easy' ? '⚡' : '🛡️'}</span> ${label}`;
+    chatMessages.insertBefore(div, typing);
+    scrollToBottom();
+    setTimeout(() => div.classList.add('fade-out'), 3000);
+    setTimeout(() => div.remove(), 3500);
+}
+
+// ── In-Conversation Gamification ──
+function showCorrectFeedback(streakCount) {
+    const bubbles = document.querySelectorAll('.message.tutor .bubble');
+    const lastBubble = bubbles[bubbles.length - 1];
+    if (lastBubble) {
+        lastBubble.classList.add('correct-glow');
+        setTimeout(() => lastBubble.classList.remove('correct-glow'), 2000);
+    }
+    if (streakCount >= 3) {
+        const div = document.createElement('div');
+        div.className = 'streak-celebration';
+        const emoji = streakCount >= 5 ? '🔥' : '⚡';
+        div.innerHTML = `<span class="streak-emoji">${emoji}</span> ${streakCount} in a row!`;
+        chatMessages.insertBefore(div, typing);
+        scrollToBottom();
+        setTimeout(() => div.classList.add('fade-out'), 3000);
+        setTimeout(() => div.remove(), 3500);
+    }
+}
+
+function showMilestone(milestone, stepNum, totalSteps) {
+    const messages = {
+        'halfway': `🎯 Halfway there! Step ${stepNum} of ${totalSteps}`,
+        'final_step': '🏁 Final step — you\'re almost done!',
+        'streak_3': '⚡ 3 correct in a row!',
+        'streak_5': '🔥 5 correct in a row — unstoppable!',
+        'perfect_run': '💎 Perfect score so far!',
+    };
+    const text = messages[milestone];
+    if (!text) return;
+    const div = document.createElement('div');
+    div.className = 'milestone-banner';
+    div.textContent = text;
+    chatMessages.insertBefore(div, typing);
+    scrollToBottom();
 }
 
 function createStreamingMessage() {

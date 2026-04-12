@@ -108,6 +108,10 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
         mock_result.is_complete = False
         mock_result.step_number = 1
         mock_result.total_steps = 5
+        mock_result.is_correct = False
+        mock_result.streak_count = 0
+        mock_result.practice_score = ""
+        mock_result.milestone = None
         mock_respond.return_value = mock_result
 
         session = self._create_session()
