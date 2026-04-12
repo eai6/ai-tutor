@@ -1,0 +1,302 @@
+[
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "economic",
+      "title": "GDP and GNP",
+      "content": "GNP: approximately $1.59 billion (2018). GDP heavily dependent on tourism. COVID-19 caused significant GDP collapse when tourism stopped. Upper-middle income country classification.",
+      "subject_tags": ["geography", "economics", "social_studies"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "economic",
+      "title": "Human Development Index",
+      "content": "HDI score: 0.796 (67th of 189 countries). The HDI is preferable to GNP as a measure of development because it includes health (life expectancy), education (years of schooling), and income — not just economic output.",
+      "subject_tags": ["geography", "economics", "social_studies"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "economic",
+      "title": "Currency and Exchange",
+      "content": "Seychelles Rupee (SCR). GNP is given in US dollars to allow international comparison between countries.",
+      "subject_tags": ["geography", "economics", "mathematics"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "trade",
+      "title": "Trade Memberships",
+      "content": "Seychelles belongs to: IOTC (Indian Ocean Tuna Commission), AU (African Union), SADC (Southern African Development Community), COMESA (Common Market for Eastern and Southern Africa), WTO (World Trade Organization).",
+      "subject_tags": ["geography", "economics", "social_studies"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "trade",
+      "title": "Exports and Imports",
+      "content": "Exports: canned tuna, raw fish. Imports: fuel, electronics, clothing, motor vehicles, food products. EEZ (Exclusive Economic Zone): 1.37 million km2 — one of the largest in the world relative to land area.",
+      "subject_tags": ["geography", "economics"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "trade",
+      "title": "North-South Divide and Brandt Line",
+      "content": "The Brandt Line divides the world into the richer 'North' and poorer 'South'. Seychelles is in the Southern hemisphere but is classified as upper-middle income, showing the limitation of this simplistic division.",
+      "subject_tags": ["geography", "economics", "social_studies"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "industry",
+      "title": "Indian Ocean Tuna (IOT)",
+      "content": "IOT (Indian Ocean Tuna) is one of the world's largest tuna canneries and a major employer in Seychelles. Located on Mahe. Processes skipjack and yellowfin tuna for export, primarily to the European Union.",
+      "subject_tags": ["geography", "economics", "social_studies"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "industry",
+      "title": "Tourism Industry",
+      "content": "Tourism is the backbone of the Seychelles economy, contributing a large share of GDP. Seychelles positions itself as a premium, low-volume, high-value destination. The sector was severely impacted by COVID-19.",
+      "subject_tags": ["geography", "economics", "social_studies"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "industry",
+      "title": "Foodpro and Fishing",
+      "content": "Foodpro is the main food processing company in Seychelles. Fishing is divided into artisanal (small-scale, local consumption) and industrial (large-scale, export-oriented). Both are significant economic activities.",
+      "subject_tags": ["geography", "economics"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "geographic",
+      "title": "Island Types",
+      "content": "Granitic Inner Islands (Mahe, Praslin, La Digue) — continental granite origin, mountainous and hilly. Coralline Outer Islands (Aldabra, Farquhar, Cosmoledo) — low-lying coral atolls formed on ancient coral reefs.",
+      "subject_tags": ["geography", "science"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "geographic",
+      "title": "Key Geographic Features",
+      "content": "Morne Seychellois: 905m, highest peak on Mahe and in Seychelles. Capital: Victoria, on the northeast coast of Mahe. Victoria is one of the smallest capital cities in the world.",
+      "subject_tags": ["geography"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "geographic",
+      "title": "Land and Sea Area",
+      "content": "Total land area: approximately 459 km2 spread across 115 islands. EEZ: 1.37 million km2. The ocean territory is nearly 3,000 times larger than the land area.",
+      "subject_tags": ["geography", "mathematics"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "climate",
+      "title": "Tropical Maritime Climate",
+      "content": "Tropical maritime climate with two distinct seasons. North-west monsoon (October-April): hot, wet, calmer seas. South-east trade winds (May-September): cooler, drier, windier. No true dry season — rain falls year-round.",
+      "subject_tags": ["geography", "science"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "climate",
+      "title": "Temperature and Rainfall",
+      "content": "Annual rainfall in Victoria: approximately 2,300mm. Temperature range: 24-30 degrees Celsius year-round. Higher elevations on Mahe receive significantly more rainfall than coastal areas.",
+      "subject_tags": ["geography", "science", "mathematics"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "population",
+      "title": "Population Demographics",
+      "content": "Population: approximately 98,000 people. About 90% live on Mahe. Significant immigrant workforce in construction and tourism sectors. Ethnically diverse population of Creole, European, Asian, and African descent.",
+      "subject_tags": ["geography", "social_studies"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "population",
+      "title": "Languages",
+      "content": "Three official languages: Seychellois Creole (Kreol), English, and French. Creole is the most widely spoken language in daily life. English is the medium of instruction in schools.",
+      "subject_tags": ["geography", "social_studies"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "sustainable_dev",
+      "title": "Marine Conservation",
+      "content": "Seychelles has established extensive marine protected areas covering approximately 30% of its ocean territory. The country conducted a debt-for-nature swap with Paris Club creditors, converting national debt into conservation funding.",
+      "subject_tags": ["geography", "science", "social_studies"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "sustainable_dev",
+      "title": "UNESCO World Heritage Sites",
+      "content": "Vallee de Mai on Praslin: home to the endemic coco de mer palm. Aldabra Atoll: the world's largest raised coral atoll, home to giant Aldabra tortoises. Both are UNESCO World Heritage Sites.",
+      "subject_tags": ["geography", "science"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "sustainable_dev",
+      "title": "Renewable Energy and Blue Economy",
+      "content": "Seychelles has committed to generating 15% of energy from renewable sources. The 'Blue Economy' strategy focuses on sustainable use of ocean resources for economic growth while preserving marine ecosystems.",
+      "subject_tags": ["geography", "science", "economics"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "os_map",
+      "title": "OS Map Specifications",
+      "content": "Seychelles national exams use 1:10,000 scale topographic maps. Students must read grid references (4-figure and 6-figure), measure distances, identify contour patterns, and describe relief features from these maps.",
+      "subject_tags": ["geography"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "Past examination papers 2021-2023",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "os_map",
+      "title": "Map Areas Used in Exams",
+      "content": "Documented exam map areas: Cascade/Pointe Larue area (2023 exam), Beau Vallon area (2021 exam). Features include: Mahe coastal settlements, water treatment works, police stations, schools, jetties, steep granite terrain contours.",
+      "subject_tags": ["geography"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "Past examination papers 2021-2023",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "geographic",
+      "title": "Major Settlements",
+      "content": "Victoria (capital, NE Mahe), Anse Royale (SE Mahe), Beau Vallon (NW Mahe — major tourist beach), Baie Lazare (SW Mahe), Grand Anse (Praslin). Most settlements are coastal due to the mountainous interior.",
+      "subject_tags": ["geography"],
+      "grade_levels": ["S1", "S2", "S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "economic",
+      "title": "Employment Sectors",
+      "content": "Service sector (tourism, government) employs the majority. Industrial sector centres on tuna processing (IOT) and beverage manufacturing (SeyBrew). Agriculture is minimal — Seychelles imports most food.",
+      "subject_tags": ["geography", "economics", "social_studies"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "sustainable_dev",
+      "title": "Environmental Challenges",
+      "content": "Key challenges: coral bleaching from rising sea temperatures, coastal erosion, limited freshwater resources, waste management on small islands, invasive species threatening endemic biodiversity.",
+      "subject_tags": ["geography", "science"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  },
+  {
+    "model": "curriculum.seychellescontext",
+    "fields": {
+      "category": "trade",
+      "title": "Trade Deficit",
+      "content": "Seychelles has a significant trade deficit — it imports far more than it exports. Main reason: small island economy with limited natural resources and manufacturing capacity. Tourism revenue helps offset the trade gap.",
+      "subject_tags": ["geography", "economics"],
+      "grade_levels": ["S3", "S4", "S5"],
+      "source": "National curriculum materials 2021",
+      "is_active": true
+    }
+  }
+]

@@ -55,7 +55,7 @@ class StudentLessonProgressAdmin(admin.ModelAdmin):
 class ExitTicketQuestionInline(admin.TabularInline):
     model = ExitTicketQuestion
     extra = 0
-    fields = ['order_index', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer', 'difficulty']
+    fields = ['order_index', 'question_type', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer', 'difficulty']
     ordering = ['order_index']
 
 
@@ -74,8 +74,8 @@ class ExitTicketAdmin(admin.ModelAdmin):
 
 @admin.register(ExitTicketQuestion)
 class ExitTicketQuestionAdmin(admin.ModelAdmin):
-    list_display = ['exit_ticket', 'order_index', 'short_question', 'correct_answer', 'difficulty']
-    list_filter = ['difficulty', 'exit_ticket__lesson__unit__course']
+    list_display = ['exit_ticket', 'order_index', 'question_type', 'short_question', 'correct_answer', 'difficulty']
+    list_filter = ['question_type', 'difficulty', 'exit_ticket__lesson__unit__course']
     search_fields = ['question_text', 'exit_ticket__lesson__title']
     ordering = ['exit_ticket', 'order_index']
     

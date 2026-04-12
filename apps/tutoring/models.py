@@ -256,32 +256,62 @@ class ExitTicket(models.Model):
 
 class ExitTicketQuestion(models.Model):
     """
-    A single MCQ question in an exit ticket.
+    A question in an exit ticket — supports multiple formats (MCQ, fill-in-blank,
+    matching, short answer, data interpretation).
     """
     class Difficulty(models.TextChoices):
         EASY = 'easy', 'Easy (recall)'
         MEDIUM = 'medium', 'Medium (apply)'
         HARD = 'hard', 'Hard (analyze)'
 
+    class QuestionType(models.TextChoices):
+        MCQ = 'mcq', 'Multiple Choice'
+        FILL_IN_BLANK = 'fill_in_blank', 'Fill in the Blank'
+        MATCHING = 'matching', 'Matching'
+        SHORT_ANSWER = 'short_answer', 'Short Answer'
+        DATA_INTERPRETATION = 'data_interpretation', 'Data Interpretation'
+
     exit_ticket = models.ForeignKey(
         ExitTicket,
         on_delete=models.CASCADE,
         related_name='questions'
     )
-    
+
+    question_type = models.CharField(
+        max_length=25,
+        choices=QuestionType.choices,
+        default=QuestionType.MCQ,
+        help_text="Question format type"
+    )
+
     question_text = models.TextField(help_text="The question stem")
-    
-    option_a = models.CharField(max_length=500)
-    option_b = models.CharField(max_length=500)
-    option_c = models.CharField(max_length=500)
-    option_d = models.CharField(max_length=500)
-    
+
+    # MCQ fields (kept for backward compatibility)
+    option_a = models.CharField(max_length=500, blank=True, default='')
+    option_b = models.CharField(max_length=500, blank=True, default='')
+    option_c = models.CharField(max_length=500, blank=True, default='')
+    option_d = models.CharField(max_length=500, blank=True, default='')
+
     correct_answer = models.CharField(
         max_length=1,
         choices=[('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D')],
-        help_text="The correct option (A, B, C, or D)"
+        blank=True,
+        default='',
+        help_text="The correct option for MCQ (A, B, C, or D)"
     )
-    
+
+    # Non-MCQ answer data
+    answer_data = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="""Type-specific answer data:
+        fill_in_blank: {"text_template": "The ___ is...", "blanks": ["GNP"], "accept_alternatives": [["gross national product"]]}
+        matching: {"pairs": [{"left": "A", "right": "1"}], "distractor_rights": ["X"]}
+        short_answer: {"model_answer": "...", "keywords": ["k1", "k2"], "min_keywords": 2}
+        data_interpretation: {"data_description": "...", "model_answer": "...", "keywords": [...]}
+        """
+    )
+
     explanation = models.TextField(
         blank=True,
         help_text="Explanation of the correct answer"
@@ -298,19 +328,19 @@ class ExitTicketQuestion(models.Model):
         choices=Difficulty.choices,
         default=Difficulty.MEDIUM
     )
-    
+
     order_index = models.PositiveIntegerField(
         default=0,
         help_text="Order in the exit ticket (0-9)"
     )
-    
+
     image = models.ImageField(
         upload_to='exit_tickets/',
         blank=True,
         null=True,
         help_text="Optional image for the question"
     )
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

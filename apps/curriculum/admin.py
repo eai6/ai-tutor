@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Course, Unit, Lesson, LessonStep
+from .models import Course, Unit, Lesson, LessonStep, SeychellesContext
 
 
 class UnitInline(admin.TabularInline):
@@ -38,25 +38,39 @@ class CourseAdmin(admin.ModelAdmin):
 
 @admin.register(Unit)
 class UnitAdmin(admin.ModelAdmin):
-    list_display = ['title', 'course', 'order_index']
-    list_filter = ['course__institution', 'course']
+    list_display = ['title', 'course', 'order_index', 'grade_level']
+    list_filter = ['course__institution', 'course', 'grade_level']
     search_fields = ['title']
     inlines = [LessonInline]
+    fieldsets = (
+        (None, {'fields': ('course', 'title', 'description', 'order_index', 'grade_level')}),
+        ('Objectives', {
+            'fields': ('terminal_objectives', 'enabling_objectives'),
+            'classes': ('collapse',),
+        }),
+    )
 
 
 @admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
-    list_display = ['title', 'unit', 'mastery_rule', 'is_published', 'estimated_minutes']
-    list_filter = ['is_published', 'mastery_rule', 'unit__course__institution']
+    list_display = ['title', 'unit', 'content_quality', 'teacher_approved', 'is_published', 'estimated_minutes']
+    list_filter = ['is_published', 'content_quality', 'teacher_approved', 'mastery_rule', 'unit__course__institution']
     search_fields = ['title', 'objective']
     inlines = [LessonStepInline]
-    
+
     fieldsets = (
         (None, {
             'fields': ('unit', 'title', 'objective')
         }),
         ('Settings', {
             'fields': ('order_index', 'estimated_minutes', 'mastery_rule', 'is_published')
+        }),
+        ('Content Quality', {
+            'fields': ('content_quality', 'teacher_approved', 'teacher_approved_at', 'teacher_approved_by'),
+        }),
+        ('Enabling Objectives', {
+            'fields': ('enabling_objectives',),
+            'classes': ('collapse',),
         }),
     )
 
@@ -73,7 +87,7 @@ class LessonStepAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Lesson & Order', {
-            'fields': ('lesson', 'order_index', 'phase')
+            'fields': ('lesson', 'order_index', 'phase', 'concept_tag', 'enabling_objective')
         }),
         ('Step Content', {
             'fields': ('step_type', 'teacher_script'),
@@ -133,3 +147,11 @@ class LessonStepAdmin(admin.ModelAdmin):
             'all': ('admin/css/forms.css',)
         }
         js = ('admin/js/vendor/jquery/jquery.min.js',)
+
+
+@admin.register(SeychellesContext)
+class SeychellesContextAdmin(admin.ModelAdmin):
+    list_display = ['title', 'category', 'subject_tags', 'is_active', 'updated_at']
+    list_filter = ['category', 'is_active']
+    search_fields = ['title', 'content']
+    list_editable = ['is_active']

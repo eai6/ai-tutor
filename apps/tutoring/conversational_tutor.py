@@ -417,7 +417,10 @@ class ConversationalTutor:
         
         # Load exit ticket concepts (CRITICAL for ensuring coverage)
         self.exit_ticket_concepts = self._load_exit_ticket_concepts()
-        
+
+        # Load enabling objectives for systematic coverage (P1.2)
+        self.enabling_objectives = self._load_enabling_objectives()
+
         # Build lesson context including exit ticket requirements
         self.lesson_context = self._build_lesson_context()
         
@@ -510,35 +513,46 @@ class ConversationalTutor:
         self, all_questions: list, count: int = 10
     ) -> list:
         """
-        Select `count` questions from the bank ensuring concept coverage.
+        Select `count` questions from the bank ensuring concept AND format coverage.
 
-        1. Group by concept_tag
-        2. Pick one per unique concept tag (random within group)
+        1. Ensure at least 3 different question_types if available (P1.3)
+        2. Group by concept_tag, pick one per unique concept
         3. Fill remaining slots randomly from unused questions
         4. Shuffle the final set
         """
         from collections import defaultdict
 
-        # Group by concept_tag
-        by_tag = defaultdict(list)
-        no_tag = []
-        for q in all_questions:
-            tag = q.concept_tag.strip() if q.concept_tag else ''
-            if tag:
-                by_tag[tag].append(q)
-            else:
-                no_tag.append(q)
-
         selected = []
         used_ids = set()
 
-        # Step 1: one per concept tag
-        for tag, group in by_tag.items():
+        # Step 0: Ensure format diversity — pick one per unique question_type (P1.3)
+        by_type = defaultdict(list)
+        for q in all_questions:
+            q_type = getattr(q, 'question_type', 'mcq') or 'mcq'
+            by_type[q_type].append(q)
+
+        for q_type, group in by_type.items():
+            if len(selected) >= count:
+                break
             pick = random.choice(group)
             selected.append(pick)
             used_ids.add(pick.id)
+
+        # Step 1: one per concept tag (from remaining)
+        by_tag = defaultdict(list)
+        for q in all_questions:
+            if q.id in used_ids:
+                continue
+            tag = q.concept_tag.strip() if q.concept_tag else ''
+            if tag:
+                by_tag[tag].append(q)
+
+        for tag, group in by_tag.items():
             if len(selected) >= count:
                 break
+            pick = random.choice(group)
+            selected.append(pick)
+            used_ids.add(pick.id)
 
         # Step 2: fill remaining from unused
         remaining = [q for q in all_questions if q.id not in used_ids]
@@ -551,6 +565,27 @@ class ConversationalTutor:
         random.shuffle(selected)
         return selected[:count]
     
+    def _load_enabling_objectives(self) -> List[Dict]:
+        """Load enabling objectives for systematic coverage tracking (P1.2).
+
+        Collects objectives from the lesson model and from individual step fields.
+        Returns empty list for old lessons without objectives (graceful fallback).
+        """
+        all_objectives = set()
+
+        # From lesson-level enabling_objectives
+        for obj in (self.lesson.enabling_objectives or []):
+            if obj and obj.strip():
+                all_objectives.add(obj.strip())
+
+        # From step-level enabling_objective fields
+        for step in self.steps:
+            eo = getattr(step, 'enabling_objective', '')
+            if eo and eo.strip():
+                all_objectives.add(eo.strip())
+
+        return [{'objective': obj, 'covered': False} for obj in sorted(all_objectives)]
+
     def _load_student_grade_level(self) -> str:
         """Load student's grade level from profile for grade-calibrated delivery."""
         try:
@@ -624,6 +659,11 @@ class ConversationalTutor:
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
             concept['covered'] = concept['id'] in covered_concept_ids
+
+        # Restore enabling objective coverage (P1.2)
+        covered_objectives = set(state.get('covered_objectives', []))
+        for obj in getattr(self, 'enabling_objectives', []):
+            obj['covered'] = obj['objective'] in covered_objectives
     
     def _save_state(self):
         """Save session state."""
@@ -671,6 +711,11 @@ class ConversationalTutor:
             'difficulty_level': getattr(self, 'difficulty_level', 0),
             # Correct-answer streak for in-conversation gamification
             'correct_streak': getattr(self, '_correct_streak', 0),
+            # Enabling objective coverage (P1.2)
+            'covered_objectives': [
+                o['objective'] for o in getattr(self, 'enabling_objectives', [])
+                if o.get('covered')
+            ],
         }
         self.session.save()
     
@@ -1864,6 +1909,23 @@ IMPORTANT: Any question you ask must be complete and self-contained. Never say "
             logger.warning(f"Failed to build student profile block: {e}")
             return ""
 
+    def _build_enabling_objectives_block(self) -> str:
+        """Build [ENABLING OBJECTIVES] status block for the response prompt (P1.2)."""
+        if not self.enabling_objectives:
+            return ""
+
+        covered = sum(1 for o in self.enabling_objectives if o['covered'])
+        total = len(self.enabling_objectives)
+        lines = []
+        for i, obj in enumerate(self.enabling_objectives):
+            status = "COVERED" if obj['covered'] else "NOT YET COVERED"
+            lines.append(f"  EO{i+1}. [{status}] {obj['objective']}")
+
+        return f"""[ENABLING OBJECTIVES] {covered}/{total} covered
+{chr(10).join(lines)}
+Prioritize uncovered objectives in your teaching. Ensure each is explicitly addressed before the session ends.
+[/ENABLING OBJECTIVES]"""
+
     def _build_difficulty_signal_block(self) -> str:
         """Build [DIFFICULTY ADJUSTMENT] context block based on student signal.
 
@@ -2076,6 +2138,7 @@ Apply the cognitive_load and targeted_remediation principles {intensity}:
         difficulty_block = self._build_difficulty_signal_block()
         worked_example_block = self._build_worked_example_block()
         interleaved_block = self._build_interleaved_practice_block()
+        enabling_obj_block = self._build_enabling_objectives_block()
 
         # Detect explicit hint requests and inject graduated hint instruction
         hint_block = self._build_hint_request_block(student_input)
@@ -2129,6 +2192,8 @@ CURRENT STEP DIRECTIVE (follow this exactly):
 {student_profile}
 
 {difficulty_block}
+
+{enabling_obj_block}
 
 Generate your response following these rules:
 1. EXECUTE the CURRENT STEP DIRECTIVE above — deliver its content, ask its question, or walk through its example
@@ -2356,10 +2421,42 @@ Follow the current step; this concept will be covered in sequence."""
                 "\n</math_notation>"
             )
 
+        # Append Seychelles context library (P1.5)
+        system_prompt += self._build_seychelles_context_block()
+
         # Append media catalog so the LLM knows what figures are available
         system_prompt += self._build_media_catalog()
 
         return system_prompt
+
+    def _build_seychelles_context_block(self) -> str:
+        """Build Seychelles context library block for the system prompt (P1.5)."""
+        try:
+            from apps.curriculum.models import SeychellesContext
+            course = self.lesson.unit.course
+            subject = (course.title.split()[0] if course else '').lower()
+
+            entries = SeychellesContext.objects.filter(is_active=True)
+            if subject:
+                entries = entries.filter(subject_tags__contains=subject)
+            entries = list(entries.values('category', 'title', 'content')[:10])
+
+            if not entries:
+                return ""
+
+            lines = "\n".join(
+                f"- [{e['category'].upper()}] {e['title']}: {e['content']}"
+                for e in entries
+            )
+            return (
+                f"\n\n<seychelles_context>\n"
+                f"Use these verified Seychelles facts when relevant. Do NOT invent local data.\n"
+                f"{lines}\n"
+                f"</seychelles_context>"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to build Seychelles context block: {e}")
+            return ""
 
     def _build_media_catalog(self) -> str:
         """Build a numbered catalog of available media for the LLM.
@@ -2994,12 +3091,14 @@ Break concepts into smaller steps. Be encouraging."""
                     boundary_attempts = getattr(self, 'concept_boundary_attempts', 0)
                     if self._current_concept_practice_passed():
                         self.concept_boundary_attempts = 0
+                        self._mark_step_objective_covered(self.current_topic_index)
                         self.current_topic_index += 1
                         self.step_exchange_count = 0
                         self._step_just_advanced = True
                         logger.info(f"Concept boundary crossed at step {self.current_topic_index}")
                     elif boundary_attempts >= 4:
                         self.concept_boundary_attempts = 0
+                        self._mark_step_objective_covered(self.current_topic_index)
                         self.current_topic_index += 1
                         self.step_exchange_count = 0
                         self._step_just_advanced = True
@@ -3011,13 +3110,29 @@ Break concepts into smaller steps. Be encouraging."""
                         logger.info(f"Concept boundary blocked (attempt {self.concept_boundary_attempts}): {tag}")
                 else:
                     # No boundary or empty tags — advance normally
+                    self._mark_step_objective_covered(self.current_topic_index)
                     self.current_topic_index += 1
                     self.step_exchange_count = 0
                     self._step_just_advanced = True
             elif should_advance and self.current_topic_index >= len(self.steps) - 1:
                 # Last step complete — mark index past end so exit ticket triggers
+                self._mark_step_objective_covered(self.current_topic_index)
                 self.current_topic_index = len(self.steps)
                 self._step_just_advanced = True
+
+    def _mark_step_objective_covered(self, step_index: int):
+        """Mark the enabling objective of the given step as covered (P1.2)."""
+        if not self.enabling_objectives:
+            return
+        if step_index < 0 or step_index >= len(self.steps):
+            return
+        step_eo = getattr(self.steps[step_index], 'enabling_objective', '')
+        if not step_eo:
+            return
+        for obj in self.enabling_objectives:
+            if obj['objective'] == step_eo.strip():
+                obj['covered'] = True
+                break
 
     def _llm_evaluate_response(self, student_input: str, tutor_response: str) -> dict:
         """Use LLM to semantically evaluate whether the student answered correctly.
@@ -3275,17 +3390,23 @@ Which concept numbers were meaningfully covered?"""
             q = q_map.get(concept['id'])
             if not q:
                 continue
-            exit_questions.append({
+            q_type = getattr(q, 'question_type', 'mcq') or 'mcq'
+            q_data = {
                 'index': i,
+                'question_type': q_type,
                 'question': q.question_text,
-                'options': [
+            }
+            if q_type == 'mcq':
+                q_data['options'] = [
                     {'letter': 'A', 'text': q.option_a},
                     {'letter': 'B', 'text': q.option_b},
                     {'letter': 'C', 'text': q.option_c},
                     {'letter': 'D', 'text': q.option_d},
-                ],
-                'correct': q.correct_answer,
-            })
+                ]
+                q_data['correct'] = q.correct_answer
+            else:
+                q_data['answer_data'] = q.answer_data or {}
+            exit_questions.append(q_data)
 
         if not exit_questions:
             return self._complete_session()
@@ -3327,8 +3448,59 @@ Which concept numbers were meaningfully covered?"""
             is_complete=True,
         )
     
-    def submit_exit_ticket(self, answers: List[str]) -> TutorMessage:
-        """Process exit ticket submission using the pre-selected randomized questions."""
+    def _grade_exit_question(self, question, student_answer) -> bool:
+        """Grade an exit ticket question based on its type (P1.3).
+
+        Returns True if correct, False otherwise. All grading is deterministic
+        (no LLM) for speed and consistency.
+        """
+        q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
+
+        if q_type == 'mcq':
+            return (student_answer or '').upper().strip() == (question.correct_answer or '').upper().strip()
+
+        data = question.answer_data or {}
+
+        if q_type == 'fill_in_blank':
+            blanks = data.get('blanks', [])
+            alternatives = data.get('accept_alternatives', [])
+            student_blanks = student_answer if isinstance(student_answer, list) else [student_answer]
+            correct_count = 0
+            for idx, expected in enumerate(blanks):
+                given = (student_blanks[idx] if idx < len(student_blanks) else '').strip().lower()
+                accepted = {expected.lower()}
+                if idx < len(alternatives):
+                    accepted.update(a.lower() for a in alternatives[idx])
+                if given in accepted:
+                    correct_count += 1
+            return correct_count == len(blanks)
+
+        if q_type == 'matching':
+            pairs = data.get('pairs', [])
+            correct_map = {p['left'].lower(): p['right'].lower() for p in pairs}
+            student_map = student_answer if isinstance(student_answer, dict) else {}
+            correct_count = sum(
+                1 for left, right in student_map.items()
+                if correct_map.get(left.lower(), '') == right.lower()
+            )
+            return correct_count == len(correct_map)
+
+        if q_type in ('short_answer', 'data_interpretation'):
+            keywords = data.get('keywords', [])
+            min_kw = data.get('min_keywords', 2)
+            text = (student_answer if isinstance(student_answer, str) else '').lower()
+            matched = sum(1 for kw in keywords if kw.lower() in text)
+            return matched >= min_kw
+
+        # Unknown type — default to incorrect
+        return False
+
+    def submit_exit_ticket(self, answers) -> TutorMessage:
+        """Process exit ticket submission using the pre-selected randomized questions.
+
+        answers: List of answers — each is a string (MCQ letter), list (fill_in_blank),
+                 dict (matching pairs), or string (short answer/data interpretation).
+        """
         from apps.tutoring.models import ExitTicketQuestion
 
         if not self.exit_ticket_concepts:
@@ -3338,42 +3510,49 @@ Which concept numbers were meaningfully covered?"""
         selected_ids = [c['id'] for c in self.exit_ticket_concepts]
         q_map = {q.id: q for q in ExitTicketQuestion.objects.filter(id__in=selected_ids)}
         questions = [q_map[qid] for qid in selected_ids if qid in q_map]
-        
+
         # Grade
         correct = 0
         results = []
         failed_questions = []
-        
+
         for i, q in enumerate(questions):
-            student_answer = answers[i].upper() if i < len(answers) else ''
-            is_correct = student_answer == q.correct_answer.upper()
+            raw_answer = answers[i] if i < len(answers) else ''
+            # Support both old format (plain string) and new format ({type, answer})
+            if isinstance(raw_answer, dict) and 'answer' in raw_answer:
+                student_answer = raw_answer['answer']
+            else:
+                student_answer = raw_answer
+
+            is_correct = self._grade_exit_question(q, student_answer)
             if is_correct:
                 correct += 1
             else:
-                # Track failed questions for remediation
+                q_type = getattr(q, 'question_type', 'mcq') or 'mcq'
                 failed_questions.append({
                     'id': q.id,
                     'index': i,
                     'question': q.question_text,
                     'student_answer': student_answer,
-                    'correct_answer': q.correct_answer,
-                    'correct_text': getattr(q, f'option_{q.correct_answer.lower()}', ''),
+                    'correct_answer': q.correct_answer if q_type == 'mcq' else str(q.answer_data or {}),
+                    'correct_text': getattr(q, f'option_{(q.correct_answer or "a").lower()}', '') if q_type == 'mcq' else '',
                     'explanation': q.explanation,
                 })
-            
+
             results.append({
                 'index': i,
                 'question': q.question_text,
+                'question_type': getattr(q, 'question_type', 'mcq') or 'mcq',
                 'selected': student_answer,
-                'correct_answer': q.correct_answer,
+                'correct_answer': q.correct_answer if (getattr(q, 'question_type', 'mcq') or 'mcq') == 'mcq' else q.answer_data,
                 'is_correct': is_correct,
                 'explanation': q.explanation,
             })
-        
+
         passed = correct >= 8
-        
+
         self.session.mastery_achieved = passed
-        
+
         if passed:
             self._save_state()
             return self._complete_session_with_results(results, correct)

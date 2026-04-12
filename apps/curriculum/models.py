@@ -8,6 +8,7 @@ Hierarchy: Course > Unit > Lesson > LessonStep
 """
 
 from django.db import models
+from django.contrib.auth.models import User
 from apps.accounts.models import Institution
 
 
@@ -64,6 +65,16 @@ class Unit(models.Model):
         blank=True,
         help_text="Target grade level(s), e.g. 'S1', 'S1,S2'. Empty = visible to all grades in the course."
     )
+    terminal_objectives = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Unit-level terminal objectives — what students must achieve by end of unit"
+    )
+    enabling_objectives = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Unit-level enabling objectives — granular teaching steps from the syllabus"
+    )
 
     class Meta:
         ordering = ['order_index']
@@ -93,6 +104,12 @@ class Lesson(models.Model):
         READY = 'ready', 'Ready'
         FAILED = 'failed', 'Failed'
 
+    class ContentQuality(models.TextChoices):
+        TIER_1 = 'tier_1', 'Tier 1 - Fully Resourced'
+        TIER_2 = 'tier_2', 'Tier 2 - Syllabus + Exam'
+        TIER_3 = 'tier_3', 'Tier 3 - Syllabus Only'
+        TIER_4 = 'tier_4', 'Tier 4 - Framework Only'
+
     unit = models.ForeignKey(
         Unit,
         on_delete=models.CASCADE,
@@ -120,9 +137,36 @@ class Lesson(models.Model):
         help_text="Status of generated content for this lesson"
     )
 
+    # Enabling objectives — the specific teaching steps for this lesson
+    enabling_objectives = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of enabling objectives this lesson covers"
+    )
+
+    # Content quality tier (P1.4)
+    content_quality = models.CharField(
+        max_length=10,
+        choices=ContentQuality.choices,
+        default=ContentQuality.TIER_3,
+        help_text="Content quality tier based on available source materials"
+    )
+    teacher_approved = models.BooleanField(
+        default=False,
+        help_text="Teacher has reviewed and approved this content (required for tier_3/tier_4)"
+    )
+    teacher_approved_at = models.DateTimeField(null=True, blank=True)
+    teacher_approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='approved_lessons',
+    )
+
     # Flexible metadata (key concepts, skills, image suggestions, etc.)
     metadata = models.JSONField(default=dict, blank=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -316,6 +360,12 @@ class LessonStep(models.Model):
         default='',
         help_text="Groups steps by concept — all steps teaching/practicing the same concept share a tag"
     )
+    enabling_objective = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="The specific enabling objective this step addresses"
+    )
 
     class Meta:
         ordering = ['order_index']
@@ -380,7 +430,55 @@ class LessonStep(models.Model):
         if not self.media:
             return False
         return bool(
-            self.media.get('images') or 
-            self.media.get('videos') or 
+            self.media.get('images') or
+            self.media.get('videos') or
             self.media.get('audio')
         )
+
+
+class SeychellesContext(models.Model):
+    """
+    Structured local context library for Seychelles.
+
+    Stores factual data about the Seychelles (economic, geographic, trade, etc.)
+    that is injected into LLM prompts during content generation and tutoring.
+    Admin-editable so data can be updated without code changes.
+    """
+    class Category(models.TextChoices):
+        ECONOMIC = 'economic', 'Economic'
+        GEOGRAPHIC = 'geographic', 'Geographic'
+        TRADE = 'trade', 'Trade'
+        CLIMATE = 'climate', 'Climate'
+        POPULATION = 'population', 'Population'
+        SUSTAINABLE_DEV = 'sustainable_dev', 'Sustainable Development'
+        OS_MAP = 'os_map', 'OS Map Data'
+        INDUSTRY = 'industry', 'Industry'
+
+    category = models.CharField(max_length=30, choices=Category.choices)
+    title = models.CharField(max_length=200)
+    content = models.TextField(help_text="The factual content or data point")
+    subject_tags = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Subjects this is relevant to, e.g. ['geography', 'economics']"
+    )
+    grade_levels = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Applicable grade levels, e.g. ['S1', 'S2', 'S3']"
+    )
+    source = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Data source or attribution"
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['category', 'title']
+        verbose_name_plural = 'Seychelles context entries'
+
+    def __str__(self):
+        return f"[{self.get_category_display()}] {self.title}"

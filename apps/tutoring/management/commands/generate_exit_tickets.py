@@ -17,36 +17,41 @@ from apps.llm.client import get_llm_client
 from apps.llm.models import ModelConfig
 
 
-EXIT_TICKET_PROMPT = """Generate exactly 35 multiple choice questions for a summative assessment (exit ticket) question bank on this lesson.
+EXIT_TICKET_PROMPT = """Generate a mixed-format question bank (35 questions) for a summative assessment (exit ticket) on this lesson.
 
 LESSON: {lesson_title}
 OBJECTIVE: {lesson_objective}
 SUBJECT: {subject}
-{exam_context}
-REQUIREMENTS:
-1. Generate EXACTLY 35 questions
-2. Each question must have exactly 4 options (A, B, C, D)
-3. Include one correct answer per question
-4. Include a short concept_tag for each question (the specific concept it tests)
-5. Questions should directly assess the lesson objective
-6. Use context relevant to Seychelles secondary school students
-7. Vary question phrasing — avoid repetitive stems
+{exam_context}{seychelles_context}
+QUESTION FORMAT MIX (EXACTLY 35 questions total):
+- 20 MCQ (multiple choice, 4 options each)
+- 5 FILL_IN_BLANK (sentence with blanks to complete)
+- 4 MATCHING (match terms to definitions)
+- 3 SHORT_ANSWER (1-3 sentence written response)
+- 3 DATA_INTERPRETATION (analyze data then answer)
 
-OUTPUT FORMAT (JSON array):
-[
-    {{
-        "question": "What is...?",
-        "option_a": "First option",
-        "option_b": "Second option",
-        "option_c": "Third option",
-        "option_d": "Fourth option",
-        "correct": "B",
-        "explanation": "B is correct because...",
-        "difficulty": "easy",
-        "concept_tag": "relief rainfall"
-    }},
-    ...
-]
+REQUIREMENTS:
+1. Generate EXACTLY 35 questions in the format mix above
+2. Each question must have a concept_tag (the specific concept it tests)
+3. Use context relevant to Seychelles secondary school students
+4. Vary question phrasing — avoid repetitive stems
+
+OUTPUT FORMAT (JSON array — each question has a "question_type" field):
+
+MCQ format:
+{{"question_type": "mcq", "question": "What is...?", "option_a": "...", "option_b": "...", "option_c": "...", "option_d": "...", "correct": "B", "explanation": "...", "difficulty": "easy", "concept_tag": "..."}}
+
+FILL_IN_BLANK format:
+{{"question_type": "fill_in_blank", "question": "Complete the sentence:", "answer_data": {{"text_template": "The ___ of a country is measured using ___ per capita figures.", "blanks": ["GNP", "US dollar"], "accept_alternatives": [["gross national product", "Gross National Product"], ["USD", "American dollar"]]}}, "explanation": "...", "difficulty": "easy", "concept_tag": "..."}}
+
+MATCHING format:
+{{"question_type": "matching", "question": "Match each term to its definition:", "answer_data": {{"pairs": [{{"left": "GNP", "right": "Total value of goods and services"}}, {{"left": "HDI", "right": "Measure combining health, education, income"}}], "distractor_rights": ["Population growth rate"]}}, "explanation": "...", "difficulty": "medium", "concept_tag": "..."}}
+
+SHORT_ANSWER format:
+{{"question_type": "short_answer", "question": "Explain why HDI is considered a better measure of development than GNP.", "answer_data": {{"model_answer": "HDI is better because it measures health, education and income, not just economic output.", "keywords": ["health", "education", "income", "not just economic"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "..."}}
+
+DATA_INTERPRETATION format:
+{{"question_type": "data_interpretation", "question": "Study the data below and answer:", "answer_data": {{"data_description": "Table: Country A - GNP $500, HDI 0.4 | Country B - GNP $2000, HDI 0.65 | Country C - GNP $800, HDI 0.75", "model_answer": "Country C has the highest HDI despite not having the highest GNP, showing that wealth alone does not determine development.", "keywords": ["Country C", "highest HDI", "wealth", "development"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "..."}}
 
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (recall facts)
@@ -147,19 +152,27 @@ class Command(BaseCommand):
 
                     # Create questions (up to 35 in the bank, 10 selected per session)
                     for i, q in enumerate(questions):
-                        ExitTicketQuestion.objects.create(
-                            exit_ticket=exit_ticket,
-                            question_text=q['question'],
-                            option_a=q['option_a'],
-                            option_b=q['option_b'],
-                            option_c=q['option_c'],
-                            option_d=q['option_d'],
-                            correct_answer=q['correct'],
-                            explanation=q.get('explanation', ''),
-                            concept_tag=q.get('concept_tag', ''),
-                            difficulty=q.get('difficulty', 'medium'),
-                            order_index=i,
-                        )
+                        q_type = q.get('question_type', 'mcq')
+                        kwargs = {
+                            'exit_ticket': exit_ticket,
+                            'question_type': q_type,
+                            'question_text': q['question'],
+                            'explanation': q.get('explanation', ''),
+                            'concept_tag': q.get('concept_tag', ''),
+                            'difficulty': q.get('difficulty', 'medium'),
+                            'order_index': i,
+                        }
+                        if q_type == 'mcq':
+                            kwargs.update({
+                                'option_a': q.get('option_a', ''),
+                                'option_b': q.get('option_b', ''),
+                                'option_c': q.get('option_c', ''),
+                                'option_d': q.get('option_d', ''),
+                                'correct_answer': q.get('correct', ''),
+                            })
+                        else:
+                            kwargs['answer_data'] = q.get('answer_data', {})
+                        ExitTicketQuestion.objects.create(**kwargs)
                     
                     self.stdout.write(self.style.SUCCESS(f"  ✓ Created exit ticket with {len(questions)} questions"))
                     
@@ -192,11 +205,26 @@ class Command(BaseCommand):
         except Exception as e:
             self.stderr.write(f"  KB query failed (continuing without): {e}")
 
+        # Get Seychelles context for grounding (P1.5)
+        seychelles_context = ""
+        try:
+            from apps.curriculum.models import SeychellesContext
+            entries = SeychellesContext.objects.filter(
+                is_active=True,
+                subject_tags__contains=subject.lower(),
+            ).values('title', 'content')[:8]
+            if entries:
+                lines = "\n".join(f"- {e['title']}: {e['content']}" for e in entries)
+                seychelles_context = f"\nSEYCHELLES CONTEXT (use these real facts):\n{lines}\n"
+        except Exception:
+            pass
+
         prompt = EXIT_TICKET_PROMPT.format(
             lesson_title=lesson.title,
             lesson_objective=lesson.objective,
             subject=subject,
             exam_context=exam_context,
+            seychelles_context=seychelles_context,
         )
         
         from apps.llm.prompts import get_prompt_or_default

@@ -91,6 +91,10 @@ class LessonStepSchema(BaseModel):
     answer_type: str = Field(default="none", description="Answer type: none, short_numeric, short_text, multiple_choice, or free_response")
     expected_answer: Optional[str] = Field(default=None, description="Correct answer. For multiple_choice, the letter (A/B/C/D)")
     choices: Optional[List[str]] = Field(default=None, description="MCQ options: ['A) ...', 'B) ...', 'C) ...', 'D) ...']")
+    enabling_objective: Optional[str] = Field(default="", description=(
+        "The specific enabling objective this step addresses. "
+        "Map each step to one of the lesson's enabling objectives if provided."
+    ))
     hints: Optional[List[str]] = Field(default=None, description="2-3 hints scaffolded from general to specific")
     media: Optional[StepMedia] = Field(default=None, description="Media for this step, only if teacher_script references it")
     educational_content: Optional[EducationalContent] = None
@@ -188,6 +192,11 @@ class LessonContentGenerator:
 
         # Get curriculum context
         curriculum_context = self._get_curriculum_context(lesson)
+
+        # Auto-detect content quality tier (P1.4)
+        content_quality = self._determine_content_quality(curriculum_context)
+        lesson.content_quality = content_quality
+        lesson.save(update_fields=['content_quality'])
 
         # Generate steps
         steps_data = self._generate_steps(lesson, curriculum_context)
@@ -296,6 +305,28 @@ class LessonContentGenerator:
             "Provide scaffolded practice"
         ])
 
+    def _determine_content_quality(self, curriculum_context: Dict) -> str:
+        """Determine content quality tier based on available source materials."""
+        has_related_content = bool(curriculum_context.get('related_content'))
+        has_figures = bool(curriculum_context.get('figure_descriptions'))
+        has_objectives = bool(curriculum_context.get('objectives'))
+
+        # Check for exam bank content in KB
+        has_exam = False
+        if has_related_content:
+            for chunk in curriculum_context.get('related_content', []):
+                if any(kw in (chunk or '').lower() for kw in ['exam', 'assessment', 'mark scheme', 'past paper']):
+                    has_exam = True
+                    break
+
+        if has_related_content and has_exam:
+            return 'tier_2'  # Syllabus + Exam
+        if has_related_content or has_figures:
+            return 'tier_1'  # Fully Resourced (has KB content)
+        if has_objectives:
+            return 'tier_3'  # Syllabus Only
+        return 'tier_4'  # Framework Only
+
     def _generate_steps(self, lesson, curriculum_context: Dict) -> Dict:
         """Generate lesson steps using instructor for guaranteed structured output."""
 
@@ -341,6 +372,37 @@ base your media descriptions on these figures so generated images match the text
 {chr(10).join(fig_lines)}
 """
 
+        # Build enabling objectives section
+        enabling_objectives = lesson.enabling_objectives or []
+        enabling_obj_str = ""
+        if enabling_objectives:
+            eo_lines = "\n".join(f"  EO{i+1}: {obj}" for i, obj in enumerate(enabling_objectives))
+            enabling_obj_str = f"""
+ENABLING OBJECTIVES (each step MUST map to one of these):
+{eo_lines}
+Every enabling objective must be covered by at least one step. Set each step's
+enabling_objective field to the exact text of the objective it addresses.
+"""
+        # Build Seychelles context library section
+        seychelles_str = ""
+        try:
+            from apps.curriculum.models import SeychellesContext
+            sey_entries = SeychellesContext.objects.filter(is_active=True)
+            if subject:
+                sey_entries = sey_entries.filter(subject_tags__contains=subject.lower())
+            sey_entries = list(sey_entries.values('category', 'title', 'content')[:12])
+            if sey_entries:
+                sey_lines = "\n".join(
+                    f"- [{e['category'].upper()}] {e['title']}: {e['content']}"
+                    for e in sey_entries
+                )
+                seychelles_str = f"""
+SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data):
+{sey_lines}
+"""
+        except Exception as e:
+            logger.warning(f"Failed to load Seychelles context: {e}")
+
         # Prompt focuses on CONTENT, not FORMAT — instructor handles the schema
         prompt = f"""Create a complete tutoring session for this lesson.
 
@@ -352,8 +414,7 @@ GRADE: {grade} (Seychelles secondary school)
 
 TEACHING STRATEGIES TO USE:
 {strategies_str}
-{kb_context_str}{figures_str}
-
+{kb_context_str}{figures_str}{enabling_obj_str}{seychelles_str}
 Create 12-18 CONCEPT-GROUPED steps. The student must master each concept before moving to the next.
 
 STRUCTURE:
@@ -461,6 +522,7 @@ CONTENT GUIDELINES:
                     'phase': step_data.get('phase', ''),
                     'step_type': step_data.get('step_type', 'teach'),
                     'concept_tag': step_data.get('concept_tag', ''),
+                    'enabling_objective': step_data.get('enabling_objective', ''),
                     'teacher_script': step_data.get('teacher_script', ''),
                     'question': step_data.get('question') or '',
                     'answer_type': step_data.get('answer_type', 'none'),

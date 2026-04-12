@@ -770,6 +770,102 @@ body {
 }
 .option.selected .letter { background: #18181b; color: #fff; }
 
+/* ── Multi-Format Exit Ticket Styles (P1.3) ── */
+.q-type-badge {
+    display: inline-block;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+.q-type-mcq { background: #dbeafe; color: #1e40af; }
+.q-type-fill_in_blank { background: #fce7f3; color: #9d174d; }
+.q-type-matching { background: #ede9fe; color: #7c3aed; }
+.q-type-short_answer { background: #d1fae5; color: #065f46; }
+.q-type-data_interpretation { background: #fef3c7; color: #92400e; }
+
+.exit-blank-input {
+    display: inline-block;
+    width: 120px;
+    padding: 0.25rem 0.5rem;
+    border: 2px solid #a1a1aa;
+    border-radius: 0.375rem;
+    font-size: 0.9375rem;
+    text-align: center;
+    margin: 0 0.25rem;
+}
+.exit-blank-input:focus { border-color: #18181b; outline: none; }
+
+.matching-body { display: flex; flex-direction: column; gap: 0.5rem; }
+.matching-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+}
+.matching-left {
+    font-weight: 600;
+    min-width: 100px;
+    padding: 0.375rem 0.75rem;
+    background: #f4f4f5;
+    border-radius: 0.375rem;
+}
+.matching-arrow { color: #a1a1aa; font-size: 1.25rem; }
+.matching-select {
+    flex: 1;
+    padding: 0.5rem;
+    border: 2px solid #e4e4e7;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    background: #fff;
+}
+.matching-select:focus { border-color: #18181b; outline: none; }
+
+.exit-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e4e4e7;
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 80px;
+}
+.exit-textarea:focus { border-color: #18181b; outline: none; }
+
+.data-description {
+    padding: 0.75rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+
+.exit-result-correct {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #d1fae5;
+    color: #065f46;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+.exit-result-incorrect {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+}
+
 .submit-btn {
     width: 100%;
     padding: 0.875rem;
@@ -1471,42 +1567,112 @@ function updateStreamingMessage(div, content, media = []) {
 
 function showExitTicket() {
     if (!exitTicketData) return;
-    
+
     document.getElementById('input-area').style.display = 'none';
-    
+
     const container = document.getElementById('exit-questions');
     container.innerHTML = '';
-    
+
     exitTicketData.questions.forEach((q, i) => {
         const div = document.createElement('div');
         div.className = 'exit-question';
-        div.innerHTML = `
-            <div class="question-num">Question ${i + 1}</div>
-            <div class="question-text">${q.question}</div>
-            <div class="options" data-q="${i}">
-                ${q.options.map(opt => `
+        const qType = q.question_type || 'mcq';
+        let bodyHTML = '';
+
+        if (qType === 'mcq') {
+            bodyHTML = `<div class="options" data-q="${i}">
+                ${(q.options || []).map(opt => `
                     <div class="option" data-letter="${opt.letter}" onclick="selectOption(${i}, '${opt.letter}', this)">
                         <span class="letter">${opt.letter}</span>
                         <span>${opt.text}</span>
                     </div>
                 `).join('')}
-            </div>
+            </div>`;
+        } else if (qType === 'fill_in_blank') {
+            const ad = q.answer_data || {};
+            const tpl = (ad.text_template || '').replace(/___/g, () =>
+                `<input type="text" class="exit-blank-input" data-q="${i}" data-blank-idx placeholder="..." oninput="collectBlankAnswer(${i})">`
+            );
+            bodyHTML = `<div class="fill-blank-body" data-q="${i}">${tpl}</div>`;
+        } else if (qType === 'matching') {
+            const ad = q.answer_data || {};
+            const pairs = ad.pairs || [];
+            const allRights = pairs.map(p => p.right).concat(ad.distractor_rights || []);
+            allRights.sort(() => Math.random() - 0.5);
+            const optionsHTML = allRights.map(r => `<option value="${r}">${r}</option>`).join('');
+            bodyHTML = `<div class="matching-body" data-q="${i}">
+                ${pairs.map((p, pi) => `
+                    <div class="matching-row">
+                        <span class="matching-left">${p.left}</span>
+                        <span class="matching-arrow">&rarr;</span>
+                        <select class="matching-select" data-q="${i}" data-pair="${pi}" onchange="collectMatchingAnswer(${i})">
+                            <option value="">Select...</option>
+                            ${optionsHTML}
+                        </select>
+                    </div>
+                `).join('')}
+            </div>`;
+        } else if (qType === 'short_answer' || qType === 'data_interpretation') {
+            const ad = q.answer_data || {};
+            const dataDesc = ad.data_description ? `<div class="data-description">${ad.data_description}</div>` : '';
+            bodyHTML = `${dataDesc}
+            <textarea class="exit-textarea" data-q="${i}" rows="3" placeholder="Type your answer..." oninput="collectTextAnswer(${i}, this)"></textarea>`;
+        }
+
+        div.innerHTML = `
+            <div class="question-num">Question ${i + 1} <span class="q-type-badge q-type-${qType}">${qType.replace(/_/g, ' ')}</span></div>
+            <div class="question-text">${q.question}</div>
+            ${bodyHTML}
         `;
         container.appendChild(div);
     });
-    
+
     document.getElementById('exit-modal').style.display = 'flex';
 }
 
 function selectOption(qIndex, letter, el) {
-    // Deselect others
     el.parentElement.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
     el.classList.add('selected');
     exitAnswers[qIndex] = letter;
-    
-    // Enable submit if all answered
-    document.getElementById('submit-exit').disabled = 
-        Object.keys(exitAnswers).length < exitTicketData.questions.length;
+    checkExitSubmitReady();
+}
+
+function collectBlankAnswer(qIndex) {
+    const inputs = document.querySelectorAll(`.exit-blank-input[data-q="${qIndex}"]`);
+    const values = Array.from(inputs).map(inp => inp.value.trim());
+    exitAnswers[qIndex] = values;
+    checkExitSubmitReady();
+}
+
+function collectMatchingAnswer(qIndex) {
+    const selects = document.querySelectorAll(`.matching-select[data-q="${qIndex}"]`);
+    const q = exitTicketData.questions[qIndex];
+    const pairs = (q.answer_data || {}).pairs || [];
+    const mapping = {};
+    selects.forEach((sel, idx) => {
+        if (sel.value && idx < pairs.length) mapping[pairs[idx].left] = sel.value;
+    });
+    exitAnswers[qIndex] = mapping;
+    checkExitSubmitReady();
+}
+
+function collectTextAnswer(qIndex, el) {
+    exitAnswers[qIndex] = el.value.trim();
+    checkExitSubmitReady();
+}
+
+function checkExitSubmitReady() {
+    const total = exitTicketData.questions.length;
+    let answered = 0;
+    for (let i = 0; i < total; i++) {
+        const a = exitAnswers[i];
+        if (a !== undefined && a !== '' && a !== null) {
+            if (Array.isArray(a) && a.some(v => v)) answered++;
+            else if (typeof a === 'object' && !Array.isArray(a) && Object.keys(a).length > 0) answered++;
+            else if (typeof a === 'string' && a) answered++;
+        }
+    }
+    document.getElementById('submit-exit').disabled = answered < total;
 }
 
 async function submitExitTicket() {
@@ -1514,7 +1680,7 @@ async function submitExitTicket() {
     for (let i = 0; i < exitTicketData.questions.length; i++) {
         answers.push(exitAnswers[i] || '');
     }
-    
+
     try {
         const response = await fetch(`/tutor/api/chat/${sessionId}/exit-ticket/`, {
             method: 'POST',
@@ -1524,26 +1690,24 @@ async function submitExitTicket() {
             },
             body: JSON.stringify({ answers }),
         });
-        
+
         const data = await response.json();
-        
-        // Show results
+
         if (data.exit_ticket && data.exit_ticket.results) {
             showExitResults(data.exit_ticket.results);
         }
-        
+
         setTimeout(() => {
             document.getElementById('exit-modal').style.display = 'none';
             if (data.is_complete) {
                 const gam = data.exit_ticket && data.exit_ticket.gamification ? data.exit_ticket.gamification : null;
                 showCompletion(data.message, gam);
             } else {
-                // Failed - show message and let them try again
                 document.getElementById('input-area').style.display = 'block';
                 addMessage('tutor', data.message);
             }
         }, 2000);
-        
+
     } catch (error) {
         console.error('Submit error:', error);
         alert('Failed to submit. Please try again.');
@@ -1552,17 +1716,24 @@ async function submitExitTicket() {
 
 function showExitResults(results) {
     results.forEach(r => {
-        const options = document.querySelector(`[data-q="${r.index}"]`);
-        if (!options) return;
-        
-        options.querySelectorAll('.option').forEach(opt => {
-            const letter = opt.dataset.letter;
-            if (letter === r.correct_answer) {
-                opt.classList.add('correct');
-            } else if (letter === r.selected && !r.is_correct) {
-                opt.classList.add('incorrect');
-            }
-        });
+        const qType = r.question_type || 'mcq';
+        if (qType === 'mcq') {
+            const options = document.querySelector(`[data-q="${r.index}"].options`);
+            if (!options) return;
+            options.querySelectorAll('.option').forEach(opt => {
+                const letter = opt.dataset.letter;
+                if (letter === r.correct_answer) opt.classList.add('correct');
+                else if (letter === r.selected && !r.is_correct) opt.classList.add('incorrect');
+            });
+        } else {
+            // For non-MCQ: show a result indicator on the question container
+            const qDiv = document.querySelectorAll('.exit-question')[r.index];
+            if (!qDiv) return;
+            const indicator = document.createElement('div');
+            indicator.className = r.is_correct ? 'exit-result-correct' : 'exit-result-incorrect';
+            indicator.textContent = r.is_correct ? 'Correct!' : `Incorrect. ${r.explanation || ''}`;
+            qDiv.appendChild(indicator);
+        }
     });
 }
 
