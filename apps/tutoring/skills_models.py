@@ -149,6 +149,12 @@ class Skill(models.Model):
         default=False,
         help_text="True if this skill was auto-created from a curriculum enabling objective"
     )
+    source_code = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text="Original curriculum code if any (e.g. K408, S401, S510)"
+    )
 
     # Metadata
     tags = models.JSONField(

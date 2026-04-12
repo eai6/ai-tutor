@@ -619,6 +619,31 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
     except Exception as e:
         logger.warning(f"KB query failed for exit ticket: {e}")
 
+    # Query figures from KB for data_interpretation questions
+    figure_context = ""
+    try:
+        figures = kb.query_for_figure_descriptions(
+            topic=f"{lesson.title} {lesson.objective or ''}",
+            subject=subject,
+            n_results=3,
+        )
+        if figures:
+            fig_lines = []
+            for fig in figures:
+                url = fig.get('image_url', '')
+                desc = fig.get('description', '')
+                if desc:
+                    fig_lines.append(f"- [{fig.get('figure_type', 'figure').upper()}] {desc[:200]}" +
+                                     (f" (image: {url})" if url else ""))
+            if fig_lines:
+                figure_context = (
+                    "\nAVAILABLE FIGURES FROM TEXTBOOKS/WORKSHEETS:\n"
+                    + "\n".join(fig_lines)
+                    + "\nFor DATA_INTERPRETATION questions, you can reference these figures in data_description.\n"
+                )
+    except Exception:
+        pass
+
     # Seychelles context
     seychelles_context = ""
     try:
@@ -640,6 +665,9 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
         exam_context=exam_context,
         seychelles_context=seychelles_context,
     )
+    # Append figure context if available
+    if figure_context:
+        prompt += "\n" + figure_context
 
     from apps.llm.prompts import get_prompt_or_default
     exit_sys_prompt = get_prompt_or_default(

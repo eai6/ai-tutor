@@ -66,6 +66,15 @@ def process_teaching_material(upload_id: int):
             f"{upload.chunks_created} chunks indexed{figures_msg}"
         )
 
+        # Cross-document matching: enrich lessons with worksheet metadata (P2.2)
+        if upload.material_type in ('worksheet', 'question_bank') and upload.course:
+            try:
+                matched = _match_worksheet_to_objectives(upload, kb)
+                if matched:
+                    upload.add_log(f"Matched worksheet to {matched} lesson(s)")
+            except Exception as e:
+                logger.warning(f"Worksheet matching failed: {e}")
+
         logger.info(
             f"Teaching material processed: {upload.title} "
             f"({upload.chunks_created} chunks, {figures_indexed} figures)"
@@ -100,6 +109,111 @@ def _find_matching_course(upload):
         q &= Q(institution__isnull=True)
 
     return Course.objects.filter(q).first()
+
+
+def _match_worksheet_to_objectives(upload, kb) -> int:
+    """Match worksheet content to curriculum objectives via KB semantic similarity.
+
+    Enriches lesson metadata with worksheet-derived calibration:
+    - vocabulary_register: terms and their usage level
+    - question_formats: what question types appear
+    - concept_emphasis: which objectives get most practice
+
+    Returns number of lessons matched.
+    """
+    from apps.curriculum.models import Lesson
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+
+    course = upload.course
+    if not course:
+        return 0
+
+    lessons = Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
+    if not lessons.exists():
+        return 0
+
+    # Query KB for worksheet chunks
+    worksheet_chunks = kb.query(
+        query_text=f"{upload.title} {upload.subject_name} worksheet exercises questions",
+        n_results=20,
+    )
+    if not worksheet_chunks or not worksheet_chunks.get('chunks'):
+        return 0
+
+    worksheet_text = "\n".join(
+        c.get('content', '')[:500] for c in worksheet_chunks['chunks'][:10]
+        if c.get('content')
+    )
+    if not worksheet_text.strip():
+        return 0
+
+    # Use LLM to match worksheet content to lessons
+    model_config = ModelConfig.get_for('generation')
+    if not model_config:
+        return 0
+    llm_client = get_llm_client(model_config)
+
+    lesson_list = "\n".join(
+        f"{i+1}. [{l.id}] {l.title} — {l.objective[:100]}"
+        for i, l in enumerate(lessons[:20])
+    )
+
+    prompt = f"""Analyze this worksheet content and match it to the most relevant lessons.
+
+WORKSHEET: {upload.title}
+CONTENT SAMPLE:
+{worksheet_text[:3000]}
+
+AVAILABLE LESSONS:
+{lesson_list}
+
+For each lesson that the worksheet content is relevant to, provide:
+- "lesson_id": the ID number from the list above
+- "vocabulary": list of key terms used in the worksheet for this topic
+- "question_formats": list of question types found (e.g., "multiple_choice", "fill_in_blank", "calculation", "word_problem", "matching", "diagram_interpretation")
+- "emphasis_score": 0.0-1.0 how much the worksheet focuses on this lesson's topic
+
+Return a JSON array. Only include lessons with emphasis_score >= 0.3.
+Return ONLY valid JSON."""
+
+    try:
+        response = llm_client.generate(
+            messages=[{"role": "user", "content": prompt}],
+            system_prompt="You are a curriculum alignment expert. Match worksheet content to lesson objectives precisely. Return only valid JSON.",
+            max_tokens=4000,
+        )
+
+        from apps.llm.json_utils import parse_llm_json
+        matches = parse_llm_json(response.content, expect_array=True)
+        if not matches or not isinstance(matches, list):
+            return 0
+
+        matched_count = 0
+        for match in matches:
+            lesson_id = match.get('lesson_id')
+            if not lesson_id:
+                continue
+            try:
+                lesson = Lesson.objects.get(id=lesson_id, unit__course=course)
+                metadata = lesson.metadata or {}
+                metadata['worksheet_calibration'] = {
+                    'source': upload.title,
+                    'vocabulary': match.get('vocabulary', []),
+                    'question_formats': match.get('question_formats', []),
+                    'emphasis_score': match.get('emphasis_score', 0.5),
+                }
+                lesson.metadata = metadata
+                lesson.save(update_fields=['metadata'])
+                matched_count += 1
+            except Lesson.DoesNotExist:
+                continue
+
+        return matched_count
+
+    except Exception as e:
+        logger.warning(f"Worksheet-to-objective matching failed: {e}")
+        return 0
 
 
 def link_unlinked_materials():

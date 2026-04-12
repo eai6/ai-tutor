@@ -457,22 +457,31 @@ Return JSON:
             if not eo_text:
                 continue
 
+            # Extract source code if present (e.g., "K408: ..." or "S401: ...")
+            source_code = ''
+            clean_eo_text = eo_text
+            code_match = re.match(r'^([KSA]\d{3})\s*[:.\-]\s*', eo_text)
+            if code_match:
+                source_code = code_match.group(1)
+                clean_eo_text = eo_text[code_match.end():].strip()
+
             # Generate deterministic code from text
-            slug = re.sub(r'[^a-z0-9]+', '_', eo_text[:60].lower()).strip('_')
-            code = f"eo_{slug}"
+            slug = re.sub(r'[^a-z0-9]+', '_', clean_eo_text[:60].lower()).strip('_')
+            code = f"eo_{slug}" if not source_code else f"eo_{source_code.lower()}_{slug[:40]}"
 
             # Infer Bloom level and difficulty from action verb
-            bloom = self._infer_bloom_level(eo_text)
+            bloom = self._infer_bloom_level(clean_eo_text)
             difficulty_label, difficulty_score = self.BLOOM_DIFFICULTY.get(bloom, ('intermediate', 0.5))
 
             skill, created = Skill.objects.get_or_create(
                 institution_id=self.institution_id,
                 code=code,
                 defaults={
-                    'name': eo_text[:200],
+                    'name': clean_eo_text[:200],
                     'description': f"Enabling objective: {eo_text}",
                     'enabling_objective_text': eo_text,
                     'is_enabling_objective': True,
+                    'source_code': source_code,
                     'course': course,
                     'unit': lesson.unit,
                     'primary_lesson': lesson,

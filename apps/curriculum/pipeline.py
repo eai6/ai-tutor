@@ -216,6 +216,135 @@ def _get_instructor_client():
 
 
 # ============================================================================
+# STEP 2b: KB-BASED COMPETENCY EXTRACTION (format-agnostic)
+# ============================================================================
+
+def extract_competencies_from_kb(
+    subject: str,
+    grade_level: str,
+    institution_id: int,
+    unit_title: str = "",
+) -> List[Dict]:
+    """
+    Extract standardized competencies from the KB using LLM analysis.
+
+    This is format-agnostic — it queries the vectorized KB for relevant chunks
+    from ANY uploaded document (curriculum, textbook, worksheet, exam paper)
+    and uses an LLM to extract normalized competency statements.
+
+    Returns a list of competency dicts:
+    [{"text": "Define population density", "type": "knowledge|skill|attitude",
+      "bloom_level": "remember", "source_code": "K408"}]
+    """
+    from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+
+    kb = CurriculumKnowledgeBase(institution_id=institution_id)
+    result = kb.query_for_competency_extraction(
+        subject=subject,
+        grade_level=grade_level,
+        unit_title=unit_title,
+        n_results=30,
+    )
+
+    if not result.chunks:
+        return []
+
+    # Build context from KB chunks
+    kb_context = "\n\n".join(
+        f"[Source: {c.get('section', 'Document')}]\n{c.get('content', '')}"
+        for c in result.chunks[:15]
+        if c.get('content', '').strip()
+    )
+
+    if not kb_context.strip():
+        return []
+
+    model_config = ModelConfig.get_for('generation')
+    if not model_config:
+        logger.warning("No LLM model configured for competency extraction")
+        return []
+
+    llm_client = get_llm_client(model_config)
+
+    prompt = f"""Analyze the following curriculum/teaching material and extract ALL specific learning competencies (objectives, skills, knowledge items) that students must master.
+
+SUBJECT: {subject}
+GRADE LEVEL: {grade_level}
+{f'UNIT/TOPIC: {unit_title}' if unit_title else ''}
+
+=== SOURCE MATERIAL ===
+{kb_context}
+=== END MATERIAL ===
+
+Extract every specific, measurable competency. For each one, provide:
+- "text": The competency statement (action verb + specific content, e.g., "Define population density")
+- "type": "knowledge", "skill", or "attitude"
+- "bloom_level": "remember", "understand", "apply", "analyze", "evaluate", or "create"
+- "source_code": Original curriculum code if visible (e.g., "K408", "S401"), otherwise ""
+- "strand": The topic/strand this belongs to (e.g., "Number", "Population", "Map Skills")
+
+Return a JSON array of competency objects. Extract as many as you can find — do NOT summarize or merge.
+Return ONLY valid JSON."""
+
+    try:
+        response = llm_client.generate(
+            messages=[{"role": "user", "content": prompt}],
+            system_prompt="You are a curriculum analysis expert. Extract learning competencies precisely. Return only valid JSON.",
+            max_tokens=8000,
+        )
+
+        from apps.llm.json_utils import parse_llm_json
+        competencies = parse_llm_json(response.content, expect_array=True)
+        if competencies and isinstance(competencies, list):
+            logger.info(f"Extracted {len(competencies)} competencies from KB for {subject} {grade_level}")
+            return competencies
+    except Exception as e:
+        logger.warning(f"KB competency extraction failed: {e}")
+
+    return []
+
+
+def _merge_competencies_into_structure(structure: Dict, competencies: List[Dict]):
+    """Merge KB-extracted competencies into the lesson structure as enabling_objectives.
+
+    Uses keyword matching to assign each competency to the most relevant unit/lesson.
+    Competencies that don't match any lesson are added to the unit level.
+    """
+    units = structure.get('units', [])
+    if not units or not competencies:
+        return
+
+    for comp in competencies:
+        comp_text = comp.get('text', '')
+        comp_full = f"{comp.get('source_code', '')}: {comp_text}".strip(': ')
+        comp_lower = comp_text.lower()
+        best_lesson = None
+        best_score = 0
+
+        for unit in units:
+            for lesson in unit.get('lessons', []):
+                # Score by keyword overlap between competency and lesson title/objective
+                lesson_text = f"{lesson.get('title', '')} {lesson.get('objective', '')}".lower()
+                words = set(comp_lower.split()) & set(lesson_text.split())
+                score = len(words)
+                if score > best_score:
+                    best_score = score
+                    best_lesson = lesson
+
+        if best_lesson and best_score >= 2:
+            best_lesson.setdefault('enabling_objectives', [])
+            if comp_full not in best_lesson['enabling_objectives']:
+                best_lesson['enabling_objectives'].append(comp_full)
+        else:
+            # Add to the first unit's enabling_objectives as unassigned
+            units[0].setdefault('enabling_objectives', [])
+            if comp_full not in units[0]['enabling_objectives']:
+                units[0]['enabling_objectives'].append(comp_full)
+
+
+# ============================================================================
 # STEP 3: GENERATE LESSONS (Query KB + LLM)
 # ============================================================================
 
@@ -877,6 +1006,20 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
             for unit in structure.get('units', [])[:5]:
                 upload.add_log(f"      📁 {unit['title']}: {len(unit.get('lessons', []))} lessons")
             
+            # Enrich with KB-extracted competencies (format-agnostic)
+            try:
+                competencies = extract_competencies_from_kb(
+                    subject=upload.subject_name,
+                    grade_level=upload.grade_level or 'S1',
+                    institution_id=institution_id,
+                )
+                if competencies:
+                    upload.add_log(f"   ✓ Extracted {len(competencies)} competencies from knowledge base")
+                    # Merge competencies as enabling_objectives into units/lessons
+                    _merge_competencies_into_structure(structure, competencies)
+            except Exception as e:
+                upload.add_log(f"   ⚠ Competency extraction skipped: {e}")
+
             upload.parsed_data = structure
             upload.save()
             

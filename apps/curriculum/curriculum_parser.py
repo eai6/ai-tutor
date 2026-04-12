@@ -553,79 +553,232 @@ def parse_mathematics_curriculum(text: str, grade_level: str = "S1") -> ParsedCu
     Parse Seychelles Mathematics curriculum text.
 
     The curriculum is organized by:
-    - Strands: Number, Measures, Shape & Space, Algebra, Handling Data
-    - Each strand has Terminal Objectives
+    - **Knowledge** (K-codes): Concept understanding per strand per cycle
+    - **Skills** (S-codes): Computation, Measuring, Communicating, Reasoning, Problem Solving
+    - **Attitudes** (A-codes): Learning behaviors
+    - **Terminal Objectives**: By cycle, organized by topic
+    - **Scope & Sequence**: Topics per strand per cycle
+
+    Output is organized by **strand** (as Units) with **sub-strand topic groups** (as Lessons).
+    Each lesson gets enabling_objectives from K/S/A codes + terminal objectives.
     """
+    import re as _re
     from apps.curriculum.utils import determine_cycles
     cycles = determine_cycles(grade_level)
     cycle = "/".join(cycles)
-    
-    # Define the strands
-    strands = {
-        "NUMBER": {
-            "title": "Number",
-            "terminal_objectives": [],
-        },
-        "MEASURES": {
-            "title": "Measures", 
-            "terminal_objectives": [],
-        },
-        "SHAPE AND SPACE": {
-            "title": "Shape and Space",
-            "terminal_objectives": [],
-        },
-        "ALGEBRA": {
-            "title": "Algebra",
-            "terminal_objectives": [],
-        },
-        "HANDLING DATA": {
-            "title": "Handling Data",
-            "terminal_objectives": [],
-        }
-    }
-    
-    # Extract terminal objectives from text
-    current_strand = None
+
+    # Map grade level to cycle column for K/S/A extraction
+    # Cycle 4 = S1-S2, Cycle 5 = S3-S5
+    target_cycles = set()
+    gl = grade_level.upper()
+    if gl in ('S1', 'S2'):
+        target_cycles = {'4', 'CYCLE 4'}
+    elif gl in ('S3', 'S4', 'S5'):
+        target_cycles = {'5', 'CYCLE 5'}
+    else:
+        target_cycles = {'4', '5', 'CYCLE 4', 'CYCLE 5'}
+
+    # ── Step 1: Extract coded objectives (K/S/A codes) ──
+    coded_objectives = {'K': [], 'S': [], 'A': []}
     lines = text.split('\n')
-    
     for line in lines:
-        line_clean = line.strip()
-        line_upper = line_clean.upper()
-        
-        # Detect strand headers
-        for strand_key in strands.keys():
-            if strand_key in line_upper and len(line_clean) < 80:
-                current_strand = strand_key
-                break
-        
-        # Extract objectives (bullet points)
-        if current_strand and line_clean.startswith('-'):
-            objective = line_clean[1:].strip()
-            # Filter out garbage (table borders, short text, etc.)
-            if (objective and 
-                len(objective) > 20 and 
-                not objective.startswith('---') and
-                not objective.startswith('===') and
-                not all(c in '-=|+' for c in objective.replace(' ', ''))):
-                strands[current_strand]["terminal_objectives"].append(objective)
-    
-    # Build units from strands
+        clean = line.strip()
+        # Match patterns like "K408 ...", "S401 ...", "A301 ..."
+        code_match = _re.match(r'^([KSA])(\d)(\d{2})\s+(.+)', clean)
+        if code_match:
+            prefix = code_match.group(1)      # K, S, or A
+            cycle_num = code_match.group(2)    # 1-5
+            obj_text = code_match.group(4).strip().rstrip('.')
+            full_code = f"{prefix}{code_match.group(2)}{code_match.group(3)}"
+            if cycle_num in target_cycles or f'CYCLE {cycle_num}' in target_cycles:
+                if len(obj_text) > 10:
+                    coded_objectives[prefix].append({
+                        'code': full_code,
+                        'text': obj_text,
+                        'full': f"{full_code}: {obj_text}",
+                    })
+
+    # ── Step 2: Extract terminal objectives for target cycle ──
+    terminal_objectives = {
+        'number': [], 'measures': [], 'fractions': [],
+        'shape': [], 'statistics': [], 'algebra': [],
+    }
+    current_topic = None
+    in_target_cycle = False
+
+    cycle_headers = {
+        '4': ['cycle 4', 'cycle four'],
+        '5': ['cycle 5', 'cycle five'],
+    }
+    target_cycle_keys = []
+    for tc in target_cycles:
+        tc_num = tc.replace('CYCLE ', '')
+        target_cycle_keys.extend(cycle_headers.get(tc_num, [f'cycle {tc_num}']))
+
+    for line in lines:
+        clean = line.strip()
+        lower = clean.lower()
+
+        # Detect cycle section
+        if any(ck in lower for ck in ['cycle 1', 'cycle 2', 'cycle 3', 'cycle 4', 'cycle 5']):
+            in_target_cycle = any(ck in lower for ck in target_cycle_keys)
+            continue
+
+        if not in_target_cycle:
+            continue
+
+        # Detect topic headers (match sub-headers in terminal objectives section)
+        topic_map = {
+            'whole number': 'number', 'number': 'number',
+            'addition': 'number', 'subtraction': 'number',
+            'multiplication': 'number', 'division': 'number',
+            'ratio': 'number', 'proportion': 'number', 'percentage': 'fractions',
+            'measurement': 'measures', 'measure': 'measures',
+            'length': 'measures', 'mass': 'measures', 'money': 'measures',
+            'time': 'measures', 'capacity': 'measures', 'temperature': 'measures',
+            'decimal measure': 'measures',
+            'fraction': 'fractions', 'decimal': 'fractions',
+            'shape': 'shape', 'space': 'shape', 'angle': 'shape',
+            'symmetry': 'shape', 'transformation': 'shape', 'position': 'shape',
+            '2-d': 'shape', '3-d': 'shape', 'movement': 'shape',
+            'statistic': 'statistics', 'data': 'statistics', 'handling data': 'statistics',
+            'probability': 'statistics',
+            'algebra': 'algebra', 'equation': 'algebra', 'pattern': 'algebra',
+        }
+        if len(clean) < 80:
+            for keyword, topic in topic_map.items():
+                if keyword in lower:
+                    current_topic = topic
+                    break
+
+        # Extract bullet-point objectives (handle \uf0b7 Windows bullet, •, -, etc.)
+        if current_topic and (clean.startswith('\u2022') or clean.startswith('-') or clean.startswith('•') or clean.startswith('\uf0b7')):
+            obj = clean.lstrip('•-\u2022\uf0b7 ').strip().rstrip('.')
+            if len(obj) > 15 and not obj.startswith('---'):
+                terminal_objectives[current_topic].append(obj)
+
+    # ── Step 3: Build strand-based units ──
+    STRANDS = [
+        {
+            'key': 'number',
+            'title': 'Number',
+            'sub_strands': [
+                ('Whole Numbers and Place Value', ['place value', 'read', 'write', 'order', 'numeral']),
+                ('Operations with Whole Numbers', ['add', 'subtract', 'multiply', 'divide', 'operation', 'mental']),
+                ('Fractions, Decimals and Percentages', ['fraction', 'decimal', 'percentage', 'mixed number', 'equivalent']),
+                ('Ratio and Proportion', ['ratio', 'proportion', 'scale']),
+            ],
+            'topics': ['number', 'fractions'],
+        },
+        {
+            'key': 'algebra',
+            'title': 'Algebra',
+            'sub_strands': [
+                ('Patterns and Sequences', ['pattern', 'sequence', 'term', 'generaliz']),
+                ('Expressions and Equations', ['expression', 'equation', 'formula', 'solve', 'variable', 'letter']),
+                ('Functions and Graphs', ['function', 'graph', 'coordinate', 'plot']),
+            ],
+            'topics': ['algebra'],
+        },
+        {
+            'key': 'shape',
+            'title': 'Shape and Space',
+            'sub_strands': [
+                ('2-D and 3-D Shapes', ['shape', 'triangle', 'rectangle', 'circle', 'polygon', 'cube', 'prism', 'net']),
+                ('Angles and Measurement', ['angle', 'protractor', 'degree', 'bearing']),
+                ('Symmetry and Transformation', ['symmetry', 'reflect', 'rotate', 'translate', 'transform', 'enlarg']),
+                ('Coordinates and Position', ['coordinate', 'grid', 'position', 'location']),
+            ],
+            'topics': ['shape'],
+        },
+        {
+            'key': 'measures',
+            'title': 'Measures',
+            'sub_strands': [
+                ('Money', ['money', 'rupee', 'currency', 'profit', 'loss', 'interest', 'wage']),
+                ('Time and Temperature', ['time', 'clock', 'calendar', 'temperature', 'timetable']),
+                ('Length, Mass and Capacity', ['length', 'mass', 'capacity', 'weight', 'metre', 'kilogram', 'litre', 'convert']),
+                ('Area, Perimeter and Volume', ['area', 'perimeter', 'volume', 'surface']),
+            ],
+            'topics': ['measures'],
+        },
+        {
+            'key': 'handling_data',
+            'title': 'Handling Data',
+            'sub_strands': [
+                ('Data Collection and Graphs', ['data', 'collect', 'graph', 'chart', 'table', 'bar', 'pie', 'histogram', 'frequency']),
+                ('Probability', ['probability', 'likely', 'certain', 'chance', 'random']),
+            ],
+            'topics': ['statistics'],
+        },
+    ]
+
+    # Collect all enabling objectives from K/S codes
+    all_eo = [o['full'] for o in coded_objectives['K']] + [o['full'] for o in coded_objectives['S']]
+
     units = []
-    for strand_key, strand_data in strands.items():
-        if strand_data["terminal_objectives"]:
+    for strand in STRANDS:
+        # Collect terminal objectives for this strand's topics
+        strand_terminal = []
+        for topic_key in strand['topics']:
+            strand_terminal.extend(terminal_objectives.get(topic_key, []))
+
+        # Match coded objectives to this strand by keyword
+        strand_enabling = []
+        strand_keywords = set()
+        for _, keywords in strand['sub_strands']:
+            strand_keywords.update(keywords)
+
+        for eo in all_eo:
+            eo_lower = eo.lower()
+            if any(kw in eo_lower for kw in strand_keywords):
+                strand_enabling.append(eo)
+
+        # Build lessons from sub-strands
+        lessons = []
+        for sub_title, sub_keywords in strand['sub_strands']:
+            # Match terminal objectives to this sub-strand
+            sub_objectives = []
+            for obj in strand_terminal:
+                obj_lower = obj.lower()
+                if any(kw in obj_lower for kw in sub_keywords):
+                    sub_objectives.append(obj)
+
+            # Match enabling objectives to this sub-strand
+            sub_enabling = []
+            for eo in strand_enabling:
+                eo_lower = eo.lower()
+                if any(kw in eo_lower for kw in sub_keywords):
+                    sub_enabling.append(eo)
+
+            # Also create enabling objectives from terminal objectives if no K/S codes matched
+            if not sub_enabling and sub_objectives:
+                sub_enabling = sub_objectives[:5]
+
+            if sub_objectives or sub_enabling:
+                lessons.append({
+                    "title": sub_title,
+                    "objective": sub_objectives[0] if sub_objectives else f"Master {sub_title.lower()} concepts",
+                    "enabling_objectives": sub_enabling or sub_objectives[:5],
+                    "teaching_strategies": ["Worked examples", "Practice exercises", "Problem solving"],
+                    "resources": ["Textbook", "Whiteboard", "Calculator"],
+                    "assessment_methods": ["Written exercises", "Problem-solving tasks"],
+                    "estimated_minutes": 40,
+                    "order": len(lessons) + 1,
+                })
+
+        if lessons:
             units.append({
                 "number": len(units) + 1,
-                "title": strand_data["title"],
+                "title": f"{grade_level}: {strand['title']}",
+                "grade_level": grade_level,
                 "duration": "Multiple periods",
-                "introduction": f"{strand_data['title']} strand for Cycle {cycle}",
-                "terminal_objectives": strand_data["terminal_objectives"],
-                "lessons": create_lessons_from_objectives(
-                    strand_data["terminal_objectives"],
-                    strand_data["title"]
-                )
+                "introduction": f"{strand['title']} strand for {grade_level} (Cycle {cycle})",
+                "terminal_objectives": strand_terminal[:15],
+                "enabling_objectives": strand_enabling[:20],
+                "lessons": lessons,
             })
-    
-    # Teaching strategies
+
     teaching_strategies = [
         "Worked examples with step-by-step solutions",
         "Mental computation practice",
@@ -633,16 +786,16 @@ def parse_mathematics_curriculum(text: str, grade_level: str = "S1") -> ParsedCu
         "Group work and collaborative learning",
         "Use of manipulatives and visual aids",
         "Practice exercises with graduated difficulty",
-        "Application to Seychelles context (SCR, local measurements)"
+        "Application to Seychelles context (SCR, local measurements)",
     ]
-    
+
     assessment_methods = [
         "Written exercises",
         "Problem-solving tasks",
         "Mental math tests",
-        "Practical investigations"
+        "Practical investigations",
     ]
-    
+
     return ParsedCurriculum(
         subject="Mathematics",
         grade_level=grade_level,
@@ -650,7 +803,7 @@ def parse_mathematics_curriculum(text: str, grade_level: str = "S1") -> ParsedCu
         description=f"Mathematics curriculum for Seychelles secondary schools (Cycle {cycle})",
         units=units,
         teaching_strategies=teaching_strategies,
-        assessment_methods=assessment_methods
+        assessment_methods=assessment_methods,
     )
 
 

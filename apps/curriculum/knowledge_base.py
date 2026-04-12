@@ -875,7 +875,38 @@ class CurriculumKnowledgeBase:
         )
 
         return self._process_query_results(self._convert_fallback_to_query_results(merged))
-    
+
+    def query_for_competency_extraction(
+        self,
+        subject: str,
+        grade_level: str,
+        unit_title: str = "",
+        n_results: int = 30,
+    ) -> 'QueryResult':
+        """
+        Query KB for content relevant to extracting competencies/enabling objectives.
+
+        Returns chunks from curriculum documents, worksheets, and teaching materials
+        that can be analyzed by an LLM to produce standardized competency statements.
+        This is format-agnostic — works regardless of document structure.
+        """
+        if not self._chromadb_available:
+            return QueryResult(chunks=[], context_summary="", teaching_strategies=[], objectives=[])
+
+        query_text = (
+            f"{subject} {grade_level} {unit_title} "
+            f"objectives skills knowledge competencies learning outcomes "
+            f"students will be able to understand apply"
+        )
+
+        merged = self.query_with_global_fallback(
+            query_text=query_text,
+            n_results=n_results,
+            where_filter={"subject": {"$eq": subject}} if subject else None,
+        )
+
+        return self._process_query_results(self._convert_fallback_to_query_results(merged))
+
     # ========================================================================
     # STEP 4: GENERATE CONTENT (Query for rich context)
     # ========================================================================
