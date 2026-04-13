@@ -730,11 +730,111 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
                     kwargs['answer_data'] = q.get('answer_data', {})
                 ExitTicketQuestion.objects.create(**kwargs)
 
+        # Post-processing: generate images for questions that need figures
+        try:
+            figures_generated = _generate_exit_ticket_figures(
+                exit_ticket, lesson, institution_id
+            )
+            if figures_generated:
+                logger.info(f"Generated {figures_generated} figures for exit ticket of {lesson.title}")
+        except Exception as e:
+            logger.warning(f"Exit ticket figure generation failed (non-blocking): {e}")
+
         return {'success': True, 'questions_created': len(questions)}
 
     except Exception as e:
         logger.error(f"Exit ticket generation failed for {lesson.title}: {e}")
         return {'success': False, 'error': str(e)}
+
+
+def _generate_exit_ticket_figures(exit_ticket, lesson, institution_id: int) -> int:
+    """Generate images for exit ticket questions that describe figures.
+
+    Scans question text and answer_data for figure descriptions (e.g., "diagram showing...",
+    "map of...", "graph of..."), generates images, and stores URLs in the question's
+    answer_data for rendering.
+
+    Returns the number of figures generated.
+    """
+    from apps.tutoring.models import ExitTicketQuestion
+
+    FIGURE_KEYWORDS = [
+        'diagram', 'graph', 'chart', 'map', 'figure', 'illustration',
+        'draw', 'sketch', 'image', 'picture', 'photograph',
+    ]
+
+    media_service = MediaGenerationService(institution_id)
+    figures_generated = 0
+
+    questions = ExitTicketQuestion.objects.filter(exit_ticket=exit_ticket)
+
+    for q in questions:
+        # Check if question references a figure that could be generated
+        q_text = (q.question_text or '').lower()
+        needs_figure = any(kw in q_text for kw in FIGURE_KEYWORDS)
+
+        # For data_interpretation: check if data_description mentions visual content
+        answer_data = q.answer_data or {}
+        data_desc = answer_data.get('data_description', '') if isinstance(answer_data, dict) else ''
+
+        # Skip if already has HTML content (table/svg/img) — those are self-rendering
+        if data_desc and '<' in data_desc:
+            continue
+
+        # Skip if question already has an image
+        if q.image:
+            continue
+
+        # Generate figure for questions that describe one but don't have HTML
+        if needs_figure and not data_desc:
+            # Extract figure description from question text
+            description = f"Educational diagram for assessment: {q.question_text[:200]}"
+            subject = lesson.unit.course.title.split()[0] if lesson.unit and lesson.unit.course else 'General'
+
+            generated = media_service._generate_or_find_image(
+                description=description,
+                image_type='diagram',
+                lesson=lesson,
+            )
+
+            if generated and generated.get('url'):
+                # Store the figure URL in answer_data
+                if not isinstance(answer_data, dict):
+                    answer_data = {}
+                answer_data['figure_url'] = generated['url']
+                answer_data['figure_source'] = generated.get('source', 'generated')
+                q.answer_data = answer_data
+                q.save(update_fields=['answer_data'])
+                figures_generated += 1
+
+        # For data_interpretation with plain text data: try to find a matching KB figure
+        elif q.question_type == 'data_interpretation' and data_desc and '<' not in data_desc:
+            try:
+                from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+                kb = CurriculumKnowledgeBase(institution_id=institution_id)
+                subject = lesson.unit.course.title.split()[0] if lesson.unit and lesson.unit.course else 'General'
+                figures = kb.query_for_figure_descriptions(
+                    topic=q.question_text[:100],
+                    subject=subject,
+                    n_results=1,
+                )
+                if figures and figures[0].get('image_url'):
+                    fig = figures[0]
+                    # Embed figure in data_description as HTML
+                    answer_data['data_description'] = (
+                        f"<div style='text-align:center;margin-bottom:8px;'>"
+                        f"<img src='{fig['image_url']}' style='max-width:100%;border-radius:4px;' "
+                        f"alt='{fig.get('description', '')[:100]}'>"
+                        f"</div>"
+                        f"<div style='font-size:13px;'>{data_desc}</div>"
+                    )
+                    q.answer_data = answer_data
+                    q.save(update_fields=['answer_data'])
+                    figures_generated += 1
+            except Exception:
+                pass
+
+    return figures_generated
 
 
 # ============================================================================
