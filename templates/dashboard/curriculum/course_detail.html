@@ -170,7 +170,8 @@
                 <p style="color: var(--gray-500); margin: 0; font-size: 0.875rem;">Grade: {{ course.grade_level }}</p>
                 {% endif %}
             </div>
-            <div style="display: flex; gap: 0.5rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <a href="{% url 'dashboard:class_readiness' course.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">Class Readiness Report</a>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-header-display').style.display='none'; document.getElementById('course-edit-form').style.display='block';">Edit Course</button>
                 <form method="post" action="{% url 'dashboard:course_publish_all' course.id %}" style="display: inline;">
                     {% csrf_token %}
@@ -515,6 +516,7 @@
                         {% endif %}
                     {% endwith %}
                     <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">Review</a>
+                    <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="Competency report for this lesson">Report</a>
                 </div>
             </div>
             {% endfor %}
