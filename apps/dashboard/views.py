@@ -1568,6 +1568,69 @@ def lesson_session_report(request, lesson_id):
             is_published=True,
         ).order_by('unit__order_index', 'order_index').first()
 
+    # ── Group students by category with targeted instruction recommendations ──
+    from collections import Counter
+
+    category_groups = []
+    for cat_code, cat_meta in [
+        ('BE', {'label': 'Below Expectation', 'color': '#dc2626', 'bg': '#fee2e2', 'border': '#fecaca'}),
+        ('AE', {'label': 'Approaching Expectation', 'color': '#d97706', 'bg': '#fef3c7', 'border': '#fde68a'}),
+        ('ME', {'label': 'Meeting Expectation', 'color': '#059669', 'bg': '#d1fae5', 'border': '#a7f3d0'}),
+        ('EE', {'label': 'Exceeding Expectation', 'color': '#6366f1', 'bg': '#ede9fe', 'border': '#c4b5fd'}),
+    ]:
+        group_students = [s for s in students_data if s['category']['code'] == cat_code]
+        if not group_students:
+            continue
+
+        # Find the most common weak objectives across this group
+        group_weak = Counter()
+        for s in group_students:
+            for wo in s.get('weak_objectives', []):
+                group_weak[wo] += 1
+        common_weak = [obj for obj, _ in group_weak.most_common(5)]
+
+        # Generate targeted instruction recommendation per group
+        if cat_code == 'BE':
+            if common_weak:
+                instruction = (
+                    f"These students need intensive support. Focus your next session on: "
+                    f"{', '.join(common_weak[:3])}. "
+                    f"Consider one-on-one or small-group instruction on these objectives."
+                )
+            else:
+                instruction = "These students need intensive support across most objectives."
+        elif cat_code == 'AE':
+            if common_weak:
+                instruction = (
+                    f"These students are close to meeting expectations. A brief review of: "
+                    f"{', '.join(common_weak[:3])} should help them cross the threshold. "
+                    f"The AI tutor will continue remediation on these objectives."
+                )
+            else:
+                instruction = "These students are progressing well. The AI tutor will continue targeted practice."
+        elif cat_code == 'ME':
+            instruction = (
+                "These students have met expectations. They are ready for the next lesson. "
+                "Consider offering extension activities or peer tutoring opportunities."
+            )
+        else:  # EE
+            instruction = (
+                "These students exceeded expectations. Consider giving them challenge problems, "
+                "leadership roles in group work, or peer tutoring responsibilities."
+            )
+
+        category_groups.append({
+            'code': cat_code,
+            'label': cat_meta['label'],
+            'color': cat_meta['color'],
+            'bg': cat_meta['bg'],
+            'border': cat_meta['border'],
+            'students': group_students,
+            'count': len(group_students),
+            'common_weak': common_weak,
+            'instruction': instruction,
+        })
+
     context = {
         **request.staff_ctx,
         'lesson': lesson,
@@ -1578,6 +1641,7 @@ def lesson_session_report(request, lesson_id):
         'total_objectives': total_objectives,
         'objectives_data': objectives_data,
         'students_data': students_data,
+        'category_groups': category_groups,
         'avg_pct': avg_pct,
         'category_counts': category_counts,
         'students_below_count': len(students_below),
