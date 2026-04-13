@@ -2546,6 +2546,7 @@ Follow the current step; this concept will be covered in sequence."""
                 topic=f"{self.lesson.title} {self.lesson.objective or ''}",
                 subject=subject,
                 n_results=5,
+                grade_level=course.grade_level or '',
             )
             for fig in (figures or []):
                 url = fig.get('image_url', '')

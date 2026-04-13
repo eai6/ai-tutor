@@ -249,6 +249,7 @@ class LessonContentGenerator:
                     topic=f"{lesson.title} {lesson.objective or ''}",
                     subject=subject,
                     n_results=5,
+                    grade_level=curriculum_context.get('grade_level', ''),
                 )
                 for fig in figures:
                     figure_descriptions.append({
@@ -626,6 +627,7 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
             topic=f"{lesson.title} {lesson.objective or ''}",
             subject=subject,
             n_results=3,
+            grade_level=lesson.unit.course.grade_level or '',
         )
         if figures:
             fig_lines = []
@@ -779,6 +781,7 @@ def _generate_exit_ticket_figures(exit_ticket, lesson, institution_id: int) -> i
             topic=f"{lesson.title} {lesson.objective or ''}",
             subject=subject,
             n_results=8,
+            grade_level=lesson.unit.course.grade_level or '',
         ) or []
 
         # Get text context for enriching figure generation prompts

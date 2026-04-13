@@ -702,11 +702,14 @@ def curriculum_upload(request):
             status='pending'
         )
 
-        # Handle optional material attachments (per-file type + title)
-        material_files = request.FILES.getlist('material_files')
-        if material_files and request.POST.get('attach_material'):
+        # Handle optional material attachments (per-entry: files + title + type + grade)
+        # Each material entry has: files (multiple), title, type, grade
+        # Files within an entry share the same title/type/grade
+        material_files_list = request.FILES.getlist('material_files')
+        if material_files_list and request.POST.get('attach_material'):
             material_titles = request.POST.getlist('material_titles')
             material_types = request.POST.getlist('material_types')
+            material_grades = request.POST.getlist('material_grades')
 
             from apps.dashboard.material_tasks import process_teaching_material
             from apps.dashboard.background_tasks import run_async
@@ -714,23 +717,30 @@ def curriculum_upload(request):
             mat_dir = os.path.join(settings.MEDIA_ROOT, 'material_uploads')
             os.makedirs(mat_dir, exist_ok=True)
 
-            for idx, material_file in enumerate(material_files):
+            # Map files to entries: each file input can have multiple files,
+            # but they share the same title/type/grade from their entry
+            entry_idx = 0
+            for material_file in material_files_list:
                 mat_path = os.path.join(mat_dir, material_file.name)
                 with open(mat_path, 'wb+') as dest:
                     for chunk in material_file.chunks():
                         dest.write(chunk)
 
-                file_title = material_titles[idx] if idx < len(material_titles) else os.path.splitext(material_file.name)[0]
-                file_type = material_types[idx] if idx < len(material_types) else 'textbook'
+                file_title = material_titles[entry_idx] if entry_idx < len(material_titles) else os.path.splitext(material_file.name)[0]
+                file_type = material_types[entry_idx] if entry_idx < len(material_types) else 'textbook'
+                file_grade = material_grades[entry_idx] if entry_idx < len(material_grades) else grade_level
+
+                # Use the per-material grade level, falling back to curriculum-level grade
+                mat_grade = file_grade if file_grade else grade_level
 
                 material_record = TeachingMaterialUpload.objects.create(
                     institution=institution,
                     uploaded_by=request.user,
                     file_path=mat_path,
                     original_filename=material_file.name,
-                    title=file_title,
+                    title=f"{file_title} - {os.path.splitext(material_file.name)[0]}" if len(material_files_list) > 1 else file_title,
                     subject_name=subject_name,
-                    grade_level=grade_level,
+                    grade_level=mat_grade,
                     material_type=file_type,
                     description='',
                     curriculum_upload=upload_record,

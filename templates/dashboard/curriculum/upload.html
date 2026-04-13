@@ -312,9 +312,9 @@
                         <div id="material-entries">
                             <!-- First entry (always shown) -->
                             <div class="material-entry" style="border:1px solid var(--gray-200);border-radius:0.5rem;padding:1rem;margin-bottom:0.75rem;">
-                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
                                     <div class="form-group" style="grid-column:1/-1;">
-                                        <label class="form-label">File</label>
+                                        <label class="form-label">Files</label>
                                         <input type="file" name="material_files" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple required>
                                     </div>
                                     <div class="form-group">
@@ -327,6 +327,17 @@
                                             {% for code, name in material_types %}
                                             <option value="{{ code }}" {% if code == 'worksheet' %}selected{% endif %}>{{ name }}</option>
                                             {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Grade Level</label>
+                                        <select name="material_grades" class="form-control">
+                                            <option value="">All Levels</option>
+                                            <option value="S1">S1</option>
+                                            <option value="S2">S2</option>
+                                            <option value="S3">S3</option>
+                                            <option value="S4">S4</option>
+                                            <option value="S5">S5</option>
                                         </select>
                                     </div>
                                 </div>
@@ -467,18 +478,29 @@
         entry.style.cssText = 'border:1px solid var(--gray-200);border-radius:0.5rem;padding:1rem;margin-bottom:0.75rem;position:relative;';
         entry.innerHTML = `
             <button type="button" onclick="this.closest('.material-entry').remove()" style="position:absolute;top:0.5rem;right:0.5rem;background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:1.25rem;" title="Remove">&times;</button>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
                 <div class="form-group" style="grid-column:1/-1;">
-                    <label class="form-label">File</label>
+                    <label class="form-label">Files</label>
                     <input type="file" name="material_files" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Title (applied to all files in this group)</label>
-                    <input type="text" name="material_titles" class="form-control" placeholder="e.g., Past Exam Papers 2023" required>
+                    <label class="form-label">Title</label>
+                    <input type="text" name="material_titles" class="form-control" placeholder="e.g., S2 Past Exam Papers" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Type</label>
                     <select name="material_types" class="form-control">${typeOptions}</select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Grade Level</label>
+                    <select name="material_grades" class="form-control">
+                        <option value="">All Levels</option>
+                        <option value="S1">S1</option>
+                        <option value="S2">S2</option>
+                        <option value="S3">S3</option>
+                        <option value="S4">S4</option>
+                        <option value="S5">S5</option>
+                    </select>
                 </div>
             </div>
         `;

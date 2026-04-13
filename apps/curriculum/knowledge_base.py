@@ -790,6 +790,7 @@ class CurriculumKnowledgeBase:
         topic: str,
         subject: str,
         n_results: int = 5,
+        grade_level: str = "",
     ) -> List[Dict]:
         """
         Query ChromaDB for figure descriptions related to a topic.
@@ -798,6 +799,7 @@ class CurriculumKnowledgeBase:
             topic: Topic to search for (e.g., lesson title)
             subject: Subject name for filtering
             n_results: Max results to return
+            grade_level: Grade level for filtering (e.g., "S1"). Empty = all.
 
         Returns:
             List of dicts with description, figure_type, figure_number,
@@ -810,16 +812,24 @@ class CurriculumKnowledgeBase:
         if collection is None:
             return []
 
+        # Build filter — always require figure_description type + subject
+        # Optionally filter by grade level if provided
+        where_conditions = [
+            {"chunk_type": {"$eq": "figure_description"}},
+            {"subject": {"$eq": subject}},
+        ]
+        if grade_level:
+            from apps.curriculum.utils import parse_grade_level_string
+            grade_list = parse_grade_level_string(grade_level)
+            if grade_list:
+                grade_match = grade_list + ([grade_level] if len(grade_list) > 1 else []) + ['']
+                where_conditions.append({"grade_level": {"$in": grade_match}})
+
         try:
             results = collection.query(
                 query_texts=[topic],
                 n_results=n_results,
-                where={
-                    "$and": [
-                        {"chunk_type": {"$eq": "figure_description"}},
-                        {"subject": {"$eq": subject}},
-                    ]
-                },
+                where={"$and": where_conditions},
             )
         except Exception as e:
             logger.warning(f"Figure description query failed: {e}")
@@ -974,12 +984,26 @@ class CurriculumKnowledgeBase:
             )
         
         # Query for relevant content with global fallback
+        # Filter by subject AND grade level so S1 materials are used for S1 lessons etc.
         query_text = f"{lesson_title} {lesson_objective} {unit_title} teaching strategies methods"
+
+        from apps.curriculum.utils import parse_grade_level_string
+        grade_list = parse_grade_level_string(grade_level)
+        if grade_list:
+            grade_match = grade_list + ([grade_level] if len(grade_list) > 1 else []) + ['']
+            where_filter = {
+                "$and": [
+                    {"subject": {"$eq": subject}},
+                    {"grade_level": {"$in": grade_match}},
+                ]
+            }
+        else:
+            where_filter = {"subject": {"$eq": subject}}
 
         merged = self.query_with_global_fallback(
             query_text=query_text,
             n_results=n_results,
-            where_filter={"subject": {"$eq": subject}},
+            where_filter=where_filter,
         )
 
         return self._process_query_results(self._convert_fallback_to_query_results(merged))
