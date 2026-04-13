@@ -794,7 +794,7 @@ def parse_mathematics_curriculum(text: str, grade_level: str = "S1") -> ParsedCu
                     "teaching_strategies": ["Worked examples", "Practice exercises", "Problem solving"],
                     "resources": ["Textbook", "Whiteboard", "Calculator"],
                     "assessment_methods": ["Written exercises", "Problem-solving tasks"],
-                    "estimated_minutes": 40,
+                    "estimated_minutes": 20,
                     "order": len(lessons) + 1,
                 })
 
@@ -853,7 +853,7 @@ def create_lessons_from_objectives(objectives: List[str], unit_title: str) -> Li
             "teaching_strategies": ["Worked examples", "Practice exercises", "Discussion"],
             "resources": get_resources_for_topic(unit_title),
             "assessment_methods": ["Written exercises", "Oral questioning"],
-            "estimated_minutes": 40,
+            "estimated_minutes": 20,
             "order": i + 1
         })
     
@@ -1194,11 +1194,11 @@ def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurr
             e for e in eos if e not in lesson_objectives
         ]
 
-        # Group terminal objectives into lessons (2-4 TOs per lesson)
+        # Group terminal objectives into lessons (1-2 TOs per 20-minute lesson)
         # Attach relevant enabling objectives as teaching steps for content generation
         raw_eos = unit.get('enabling_objectives', [])  # The raw extracted EOs
         lessons = []
-        chunk_size = min(4, max(2, len(lesson_objectives) // 3)) if lesson_objectives else 3
+        chunk_size = min(2, max(1, len(lesson_objectives) // 4)) if lesson_objectives else 2
         for start in range(0, len(lesson_objectives), chunk_size):
             chunk = lesson_objectives[start:start + chunk_size]
             if not chunk:
@@ -1403,7 +1403,7 @@ Return ONLY valid JSON, no explanation or markdown."""
                     "teaching_strategies": ["Discussion", "Practice", "Examples"],
                     "resources": ["Textbook", "Whiteboard"],
                     "assessment_methods": ["Written work", "Oral questioning"],
-                    "estimated_minutes": 40,
+                    "estimated_minutes": 20,
                     "order": j + 1
                 })
 

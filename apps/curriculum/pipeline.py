@@ -1275,7 +1275,7 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                     defaults={
                         'objective': lesson_data.get('objective', ''),
                         'order_index': lesson_idx,
-                        'estimated_minutes': 40,
+                        'estimated_minutes': 20,
                         'is_published': False,
                         'enabling_objectives': lesson_data.get('enabling_objectives', []),
                         'metadata': {

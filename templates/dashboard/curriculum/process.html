@@ -398,22 +398,79 @@
                             <input type="text" value="{{ unit.title }}" onclick="event.stopPropagation()" placeholder="Unit title" class="unit-title-input">
                         </div>
                         <div class="unit-actions">
-                            {% if unit.duration %}<span style="font-size:0.75rem;color:var(--gray-500);margin-right:0.5rem;">{{ unit.duration }}</span>{% endif %}
                             <span class="lesson-count-badge">{{ unit.lessons|length }} lessons</span>
                             <button type="button" class="btn-icon danger" onclick="event.stopPropagation(); removeUnit(this)" title="Remove unit">🗑️</button>
                         </div>
                     </div>
                     <div class="lesson-review-list">
+                        <!-- Unit-level terminal objectives (editable) -->
+                        <div style="padding:0.75rem 1rem;background:#f8fafc;border-bottom:1px solid var(--gray-200);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                                <div style="font-size:0.75rem;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:0.05em;">Terminal Objectives (Assessment Targets)</div>
+                                <button type="button" class="btn btn-sm" style="font-size:0.6875rem;padding:2px 8px;background:#ede9fe;color:#6366f1;border:1px solid #c4b5fd;border-radius:4px;" onclick="addObjective(this, 'to')">+ Add TO</button>
+                            </div>
+                            <div class="unit-tos-list">
+                            {% for to in unit.terminal_objectives %}
+                            <div class="objective-row" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.375rem;">
+                                <span style="font-size:0.6875rem;font-weight:700;color:#6366f1;background:#ede9fe;padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">TO{{ forloop.counter }}</span>
+                                <textarea class="to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--gray-200);border-radius:4px;padding:4px 8px;resize:vertical;min-height:28px;" rows="1">{{ to }}</textarea>
+                                <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="Remove">✕</button>
+                            </div>
+                            {% empty %}
+                            <div style="font-size:0.8125rem;color:var(--gray-400);font-style:italic;">No terminal objectives extracted. Click + Add TO to add manually.</div>
+                            {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Unit-level enabling objectives / teaching steps (editable) -->
+                        {% if unit.enabling_objectives %}
+                        <div style="padding:0.75rem 1rem;background:#f0fdf4;border-bottom:1px solid var(--gray-200);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                                <div style="font-size:0.75rem;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.05em;">Enabling Objectives (Teaching Steps)</div>
+                                <button type="button" class="btn btn-sm" style="font-size:0.6875rem;padding:2px 8px;background:#d1fae5;color:#059669;border:1px solid #a7f3d0;border-radius:4px;" onclick="addObjective(this, 'eo')">+ Add EO</button>
+                            </div>
+                            <div class="unit-eos-list">
+                            {% for eo in unit.enabling_objectives %}
+                            <div class="objective-row" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.25rem;">
+                                <span style="font-size:0.6875rem;font-weight:700;color:#059669;background:#d1fae5;padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">EO{{ forloop.counter }}</span>
+                                <textarea class="eo-input" style="flex:1;font-size:0.75rem;border:1px solid var(--gray-200);border-radius:4px;padding:3px 8px;resize:vertical;min-height:24px;color:#374151;" rows="1">{{ eo }}</textarea>
+                                <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="Remove">✕</button>
+                            </div>
+                            {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Lessons (editable) -->
                         {% for lesson in unit.lessons %}
                         <div class="lesson-review-item" data-lesson-index="{{ forloop.counter0 }}">
                             <span class="lesson-number">{{ forloop.counter }}.</span>
                             <div class="lesson-details">
                                 <input type="text" value="{{ lesson.title }}" placeholder="Lesson title" class="lesson-title-input">
-                                <textarea placeholder="Learning objective (what students will be able to do)" class="lesson-objective-input" rows="2">{{ lesson.objective|default:"" }}</textarea>
+                                <textarea placeholder="Learning objective" class="lesson-objective-input" rows="2">{{ lesson.objective|default:"" }}</textarea>
+
+                                <!-- Terminal objectives for this lesson (editable) -->
                                 {% if lesson.enabling_objectives %}
-                                <div style="margin-top:0.375rem;display:flex;flex-wrap:wrap;gap:0.25rem;">
+                                <div style="margin-top:0.5rem;">
+                                    <div style="font-size:0.625rem;font-weight:700;color:#6366f1;text-transform:uppercase;margin-bottom:0.25rem;">Lesson Terminal Objectives</div>
                                     {% for eo in lesson.enabling_objectives %}
-                                    <span style="display:inline-block;font-size:0.6875rem;padding:2px 8px;border-radius:999px;background:#ede9fe;color:#6366f1;border:1px solid #c4b5fd;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ eo }}">{{ eo|truncatewords:8 }}</span>
+                                    <div style="display:flex;align-items:flex-start;gap:0.375rem;margin-bottom:0.25rem;">
+                                        <span style="font-size:0.5625rem;font-weight:700;color:#6366f1;margin-top:4px;">TO</span>
+                                        <textarea class="lesson-to-input" style="flex:1;font-size:0.8125rem;border:1px solid #e4e4e7;border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" rows="1">{{ eo }}</textarea>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+
+                                <!-- Teaching steps for this lesson (editable) -->
+                                {% if lesson.teaching_steps %}
+                                <div style="margin-top:0.5rem;">
+                                    <div style="font-size:0.625rem;font-weight:700;color:#059669;text-transform:uppercase;margin-bottom:0.25rem;">Teaching Steps</div>
+                                    {% for ts in lesson.teaching_steps %}
+                                    <div style="display:flex;align-items:flex-start;gap:0.375rem;margin-bottom:0.25rem;">
+                                        <span style="font-size:0.5625rem;font-weight:700;color:#059669;margin-top:4px;">EO</span>
+                                        <textarea class="lesson-eo-input" style="flex:1;font-size:0.75rem;border:1px solid #e4e4e7;border-radius:4px;padding:3px 6px;resize:vertical;min-height:22px;color:#6b7280;" rows="1">{{ ts }}</textarea>
+                                    </div>
                                     {% endfor %}
                                 </div>
                                 {% endif %}
@@ -567,6 +624,25 @@ function addUnit() {
     if (empty) empty.remove();
     container.insertAdjacentHTML('beforeend', html);
     updateCounts();
+}
+
+function addObjective(btn, type) {
+    const list = btn.closest('div').querySelector(type === 'to' ? '.unit-tos-list' : '.unit-eos-list');
+    if (!list) return;
+    const count = list.querySelectorAll('.objective-row').length + 1;
+    const color = type === 'to' ? '#6366f1' : '#059669';
+    const bg = type === 'to' ? '#ede9fe' : '#d1fae5';
+    const label = type === 'to' ? 'TO' : 'EO';
+    const row = document.createElement('div');
+    row.className = 'objective-row';
+    row.style.cssText = 'display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.375rem;';
+    row.innerHTML = `
+        <span style="font-size:0.6875rem;font-weight:700;color:${color};background:${bg};padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">${label}${count}</span>
+        <textarea class="${type}-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--gray-200);border-radius:4px;padding:4px 8px;resize:vertical;min-height:28px;" rows="1" placeholder="Type objective here..."></textarea>
+        <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="Remove">✕</button>
+    `;
+    list.appendChild(row);
+    row.querySelector('textarea').focus();
 }
 
 function addLesson(btn) {
