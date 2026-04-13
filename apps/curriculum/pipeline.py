@@ -374,6 +374,7 @@ def generate_lesson_structure(
     from apps.llm.client import get_llm_client
 
     # For pilot subjects: try dedicated parsers first (more accurate extraction)
+    print(f"[generate_lesson_structure] subject={subject} grade={grade_level} text_len={len(extracted_text or '')}", flush=True)
     if extracted_text:
         subject_lower = subject.lower()
         dedicated_result = None
@@ -381,33 +382,39 @@ def generate_lesson_structure(
         if subject_lower in ('mathematics', 'maths', 'math'):
             try:
                 from apps.curriculum.curriculum_parser import parse_mathematics_curriculum
+                print(f"[generate_lesson_structure] Trying math parser...", flush=True)
                 result = parse_mathematics_curriculum(extracted_text, grade_level)
                 if result.units and sum(len(u.get('lessons', [])) for u in result.units) >= 5:
                     dedicated_result = result
-                    logger.info(f"Math parser: {len(result.units)} strands, "
-                                f"{sum(len(u.get('lessons',[])) for u in result.units)} lessons")
+                    print(f"[generate_lesson_structure] Math parser: {len(result.units)} strands", flush=True)
             except Exception as e:
-                logger.warning(f"Math parser failed, falling back to LLM: {e}")
+                print(f"[generate_lesson_structure] Math parser failed: {e}", flush=True)
 
         elif subject_lower in ('geography', 'geo'):
             try:
                 from apps.curriculum.curriculum_parser import parse_geography_curriculum
+                print(f"[generate_lesson_structure] Trying geography parser...", flush=True)
                 result = parse_geography_curriculum(extracted_text, grade_level)
-                if result.units and sum(len(u.get('lessons', [])) for u in result.units) >= 3:
+                units_count = len(result.units) if result.units else 0
+                lessons_count = sum(len(u.get('lessons', [])) for u in result.units) if result.units else 0
+                print(f"[generate_lesson_structure] Geography parser: {units_count} units, {lessons_count} lessons", flush=True)
+                if result.units and lessons_count >= 3:
                     dedicated_result = result
-                    logger.info(f"Geography parser: {len(result.units)} units, "
-                                f"{sum(len(u.get('lessons',[])) for u in result.units)} lessons, "
-                                f"{sum(len(u.get('enabling_objectives',[])) for u in result.units)} EOs")
             except Exception as e:
-                logger.warning(f"Geography parser failed, falling back to LLM: {e}")
+                print(f"[generate_lesson_structure] Geography parser failed: {e}", flush=True)
+                import traceback; traceback.print_exc()
 
         if dedicated_result:
+            print(f"[generate_lesson_structure] Using dedicated parser result", flush=True)
             return {
                 'subject': subject,
                 'grade_level': grade_level,
                 'units': dedicated_result.units,
                 'total_lessons': sum(len(u.get('lessons', [])) for u in dedicated_result.units),
             }
+
+    # Fall through to LLM-based parsing
+    print(f"[generate_lesson_structure] Dedicated parser insufficient, using LLM...", flush=True)
 
     # Query knowledge base for context
     kb = CurriculumKnowledgeBase(institution_id=institution_id)
@@ -1106,9 +1113,10 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
         # STEP 3: GENERATE LESSONS
         # ================================================================
         upload.current_step = 3
-        upload.add_log("📚 Step 3: Generating lesson structure with AI...")
+        upload.add_log("📚 Step 3: Generating lesson structure...")
         upload.save()
-        
+        print(f"[Pipeline] Step 3: Generating lesson structure for {upload.subject_name} {upload.grade_level}", flush=True)
+
         try:
             structure = generate_lesson_structure(
                 subject=upload.subject_name,
@@ -1116,6 +1124,7 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
                 institution_id=institution_id,
                 extracted_text=text
             )
+            print(f"[Pipeline] Step 3 complete: {len(structure.get('units',[]))} units", flush=True)
             
             units_count = len(structure.get('units', []))
             lessons_count = structure.get('total_lessons', 0)
