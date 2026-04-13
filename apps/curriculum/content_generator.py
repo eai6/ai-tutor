@@ -765,31 +765,101 @@ def _generate_exit_ticket_figures(exit_ticket, lesson, institution_id: int) -> i
 
     media_service = MediaGenerationService(institution_id)
     figures_generated = 0
+    subject = lesson.unit.course.title.split()[0] if lesson.unit and lesson.unit.course else 'General'
+
+    # Pre-query KB for relevant figures from worksheets/exams for this lesson
+    kb_figures = []
+    kb_text_context = ""
+    try:
+        from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+        kb = CurriculumKnowledgeBase(institution_id=institution_id)
+
+        # Get figures from uploaded worksheets, exams, textbooks
+        kb_figures = kb.query_for_figure_descriptions(
+            topic=f"{lesson.title} {lesson.objective or ''}",
+            subject=subject,
+            n_results=8,
+        ) or []
+
+        # Get text context for enriching figure generation prompts
+        text_result = kb.query_for_content_generation(
+            lesson_title=lesson.title,
+            lesson_objective=lesson.objective or '',
+            unit_title=lesson.unit.title,
+            subject=subject,
+            grade_level=lesson.unit.course.grade_level or 'S1',
+            n_results=5,
+        )
+        if text_result and text_result.chunks:
+            kb_text_context = "\n".join(
+                c.get('content', '')[:300] for c in text_result.chunks[:3]
+                if c.get('content')
+            )
+    except Exception as e:
+        logger.warning(f"KB query for exit ticket figures: {e}")
+
+    # Build a lookup of KB figures by keyword for matching to questions
+    def find_matching_kb_figure(question_text):
+        """Find the best matching KB figure for a question."""
+        q_words = set(question_text.lower().split())
+        best_fig = None
+        best_score = 0
+        for fig in kb_figures:
+            if not fig.get('image_url'):
+                continue
+            desc_words = set((fig.get('description', '') or '').lower().split())
+            overlap = len(q_words & desc_words)
+            if overlap > best_score:
+                best_score = overlap
+                best_fig = fig
+        return best_fig if best_score >= 2 else None
 
     questions = ExitTicketQuestion.objects.filter(exit_ticket=exit_ticket)
 
     for q in questions:
-        # Check if question references a figure that could be generated
         q_text = (q.question_text or '').lower()
         needs_figure = any(kw in q_text for kw in FIGURE_KEYWORDS)
 
-        # For data_interpretation: check if data_description mentions visual content
         answer_data = q.answer_data or {}
-        data_desc = answer_data.get('data_description', '') if isinstance(answer_data, dict) else ''
+        if not isinstance(answer_data, dict):
+            answer_data = {}
+        data_desc = answer_data.get('data_description', '')
 
-        # Skip if already has HTML content (table/svg/img) — those are self-rendering
-        if data_desc and '<' in data_desc:
+        # Skip if already has HTML content or existing image
+        if (data_desc and '<' in data_desc) or q.image or answer_data.get('figure_url'):
             continue
 
-        # Skip if question already has an image
-        if q.image:
+        # Step 1: Try to find a matching figure from KB (worksheets/exams)
+        matched_fig = find_matching_kb_figure(q.question_text or '')
+
+        if matched_fig:
+            # Use the KB figure directly
+            if q.question_type == 'data_interpretation' and data_desc:
+                # Embed above existing text data
+                answer_data['data_description'] = (
+                    f"<div style='text-align:center;margin-bottom:8px;'>"
+                    f"<img src='{matched_fig['image_url']}' style='max-width:100%;border-radius:4px;' "
+                    f"alt='{matched_fig.get('description', '')[:100]}'>"
+                    f"<div style='font-size:11px;color:#71717a;margin-top:4px;'>"
+                    f"Source: {matched_fig.get('source_file', 'textbook')}</div>"
+                    f"</div>"
+                    f"<div style='font-size:13px;'>{data_desc}</div>"
+                )
+            else:
+                answer_data['figure_url'] = matched_fig['image_url']
+                answer_data['figure_source'] = 'worksheet/exam'
+                answer_data['figure_description'] = matched_fig.get('description', '')[:200]
+            q.answer_data = answer_data
+            q.save(update_fields=['answer_data'])
+            figures_generated += 1
             continue
 
-        # Generate figure for questions that describe one but don't have HTML
-        if needs_figure and not data_desc:
-            # Extract figure description from question text
+        # Step 2: Generate a new figure if the question describes one
+        if needs_figure:
+            # Enrich the generation prompt with KB text context
             description = f"Educational diagram for assessment: {q.question_text[:200]}"
-            subject = lesson.unit.course.title.split()[0] if lesson.unit and lesson.unit.course else 'General'
+            if kb_text_context:
+                description += f"\nContext from curriculum: {kb_text_context[:300]}"
 
             generated = media_service._generate_or_find_image(
                 description=description,
@@ -798,41 +868,11 @@ def _generate_exit_ticket_figures(exit_ticket, lesson, institution_id: int) -> i
             )
 
             if generated and generated.get('url'):
-                # Store the figure URL in answer_data
-                if not isinstance(answer_data, dict):
-                    answer_data = {}
                 answer_data['figure_url'] = generated['url']
                 answer_data['figure_source'] = generated.get('source', 'generated')
                 q.answer_data = answer_data
                 q.save(update_fields=['answer_data'])
                 figures_generated += 1
-
-        # For data_interpretation with plain text data: try to find a matching KB figure
-        elif q.question_type == 'data_interpretation' and data_desc and '<' not in data_desc:
-            try:
-                from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
-                kb = CurriculumKnowledgeBase(institution_id=institution_id)
-                subject = lesson.unit.course.title.split()[0] if lesson.unit and lesson.unit.course else 'General'
-                figures = kb.query_for_figure_descriptions(
-                    topic=q.question_text[:100],
-                    subject=subject,
-                    n_results=1,
-                )
-                if figures and figures[0].get('image_url'):
-                    fig = figures[0]
-                    # Embed figure in data_description as HTML
-                    answer_data['data_description'] = (
-                        f"<div style='text-align:center;margin-bottom:8px;'>"
-                        f"<img src='{fig['image_url']}' style='max-width:100%;border-radius:4px;' "
-                        f"alt='{fig.get('description', '')[:100]}'>"
-                        f"</div>"
-                        f"<div style='font-size:13px;'>{data_desc}</div>"
-                    )
-                    q.answer_data = answer_data
-                    q.save(update_fields=['answer_data'])
-                    figures_generated += 1
-            except Exception:
-                pass
 
     return figures_generated
 
