@@ -3249,7 +3249,7 @@ def flagged_session_detail(request, session_id):
 @staff_required
 @require_POST
 def resolve_flag(request, session_id):
-    """Mark a flagged session as reviewed."""
+    """Mark a flagged session as reviewed and optionally re-approve the student."""
     institution = request.staff_ctx['institution']
 
     qs = TutorSession.objects.filter(is_flagged=True)
@@ -3260,6 +3260,23 @@ def resolve_flag(request, session_id):
     session.reviewed_by = request.user
     session.reviewed_at = timezone.now()
     session.save(update_fields=['flag_reviewed', 'reviewed_by', 'reviewed_at'])
+
+    # If the student is suspended, lift the suspension (teacher has reviewed)
+    try:
+        from apps.accounts.models import StudentProfile
+        profile = StudentProfile.objects.filter(user=session.student).first()
+        if profile and profile.is_tutor_suspended:
+            profile.is_tutor_suspended = False
+            profile.tutor_suspended_reason = (
+                f"{profile.tutor_suspended_reason}\n"
+                f"Re-approved by {request.user.get_full_name() or request.user.username} "
+                f"on {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+            )
+            profile.save(update_fields=['is_tutor_suspended', 'tutor_suspended_reason'])
+            messages.success(request, f"Flag resolved and {session.student.get_full_name() or session.student.username}'s tutor access restored.")
+            return redirect('dashboard:flagged_session_detail', session_id=session.id)
+    except Exception:
+        pass
 
     messages.success(request, "Flag resolved.")
     return redirect('dashboard:flagged_session_detail', session_id=session.id)

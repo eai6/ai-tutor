@@ -457,6 +457,18 @@ def chat_start_session(request, lesson_id):
     from apps.tutoring.conversational_tutor import ConversationalTutor
     from apps.safety import RateLimiter, SafetyAuditLog
 
+    # Check if student is suspended from tutor
+    try:
+        from apps.accounts.models import StudentProfile
+        profile = StudentProfile.objects.filter(user=request.user).first()
+        if profile and profile.is_tutor_suspended:
+            return JsonResponse({
+                "error": "Your tutor access has been temporarily paused. Please speak with your teacher.",
+                "suspended": True,
+            }, status=403)
+    except Exception:
+        pass
+
     # Rate limiting (R8)
     allowed, reason = RateLimiter.check_rate_limit(request.user.id)
     if not allowed:
@@ -605,6 +617,20 @@ def chat_respond(request, session_id):
         student=request.user,
     )
 
+    # Check if student is suspended
+    try:
+        from apps.accounts.models import StudentProfile
+        profile = StudentProfile.objects.filter(user=request.user).first()
+        if profile and profile.is_tutor_suspended:
+            return JsonResponse({
+                "message": "Your tutor access has been temporarily paused. Please speak with your teacher.",
+                "phase": "suspended",
+                "is_complete": True,
+                "suspended": True,
+            })
+    except Exception:
+        pass
+
     # Handle completed sessions (non-streaming)
     if session.status == TutorSession.Status.COMPLETED:
         return JsonResponse({
@@ -669,6 +695,43 @@ def chat_respond(request, session_id):
 
     if safety_result.blocked:
         safe_response = ContentSafetyFilter.get_safe_response(safety_result.flags[0])
+
+        # Count safety strikes in this session (flagged student turns)
+        strike_count = SessionTurn.objects.filter(
+            session=session, role='student', is_flagged=True
+        ).count()
+
+        if strike_count >= 2:
+            # Auto-end session and suspend student
+            session.status = TutorSession.Status.ABANDONED
+            session.ended_at = timezone.now()
+            session.save(update_fields=['status', 'ended_at'])
+
+            try:
+                from apps.accounts.models import StudentProfile
+                profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+                if not profile.is_tutor_suspended:
+                    profile.is_tutor_suspended = True
+                    profile.tutor_suspended_at = timezone.now()
+                    profile.tutor_suspended_reason = (
+                        f"Automatic suspension after {strike_count} safety violations in session {session.id}. "
+                        f"Reasons: {session.flag_reason}. "
+                        f"Teacher review required before re-enabling access."
+                    )
+                    profile.save(update_fields=['is_tutor_suspended', 'tutor_suspended_at', 'tutor_suspended_reason'])
+            except Exception as e:
+                logger.warning(f"Failed to suspend student {request.user.id}: {e}")
+
+            return JsonResponse({
+                "message": "This session has been ended due to repeated safety concerns. Your teacher has been notified and will discuss this with you.",
+                "phase": "suspended",
+                "media": [],
+                "show_exit_ticket": False,
+                "exit_ticket": None,
+                "is_complete": True,
+                "suspended": True,
+            })
+
         return JsonResponse({
             "message": safe_response,
             "phase": "safety",

@@ -156,6 +156,18 @@ class StudentProfile(models.Model):
         'TutorPersonality', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='students',
     )
+
+    # Safety suspension — student locked out of tutor until teacher reviews
+    is_tutor_suspended = models.BooleanField(
+        default=False,
+        help_text="Locked out of AI tutor due to safety violations. Teacher must review and re-approve."
+    )
+    tutor_suspended_at = models.DateTimeField(null=True, blank=True)
+    tutor_suspended_reason = models.TextField(
+        blank=True,
+        help_text="Reason for suspension (auto-filled from safety flags)"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
