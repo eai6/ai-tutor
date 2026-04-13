@@ -723,6 +723,9 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
                         'option_d': q.get('option_d', ''),
                         'correct_answer': q.get('correct', ''),
                     })
+                    # Store source HTML for source-based MCQ questions
+                    if q.get('source'):
+                        kwargs['answer_data'] = {'source': q['source']}
                 else:
                     kwargs['answer_data'] = q.get('answer_data', {})
                 ExitTicketQuestion.objects.create(**kwargs)

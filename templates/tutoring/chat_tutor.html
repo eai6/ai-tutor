@@ -1721,7 +1721,17 @@ function showExitTicket() {
 
             let bodyHTML = '';
             if (qType === 'mcq') {
-                bodyHTML = `<div class="options" data-q="${origIdx}">
+                // Source-based MCQ: render source HTML above options
+                let sourceHTML = '';
+                if (q.source) {
+                    if (/<[a-z][\s\S]*>/i.test(q.source) && window.DOMPurify) {
+                        const clean = DOMPurify.sanitize(q.source);
+                        sourceHTML = `<div class="data-description-rich" style="margin-bottom:0.75rem;"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:120px;border:none;"></iframe></div>`;
+                    } else {
+                        sourceHTML = `<div class="data-description" style="margin-bottom:0.75rem;">${q.source}</div>`;
+                    }
+                }
+                bodyHTML = `${sourceHTML}<div class="options" data-q="${origIdx}">
                     ${(q.options || []).map(opt => `
                         <div class="option" data-letter="${opt.letter}" onclick="selectOption(${origIdx}, '${opt.letter}', this)">
                             <span class="letter">${opt.letter}</span>

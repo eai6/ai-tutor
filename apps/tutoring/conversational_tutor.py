@@ -3477,6 +3477,9 @@ Which concept numbers were meaningfully covered?"""
                     {'letter': 'D', 'text': q.option_d},
                 ]
                 q_data['correct'] = q.correct_answer
+                # Include source HTML for source-based MCQ questions
+                if q.answer_data and q.answer_data.get('source'):
+                    q_data['source'] = q.answer_data['source']
             else:
                 q_data['answer_data'] = q.answer_data or {}
             exit_questions.append(q_data)

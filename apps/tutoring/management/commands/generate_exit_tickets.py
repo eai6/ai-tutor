@@ -49,7 +49,28 @@ SHORT_ANSWER format:
 DATA_INTERPRETATION format:
 {{"question_type": "data_interpretation", "question": "Study the data below and answer:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'><tr style='background:#f4f4f5'><th style='padding:8px 12px;border:1px solid #e4e4e7'>Country</th><th style='padding:8px 12px;border:1px solid #e4e4e7'>GNP ($)</th><th style='padding:8px 12px;border:1px solid #e4e4e7'>HDI</th></tr><tr><td style='padding:8px 12px;border:1px solid #e4e4e7'>Country A</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>500</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>0.40</td></tr><tr><td style='padding:8px 12px;border:1px solid #e4e4e7'>Country B</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>2,000</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>0.65</td></tr><tr><td style='padding:8px 12px;border:1px solid #e4e4e7'>Country C</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>800</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>0.75</td></tr></table>", "model_answer": "Country C has the highest HDI despite not having the highest GNP, showing that wealth alone does not determine development.", "keywords": ["Country C", "highest HDI", "wealth", "development"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "..."}}
 
-For DATA_INTERPRETATION questions, use HTML tables in data_description for clean data presentation. Use inline styles only (no external CSS). Tables should have clear headers, borders, and padding.
+RICH VISUAL CONTENT REQUIREMENTS:
+1. DATA_INTERPRETATION questions MUST include rich HTML in data_description:
+   - Use HTML tables with inline styles for data (population stats, GNP figures, trade data, etc.)
+   - Use <img> tags to reference figures from uploaded textbooks/worksheets when available
+   - Create SVG diagrams for simple visuals (bar charts, pie charts, maps) using inline SVG
+   Example SVG bar chart:
+   <svg width='300' height='150' xmlns='http://www.w3.org/2000/svg'><rect x='20' y='20' width='40' height='100' fill='#3b82f6'/><text x='30' y='140' font-size='10'>A</text><rect x='80' y='50' width='40' height='70' fill='#10b981'/><text x='90' y='140' font-size='10'>B</text><rect x='140' y='80' width='40' height='40' fill='#f59e0b'/><text x='150' y='140' font-size='10'>C</text></svg>
+
+2. At least 2 of the 3 DATA_INTERPRETATION questions must include a visual (table, chart, or diagram)
+
+3. For MATH subjects: include SVG diagrams where relevant:
+   - Number lines for number/fraction questions
+   - Geometric shapes with labeled dimensions for area/perimeter questions
+   - Coordinate grids for algebra/graph questions
+   Example: <svg width='200' height='200' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
+
+4. For GEOGRAPHY subjects: include data tables with real Seychelles/world data, and reference any available textbook figures via <img> tags
+
+5. For MCQ questions that involve reading a source: add a "source" field with HTML content:
+   {{"question_type": "mcq", "question": "Based on the source above, which country...", "source": "<table>...</table>", "option_a": "...", ...}}
+
+6. Use inline styles ONLY (no external CSS or scripts). All HTML renders in a sandboxed iframe.
 
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (recall facts)
