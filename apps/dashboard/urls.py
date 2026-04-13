@@ -64,6 +64,7 @@ urlpatterns = [
     # Reports
     path('reports/', views.reports_overview, name='reports'),
     path('class/<int:course_id>/readiness/', views.class_readiness_report, name='class_readiness'),
+    path('lesson/<int:lesson_id>/session-report/', views.lesson_session_report, name='lesson_session_report'),
     
     # Settings
     path('settings/', views.settings_page, name='settings'),

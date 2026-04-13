@@ -1392,6 +1392,175 @@ def class_readiness_report(request, course_id):
     return render(request, 'dashboard/class_readiness.html', context)
 
 
+@teacher_required
+def lesson_session_report(request, lesson_id):
+    """Post-session report for a specific lesson — the teacher's decision view.
+
+    Shows after the 40-minute tutor lab session:
+    - How many students completed the session
+    - Per-objective competency: X/Y students achieved each enabling objective
+    - Per-student competency: each student's X/Y objectives achieved
+    - Clear recommendation: move to next lesson or revisit with focus areas
+    """
+    from apps.curriculum.models import Lesson
+    from apps.tutoring.skills_models import Skill, StudentSkillMastery
+    from apps.tutoring.models import TutorSession, ExitTicketAttempt
+    from django.db.models import Avg, Q
+    from django.contrib.auth.models import User
+
+    institution = request.staff_ctx['institution']
+    lookup = {'id': lesson_id}
+    if institution is not None:
+        lookup['unit__course__institution'] = institution
+    lesson = get_object_or_404(Lesson, **lookup)
+
+    course = lesson.unit.course
+    mastery_threshold = 0.7  # 70% = competent
+
+    # ── Students who had tutor sessions for this lesson ──
+    sessions = TutorSession.objects.filter(lesson=lesson).select_related('student')
+    student_ids = list(sessions.values_list('student_id', flat=True).distinct())
+    total_students = len(student_ids)
+
+    completed_sessions = sessions.filter(status='completed').values_list('student_id', flat=True).distinct()
+    completed_count = len(set(completed_sessions))
+
+    # ── Enabling objectives for this lesson ──
+    eo_skills = Skill.objects.filter(
+        primary_lesson=lesson,
+        is_enabling_objective=True,
+    ).order_by('id')
+    total_objectives = eo_skills.count()
+
+    # ── Per-objective competency ──
+    objectives_data = []
+    for skill in eo_skills:
+        masteries = StudentSkillMastery.objects.filter(
+            skill=skill, student_id__in=student_ids
+        )
+        achieved = masteries.filter(mastery_level__gte=mastery_threshold).count()
+        not_achieved = total_students - achieved
+        avg = masteries.aggregate(a=Avg('mastery_level'))['a'] or 0
+
+        objectives_data.append({
+            'objective': skill.enabling_objective_text,
+            'bloom': skill.bloom_level,
+            'achieved': achieved,
+            'not_achieved': not_achieved,
+            'total': total_students,
+            'pct': round(achieved / total_students * 100) if total_students else 0,
+            'avg_mastery': round(avg * 100),
+            'color': 'green' if (achieved / total_students * 100 if total_students else 0) >= 70 else (
+                'yellow' if (achieved / total_students * 100 if total_students else 0) >= 40 else 'red'
+            ),
+        })
+
+    # ── Per-student competency ──
+    students_data = []
+    for sid in student_ids:
+        student = User.objects.filter(id=sid).first()
+        if not student:
+            continue
+
+        achieved_count = StudentSkillMastery.objects.filter(
+            skill__in=eo_skills,
+            student_id=sid,
+            mastery_level__gte=mastery_threshold,
+        ).count()
+
+        # Exit ticket score
+        exit_attempt = ExitTicketAttempt.objects.filter(
+            exit_ticket__lesson=lesson,
+            student_id=sid,
+        ).order_by('-completed_at').first()
+
+        session = sessions.filter(student_id=sid).order_by('-started_at').first()
+
+        weak_objectives = []
+        if achieved_count < total_objectives:
+            weak = StudentSkillMastery.objects.filter(
+                skill__in=eo_skills,
+                student_id=sid,
+                mastery_level__lt=mastery_threshold,
+            ).select_related('skill')
+            weak_objectives = [w.skill.enabling_objective_text[:60] for w in weak[:5]]
+
+        students_data.append({
+            'student': student,
+            'achieved': achieved_count,
+            'total': total_objectives,
+            'pct': round(achieved_count / total_objectives * 100) if total_objectives else 0,
+            'exit_score': f"{exit_attempt.score}/10" if exit_attempt else '—',
+            'exit_passed': exit_attempt.passed if exit_attempt else None,
+            'session_status': session.status if session else 'not_started',
+            'weak_objectives': weak_objectives,
+        })
+
+    students_data.sort(key=lambda s: s['pct'])
+
+    # ── Class competency summary ──
+    competent_students = sum(1 for s in students_data if s['pct'] >= 70)
+    class_competency_pct = round(competent_students / total_students * 100) if total_students else 0
+
+    # ── Recommendation ──
+    weak_objectives = [o for o in objectives_data if o['pct'] < 50]
+    if class_competency_pct >= 80:
+        recommendation = f"Class is ready to move on. {competent_students}/{total_students} students achieved competency."
+        recommendation_type = 'success'
+        recommendation_action = 'proceed'
+    elif class_competency_pct >= 60:
+        focus_areas = ', '.join(f"'{o['objective'][:50]}'" for o in weak_objectives[:2])
+        recommendation = (
+            f"{competent_students}/{total_students} students achieved competency. "
+            f"Consider a brief review of: {focus_areas} before moving on."
+            if focus_areas else
+            f"{competent_students}/{total_students} students achieved competency. Ready to proceed with monitoring."
+        )
+        recommendation_type = 'warning'
+        recommendation_action = 'proceed_with_review'
+    else:
+        focus_areas = ', '.join(f"'{o['objective'][:50]}'" for o in weak_objectives[:3])
+        recommendation = (
+            f"Only {competent_students}/{total_students} students achieved competency. "
+            f"Recommend revisiting this lesson next week, focusing on: {focus_areas}."
+        )
+        recommendation_type = 'danger'
+        recommendation_action = 'revisit'
+
+    # Next lesson info
+    next_lesson = Lesson.objects.filter(
+        unit=lesson.unit,
+        order_index__gt=lesson.order_index,
+        is_published=True,
+    ).order_by('order_index').first()
+    if not next_lesson:
+        next_lesson = Lesson.objects.filter(
+            unit__course=course,
+            unit__order_index__gt=lesson.unit.order_index,
+            is_published=True,
+        ).order_by('unit__order_index', 'order_index').first()
+
+    context = {
+        **request.staff_ctx,
+        'lesson': lesson,
+        'unit': lesson.unit,
+        'course': course,
+        'total_students': total_students,
+        'completed_count': completed_count,
+        'total_objectives': total_objectives,
+        'objectives_data': objectives_data,
+        'students_data': students_data,
+        'competent_students': competent_students,
+        'class_competency_pct': class_competency_pct,
+        'recommendation': recommendation,
+        'recommendation_type': recommendation_type,
+        'recommendation_action': recommendation_action,
+        'next_lesson': next_lesson,
+    }
+
+    return render(request, 'dashboard/lesson_session_report.html', context)
+
+
 # ============================================================================
 # Teaching Materials
 # ============================================================================

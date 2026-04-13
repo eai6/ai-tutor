@@ -1,0 +1,329 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Session Report — {{ lesson.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.report-header h2 { margin: 0; font-size: 1.25rem; }
+.report-meta { color: #71717a; font-size: 0.875rem; margin-top: 0.25rem; }
+
+/* Summary Cards */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+.summary-card {
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.summary-card .number {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1;
+}
+.summary-card .label {
+    font-size: 0.75rem;
+    color: #71717a;
+    margin-top: 0.375rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.number.green { color: #059669; }
+.number.yellow { color: #d97706; }
+.number.red { color: #dc2626; }
+
+/* Recommendation Banner */
+.recommendation {
+    padding: 1.25rem 1.5rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+.recommendation.success { background: #d1fae5; border: 1px solid #a7f3d0; }
+.recommendation.warning { background: #fef3c7; border: 1px solid #fde68a; }
+.recommendation.danger { background: #fee2e2; border: 1px solid #fecaca; }
+.recommendation-icon { font-size: 1.5rem; flex-shrink: 0; }
+.recommendation-text { font-weight: 600; font-size: 0.9375rem; }
+.recommendation-text .sub { font-weight: 400; color: #71717a; font-size: 0.8125rem; margin-top: 0.25rem; }
+.recommendation-action {
+    margin-top: 0.75rem;
+    display: inline-flex;
+    gap: 0.5rem;
+}
+.recommendation-action a {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+.btn-proceed { background: #059669; color: #fff; }
+.btn-revisit { background: #dc2626; color: #fff; }
+
+/* Objectives Table */
+.section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 1.5rem 0 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.obj-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+}
+.obj-table th {
+    background: #f4f4f5;
+    padding: 0.625rem 0.875rem;
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #71717a;
+}
+.obj-table td {
+    padding: 0.75rem 0.875rem;
+    border-top: 1px solid #f4f4f5;
+    font-size: 0.875rem;
+}
+.obj-table tr:hover { background: #fafafa; }
+
+.competency-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.competency-bar-track {
+    flex: 1;
+    height: 8px;
+    background: #e4e4e7;
+    border-radius: 999px;
+    overflow: hidden;
+    min-width: 60px;
+}
+.competency-bar-fill { height: 100%; border-radius: 999px; }
+.competency-bar-fill.green { background: #10b981; }
+.competency-bar-fill.yellow { background: #f59e0b; }
+.competency-bar-fill.red { background: #ef4444; }
+.competency-fraction { font-weight: 700; font-size: 0.8125rem; white-space: nowrap; }
+
+.bloom-tag {
+    display: inline-block;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: #ede9fe;
+    color: #7c3aed;
+}
+
+/* Student Rows */
+.student-row { display: flex; align-items: center; gap: 0.75rem; }
+.student-name { font-weight: 600; font-size: 0.875rem; min-width: 120px; }
+.student-score {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+}
+.student-score.pass { background: #d1fae5; color: #065f46; }
+.student-score.fail { background: #fee2e2; color: #991b1b; }
+.student-score.partial { background: #fef3c7; color: #92400e; }
+.weak-list { color: #71717a; font-size: 0.75rem; margin-top: 0.125rem; }
+.exit-badge {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 999px;
+}
+.exit-badge.passed { background: #d1fae5; color: #065f46; }
+.exit-badge.failed { background: #fee2e2; color: #991b1b; }
+
+@media (max-width: 768px) {
+    .summary-cards { grid-template-columns: repeat(2, 1fr); }
+    .obj-table th, .obj-table td { padding: 0.5rem; font-size: 0.8125rem; }
+    .recommendation { flex-direction: column; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="display:inline-flex;align-items:center;gap:0.5rem;color:#71717a;text-decoration:none;margin-bottom:1rem;">
+    &larr; Back to {{ lesson.title }}
+</a>
+
+<!-- Header -->
+<div class="report-header">
+    <div>
+        <h2>Session Report: {{ lesson.title }}</h2>
+        <div class="report-meta">{{ unit.title }} &mdash; {{ course.title }}</div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="summary-cards">
+    <div class="summary-card">
+        <div class="number">{{ completed_count }}/{{ total_students }}</div>
+        <div class="label">Sessions Completed</div>
+    </div>
+    <div class="summary-card">
+        <div class="number {% if class_competency_pct >= 80 %}green{% elif class_competency_pct >= 60 %}yellow{% else %}red{% endif %}">{{ class_competency_pct }}%</div>
+        <div class="label">Class Competency</div>
+    </div>
+    <div class="summary-card">
+        <div class="number {% if class_competency_pct >= 80 %}green{% elif class_competency_pct >= 60 %}yellow{% else %}red{% endif %}">{{ competent_students }}/{{ total_students }}</div>
+        <div class="label">Students Competent</div>
+    </div>
+    <div class="summary-card">
+        <div class="number">{{ total_objectives }}</div>
+        <div class="label">Enabling Objectives</div>
+    </div>
+</div>
+
+<!-- Recommendation -->
+<div class="recommendation {{ recommendation_type }}">
+    <div class="recommendation-icon">
+        {% if recommendation_type == 'success' %}&#9989;{% elif recommendation_type == 'warning' %}&#9888;{% else %}&#10060;{% endif %}
+    </div>
+    <div>
+        <div class="recommendation-text">
+            {{ recommendation }}
+            {% if recommendation_action == 'proceed' or recommendation_action == 'proceed_with_review' %}
+                <div class="sub">The class has demonstrated sufficient understanding to move forward.</div>
+            {% else %}
+                <div class="sub">Consider dedicating the next teacher session to revisiting the weak objectives before moving on.</div>
+            {% endif %}
+        </div>
+        <div class="recommendation-action">
+            {% if next_lesson and recommendation_action != 'revisit' %}
+                <a href="{% url 'dashboard:lesson_detail' next_lesson.id %}" class="btn-proceed">Next Lesson: {{ next_lesson.title|truncatewords:5 }}</a>
+            {% endif %}
+            {% if recommendation_action == 'revisit' %}
+                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn-revisit">Review This Lesson</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Per-Objective Competency -->
+<div class="section-title">Competency by Enabling Objective</div>
+{% if objectives_data %}
+<table class="obj-table">
+    <thead>
+        <tr>
+            <th style="width:50%">Enabling Objective</th>
+            <th style="width:8%">Level</th>
+            <th style="width:22%">Competency</th>
+            <th style="width:20%">Students</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for obj in objectives_data %}
+        <tr>
+            <td>{{ obj.objective|truncatewords:18 }}</td>
+            <td><span class="bloom-tag">{{ obj.bloom }}</span></td>
+            <td>
+                <div class="competency-bar">
+                    <div class="competency-bar-track">
+                        <div class="competency-bar-fill {{ obj.color }}" style="width:{{ obj.pct }}%"></div>
+                    </div>
+                    <span class="competency-fraction">{{ obj.pct }}%</span>
+                </div>
+            </td>
+            <td>
+                <span class="competency-fraction" style="color:{% if obj.pct >= 70 %}#059669{% elif obj.pct >= 40 %}#d97706{% else %}#dc2626{% endif %}">{{ obj.achieved }}/{{ obj.total }}</span>
+                achieved
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div style="padding:2rem;text-align:center;color:#71717a;background:#fff;border-radius:0.75rem;">
+    No enabling objective data available yet. Students need to complete tutor sessions to generate competency data.
+</div>
+{% endif %}
+
+<!-- Per-Student Competency -->
+<div class="section-title">Individual Student Competency</div>
+{% if students_data %}
+<table class="obj-table">
+    <thead>
+        <tr>
+            <th>Student</th>
+            <th>Objectives</th>
+            <th>Exit Quiz</th>
+            <th>Status</th>
+            <th>Weak Areas</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in students_data %}
+        <tr>
+            <td><span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span></td>
+            <td>
+                <span class="student-score {% if s.pct >= 70 %}pass{% elif s.pct >= 40 %}partial{% else %}fail{% endif %}">
+                    {{ s.achieved }}/{{ s.total }}
+                </span>
+            </td>
+            <td>
+                {% if s.exit_passed != None %}
+                    <span class="exit-badge {% if s.exit_passed %}passed{% else %}failed{% endif %}">{{ s.exit_score }}</span>
+                {% else %}
+                    <span style="color:#a1a1aa;font-size:0.8125rem;">{{ s.exit_score }}</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if s.session_status == 'completed' %}
+                    <span style="color:#059669;font-weight:600;font-size:0.8125rem;">Completed</span>
+                {% elif s.session_status == 'active' %}
+                    <span style="color:#d97706;font-weight:600;font-size:0.8125rem;">In Progress</span>
+                {% else %}
+                    <span style="color:#a1a1aa;font-size:0.8125rem;">Not Started</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if s.weak_objectives %}
+                    <div class="weak-list">{{ s.weak_objectives|join:", " }}</div>
+                {% else %}
+                    <span style="color:#059669;font-size:0.75rem;">All objectives met</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div style="padding:2rem;text-align:center;color:#71717a;background:#fff;border-radius:0.75rem;">
+    No student session data available yet.
+</div>
+{% endif %}
+
+{% endblock %}
