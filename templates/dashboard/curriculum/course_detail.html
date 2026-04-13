@@ -399,6 +399,14 @@
 
 <!-- Units and Lessons -->
 {% for unit in units %}
+{% ifchanged unit.grade_level %}
+{% if unit.grade_level %}
+<div style="display:flex;align-items:center;gap:0.75rem;margin:1.5rem 0 0.75rem;padding-bottom:0.5rem;border-bottom:2px solid var(--primary);">
+    <span style="background:var(--primary);color:#fff;padding:4px 12px;border-radius:999px;font-weight:700;font-size:0.8125rem;">{{ unit.grade_level }}</span>
+    <span style="font-weight:600;color:var(--gray-600);font-size:0.9375rem;">Secondary {{ unit.grade_level|cut:"S" }}</span>
+</div>
+{% endif %}
+{% endifchanged %}
 <div class="card" style="margin-bottom: 1rem;">
     <div class="card-header collapsible-header" style="background: var(--gray-50);" onclick="toggleCollapse(this)">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -406,7 +414,10 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
             <div>
-                <h3 class="card-title" style="margin: 0;">{{ forloop.counter }}. {{ unit.title }}</h3>
+                <h3 class="card-title" style="margin: 0;">
+                    {{ forloop.counter }}. {{ unit.title }}
+                    {% if unit.grade_level %}<span style="font-size:0.6875rem;font-weight:600;background:#ede9fe;color:#7c3aed;padding:2px 6px;border-radius:999px;margin-left:0.5rem;vertical-align:middle;">{{ unit.grade_level }}</span>{% endif %}
+                </h3>
                 <p style="font-size: 0.875rem; color: var(--gray-500); margin: 0.25rem 0 0 0;">
                     {{ unit.lessons.count }} lesson{{ unit.lessons.count|pluralize }}
                 </p>

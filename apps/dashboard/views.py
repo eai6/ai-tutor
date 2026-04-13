@@ -567,7 +567,7 @@ def course_detail(request, course_id):
     is_platform_wide = course.institution is None
     course_read_only = is_platform_wide and not is_superadmin
     
-    units = course.units.prefetch_related('lessons', 'lessons__steps').order_by('order_index')
+    units = course.units.prefetch_related('lessons', 'lessons__steps').order_by('grade_level', 'order_index')
     
     # Get progress stats and content stats per lesson
     from apps.tutoring.models import ExitTicket
