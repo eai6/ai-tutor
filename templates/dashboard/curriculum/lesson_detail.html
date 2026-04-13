@@ -189,6 +189,7 @@
                 </div>
             </div>
             <div class="action-buttons">
+                {% if can_edit_content %}
                 {% if not lesson.is_published %}
                     {% if lesson.content_quality in 'tier_3,tier_4' and not lesson.teacher_approved %}
                     <form method="post" action="{% url 'dashboard:lesson_approve' lesson.id %}" style="display: inline;">
@@ -216,6 +217,7 @@
                         🔄 Regenerate Content
                     </button>
                 </form>
+                {% endif %}
                 <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">
                     Session Report
                 </a>

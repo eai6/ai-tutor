@@ -61,6 +61,7 @@ def get_staff_context(request):
             'all_schools': all_schools,
             'is_aggregated': institution is None,
             'unreviewed_flag_count': flag_qs.count(),
+            'can_edit_content': True,  # Superadmin always has full access
         }
 
     # Regular staff — may belong to multiple schools
@@ -89,6 +90,9 @@ def get_staff_context(request):
         is_flagged=True, flag_reviewed=False, institution=institution
     )
 
+    from apps.accounts.models import PlatformConfig
+    config = PlatformConfig.load()
+
     return {
         'membership': membership,
         'institution': institution,
@@ -96,6 +100,7 @@ def get_staff_context(request):
         'all_schools': staff_schools if len(staff_schools) > 1 else [],
         'is_aggregated': False,
         'unreviewed_flag_count': flag_qs.count(),
+        'can_edit_content': config.teachers_can_edit_content,
     }
 
 
@@ -1881,6 +1886,7 @@ def settings_page(request):
                 platform_config.threshold_me_min = int(request.POST.get('threshold_me_min', 80))
                 platform_config.threshold_ee_time_minutes = int(request.POST.get('threshold_ee_time', 5))
                 platform_config.threshold_move_on = int(request.POST.get('threshold_move_on', 70))
+                platform_config.teachers_can_edit_content = request.POST.get('teachers_can_edit') == '1'
                 platform_config.save()
                 messages.success(request, "Competency thresholds updated.")
             except (ValueError, TypeError):

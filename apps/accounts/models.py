@@ -208,6 +208,12 @@ class PlatformConfig(models.Model):
         help_text="Recommend teacher to move on when ALL students achieve at least this % of objectives. Default: 70%"
     )
 
+    # Role-based access
+    teachers_can_edit_content = models.BooleanField(
+        default=False,
+        help_text="If False, teachers can only view content and reports — they cannot edit, publish, regenerate, delete, or upload curriculum. Super admins always have full access."
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):

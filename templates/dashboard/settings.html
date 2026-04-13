@@ -232,6 +232,15 @@
                     <input type="number" class="form-control" name="threshold_move_on" value="{{ platform_config.threshold_move_on }}" min="30" max="100" style="max-width:200px;">
                     <small style="color:var(--gray-500);">Teacher is recommended to move on only when every student achieves at least this % of enabling objectives</small>
                 </div>
+
+                <div class="form-group" style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--gray-200);">
+                    <label class="form-label">Teacher Content Editing</label>
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                        <input type="checkbox" name="teachers_can_edit" value="1" {% if platform_config.teachers_can_edit_content %}checked{% endif %}>
+                        <span style="font-size:0.875rem;">Allow teachers to edit, publish, regenerate, and delete content</span>
+                    </label>
+                    <small style="color:var(--gray-500);display:block;margin-top:0.25rem;">When off (default for pilot), teachers can only view lessons and access session/competency reports. Super admins always have full access.</small>
+                </div>
             </div>
         </div>
 

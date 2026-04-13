@@ -172,7 +172,9 @@
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <a href="{% url 'dashboard:class_readiness' course.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">Class Readiness Report</a>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-header-display').style.display='none'; document.getElementById('course-edit-form').style.display='block';">Edit Course</button>
+                {% if can_edit_content %}
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-header-display').style.display='none'; document.getElementById('course-edit-form').style.display='block';">Edit Course</button>{% endif %}
+                {% if can_edit_content %}
                 <form method="post" action="{% url 'dashboard:course_publish_all' course.id %}" style="display: inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Publish all lessons in this course?');">Publish All</button>
@@ -181,6 +183,7 @@
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone.');">Delete</button>
                 </form>
+                {% endif %}
             </div>
         </div>
 
@@ -255,9 +258,11 @@
             </svg>
             <h3 class="card-title" style="margin: 0;">Teaching Materials{% if materials %} ({{ materials|length }}){% endif %}</h3>
         </div>
+        {% if can_edit_content %}
         <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); var el=document.getElementById('material-upload-form'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; var body=this.closest('.card').querySelector('.collapsible-body'); if(body.classList.contains('collapsed')){toggleCollapse(this.closest('.collapsible-header'));}">
             + Upload Material
         </button>
+        {% endif %}
     </div>
     <div class="collapsible-body collapsed" style="max-height: 600px;">
         <div class="card-body" style="padding: 0;">
@@ -365,7 +370,7 @@
     {% endif %}
 </div>
 <script>setTimeout(function(){ window.location.reload(); }, 15000);</script>
-{% elif lessons_without_content > 0 %}
+{% elif lessons_without_content > 0 and can_edit_content %}
 <div class="bulk-actions" style="background: #FEF3C7; border: 1px solid #FCD34D;">
     <span style="font-size: 1.25rem;">⚠️</span>
     <div style="flex: 1;">
@@ -379,7 +384,7 @@
         </button>
     </form>
 </div>
-{% else %}
+{% elif can_edit_content %}
 <!-- Bulk Actions -->
 <div class="bulk-actions">
     <span class="bulk-actions-label">🚀 Quick Actions:</span>
@@ -407,7 +412,7 @@
                 </p>
             </div>
         </div>
-        <a href="{% url 'dashboard:lesson_create' unit.id %}" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();">+ Add Lesson</a>
+        {% if can_edit_content %}<a href="{% url 'dashboard:lesson_create' unit.id %}" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();">+ Add Lesson</a>{% endif %}
     </div>
     <div class="collapsible-body" style="max-height: 2000px;">
         <div class="card-body" style="padding: 0;">

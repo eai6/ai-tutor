@@ -536,12 +536,14 @@
                         </svg>
                         Courses
                     </a>
+                    {% if can_edit_content %}
                     <a href="{% url 'dashboard:curriculum_upload' %}" class="nav-link {% if 'upload' in request.resolver_match.url_name %}active{% endif %}">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                         </svg>
                         Upload Curriculum
                     </a>
+                    {% endif %}
                 </div>
                 
                 <div class="nav-section">
