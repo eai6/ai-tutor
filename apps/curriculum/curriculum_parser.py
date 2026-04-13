@@ -965,7 +965,10 @@ def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurr
     cycle = "/".join(cycles)
 
     gl = grade_level.upper()
-    is_cycle_5 = gl in ('S3', 'S4', 'S5')
+    # Cycle 4 = S1, S2, S3 (detailed syllabus with Teaching/Learning Scheme)
+    # Cycle 5 = S4, S5 (IGCSE programme with themes)
+    is_cycle_5_only = gl in ('S4', 'S5')
+    in_igcse_section = False  # Track when we enter IGCSE section
 
     lines = text.split('\n')
     units = []
@@ -983,15 +986,33 @@ def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurr
 
         line_lower = line.lower()
 
+        # ── Detect IGCSE/Cycle 5 section boundary ──
+        # Only match "CYCLE 5" as a standalone header, not mentions within unit text
+        if _re.match(r'^CYCLE\s+5', line, _re.IGNORECASE) or 'igcse programme' in line_lower:
+            in_igcse_section = True
+            if not is_cycle_5_only:
+                # For S1-S3: stop processing when we hit the IGCSE section header
+                break  # Exit the loop entirely — we have all Cycle 4 content
+
         # ── Detect grade/term headers ──
         term_match = _re.match(r'Secondary\s+(One|Two|Three|Four|Five)', line, _re.IGNORECASE)
         if term_match:
             grade_map = {'one': 'S1', 'two': 'S2', 'three': 'S3', 'four': 'S4', 'five': 'S5'}
             current_term_grade = grade_map.get(term_match.group(1).lower(), grade_level)
 
+        # Skip content not for our target grade
+        # For S1-S3: only process Cycle 4 content (not IGCSE)
+        if not is_cycle_5_only and in_igcse_section:
+            continue
+        # For S4-S5: only process IGCSE content
+        if is_cycle_5_only and not in_igcse_section:
+            # Still detect unit headers to skip Cycle 4 units
+            if _re.match(r'Unit\s+\d+\s*:', line):
+                continue
+
         # ── Detect unit headers ──
         unit_match = _re.match(r'Unit\s+(\d+)\s*:\s*(.+)', line)
-        if not unit_match and is_cycle_5:
+        if not unit_match and (is_cycle_5_only or in_igcse_section):
             # IGCSE theme format: "Theme 1: Population and settlement" or "1.1 Population dynamics"
             unit_match = _re.match(r'(?:Theme\s+)?(\d+(?:\.\d+)?)\s*[:.]\s*(.+)', line)
             if unit_match and len(unit_match.group(2)) < 5:
@@ -1099,6 +1120,28 @@ def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurr
     # Save last unit
     if current_unit and (current_unit['terminal_objectives'] or current_unit['enabling_objectives']):
         units.append(current_unit)
+
+    # ── Deduplicate units (same unit appears twice: intro block + Teaching/Learning Scheme) ──
+    # Strategy: merge by normalized title, prefer the version with more enabling objectives
+    deduped = []
+    seen_titles = {}
+    for u in units:
+        # Normalize: lowercase, strip punctuation and extra spaces, first 35 chars
+        clean_title = _re.sub(r'[^a-z0-9 ]', '', u['title'].lower()).strip()
+        clean_title = _re.sub(r'\s+', ' ', clean_title)[:35]
+        if clean_title in seen_titles:
+            # Merge into the existing unit (keep the one with more EOs)
+            existing = seen_titles[clean_title]
+            for eo in u.get('enabling_objectives', []):
+                if eo not in existing.get('enabling_objectives', []):
+                    existing.setdefault('enabling_objectives', []).append(eo)
+            for to in u.get('terminal_objectives', []):
+                if to not in existing.get('terminal_objectives', []):
+                    existing.setdefault('terminal_objectives', []).append(to)
+        else:
+            seen_titles[clean_title] = u
+            deduped.append(u)
+    units = deduped
 
     # ── Filter units by target grade level ──
     if gl in ('S1', 'S2', 'S3', 'S4', 'S5'):
