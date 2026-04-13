@@ -1503,10 +1503,14 @@ def lesson_session_report(request, lesson_id):
     config = PlatformConfig.load()
 
     institution = request.staff_ctx['institution']
-    lookup = {'id': lesson_id}
     if institution is not None:
-        lookup['unit__course__institution'] = institution
-    lesson = get_object_or_404(Lesson, **lookup)
+        lesson = get_object_or_404(
+            Lesson,
+            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            id=lesson_id,
+        )
+    else:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
 
     course = lesson.unit.course
     mastery_threshold = config.threshold_me_min / 100.0  # Default 0.8
@@ -2292,10 +2296,14 @@ def lesson_detail(request, lesson_id):
 
     institution = request.staff_ctx['institution']
 
-    lookup = {'id': lesson_id}
     if institution is not None:
-        lookup['unit__course__institution'] = institution
-    lesson = get_object_or_404(Lesson, **lookup)
+        lesson = get_object_or_404(
+            Lesson,
+            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            id=lesson_id,
+        )
+    else:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
     
     # Get all steps
     steps = lesson.steps.all().order_by('order_index')
@@ -2566,13 +2574,17 @@ def lesson_generate_content(request, lesson_id):
 def lesson_publish(request, lesson_id):
     """Publish or unpublish a lesson."""
     from apps.curriculum.models import Lesson
-    
+
     institution = request.staff_ctx['institution']
-    
-    lookup = {'id': lesson_id}
+
     if institution is not None:
-        lookup['unit__course__institution'] = institution
-    lesson = get_object_or_404(Lesson, **lookup)
+        lesson = get_object_or_404(
+            Lesson,
+            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            id=lesson_id,
+        )
+    else:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
     
     # Gate: tier_3/tier_4 content requires teacher approval before publishing
     if not lesson.is_published and lesson.content_quality in ('tier_3', 'tier_4'):
@@ -2608,10 +2620,14 @@ def lesson_approve(request, lesson_id):
 
     institution = request.staff_ctx['institution']
 
-    lookup = {'id': lesson_id}
     if institution is not None:
-        lookup['unit__course__institution'] = institution
-    lesson = get_object_or_404(Lesson, **lookup)
+        lesson = get_object_or_404(
+            Lesson,
+            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            id=lesson_id,
+        )
+    else:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
 
     lesson.teacher_approved = True
     lesson.teacher_approved_at = timezone.now()
