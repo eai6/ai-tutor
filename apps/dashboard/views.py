@@ -738,6 +738,8 @@ def curriculum_upload(request):
             mat_dir = os.path.join(settings.MEDIA_ROOT, 'material_uploads')
             os.makedirs(mat_dir, exist_ok=True)
 
+            material_ids_to_process = []
+
             # Map files to entries: each file input can have multiple files,
             # but they share the same title/type/grade from their entry
             entry_idx = 0
@@ -767,7 +769,52 @@ def curriculum_upload(request):
                     curriculum_upload=upload_record,
                 )
 
-                run_async(process_teaching_material, material_record.id)
+                material_ids_to_process.append(material_record.id)
+
+            # Process materials concurrently with adaptive throttling
+            # If DB connections exhaust, reduce batch size and retry
+            def _process_material_batch(ids):
+                import time
+                import django.db
+
+                batch_size = len(ids)  # Start fully concurrent
+                idx = 0
+
+                while idx < len(ids):
+                    batch = ids[idx:idx + batch_size]
+                    threads = []
+
+                    for mid in batch:
+                        try:
+                            t = run_async(process_teaching_material, mid)
+                            threads.append(t)
+                        except Exception as e:
+                            err = str(e).lower()
+                            if 'connection' in err or 'slot' in err or 'too many' in err:
+                                # Reduce batch size and retry this batch
+                                django.db.connections.close_all()
+                                batch_size = max(1, batch_size - 3)
+                                logger.warning(
+                                    f"DB connection pressure — reducing batch to {batch_size}, "
+                                    f"waiting 5s before retrying"
+                                )
+                                time.sleep(5)
+                                break  # Retry from current idx
+                            else:
+                                logger.error(f"Material {mid} launch failed: {e}")
+                                threads.append(None)
+                    else:
+                        # All launched — wait for completion, then next batch
+                        for t in threads:
+                            if t and hasattr(t, 'join'):
+                                t.join(timeout=300)
+                        idx += batch_size
+                        continue
+                    # break hit — retry same idx with smaller batch
+                    continue
+
+            if material_ids_to_process:
+                run_async(_process_material_batch, material_ids_to_process)
 
         messages.success(request, "Curriculum uploaded! Processing will begin shortly.")
         return redirect('dashboard:curriculum_process', upload_id=upload_record.id)
