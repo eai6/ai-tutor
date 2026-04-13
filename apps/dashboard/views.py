@@ -421,6 +421,57 @@ def student_detail(request, student_id):
                 'total': info['count'],
             }
     
+    # ── Competency breakdown per course ──
+    from apps.tutoring.skills_models import Skill, StudentSkillMastery
+    from apps.accounts.models import PlatformConfig
+    config = PlatformConfig.load()
+
+    competency_data = []
+    for cid, cp in courses_progress.items():
+        course = cp['course']
+        eo_skills = Skill.objects.filter(course=course, is_enabling_objective=True)
+        total_eo = eo_skills.count()
+        if total_eo == 0:
+            continue
+
+        achieved = StudentSkillMastery.objects.filter(
+            student=student, skill__in=eo_skills,
+            mastery_level__gte=config.threshold_me_min / 100.0,
+        ).count()
+        pct = round(achieved / total_eo * 100) if total_eo else 0
+        category = config.categorize_student(pct)
+
+        # Per-lesson breakdown
+        lesson_competencies = []
+        for unit in course.units.all().order_by('order_index'):
+            for lesson in unit.lessons.filter(is_published=True).order_by('order_index'):
+                lesson_eos = eo_skills.filter(primary_lesson=lesson)
+                lesson_total = lesson_eos.count()
+                if lesson_total == 0:
+                    continue
+                lesson_achieved = StudentSkillMastery.objects.filter(
+                    student=student, skill__in=lesson_eos,
+                    mastery_level__gte=config.threshold_me_min / 100.0,
+                ).count()
+                lesson_pct = round(lesson_achieved / lesson_total * 100) if lesson_total else 0
+                lesson_cat = config.categorize_student(lesson_pct)
+                lesson_competencies.append({
+                    'lesson': lesson,
+                    'achieved': lesson_achieved,
+                    'total': lesson_total,
+                    'pct': lesson_pct,
+                    'category': lesson_cat,
+                })
+
+        competency_data.append({
+            'course': course,
+            'achieved': achieved,
+            'total': total_eo,
+            'pct': pct,
+            'category': category,
+            'lessons': lesson_competencies,
+        })
+
     context = {
         **request.staff_ctx,
         'student': student,
@@ -428,8 +479,9 @@ def student_detail(request, student_id):
         'stats': stats,
         'sessions': sessions,
         'courses_progress': courses_progress.values(),
+        'competency_data': competency_data,
     }
-    
+
     return render(request, 'dashboard/students/detail.html', context)
 
 

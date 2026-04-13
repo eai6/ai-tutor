@@ -99,6 +99,43 @@
         </div>
     </div>
     
+    <!-- Competency Breakdown -->
+    {% if competency_data %}
+    <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+            <h3 class="card-title">Competency Breakdown</h3>
+        </div>
+        <div class="card-body">
+            {% for comp in competency_data %}
+            <div style="margin-bottom: 1.5rem; {% if not forloop.last %}border-bottom: 1px solid var(--gray-100); padding-bottom: 1.5rem;{% endif %}">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <div>
+                        <strong>{{ comp.course.title }}</strong>
+                        <span style="margin-left: 0.5rem; font-size: 0.8125rem; color: var(--gray-500);">{{ comp.achieved }}/{{ comp.total }} objectives</span>
+                    </div>
+                    <span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;background:{{ comp.category.color }}18;color:{{ comp.category.color }};border:1px solid {{ comp.category.color }}33;">
+                        {{ comp.category.code }} — {{ comp.category.label }}
+                    </span>
+                </div>
+                <div style="height:8px;background:var(--gray-100);border-radius:999px;overflow:hidden;margin-bottom:0.75rem;">
+                    <div style="height:100%;width:{{ comp.pct }}%;background:{{ comp.category.color }};border-radius:999px;transition:width 0.3s;"></div>
+                </div>
+                {% if comp.lessons %}
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.5rem;">
+                    {% for lc in comp.lessons %}
+                    <div style="padding:0.5rem 0.75rem;border:1px solid var(--gray-200);border-radius:0.5rem;font-size:0.8125rem;display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;" title="{{ lc.lesson.title }}">{{ lc.lesson.title }}</span>
+                        <span style="font-weight:700;color:{{ lc.category.color }};white-space:nowrap;margin-left:0.5rem;">{{ lc.achieved }}/{{ lc.total }} <span style="font-size:0.625rem;">{{ lc.category.code }}</span></span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Recent Sessions -->
     <div class="card">
         <div class="card-header">
