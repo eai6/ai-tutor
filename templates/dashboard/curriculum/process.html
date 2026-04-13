@@ -398,6 +398,7 @@
                             <input type="text" value="{{ unit.title }}" onclick="event.stopPropagation()" placeholder="Unit title" class="unit-title-input">
                         </div>
                         <div class="unit-actions">
+                            {% if unit.duration %}<span style="font-size:0.75rem;color:var(--gray-500);margin-right:0.5rem;">{{ unit.duration }}</span>{% endif %}
                             <span class="lesson-count-badge">{{ unit.lessons|length }} lessons</span>
                             <button type="button" class="btn-icon danger" onclick="event.stopPropagation(); removeUnit(this)" title="Remove unit">🗑️</button>
                         </div>
@@ -409,6 +410,13 @@
                             <div class="lesson-details">
                                 <input type="text" value="{{ lesson.title }}" placeholder="Lesson title" class="lesson-title-input">
                                 <textarea placeholder="Learning objective (what students will be able to do)" class="lesson-objective-input" rows="2">{{ lesson.objective|default:"" }}</textarea>
+                                {% if lesson.enabling_objectives %}
+                                <div style="margin-top:0.375rem;display:flex;flex-wrap:wrap;gap:0.25rem;">
+                                    {% for eo in lesson.enabling_objectives %}
+                                    <span style="display:inline-block;font-size:0.6875rem;padding:2px 8px;border-radius:999px;background:#ede9fe;color:#6366f1;border:1px solid #c4b5fd;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ eo }}">{{ eo|truncatewords:8 }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </div>
                             <button type="button" class="btn-icon danger" onclick="removeLesson(this)" title="Remove lesson">✕</button>
                         </div>

@@ -1156,6 +1156,8 @@ def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurr
         'calculate', 'solve', 'give', 'know', 'understand', 'recognise',
         'recognize', 'locate', 'illustrate', 'suggest', 'evaluate', 'discuss',
         'outline', 'show', 'draw', 'measure', 'construct', 'assess',
+        'develop', 'determine', 'differentiate', 'interpret', 'analyse',
+        'analyze', 'investigate', 'with', 'select', 'read', 'work',
     }
     for unit in units:
         cleaned = []
@@ -1168,6 +1170,20 @@ def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurr
             if first_word in ACTION_VERBS or any(v in eo.lower() for v in ['should be able', 'will be able']):
                 cleaned.append(eo)
         unit['enabling_objectives'] = cleaned
+
+        # If enabling objectives are sparse but terminal objectives are rich,
+        # merge terminal objectives into enabling objectives
+        tos = unit.get('terminal_objectives', [])
+        eos = unit['enabling_objectives']
+        if len(tos) > len(eos) * 2 and len(tos) >= 3:
+            # Terminal objectives are much richer — add any that aren't already covered
+            eo_lower = {e.lower()[:40] for e in eos}
+            for to in tos:
+                to_key = to.lower()[:40]
+                if to_key not in eo_lower and len(to) > 15:
+                    eos.append(to)
+                    eo_lower.add(to_key)
+            unit['enabling_objectives'] = eos
 
     # ── Build lessons from enabling objectives ──
     for unit in units:
