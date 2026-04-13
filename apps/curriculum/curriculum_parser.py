@@ -939,6 +939,252 @@ def get_resources_for_topic(unit_name: str) -> List[str]:
 
 
 # ============================================================================
+# GEOGRAPHY CURRICULUM PARSER
+# ============================================================================
+
+def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurriculum:
+    """
+    Parse Seychelles Geography curriculum text.
+
+    The geography syllabus has two formats:
+    - Cycle 4 (S1-S2): Unit blocks with terminal objectives + Teaching/Learning Scheme
+      tables containing enabling objectives in the first column.
+    - Cycle 5 (S3-S5): IGCSE themes with "Candidates should be able to:" objectives.
+
+    Each unit block structure:
+        Unit N: Title
+        Duration: X periods
+        Introduction: ...
+        Terminal objectives: 1. ... 2. ...
+        Teaching/Learning Scheme:
+          Enabling objectives | Teaching Strategies | Resources | Assessment
+    """
+    import re as _re
+    from apps.curriculum.utils import determine_cycles
+    cycles = determine_cycles(grade_level)
+    cycle = "/".join(cycles)
+
+    gl = grade_level.upper()
+    is_cycle_5 = gl in ('S3', 'S4', 'S5')
+
+    lines = text.split('\n')
+    units = []
+    current_unit = None
+    current_section = None  # 'intro', 'terminal', 'enabling', 'assessment'
+    current_term_grade = grade_level
+
+    # Bullet chars used in the document
+    BULLETS = {'\uf0b7', '•', '-', '\u2022'}
+
+    for i, raw_line in enumerate(lines):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        line_lower = line.lower()
+
+        # ── Detect grade/term headers ──
+        term_match = _re.match(r'Secondary\s+(One|Two|Three|Four|Five)', line, _re.IGNORECASE)
+        if term_match:
+            grade_map = {'one': 'S1', 'two': 'S2', 'three': 'S3', 'four': 'S4', 'five': 'S5'}
+            current_term_grade = grade_map.get(term_match.group(1).lower(), grade_level)
+
+        # ── Detect unit headers ──
+        unit_match = _re.match(r'Unit\s+(\d+)\s*:\s*(.+)', line)
+        if not unit_match and is_cycle_5:
+            # IGCSE theme format: "Theme 1: Population and settlement" or "1.1 Population dynamics"
+            unit_match = _re.match(r'(?:Theme\s+)?(\d+(?:\.\d+)?)\s*[:.]\s*(.+)', line)
+            if unit_match and len(unit_match.group(2)) < 5:
+                unit_match = None  # Skip short matches like page numbers
+
+        if unit_match:
+            # Save previous unit
+            if current_unit and (current_unit['terminal_objectives'] or current_unit['enabling_objectives']):
+                units.append(current_unit)
+
+            current_unit = {
+                'number': len(units) + 1,
+                'title': unit_match.group(2).strip().rstrip('.'),
+                'grade_level': current_term_grade,
+                'duration': '',
+                'introduction': '',
+                'terminal_objectives': [],
+                'enabling_objectives': [],
+                'teaching_strategies': [],
+                'resources': [],
+                'assessment_methods': [],
+                'lessons': [],
+            }
+            current_section = 'intro'
+            continue
+
+        if not current_unit:
+            continue
+
+        # ── Detect duration ──
+        dur_match = _re.match(r'Duration\s*:\s*(.+)', line, _re.IGNORECASE)
+        if dur_match:
+            current_unit['duration'] = dur_match.group(1).strip()
+            continue
+
+        # ── Detect section transitions ──
+        if 'terminal objective' in line_lower:
+            current_section = 'terminal'
+            continue
+        if 'enabling objective' in line_lower:
+            current_section = 'enabling'
+            continue
+        if 'teaching/learning scheme' in line_lower or 'teaching/learning strategies' in line_lower:
+            current_section = 'enabling'  # The scheme table starts with enabling objectives column
+            continue
+        if 'unit assessment' in line_lower or 'assessment:' in line_lower:
+            current_section = 'assessment'
+            continue
+        if 'candidates should be able to' in line_lower:
+            current_section = 'enabling'  # IGCSE format
+            continue
+        if line_lower.startswith('resources') or line_lower.startswith('assessment'):
+            # Column headers in the Teaching/Learning Scheme table — skip
+            continue
+
+        # ── Extract content based on section ──
+        if current_section == 'intro' and len(line) > 20:
+            current_unit['introduction'] += ' ' + line
+
+        elif current_section == 'terminal':
+            # Numbered objectives: "1. Understand that..."
+            obj_match = _re.match(r'\d+\.?\s+(.+)', line)
+            if obj_match:
+                obj = obj_match.group(1).strip().rstrip('.')
+                if len(obj) > 10:
+                    current_unit['terminal_objectives'].append(obj)
+            elif line[0] in BULLETS:
+                obj = line.lstrip(''.join(BULLETS) + ' ').strip().rstrip('.')
+                if len(obj) > 10:
+                    current_unit['terminal_objectives'].append(obj)
+
+        elif current_section == 'enabling':
+            # Bullet-point enabling objectives
+            if line[0] in BULLETS:
+                obj = line.lstrip(''.join(BULLETS) + ' ').strip().rstrip('.')
+                if len(obj) > 10:
+                    current_unit['enabling_objectives'].append(obj)
+            elif len(line) > 15 and not any(kw in line_lower for kw in [
+                'teacher', 'oral questioning', 'discussion', 'textbook',
+                'written activities', 'group work', 'explanation', 'brainstorm',
+                'handout', 'atlas', 'globe', 'video', 'map interpretation',
+                'informal', 'structured', 'source-based', 'photographs',
+                'exposition', 'demonstration', 'practical', 'newspaper',
+                'magazine', 'relevant document', 'handbook', 'teaching',
+                'learning strategies', 'visit:', 'meteorological',
+                'blue economy', 'documentary', 'chart', 'analysis of',
+                'interpretation of', 'videos', 'case study', 'research',
+                'field', 'investigate', 'project', 'presentation',
+            ]):
+                # Continuation of previous objective or standalone objective
+                if current_unit['enabling_objectives']:
+                    # Append to last objective if it looks like continuation
+                    last = current_unit['enabling_objectives'][-1]
+                    if not last.endswith('.') and len(line) < 80:
+                        current_unit['enabling_objectives'][-1] = last + ' ' + line
+                    elif len(line) > 20:
+                        current_unit['enabling_objectives'].append(line.rstrip('.'))
+                elif len(line) > 20:
+                    current_unit['enabling_objectives'].append(line.rstrip('.'))
+
+        elif current_section == 'assessment':
+            if len(line) > 15:
+                current_unit['assessment_methods'].append(line.rstrip('.'))
+
+    # Save last unit
+    if current_unit and (current_unit['terminal_objectives'] or current_unit['enabling_objectives']):
+        units.append(current_unit)
+
+    # ── Filter units by target grade level ──
+    if gl in ('S1', 'S2', 'S3', 'S4', 'S5'):
+        filtered = [u for u in units if u.get('grade_level', '').upper() == gl]
+        if filtered:
+            units = filtered
+
+    # ── Post-process: clean enabling objectives ──
+    ACTION_VERBS = {
+        'define', 'describe', 'explain', 'list', 'state', 'identify', 'name',
+        'compare', 'distinguish', 'classify', 'demonstrate', 'apply', 'use',
+        'calculate', 'solve', 'give', 'know', 'understand', 'recognise',
+        'recognize', 'locate', 'illustrate', 'suggest', 'evaluate', 'discuss',
+        'outline', 'show', 'draw', 'measure', 'construct', 'assess',
+    }
+    for unit in units:
+        cleaned = []
+        for eo in unit.get('enabling_objectives', []):
+            eo = eo.strip()
+            if len(eo) < 15:
+                continue
+            first_word = eo.split()[0].lower().rstrip('s') if eo else ''
+            # Keep if starts with an action verb or is clearly an objective
+            if first_word in ACTION_VERBS or any(v in eo.lower() for v in ['should be able', 'will be able']):
+                cleaned.append(eo)
+        unit['enabling_objectives'] = cleaned
+
+    # ── Build lessons from enabling objectives ──
+    for unit in units:
+        eos = unit['enabling_objectives']
+        if not eos:
+            # Fall back to terminal objectives as enabling objectives
+            eos = unit['terminal_objectives']
+
+        # Group enabling objectives into lessons (3-6 EOs per lesson)
+        lessons = []
+        chunk_size = min(5, max(3, len(eos) // 3)) if eos else 3
+        for start in range(0, len(eos), chunk_size):
+            chunk = eos[start:start + chunk_size]
+            if not chunk:
+                continue
+            # Use first objective as lesson title seed
+            title = create_lesson_title(chunk[0])
+            lessons.append({
+                'title': title,
+                'objective': chunk[0],
+                'enabling_objectives': chunk,
+                'teaching_strategies': ['Explanation', 'Discussion', 'Practical activities'],
+                'resources': ['Textbook', 'Atlas', 'Maps'],
+                'assessment_methods': ['Structured source-based written questions', 'Oral questioning'],
+                'estimated_minutes': 40,
+                'order': len(lessons) + 1,
+            })
+
+        unit['lessons'] = lessons
+
+    teaching_strategies = [
+        'Teacher exposition and explanation',
+        'Oral questioning and discussion',
+        'Map interpretation and analysis',
+        'Group work and collaborative learning',
+        'Written activities and exercises',
+        'Use of photographs and visual sources',
+        'Fieldwork and observation',
+        'Data interpretation (graphs, tables, statistics)',
+    ]
+
+    assessment_methods = [
+        'Structured source-based written questions',
+        'Informal assessments based on oral questioning',
+        'Written exercises and assignments',
+        'Map and data interpretation tasks',
+    ]
+
+    return ParsedCurriculum(
+        subject='Geography',
+        grade_level=grade_level,
+        cycle=cycle,
+        description=f"Geography curriculum for Seychelles secondary schools (Cycle {cycle})",
+        units=units,
+        teaching_strategies=teaching_strategies,
+        assessment_methods=assessment_methods,
+    )
+
+
+# ============================================================================
 # LLM-BASED CURRICULUM PARSER (Robust)
 # ============================================================================
 
