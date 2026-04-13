@@ -788,13 +788,18 @@ def curriculum_upload(request):
 def curriculum_process(request, upload_id):
     """Process uploaded curriculum and show progress."""
     institution = request.staff_ctx['institution']
-    
+
     from apps.dashboard.models import CurriculumUpload
-    
-    lookup = {'id': upload_id}
+
+    # Allow platform-wide uploads (institution=None) for any staff
     if institution is not None:
-        lookup['institution'] = institution
-    upload = get_object_or_404(CurriculumUpload, **lookup)
+        upload = get_object_or_404(
+            CurriculumUpload,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=upload_id,
+        )
+    else:
+        upload = get_object_or_404(CurriculumUpload, id=upload_id)
 
     # Prepare context based on status
     context = {
@@ -818,14 +823,18 @@ def curriculum_process(request, upload_id):
 def curriculum_generate(request, upload_id):
     """API endpoint to start curriculum generation."""
     institution = request.staff_ctx['institution']
-    
+
     from apps.dashboard.models import CurriculumUpload
     from apps.dashboard.tasks import process_curriculum_upload
-    
-    lookup = {'id': upload_id}
+
     if institution is not None:
-        lookup['institution'] = institution
-    upload = get_object_or_404(CurriculumUpload, **lookup)
+        upload = get_object_or_404(
+            CurriculumUpload,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=upload_id,
+        )
+    else:
+        upload = get_object_or_404(CurriculumUpload, id=upload_id)
 
     if upload.status != 'pending':
         return JsonResponse({'error': 'Already processing'}, status=400)
@@ -1050,10 +1059,14 @@ def curriculum_process_api(request, upload_id):
     
     institution = request.staff_ctx['institution']
 
-    lookup = {'id': upload_id}
     if institution is not None:
-        lookup['institution'] = institution
-    upload = get_object_or_404(CurriculumUpload, **lookup)
+        upload = get_object_or_404(
+            CurriculumUpload,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=upload_id,
+        )
+    else:
+        upload = get_object_or_404(CurriculumUpload, id=upload_id)
 
     try:
         data = json.loads(request.body)
