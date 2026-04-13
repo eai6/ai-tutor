@@ -467,43 +467,127 @@ For {subject}, organize by these strands where applicable:
 
     system_prompt = "You are a curriculum design expert. Create well-structured educational content."
 
-    client, config = _get_instructor_client()
-    if client:
-        create_kwargs = dict(
-            response_model=LessonStructureResult,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt},
-            ],
-            max_retries=3,
-        )
-        if config and config.provider == 'google':
-            create_kwargs['generation_config'] = {'max_tokens': 8192}
-        else:
-            create_kwargs['max_tokens'] = 8192
+    # LLM-based lesson structure generation
+    # Strategy: chunk large documents and process each chunk, then merge
+    CHUNK_SIZE = 15000  # chars per LLM call — safe for most models
+    all_content = kb_context or (extracted_text[:40000] if extracted_text else "")
 
-        result = client.chat.completions.create(**create_kwargs)
-        structure = result.model_dump()
+    if len(all_content) <= CHUNK_SIZE:
+        chunks_to_process = [all_content]
     else:
-        # Fallback: raw LLM + JSON repair
-        logger.warning("Instructor unavailable for lesson structure, using raw LLM")
-        model_config = ModelConfig.get_for('generation')
-        if not model_config:
-            raise ValueError("No active LLM model configured")
-        llm_client = get_llm_client(model_config)
+        # Split into chunks at paragraph boundaries
+        chunks_to_process = []
+        remaining = all_content
+        while remaining:
+            if len(remaining) <= CHUNK_SIZE:
+                chunks_to_process.append(remaining)
+                break
+            # Find a good split point (paragraph break near chunk size)
+            split_at = remaining.rfind('\n\n', CHUNK_SIZE // 2, CHUNK_SIZE)
+            if split_at == -1:
+                split_at = remaining.rfind('\n', CHUNK_SIZE // 2, CHUNK_SIZE)
+            if split_at == -1:
+                split_at = CHUNK_SIZE
+            chunks_to_process.append(remaining[:split_at])
+            remaining = remaining[split_at:].lstrip()
 
-        response = llm_client.generate(
-            messages=[{"role": "user", "content": prompt + "\n\nReturn ONLY valid JSON."}],
-            system_prompt=system_prompt,
-            max_tokens=8192,
-        )
-        content = _clean_json_response(response.content.strip())
-        try:
-            structure = json.loads(content)
-        except json.JSONDecodeError as e:
-            structure = _try_fix_json(content)
-            if structure is None:
-                raise ValueError(f"Could not parse LLM response as JSON: {e.msg}")
+        logger.info(f"Document split into {len(chunks_to_process)} chunks for LLM processing")
+
+    all_units = []
+    last_error = None
+    client, config = _get_instructor_client()
+
+    for chunk_idx, chunk_text in enumerate(chunks_to_process):
+        chunk_prompt = f"""Analyze this {subject} curriculum for {grade_level} students and create a well-organized lesson structure.
+
+=== CURRICULUM CONTENT (Part {chunk_idx + 1} of {len(chunks_to_process)}) ===
+{chunk_text}
+=== END CONTENT ===
+
+{prompt.split('=== END CONTENT ===')[1] if '=== END CONTENT ===' in prompt else ''}"""
+
+        for attempt in range(2):
+            try:
+                if client:
+                    create_kwargs = dict(
+                        response_model=LessonStructureResult,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": chunk_prompt},
+                        ],
+                        max_retries=2,
+                    )
+                    if config and config.provider == 'google':
+                        create_kwargs['generation_config'] = {'max_tokens': 8192}
+                    else:
+                        create_kwargs['max_tokens'] = 8192
+
+                    result = client.chat.completions.create(**create_kwargs)
+                    chunk_units = result.model_dump().get('units', [])
+                    all_units.extend(chunk_units)
+                    logger.info(f"Chunk {chunk_idx + 1}: extracted {len(chunk_units)} units")
+                    break
+                else:
+                    model_config = ModelConfig.get_for('generation')
+                    if not model_config:
+                        raise ValueError("No active LLM model configured")
+                    llm_client = get_llm_client(model_config)
+
+                    response = llm_client.generate(
+                        messages=[{"role": "user", "content": chunk_prompt + "\n\nReturn ONLY valid JSON."}],
+                        system_prompt=system_prompt,
+                        max_tokens=8192,
+                    )
+                    content = _clean_json_response(response.content.strip())
+                    try:
+                        parsed = json.loads(content)
+                    except json.JSONDecodeError:
+                        parsed = _try_fix_json(content)
+
+                    if parsed and parsed.get('units'):
+                        all_units.extend(parsed['units'])
+                        logger.info(f"Chunk {chunk_idx + 1}: extracted {len(parsed['units'])} units")
+                    break
+
+            except Exception as e:
+                last_error = str(e)
+                error_lower = str(e).lower()
+                if any(kw in error_lower for kw in ['timeout', 'stream', 'deadline', 'timed out']):
+                    logger.warning(f"Chunk {chunk_idx + 1} attempt {attempt + 1} timed out: {e}")
+                    if attempt == 0:
+                        # Retry with even shorter chunk
+                        chunk_text = chunk_text[:CHUNK_SIZE // 2]
+                        continue
+                elif attempt == 0:
+                    logger.warning(f"Chunk {chunk_idx + 1} attempt {attempt + 1} failed: {e}")
+                    continue
+                logger.error(f"Chunk {chunk_idx + 1} failed permanently: {e}")
+                break
+
+    if not all_units:
+        # Final fallback: dedicated parsers
+        if extracted_text:
+            logger.warning(f"LLM parsing produced no units ({last_error}), trying dedicated parsers")
+            try:
+                from apps.curriculum.curriculum_parser import (
+                    parse_mathematics_curriculum, parse_geography_curriculum, parse_generic_curriculum
+                )
+                sl = subject.lower()
+                if 'math' in sl:
+                    result = parse_mathematics_curriculum(extracted_text, grade_level)
+                elif 'geo' in sl:
+                    result = parse_geography_curriculum(extracted_text, grade_level)
+                else:
+                    result = parse_generic_curriculum(extracted_text, subject, grade_level)
+                if result and result.units:
+                    all_units = result.units
+            except Exception:
+                pass
+
+        if not all_units:
+            raise ValueError(f"Lesson structure generation failed: {last_error}")
+
+    structure = {'units': all_units}
 
     # Validate and clean
     return _validate_lesson_structure(structure, subject, grade_level)

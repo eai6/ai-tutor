@@ -1088,10 +1088,22 @@ def curriculum_process_api(request, upload_id):
             
             detected_subject = detect_subject(text, upload.subject_name)
             grade_level = upload.grade_level or 'S1'
-            
+
+            # Use dedicated parsers for pilot subjects, generic for others
+            curriculum = None
             if 'math' in detected_subject.lower():
-                curriculum = parse_mathematics_curriculum(text, grade_level)
-            else:
+                try:
+                    curriculum = parse_mathematics_curriculum(text, grade_level)
+                except Exception:
+                    pass
+            elif 'geo' in detected_subject.lower():
+                try:
+                    from apps.curriculum.curriculum_parser import parse_geography_curriculum
+                    curriculum = parse_geography_curriculum(text, grade_level)
+                except Exception:
+                    pass
+
+            if not curriculum or not curriculum.units:
                 curriculum = parse_generic_curriculum(text, detected_subject, grade_level)
             
             # Convert to dict
