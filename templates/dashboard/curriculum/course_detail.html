@@ -164,6 +164,7 @@
                     {% else %}
                         <span class="badge badge-warning">Draft</span>
                     {% endif %}
+                    <span style="padding:3px 10px;border-radius:999px;font-size:0.6875rem;font-weight:700;background:{{ course_tier_bg }};color:{{ course_tier_color }};">{{ course_tier_label }}</span>
                 </div>
                 <p style="color: var(--gray-500); margin: 0.5rem 0;">{{ course.description|default:"No description" }}</p>
                 {% if course.grade_level %}
@@ -178,6 +179,10 @@
                 <form method="post" action="{% url 'dashboard:course_publish_all' course.id %}" style="display: inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Publish all lessons in this course?');">Publish All</button>
+                </form>
+                <form method="post" action="{% url 'dashboard:course_unpublish_all' course.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('Unpublish all lessons in this course?');">Unpublish All</button>
                 </form>
                 <form method="post" action="{% url 'dashboard:course_delete' course.id %}" style="display: inline;">
                     {% csrf_token %}
@@ -491,6 +496,7 @@
                     {% if lesson.is_published %}
                         <span class="status-indicator ready">✓ Published</span>
                     {% else %}
+
                         {% with lstats=lesson_stats|get_item:lesson.id %}
                             {% if lstats.content_status == 'generating' %}
                                 <span class="status-indicator generating"><span class="spinner-icon">⏳</span> Generating</span>

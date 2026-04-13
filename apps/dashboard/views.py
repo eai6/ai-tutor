@@ -634,6 +634,24 @@ def course_detail(request, course_id):
         or active_upload is not None
     )
 
+    # Course-level content quality tier (most common tier across lessons)
+    from collections import Counter
+    tier_counts = Counter()
+    for unit in units:
+        for lesson in unit.lessons.all():
+            if lesson.content_quality:
+                tier_counts[lesson.content_quality] += 1
+    course_tier = tier_counts.most_common(1)[0][0] if tier_counts else 'tier_3'
+    tier_labels = {
+        'tier_1': ('Tier 1 — Fully Resourced', '#065f46', '#d1fae5'),
+        'tier_2': ('Tier 2 — Syllabus + Exam', '#1e40af', '#dbeafe'),
+        'tier_3': ('Tier 3 — Syllabus Only', '#92400e', '#fef3c7'),
+        'tier_4': ('Tier 4 — Framework Only', '#991b1b', '#fee2e2'),
+    }
+    course_tier_label, course_tier_color, course_tier_bg = tier_labels.get(
+        course_tier, ('Tier 3', '#92400e', '#fef3c7')
+    )
+
     context = {
         **request.staff_ctx,
         'course': course,
@@ -650,6 +668,9 @@ def course_detail(request, course_id):
         'material_types': TeachingMaterialUpload.MaterialType.choices,
         'is_platform_wide': is_platform_wide,
         'course_read_only': course_read_only,
+        'course_tier_label': course_tier_label,
+        'course_tier_color': course_tier_color,
+        'course_tier_bg': course_tier_bg,
     }
 
     return render(request, 'dashboard/curriculum/course_detail.html', context)
@@ -3042,6 +3063,26 @@ def course_publish_all(request, course_id):
     course.save()
     
     messages.success(request, f"Published {published} lessons and the course.")
+    return redirect('dashboard:course_detail', course_id=course.id)
+
+
+@teacher_required
+@require_POST
+def course_unpublish_all(request, course_id):
+    """Unpublish all lessons in a course."""
+    from apps.curriculum.models import Lesson
+
+    institution = request.staff_ctx['institution']
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
+
+    unpublished = Lesson.objects.filter(
+        unit__course=course, is_published=True
+    ).update(is_published=False)
+
+    course.is_published = False
+    course.save(update_fields=['is_published'])
+
+    messages.success(request, f"Unpublished {unpublished} lessons and the course.")
     return redirect('dashboard:course_detail', course_id=course.id)
 
 
