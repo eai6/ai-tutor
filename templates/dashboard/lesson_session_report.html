@@ -194,12 +194,12 @@
         <div class="label">Sessions Completed</div>
     </div>
     <div class="summary-card">
-        <div class="number {% if class_competency_pct >= 80 %}green{% elif class_competency_pct >= 60 %}yellow{% else %}red{% endif %}">{{ class_competency_pct }}%</div>
-        <div class="label">Class Competency</div>
+        <div class="number {% if class_competency_pct >= 70 %}green{% elif class_competency_pct >= 50 %}yellow{% else %}red{% endif %}">{{ class_competency_pct }}%</div>
+        <div class="label">Avg Competency</div>
     </div>
     <div class="summary-card">
-        <div class="number {% if class_competency_pct >= 80 %}green{% elif class_competency_pct >= 60 %}yellow{% else %}red{% endif %}">{{ competent_students }}/{{ total_students }}</div>
-        <div class="label">Students Competent</div>
+        <div class="number {% if class_competency_pct >= 70 %}green{% elif class_competency_pct >= 50 %}yellow{% else %}red{% endif %}">{{ avg_achieved_display }}</div>
+        <div class="label">Avg Objectives Met</div>
     </div>
     <div class="summary-card">
         <div class="number">{{ total_objectives }}</div>
@@ -215,10 +215,12 @@
     <div>
         <div class="recommendation-text">
             {{ recommendation }}
-            {% if recommendation_action == 'proceed' or recommendation_action == 'proceed_with_review' %}
-                <div class="sub">The class has demonstrated sufficient understanding to move forward.</div>
+            {% if recommendation_action == 'proceed' %}
+                <div class="sub">Students have achieved 70%+ of enabling objectives on average. The class is ready for the next lesson.</div>
+            {% elif recommendation_action == 'proceed_with_review' %}
+                <div class="sub">Students are close to the 70% threshold. A brief review of the weak areas in your next teacher session should be enough.</div>
             {% else %}
-                <div class="sub">Consider dedicating the next teacher session to revisiting the weak objectives before moving on.</div>
+                <div class="sub">Students are below the 70% threshold. Consider dedicating your next teacher session to revisiting the weak objectives listed above.</div>
             {% endif %}
         </div>
         <div class="recommendation-action">

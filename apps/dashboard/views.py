@@ -1498,30 +1498,40 @@ def lesson_session_report(request, lesson_id):
 
     students_data.sort(key=lambda s: s['pct'])
 
-    # ── Class competency summary ──
-    competent_students = sum(1 for s in students_data if s['pct'] >= 70)
-    class_competency_pct = round(competent_students / total_students * 100) if total_students else 0
+    # ── Class competency: average % of objectives achieved across all students ──
+    if students_data and total_objectives > 0:
+        avg_objectives_achieved = sum(s['achieved'] for s in students_data) / len(students_data)
+        class_competency_pct = round(avg_objectives_achieved / total_objectives * 100)
+        avg_achieved_display = f"{avg_objectives_achieved:.1f}/{total_objectives}"
+    else:
+        class_competency_pct = 0
+        avg_achieved_display = f"0/{total_objectives}"
 
-    # ── Recommendation ──
+    # ── Recommendation based on average competency ──
+    # Threshold: 70% of enabling objectives achieved on average → move on
     weak_objectives = [o for o in objectives_data if o['pct'] < 50]
-    if class_competency_pct >= 80:
-        recommendation = f"Class is ready to move on. {competent_students}/{total_students} students achieved competency."
+    if class_competency_pct >= 70:
+        recommendation = (
+            f"Class is ready to move on. "
+            f"Students achieved an average of {avg_achieved_display} enabling objectives ({class_competency_pct}%)."
+        )
         recommendation_type = 'success'
         recommendation_action = 'proceed'
-    elif class_competency_pct >= 60:
+    elif class_competency_pct >= 50:
         focus_areas = ', '.join(f"'{o['objective'][:50]}'" for o in weak_objectives[:2])
         recommendation = (
-            f"{competent_students}/{total_students} students achieved competency. "
+            f"Students achieved an average of {avg_achieved_display} enabling objectives ({class_competency_pct}%). "
             f"Consider a brief review of: {focus_areas} before moving on."
             if focus_areas else
-            f"{competent_students}/{total_students} students achieved competency. Ready to proceed with monitoring."
+            f"Students achieved an average of {avg_achieved_display} enabling objectives ({class_competency_pct}%). "
+            f"Ready to proceed with monitoring."
         )
         recommendation_type = 'warning'
         recommendation_action = 'proceed_with_review'
     else:
         focus_areas = ', '.join(f"'{o['objective'][:50]}'" for o in weak_objectives[:3])
         recommendation = (
-            f"Only {competent_students}/{total_students} students achieved competency. "
+            f"Students achieved an average of only {avg_achieved_display} enabling objectives ({class_competency_pct}%). "
             f"Recommend revisiting this lesson next week, focusing on: {focus_areas}."
         )
         recommendation_type = 'danger'
@@ -1550,7 +1560,7 @@ def lesson_session_report(request, lesson_id):
         'total_objectives': total_objectives,
         'objectives_data': objectives_data,
         'students_data': students_data,
-        'competent_students': competent_students,
+        'avg_achieved_display': avg_achieved_display,
         'class_competency_pct': class_competency_pct,
         'recommendation': recommendation,
         'recommendation_type': recommendation_type,
