@@ -1217,36 +1217,72 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
         structure = upload.parsed_data
         if not structure:
             raise ValueError("No parsed data available")
-        
-        # Create or update course
-        course_title = f"{structure.get('subject', upload.subject_name)} {structure.get('grade_level', upload.grade_level)}"
-        
-        course, created = Course.objects.update_or_create(
-            institution=upload.institution,
-            title=course_title,
-            defaults={
-                'description': f"{upload.subject_name} curriculum",
-                'grade_level': structure.get('grade_level', upload.grade_level or 'S1'),
-                'is_published': False,
-            }
-        )
-        
-        upload.created_course = course
-        upload.add_log(f"   {'Created' if created else 'Updated'} course: {course.title}")
 
-        # Link any teaching materials uploaded with this curriculum
         from apps.dashboard.models import TeachingMaterialUpload
-        linked = TeachingMaterialUpload.objects.filter(
-            curriculum_upload=upload, course__isnull=True
-        ).update(course=course)
-        if linked:
-            upload.add_log(f"   Linked {linked} teaching material(s) to course")
-        
+        from collections import defaultdict
+
+        subject = structure.get('subject', upload.subject_name)
+        all_units = structure.get('units', [])
+
+        # Group units by grade level — create one course per grade
+        units_by_grade = defaultdict(list)
+        for unit_data in all_units:
+            grade = unit_data.get('grade_level', '').strip()
+            if not grade:
+                # Try to extract from title prefix (e.g., "S1: Introduction to Geography")
+                title = unit_data.get('title', '')
+                for g in ['S1', 'S2', 'S3', 'S4', 'S5']:
+                    if title.upper().startswith(g):
+                        grade = g
+                        break
+            if not grade:
+                grade = upload.grade_level.split(',')[0] if upload.grade_level else 'S1'
+            units_by_grade[grade].append(unit_data)
+
+        # If only one grade or all units have the same grade, create a single course
+        if len(units_by_grade) <= 1:
+            grade_keys = list(units_by_grade.keys())
+            single_grade = grade_keys[0] if grade_keys else upload.grade_level or 'S1'
+            courses_to_create = [(single_grade, all_units)]
+        else:
+            courses_to_create = sorted(units_by_grade.items())
+
+        upload.add_log(f"   Creating {len(courses_to_create)} course(s) by grade level")
+
         units_created = 0
         lessons_created = 0
-        
-        # Create units and lessons
-        for unit_idx, unit_data in enumerate(structure.get('units', [])):
+        first_course = None
+
+        for grade, grade_units in courses_to_create:
+            course_title = f"{subject} {grade}"
+
+            course, created = Course.objects.update_or_create(
+                institution=upload.institution,
+                title=course_title,
+                defaults={
+                    'description': f"{subject} curriculum for {grade}",
+                    'grade_level': grade,
+                    'is_published': False,
+                }
+            )
+
+            if not first_course:
+                first_course = course
+
+            upload.add_log(f"   {'Created' if created else 'Updated'} course: {course.title}")
+
+            # Link teaching materials matching this grade (or "All Levels")
+            linked = TeachingMaterialUpload.objects.filter(
+                curriculum_upload=upload,
+                course__isnull=True,
+            ).filter(
+                Q(grade_level=grade) | Q(grade_level='') | Q(grade_level__icontains=grade)
+            ).update(course=course)
+            if linked:
+                upload.add_log(f"   Linked {linked} teaching material(s) to {course_title}")
+
+            # Create units and lessons for this grade
+            for unit_idx, unit_data in enumerate(grade_units):
             unit, u_created = Unit.objects.update_or_create(
                 course=course,
                 title=unit_data['title'],
@@ -1294,21 +1330,24 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                         }
                     )
         
+        upload.created_course = first_course
         upload.units_created = units_created
         upload.lessons_created = lessons_created
         upload.status = 'completed'
         upload.completed_at = timezone.now()
-        upload.add_log(f"   ✓ Created {units_created} units, {lessons_created} lessons")
-        upload.add_log(f"✅ Complete! Course '{course.title}' is ready.")
+        grades_str = ', '.join(g for g, _ in courses_to_create)
+        upload.add_log(f"   ✓ Created {units_created} units, {lessons_created} lessons across {len(courses_to_create)} course(s)")
+        upload.add_log(f"✅ Complete! Courses created for: {grades_str}")
         upload.save()
-        
+
         return {
             'success': True,
             'status': 'completed',
-            'course_id': course.id,
-            'course_name': course.title,
+            'course_id': first_course.id if first_course else None,
+            'course_name': first_course.title if first_course else '',
             'units_created': units_created,
             'lessons_created': lessons_created,
+            'courses_created': len(courses_to_create),
         }
         
     except Exception as e:
