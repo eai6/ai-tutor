@@ -190,6 +190,54 @@
         <button type="submit" class="btn btn-primary">Save Theme</button>
     </form>
 
+    {# ── Competency Thresholds (superadmin only) ── #}
+    <form method="post" style="margin-top: 2rem;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="competency">
+
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">Competency Categories &amp; Thresholds</h3>
+            </div>
+            <div class="card-body">
+                <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                    Configure how students are categorized based on fraction of enabling objectives achieved.
+                </p>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Below Expectation (BE) — below this %</label>
+                        <input type="number" class="form-control" name="threshold_be_max" value="{{ platform_config.threshold_be_max }}" min="10" max="100">
+                        <small style="color:var(--gray-500);">Students below this % are categorized as BE</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Approaching Expectation (AE) — below this %</label>
+                        <input type="number" class="form-control" name="threshold_ae_max" value="{{ platform_config.threshold_ae_max }}" min="20" max="100">
+                        <small style="color:var(--gray-500);">Students between BE and this % are AE</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Meeting Expectation (ME) — at or above this %</label>
+                        <input type="number" class="form-control" name="threshold_me_min" value="{{ platform_config.threshold_me_min }}" min="50" max="100">
+                        <small style="color:var(--gray-500);">Students at or above this % are ME (should match AE max)</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Exceeding Expectation (EE) — exit ticket time (minutes)</label>
+                        <input type="number" class="form-control" name="threshold_ee_time" value="{{ platform_config.threshold_ee_time_minutes }}" min="1" max="30">
+                        <small style="color:var(--gray-500);">100% + exit ticket under this time = EE</small>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top:1rem;">
+                    <label class="form-label">Move-On Threshold — minimum % for ALL students</label>
+                    <input type="number" class="form-control" name="threshold_move_on" value="{{ platform_config.threshold_move_on }}" min="30" max="100" style="max-width:200px;">
+                    <small style="color:var(--gray-500);">Teacher is recommended to move on only when every student achieves at least this % of enabling objectives</small>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Thresholds</button>
+    </form>
+
     {# ── Manage Schools (superadmin only) ── #}
     <div style="margin-top: 2rem;">
         <div class="card" style="margin-bottom: 1.5rem;">

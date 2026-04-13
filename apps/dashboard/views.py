@@ -1408,6 +1408,9 @@ def lesson_session_report(request, lesson_id):
     from django.db.models import Avg, Q
     from django.contrib.auth.models import User
 
+    from apps.accounts.models import PlatformConfig
+    config = PlatformConfig.load()
+
     institution = request.staff_ctx['institution']
     lookup = {'id': lesson_id}
     if institution is not None:
@@ -1415,7 +1418,7 @@ def lesson_session_report(request, lesson_id):
     lesson = get_object_or_404(Lesson, **lookup)
 
     course = lesson.unit.course
-    mastery_threshold = 0.7  # 70% = competent
+    mastery_threshold = config.threshold_me_min / 100.0  # Default 0.8
 
     # ── Students who had tutor sessions for this lesson ──
     sessions = TutorSession.objects.filter(lesson=lesson).select_related('student')
@@ -1485,54 +1488,69 @@ def lesson_session_report(request, lesson_id):
             ).select_related('skill')
             weak_objectives = [w.skill.enabling_objective_text[:60] for w in weak[:5]]
 
+        pct = round(achieved_count / total_objectives * 100) if total_objectives else 0
+
+        # Calculate exit ticket completion time
+        exit_time_minutes = None
+        if exit_attempt and exit_attempt.started_at and exit_attempt.completed_at:
+            delta = (exit_attempt.completed_at - exit_attempt.started_at).total_seconds() / 60.0
+            exit_time_minutes = round(delta, 1)
+
+        # Categorize student (BE/AE/ME/EE)
+        category = config.categorize_student(pct, exit_time_minutes if exit_attempt and exit_attempt.passed else None)
+
         students_data.append({
             'student': student,
             'achieved': achieved_count,
             'total': total_objectives,
-            'pct': round(achieved_count / total_objectives * 100) if total_objectives else 0,
+            'pct': pct,
+            'category': category,
             'exit_score': f"{exit_attempt.score}/10" if exit_attempt else '—',
             'exit_passed': exit_attempt.passed if exit_attempt else None,
+            'exit_time': f"{exit_time_minutes:.0f} min" if exit_time_minutes else '—',
             'session_status': session.status if session else 'not_started',
             'weak_objectives': weak_objectives,
         })
 
     students_data.sort(key=lambda s: s['pct'])
 
-    # ── Class competency: average % of objectives achieved across all students ──
-    if students_data and total_objectives > 0:
-        avg_objectives_achieved = sum(s['achieved'] for s in students_data) / len(students_data)
-        class_competency_pct = round(avg_objectives_achieved / total_objectives * 100)
-        avg_achieved_display = f"{avg_objectives_achieved:.1f}/{total_objectives}"
-    else:
-        class_competency_pct = 0
-        avg_achieved_display = f"0/{total_objectives}"
+    # ── Category counts ──
+    category_counts = {'EE': 0, 'ME': 0, 'AE': 0, 'BE': 0}
+    for s in students_data:
+        category_counts[s['category']['code']] += 1
 
-    # ── Recommendation based on average competency ──
-    # Threshold: 70% of enabling objectives achieved on average → move on
+    # ── Class competency: every student must meet threshold ──
+    move_on_threshold = config.threshold_move_on  # Default 70%
+    students_below = [s for s in students_data if s['pct'] < move_on_threshold]
+    all_above_threshold = len(students_below) == 0 and total_students > 0
+
+    avg_pct = round(sum(s['pct'] for s in students_data) / len(students_data)) if students_data else 0
+
+    # ── Recommendation ──
     weak_objectives = [o for o in objectives_data if o['pct'] < 50]
-    if class_competency_pct >= 70:
+    if all_above_threshold:
         recommendation = (
-            f"Class is ready to move on. "
-            f"Students achieved an average of {avg_achieved_display} enabling objectives ({class_competency_pct}%)."
+            f"All {total_students} students have achieved at least {move_on_threshold}% of enabling objectives. "
+            f"Class is ready to move to the next lesson."
         )
         recommendation_type = 'success'
         recommendation_action = 'proceed'
-    elif class_competency_pct >= 50:
-        focus_areas = ', '.join(f"'{o['objective'][:50]}'" for o in weak_objectives[:2])
+    elif len(students_below) <= 3 and total_students > 5:
+        names = ', '.join(s['student'].get_full_name() or s['student'].username for s in students_below[:3])
         recommendation = (
-            f"Students achieved an average of {avg_achieved_display} enabling objectives ({class_competency_pct}%). "
-            f"Consider a brief review of: {focus_areas} before moving on."
-            if focus_areas else
-            f"Students achieved an average of {avg_achieved_display} enabling objectives ({class_competency_pct}%). "
-            f"Ready to proceed with monitoring."
+            f"{len(students_below)} student(s) are below the {move_on_threshold}% threshold: {names}. "
+            f"Consider targeted support for these students while moving on."
         )
         recommendation_type = 'warning'
         recommendation_action = 'proceed_with_review'
     else:
         focus_areas = ', '.join(f"'{o['objective'][:50]}'" for o in weak_objectives[:3])
         recommendation = (
-            f"Students achieved an average of only {avg_achieved_display} enabling objectives ({class_competency_pct}%). "
-            f"Recommend revisiting this lesson next week, focusing on: {focus_areas}."
+            f"{len(students_below)}/{total_students} students are below the {move_on_threshold}% threshold. "
+            f"Recommend revisiting this lesson, focusing on: {focus_areas}."
+            if focus_areas else
+            f"{len(students_below)}/{total_students} students are below the {move_on_threshold}% threshold. "
+            f"Recommend revisiting this lesson."
         )
         recommendation_type = 'danger'
         recommendation_action = 'revisit'
@@ -1560,8 +1578,10 @@ def lesson_session_report(request, lesson_id):
         'total_objectives': total_objectives,
         'objectives_data': objectives_data,
         'students_data': students_data,
-        'avg_achieved_display': avg_achieved_display,
-        'class_competency_pct': class_competency_pct,
+        'avg_pct': avg_pct,
+        'category_counts': category_counts,
+        'students_below_count': len(students_below),
+        'move_on_threshold': move_on_threshold,
         'recommendation': recommendation,
         'recommendation_type': recommendation_type,
         'recommendation_action': recommendation_action,
@@ -1702,6 +1722,19 @@ def settings_page(request):
                 request.user.delete()
                 logout(request)
                 return redirect('accounts:landing')
+
+        elif action == 'competency' and is_superadmin:
+            platform_config = PlatformConfig.load()
+            try:
+                platform_config.threshold_be_max = int(request.POST.get('threshold_be_max', 50))
+                platform_config.threshold_ae_max = int(request.POST.get('threshold_ae_max', 80))
+                platform_config.threshold_me_min = int(request.POST.get('threshold_me_min', 80))
+                platform_config.threshold_ee_time_minutes = int(request.POST.get('threshold_ee_time', 5))
+                platform_config.threshold_move_on = int(request.POST.get('threshold_move_on', 70))
+                platform_config.save()
+                messages.success(request, "Competency thresholds updated.")
+            except (ValueError, TypeError):
+                messages.error(request, "Invalid threshold values.")
 
         elif action == 'theme' and is_superadmin:
             platform_config = PlatformConfig.load()

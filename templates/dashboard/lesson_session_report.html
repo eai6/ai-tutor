@@ -194,16 +194,36 @@
         <div class="label">Sessions Completed</div>
     </div>
     <div class="summary-card">
-        <div class="number {% if class_competency_pct >= 70 %}green{% elif class_competency_pct >= 50 %}yellow{% else %}red{% endif %}">{{ class_competency_pct }}%</div>
+        <div class="number {% if students_below_count == 0 %}green{% elif students_below_count <= 3 %}yellow{% else %}red{% endif %}">{{ avg_pct }}%</div>
         <div class="label">Avg Competency</div>
     </div>
     <div class="summary-card">
-        <div class="number {% if class_competency_pct >= 70 %}green{% elif class_competency_pct >= 50 %}yellow{% else %}red{% endif %}">{{ avg_achieved_display }}</div>
-        <div class="label">Avg Objectives Met</div>
+        <div class="number {% if students_below_count == 0 %}green{% else %}red{% endif %}">{{ students_below_count }}</div>
+        <div class="label">Below {{ move_on_threshold }}%</div>
     </div>
     <div class="summary-card">
         <div class="number">{{ total_objectives }}</div>
         <div class="label">Enabling Objectives</div>
+    </div>
+</div>
+
+<!-- Category Distribution -->
+<div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+    <div style="flex:1;min-width:100px;padding:0.625rem;border-radius:0.5rem;text-align:center;background:#ede9fe;border:1px solid #c4b5fd;">
+        <div style="font-size:1.25rem;font-weight:800;color:#6366f1;">{{ category_counts.EE }}</div>
+        <div style="font-size:0.6875rem;font-weight:700;color:#6366f1;">EE</div>
+    </div>
+    <div style="flex:1;min-width:100px;padding:0.625rem;border-radius:0.5rem;text-align:center;background:#d1fae5;border:1px solid #a7f3d0;">
+        <div style="font-size:1.25rem;font-weight:800;color:#059669;">{{ category_counts.ME }}</div>
+        <div style="font-size:0.6875rem;font-weight:700;color:#059669;">ME</div>
+    </div>
+    <div style="flex:1;min-width:100px;padding:0.625rem;border-radius:0.5rem;text-align:center;background:#fef3c7;border:1px solid #fde68a;">
+        <div style="font-size:1.25rem;font-weight:800;color:#d97706;">{{ category_counts.AE }}</div>
+        <div style="font-size:0.6875rem;font-weight:700;color:#d97706;">AE</div>
+    </div>
+    <div style="flex:1;min-width:100px;padding:0.625rem;border-radius:0.5rem;text-align:center;background:#fee2e2;border:1px solid #fecaca;">
+        <div style="font-size:1.25rem;font-weight:800;color:#dc2626;">{{ category_counts.BE }}</div>
+        <div style="font-size:0.6875rem;font-weight:700;color:#dc2626;">BE</div>
     </div>
 </div>
 
@@ -216,11 +236,11 @@
         <div class="recommendation-text">
             {{ recommendation }}
             {% if recommendation_action == 'proceed' %}
-                <div class="sub">Students have achieved 70%+ of enabling objectives on average. The class is ready for the next lesson.</div>
+                <div class="sub">Every student has achieved at least {{ move_on_threshold }}% of enabling objectives. The class is ready for the next lesson.</div>
             {% elif recommendation_action == 'proceed_with_review' %}
-                <div class="sub">Students are close to the 70% threshold. A brief review of the weak areas in your next teacher session should be enough.</div>
+                <div class="sub">A small number of students need targeted support. You can proceed while the tutor provides remediation to those students.</div>
             {% else %}
-                <div class="sub">Students are below the 70% threshold. Consider dedicating your next teacher session to revisiting the weak objectives listed above.</div>
+                <div class="sub">Too many students are below the {{ move_on_threshold }}% threshold. Dedicate your next teacher session to the weak objectives listed above.</div>
             {% endif %}
         </div>
         <div class="recommendation-action">
@@ -281,8 +301,8 @@
         <tr>
             <th>Student</th>
             <th>Objectives</th>
+            <th>Category</th>
             <th>Exit Quiz</th>
-            <th>Status</th>
             <th>Weak Areas</th>
         </tr>
     </thead>
@@ -291,24 +311,21 @@
         <tr>
             <td><span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span></td>
             <td>
-                <span class="student-score {% if s.pct >= 70 %}pass{% elif s.pct >= 40 %}partial{% else %}fail{% endif %}">
+                <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">
                     {{ s.achieved }}/{{ s.total }}
+                </span>
+            </td>
+            <td>
+                <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.6875rem;font-weight:700;background:{{ s.category.color }}22;color:{{ s.category.color }};border:1px solid {{ s.category.color }}44;">
+                    {{ s.category.code }}
                 </span>
             </td>
             <td>
                 {% if s.exit_passed != None %}
                     <span class="exit-badge {% if s.exit_passed %}passed{% else %}failed{% endif %}">{{ s.exit_score }}</span>
+                    <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">{{ s.exit_time }}</span>
                 {% else %}
                     <span style="color:#a1a1aa;font-size:0.8125rem;">{{ s.exit_score }}</span>
-                {% endif %}
-            </td>
-            <td>
-                {% if s.session_status == 'completed' %}
-                    <span style="color:#059669;font-weight:600;font-size:0.8125rem;">Completed</span>
-                {% elif s.session_status == 'active' %}
-                    <span style="color:#d97706;font-weight:600;font-size:0.8125rem;">In Progress</span>
-                {% else %}
-                    <span style="color:#a1a1aa;font-size:0.8125rem;">Not Started</span>
                 {% endif %}
             </td>
             <td>

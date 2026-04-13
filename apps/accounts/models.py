@@ -185,6 +185,29 @@ class PlatformConfig(models.Model):
 
     schools = models.JSONField(default=list)   # [{"code": "...", "name": "..."}]
     grades = models.JSONField(default=list)    # [{"code": "...", "name": "..."}]
+
+    # Competency category thresholds (configurable by super admin)
+    threshold_be_max = models.IntegerField(
+        default=50,
+        help_text="Below Expectation (BE): 0% to this value (exclusive). Default: 50%"
+    )
+    threshold_ae_max = models.IntegerField(
+        default=80,
+        help_text="Approaching Expectation (AE): BE threshold to this value (exclusive). Default: 80%"
+    )
+    threshold_me_min = models.IntegerField(
+        default=80,
+        help_text="Meeting Expectation (ME): this value to 100% (exclusive). Default: 80%"
+    )
+    threshold_ee_time_minutes = models.IntegerField(
+        default=5,
+        help_text="Exceeding Expectation (EE): 100% objectives + exit ticket completed under this many minutes. Default: 5"
+    )
+    threshold_move_on = models.IntegerField(
+        default=70,
+        help_text="Recommend teacher to move on when ALL students achieve at least this % of objectives. Default: 70%"
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
@@ -195,6 +218,19 @@ class PlatformConfig(models.Model):
     def load(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+    def categorize_student(self, pct_achieved: float, exit_time_minutes: float = None) -> dict:
+        """Categorize a student based on % of enabling objectives achieved.
+
+        Returns dict with 'code', 'label', 'color', 'description'.
+        """
+        if pct_achieved >= 100 and exit_time_minutes is not None and exit_time_minutes <= self.threshold_ee_time_minutes:
+            return {'code': 'EE', 'label': 'Exceeding Expectation', 'color': '#6366f1', 'description': 'All objectives met, completed quickly'}
+        if pct_achieved >= self.threshold_me_min:
+            return {'code': 'ME', 'label': 'Meeting Expectation', 'color': '#059669', 'description': 'Most objectives achieved'}
+        if pct_achieved >= self.threshold_be_max:
+            return {'code': 'AE', 'label': 'Approaching Expectation', 'color': '#d97706', 'description': 'Making progress, some objectives remain'}
+        return {'code': 'BE', 'label': 'Below Expectation', 'color': '#dc2626', 'description': 'Significant gaps in understanding'}
 
     @classmethod
     def get_school_choices(cls):
