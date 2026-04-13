@@ -1195,8 +1195,11 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
         
     except Exception as e:
         logger.exception(f"Pipeline failed: {e}")
+        print(f"[Pipeline] FAILED: {e}", flush=True)
+        import traceback; traceback.print_exc()
+        upload.refresh_from_db()
         upload.status = 'failed'
-        upload.error_message = str(e)
+        upload.error_message = str(e)[:1000]
         upload.add_log(f"❌ Error: {e}")
         upload.save()
         raise
