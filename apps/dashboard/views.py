@@ -702,44 +702,41 @@ def curriculum_upload(request):
             status='pending'
         )
 
-        # Handle optional material attachments (multi-file)
+        # Handle optional material attachments (per-file type + title)
         material_files = request.FILES.getlist('material_files')
         if material_files and request.POST.get('attach_material'):
-            material_title = request.POST.get('material_title', '').strip()
-            if material_title:
-                from apps.dashboard.material_tasks import process_teaching_material
-                from apps.dashboard.background_tasks import run_async
+            material_titles = request.POST.getlist('material_titles')
+            material_types = request.POST.getlist('material_types')
 
-                mat_dir = os.path.join(settings.MEDIA_ROOT, 'material_uploads')
-                os.makedirs(mat_dir, exist_ok=True)
+            from apps.dashboard.material_tasks import process_teaching_material
+            from apps.dashboard.background_tasks import run_async
 
-                for material_file in material_files:
-                    mat_path = os.path.join(mat_dir, material_file.name)
-                    with open(mat_path, 'wb+') as dest:
-                        for chunk in material_file.chunks():
-                            dest.write(chunk)
+            mat_dir = os.path.join(settings.MEDIA_ROOT, 'material_uploads')
+            os.makedirs(mat_dir, exist_ok=True)
 
-                    # For multiple files, append filename stem to title
-                    if len(material_files) > 1:
-                        stem = os.path.splitext(material_file.name)[0]
-                        file_title = f"{material_title} - {stem}"
-                    else:
-                        file_title = material_title
+            for idx, material_file in enumerate(material_files):
+                mat_path = os.path.join(mat_dir, material_file.name)
+                with open(mat_path, 'wb+') as dest:
+                    for chunk in material_file.chunks():
+                        dest.write(chunk)
 
-                    material_record = TeachingMaterialUpload.objects.create(
-                        institution=institution,
-                        uploaded_by=request.user,
-                        file_path=mat_path,
-                        original_filename=material_file.name,
-                        title=file_title,
-                        subject_name=subject_name,
-                        grade_level=grade_level,
-                        material_type=request.POST.get('material_type', 'textbook'),
-                        description=request.POST.get('material_description', '').strip(),
-                        curriculum_upload=upload_record,
-                    )
+                file_title = material_titles[idx] if idx < len(material_titles) else os.path.splitext(material_file.name)[0]
+                file_type = material_types[idx] if idx < len(material_types) else 'textbook'
 
-                    run_async(process_teaching_material, material_record.id)
+                material_record = TeachingMaterialUpload.objects.create(
+                    institution=institution,
+                    uploaded_by=request.user,
+                    file_path=mat_path,
+                    original_filename=material_file.name,
+                    title=file_title,
+                    subject_name=subject_name,
+                    grade_level=grade_level,
+                    material_type=file_type,
+                    description='',
+                    curriculum_upload=upload_record,
+                )
+
+                run_async(process_teaching_material, material_record.id)
 
         messages.success(request, "Curriculum uploaded! Processing will begin shortly.")
         return redirect('dashboard:curriculum_process', upload_id=upload_record.id)
