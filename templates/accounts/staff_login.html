@@ -50,6 +50,7 @@
         </form>
         
         <div class="auth-footer">
+            <p><a href="{% url 'accounts:password_reset' %}">Forgot your password?</a></p>
             <p><strong>Don't have an account?</strong> <a href="{% url 'accounts:staff_self_register' %}">Create Account</a></p>
             <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--gray-500);">Your account will need admin approval before you can sign in.</p>
             <p style="margin-top: 1rem;"><a href="{% url 'accounts:landing' %}">← Back to home</a></p>

@@ -86,6 +86,7 @@ def student_register(request):
         last_name = request.POST.get('last_name', '').strip()
         school = request.POST.get('school', '')
         grade_level = request.POST.get('grade_level', '')
+        student_id = request.POST.get('student_id', '').strip()
         
         errors = []
         
@@ -122,6 +123,7 @@ def student_register(request):
                 'last_name': last_name,
                 'school': school,
                 'grade_level': grade_level,
+                'student_id': student_id,
                 'school_choices': school_choices,
                 'grade_choices': grade_choices,
             })
@@ -138,6 +140,7 @@ def student_register(request):
         # Create student profile
         StudentProfile.objects.create(
             user=user,
+            student_id=student_id,
             school=school,
             grade_level=grade_level,
         )
@@ -531,3 +534,130 @@ def logout_view(request):
     logout(request)
     messages.info(request, "You've been logged out.")
     return redirect('accounts:landing')
+
+
+@login_required
+def bulk_student_upload(request):
+    """Bulk register students via CSV upload.
+
+    CSV format: student_id, first_name, last_name, username, password, grade_level
+    All fields required except student_id. School is selected in the form.
+    """
+    if not request.user.is_staff:
+        # Check if user has staff membership
+        if not Membership.objects.filter(user=request.user, role='staff', is_active=True).exists():
+            messages.error(request, "Staff access required.")
+            return redirect('accounts:landing')
+
+    school_choices = PlatformConfig.get_school_choices()
+
+    if request.method == 'POST':
+        import csv
+        import io
+
+        csv_file = request.FILES.get('csv_file')
+        school = request.POST.get('school', '')
+
+        if not csv_file:
+            messages.error(request, "Please upload a CSV file.")
+            return render(request, 'accounts/bulk_student_upload.html', {
+                'school_choices': school_choices,
+            })
+
+        if not school:
+            messages.error(request, "Please select a school.")
+            return render(request, 'accounts/bulk_student_upload.html', {
+                'school_choices': school_choices,
+            })
+
+        # Find institution
+        institution = Institution.objects.filter(id=school, is_active=True).first()
+        if not institution:
+            institution = Institution.objects.filter(slug=school, is_active=True).first()
+        if not institution:
+            institution = Institution.objects.filter(is_active=True).first()
+
+        # Read CSV
+        try:
+            content = csv_file.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(content))
+        except Exception as e:
+            messages.error(request, f"Could not read CSV: {e}")
+            return render(request, 'accounts/bulk_student_upload.html', {
+                'school_choices': school_choices,
+            })
+
+        created = 0
+        skipped = 0
+        errors_list = []
+
+        for row_num, row in enumerate(reader, start=2):
+            student_id = (row.get('student_id') or '').strip()
+            first_name = (row.get('first_name') or '').strip()
+            last_name = (row.get('last_name') or '').strip()
+            username = (row.get('username') or '').strip()
+            password = (row.get('password') or '').strip()
+            grade_level = (row.get('grade_level') or '').strip().upper()
+
+            if not first_name or not username or not password:
+                errors_list.append(f"Row {row_num}: Missing required field (first_name, username, or password)")
+                skipped += 1
+                continue
+
+            if len(username) < 3:
+                errors_list.append(f"Row {row_num}: Username '{username}' too short (min 3 chars)")
+                skipped += 1
+                continue
+
+            if User.objects.filter(username=username).exists():
+                errors_list.append(f"Row {row_num}: Username '{username}' already exists")
+                skipped += 1
+                continue
+
+            if grade_level not in ('S1', 'S2', 'S3', 'S4', 'S5', ''):
+                errors_list.append(f"Row {row_num}: Invalid grade level '{grade_level}'")
+                skipped += 1
+                continue
+
+            try:
+                user = User.objects.create_user(
+                    username=username,
+                    password=password,
+                    first_name=first_name,
+                    last_name=last_name,
+                )
+
+                StudentProfile.objects.create(
+                    user=user,
+                    student_id=student_id,
+                    school=str(school),
+                    grade_level=grade_level,
+                )
+
+                if institution:
+                    Membership.objects.create(
+                        user=user,
+                        institution=institution,
+                        role='student',
+                        is_active=True,
+                    )
+
+                created += 1
+            except Exception as e:
+                errors_list.append(f"Row {row_num}: {e}")
+                skipped += 1
+
+        messages.success(request, f"Bulk upload complete: {created} students created, {skipped} skipped.")
+
+        return render(request, 'accounts/bulk_student_upload.html', {
+            'school_choices': school_choices,
+            'results': {
+                'created': created,
+                'skipped': skipped,
+                'errors': errors_list[:20],
+            },
+        })
+
+    return render(request, 'accounts/bulk_student_upload.html', {
+        'school_choices': school_choices,
+    })

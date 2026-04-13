@@ -50,6 +50,7 @@
         </form>
         
         <div class="auth-footer">
+            <p><a href="{% url 'accounts:password_reset' %}">Forgot your password?</a></p>
             <p>Don't have an account? <a href="{% url 'accounts:student_register' %}">Register as Student</a></p>
             <p style="margin-top: 0.5rem;"><a href="{% url 'accounts:landing' %}">← Back to home</a></p>
         </div>

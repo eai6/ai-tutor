@@ -94,7 +94,13 @@
                     </select>
                 </div>
             </div>
-            
+
+            <div class="form-group">
+                <label for="student_id">Student ID (optional)</label>
+                <input type="text" id="student_id" name="student_id" value="{{ student_id|default:'' }}" placeholder="e.g., STU-2024-001">
+                <div style="font-size: 0.75rem; color: #71717a; margin-top: 0.25rem;">Your school ID number, if you have one</div>
+            </div>
+
             <div class="form-group">
                 <label for="password">Password</label>
                 <input 

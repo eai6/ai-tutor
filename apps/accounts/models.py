@@ -140,6 +140,12 @@ class StudentProfile(models.Model):
         on_delete=models.CASCADE,
         related_name='student_profile'
     )
+    student_id = models.CharField(
+        max_length=50,
+        blank=True,
+        default='',
+        help_text="Unique student ID from school management system (e.g., STU-2024-001)"
+    )
     school = models.CharField(
         max_length=50,
         choices=SCHOOL_CHOICES,
