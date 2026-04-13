@@ -1260,14 +1260,48 @@ def reports_overview(request):
         completions=Count('sessions', filter=Q(sessions__mastery_achieved=True))
     ).order_by('-attempts')[:20]
     
+    # Courses with competency data (for readiness report links)
+    from apps.curriculum.models import Course
+    from apps.tutoring.skills_models import Skill
+    courses_with_eo = []
+    course_qs = filter_by_institution(
+        Course.objects.filter(is_published=True),
+        institution,
+    ).order_by('title')
+    for course in course_qs:
+        eo_count = Skill.objects.filter(course=course, is_enabling_objective=True).count()
+        session_count = filter_by_institution(
+            TutorSession.objects.filter(lesson__unit__course=course),
+            institution,
+        ).count()
+        courses_with_eo.append({
+            'course': course,
+            'eo_count': eo_count,
+            'session_count': session_count,
+        })
+
+    # Lessons with session report data (recent lessons with sessions)
+    recent_lessons = filter_by_institution(
+        Lesson.objects.filter(
+            is_published=True,
+            sessions__started_at__date__gte=start_date,
+        ),
+        institution, field='unit__course__institution'
+    ).annotate(
+        recent_sessions=Count('sessions', filter=Q(sessions__started_at__date__gte=start_date)),
+        recent_completions=Count('sessions', filter=Q(sessions__started_at__date__gte=start_date, sessions__status='completed')),
+    ).filter(recent_sessions__gt=0).order_by('-recent_sessions').distinct()[:10]
+
     context = {
         **request.staff_ctx,
         'days': days,
         'sessions_by_day': list(sessions_by_day),
         'top_students': top_students,
         'lessons': lessons,
+        'courses_with_eo': courses_with_eo,
+        'recent_lessons': recent_lessons,
     }
-    
+
     return render(request, 'dashboard/reports/overview.html', context)
 
 

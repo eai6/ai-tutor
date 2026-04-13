@@ -350,19 +350,21 @@ class TestSeychellesContextLibrary(TestCase):
         self.assertEqual(str(entry), '[Economic] GDP')
 
     def test_filter_by_subject_tag(self):
+        # Clear any seeded data first to test in isolation
+        SeychellesContext.objects.all().delete()
         SeychellesContext.objects.create(
-            category='economic', title='GDP', content='...',
+            category='economic', title='GDP Test', content='...',
             subject_tags=['geography'],
         )
         SeychellesContext.objects.create(
-            category='climate', title='Rainfall', content='...',
+            category='climate', title='Rainfall Test', content='...',
             subject_tags=['science'],
         )
         # Filter in Python since SQLite JSON contains varies
         all_entries = SeychellesContext.objects.all()
         geo = [e for e in all_entries if 'geography' in (e.subject_tags or [])]
         self.assertEqual(len(geo), 1)
-        self.assertEqual(geo[0].title, 'GDP')
+        self.assertEqual(geo[0].title, 'GDP Test')
 
     def test_inactive_entries_excluded(self):
         SeychellesContext.objects.create(

@@ -86,6 +86,71 @@
     </div>
 </div>
 
+<!-- Competency Reports -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Competency Reports</h3>
+    </div>
+    <div class="card-body">
+        {% if courses_with_eo %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+            {% for item in courses_with_eo %}
+            <div style="border: 1px solid var(--gray-200); border-radius: 0.75rem; padding: 1rem;">
+                <div style="font-weight: 700; margin-bottom: 0.25rem;">{{ item.course.title }}</div>
+                <div style="font-size: 0.8125rem; color: var(--gray-500); margin-bottom: 0.75rem;">
+                    {{ item.eo_count }} enabling objectives &middot; {{ item.session_count }} sessions
+                </div>
+                <a href="{% url 'dashboard:class_readiness' item.course.id %}" class="btn btn-sm btn-primary" style="font-size: 0.8125rem;">
+                    Class Readiness Report
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No courses with competency data yet. Upload a curriculum and generate content to see competency reports.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recent Lesson Sessions -->
+{% if recent_lessons %}
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Recent Lesson Sessions</h3>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Lesson</th>
+                    <th>Course</th>
+                    <th style="text-align: center;">Sessions</th>
+                    <th style="text-align: center;">Completed</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lesson in recent_lessons %}
+                <tr>
+                    <td style="font-weight: 500;">{{ lesson.title }}</td>
+                    <td style="color: var(--gray-500);">{{ lesson.unit.course.title }}</td>
+                    <td style="text-align: center;">{{ lesson.recent_sessions }}</td>
+                    <td style="text-align: center;">{{ lesson.recent_completions }}</td>
+                    <td style="text-align: right;">
+                        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:0.75rem;font-weight:600;text-decoration:none;">
+                            Session Report
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <!-- Lesson Performance -->
 <div class="card" style="margin-top: 1.5rem;">
     <div class="card-header">
