@@ -1636,12 +1636,16 @@ def lesson_session_report(request, lesson_id):
     completed_sessions = sessions.filter(status='completed').values_list('student_id', flat=True).distinct()
     completed_count = len(set(completed_sessions))
 
-    # ── Enabling objectives for this lesson ──
+    # ── Objectives for this lesson (terminal + enabling) ──
     eo_skills = Skill.objects.filter(
         primary_lesson=lesson,
         is_enabling_objective=True,
     ).order_by('id')
     total_objectives = eo_skills.count()
+    terminal_skills = eo_skills.filter(objective_type='terminal')
+    enabling_skills = eo_skills.filter(objective_type='enabling')
+    total_terminal = terminal_skills.count()
+    total_enabling = enabling_skills.count()
 
     # ── Per-objective competency ──
     objectives_data = []
@@ -1652,18 +1656,18 @@ def lesson_session_report(request, lesson_id):
         achieved = masteries.filter(mastery_level__gte=mastery_threshold).count()
         not_achieved = total_students - achieved
         avg = masteries.aggregate(a=Avg('mastery_level'))['a'] or 0
+        pct = round(achieved / total_students * 100) if total_students else 0
 
         objectives_data.append({
             'objective': skill.enabling_objective_text,
+            'objective_type': skill.objective_type or 'enabling',
             'bloom': skill.bloom_level,
             'achieved': achieved,
             'not_achieved': not_achieved,
             'total': total_students,
-            'pct': round(achieved / total_students * 100) if total_students else 0,
+            'pct': pct,
             'avg_mastery': round(avg * 100),
-            'color': 'green' if (achieved / total_students * 100 if total_students else 0) >= 70 else (
-                'yellow' if (achieved / total_students * 100 if total_students else 0) >= 40 else 'red'
-            ),
+            'color': 'green' if pct >= 70 else ('yellow' if pct >= 40 else 'red'),
         })
 
     # ── Per-student competency ──
@@ -1847,6 +1851,8 @@ def lesson_session_report(request, lesson_id):
         'total_students': total_students,
         'completed_count': completed_count,
         'total_objectives': total_objectives,
+        'total_terminal': total_terminal,
+        'total_enabling': total_enabling,
         'objectives_data': objectives_data,
         'students_data': students_data,
         'category_groups': category_groups,

@@ -138,16 +138,27 @@ class Skill(models.Model):
         default='understand'
     )
     
-    # Enabling Objective linkage
+    # Objective linkage
     enabling_objective_text = models.CharField(
         max_length=500,
         blank=True,
         default='',
-        help_text="Source enabling objective text from syllabus (if this skill was derived from an EO)"
+        help_text="Source objective text from syllabus"
     )
     is_enabling_objective = models.BooleanField(
         default=False,
-        help_text="True if this skill was auto-created from a curriculum enabling objective"
+        help_text="True if this skill was auto-created from a curriculum objective"
+    )
+    objective_type = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        choices=[
+            ('terminal', 'Terminal Objective'),
+            ('enabling', 'Enabling Objective'),
+            ('', 'Not specified'),
+        ],
+        help_text="Whether this is a terminal (assessment) or enabling (teaching step) objective"
     )
     source_code = models.CharField(
         max_length=20,

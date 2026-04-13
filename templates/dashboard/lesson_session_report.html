@@ -255,7 +255,13 @@
 </div>
 
 <!-- Per-Objective Competency -->
-<div class="section-title">Competency by Enabling Objective</div>
+<div class="section-title">Competency by Objective</div>
+{% if total_terminal > 0 %}
+<div style="font-size:0.8125rem;color:var(--gray-500);margin-bottom:0.75rem;">
+    <span style="font-weight:600;color:#6366f1;">{{ total_terminal }} terminal objectives</span> (assessment targets)
+    {% if total_enabling > 0 %} + <span style="font-weight:600;color:#059669;">{{ total_enabling }} enabling objectives</span> (teaching steps){% endif %}
+</div>
+{% endif %}
 {% if objectives_data %}
 <table class="obj-table">
     <thead>
@@ -269,7 +275,10 @@
     <tbody>
         {% for obj in objectives_data %}
         <tr>
-            <td>{{ obj.objective|truncatewords:18 }}</td>
+            <td>
+                {% if obj.objective_type == 'terminal' %}<span style="font-size:0.5625rem;font-weight:700;color:#6366f1;background:#ede9fe;padding:1px 4px;border-radius:3px;margin-right:4px;">TO</span>{% elif obj.objective_type == 'enabling' %}<span style="font-size:0.5625rem;font-weight:700;color:#059669;background:#d1fae5;padding:1px 4px;border-radius:3px;margin-right:4px;">EO</span>{% endif %}
+                {{ obj.objective|truncatewords:18 }}
+            </td>
             <td><span class="bloom-tag">{{ obj.bloom }}</span></td>
             <td>
                 <div class="competency-bar">

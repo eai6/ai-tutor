@@ -28,9 +28,13 @@ QUESTION FORMAT MIX (EXACTLY 35 questions total):
 
 REQUIREMENTS:
 1. Generate EXACTLY 35 questions in the format mix above
-2. Each question must have a concept_tag (the specific concept it tests)
-3. Use context relevant to Seychelles secondary school students
-4. Vary question phrasing — avoid repetitive stems
+2. Each question MUST have:
+   - concept_tag: the specific concept it tests (short label)
+   - terminal_objective: the exact terminal objective this question assesses (from the lesson objectives)
+   - enabling_objective: the specific enabling objective/teaching step this question tests (if applicable)
+3. EVERY terminal objective in the lesson must be assessed by at least 2 questions
+4. Use context relevant to Seychelles secondary school students
+5. Vary question phrasing — avoid repetitive stems
 
 OUTPUT FORMAT (JSON array — each question has a "question_type" field):
 

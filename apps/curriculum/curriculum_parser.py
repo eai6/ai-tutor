@@ -1171,40 +1171,59 @@ def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurr
                 cleaned.append(eo)
         unit['enabling_objectives'] = cleaned
 
-        # If enabling objectives are sparse but terminal objectives are rich,
-        # merge terminal objectives into enabling objectives
-        tos = unit.get('terminal_objectives', [])
-        eos = unit['enabling_objectives']
-        if len(tos) > len(eos) * 2 and len(tos) >= 3:
-            # Terminal objectives are much richer — add any that aren't already covered
-            eo_lower = {e.lower()[:40] for e in eos}
-            for to in tos:
-                to_key = to.lower()[:40]
-                if to_key not in eo_lower and len(to) > 15:
-                    eos.append(to)
-                    eo_lower.add(to_key)
-            unit['enabling_objectives'] = eos
-
-    # ── Build lessons from enabling objectives ──
+    # ── Build lessons from TERMINAL OBJECTIVES (primary) ──
+    # Terminal objectives are the assessment targets — always clearly defined.
+    # Enabling objectives supplement but are harder to extract reliably.
     for unit in units:
-        eos = unit['enabling_objectives']
-        if not eos:
-            # Fall back to terminal objectives as enabling objectives
-            eos = unit['terminal_objectives']
+        # Use terminal objectives as the primary lesson driver
+        tos = unit.get('terminal_objectives', [])
+        eos = unit.get('enabling_objectives', [])
 
-        # Group enabling objectives into lessons (3-6 EOs per lesson)
+        # Terminal objectives are the lesson backbone
+        # Enabling objectives provide additional granularity
+        if tos:
+            lesson_objectives = tos
+        elif eos:
+            lesson_objectives = eos
+        else:
+            continue
+
+        # Store all objectives on the unit for competency tracking
+        # Terminal objectives = what we assess, enabling = supplementary detail
+        unit['enabling_objectives'] = lesson_objectives + [
+            e for e in eos if e not in lesson_objectives
+        ]
+
+        # Group terminal objectives into lessons (2-4 TOs per lesson)
+        # Attach relevant enabling objectives as teaching steps for content generation
+        raw_eos = unit.get('enabling_objectives', [])  # The raw extracted EOs
         lessons = []
-        chunk_size = min(5, max(3, len(eos) // 3)) if eos else 3
-        for start in range(0, len(eos), chunk_size):
-            chunk = eos[start:start + chunk_size]
+        chunk_size = min(4, max(2, len(lesson_objectives) // 3)) if lesson_objectives else 3
+        for start in range(0, len(lesson_objectives), chunk_size):
+            chunk = lesson_objectives[start:start + chunk_size]
             if not chunk:
                 continue
+
+            # Match enabling objectives to this lesson's terminal objectives by keyword overlap
+            lesson_eos = []
+            chunk_words = set()
+            for to in chunk:
+                chunk_words.update(w.lower() for w in to.split() if len(w) > 3)
+
+            for eo in raw_eos:
+                eo_words = set(w.lower() for w in eo.split() if len(w) > 3)
+                if len(chunk_words & eo_words) >= 2:
+                    lesson_eos.append(eo)
+
             # Use first objective as lesson title seed
             title = create_lesson_title(chunk[0])
             lessons.append({
                 'title': title,
                 'objective': chunk[0],
+                # Terminal objectives = what we assess (the lesson targets)
                 'enabling_objectives': chunk,
+                # Enabling objectives = teaching steps (inform content generation)
+                'teaching_steps': lesson_eos,
                 'teaching_strategies': ['Explanation', 'Discussion', 'Practical activities'],
                 'resources': ['Textbook', 'Atlas', 'Maps'],
                 'assessment_methods': ['Structured source-based written questions', 'Oral questioning'],

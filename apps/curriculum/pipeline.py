@@ -1280,6 +1280,7 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                         'enabling_objectives': lesson_data.get('enabling_objectives', []),
                         'metadata': {
                             'key_concepts': lesson_data.get('key_concepts', []),
+                            'teaching_steps': lesson_data.get('teaching_steps', []),
                             'from_curriculum_upload': upload.id,
                         }
                     }

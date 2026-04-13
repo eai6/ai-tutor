@@ -91,9 +91,13 @@ class LessonStepSchema(BaseModel):
     answer_type: str = Field(default="none", description="Answer type: none, short_numeric, short_text, multiple_choice, or free_response")
     expected_answer: Optional[str] = Field(default=None, description="Correct answer. For multiple_choice, the letter (A/B/C/D)")
     choices: Optional[List[str]] = Field(default=None, description="MCQ options: ['A) ...', 'B) ...', 'C) ...', 'D) ...']")
+    terminal_objective: Optional[str] = Field(default="", description=(
+        "The terminal objective this step works toward. "
+        "Must be one of the lesson's TERMINAL OBJECTIVES listed above."
+    ))
     enabling_objective: Optional[str] = Field(default="", description=(
-        "The specific enabling objective this step addresses. "
-        "Map each step to one of the lesson's enabling objectives if provided."
+        "The specific teaching step/enabling objective this step addresses. "
+        "Should be one of the TEACHING STEPS listed above, if provided."
     ))
     hints: Optional[List[str]] = Field(default=None, description="2-3 hints scaffolded from general to specific")
     media: Optional[StepMedia] = Field(default=None, description="Media for this step, only if teacher_script references it")
@@ -380,17 +384,31 @@ base your media descriptions on these figures so generated images match the text
 {chr(10).join(fig_lines)}
 """
 
-        # Build enabling objectives section
+        # Build enabling objectives section (terminal objectives = assessment targets)
         enabling_objectives = lesson.enabling_objectives or []
         enabling_obj_str = ""
         if enabling_objectives:
             eo_lines = "\n".join(f"  EO{i+1}: {obj}" for i, obj in enumerate(enabling_objectives))
             enabling_obj_str = f"""
-ENABLING OBJECTIVES (each step MUST map to one of these):
+TERMINAL OBJECTIVES (assessment targets — each MUST be covered):
 {eo_lines}
-Every enabling objective must be covered by at least one step. Set each step's
-enabling_objective field to the exact text of the objective it addresses.
+Every terminal objective must be covered by at least one step.
+Set each step's terminal_objective field to the exact text of the TO it works toward.
+Set each step's enabling_objective field to the specific teaching step it addresses.
 """
+
+        # Build teaching steps section (granular enabling objectives from syllabus)
+        teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
+        teaching_steps_str = ""
+        if teaching_steps:
+            ts_lines = "\n".join(f"  - {ts}" for ts in teaching_steps)
+            teaching_steps_str = f"""
+TEACHING STEPS (from syllabus — use these to guide HOW you teach each objective):
+{ts_lines}
+These are the granular steps from the curriculum. Use them to structure your
+explanation, examples, and practice for each terminal objective above.
+"""
+
         # Build Seychelles context library section
         seychelles_str = ""
         try:
@@ -422,7 +440,7 @@ GRADE: {grade} (Seychelles secondary school)
 
 TEACHING STRATEGIES TO USE:
 {strategies_str}
-{kb_context_str}{figures_str}{enabling_obj_str}{seychelles_str}
+{kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}
 Create 12-18 CONCEPT-GROUPED steps. The student must master each concept before moving to the next.
 
 STRUCTURE:
@@ -531,6 +549,10 @@ CONTENT GUIDELINES:
                     'step_type': step_data.get('step_type', 'teach'),
                     'concept_tag': step_data.get('concept_tag', ''),
                     'enabling_objective': step_data.get('enabling_objective', ''),
+                    'curriculum_context': {
+                        **(step_data.get('curriculum_context') or {}),
+                        'terminal_objective': step_data.get('terminal_objective', ''),
+                    },
                     'teacher_script': step_data.get('teacher_script', ''),
                     'question': step_data.get('question') or '',
                     'answer_type': step_data.get('answer_type', 'none'),
@@ -663,6 +685,17 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
     except Exception:
         pass
 
+    # Build terminal objectives and teaching steps context for exit ticket
+    objectives_context = ""
+    terminal_objs = lesson.enabling_objectives or []
+    teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
+    if terminal_objs:
+        to_lines = "\n".join(f"  TO{i+1}: {to}" for i, to in enumerate(terminal_objs))
+        objectives_context += f"\nTERMINAL OBJECTIVES (each must be assessed by at least 2 questions):\n{to_lines}\n"
+    if teaching_steps:
+        ts_lines = "\n".join(f"  - {ts}" for ts in teaching_steps)
+        objectives_context += f"\nENABLING OBJECTIVES / TEACHING STEPS:\n{ts_lines}\n"
+
     prompt = EXIT_TICKET_PROMPT.format(
         lesson_title=lesson.title,
         lesson_objective=lesson.objective or '',
@@ -670,6 +703,9 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
         exam_context=exam_context,
         seychelles_context=seychelles_context,
     )
+    # Append objectives for systematic assessment coverage
+    if objectives_context:
+        prompt += "\n" + objectives_context
     # Append figure context if available
     if figure_context:
         prompt += "\n" + figure_context
@@ -717,6 +753,13 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
                     'difficulty': q.get('difficulty', 'medium'),
                     'order_index': i,
                 }
+                # Store objective linkage on all question types
+                objective_data = {}
+                if q.get('terminal_objective'):
+                    objective_data['terminal_objective'] = q['terminal_objective']
+                if q.get('enabling_objective'):
+                    objective_data['enabling_objective'] = q['enabling_objective']
+
                 if q_type == 'mcq':
                     kwargs.update({
                         'option_a': q.get('option_a', ''),
@@ -725,11 +768,16 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
                         'option_d': q.get('option_d', ''),
                         'correct_answer': q.get('correct', ''),
                     })
-                    # Store source HTML for source-based MCQ questions
+                    mcq_data = {}
                     if q.get('source'):
-                        kwargs['answer_data'] = {'source': q['source']}
+                        mcq_data['source'] = q['source']
+                    mcq_data.update(objective_data)
+                    if mcq_data:
+                        kwargs['answer_data'] = mcq_data
                 else:
-                    kwargs['answer_data'] = q.get('answer_data', {})
+                    ad = q.get('answer_data', {}) or {}
+                    ad.update(objective_data)
+                    kwargs['answer_data'] = ad
                 ExitTicketQuestion.objects.create(**kwargs)
 
         # Post-processing: generate images for questions that need figures

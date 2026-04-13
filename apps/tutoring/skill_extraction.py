@@ -439,20 +439,32 @@ Return JSON:
         return self.BLOOM_VERB_MAP.get(first_word, 'understand')
 
     def create_skills_from_enabling_objectives(self, lesson: Lesson) -> List[Skill]:
-        """Create Skill records from a lesson's enabling objectives.
+        """Create Skill records from a lesson's terminal and enabling objectives.
 
-        Each enabling objective becomes a first-class Skill with SM-2 tracking,
-        Bloom level inference, and lesson linkage. No LLM call needed — purely
-        deterministic from the syllabus data.
+        Terminal objectives (assessment targets) and enabling objectives (teaching
+        steps) both become Skills with SM-2 tracking. Each is tagged with
+        objective_type='terminal' or 'enabling' for separate competency reporting.
         """
-        enabling_objectives = lesson.enabling_objectives or []
-        if not enabling_objectives:
+        # Terminal objectives = what we assess (stored in lesson.enabling_objectives)
+        terminal_objectives = lesson.enabling_objectives or []
+        # Enabling objectives = teaching steps (stored in lesson.metadata)
+        teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
+
+        if not terminal_objectives and not teaching_steps:
             return []
 
         created_skills = []
         course = lesson.unit.course
 
-        for eo_text in enabling_objectives:
+        # Create skills for both types
+        all_objectives = [
+            (to, 'terminal') for to in terminal_objectives
+        ] + [
+            (ts, 'enabling') for ts in teaching_steps
+            if ts not in terminal_objectives  # Avoid duplicates
+        ]
+
+        for eo_text, obj_type in all_objectives:
             eo_text = eo_text.strip()
             if not eo_text:
                 continue
@@ -478,9 +490,10 @@ Return JSON:
                 code=code,
                 defaults={
                     'name': clean_eo_text[:200],
-                    'description': f"Enabling objective: {eo_text}",
+                    'description': f"{'Terminal' if obj_type == 'terminal' else 'Enabling'} objective: {eo_text}",
                     'enabling_objective_text': eo_text,
                     'is_enabling_objective': True,
+                    'objective_type': obj_type,
                     'source_code': source_code,
                     'course': course,
                     'unit': lesson.unit,
@@ -488,16 +501,16 @@ Return JSON:
                     'difficulty': difficulty_label,
                     'difficulty_score': difficulty_score,
                     'bloom_level': bloom,
-                    'importance': 0.8,  # EOs are high-importance by definition
-                    'tags': ['enabling_objective'],
+                    'importance': 1.0 if obj_type == 'terminal' else 0.7,
+                    'tags': [f'{obj_type}_objective'],
                 }
             )
 
-            if not created and not skill.is_enabling_objective:
-                # Update existing skill to mark as EO
-                skill.enabling_objective_text = eo_text
-                skill.is_enabling_objective = True
-                skill.save(update_fields=['enabling_objective_text', 'is_enabling_objective'])
+            if not created:
+                # Update objective_type if not set
+                if not skill.objective_type:
+                    skill.objective_type = obj_type
+                    skill.save(update_fields=['objective_type'])
 
             skill.lessons.add(lesson)
             created_skills.append(skill)
