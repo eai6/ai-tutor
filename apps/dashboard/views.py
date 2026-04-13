@@ -897,22 +897,21 @@ def curriculum_generate(request, upload_id):
     else:
         upload = get_object_or_404(CurriculumUpload, id=upload_id)
 
-    if upload.status != 'pending':
+    if upload.status not in ('pending', 'failed'):
         return JsonResponse({'error': 'Already processing'}, status=400)
-    
-    # Start processing (sync for now, async with Celery later)
+
+    # Start processing in background thread (avoids Gunicorn 120s timeout)
     try:
         upload.status = 'processing'
         upload.save()
-        
-        result = process_curriculum_upload(upload.id)
-        
+
+        from apps.dashboard.background_tasks import run_async
+        run_async(process_curriculum_upload, upload.id)
+
         return JsonResponse({
             'status': 'success',
             'success': True,
-            'message': 'Processing started',
-            'review_required': result.get('status') == 'review',
-            'course_id': result.get('course_id'),
+            'message': 'Processing started in background. This page will refresh automatically.',
         })
     except Exception as e:
         upload.status = 'failed'

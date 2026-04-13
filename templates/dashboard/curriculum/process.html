@@ -496,7 +496,17 @@ function startProcessing() {
         headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
     })
     .then(r => r.json())
-    .then(data => { window.location.reload(); })
+    .then(data => {
+        if (data.success) {
+            btn.innerHTML = '<span class="spinner"></span> Processing in background...';
+            // Auto-refresh every 10 seconds to check progress
+            setInterval(() => { window.location.reload(); }, 10000);
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+            btn.disabled = false;
+            btn.innerHTML = 'Start Processing';
+        }
+    })
     .catch(err => { alert('Error: ' + err.message); window.location.reload(); });
 }
 
