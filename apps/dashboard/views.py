@@ -787,36 +787,47 @@ def curriculum_upload(request):
 @teacher_required
 def curriculum_process(request, upload_id):
     """Process uploaded curriculum and show progress."""
-    institution = request.staff_ctx['institution']
+    import traceback as tb
+    try:
+        institution = request.staff_ctx['institution']
 
-    from apps.dashboard.models import CurriculumUpload
+        from apps.dashboard.models import CurriculumUpload
 
-    # Allow platform-wide uploads (institution=None) for any staff
-    if institution is not None:
-        upload = get_object_or_404(
-            CurriculumUpload,
-            Q(institution=institution) | Q(institution__isnull=True),
-            id=upload_id,
-        )
-    else:
-        upload = get_object_or_404(CurriculumUpload, id=upload_id)
+        # Allow platform-wide uploads (institution=None) for any staff
+        if institution is not None:
+            upload = get_object_or_404(
+                CurriculumUpload,
+                Q(institution=institution) | Q(institution__isnull=True),
+                id=upload_id,
+            )
+        else:
+            upload = get_object_or_404(CurriculumUpload, id=upload_id)
+    except Exception as e:
+        logger.error(f"curriculum_process CRASHED for upload {upload_id}: {e}\n{tb.format_exc()}")
+        print(f"[ERROR] curriculum_process({upload_id}): {e}\n{tb.format_exc()}", flush=True)
+        raise
 
     # Prepare context based on status
-    context = {
-        **request.staff_ctx,
-        'upload': upload,
-    }
-    
-    # If in review state, add parsed data for display
-    if upload.status == 'review' and upload.parsed_data:
-        parsed = upload.parsed_data
-        context['parsed_data'] = parsed
-        context['total_lessons'] = sum(
-            len(u.get('lessons', [])) for u in parsed.get('units', [])
-        )
-        context['text_length'] = upload.extracted_text_length
-    
-    return render(request, 'dashboard/curriculum/process.html', context)
+    try:
+        context = {
+            **request.staff_ctx,
+            'upload': upload,
+        }
+
+        # If in review state, add parsed data for display
+        if upload.status == 'review' and upload.parsed_data:
+            parsed = upload.parsed_data
+            context['parsed_data'] = parsed
+            context['total_lessons'] = sum(
+                len(u.get('lessons', [])) for u in parsed.get('units', [])
+            )
+            context['text_length'] = upload.extracted_text_length
+
+        return render(request, 'dashboard/curriculum/process.html', context)
+    except Exception as e:
+        logger.error(f"curriculum_process RENDER failed for upload {upload_id}: {e}\n{tb.format_exc()}")
+        print(f"[ERROR] curriculum_process render({upload_id}): {e}\n{tb.format_exc()}", flush=True)
+        raise
 
 
 @teacher_required
