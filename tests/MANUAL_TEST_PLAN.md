@@ -2,28 +2,26 @@
 
 ## Prerequisites
 
+**Deployed URL:** https://aitutor-pixel-app.niceground-67d5237f.centralus.azurecontainerapps.io
+
 ```bash
-# 1. Run automated checks first (must all pass)
+# Run automated checks locally first (verifies code logic — 70 checks, 5 seconds)
 ./venv/bin/python tests/run_all_checks.py
-
-# 2. Apply migrations
-./venv/bin/python manage.py migrate
-
-# 3. Start dev server
-./venv/bin/python manage.py runserver
 ```
 
 Ensure you have:
 - A super admin account (staff user)
 - At least one teacher account
 - At least one student account
-- The geography and math curriculum PDFs in `seychelles_package/curriculum_materials/`
+- The geography and math curriculum PDFs ready to upload from `seychelles_package/curriculum_materials/`
+
+**Note:** All testing below is done against the deployed web app. Replace `localhost:8000` with the deployed URL. Migrations are applied automatically on deployment — no manual migration step needed.
 
 ---
 
 ## Test 1: Admin Panel Verification
 
-**URL:** http://localhost:8000/admin/
+**URL:** https://aitutor-pixel-app.niceground-67d5237f.centralus.azurecontainerapps.io/admin/
 
 ### 1.1 Seychelles Context Library
 - [ ] Navigate to `/admin/curriculum/seychellescontext/`
@@ -58,7 +56,7 @@ Ensure you have:
 
 ## Test 2: Dashboard Settings — Competency Thresholds
 
-**URL:** http://localhost:8000/dashboard/settings/
+**URL:** https://aitutor-pixel-app.niceground-67d5237f.centralus.azurecontainerapps.io/dashboard/settings/
 
 **Login as:** Super admin
 
@@ -87,7 +85,7 @@ Ensure you have:
 
 ## Test 3: Curriculum Upload — Geography
 
-**URL:** http://localhost:8000/dashboard/curriculum/upload/
+**URL:** https://aitutor-pixel-app.niceground-67d5237f.centralus.azurecontainerapps.io/dashboard/curriculum/upload/
 
 **Login as:** Teacher or super admin
 
@@ -195,7 +193,7 @@ Ensure you have:
 **Login as:** Student
 
 ### 7.1 Start a Lesson
-- [ ] Navigate to the tutor catalog: http://localhost:8000/tutor/
+- [ ] Navigate to the tutor catalog: https://aitutor-pixel-app.niceground-67d5237f.centralus.azurecontainerapps.io/tutor/
 - [ ] Verify the published lesson appears
 - [ ] If grade-level filtering is active, verify only appropriate lessons show
 - [ ] Click the lesson to start
@@ -331,7 +329,7 @@ Ensure you have:
 
 ## Test 10: Class Readiness Report
 
-**URL:** http://localhost:8000/dashboard/class/COURSE_ID/readiness/
+**URL:** https://aitutor-pixel-app.niceground-67d5237f.centralus.azurecontainerapps.io/dashboard/class/COURSE_ID/readiness/
 
 ### 10.1 Course-Level View
 - [ ] Verify header shows course name, student count, objective count
