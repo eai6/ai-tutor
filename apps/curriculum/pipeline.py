@@ -1291,6 +1291,7 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                     'description': f"{subject} curriculum for {grade}",
                     'grade_level': grade,
                     'is_published': False,
+                    'curriculum_upload': upload,
                 }
             )
 

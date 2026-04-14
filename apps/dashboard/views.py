@@ -622,25 +622,17 @@ def course_detail(request, course_id):
     
     # Check if any lesson is currently generating (course-wide generation in progress)
     from apps.dashboard.models import TeachingMaterialUpload, CurriculumUpload
-    # Show ALL materials related to this course via any linkage path:
+    # Show materials linked to this course directly or via its curriculum upload (ID-based)
     material_q = Q(course=course)
-    # Find curriculum uploads related to this course
-    subject_word = course.title.split()[0] if course.title else ''
-    upload_q = Q(created_course=course)
-    if subject_word:
-        upload_q |= Q(subject_name__icontains=subject_word, institution=course.institution)
-    related_upload_ids = list(
-        CurriculumUpload.objects.filter(upload_q).values_list('id', flat=True)
-    )
-    if related_upload_ids:
-        material_q |= Q(curriculum_upload_id__in=related_upload_ids)
-    # Also include materials with same subject+institution but no course link
-    if subject_word:
-        material_q |= Q(
-            subject_name__icontains=subject_word,
-            institution=course.institution,
-            course__isnull=True,
+    if course.curriculum_upload_id:
+        material_q |= Q(curriculum_upload_id=course.curriculum_upload_id)
+    else:
+        # Fallback for courses created before this FK was added
+        related_upload_ids = list(
+            CurriculumUpload.objects.filter(created_course=course).values_list('id', flat=True)
         )
+        if related_upload_ids:
+            material_q |= Q(curriculum_upload_id__in=related_upload_ids)
     materials = TeachingMaterialUpload.objects.filter(material_q).distinct()
 
     # Check both: any lesson with 'generating' status, OR an active upload still processing
@@ -1851,26 +1843,19 @@ def process_pending_materials(request, course_id):
     institution = request.staff_ctx['institution']
     course = get_scoped_object_or_404(Course, institution, id=course_id)
 
-    # Find ALL pending materials related to this course (same broad query as course detail)
+    # Find pending materials linked to this course or its curriculum upload (ID-based)
     from apps.dashboard.models import CurriculumUpload
     material_q = Q(course=course)
-    subject_word = course.title.split()[0] if course.title else ''
-    upload_q = Q(created_course=course)
-    if subject_word:
-        upload_q |= Q(subject_name__icontains=subject_word, institution=course.institution)
-    related_upload_ids = list(
-        CurriculumUpload.objects.filter(upload_q).values_list('id', flat=True)
-    )
-    if related_upload_ids:
-        material_q |= Q(curriculum_upload_id__in=related_upload_ids)
-    if subject_word:
-        material_q |= Q(
-            subject_name__icontains=subject_word,
-            institution=course.institution,
-            course__isnull=True,
+    if course.curriculum_upload_id:
+        material_q |= Q(curriculum_upload_id=course.curriculum_upload_id)
+    else:
+        related_upload_ids = list(
+            CurriculumUpload.objects.filter(created_course=course).values_list('id', flat=True)
         )
+        if related_upload_ids:
+            material_q |= Q(curriculum_upload_id__in=related_upload_ids)
 
-    # Link unlinked materials to this course so processing can find them
+    # Link unlinked materials from the curriculum upload to this course
     TeachingMaterialUpload.objects.filter(material_q, course__isnull=True).update(course=course)
 
     all_pending = TeachingMaterialUpload.objects.filter(

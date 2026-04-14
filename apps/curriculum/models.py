@@ -24,6 +24,14 @@ class Course(models.Model):
         blank=True,
         help_text="Null = platform-wide course visible to all schools"
     )
+    curriculum_upload = models.ForeignKey(
+        'dashboard.CurriculumUpload',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_courses',
+        help_text="The curriculum upload that created this course"
+    )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     grade_level = models.CharField(
