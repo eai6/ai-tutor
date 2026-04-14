@@ -937,7 +937,7 @@ body {
     overflow: hidden;
     background: #f8fafc;
 }
-.data-description-rich iframe { display: block; }
+.data-description-rich iframe { display: block; width: 100%; border: none; }
 
 .submit-btn {
     width: 100%;
@@ -1814,6 +1814,25 @@ function showExitTicket() {
     });
 
     document.getElementById('exit-modal').style.display = 'flex';
+
+    // Auto-resize iframes to fit their content
+    setTimeout(function() {
+        document.querySelectorAll('.data-description-rich iframe').forEach(function(iframe) {
+            iframe.addEventListener('load', function() {
+                try {
+                    var h = iframe.contentDocument.documentElement.scrollHeight;
+                    iframe.style.height = (h + 16) + 'px';
+                } catch(e) {}
+            });
+            // Trigger for already-loaded iframes
+            try {
+                if (iframe.contentDocument && iframe.contentDocument.documentElement) {
+                    var h = iframe.contentDocument.documentElement.scrollHeight;
+                    if (h > 50) iframe.style.height = (h + 16) + 'px';
+                }
+            } catch(e) {}
+        });
+    }, 200);
 }
 
 function selectOption(qIndex, letter, el) {
