@@ -3679,6 +3679,22 @@ Which concept numbers were meaningfully covered?"""
         answers: List of answers — each is a string (MCQ letter), list (fill_in_blank),
                  dict (matching pairs), or string (short answer/data interpretation).
         """
+        try:
+            return self._submit_exit_ticket_inner(answers)
+        except Exception as e:
+            logger.error(f"Exit ticket submission failed: {e}", exc_info=True)
+            print(f"[ExitTicket] CRASH: {e}", flush=True)
+            import traceback; traceback.print_exc()
+            # Don't crash — complete the session gracefully
+            self._save_state()
+            return TutorMessage(
+                content=f"There was an issue grading your quiz. Your session has been saved. Score could not be calculated.",
+                phase="completed",
+                is_complete=True,
+            )
+
+    def _submit_exit_ticket_inner(self, answers) -> TutorMessage:
+        """Inner implementation of exit ticket submission."""
         from apps.tutoring.models import ExitTicketQuestion
 
         if not self.exit_ticket_concepts:
