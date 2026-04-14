@@ -3813,6 +3813,32 @@ Which concept numbers were meaningfully covered?"""
         self._save_state()
         self.session.save()
 
+        # Record ExitTicketAttempt for competency reporting
+        try:
+            from apps.tutoring.models import ExitTicket, ExitTicketAttempt
+            exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
+            if exit_ticket:
+                # Build per-question answer data
+                answer_data = []
+                for r in results:
+                    answer_data.append({
+                        'concept_tag': r.get('concept_tag', ''),
+                        'correct': r.get('is_correct', False),
+                        'selected': str(r.get('selected', ''))[:200],
+                        'question_type': r.get('question_type', 'mcq'),
+                    })
+                ExitTicketAttempt.objects.create(
+                    exit_ticket=exit_ticket,
+                    student=self.student,
+                    session=self.session,
+                    score=score,
+                    passed=True,
+                    answers=answer_data,
+                    completed_at=timezone.now(),
+                )
+        except Exception as e:
+            logger.warning(f"Failed to save ExitTicketAttempt: {e}")
+
         # Update progress
         progress, _ = StudentLessonProgress.objects.get_or_create(
             student=self.student,
@@ -3911,6 +3937,31 @@ Which concept numbers were meaningfully covered?"""
         """
         self.remediation_attempt = getattr(self, 'remediation_attempt', 0) + 1
         self.is_remediation = True
+
+        # Record ExitTicketAttempt for competency reporting (failed attempt)
+        try:
+            from apps.tutoring.models import ExitTicket, ExitTicketAttempt
+            exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
+            if exit_ticket:
+                answer_data = []
+                for r in results:
+                    answer_data.append({
+                        'concept_tag': r.get('concept_tag', ''),
+                        'correct': r.get('is_correct', False),
+                        'selected': str(r.get('selected', ''))[:200],
+                        'question_type': r.get('question_type', 'mcq'),
+                    })
+                ExitTicketAttempt.objects.create(
+                    exit_ticket=exit_ticket,
+                    student=self.student,
+                    session=self.session,
+                    score=score,
+                    passed=False,
+                    answers=answer_data,
+                    completed_at=timezone.now(),
+                )
+        except Exception as e:
+            logger.warning(f"Failed to save ExitTicketAttempt: {e}")
 
         # Extract failed enabling objectives from exit ticket concept_tags
         # First try concept_tag from the failed_questions dict (added in grading)
