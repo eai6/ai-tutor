@@ -30,6 +30,15 @@ def process_teaching_material(upload_id: int):
     upload = TeachingMaterialUpload.objects.get(id=upload_id)
 
     try:
+        # Check file exists
+        import os
+        if not os.path.exists(upload.file_path):
+            upload.status = 'failed'
+            upload.error_message = f"File not found: {upload.file_path}. The file may need to be re-uploaded."
+            upload.save()
+            upload.add_log(f"FAILED: File not found on disk. Please re-upload this material.")
+            return
+
         # Update status
         upload.status = 'processing'
         upload.save(update_fields=['status'])
@@ -131,6 +140,15 @@ def process_teaching_material_fast(upload_id: int):
     upload = TeachingMaterialUpload.objects.get(id=upload_id)
 
     try:
+        # Check file exists
+        import os
+        if not os.path.exists(upload.file_path):
+            upload.status = 'failed'
+            upload.error_message = f"File not found: {upload.file_path}. The file may need to be re-uploaded."
+            upload.save()
+            upload.add_log(f"FAILED: File not found on disk. Please re-upload this material.")
+            return {'error': 'file_not_found'}
+
         upload.status = 'processing'
         upload.save(update_fields=['status'])
         print(f"[MaterialFast] Processing {upload.original_filename}", flush=True)
