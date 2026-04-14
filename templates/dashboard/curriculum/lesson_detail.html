@@ -230,6 +230,34 @@
             <p style="margin: 0.5rem 0 0 0; color: #1e40af;">{{ lesson.objective }}</p>
         </div>
         {% endif %}
+
+        {% if lesson.enabling_objectives %}
+        <div style="margin-top: 0.75rem; padding: 1rem; background: #fefce8; border: 1px solid #fde68a; border-radius: 8px;">
+            <strong style="color: #854d0e; font-size: 0.875rem;">Terminal Objectives ({{ lesson.enabling_objectives|length }})</strong>
+            <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.375rem;">
+                {% for to in lesson.enabling_objectives %}
+                <div style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; color: #a16207;">
+                    <span style="background: #fef9c3; color: #854d0e; padding: 0.0625rem 0.375rem; border-radius: 4px; font-size: 0.6875rem; font-weight: 600; flex-shrink: 0;">TO{{ forloop.counter }}</span>
+                    <span>{{ to }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if teaching_steps %}
+        <div style="margin-top: 0.75rem; padding: 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+            <strong style="color: #166534; font-size: 0.875rem;">Enabling Objectives ({{ teaching_steps|length }})</strong>
+            <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.375rem;">
+                {% for eo in teaching_steps %}
+                <div style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; color: #15803d;">
+                    <span style="background: #dcfce7; color: #166534; padding: 0.0625rem 0.375rem; border-radius: 4px; font-size: 0.6875rem; font-weight: 600; flex-shrink: 0;">EO{{ forloop.counter }}</span>
+                    <span>{{ eo }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -293,11 +321,14 @@
             {% for step in steps %}
             <div class="step-card" data-step-id="{{ step.id }}">
                 <div class="step-header" onclick="toggleStep(this)">
-                    <div style="display: flex; align-items: center;">
+                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.375rem;">
                         <span class="step-number">{{ step.order_index|add:1 }}</span>
                         <span style="font-weight: 500;">{{ step.step_type|default:"teach"|title }}</span>
                         {% if step.phase %}
-                        <span class="step-phase {{ step.phase }}" style="margin-left: 0.5rem;">{{ step.phase }}</span>
+                        <span class="step-phase {{ step.phase }}">{{ step.phase }}</span>
+                        {% endif %}
+                        {% if step.enabling_objective %}
+                        <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 4px; background: #dcfce7; color: #166534; font-weight: 500; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ step.enabling_objective }}">EO: {{ step.enabling_objective|truncatewords:8 }}</span>
                         {% endif %}
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -424,7 +455,8 @@
                     <div style="font-weight: 600; margin-bottom: 0.75rem; flex: 1;">
                         Q{{ forloop.counter }}: {{ question.question_text }}
                     </div>
-                    <div style="display: flex; gap: 0.375rem; margin-left: 0.5rem; flex-shrink: 0;">
+                    <div style="display: flex; gap: 0.375rem; margin-left: 0.5rem; flex-shrink: 0; flex-wrap: wrap;">
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.question_type == 'mcq' %}#e0e7ff{% elif question.question_type == 'fill_in_blank' %}#fce7f3{% elif question.question_type == 'matching' %}#ede9fe{% elif question.question_type == 'short_answer' %}#ecfdf5{% else %}#fff7ed{% endif %};">{{ question.get_question_type_display }}</span>
                         {% if question.difficulty %}
                         <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}#d1fae5{% elif question.difficulty == 'hard' %}#fee2e2{% else %}#fef3c7{% endif %};">{{ question.difficulty }}</span>
                         {% endif %}
@@ -435,6 +467,8 @@
                 </div>
 
                 <div style="margin-left: 1rem;">
+                    {% if question.question_type == 'mcq' %}
+                    <!-- MCQ: Show A/B/C/D options -->
                     <div style="padding: 0.375rem 0; {% if question.correct_answer == 'A' %}color: var(--success); font-weight: 500;{% endif %}">
                         {% if question.correct_answer == 'A' %}✓{% endif %} A) {{ question.option_a }}
                     </div>
@@ -447,6 +481,78 @@
                     <div style="padding: 0.375rem 0; {% if question.correct_answer == 'D' %}color: var(--success); font-weight: 500;{% endif %}">
                         {% if question.correct_answer == 'D' %}✓{% endif %} D) {{ question.option_d }}
                     </div>
+
+                    {% elif question.question_type == 'fill_in_blank' %}
+                    <!-- Fill in the Blank -->
+                    {% if question.answer_data.text_template %}
+                    <div style="padding: 0.5rem; background: #fff; border: 1px solid var(--gray-200); border-radius: 6px; font-style: italic; margin-bottom: 0.5rem;">
+                        {{ question.answer_data.text_template }}
+                    </div>
+                    {% endif %}
+                    <div style="padding: 0.375rem 0; color: var(--success); font-weight: 500;">
+                        ✓ Answer: {% for blank in question.answer_data.blanks %}{{ blank }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                    </div>
+                    {% if question.answer_data.accept_alternatives %}
+                    <div style="padding: 0.25rem 0; font-size: 0.8rem; color: var(--gray-500);">
+                        Also accepts: {% for alt_list in question.answer_data.accept_alternatives %}{% for alt in alt_list %}{{ alt }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if not forloop.last %}; {% endif %}{% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% elif question.question_type == 'matching' %}
+                    <!-- Matching -->
+                    {% if question.answer_data.pairs %}
+                    <table style="width: 100%; font-size: 0.875rem; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--gray-200);">
+                                <th style="text-align: left; padding: 0.375rem; width: 50%;">Term</th>
+                                <th style="text-align: left; padding: 0.375rem; width: 50%;">Match</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pair in question.answer_data.pairs %}
+                            <tr style="border-bottom: 1px solid var(--gray-100);">
+                                <td style="padding: 0.375rem; font-weight: 500;">{{ pair.left }}</td>
+                                <td style="padding: 0.375rem; color: var(--success);">✓ {{ pair.right }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+
+                    {% elif question.question_type == 'short_answer' or question.question_type == 'data_interpretation' %}
+                    <!-- Short Answer / Data Interpretation -->
+                    {% if question.answer_data.data_description %}
+                    <div style="padding: 0.5rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 0.8rem; margin-bottom: 0.5rem;">
+                        📊 {{ question.answer_data.data_description }}
+                    </div>
+                    {% endif %}
+                    {% if question.answer_data.model_answer %}
+                    <div style="padding: 0.5rem; background: #d1fae5; border-radius: 6px; font-size: 0.875rem;">
+                        <strong>Model answer:</strong> {{ question.answer_data.model_answer }}
+                    </div>
+                    {% endif %}
+                    {% if question.answer_data.keywords %}
+                    <div style="padding: 0.375rem 0; font-size: 0.8rem; color: var(--gray-500);">
+                        Keywords: {% for kw in question.answer_data.keywords %}<span style="background: #fef3c7; padding: 0.125rem 0.375rem; border-radius: 4px; margin-right: 0.25rem;">{{ kw }}</span>{% endfor %}
+                        {% if question.answer_data.min_keywords %}(min {{ question.answer_data.min_keywords }} required){% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% else %}
+                    <!-- Fallback: show options if they exist -->
+                    {% if question.option_a %}
+                    <div style="padding: 0.375rem 0;">A) {{ question.option_a }}</div>
+                    {% endif %}
+                    {% if question.option_b %}
+                    <div style="padding: 0.375rem 0;">B) {{ question.option_b }}</div>
+                    {% endif %}
+                    {% if question.option_c %}
+                    <div style="padding: 0.375rem 0;">C) {{ question.option_c }}</div>
+                    {% endif %}
+                    {% if question.option_d %}
+                    <div style="padding: 0.375rem 0;">D) {{ question.option_d }}</div>
+                    {% endif %}
+                    {% endif %}
                 </div>
 
                 {% if question.explanation %}
@@ -467,6 +573,9 @@
                     <label style="font-size: 0.75rem; font-weight: 600;">Question</label>
                     <textarea class="eq-question_text" rows="2" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{{ question.question_text }}</textarea>
                 </div>
+
+                {% if question.question_type == 'mcq' %}
+                <!-- MCQ edit fields -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <div>
                         <label style="font-size: 0.75rem;">A)</label>
@@ -485,16 +594,54 @@
                         <input class="eq-option_d" value="{{ question.option_d }}" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: auto auto 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
-                    <div>
-                        <label style="font-size: 0.75rem;">Correct</label>
-                        <select class="eq-correct_answer" style="padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
-                            <option value="A" {% if question.correct_answer == 'A' %}selected{% endif %}>A</option>
-                            <option value="B" {% if question.correct_answer == 'B' %}selected{% endif %}>B</option>
-                            <option value="C" {% if question.correct_answer == 'C' %}selected{% endif %}>C</option>
-                            <option value="D" {% if question.correct_answer == 'D' %}selected{% endif %}>D</option>
-                        </select>
-                    </div>
+                <div style="margin-bottom: 0.5rem;">
+                    <label style="font-size: 0.75rem;">Correct Answer</label>
+                    <select class="eq-correct_answer" style="padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
+                        <option value="A" {% if question.correct_answer == 'A' %}selected{% endif %}>A</option>
+                        <option value="B" {% if question.correct_answer == 'B' %}selected{% endif %}>B</option>
+                        <option value="C" {% if question.correct_answer == 'C' %}selected{% endif %}>C</option>
+                        <option value="D" {% if question.correct_answer == 'D' %}selected{% endif %}>D</option>
+                    </select>
+                </div>
+
+                {% elif question.question_type == 'fill_in_blank' %}
+                <!-- Fill-in-blank edit -->
+                <div style="margin-bottom: 0.5rem;">
+                    <label style="font-size: 0.75rem;">Sentence template (use ___ for blanks)</label>
+                    <input class="eq-fill_template" value="{{ question.answer_data.text_template }}" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                    <label style="font-size: 0.75rem;">Correct answers (comma-separated)</label>
+                    <input class="eq-fill_answers" value="{% for b in question.answer_data.blanks %}{{ b }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
+                </div>
+
+                {% elif question.question_type == 'matching' %}
+                <!-- Matching edit -->
+                <div style="margin-bottom: 0.5rem;">
+                    <label style="font-size: 0.75rem;">Pairs (one per line: term = definition)</label>
+                    <textarea class="eq-matching_pairs" rows="4" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{% if question.answer_data.pairs %}{% for p in question.answer_data.pairs %}{{ p.left }} = {{ p.right }}
+{% endfor %}{% endif %}</textarea>
+                </div>
+
+                {% elif question.question_type == 'short_answer' or question.question_type == 'data_interpretation' %}
+                <!-- Short answer / Data interpretation edit -->
+                {% if question.question_type == 'data_interpretation' %}
+                <div style="margin-bottom: 0.5rem;">
+                    <label style="font-size: 0.75rem;">Data description</label>
+                    <textarea class="eq-data_description" rows="2" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{{ question.answer_data.data_description }}</textarea>
+                </div>
+                {% endif %}
+                <div style="margin-bottom: 0.5rem;">
+                    <label style="font-size: 0.75rem;">Model answer</label>
+                    <textarea class="eq-model_answer" rows="3" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{{ question.answer_data.model_answer }}</textarea>
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                    <label style="font-size: 0.75rem;">Keywords (comma-separated)</label>
+                    <input class="eq-keywords" value="{% for kw in question.answer_data.keywords %}{{ kw }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
+                </div>
+                {% endif %}
+
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <div>
                         <label style="font-size: 0.75rem;">Difficulty</label>
                         <select class="eq-difficulty" style="padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">

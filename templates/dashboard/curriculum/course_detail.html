@@ -312,8 +312,14 @@
                         </td>
                         <td>{{ m.chunks_created }}</td>
                         <td>{{ m.created_at|date:"M d" }}</td>
-                        <td>
+                        <td style="white-space: nowrap;">
                             <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary">Details</a>
+                            {% if can_edit_content %}
+                            <form method="post" action="{% url 'dashboard:material_delete' material_id=m.id %}" style="display:inline;" onsubmit="return confirm('Delete {{ m.title|escapejs }}?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm" style="color: var(--danger); padding: 0.25rem 0.5rem;">✕</button>
+                            </form>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

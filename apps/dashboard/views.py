@@ -1967,6 +1967,41 @@ def course_upload_material(request, course_id):
     return redirect('dashboard:course_detail', course_id=course.id)
 
 
+@teacher_required
+@require_POST
+def material_delete(request, material_id):
+    """Delete a teaching material and its vector chunks."""
+    from apps.dashboard.models import TeachingMaterialUpload
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        material = get_object_or_404(
+            TeachingMaterialUpload,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=material_id,
+        )
+    else:
+        material = get_object_or_404(TeachingMaterialUpload, id=material_id)
+
+    course = material.course
+    title = material.title
+
+    # Delete the file
+    import os
+    if material.file_path and os.path.exists(material.file_path):
+        try:
+            os.remove(material.file_path)
+        except OSError:
+            pass
+
+    material.delete()
+    messages.success(request, f"Deleted material: {title}")
+
+    if course:
+        return redirect('dashboard:course_detail', course_id=course.id)
+    return redirect('dashboard:curriculum_list')
+
+
 # ============================================================================
 # Settings
 # ============================================================================
@@ -2486,6 +2521,9 @@ def lesson_detail(request, lesson_id):
         unit__course=course, is_published=True
     ).exclude(id=lesson.id).order_by('unit__order_index', 'order_index')
 
+    # Teaching steps (enabling objectives from syllabus) stored in lesson metadata
+    teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
+
     context = {
         **request.staff_ctx,
         'lesson': lesson,
@@ -2499,6 +2537,7 @@ def lesson_detail(request, lesson_id):
         'students_completed': students_completed,
         'prerequisites': prerequisites,
         'available_lessons': available_lessons,
+        'teaching_steps': teaching_steps,
     }
     
     return render(request, 'dashboard/curriculum/lesson_detail.html', context)
