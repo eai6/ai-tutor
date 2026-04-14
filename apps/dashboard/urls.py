@@ -59,6 +59,7 @@ urlpatterns = [
     path('materials/<int:material_id>/delete/', views.material_delete, name='material_delete'),
     path('curriculum/course/<int:course_id>/upload-material/', views.course_upload_material, name='course_upload_material'),
     path('curriculum/course/<int:course_id>/process-materials/', views.process_pending_materials, name='process_pending_materials'),
+    path('curriculum/course/<int:course_id>/reindex-materials/', views.reindex_materials, name='reindex_materials'),
 
     # Classes
     path('classes/', views.class_list, name='class_list'),

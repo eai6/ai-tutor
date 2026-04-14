@@ -266,10 +266,17 @@ class LessonContentGenerator:
             except Exception as e:
                 logger.warning(f"Failed to query figure descriptions: {e}")
 
+            related = [c.get('content', '')[:500] for c in context.chunks[:6]]
+            print(f"[ContentGen] KB context for '{lesson.title}': {len(context.chunks)} chunks, "
+                  f"{len(figure_descriptions)} figures, {len(related)} related excerpts", flush=True)
+            if not related:
+                print(f"[ContentGen] WARNING: No KB content found for '{lesson.title}' — "
+                      f"materials may need reprocessing after embedding change", flush=True)
+
             return {
                 'teaching_strategies': context.teaching_strategies or self._default_strategies(subject),
                 'objectives': context.objectives,
-                'related_content': [c.get('content', '')[:500] for c in context.chunks[:6]],
+                'related_content': related,
                 'figure_descriptions': figure_descriptions,
                 'subject': subject,
                 'grade_level': course.grade_level if course else "S1",

@@ -3751,3 +3751,61 @@ def seed_demo_school(request):
         f"<pre>{result}</pre><br><a href='/dashboard/'>Back to Dashboard</a>",
         content_type='text/html'
     )
+
+
+@teacher_required
+@require_POST
+def reindex_materials(request, course_id):
+    """Re-index completed materials into KB (after embedding change)."""
+    from apps.dashboard.models import TeachingMaterialUpload
+    from apps.dashboard.background_tasks import run_async
+
+    institution = request.staff_ctx['institution']
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
+
+    completed = TeachingMaterialUpload.objects.filter(
+        course=course, status='completed'
+    )
+    count = completed.count()
+
+    if count == 0:
+        messages.info(request, "No completed materials to reindex.")
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    material_ids = list(completed.values_list('id', flat=True))
+
+    def _reindex(ids):
+        import django.db
+        django.db.connections.close_all()
+        from apps.dashboard.models import TeachingMaterialUpload
+        from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+        from apps.accounts.models import Institution
+
+        for mid in ids:
+            try:
+                upload = TeachingMaterialUpload.objects.get(id=mid)
+                import os
+                if not os.path.exists(upload.file_path):
+                    print(f"[Reindex] Skip {upload.original_filename}: file not found", flush=True)
+                    continue
+
+                inst_id = upload.institution_id or Institution.get_global().id
+                kb = CurriculumKnowledgeBase(institution_id=inst_id)
+                result = kb.index_teaching_material(
+                    file_path=upload.file_path,
+                    subject=upload.subject_name,
+                    grade_level=upload.grade_level,
+                    material_title=upload.title,
+                    material_type=upload.material_type,
+                    upload_id=upload.id,
+                )
+                chunks = result.get('chunks_indexed', 0)
+                upload.chunks_created = chunks
+                upload.save(update_fields=['chunks_created'])
+                print(f"[Reindex] {upload.original_filename}: {chunks} chunks", flush=True)
+            except Exception as e:
+                print(f"[Reindex] FAILED {mid}: {e}", flush=True)
+
+    run_async(_reindex, material_ids)
+    messages.success(request, f"Reindexing {count} materials into knowledge base.")
+    return redirect('dashboard:course_detail', course_id=course.id)
