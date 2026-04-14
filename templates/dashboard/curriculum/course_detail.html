@@ -79,7 +79,7 @@
     
     .lesson-row {
         display: grid;
-        grid-template-columns: 40px 1fr 120px 80px 140px 140px;
+        grid-template-columns: 40px 1fr 120px 70px 100px auto;
         gap: 1rem;
         padding: 0.75rem 1rem;
         border-bottom: 1px solid var(--gray-100);
@@ -496,25 +496,8 @@
     <span style="font-size: 1.25rem;">⚠️</span>
     <div style="flex: 1;">
         <strong style="color: #92400E;">{{ lessons_without_content }} lesson{{ lessons_without_content|pluralize }} need{{ lessons_without_content|pluralize:"s," }} content</strong>
-        <div style="font-size: 0.8rem; color: #A16207;">Click "Generate All Content" to create tutoring steps, or use ⚡ on individual lessons</div>
+        <div style="font-size: 0.8rem; color: #A16207;">Use ⚡ on individual lessons to generate content one at a time</div>
     </div>
-    <form method="post" action="{% url 'dashboard:course_generate_all' course.id %}" style="display: inline;">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary" onclick="this.disabled=true; this.innerHTML='⏳ Generating...'; this.form.submit();">
-            ⚡ Generate All Content
-        </button>
-    </form>
-</div>
-{% elif can_edit_content %}
-<!-- Bulk Actions -->
-<div class="bulk-actions">
-    <span class="bulk-actions-label">🚀 Quick Actions:</span>
-    <form method="post" action="{% url 'dashboard:course_generate_all' course.id %}" style="display: inline;">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary btn-sm" onclick="this.disabled=true; this.innerHTML='Generating...'; this.form.submit();">
-            ⚡ Generate All Content & Media
-        </button>
-    </form>
 </div>
 {% endif %}
 
@@ -631,7 +614,7 @@
                     {% endif %}
                 </div>
 
-                <div style="display: flex; gap: 0.25rem;">
+                <div style="display: flex; gap: 0.25rem; flex-wrap: wrap; justify-content: flex-end;">
                     {% with lstats=lesson_stats|get_item:lesson.id %}
                         {% if lstats.content_status == 'generating' %}
                             <form method="post" action="{% url 'dashboard:cancel_lesson_generation' lesson.id %}" style="display: inline;">
