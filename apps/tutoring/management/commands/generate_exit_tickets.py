@@ -19,12 +19,14 @@ LESSON: {lesson_title}
 OBJECTIVE: {lesson_objective}
 SUBJECT: {subject}
 {exam_context}{seychelles_context}
-QUESTION FORMAT MIX (EXACTLY 35 questions total):
-- 20 MCQ (multiple choice, 4 options each)
-- 5 FILL_IN_BLANK (sentence with blanks to complete)
-- 4 MATCHING (match terms to definitions)
-- 3 SHORT_ANSWER (1-3 sentence written response)
-- 3 DATA_INTERPRETATION (analyze data then answer)
+QUESTION FORMAT MIX — generate in THIS EXACT ORDER:
+Questions 1-5: FILL_IN_BLANK (sentence with blanks to complete)
+Questions 6-9: MATCHING (match terms to definitions)
+Questions 10-12: SHORT_ANSWER (1-3 sentence written response)
+Questions 13-15: DATA_INTERPRETATION (analyze data then answer)
+Questions 16-35: MCQ (multiple choice, 4 options each)
+
+YOU MUST generate ALL 5 types. The first 15 questions MUST NOT be MCQ.
 
 REQUIREMENTS:
 1. Generate EXACTLY 35 questions in the format mix above

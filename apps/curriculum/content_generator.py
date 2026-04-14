@@ -723,21 +723,27 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
     except Exception:
         pass
 
-    # Build terminal objectives and teaching steps context for exit ticket
+    # Build terminal objectives and enabling objectives context for exit ticket
     objectives_context = ""
     terminal_objs = lesson.enabling_objectives or []
     teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
+
+    # Use teaching_steps as EOs if available, otherwise fall back to enabling_objectives
+    # (In the curriculum parser, enabling_objectives = TO chunks, teaching_steps = actual EOs)
+    eo_list = teaching_steps if teaching_steps else terminal_objs
+
     if terminal_objs:
         to_lines = "\n".join(f"  TO{i+1}: {to}" for i, to in enumerate(terminal_objs))
         objectives_context += f"\nTERMINAL OBJECTIVES (each must be assessed by at least 2 questions):\n{to_lines}\n"
-    if teaching_steps:
-        ts_lines = "\n".join(f"  EO{i+1}: {ts}" for i, ts in enumerate(teaching_steps))
+    if eo_list:
+        eo_lines = "\n".join(f"  EO{i+1}: {eo}" for i, eo in enumerate(eo_list))
         objectives_context += f"""
 ENABLING OBJECTIVES (the concept_tag for EVERY question MUST be one of these):
-{ts_lines}
+{eo_lines}
 
-CRITICAL: The concept_tag field must be the EXACT text of one of the enabling objectives above (e.g. "Define the terms Development, Globalization, MEDC, NIC, LEDC").
-Do NOT invent short labels — use the full enabling objective text so assessments link directly to teaching steps.
+CRITICAL: The concept_tag field must be the EXACT text of one of the enabling objectives above.
+Example: "Define the terms Development, Globalization, MEDC, NIC, LEDC"
+Do NOT invent short labels like "industry_definition" — use the FULL enabling objective text.
 Every enabling objective must be assessed by at least 1 question. Distribute questions across all EOs.
 """
 

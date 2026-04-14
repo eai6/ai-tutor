@@ -1518,7 +1518,7 @@ def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurr
                 'teaching_strategies': ['Explanation', 'Discussion', 'Practical activities'],
                 'resources': ['Textbook', 'Atlas', 'Maps'],
                 'assessment_methods': ['Structured source-based written questions', 'Oral questioning'],
-                'estimated_minutes': 40,
+                'estimated_minutes': 20,
                 'order': len(lessons) + 1,
             })
 
@@ -2008,7 +2008,7 @@ def create_curriculum_from_structure(structure: Dict, institution, upload=None) 
                 title=lesson_data.get('title', 'Unnamed Lesson'),
                 defaults={
                     'objective': lesson_data.get('objective', ''),
-                    'estimated_minutes': lesson_data.get('estimated_minutes', 40),
+                    'estimated_minutes': lesson_data.get('estimated_minutes', 20),
                     'order_index': lesson_data.get('order', 0),
                     'is_published': False,
                     'metadata': lesson_metadata,

@@ -622,25 +622,25 @@ def course_detail(request, course_id):
     
     # Check if any lesson is currently generating (course-wide generation in progress)
     from apps.dashboard.models import TeachingMaterialUpload, CurriculumUpload
-    # Show all materials related to this course:
-    # 1. Directly linked via course FK
-    # 2. From any curriculum upload that created this course
-    # 3. From any curriculum upload that shares the same subject+institution
+    # Show ALL materials related to this course via any linkage path:
     material_q = Q(course=course)
-    related_upload_ids = list(CurriculumUpload.objects.filter(
-        Q(created_course=course) |
-        Q(teaching_materials__course=course)
-    ).values_list('id', flat=True).distinct())
-    if not related_upload_ids:
-        # Fallback: find uploads matching subject in course title
-        subject_word = course.title.split()[0] if course.title else ''
-        if subject_word:
-            related_upload_ids = list(CurriculumUpload.objects.filter(
-                subject_name__iexact=subject_word,
-                institution=course.institution,
-            ).values_list('id', flat=True))
+    # Find curriculum uploads related to this course
+    subject_word = course.title.split()[0] if course.title else ''
+    upload_q = Q(created_course=course)
+    if subject_word:
+        upload_q |= Q(subject_name__icontains=subject_word, institution=course.institution)
+    related_upload_ids = list(
+        CurriculumUpload.objects.filter(upload_q).values_list('id', flat=True)
+    )
     if related_upload_ids:
         material_q |= Q(curriculum_upload_id__in=related_upload_ids)
+    # Also include materials with same subject+institution but no course link
+    if subject_word:
+        material_q |= Q(
+            subject_name__icontains=subject_word,
+            institution=course.institution,
+            course__isnull=True,
+        )
     materials = TeachingMaterialUpload.objects.filter(material_q).distinct()
 
     # Check both: any lesson with 'generating' status, OR an active upload still processing
@@ -995,7 +995,7 @@ def curriculum_approve(request, upload_id):
                     defaults={
                         'objective': lesson_data.get('objective', ''),
                         'order_index': lesson_idx,
-                        'estimated_minutes': 40,
+                        'estimated_minutes': 20,
                         'is_published': False,
                         'metadata': {
                             'key_concepts': lesson_data.get('key_concepts', []),
@@ -1854,18 +1854,21 @@ def process_pending_materials(request, course_id):
     # Find ALL pending materials related to this course (same broad query as course detail)
     from apps.dashboard.models import CurriculumUpload
     material_q = Q(course=course)
-    related_upload_ids = list(CurriculumUpload.objects.filter(
-        created_course=course
-    ).values_list('id', flat=True))
-    if not related_upload_ids:
-        subject_word = course.title.split()[0] if course.title else ''
-        if subject_word:
-            related_upload_ids = list(CurriculumUpload.objects.filter(
-                subject_name__iexact=subject_word,
-                institution=course.institution,
-            ).values_list('id', flat=True))
+    subject_word = course.title.split()[0] if course.title else ''
+    upload_q = Q(created_course=course)
+    if subject_word:
+        upload_q |= Q(subject_name__icontains=subject_word, institution=course.institution)
+    related_upload_ids = list(
+        CurriculumUpload.objects.filter(upload_q).values_list('id', flat=True)
+    )
     if related_upload_ids:
         material_q |= Q(curriculum_upload_id__in=related_upload_ids)
+    if subject_word:
+        material_q |= Q(
+            subject_name__icontains=subject_word,
+            institution=course.institution,
+            course__isnull=True,
+        )
 
     # Link unlinked materials to this course so processing can find them
     TeachingMaterialUpload.objects.filter(material_q, course__isnull=True).update(course=course)
@@ -2561,8 +2564,16 @@ def lesson_detail(request, lesson_id):
         unit__course=course, is_published=True
     ).exclude(id=lesson.id).order_by('unit__order_index', 'order_index')
 
-    # Teaching steps (enabling objectives from syllabus) stored in lesson metadata
+    # Enabling objectives: try metadata first, then collect from steps
     teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
+    if not teaching_steps:
+        # Collect unique EOs from step enabling_objective fields
+        seen = set()
+        for step in steps:
+            eo = getattr(step, 'enabling_objective', '') or ''
+            if eo and eo not in seen:
+                seen.add(eo)
+                teaching_steps.append(eo)
 
     context = {
         **request.staff_ctx,
@@ -3341,7 +3352,7 @@ def lesson_create(request, unit_id):
                 title=title,
                 objective=objective,
                 order_index=max_order + 1,
-                estimated_minutes=40,
+                estimated_minutes=20,
             )
             messages.success(request, f"Lesson '{title}' created.")
             return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
