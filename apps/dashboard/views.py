@@ -1926,64 +1926,70 @@ def lesson_session_report(request, lesson_id):
 @teacher_required
 @require_POST
 def process_pending_materials(request, course_id):
-    """Process all pending teaching materials for a course."""
+    """Process teaching materials — supports single, batch, or all pending."""
     from apps.dashboard.models import TeachingMaterialUpload
-    from apps.dashboard.material_tasks import process_teaching_material
+    from apps.dashboard.material_tasks import process_teaching_material, process_teaching_material_fast
     from apps.dashboard.background_tasks import run_async
 
     institution = request.staff_ctx['institution']
     course = get_scoped_object_or_404(Course, institution, id=course_id)
 
-    # Find pending materials linked to this course or its curriculum upload (ID-based)
-    from apps.dashboard.models import CurriculumUpload
-    material_q = Q(course=course)
-    if course.curriculum_upload_id:
-        material_q |= Q(curriculum_upload_id=course.curriculum_upload_id)
-    else:
-        related_upload_ids = list(
-            CurriculumUpload.objects.filter(created_course=course).values_list('id', flat=True)
+    # Determine processing mode
+    mode = request.POST.get('mode', 'rich')
+    process_fn = process_teaching_material if mode == 'rich' else process_teaching_material_fast
+
+    # Determine which materials to process
+    specific_ids = request.POST.get('material_ids', '').strip()
+    if specific_ids:
+        # Process specific materials (single or batch)
+        id_list = [int(x) for x in specific_ids.split(',') if x.strip().isdigit()]
+        to_process = TeachingMaterialUpload.objects.filter(
+            id__in=id_list, course=course
         )
-        if related_upload_ids:
-            material_q |= Q(curriculum_upload_id__in=related_upload_ids)
+    else:
+        # Process all processable materials for this course
+        # Link unlinked materials first
+        from apps.dashboard.models import CurriculumUpload
+        material_q = Q(course=course)
+        if course.curriculum_upload_id:
+            material_q |= Q(curriculum_upload_id=course.curriculum_upload_id)
+        TeachingMaterialUpload.objects.filter(material_q, course__isnull=True).update(course=course)
 
-    # Link unlinked materials from the curriculum upload to this course
-    TeachingMaterialUpload.objects.filter(material_q, course__isnull=True).update(course=course)
+        to_process = TeachingMaterialUpload.objects.filter(
+            course=course,
+        ).filter(
+            Q(status='pending') | Q(status='processing', chunks_created=0) | Q(status='failed')
+        )
 
-    # Include both 'pending' and stuck 'processing' materials (0 chunks = never actually processed)
-    all_pending = TeachingMaterialUpload.objects.filter(
-        course=course,
-    ).filter(
-        Q(status='pending') | Q(status='processing', chunks_created=0) | Q(status='failed')
-    )
-    count = all_pending.count()
-
+    count = to_process.count()
     if count == 0:
-        messages.info(request, "No pending materials to process.")
+        messages.info(request, "No materials to process.")
         return redirect('dashboard:course_detail', course_id=course.id)
 
-    # Mark all as 'processing' immediately so UI shows status change
-    material_ids = list(all_pending.values_list('id', flat=True))
-    all_pending.update(status='processing')
+    # Mark as processing and start background thread
+    material_ids = list(to_process.values_list('id', flat=True))
+    to_process.update(status='processing')
 
-    def _process_all(ids):
+    mode_label = "Rich (LLM Vision)" if mode == 'rich' else "Fast (Text Only)"
+
+    def _process_materials(ids, fn):
         import django.db
         django.db.connections.close_all()
         for i, mid in enumerate(ids):
             try:
-                print(f"[ProcessMaterials] Processing material {mid} ({i+1}/{len(ids)})", flush=True)
-                process_teaching_material(mid)
+                print(f"[ProcessMaterials] {mode_label}: material {mid} ({i+1}/{len(ids)})", flush=True)
+                fn(mid)
                 print(f"[ProcessMaterials] Done {mid}", flush=True)
             except Exception as e:
                 print(f"[ProcessMaterials] Material {mid} failed: {e}", flush=True)
-                # Mark as failed so it doesn't stay in 'processing' forever
                 try:
                     TeachingMaterialUpload.objects.filter(id=mid).update(status='failed')
                 except Exception:
                     pass
 
-    run_async(_process_all, material_ids)
+    run_async(_process_materials, material_ids, process_fn)
 
-    messages.success(request, f"Processing {count} material(s). This page will auto-refresh to show progress.")
+    messages.success(request, f"Processing {count} material(s) in {mode_label} mode.")
     return redirect('dashboard:course_detail', course_id=course.id)
 
 

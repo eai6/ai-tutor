@@ -145,6 +145,9 @@
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
     }
+    .mat-filter, .type-filter { background: var(--gray-100); border: 1px solid var(--gray-200); color: var(--gray-600); }
+    .mat-filter.active, .type-filter.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .mat-filter:hover, .type-filter:hover { opacity: 0.85; }
 </style>
 {% endblock %}
 
@@ -306,17 +309,6 @@
         </div>
         {% if can_edit_content %}
         <div style="display:flex;gap:0.5rem;" onclick="event.stopPropagation();">
-            <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
-                {% csrf_token %}
-                {% if materials_processing %}
-                <button type="button" class="btn btn-primary btn-sm" disabled style="opacity:0.7;">
-                    <span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle;margin-right:0.375rem;"></span>
-                    Processing...
-                </button>
-                {% else %}
-                <button type="submit" class="btn btn-primary btn-sm" onclick="this.disabled=true;this.innerHTML='Starting...';">Process Pending Materials</button>
-                {% endif %}
-            </form>
             <button type="button" class="btn btn-secondary btn-sm" onclick="showUploadForm(this)">
                 + Upload Material
             </button>
@@ -326,27 +318,65 @@
     <div class="collapsible-body collapsed" style="max-height: 2000px;">
         <div class="card-body" style="padding: 0;">
             {% if materials %}
-            <table class="table">
+            <!-- Filter & Batch Actions Bar -->
+            {% if can_edit_content %}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:var(--gray-50);border-bottom:1px solid var(--gray-200);flex-wrap:wrap;gap:0.5rem;">
+                <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                    <div style="display:flex;gap:0.25rem;align-items:center;">
+                        <span style="font-size:0.75rem;color:var(--gray-500);">Status:</span>
+                        <button type="button" class="btn btn-sm mat-filter active" data-filter="all" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">All</button>
+                        <button type="button" class="btn btn-sm mat-filter" data-filter="pending" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Pending</button>
+                        <button type="button" class="btn btn-sm mat-filter" data-filter="processing" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Processing</button>
+                        <button type="button" class="btn btn-sm mat-filter" data-filter="completed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Completed</button>
+                        <button type="button" class="btn btn-sm mat-filter" data-filter="failed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Failed</button>
+                    </div>
+                    <div style="display:flex;gap:0.25rem;align-items:center;">
+                        <span style="font-size:0.75rem;color:var(--gray-500);">Type:</span>
+                        <button type="button" class="btn btn-sm type-filter active" data-filter="all" onclick="filterMaterialType(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">All</button>
+                        {% for code, name in material_types %}
+                        <button type="button" class="btn btn-sm type-filter" data-filter="{{ code }}" onclick="filterMaterialType(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{{ name }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div id="batch-actions" style="display:none;gap:0.375rem;align-items:center;">
+                    <span id="selected-count" style="font-size:0.8125rem;color:var(--gray-600);font-weight:500;"></span>
+                    <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;" id="batch-process-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="material_ids" id="batch-material-ids" value="">
+                        <input type="hidden" name="mode" id="batch-mode" value="rich">
+                        <button type="submit" class="btn btn-primary btn-sm" style="font-size:0.75rem;" onclick="document.getElementById('batch-mode').value='rich';this.innerHTML='Processing...';">
+                            Process Rich
+                        </button>
+                        <button type="submit" class="btn btn-secondary btn-sm" style="font-size:0.75rem;" onclick="document.getElementById('batch-mode').value='fast';this.innerHTML='Processing...';">
+                            Process Fast
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            <table class="table" id="materials-table">
                 <thead>
                     <tr>
+                        {% if can_edit_content %}<th style="width:32px;"><input type="checkbox" id="select-all-mat" onchange="toggleAllMaterials(this)" title="Select all"></th>{% endif %}
                         <th>Title</th>
                         <th>Type</th>
                         <th>Status</th>
                         <th>Chunks</th>
-                        <th>Date</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for m in materials %}
-                    <tr>
+                    <tr data-status="{{ m.status }}" data-type="{{ m.material_type }}" data-mat-id="{{ m.id }}">
+                        {% if can_edit_content %}<td><input type="checkbox" class="mat-checkbox" value="{{ m.id }}" onchange="updateBatchActions()"></td>{% endif %}
                         <td>
                             <span style="font-weight: 500;">{{ m.title }}</span>
                             {% if m.description %}
                             <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ m.description|truncatewords:8 }}</div>
                             {% endif %}
                         </td>
-                        <td><span class="badge badge-secondary">{{ m.get_material_type_display }}</span></td>
+                        <td><span class="badge badge-secondary" style="font-size:0.6875rem;">{{ m.get_material_type_display }}</span></td>
                         <td>
                             {% if m.status == 'completed' %}
                                 <span class="badge badge-success">Completed</span>
@@ -359,13 +389,24 @@
                             {% endif %}
                         </td>
                         <td>{{ m.chunks_created }}</td>
-                        <td>{{ m.created_at|date:"M d" }}</td>
                         <td style="white-space: nowrap;">
-                            <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary">Details</a>
-                            {% if can_edit_content %}
+                            <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.5rem;">Details</a>
+                            {% if can_edit_content and m.status != 'processing' %}
+                            <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="material_ids" value="{{ m.id }}">
+                                <input type="hidden" name="mode" value="rich">
+                                <button type="submit" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.4rem;background:#6366f1;color:#fff;border:none;border-radius:4px;" onclick="this.innerHTML='...';" title="Process with LLM vision">Rich</button>
+                            </form>
+                            <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="material_ids" value="{{ m.id }}">
+                                <input type="hidden" name="mode" value="fast">
+                                <button type="submit" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.4rem;" onclick="this.innerHTML='...';" title="Process text only">Fast</button>
+                            </form>
                             <form method="post" action="{% url 'dashboard:material_delete' material_id=m.id %}" style="display:inline;" onsubmit="return confirm('Delete {{ m.title|escapejs }}?');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-sm" style="color: var(--danger); padding: 0.25rem 0.5rem;">✕</button>
+                                <button type="submit" class="btn btn-sm" style="color: var(--danger); padding: 0.2rem 0.4rem; font-size:0.75rem;">✕</button>
                             </form>
                             {% endif %}
                         </td>
@@ -673,6 +714,55 @@ function showUploadForm(btn) {
     form.style.display = form.style.display === 'none' ? 'block' : 'none';
     if (form.style.display === 'block') {
         form.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+}
+
+// Material filters (status + type, combined)
+var activeStatusFilter = 'all';
+var activeTypeFilter = 'all';
+
+function filterMaterials(btn) {
+    document.querySelectorAll('.mat-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeStatusFilter = btn.dataset.filter;
+    applyMaterialFilters();
+}
+
+function filterMaterialType(btn) {
+    document.querySelectorAll('.type-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTypeFilter = btn.dataset.filter;
+    applyMaterialFilters();
+}
+
+function applyMaterialFilters() {
+    document.querySelectorAll('#materials-table tbody tr').forEach(row => {
+        var statusMatch = (activeStatusFilter === 'all' || row.dataset.status === activeStatusFilter);
+        var typeMatch = (activeTypeFilter === 'all' || row.dataset.type === activeTypeFilter);
+        row.style.display = (statusMatch && typeMatch) ? '' : 'none';
+    });
+}
+
+// Material selection
+function toggleAllMaterials(masterCheckbox) {
+    document.querySelectorAll('.mat-checkbox').forEach(cb => {
+        var row = cb.closest('tr');
+        if (row.style.display !== 'none') cb.checked = masterCheckbox.checked;
+    });
+    updateBatchActions();
+}
+
+function updateBatchActions() {
+    var checked = document.querySelectorAll('.mat-checkbox:checked');
+    var batchDiv = document.getElementById('batch-actions');
+    var countSpan = document.getElementById('selected-count');
+    var idsInput = document.getElementById('batch-material-ids');
+    if (checked.length > 0) {
+        batchDiv.style.display = 'flex';
+        countSpan.textContent = checked.length + ' selected';
+        idsInput.value = Array.from(checked).map(cb => cb.value).join(',');
+    } else {
+        batchDiv.style.display = 'none';
     }
 }
 
