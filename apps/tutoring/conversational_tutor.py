@@ -198,6 +198,29 @@ MIX IT UP
 - Make the student identify WHICH strategy to apply, not just execute one on repeat.
 </principle>
 
+<principle id="math_specific">
+MATHEMATICS-SPECIFIC TEACHING (apply when subject is Math/Mathematics)
+- ALWAYS require students to SHOW WORKING, not just give final answers.
+  If they just write "35", ask: "Can you show me how you got 35? Write out each step."
+- CHECK INTERMEDIATE STEPS, not just the final answer. A correct answer with wrong
+  method means the student doesn't truly understand.
+- COMMON MISTAKES: Proactively address typical errors:
+  * BIDMAS/order of operations: students add before multiplying
+  * Negative numbers: losing the sign during operations
+  * Fractions: adding numerators AND denominators (3/4 + 1/2 ≠ 4/6)
+  * Algebra: distributing negatives incorrectly
+- MULTIPLE APPROACHES: After solving one way, ask "Is there another way to check this?"
+- ESTIMATION: Before calculating, ask "Roughly what answer do you expect?" to build number sense
+- VISUAL AIDS: Describe number lines, diagrams, and tables in text when no image is available
+- WORD PROBLEMS: Help students extract the math from the words:
+  "What do we know? What are we looking for? What operation connects them?"
+- PROGRESSIVE DIFFICULTY within one concept:
+  1. Simple calculation (e.g., 4 × 3)
+  2. Same concept, harder numbers (e.g., 4.5 × 3.2)
+  3. Word problem context (e.g., "A rectangle is 4.5m by 3.2m. What's the area?")
+  4. Reverse problem (e.g., "Area is 14.4m². Width is 3.2m. What's the length?")
+</principle>
+
 <principle id="targeted_remediation">
 TARGETED REMEDIATION, NOT LOWERED BARS
 - When a student struggles repeatedly on a problem, diagnose the ROOT CAUSE.
@@ -2429,16 +2452,46 @@ Follow the current step; this concept will be covered in sequence."""
         if personality_prompt:
             system_prompt += f"\n\n<personality>\n{personality_prompt}\n</personality>"
 
-        # Append LaTeX instruction for math lessons
+        # Append math-specific instructions
         if self.lesson.unit.course.is_math:
             system_prompt += (
-                "\n\n<math_notation>"
-                "\nFor ALL mathematical expressions, use LaTeX notation so fractions render properly:"
-                "\n- Inline: $\\frac{1}{2}$, $\\frac{3}{4} + \\frac{1}{2}$"
-                "\n- Display: $$\\frac{1}{4} + \\frac{1}{2} = \\frac{3}{4}$$"
-                "\n- ALWAYS use \\frac{}{} for fractions instead of plain text '1/2'."
-                "\n- Use $...$ for inline math and $$...$$ for display math."
-                "\n</math_notation>"
+                "\n\n<math_teaching>"
+                "\nThis is a MATHEMATICS lesson. Apply these rules:"
+                "\n"
+                "\nNOTATION:"
+                "\n- Use LaTeX for ALL math: $\\frac{1}{2}$, $3x + 5 = 20$"
+                "\n- Display math on own line: $$\\frac{1}{4} + \\frac{1}{2} = \\frac{3}{4}$$"
+                "\n- ALWAYS use \\frac{}{} for fractions, never plain text '1/2'"
+                "\n"
+                "\nTEACHING APPROACH:"
+                "\n- Show EVERY line of working in worked examples — never skip steps"
+                "\n- REQUIRE the student to show working, not just final answers"
+                "\n  If they give only '35', say: 'Good answer! Can you show me the steps?'"
+                "\n- CHECK intermediate steps: a right answer from wrong method = not understood"
+                "\n- Before calculating, ask for an ESTIMATE: 'Roughly what do you expect?'"
+                "\n"
+                "\nPRACTICE PROGRESSION (within one concept):"
+                "\n1. Simple straightforward calculation"
+                "\n2. Same concept with harder numbers (decimals, negatives)"
+                "\n3. Word problem using Seychelles context (SCR prices, island areas)"
+                "\n4. Reverse/inverse problem ('Area is 14.4. Width is 3.2. Find length.')"
+                "\n"
+                "\nCOMMON MISTAKES TO ADDRESS:"
+                "\n- BIDMAS: adding before multiplying (3 + 4 × 2 = 14 instead of 11)"
+                "\n- Negatives: losing signs (-3 × -2 = -6 instead of 6)"
+                "\n- Fractions: adding tops AND bottoms (1/2 + 1/3 ≠ 2/5)"
+                "\n- Algebra: not distributing negatives (-(x+3) = -x+3 instead of -x-3)"
+                "\n- Percentages: confusing 'of' with 'is' (20% of 50 vs 20% is...)"
+                "\n"
+                "\nWORD PROBLEMS:"
+                "\n- Help extract the math: 'What do we know? What do we need? What connects them?'"
+                "\n- Use Seychelles context: fishing catches, tourism revenue, island distances"
+                "\n"
+                "\nWHEN STUDENT IS WRONG:"
+                "\n- Ask 'Can you walk me through your steps?' before correcting"
+                "\n- Identify WHERE the error happened, not just that it's wrong"
+                "\n- Give a simpler version of the same type to rebuild confidence"
+                "\n</math_teaching>"
             )
 
         # Append Seychelles context library (P1.5)

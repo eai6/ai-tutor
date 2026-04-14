@@ -451,14 +451,15 @@ TEACHING STRATEGIES TO USE:
 Create {max_steps - 1}-{max_steps} CONCEPT-GROUPED steps (MAXIMUM {max_steps}). This is a focused {target_minutes}-minute lesson.
 Each lesson covers 1 terminal objective with {max_eos} enabling objectives. Keep it tight.
 
-STRUCTURE:
-1 ENGAGE step — brief hook, 2-3 sentences max
+{"MATH LESSON STRUCTURE:" if lesson.unit.course.is_math else "STRUCTURE:"}
+1 ENGAGE step — real-world hook connecting to Seychelles life{"" if not lesson.unit.course.is_math else " (e.g., 'If tuna sells for SCR 45/kg and a fisherman catches 3.5kg...')"}
 Then FOR EACH ENABLING OBJECTIVE ({max_eos} EOs):
-  1 teach step → 1 practice step (paired)
-  The practice step MUST have question, expected_answer, and hints
+  1 teach step → {"1 worked_example step → " if lesson.unit.course.is_math else ""}1 practice step
+  {"The worked_example MUST show a COMPLETE solution with every line of working" if lesson.unit.course.is_math else ""}
+  The practice step MUST have question, expected_answer ({"with full working steps" if lesson.unit.course.is_math else ""}), and hints
 1 EVALUATE quiz step at the end
 
-KEEP IT SHORT: Each teach step should be 3-5 sentences of instruction, not a full lecture.
+{"KEEP IT SHORT: Each teach step should be 3-5 sentences of instruction, not a full lecture." if not lesson.unit.course.is_math else "MATH DEPTH: Each teach step explains the concept, then the worked_example shows EVERY step of the solution. Practice must be a DIFFERENT problem (not the same numbers)."}
 
 enabling_objective RULES:
 - Set each step's enabling_objective field to the EXACT TEXT of the enabling objective it covers
@@ -472,6 +473,26 @@ STEP TYPES:
 - practice: Student attempts a problem (MUST have question + expected_answer + hints)
 - quiz: Assessment question
 
+{"MATH-SPECIFIC CONTENT GUIDELINES:" if lesson.unit.course.is_math else ""}
+{'''For this MATHEMATICS lesson:
+1. WORKED EXAMPLES are essential — every teach step MUST include a fully worked problem
+   with numbered sub-steps showing EVERY line of working (not just the answer)
+2. Practice questions must be CALCULATION-BASED — students must show working, not just pick answers
+3. Include COMMON MISTAKES for each concept:
+   - What students typically get wrong and WHY
+   - Example: "Common mistake: 3 + 4 × 2 = 14 (wrong — they added before multiplying)"
+4. VARY the practice problems — same concept, different numbers and contexts:
+   - Straightforward calculation → word problem → reverse/inverse problem
+5. Use Seychelles context in word problems (SCR currency, local shop prices, island distances)
+6. For algebra: show substitution step-by-step, line by line
+7. For geometry: describe diagrams precisely (label sides, angles, units)
+8. Hints should guide the METHOD not give the answer:
+   - "What operation comes first in BIDMAS?"
+   - "Try drawing a diagram and labelling what you know"
+   - NOT "The answer is 35"
+9. Expected answers for practice MUST include the working steps, not just final answer
+   Example: expected_answer: "20 + 5 × 3 = 20 + 15 = 35 (multiply before adding)"
+''' if lesson.unit.course.is_math else ''}
 CONTENT GUIDELINES:
 1. Use Seychelles context where natural (SCR currency, local places, local examples)
 2. Media descriptions MUST be specific for accurate image generation:
