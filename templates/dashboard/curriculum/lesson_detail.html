@@ -6,11 +6,11 @@
 
 {% block extra_css %}
 <style>
-    .rendered-html-frame { font-size: 0.875rem; line-height: 1.5; }
+    .rendered-html-frame { font-size: 0.875rem; line-height: 1.5; overflow-x: auto; max-width: 100%; }
     .rendered-html-frame table { border-collapse: collapse; width: 100%; }
     .rendered-html-frame th, .rendered-html-frame td { padding: 6px 10px; border: 1px solid #e2e8f0; text-align: left; }
     .rendered-html-frame th { background: #f1f5f9; font-weight: 600; font-size: 0.8125rem; }
-    .rendered-html-frame svg { max-width: 100%; height: auto; }
+    .rendered-html-frame svg { max-width: 100%; height: auto; display: block; }
     .rendered-html-frame img { max-width: 100%; border-radius: 4px; }
 
     .lesson-header {
