@@ -610,13 +610,48 @@ Return ONLY valid JSON."""
             seen[clean] = u
             deduped.append(u)
 
-    # Build ParsedCurriculum — keep ALL units with their grade levels
-    from apps.curriculum.utils import determine_cycles
+    # Filter to requested grade levels, then build ParsedCurriculum
+    from apps.curriculum.utils import determine_cycles, parse_grade_level_string
+    requested_grades = parse_grade_level_string(grade_level)
     cycles = determine_cycles(grade_level)
     cycle = "/".join(cycles)
 
+    # Build set of acceptable grade labels for filtering
+    # e.g. grade_level="S3" → accept S3, Cycle 4
+    # e.g. grade_level="S1,S2,S3,S4,S5" → accept all
+    accept_grades = set(g.upper() for g in requested_grades) if requested_grades else None
+    accept_cycles = set(cycles)  # e.g. {'4'} or {'4','5'}
+
+    def _grade_matches(unit_grade_str: str) -> bool:
+        """Check if a unit's grade matches the requested grades."""
+        if not accept_grades:
+            return True  # No filter — accept all
+        if not unit_grade_str:
+            return True  # No grade tagged — assume it matches
+
+        ug = unit_grade_str.upper().strip()
+        # Direct match: "S3" in {"S3"}
+        if ug in accept_grades:
+            return True
+        # Cycle match: "Cycle 4" with accept_cycles={'4'}
+        import re as _re2
+        cycle_match = _re2.search(r'cycle\s*(\d+)', ug, _re2.IGNORECASE)
+        if cycle_match and cycle_match.group(1) in accept_cycles:
+            return True
+        # IGCSE match: only if Cycle 5 is accepted
+        if 'igcse' in ug.lower() and '5' in accept_cycles:
+            return True
+        # Multi-grade label: "S1-S3" or "S1,S2,S3"
+        unit_grades = parse_grade_level_string(unit_grade_str)
+        if unit_grades and accept_grades.intersection(g.upper() for g in unit_grades):
+            return True
+        return False
+
+    filtered = [u for u in deduped if _grade_matches(u.get('grade_level', ''))]
+    print(f"[VisionExtractor] Grade filter: {len(deduped)} total → {len(filtered)} matching {grade_level}", flush=True)
+
     units = []
-    for u in deduped:
+    for u in filtered:
         title = u.get('unit_title', 'Untitled Unit')
         unit_grade = u.get('grade_level', grade_level) or grade_level
         # Remove "Unit N:" prefix for cleaner titles
@@ -625,25 +660,30 @@ Return ONLY valid JSON."""
         tos = u.get('terminal_objectives', [])
         eos = u.get('enabling_objectives', [])
 
-        # Build lessons from terminal objectives (1-2 TOs per 20-min lesson)
+        # Build lessons from terminal objectives (2 TOs per 20-min lesson)
         lesson_objectives = tos if tos else eos
         lessons = []
         chunk_size = min(2, max(1, len(lesson_objectives) // 4)) if lesson_objectives else 2
 
+        # Build TO chunks first, then distribute EOs evenly across them
+        to_chunks = []
         for start in range(0, len(lesson_objectives), chunk_size):
             chunk = lesson_objectives[start:start + chunk_size]
-            if not chunk:
-                continue
+            if chunk:
+                to_chunks.append(chunk)
 
-            # Match enabling objectives to this lesson
-            lesson_eos = []
-            chunk_words = set()
-            for to in chunk:
-                chunk_words.update(w.lower() for w in to.split() if len(w) > 3)
-            for eo in eos:
-                eo_words = set(w.lower() for w in eo.split() if len(w) > 3)
-                if len(chunk_words & eo_words) >= 2:
-                    lesson_eos.append(eo)
+        num_lessons = len(to_chunks) or 1
+
+        # Distribute EOs evenly across lessons in sequential order
+        eos_per_lesson = len(eos) // num_lessons if num_lessons else 0
+        eos_remainder = len(eos) % num_lessons if num_lessons else 0
+        eo_idx = 0
+
+        for lesson_num, chunk in enumerate(to_chunks):
+            # Each lesson gets eos_per_lesson EOs, plus 1 extra for the first 'remainder' lessons
+            n_eos = eos_per_lesson + (1 if lesson_num < eos_remainder else 0)
+            lesson_eos = eos[eo_idx:eo_idx + n_eos]
+            eo_idx += n_eos
 
             lessons.append({
                 'title': create_lesson_title(chunk[0]),

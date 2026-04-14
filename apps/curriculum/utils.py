@@ -104,7 +104,7 @@ def determine_cycles(csv: str) -> List[str]:
         m = re.search(r'\d+', g)
         if m:
             num = int(m.group())
-            if num <= 2:
+            if num <= 3:
                 cycles.add('4')
             else:
                 cycles.add('5')
