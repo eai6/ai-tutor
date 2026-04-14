@@ -1912,22 +1912,48 @@ async function submitExitTicket() {
 
         if (data.exit_ticket && data.exit_ticket.results) {
             showExitResults(data.exit_ticket.results);
-        }
 
-        setTimeout(() => {
-            document.getElementById('exit-modal').style.display = 'none';
-            if (data.is_complete) {
-                const gam = data.exit_ticket && data.exit_ticket.gamification ? data.exit_ticket.gamification : null;
-                showCompletion(data.message, gam);
-            } else {
-                document.getElementById('input-area').style.display = 'block';
-                addMessage('tutor', data.message);
-            }
-        }, 2000);
+            // Show score summary and "Review & Continue" button (not auto-dismiss)
+            const score = data.exit_ticket.results.filter(r => r.is_correct).length;
+            const total = data.exit_ticket.results.length;
+            const passed = score >= 8;
+            const container = document.getElementById('exit-questions');
+
+            const summaryDiv = document.createElement('div');
+            summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid #e4e4e7;';
+            summaryDiv.innerHTML = `
+                <div style="font-size:2rem;font-weight:800;color:${passed ? '#10b981' : '#ef4444'};margin-bottom:0.5rem;">${score} / ${total}</div>
+                <div style="font-size:1rem;color:#71717a;margin-bottom:1rem;">${passed ? 'Great work! You passed!' : 'Keep going — review the explanations above, then continue.'}</div>
+                <div style="font-size:0.8125rem;color:#a1a1aa;margin-bottom:1.5rem;">Scroll up to review your answers and explanations.</div>
+                <button onclick="continueAfterExit()" class="btn btn-primary" style="font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;">
+                    ${passed ? '✓ Continue' : '→ Continue to Review'}
+                </button>
+            `;
+            container.appendChild(summaryDiv);
+            summaryDiv.scrollIntoView({behavior: 'smooth'});
+
+            // Hide submit button
+            document.getElementById('submit-exit').style.display = 'none';
+
+            // Store data for continue handler
+            window._exitResultData = data;
+        }
 
     } catch (error) {
         console.error('Submit error:', error);
         alert('Failed to submit. Please try again.');
+    }
+}
+
+function continueAfterExit() {
+    const data = window._exitResultData;
+    document.getElementById('exit-modal').style.display = 'none';
+    if (data && data.is_complete) {
+        const gam = data.exit_ticket && data.exit_ticket.gamification ? data.exit_ticket.gamification : null;
+        showCompletion(data.message, gam);
+    } else if (data) {
+        document.getElementById('input-area').style.display = 'block';
+        addMessage('tutor', data.message);
     }
 }
 
@@ -1937,26 +1963,27 @@ function showExitResults(results) {
         const qDiv = document.querySelector(`.exit-question[data-original-q="${r.index}"]`);
         if (!qDiv) return;
 
+        // Disable all inputs
+        qDiv.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
+        qDiv.querySelectorAll('.option').forEach(opt => { opt.style.pointerEvents = 'none'; });
+
         if (qType === 'mcq') {
             const options = qDiv.querySelector('.options');
-            if (!options) return;
-            options.querySelectorAll('.option').forEach(opt => {
-                opt.style.pointerEvents = 'none';
-                const letter = opt.dataset.letter;
-                if (letter === r.correct_answer) opt.classList.add('correct');
-                else if (letter === r.selected && !r.is_correct) opt.classList.add('incorrect');
-            });
+            if (options) {
+                options.querySelectorAll('.option').forEach(opt => {
+                    const letter = opt.dataset.letter;
+                    if (r.is_correct && letter === r.selected) {
+                        opt.classList.add('correct');
+                    } else if (!r.is_correct && letter === r.selected) {
+                        opt.classList.add('incorrect');
+                    }
+                    // Do NOT highlight the correct answer when wrong
+                });
+            }
         } else if (qType === 'fill_in_blank') {
             const inputs = qDiv.querySelectorAll('.exit-blank-input');
-            inputs.forEach(inp => { inp.disabled = true; });
-            const correctData = r.correct_answer || {};
-            const blanks = correctData.blanks || [];
-            const studentBlanks = Array.isArray(r.selected) ? r.selected : [r.selected];
-
-            inputs.forEach((inp, idx) => {
-                const expected = (blanks[idx] || '').toLowerCase();
-                const given = (studentBlanks[idx] || '').toLowerCase();
-                if (expected && given === expected) {
+            inputs.forEach(inp => {
+                if (r.is_correct) {
                     inp.style.borderColor = '#10b981';
                     inp.style.background = '#d1fae5';
                 } else {
@@ -1964,65 +1991,40 @@ function showExitResults(results) {
                     inp.style.background = '#fee2e2';
                 }
             });
-
-            if (!r.is_correct && blanks.length > 0) {
-                const correctDiv = document.createElement('div');
-                correctDiv.className = 'exit-correct-answer';
-                correctDiv.innerHTML = '<strong>Correct answers:</strong> ' + blanks.join(', ');
-                qDiv.appendChild(correctDiv);
-            }
+            // Do NOT show correct answers — just indicate wrong
         } else if (qType === 'matching') {
             const selects = qDiv.querySelectorAll('.matching-select');
-            selects.forEach(sel => { sel.disabled = true; });
-            const correctData = r.correct_answer || {};
-            const pairs = correctData.pairs || [];
-            const studentMap = (typeof r.selected === 'object' && !Array.isArray(r.selected)) ? r.selected : {};
-
-            const rows = qDiv.querySelectorAll('.matching-row');
-            rows.forEach((row, idx) => {
-                if (idx < pairs.length) {
-                    const correctRight = pairs[idx].right;
-                    const studentRight = studentMap[pairs[idx].left] || '';
-                    const sel = row.querySelector('.matching-select');
-                    if (studentRight.toLowerCase() === correctRight.toLowerCase()) {
-                        if (sel) { sel.style.borderColor = '#10b981'; sel.style.background = '#d1fae5'; }
-                    } else {
-                        if (sel) { sel.style.borderColor = '#ef4444'; sel.style.background = '#fee2e2'; }
-                        const correctSpan = document.createElement('span');
-                        correctSpan.style.cssText = 'color:#065f46;font-size:0.8125rem;font-weight:600;margin-left:0.5rem;';
-                        correctSpan.textContent = '\u2192 ' + correctRight;
-                        row.appendChild(correctSpan);
-                    }
+            selects.forEach(sel => {
+                if (r.is_correct) {
+                    sel.style.borderColor = '#10b981';
+                    sel.style.background = '#d1fae5';
+                } else {
+                    sel.style.borderColor = '#ef4444';
+                    sel.style.background = '#fee2e2';
                 }
             });
+            // Do NOT show correct pairs
         } else if (qType === 'short_answer' || qType === 'data_interpretation') {
             const textarea = qDiv.querySelector('.exit-textarea');
-            if (textarea) { textarea.disabled = true; }
-            const correctData = r.correct_answer || {};
-
-            if (correctData.model_answer) {
-                const ansDiv = document.createElement('div');
-                ansDiv.className = 'exit-correct-answer';
-                ansDiv.innerHTML = '<strong>Model answer:</strong> ' + correctData.model_answer;
-                qDiv.appendChild(ansDiv);
+            if (textarea) {
+                textarea.style.borderColor = r.is_correct ? '#10b981' : '#ef4444';
+                textarea.style.background = r.is_correct ? '#d1fae5' : '#fee2e2';
             }
-            if (correctData.keywords && correctData.keywords.length > 0) {
-                const kwDiv = document.createElement('div');
-                kwDiv.style.cssText = 'margin-top:0.375rem;font-size:0.8125rem;color:#71717a;';
-                const studentText = (typeof r.selected === 'string' ? r.selected : '').toLowerCase();
-                const kwHTML = correctData.keywords.map(kw => {
-                    const found = studentText.includes(kw.toLowerCase());
-                    return '<span style="display:inline-block;padding:0.125rem 0.5rem;border-radius:4px;margin:0.125rem;font-size:0.75rem;' + (found ? 'background:#d1fae5;color:#065f46;' : 'background:#fee2e2;color:#991b1b;') + '">' + (found ? '\u2713' : '\u2717') + ' ' + kw + '</span>';
-                }).join('');
-                kwDiv.innerHTML = 'Keywords: ' + kwHTML;
-                qDiv.appendChild(kwDiv);
-            }
+            // Do NOT show model answer or keywords
         }
 
-        // Add result indicator for all types
+        // Add result indicator — correct gets ✓, wrong gets explanation as hint (not the answer)
         const indicator = document.createElement('div');
         indicator.className = r.is_correct ? 'exit-result-correct' : 'exit-result-incorrect';
-        indicator.textContent = r.is_correct ? 'Correct!' : (r.explanation || 'Incorrect');
+        if (r.is_correct) {
+            indicator.textContent = 'Correct!';
+        } else {
+            // Show explanation as a hint — helps student understand WHY they're wrong
+            // without giving the answer directly
+            indicator.innerHTML = r.explanation
+                ? '<strong>Hint:</strong> ' + r.explanation
+                : 'Not quite — review this topic during remediation.';
+        }
         qDiv.appendChild(indicator);
     });
 }
