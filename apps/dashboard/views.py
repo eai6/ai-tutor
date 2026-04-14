@@ -622,10 +622,26 @@ def course_detail(request, course_id):
     
     # Check if any lesson is currently generating (course-wide generation in progress)
     from apps.dashboard.models import TeachingMaterialUpload, CurriculumUpload
-    # Show materials linked directly to course OR via the curriculum upload that created it
-    materials = TeachingMaterialUpload.objects.filter(
-        Q(course=course) | Q(curriculum_upload__created_course=course)
-    ).distinct()
+    # Show all materials related to this course:
+    # 1. Directly linked via course FK
+    # 2. From any curriculum upload that created this course
+    # 3. From any curriculum upload that shares the same subject+institution
+    material_q = Q(course=course)
+    related_upload_ids = list(CurriculumUpload.objects.filter(
+        Q(created_course=course) |
+        Q(teaching_materials__course=course)
+    ).values_list('id', flat=True).distinct())
+    if not related_upload_ids:
+        # Fallback: find uploads matching subject in course title
+        subject_word = course.title.split()[0] if course.title else ''
+        if subject_word:
+            related_upload_ids = list(CurriculumUpload.objects.filter(
+                subject_name__iexact=subject_word,
+                institution=course.institution,
+            ).values_list('id', flat=True))
+    if related_upload_ids:
+        material_q |= Q(curriculum_upload_id__in=related_upload_ids)
+    materials = TeachingMaterialUpload.objects.filter(material_q).distinct()
 
     # Check both: any lesson with 'generating' status, OR an active upload still processing
     active_upload = CurriculumUpload.objects.filter(
@@ -1879,18 +1895,33 @@ def process_pending_materials(request, course_id):
 
 @staff_required
 def material_process(request, upload_id):
-    """Show processing status for a teaching material upload."""
+    """Show processing status for a teaching material upload. Handles edit via POST."""
     from apps.dashboard.models import TeachingMaterialUpload
 
     institution = request.staff_ctx['institution']
-    lookup = {'id': upload_id}
     if institution is not None:
-        lookup['institution'] = institution
-    upload = get_object_or_404(TeachingMaterialUpload, **lookup)
+        upload = get_object_or_404(
+            TeachingMaterialUpload,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=upload_id,
+        )
+    else:
+        upload = get_object_or_404(TeachingMaterialUpload, id=upload_id)
+
+    # Handle edit POST
+    if request.method == 'POST' and request.POST.get('action') == 'update':
+        upload.title = request.POST.get('title', upload.title).strip()
+        upload.material_type = request.POST.get('material_type', upload.material_type)
+        upload.grade_level = request.POST.get('grade_level', upload.grade_level)
+        upload.description = request.POST.get('description', upload.description).strip()
+        upload.save()
+        messages.success(request, "Material updated.")
+        return redirect('dashboard:material_process', upload_id=upload.id)
 
     context = {
         **request.staff_ctx,
         'upload': upload,
+        'material_types': TeachingMaterialUpload.MaterialType.choices,
     }
     return render(request, 'dashboard/materials/process.html', context)
 

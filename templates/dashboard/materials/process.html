@@ -1,6 +1,6 @@
 {% extends "dashboard/base.html" %}
 
-{% block title %}Processing: {{ upload.title }}{% endblock %}
+{% block title %}{{ upload.title }}{% endblock %}
 {% block page_title %}{{ upload.title }}{% endblock %}
 
 {% block content %}
@@ -54,27 +54,94 @@
         </div>
     </div>
 
+    <!-- Edit Material Details -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h3 class="card-title" style="margin: 0;">Edit Details</h3>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Title</label>
+                        <input type="text" name="title" value="{{ upload.title }}" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Material Type</label>
+                        <select name="material_type" class="form-control">
+                            {% for code, name in material_types %}
+                            <option value="{{ code }}" {% if upload.material_type == code %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Grade Level</label>
+                        <select name="grade_level" class="form-control">
+                            <option value="" {% if not upload.grade_level %}selected{% endif %}>All Levels</option>
+                            <option value="S1" {% if upload.grade_level == 'S1' %}selected{% endif %}>S1</option>
+                            <option value="S2" {% if upload.grade_level == 'S2' %}selected{% endif %}>S2</option>
+                            <option value="S3" {% if upload.grade_level == 'S3' %}selected{% endif %}>S3</option>
+                            <option value="S4" {% if upload.grade_level == 'S4' %}selected{% endif %}>S4</option>
+                            <option value="S5" {% if upload.grade_level == 'S5' %}selected{% endif %}>S5</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Description <span style="color:var(--gray-400);font-weight:normal;">(optional)</span></label>
+                        <textarea name="description" class="form-control" rows="2" placeholder="Brief description of this material...">{{ upload.description }}</textarea>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- File Info -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h3 class="card-title" style="margin: 0;">File Info</h3>
+        </div>
+        <div class="card-body">
+            <div style="font-size: 0.875rem; color: var(--gray-600); display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem;">
+                <strong>Original filename:</strong> <span>{{ upload.original_filename }}</span>
+                <strong>Subject:</strong> <span>{{ upload.subject_name }}</span>
+                <strong>Uploaded:</strong> <span>{{ upload.created_at|date:"M d, Y H:i" }}</span>
+                {% if upload.course %}
+                <strong>Linked to course:</strong> <span>{{ upload.course.title }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
     <!-- Processing log -->
     {% if upload.processing_log %}
-    <div class="card">
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <h3 class="card-title" style="margin: 0;">Processing Log</h3>
+        </div>
         <div class="card-body">
-            <h4 style="margin-bottom: 1rem;">Processing Log</h4>
-            <pre style="background: var(--gray-50); padding: 1rem; border-radius: 8px; font-size: 0.8rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{{ upload.processing_log }}</pre>
+            <pre style="background: var(--gray-900); color: #10B981; padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{{ upload.processing_log }}</pre>
         </div>
     </div>
     {% endif %}
 
-    <div style="margin-top: 1.5rem;">
-        <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Back to Materials</a>
+    <div style="display: flex; gap: 0.75rem;">
+        {% if upload.course %}
+        <a href="{% url 'dashboard:course_detail' upload.course.id %}" class="btn btn-secondary">Back to Course</a>
+        {% else %}
+        <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Back to Curriculum</a>
+        {% endif %}
         {% if upload.status == 'processing' %}
-        <button class="btn btn-primary" onclick="location.reload()" style="margin-left: 0.5rem;">Refresh Status</button>
+        <button class="btn btn-primary" onclick="location.reload()">Refresh Status</button>
         {% endif %}
     </div>
 </div>
 
 {% if upload.status == 'processing' %}
 <script>
-    // Auto-refresh while processing
     setTimeout(() => location.reload(), 5000);
 </script>
 {% endif %}
