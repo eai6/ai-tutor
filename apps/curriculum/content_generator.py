@@ -642,6 +642,40 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
     except Exception as e:
         logger.warning(f"KB query failed for exit ticket: {e}")
 
+    # Query vision-extracted worksheet/exam questions as format examples
+    assessment_format_context = ""
+    try:
+        # Find worksheet and exam questions from KB that were vision-extracted
+        worksheet_results = kb.query(
+            query_text=f"{lesson.title} {lesson.objective or ''} questions assessment",
+            n_results=10,
+        )
+        if worksheet_results and worksheet_results.get('chunks'):
+            format_examples = []
+            for chunk in worksheet_results['chunks'][:8]:
+                meta = chunk.get('metadata', {})
+                chunk_type = meta.get('chunk_type', '')
+                if chunk_type in ('vision_worksheet', 'vision_question_bank'):
+                    extracted = meta.get('extracted_data', {})
+                    if extracted:
+                        q_type = extracted.get('question_type', '')
+                        marks = extracted.get('marks', '')
+                        cmd = extracted.get('command_word', '')
+                        q_text = extracted.get('question_text', chunk.get('content', ''))[:200]
+                        format_examples.append(
+                            f"- [{q_type}] {cmd}: {q_text}" +
+                            (f" ({marks} marks)" if marks else "")
+                        )
+            if format_examples:
+                assessment_format_context = (
+                    "\nREAL ASSESSMENT EXAMPLES FROM UPLOADED WORKSHEETS/EXAMS:\n"
+                    "Use these as format models — match the question style, command words, and mark allocations:\n"
+                    + "\n".join(format_examples)
+                    + "\nGenerate exit ticket questions that match this style.\n"
+                )
+    except Exception:
+        pass
+
     # Query figures from KB for data_interpretation questions
     figure_context = ""
     try:
@@ -706,6 +740,9 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
     # Append objectives for systematic assessment coverage
     if objectives_context:
         prompt += "\n" + objectives_context
+    # Append real assessment format examples from worksheets/exams
+    if assessment_format_context:
+        prompt += "\n" + assessment_format_context
     # Append figure context if available
     if figure_context:
         prompt += "\n" + figure_context

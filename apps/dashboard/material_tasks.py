@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 
 def process_teaching_material(upload_id: int):
     """
-    Process a teaching material upload: extract text, chunk, and index.
+    Process a teaching material upload:
+    1. LLM vision extraction (structured data from images)
+    2. Text extraction, chunking, and KB indexing
+    3. Figure extraction
+    4. Worksheet-to-objective matching
 
     Args:
         upload_id: TeachingMaterialUpload record ID
@@ -31,7 +35,28 @@ def process_teaching_material(upload_id: int):
         upload.save(update_fields=['status'])
         upload.add_log("Starting processing...")
 
-        # Index into knowledge base
+        # Step 1: LLM vision extraction for rich structured data
+        if upload.file_path and upload.file_path.lower().endswith('.pdf'):
+            try:
+                vision_data = extract_material_with_vision(
+                    file_path=upload.file_path,
+                    material_type=upload.material_type,
+                    subject=upload.subject_name,
+                    grade_level=upload.grade_level,
+                )
+                if vision_data:
+                    # Store structured extraction in metadata
+                    metadata = upload.description or ''
+                    if not metadata:
+                        metadata = ''
+                    # Save to processing_log for now, store in KB chunks
+                    upload.add_log(f"Vision extraction: {len(vision_data)} items extracted")
+                    _index_vision_data(upload, vision_data)
+            except Exception as e:
+                upload.add_log(f"Vision extraction skipped: {e}")
+                print(f"[MaterialVision] {upload.original_filename} failed: {e}", flush=True)
+
+        # Step 2: Standard text extraction and KB indexing
         from apps.accounts.models import Institution
         kb = CurriculumKnowledgeBase(institution_id=upload.institution_id or Institution.get_global().id)
 
@@ -109,6 +134,204 @@ def _find_matching_course(upload):
         q &= Q(institution__isnull=True)
 
     return Course.objects.filter(q).first()
+
+
+def extract_material_with_vision(file_path: str, material_type: str, subject: str, grade_level: str) -> list:
+    """
+    Use LLM vision to extract structured data from a teaching material PDF.
+
+    Different prompts per material type to extract the most relevant information:
+    - Worksheet: questions with format types, answer keys, vocabulary
+    - Exam paper: questions with mark allocations, command words, source materials
+    - Textbook: key concepts, definitions, worked examples
+    - Notes: teaching sequences, emphasis areas, local examples
+    """
+    import base64
+    import fitz
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        logger.error(f"Could not open PDF for vision extraction: {e}")
+        return []
+
+    config = ModelConfig.get_for('generation')
+    if not config:
+        return []
+
+    client = get_llm_client(config)
+    is_anthropic = config.provider == 'anthropic'
+
+    # Render pages
+    MAX_IMAGE_BYTES = 4_500_000
+    page_images = []
+    for page in doc:
+        pix = page.get_pixmap(dpi=150)
+        img_bytes = pix.tobytes("jpeg", jpg_quality=85)
+        if len(img_bytes) > MAX_IMAGE_BYTES:
+            pix = page.get_pixmap(dpi=100)
+            img_bytes = pix.tobytes("jpeg", jpg_quality=75)
+        if len(img_bytes) > MAX_IMAGE_BYTES:
+            continue
+        page_images.append({
+            'b64': base64.b64encode(img_bytes).decode('utf-8'),
+            'media_type': 'image/jpeg',
+        })
+
+    if not page_images:
+        return []
+
+    # Type-specific extraction prompts
+    PROMPTS = {
+        'worksheet': f"""Analyze this {subject} worksheet for {grade_level} students and extract ALL questions.
+
+For EACH question, extract:
+- "question_number": the question number
+- "question_text": the full question text
+- "question_type": one of "multiple_choice", "fill_in_blank", "short_answer", "matching", "calculation", "diagram_interpretation", "data_analysis", "essay", "true_false"
+- "answer": the correct answer if visible (from answer key)
+- "marks": mark allocation if shown
+- "figure_description": describe any diagram/figure/table associated with the question
+- "vocabulary_terms": key subject terms used in the question
+- "command_word": the action verb (define, describe, explain, compare, calculate, etc.)
+
+Return a JSON array of question objects. Extract EVERY question — do not skip any.""",
+
+        'question_bank': f"""Analyze this {subject} exam paper / question bank for {grade_level} students.
+
+For EACH question, extract:
+- "question_number": the full question number (e.g., "1a", "2bi")
+- "question_text": the full question text
+- "question_type": "multiple_choice", "short_answer", "structured", "source_based", "essay", "calculation", "data_analysis"
+- "marks": mark allocation (e.g., 2, 3, 6)
+- "command_word": the action verb (state, describe, explain, suggest, evaluate, etc.)
+- "source_description": if the question references a source (map, table, diagram, photo), describe it
+- "answer_guidance": model answer or marking points if visible
+- "topic": what curriculum topic this tests
+
+Return a JSON array. Extract EVERY question including sub-parts (a, b, c, i, ii).""",
+
+        'textbook': f"""Analyze these {subject} textbook pages for {grade_level} students.
+
+Extract:
+- "key_concepts": list of key concepts/definitions taught
+- "worked_examples": any worked examples with step-by-step solutions
+- "vocabulary": key terms with definitions
+- "figures": description of each diagram, map, chart, or image
+- "activities": any student activities or exercises
+- "local_context": any Seychelles-specific examples or data
+
+Return a JSON array of extracted items.""",
+
+        'notes': f"""Analyze these {subject} teacher notes for {grade_level} students.
+
+Extract:
+- "topics": main topics covered
+- "key_points": key teaching points
+- "explanations": detailed explanations of concepts
+- "examples": examples used (especially local/Seychelles context)
+- "activities": suggested student activities
+- "emphasis": concepts that receive extra emphasis or repetition
+
+Return a JSON array of extracted items.""",
+    }
+
+    prompt = PROMPTS.get(material_type, PROMPTS.get('textbook'))
+    system_prompt = (
+        "You are an expert at analyzing educational documents. "
+        "Extract ALL content with perfect accuracy. Return ONLY valid JSON."
+    )
+
+    all_items = []
+    batch_size = 5  # Smaller batches for materials (often denser than curriculum)
+
+    for batch_start in range(0, len(page_images), batch_size):
+        batch = page_images[batch_start:batch_start + batch_size]
+
+        content_blocks = []
+        for pg in batch:
+            if is_anthropic:
+                content_blocks.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": pg['media_type'],
+                        "data": pg['b64'],
+                    }
+                })
+            else:
+                content_blocks.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{pg['media_type']};base64,{pg['b64']}"},
+                })
+        content_blocks.append({"type": "text", "text": prompt})
+
+        try:
+            response = client.generate(
+                messages=[{"role": "user", "content": content_blocks}],
+                system_prompt=system_prompt,
+                max_tokens=8000,
+            )
+
+            from apps.llm.json_utils import parse_llm_json
+            items = parse_llm_json(response.content, expect_array=True)
+            if items and isinstance(items, list):
+                all_items.extend(items)
+        except Exception as e:
+            logger.warning(f"Material vision extraction batch failed: {e}")
+            continue
+
+    print(f"[MaterialVision] {material_type}: extracted {len(all_items)} items from {len(page_images)} pages", flush=True)
+    return all_items
+
+
+def _index_vision_data(upload, vision_data: list):
+    """Index vision-extracted structured data into the KB as enriched chunks."""
+    import hashlib
+    from apps.accounts.models import Institution
+    from apps.curriculum.knowledge_base import CurriculumKnowledgeBase, CurriculumChunk
+
+    institution_id = upload.institution_id or Institution.get_global().id
+    kb = CurriculumKnowledgeBase(institution_id=institution_id)
+
+    chunks = []
+    for i, item in enumerate(vision_data):
+        # Build rich content from the extracted data
+        content_parts = []
+        for key, value in item.items():
+            if isinstance(value, list):
+                content_parts.append(f"{key}: {', '.join(str(v) for v in value)}")
+            elif value:
+                content_parts.append(f"{key}: {value}")
+        content = "\n".join(content_parts)
+
+        chunk_id = hashlib.md5(
+            f"{upload.id}:vision:{i}:{content[:80]}".encode()
+        ).hexdigest()[:16]
+
+        chunks.append(CurriculumChunk(
+            id=chunk_id,
+            content=content,
+            metadata={
+                "subject": upload.subject_name,
+                "grade_level": upload.grade_level,
+                "section": f"Vision-extracted {upload.material_type} item {i+1}",
+                "chunk_type": f"vision_{upload.material_type}",
+                "source_file": upload.original_filename,
+                "upload_id": upload.id,
+                "institution_id": institution_id,
+                "material_type": upload.material_type,
+                "material_title": upload.title,
+                # Store the structured data for programmatic access
+                "extracted_data": item,
+            },
+        ))
+
+    if chunks:
+        result = kb._index_chunks(chunks)
+        logger.info(f"Indexed {result.get('indexed', 0)} vision-extracted chunks for {upload.title}")
 
 
 def _match_worksheet_to_objectives(upload, kb) -> int:
