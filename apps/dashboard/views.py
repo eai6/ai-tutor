@@ -3514,21 +3514,64 @@ def course_edit(request, course_id):
         # Delete existing units/lessons (they'll be recreated)
         course.units.all().delete()
 
-        # Re-run the pipeline in background
-        from apps.curriculum.pipeline import complete_curriculum_upload
-        def _reparse(upload_id):
+        # Re-plan lessons only (skip text extraction + vectorization — already done)
+        def _replan(upload_id, course_id, duration):
             import django.db
             django.db.connections.close_all()
             try:
-                # Re-extract structure
-                from apps.curriculum.pipeline import process_curriculum_upload
-                process_curriculum_upload(upload_id, skip_review=True)
+                from apps.dashboard.models import CurriculumUpload
+                from apps.curriculum.pipeline import generate_lesson_structure, complete_curriculum_upload
+                from apps.accounts.models import Institution
+
+                up = CurriculumUpload.objects.get(id=upload_id)
+                institution_id = up.institution_id or Institution.get_global().id
+
+                up.current_step = 3
+                up.add_log("📚 Re-planning lesson structure (skipping text extraction — already in KB)...")
+                up.add_log(f"   Target duration: {duration} minutes per lesson")
+                up.save()
+
+                print(f"[Reparse] Step 3: Vision extraction + lesson planning for {up.subject_name}", flush=True)
+
+                structure = generate_lesson_structure(
+                    subject=up.subject_name,
+                    grade_level=up.grade_level or 'S1',
+                    institution_id=institution_id,
+                    extracted_text='(already vectorized)',
+                    file_path=up.file_path,
+                )
+
+                units_count = len(structure.get('units', []))
+                lessons_count = structure.get('total_lessons', 0)
+                up.add_log(f"   ✓ Found {units_count} units with {lessons_count} lessons")
+                up.parsed_data = structure
+                up.save()
+
+                if lessons_count > 0:
+                    up.status = 'review'
+                    up.add_log("⏸️ Ready for review — check the structure then approve.")
+                    up.save()
+                else:
+                    up.status = 'failed'
+                    up.error_message = 'No lessons extracted'
+                    up.save()
+
+                print(f"[Reparse] Done: {units_count} units, {lessons_count} lessons", flush=True)
+
             except Exception as e:
                 print(f"[Reparse] FAILED: {e}", flush=True)
                 import traceback; traceback.print_exc()
+                try:
+                    up = CurriculumUpload.objects.get(id=upload_id)
+                    up.status = 'failed'
+                    up.error_message = str(e)
+                    up.add_log(f"❌ Re-parse failed: {e}")
+                    up.save()
+                except Exception:
+                    pass
 
-        run_async(_reparse, upload.id)
-        messages.success(request, f"Re-parsing curriculum with {new_duration}-minute lessons. This will take a few minutes.")
+        run_async(_replan, upload.id, course.id, new_duration)
+        messages.success(request, f"Re-planning lessons with {new_duration}-minute target. Vision extraction will analyze the PDF pages.")
         return redirect('dashboard:curriculum_process', upload_id=upload.id)
 
     messages.success(request, f"Course updated.")

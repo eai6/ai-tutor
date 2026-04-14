@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 
 from pydantic import BaseModel, Field
+from django.db.models import Q
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
