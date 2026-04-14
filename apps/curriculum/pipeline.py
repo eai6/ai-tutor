@@ -352,7 +352,8 @@ def generate_lesson_structure(
     subject: str,
     grade_level: str,
     institution_id: int,
-    extracted_text: str = None
+    extracted_text: str = None,
+    file_path: str = None,
 ) -> Dict:
     """
     Generate structured lessons from the curriculum.
@@ -373,8 +374,31 @@ def generate_lesson_structure(
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
 
-    # For pilot subjects: try dedicated parsers first (more accurate extraction)
-    print(f"[generate_lesson_structure] subject={subject} grade={grade_level} text_len={len(extracted_text or '')}", flush=True)
+    print(f"[generate_lesson_structure] subject={subject} grade={grade_level}", flush=True)
+
+    # STRATEGY 1: LLM Vision extraction (most accurate — reads actual PDF pages)
+    # This is the primary method — uses computer vision to read the document as-is
+    if file_path and file_path.lower().endswith('.pdf'):
+        try:
+            from apps.curriculum.curriculum_parser import extract_curriculum_with_vision
+            print(f"[generate_lesson_structure] Trying LLM vision extraction on {file_path}...", flush=True)
+            vision_result = extract_curriculum_with_vision(file_path, subject, grade_level)
+                if vision_result and vision_result.units:
+                    total_lessons = sum(len(u.get('lessons', [])) for u in vision_result.units)
+                    total_tos = sum(len(u.get('terminal_objectives', [])) for u in vision_result.units)
+                    print(f"[generate_lesson_structure] Vision: {len(vision_result.units)} units, {total_lessons} lessons, {total_tos} TOs", flush=True)
+                    if total_lessons >= 3:
+                        return {
+                            'subject': subject,
+                            'grade_level': grade_level,
+                            'units': vision_result.units,
+                            'total_lessons': total_lessons,
+                        }
+        except Exception as e:
+            print(f"[generate_lesson_structure] Vision extraction failed: {e}", flush=True)
+            import traceback; traceback.print_exc()
+
+    # STRATEGY 2: Dedicated regex parsers (fast fallback for known formats)
     if extracted_text:
         subject_lower = subject.lower()
         dedicated_result = None
@@ -402,10 +426,8 @@ def generate_lesson_structure(
                     dedicated_result = result
             except Exception as e:
                 print(f"[generate_lesson_structure] Geography parser failed: {e}", flush=True)
-                import traceback; traceback.print_exc()
 
         if dedicated_result:
-            print(f"[generate_lesson_structure] Using dedicated parser result", flush=True)
             return {
                 'subject': subject,
                 'grade_level': grade_level,
@@ -413,8 +435,8 @@ def generate_lesson_structure(
                 'total_lessons': sum(len(u.get('lessons', [])) for u in dedicated_result.units),
             }
 
-    # Fall through to LLM-based parsing
-    print(f"[generate_lesson_structure] Dedicated parser insufficient, using LLM...", flush=True)
+    # STRATEGY 3: LLM text-based parsing (fallback for non-PDF or when vision fails)
+    print(f"[generate_lesson_structure] Using LLM text-based parsing...", flush=True)
 
     # Query knowledge base for context
     kb = CurriculumKnowledgeBase(institution_id=institution_id)
@@ -1122,7 +1144,8 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
                 subject=upload.subject_name,
                 grade_level=upload.grade_level or 'S1',
                 institution_id=institution_id,
-                extracted_text=text
+                extracted_text=text,
+                file_path=upload.file_path,
             )
             print(f"[Pipeline] Step 3 complete: {len(structure.get('units',[]))} units", flush=True)
             
@@ -1231,38 +1254,63 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
             raise ValueError("No parsed data available")
 
         from apps.dashboard.models import TeachingMaterialUpload
+        from collections import defaultdict
 
         subject = structure.get('subject', upload.subject_name)
-        grade_level = upload.grade_level or 'S1'
+        selected_grades = [g.strip() for g in (upload.grade_level or 'S1').split(',') if g.strip()]
+        all_units = structure.get('units', [])
 
-        # One upload = one grade level = one course
-        course_title = f"{subject} {grade_level}"
+        # Group units by grade level
+        units_by_grade = defaultdict(list)
+        for unit_data in all_units:
+            unit_grade = unit_data.get('grade_level', '').strip().upper()
+            if not unit_grade:
+                unit_grade = selected_grades[0] if selected_grades else 'S1'
+            units_by_grade[unit_grade].append(unit_data)
 
-        course, created = Course.objects.update_or_create(
-            institution=upload.institution,
-            title=course_title,
-            defaults={
-                'description': f"{subject} curriculum for {grade_level}",
-                'grade_level': grade_level,
-                'is_published': False,
-            }
-        )
+        # Only create courses for selected grade levels
+        grades_to_process = [g for g in selected_grades if g in units_by_grade]
+        if not grades_to_process:
+            # If no match, use all available grades
+            grades_to_process = sorted(units_by_grade.keys())
 
-        upload.created_course = course
-        upload.add_log(f"   {'Created' if created else 'Updated'} course: {course.title}")
-
-        # Link teaching materials to this course
-        linked = TeachingMaterialUpload.objects.filter(
-            curriculum_upload=upload, course__isnull=True
-        ).update(course=course)
-        if linked:
-            upload.add_log(f"   Linked {linked} teaching material(s) to course")
+        upload.add_log(f"   Creating courses for: {', '.join(grades_to_process)}")
 
         units_created = 0
         lessons_created = 0
+        first_course = None
 
-        # Create units and lessons
-        for unit_idx, unit_data in enumerate(structure.get('units', [])):
+        for grade in grades_to_process:
+            grade_units = units_by_grade[grade]
+            course_title = f"{subject} {grade}"
+
+            course, created = Course.objects.update_or_create(
+                institution=upload.institution,
+                title=course_title,
+                defaults={
+                    'description': f"{subject} curriculum for {grade}",
+                    'grade_level': grade,
+                    'is_published': False,
+                }
+            )
+
+            if not first_course:
+                first_course = course
+                upload.created_course = course
+
+            upload.add_log(f"   {'Created' if created else 'Updated'} course: {course.title} ({len(grade_units)} units)")
+
+            # Link teaching materials matching this grade
+            linked = TeachingMaterialUpload.objects.filter(
+                curriculum_upload=upload, course__isnull=True,
+            ).filter(
+                Q(grade_level=grade) | Q(grade_level='') | Q(grade_level__icontains=grade)
+            ).update(course=course)
+            if linked:
+                upload.add_log(f"   Linked {linked} material(s) to {course_title}")
+
+            # Create units and lessons for this grade
+            for unit_idx, unit_data in enumerate(grade_units):
             unit, u_created = Unit.objects.update_or_create(
                 course=course,
                 title=unit_data['title'],
@@ -1315,17 +1363,18 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
         upload.lessons_created = lessons_created
         upload.status = 'completed'
         upload.completed_at = timezone.now()
-        upload.add_log(f"   ✓ Created {units_created} units, {lessons_created} lessons")
-        upload.add_log(f"✅ Complete! Course '{course.title}' is ready.")
+        upload.add_log(f"   ✓ Created {units_created} units, {lessons_created} lessons across {len(grades_to_process)} course(s)")
+        upload.add_log(f"✅ Complete! Courses: {', '.join(f'{subject} {g}' for g in grades_to_process)}")
         upload.save()
 
         return {
             'success': True,
             'status': 'completed',
-            'course_id': course.id,
-            'course_name': course.title,
+            'course_id': first_course.id if first_course else None,
+            'course_name': first_course.title if first_course else '',
             'units_created': units_created,
             'lessons_created': lessons_created,
+            'courses_created': len(grades_to_process),
         }
         
     except Exception as e:

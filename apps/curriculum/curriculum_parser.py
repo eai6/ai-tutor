@@ -437,6 +437,257 @@ def _extract_pdf_with_vision(doc) -> str:
     return "\n\n".join(all_text_parts)
 
 
+def extract_curriculum_with_vision(file_path: str, subject: str, grade_level: str) -> Optional['ParsedCurriculum']:
+    """
+    Use LLM vision to extract complete curriculum structure from a PDF.
+
+    Renders each page to an image and sends batches to a multimodal LLM,
+    asking it to extract units, terminal objectives, enabling objectives,
+    teaching strategies, and lesson structure — reading the actual formatted
+    document as a human would.
+
+    This is more accurate than regex-based text extraction because it
+    preserves numbering, table structure, and multi-column layouts.
+    """
+    import base64
+    import fitz
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        logger.error(f"Could not open PDF for vision extraction: {e}")
+        return None
+
+    config = ModelConfig.get_for('generation')
+    if not config:
+        logger.warning("No LLM model configured for vision extraction")
+        return None
+
+    client = get_llm_client(config)
+    is_anthropic = config.provider == 'anthropic'
+
+    # Render pages to images
+    MAX_IMAGE_BYTES = 4_500_000
+    page_images = []
+    for page_num, page in enumerate(doc):
+        pix = page.get_pixmap(dpi=150)
+        img_bytes = pix.tobytes("jpeg", jpg_quality=85)
+        media_type = "image/jpeg"
+
+        if len(img_bytes) > MAX_IMAGE_BYTES:
+            pix = page.get_pixmap(dpi=100)
+            img_bytes = pix.tobytes("jpeg", jpg_quality=75)
+
+        if len(img_bytes) > MAX_IMAGE_BYTES:
+            continue
+
+        page_images.append({
+            'page_num': page_num + 1,
+            'b64': base64.b64encode(img_bytes).decode('utf-8'),
+            'media_type': media_type,
+        })
+
+    if not page_images:
+        return None
+
+    print(f"[VisionExtractor] {len(page_images)} pages rendered for {subject} {grade_level}", flush=True)
+
+    # Process pages in batches — extract structure from each batch
+    all_units = []
+    batch_size = 8  # 8 pages per LLM call
+
+    system_prompt = (
+        "You are a curriculum analysis expert. You analyze educational documents "
+        "and extract their complete structure with perfect accuracy. "
+        "You MUST extract every numbered item, every bullet point, every table entry. "
+        "Return ONLY valid JSON, no explanation."
+    )
+
+    for batch_start in range(0, len(page_images), batch_size):
+        batch = page_images[batch_start:batch_start + batch_size]
+        page_range = f"pages {batch[0]['page_num']}-{batch[-1]['page_num']}"
+        print(f"[VisionExtractor] Processing {page_range}...", flush=True)
+
+        extraction_prompt = f"""Analyze these curriculum document pages and extract ALL units with their complete structure.
+
+SUBJECT: {subject}
+
+Extract units from ALL grade levels visible on these pages. For each unit, include a "grade_level" field indicating which secondary level it belongs to (look for "Secondary One" = "S1", "Secondary Two" = "S2", "Secondary Three" = "S3", etc. Also "Cycle 4" covers S1-S3, "Cycle 5/IGCSE" covers S4-S5).
+
+For EACH unit you find on these pages, extract:
+1. unit_title: The exact unit title (e.g., "Development and Trade")
+2. terminal_objectives: ALL numbered terminal objectives — extract EVERY single one, preserving exact text
+3. enabling_objectives: ALL bullet-point enabling objectives from the Teaching/Learning Scheme table — extract EVERY one
+4. teaching_strategies: Methods listed in the Teaching/Learning Strategies column
+5. resources: Resources listed in the Resources column
+6. assessment: Assessment methods listed
+
+Return a JSON array of units:
+[{{
+    "unit_title": "Unit 16: Development and Trade",
+    "grade_level": "S3",
+    "terminal_objectives": [
+        "Know the terminologies associated with development",
+        "Develop an understanding of the world pattern of development",
+        ...every single one...
+    ],
+    "enabling_objectives": [
+        "Define the terms Development, Globalization, MEDC, NIC, LEDC",
+        "Describe how the influence can give an indication...",
+        ...every single one from the table...
+    ],
+    "teaching_strategies": ["Discussions", "Written activities", ...],
+    "resources": ["The New Wider World", "Geography in Place 1", ...],
+    "assessment": ["Structured source-based written questions", ...]
+}}]
+
+CRITICAL: Do NOT summarize or skip any objectives. Extract the EXACT text of every numbered item and every bullet point. If a terminal objective says "10. Understand how world trade works" extract "Understand how world trade works" (without the number).
+
+Return ONLY valid JSON."""
+
+        # Build multimodal message — images FIRST, then text prompt (Anthropic format)
+        content_blocks = []
+        for pg in batch:
+            if is_anthropic:
+                content_blocks.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": pg['media_type'],
+                        "data": pg['b64'],
+                    }
+                })
+            else:
+                content_blocks.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{pg['media_type']};base64,{pg['b64']}"},
+                })
+        content_blocks.append({"type": "text", "text": extraction_prompt})
+
+        try:
+            response = client.generate(
+                messages=[{"role": "user", "content": content_blocks}],
+                system_prompt=system_prompt,
+                max_tokens=8000,
+            )
+
+            # Parse JSON response
+            from apps.llm.json_utils import parse_llm_json
+            units = parse_llm_json(response.content, expect_array=True)
+            if units and isinstance(units, list):
+                all_units.extend(units)
+                print(f"[VisionExtractor] {page_range}: extracted {len(units)} units", flush=True)
+            else:
+                print(f"[VisionExtractor] {page_range}: no units found in response", flush=True)
+
+        except Exception as e:
+            print(f"[VisionExtractor] {page_range} failed: {e}", flush=True)
+            continue
+
+    if not all_units:
+        return None
+
+    # Filter to target grade level
+    # Deduplicate units by title
+    import re as _re
+    seen = {}
+    deduped = []
+    for u in all_units:
+        title = u.get('unit_title', '')
+        clean = _re.sub(r'[^a-z0-9 ]', '', title.lower())[:35]
+        if clean in seen:
+            # Merge objectives
+            existing = seen[clean]
+            for to in u.get('terminal_objectives', []):
+                if to not in existing.get('terminal_objectives', []):
+                    existing.setdefault('terminal_objectives', []).append(to)
+            for eo in u.get('enabling_objectives', []):
+                if eo not in existing.get('enabling_objectives', []):
+                    existing.setdefault('enabling_objectives', []).append(eo)
+        else:
+            seen[clean] = u
+            deduped.append(u)
+
+    # Build ParsedCurriculum — keep ALL units with their grade levels
+    from apps.curriculum.utils import determine_cycles
+    cycles = determine_cycles(grade_level)
+    cycle = "/".join(cycles)
+
+    units = []
+    for u in deduped:
+        title = u.get('unit_title', 'Untitled Unit')
+        unit_grade = u.get('grade_level', grade_level) or grade_level
+        # Remove "Unit N:" prefix for cleaner titles
+        title = _re.sub(r'^Unit\s+\d+\s*:\s*', '', title).strip()
+
+        tos = u.get('terminal_objectives', [])
+        eos = u.get('enabling_objectives', [])
+
+        # Build lessons from terminal objectives (1-2 TOs per 20-min lesson)
+        lesson_objectives = tos if tos else eos
+        lessons = []
+        chunk_size = min(2, max(1, len(lesson_objectives) // 4)) if lesson_objectives else 2
+
+        for start in range(0, len(lesson_objectives), chunk_size):
+            chunk = lesson_objectives[start:start + chunk_size]
+            if not chunk:
+                continue
+
+            # Match enabling objectives to this lesson
+            lesson_eos = []
+            chunk_words = set()
+            for to in chunk:
+                chunk_words.update(w.lower() for w in to.split() if len(w) > 3)
+            for eo in eos:
+                eo_words = set(w.lower() for w in eo.split() if len(w) > 3)
+                if len(chunk_words & eo_words) >= 2:
+                    lesson_eos.append(eo)
+
+            lessons.append({
+                'title': create_lesson_title(chunk[0]),
+                'objective': chunk[0],
+                'enabling_objectives': chunk,
+                'teaching_steps': lesson_eos,
+                'teaching_strategies': u.get('teaching_strategies', []),
+                'resources': u.get('resources', []),
+                'assessment_methods': u.get('assessment', []),
+                'estimated_minutes': 20,
+                'order': len(lessons) + 1,
+            })
+
+        units.append({
+            'number': len(units) + 1,
+            'title': title,
+            'grade_level': unit_grade,
+            'duration': '',
+            'introduction': '',
+            'terminal_objectives': tos,
+            'enabling_objectives': eos,
+            'lessons': lessons,
+        })
+
+    print(f"[VisionExtractor] Final: {len(units)} units, "
+          f"{sum(len(u['lessons']) for u in units)} lessons, "
+          f"{sum(len(u['terminal_objectives']) for u in units)} TOs, "
+          f"{sum(len(u['enabling_objectives']) for u in units)} EOs", flush=True)
+
+    return ParsedCurriculum(
+        subject=subject,
+        grade_level=grade_level,
+        cycle=cycle,
+        description=f"{subject} curriculum for {grade_level} (extracted via LLM vision)",
+        units=units,
+        teaching_strategies=list(set(
+            s for u in deduped for s in u.get('teaching_strategies', [])
+        ))[:10],
+        assessment_methods=list(set(
+            a for u in deduped for a in u.get('assessment', [])
+        ))[:10],
+    )
+
+
 def extract_from_image(file_path: str) -> str:
     """Extract text/content from an image file using multimodal LLM."""
     import base64

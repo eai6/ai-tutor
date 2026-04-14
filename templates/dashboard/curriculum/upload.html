@@ -280,17 +280,18 @@
                            placeholder="e.g., Geography, Mathematics, Biology" required>
                 </div>
 
-                <!-- Grade Level — single select -->
+                <!-- Grade Level — multi-select checkboxes -->
                 <div class="form-group">
-                    <label class="form-label" for="grade_level">Grade Level</label>
-                    <select class="form-control" id="grade_level" name="grade_level" required>
-                        <option value="">— Select grade level —</option>
+                    <label class="form-label">Grade Levels to Process</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;" id="grade-pills">
                         {% for code, name in grade_levels %}
-                        <option value="{{ code }}">{{ name }}</option>
+                        <label style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;border:2px solid var(--gray-200);border-radius:999px;cursor:pointer;font-size:0.875rem;transition:all 0.15s;">
+                            <input type="checkbox" name="grade_level" value="{{ code }}" style="accent-color:var(--primary);"> {{ name }}
+                        </label>
                         {% endfor %}
-                    </select>
+                    </div>
                     <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
-                        Each upload focuses on one secondary level. Upload the same curriculum again for a different level.
+                        Select which grade levels to extract. The document will be analyzed once and separate courses created per level.
                     </div>
                 </div>
 

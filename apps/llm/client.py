@@ -322,15 +322,49 @@ class GeminiClient(BaseLLMClient):
             raise ImportError("google-genai package not installed. Run: pip install google-genai")
 
     def _build_contents(self, messages):
-        """Map chat messages to Gemini Content objects."""
+        """Map chat messages to Gemini Content objects, supporting multimodal."""
+        import base64
         from google.genai import types
         contents = []
         for msg in messages:
             role = 'model' if msg['role'] == 'assistant' else 'user'
-            contents.append(types.Content(
-                role=role,
-                parts=[types.Part(text=msg['content'])],
-            ))
+            content = msg['content']
+
+            # Handle multimodal content blocks (list of dicts with type/text/image)
+            if isinstance(content, list):
+                parts = []
+                for block in content:
+                    if block.get('type') == 'text':
+                        parts.append(types.Part(text=block['text']))
+                    elif block.get('type') == 'image':
+                        # Anthropic format: source.type=base64
+                        source = block.get('source', {})
+                        parts.append(types.Part(
+                            inline_data=types.Blob(
+                                mime_type=source.get('media_type', 'image/jpeg'),
+                                data=base64.b64decode(source.get('data', '')),
+                            )
+                        ))
+                    elif block.get('type') == 'image_url':
+                        # OpenAI format: image_url.url=data:mime;base64,...
+                        url = block.get('image_url', {}).get('url', '')
+                        if url.startswith('data:'):
+                            # Parse data URI: data:image/jpeg;base64,/9j/...
+                            header, b64_data = url.split(',', 1)
+                            mime = header.split(':')[1].split(';')[0]
+                            parts.append(types.Part(
+                                inline_data=types.Blob(
+                                    mime_type=mime,
+                                    data=base64.b64decode(b64_data),
+                                )
+                            ))
+                contents.append(types.Content(role=role, parts=parts))
+            else:
+                # Simple string content
+                contents.append(types.Content(
+                    role=role,
+                    parts=[types.Part(text=content)],
+                ))
         return contents
 
     def _search_tools(self):

@@ -689,7 +689,8 @@ def curriculum_upload(request):
     if request.method == 'POST':
         uploaded_file = request.FILES.get('curriculum_file')
         subject_name = request.POST.get('subject_name', '').strip()
-        grade_level = request.POST.get('grade_level', '').strip()
+        grade_levels = request.POST.getlist('grade_level')
+        grade_level = ','.join(grade_levels) if grade_levels else ''
 
         if not uploaded_file:
             messages.error(request, "Please upload a curriculum file.")
@@ -700,7 +701,7 @@ def curriculum_upload(request):
             return redirect('dashboard:curriculum_upload')
 
         if not grade_level:
-            messages.error(request, "Please select a grade level.")
+            messages.error(request, "Please select at least one grade level.")
             return redirect('dashboard:curriculum_upload')
 
         # Save curriculum file
