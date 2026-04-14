@@ -1895,49 +1895,72 @@ def material_process(request, upload_id):
 @require_POST
 @teacher_required
 def course_upload_material(request, course_id):
-    """Upload a teaching material directly to a course."""
+    """Upload teaching materials to a course with processing mode choice."""
     import os
     from django.conf import settings as django_settings
     from apps.dashboard.models import TeachingMaterialUpload
-    from apps.dashboard.material_tasks import process_teaching_material
+    from apps.dashboard.material_tasks import process_teaching_material, process_teaching_material_fast
     from apps.dashboard.background_tasks import run_async
 
     institution = request.staff_ctx['institution']
     course = get_scoped_object_or_404(Course, institution, id=course_id)
 
-    uploaded_file = request.FILES.get('material_file')
+    uploaded_files = request.FILES.getlist('material_files') or [request.FILES.get('material_file')]
+    uploaded_files = [f for f in uploaded_files if f]
     title = request.POST.get('material_title', '').strip()
     material_type = request.POST.get('material_type', 'textbook')
+    processing_mode = request.POST.get('processing_mode', 'rich')
     description = request.POST.get('material_description', '').strip()
 
-    if not uploaded_file or not title:
+    if not uploaded_files or not title:
         messages.error(request, "File and title are required.")
         return redirect('dashboard:course_detail', course_id=course.id)
 
     upload_dir = os.path.join(django_settings.MEDIA_ROOT, 'material_uploads')
     os.makedirs(upload_dir, exist_ok=True)
 
-    file_path = os.path.join(upload_dir, uploaded_file.name)
-    with open(file_path, 'wb+') as dest:
-        for chunk in uploaded_file.chunks():
-            dest.write(chunk)
+    material_ids = []
+    for uploaded_file in uploaded_files:
+        file_path = os.path.join(upload_dir, uploaded_file.name)
+        with open(file_path, 'wb+') as dest:
+            for chunk in uploaded_file.chunks():
+                dest.write(chunk)
 
-    material_record = TeachingMaterialUpload.objects.create(
-        institution=course.institution,
-        uploaded_by=request.user,
-        file_path=file_path,
-        original_filename=uploaded_file.name,
-        title=title,
-        subject_name=course.title,
-        grade_level=course.grade_level or '',
-        material_type=material_type,
-        description=description,
-        course=course,
-    )
+        file_title = f"{title} - {os.path.splitext(uploaded_file.name)[0]}" if len(uploaded_files) > 1 else title
 
-    run_async(process_teaching_material, material_record.id)
+        material_record = TeachingMaterialUpload.objects.create(
+            institution=course.institution,
+            uploaded_by=request.user,
+            file_path=file_path,
+            original_filename=uploaded_file.name,
+            title=file_title,
+            subject_name=course.title,
+            grade_level=course.grade_level or '',
+            material_type=material_type,
+            description=description,
+            course=course,
+        )
+        material_ids.append(material_record.id)
 
-    messages.success(request, f"'{title}' uploaded! Processing started.")
+    # Process in background — sequentially to avoid resource issues
+    process_fn = process_teaching_material if processing_mode == 'rich' else process_teaching_material_fast
+
+    def _process_materials(ids, fn):
+        import django.db
+        django.db.connections.close_all()
+        for mid in ids:
+            try:
+                print(f"[UploadMaterial] Processing {mid} mode={processing_mode}", flush=True)
+                fn(mid)
+                print(f"[UploadMaterial] Done {mid}", flush=True)
+            except Exception as e:
+                print(f"[UploadMaterial] FAILED {mid}: {e}", flush=True)
+                import traceback; traceback.print_exc()
+
+    run_async(_process_materials, material_ids, process_fn)
+
+    mode_label = "Rich (LLM Vision)" if processing_mode == 'rich' else "Fast (Text Only)"
+    messages.success(request, f"{len(material_ids)} file(s) uploaded! Processing in {mode_label} mode.")
     return redirect('dashboard:course_detail', course_id=course.id)
 
 

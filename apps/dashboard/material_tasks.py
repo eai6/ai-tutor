@@ -77,6 +77,7 @@ def process_teaching_material(upload_id: int):
         figures_indexed = result.get('figures_indexed', 0)
         upload.extracted_text_length = result.get('text_length', 0)
         upload.chunks_created = result.get('chunks_indexed', 0)
+        print(f"[Material] Step 2 done: {upload.extracted_text_length} chars, {upload.chunks_created} chunks, {figures_indexed} figures", flush=True)
         upload.figures_extracted = figures_indexed
         upload.status = 'completed'
         upload.completed_at = timezone.now()
@@ -109,11 +110,64 @@ def process_teaching_material(upload_id: int):
         return result
 
     except Exception as e:
+        print(f"[Material] FAILED {upload.original_filename}: {e}", flush=True)
+        import traceback; traceback.print_exc()
         upload.status = 'failed'
-        upload.error_message = str(e)
+        upload.error_message = str(e)[:500]
         upload.save()
         upload.add_log(f"FAILED: {e}")
         logger.error(f"Teaching material processing failed for upload {upload_id}: {e}")
+        raise
+
+
+def process_teaching_material_fast(upload_id: int):
+    """Fast processing: text extraction + KB indexing only, no LLM vision.
+
+    Good for textbooks and notes where structured extraction isn't needed.
+    """
+    from apps.dashboard.models import TeachingMaterialUpload
+    from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
+
+    upload = TeachingMaterialUpload.objects.get(id=upload_id)
+
+    try:
+        upload.status = 'processing'
+        upload.save(update_fields=['status'])
+        print(f"[MaterialFast] Processing {upload.original_filename}", flush=True)
+        upload.add_log("Starting fast processing (text only)...")
+
+        from apps.accounts.models import Institution
+        kb = CurriculumKnowledgeBase(institution_id=upload.institution_id or Institution.get_global().id)
+
+        result = kb.index_teaching_material(
+            file_path=upload.file_path,
+            subject=upload.subject_name,
+            grade_level=upload.grade_level,
+            material_title=upload.title,
+            material_type=upload.material_type,
+            upload_id=upload.id,
+        )
+
+        upload.extracted_text_length = result.get('text_length', 0)
+        upload.chunks_created = result.get('chunks_indexed', 0)
+        upload.figures_extracted = result.get('figures_indexed', 0)
+        upload.status = 'completed'
+        upload.completed_at = timezone.now()
+
+        if not upload.course:
+            upload.course = _find_matching_course(upload)
+        upload.save()
+
+        print(f"[MaterialFast] Done {upload.original_filename}: {upload.chunks_created} chunks, {upload.figures_extracted} figures", flush=True)
+        upload.add_log(f"Completed: {upload.chunks_created} chunks, {upload.figures_extracted} figures")
+        return result
+
+    except Exception as e:
+        upload.status = 'failed'
+        upload.error_message = str(e)
+        upload.save()
+        print(f"[MaterialFast] FAILED {upload.original_filename}: {e}", flush=True)
+        upload.add_log(f"FAILED: {e}")
         raise
 
 

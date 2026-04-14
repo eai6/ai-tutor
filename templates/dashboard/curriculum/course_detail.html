@@ -331,12 +331,12 @@
                     {% csrf_token %}
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group" style="grid-column: 1 / -1;">
-                            <label class="form-label">File</label>
-                            <input type="file" name="material_file" accept=".pdf,.docx,.doc,.txt" class="form-control" required>
+                            <label class="form-label">Files (select multiple)</label>
+                            <input type="file" name="material_files" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Title</label>
-                            <input type="text" name="material_title" class="form-control" placeholder="e.g., Biology Textbook Ch.5" required>
+                            <input type="text" name="material_title" class="form-control" placeholder="e.g., S3 Geography Worksheets" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Type</label>
@@ -347,11 +347,26 @@
                             </select>
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
-                            <label class="form-label">Description (optional)</label>
-                            <textarea name="material_description" class="form-control" rows="2" placeholder="Brief description..."></textarea>
+                            <label class="form-label">Processing Mode</label>
+                            <div style="display:flex;gap:1rem;">
+                                <label style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;border:2px solid var(--gray-200);border-radius:0.5rem;cursor:pointer;flex:1;">
+                                    <input type="radio" name="processing_mode" value="rich" checked style="accent-color:#6366f1;">
+                                    <div>
+                                        <div style="font-weight:600;font-size:0.875rem;">Rich (LLM Vision)</div>
+                                        <div style="font-size:0.75rem;color:var(--gray-500);">Extracts questions, figures, mark schemes. Slower but more accurate.</div>
+                                    </div>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;border:2px solid var(--gray-200);border-radius:0.5rem;cursor:pointer;flex:1;">
+                                    <input type="radio" name="processing_mode" value="fast" style="accent-color:#059669;">
+                                    <div>
+                                        <div style="font-weight:600;font-size:0.875rem;">Fast (Text Only)</div>
+                                        <div style="font-size:0.75rem;color:var(--gray-500);">Quick text embedding into knowledge base. Good for textbooks and notes.</div>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
                         <button type="submit" class="btn btn-primary btn-sm">Upload & Process</button>
                         <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('material-upload-form').style.display='none';">Cancel</button>
                     </div>
