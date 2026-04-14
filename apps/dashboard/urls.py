@@ -79,4 +79,7 @@ urlpatterns = [
 
     # School picker
     path('switch-school/', views.switch_school, name='switch_school'),
+
+    # Admin utilities
+    path('admin/seed-demo/', views.seed_demo_school, name='seed_demo'),
 ]

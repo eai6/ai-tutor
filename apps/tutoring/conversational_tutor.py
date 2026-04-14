@@ -333,15 +333,10 @@ a different approach -- no rush."
   keep each item to one line.
 - Use LaTeX or clear notation for mathematical expressions.
 - To show an image, write |||MEDIA:N||| as the VERY LAST line. See <media_catalog>.
-- You CAN show images and figures. An external system generates them for you.
-  If no media in the catalog fits what you need, request on-the-fly generation:
-  Write |||GENERATE:category:description||| as the LAST line.
-  Categories: diagram, chart, map, illustration, flowchart, infographic.
-  Description: Clear, specific, educational description of the image needed.
-  Example: |||GENERATE:diagram:labeled diagram showing the water cycle with evaporation, condensation, and precipitation arrows|||
-  Use GENERATE sparingly — only when a visual truly aids understanding and nothing in the catalog fits.
-  Never use GENERATE for decorative images.
-  IMPORTANT: Never tell the student you cannot show images or figures. You CAN — just use |||MEDIA:N||| or |||GENERATE:...||| as described.
+- You CAN show images ONLY from the media catalog below using |||MEDIA:N|||.
+  Do NOT reference figures, maps, charts, or diagrams that are not in the media catalog.
+  Do NOT say "let me show you a map" or "here's a diagram" unless you have a matching |||MEDIA:N||| to display.
+  If no visual exists in the catalog, teach with text descriptions instead.
 - Do NOT include suggested quick-reply options or response choices in your messages.
   Just ask your question and let the student answer in their own words.
 - NEVER say "which of these", "which one of the following", or reference a list of
@@ -1644,21 +1639,9 @@ IMPORTANT: You are showing these images with your response.
         return list(set(terms))[:10]  # Limit to 10 unique terms
     
     def _safe_generate_image(self, category: str, description: str) -> Optional[Dict]:
-        """Generate image on-the-fly with full 3-layer safety pipeline."""
-        try:
-            from apps.safety.image_safety_pipeline import ImageSafetyPipeline
-
-            pipeline = ImageSafetyPipeline(
-                instructor_client=self.instructor_client,
-                provider=getattr(self, '_instructor_provider', None),
-                lesson=self.lesson,
-                session=self.session,
-                student=self.student,
-            )
-            return pipeline.run(description, category)
-        except Exception as e:
-            logger.error(f"Safe image generation failed: {e}")
-            return None
+        """Disabled — tutor only uses pre-attached step media (teacher-reviewed).
+        On-the-fly generation was unreliable and created broken figure references."""
+        return None
 
     def _get_relevant_media_for_response(self, response: str) -> List[Dict]:
         """
@@ -2195,9 +2178,8 @@ Apply the cognitive_load and targeted_remediation principles {intensity}:
             )
         else:
             media_reminder = (
-                "\n14. If a diagram or visual would help explain this concept, you CAN generate one — "
-                "write |||GENERATE:category:description||| as the VERY LAST line. "
-                "Never say you cannot show images."
+                "\n14. Only show images from the media catalog using |||MEDIA:N|||. "
+                "Do NOT reference figures or diagrams that are not in the catalog."
             )
 
         return f"""CONVERSATION CONTEXT:
@@ -2239,7 +2221,7 @@ Generate your response following these rules:
 5. If correct: praise specifically, then continue the current step or prepare for the next
 6. If incorrect: encourage, give a hint from the HINT LADDER, ask again
 7. If confused: simplify, use an example from the step content
-8. If the student asks to see an image/figure/diagram, show one using |||MEDIA:N||| or |||GENERATE:category:description||| — never say you cannot show images
+8. If the student asks to see an image/figure/diagram, show one using |||MEDIA:N||| ONLY if one exists in the catalog. Otherwise describe it in text.
 9. Use KEY VOCABULARY terms naturally in your explanation — introduce and define them
 10. Watch for COMMON MISTAKES listed in the directive and address them proactively
 11. Weave in local Seychelles context where relevant to make the lesson relatable
@@ -2590,11 +2572,8 @@ Follow the current step; this concept will be covered in sequence."""
         if not media_items:
             return (
                 "\n\n<media_catalog>\n"
-                "No pre-made media available for this lesson.\n"
-                "You CAN still show images — an external system generates them for you.\n"
-                "If a visual would help the student, generate one:\n"
-                "|||GENERATE:category:description||| (as the LAST line)\n"
-                "Never tell the student you cannot show images or figures.\n"
+                "No media available for this lesson.\n"
+                "Do NOT reference figures, maps, or diagrams. Use text descriptions instead.\n"
                 "</media_catalog>"
             )
 

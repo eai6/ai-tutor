@@ -3724,3 +3724,30 @@ def resolve_flag(request, session_id):
 
     messages.success(request, "Flag resolved.")
     return redirect('dashboard:flagged_session_detail', session_id=session.id)
+
+@login_required
+def seed_demo_school(request):
+    """Run the seed_demo_school management command (superadmin only)."""
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Superadmin only")
+
+    from django.core.management import call_command
+    from io import StringIO
+
+    reset = request.GET.get('reset', '') == '1'
+    output = StringIO()
+
+    try:
+        args = ['--reset'] if reset else []
+        call_command('seed_demo_school', *args, stdout=output, stderr=output)
+        result = output.getvalue()
+        messages.success(request, f"Demo school seeded successfully.")
+    except Exception as e:
+        result = f"Error: {e}\n{output.getvalue()}"
+        messages.error(request, f"Seed failed: {e}")
+
+    from django.http import HttpResponse
+    return HttpResponse(
+        f"<pre>{result}</pre><br><a href='/dashboard/'>Back to Dashboard</a>",
+        content_type='text/html'
+    )
