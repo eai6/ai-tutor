@@ -1237,8 +1237,10 @@ Keep it to 2-3 sentences."""
             turn_index = len(self.conversation)  # index before appending
             self._turn_media[str(turn_index)] = media[0]
 
-        # Check if all steps complete — trigger exit ticket
-        if self.current_topic_index >= len(self.steps) and self.session_state == SessionState.TUTORING:
+        # Check if all steps complete — trigger exit ticket (NOT during remediation)
+        if (self.current_topic_index >= len(self.steps)
+                and self.session_state == SessionState.TUTORING
+                and not getattr(self, 'is_remediation', False)):
             self.session_state = SessionState.EXIT_TICKET
             self._save_state()
             # Save tutor response first, then return exit ticket
@@ -1350,10 +1352,12 @@ Keep it to 2-3 sentences."""
         # Analyze student response for adaptation
         self._analyze_student_response(student_input, clean_content)
 
-        # Check if all steps complete — trigger exit ticket
+        # Check if all steps complete — trigger exit ticket (NOT during remediation)
         show_exit_ticket = False
         exit_ticket = None
-        if self.current_topic_index >= len(self.steps) and self.session_state == SessionState.TUTORING:
+        if (self.current_topic_index >= len(self.steps)
+                and self.session_state == SessionState.TUTORING
+                and not getattr(self, 'is_remediation', False)):
             self.session_state = SessionState.EXIT_TICKET
             show_exit_ticket = True
 
@@ -3217,8 +3221,8 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         # Track exit ticket concept coverage (keyword-only — no extra LLM call)
         self._keyword_concept_coverage_check(combined_text)
 
-        # Advance topic based on step-type completion criteria (only during TUTORING)
-        if self.session_state == SessionState.TUTORING:
+        # Advance topic based on step-type completion criteria (NOT during remediation)
+        if self.session_state == SessionState.TUTORING and not getattr(self, 'is_remediation', False):
             should_advance = self._should_advance_step(student_input, tutor_response, is_correct, step_eval_result)
             if should_advance and self.current_topic_index < len(self.steps) - 1:
                 # Check concept boundary gating
@@ -3718,6 +3722,9 @@ Which concept numbers were meaningfully covered?"""
             except Exception:
                 pass
 
+            # Track EO (concept_tag) for competency reporting
+            eo_tag = getattr(q, 'concept_tag', '') or ''
+
             if is_correct:
                 correct += 1
             else:
@@ -3726,6 +3733,7 @@ Which concept numbers were meaningfully covered?"""
                     'id': q.id,
                     'index': i,
                     'question': q.question_text,
+                    'concept_tag': eo_tag,
                     'student_answer': student_answer,
                     'correct_answer': q.correct_answer if q_type == 'mcq' else str(q.answer_data or {}),
                     'correct_text': getattr(q, f'option_{(q.correct_answer or "a").lower()}', '') if q_type == 'mcq' else '',
@@ -3736,6 +3744,7 @@ Which concept numbers were meaningfully covered?"""
                 'index': i,
                 'question': q.question_text,
                 'question_type': getattr(q, 'question_type', 'mcq') or 'mcq',
+                'concept_tag': eo_tag,
                 'selected': student_answer,
                 'correct_answer': q.correct_answer if (getattr(q, 'question_type', 'mcq') or 'mcq') == 'mcq' else q.answer_data,
                 'is_correct': is_correct,
@@ -3760,6 +3769,31 @@ Which concept numbers were meaningfully covered?"""
         self.session.ended_at = timezone.now()
         self.session.completed_lesson_at = timezone.now()
         self.session.mastery_achieved = True
+
+        # Save per-EO exit ticket results for competency reporting
+        achieved_eos = set()
+        failed_eos = set()
+        for r in results:
+            eo = r.get('concept_tag', '')
+            if not eo:
+                continue
+            if r.get('is_correct'):
+                achieved_eos.add(eo)
+            else:
+                failed_eos.add(eo)
+
+        # Update engine_state with EO results
+        state = self.session.engine_state or {}
+        state['exit_ticket_achieved_eos'] = list(achieved_eos)
+        state['exit_ticket_failed_eos'] = list(failed_eos)
+        state['exit_ticket_score'] = score
+        state['exit_ticket_total'] = len(results)
+        # Merge with covered_enabling_objectives from tutoring
+        covered = set(state.get('covered_enabling_objectives', []))
+        covered.update(achieved_eos)
+        state['covered_enabling_objectives'] = list(covered)
+        self.session.engine_state = state
+
         self._save_state()
         self.session.save()
 
@@ -3863,14 +3897,22 @@ Which concept numbers were meaningfully covered?"""
         self.is_remediation = True
 
         # Extract failed enabling objectives from exit ticket concept_tags
-        from apps.tutoring.models import ExitTicketQuestion
+        # First try concept_tag from the failed_questions dict (added in grading)
         failed_eos = set()
         for fq in failed_questions:
-            q = ExitTicketQuestion.objects.filter(id=fq['id']).first()
-            if q and q.concept_tag:
-                failed_eos.add(q.concept_tag)
+            tag = fq.get('concept_tag', '')
+            if tag:
+                failed_eos.add(tag)
 
-        # If no EO tags found, fall back to question text
+        # Fallback: query DB for concept_tags
+        if not failed_eos:
+            from apps.tutoring.models import ExitTicketQuestion
+            for fq in failed_questions:
+                q = ExitTicketQuestion.objects.filter(id=fq['id']).first()
+                if q and q.concept_tag:
+                    failed_eos.add(q.concept_tag)
+
+        # Last resort: use question text
         if not failed_eos:
             failed_eos = {fq['question'][:100] for fq in failed_questions[:5]}
 
@@ -3886,6 +3928,9 @@ Which concept numbers were meaningfully covered?"""
         # Reset to tutoring state for targeted review
         self.session_state = SessionState.TUTORING
         self.exchange_count = 0
+        # Reset step index to 0 so remediation doesn't jump back to exit ticket
+        self.current_topic_index = 0
+        self.step_exchange_count = 0
 
         self._save_state()
 
