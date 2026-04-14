@@ -864,6 +864,8 @@ body {
     background: #fff;
 }
 .matching-select:focus { border-color: #18181b; outline: none; }
+.matching-row.answered { background: #f8fafc; border-radius: 0.375rem; }
+.matching-row.answered .matching-left { background: #e0f2fe; }
 
 .exit-textarea {
     width: 100%;
@@ -889,21 +891,34 @@ body {
 }
 
 .exit-result-correct {
-    margin-top: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    margin-top: 0.75rem;
+    padding: 0.625rem 0.875rem;
     background: #d1fae5;
+    border: 1px solid #6ee7b7;
+    border-radius: 0.5rem;
     color: #065f46;
-    border-radius: 0.375rem;
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 500;
 }
 .exit-result-incorrect {
+    margin-top: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-radius: 0.5rem;
+    color: #991b1b;
+    font-size: 0.875rem;
+}
+.exit-result-correct::before { content: '\2713 '; font-weight: 700; }
+.exit-result-incorrect::before { content: '\2717 '; font-weight: 700; }
+.exit-correct-answer {
     margin-top: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: #fee2e2;
-    color: #991b1b;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
+    background: #f0fdf4;
+    border-left: 3px solid #10b981;
+    border-radius: 0 0.375rem 0.375rem 0;
+    font-size: 0.8125rem;
+    color: #166534;
 }
 
 /* ── Rich HTML Artifact Rendering ── */
@@ -1824,6 +1839,10 @@ function collectMatchingAnswer(qIndex) {
         if (sel.value && idx < pairs.length) mapping[pairs[idx].left] = sel.value;
     });
     exitAnswers[qIndex] = mapping;
+    selects.forEach(sel => {
+        const row = sel.closest('.matching-row');
+        if (row) row.classList.toggle('answered', !!sel.value);
+    });
     checkExitSubmitReady();
 }
 
@@ -1903,16 +1922,89 @@ function showExitResults(results) {
             const options = qDiv.querySelector('.options');
             if (!options) return;
             options.querySelectorAll('.option').forEach(opt => {
+                opt.style.pointerEvents = 'none';
                 const letter = opt.dataset.letter;
                 if (letter === r.correct_answer) opt.classList.add('correct');
                 else if (letter === r.selected && !r.is_correct) opt.classList.add('incorrect');
             });
-        } else {
-            const indicator = document.createElement('div');
-            indicator.className = r.is_correct ? 'exit-result-correct' : 'exit-result-incorrect';
-            indicator.textContent = r.is_correct ? 'Correct!' : `Incorrect. ${r.explanation || ''}`;
-            qDiv.appendChild(indicator);
+        } else if (qType === 'fill_in_blank') {
+            const inputs = qDiv.querySelectorAll('.exit-blank-input');
+            inputs.forEach(inp => { inp.disabled = true; });
+            const correctData = r.correct_answer || {};
+            const blanks = correctData.blanks || [];
+            const studentBlanks = Array.isArray(r.selected) ? r.selected : [r.selected];
+
+            inputs.forEach((inp, idx) => {
+                const expected = (blanks[idx] || '').toLowerCase();
+                const given = (studentBlanks[idx] || '').toLowerCase();
+                if (expected && given === expected) {
+                    inp.style.borderColor = '#10b981';
+                    inp.style.background = '#d1fae5';
+                } else {
+                    inp.style.borderColor = '#ef4444';
+                    inp.style.background = '#fee2e2';
+                }
+            });
+
+            if (!r.is_correct && blanks.length > 0) {
+                const correctDiv = document.createElement('div');
+                correctDiv.className = 'exit-correct-answer';
+                correctDiv.innerHTML = '<strong>Correct answers:</strong> ' + blanks.join(', ');
+                qDiv.appendChild(correctDiv);
+            }
+        } else if (qType === 'matching') {
+            const selects = qDiv.querySelectorAll('.matching-select');
+            selects.forEach(sel => { sel.disabled = true; });
+            const correctData = r.correct_answer || {};
+            const pairs = correctData.pairs || [];
+            const studentMap = (typeof r.selected === 'object' && !Array.isArray(r.selected)) ? r.selected : {};
+
+            const rows = qDiv.querySelectorAll('.matching-row');
+            rows.forEach((row, idx) => {
+                if (idx < pairs.length) {
+                    const correctRight = pairs[idx].right;
+                    const studentRight = studentMap[pairs[idx].left] || '';
+                    const sel = row.querySelector('.matching-select');
+                    if (studentRight.toLowerCase() === correctRight.toLowerCase()) {
+                        if (sel) { sel.style.borderColor = '#10b981'; sel.style.background = '#d1fae5'; }
+                    } else {
+                        if (sel) { sel.style.borderColor = '#ef4444'; sel.style.background = '#fee2e2'; }
+                        const correctSpan = document.createElement('span');
+                        correctSpan.style.cssText = 'color:#065f46;font-size:0.8125rem;font-weight:600;margin-left:0.5rem;';
+                        correctSpan.textContent = '\u2192 ' + correctRight;
+                        row.appendChild(correctSpan);
+                    }
+                }
+            });
+        } else if (qType === 'short_answer' || qType === 'data_interpretation') {
+            const textarea = qDiv.querySelector('.exit-textarea');
+            if (textarea) { textarea.disabled = true; }
+            const correctData = r.correct_answer || {};
+
+            if (correctData.model_answer) {
+                const ansDiv = document.createElement('div');
+                ansDiv.className = 'exit-correct-answer';
+                ansDiv.innerHTML = '<strong>Model answer:</strong> ' + correctData.model_answer;
+                qDiv.appendChild(ansDiv);
+            }
+            if (correctData.keywords && correctData.keywords.length > 0) {
+                const kwDiv = document.createElement('div');
+                kwDiv.style.cssText = 'margin-top:0.375rem;font-size:0.8125rem;color:#71717a;';
+                const studentText = (typeof r.selected === 'string' ? r.selected : '').toLowerCase();
+                const kwHTML = correctData.keywords.map(kw => {
+                    const found = studentText.includes(kw.toLowerCase());
+                    return '<span style="display:inline-block;padding:0.125rem 0.5rem;border-radius:4px;margin:0.125rem;font-size:0.75rem;' + (found ? 'background:#d1fae5;color:#065f46;' : 'background:#fee2e2;color:#991b1b;') + '">' + (found ? '\u2713' : '\u2717') + ' ' + kw + '</span>';
+                }).join('');
+                kwDiv.innerHTML = 'Keywords: ' + kwHTML;
+                qDiv.appendChild(kwDiv);
+            }
         }
+
+        // Add result indicator for all types
+        const indicator = document.createElement('div');
+        indicator.className = r.is_correct ? 'exit-result-correct' : 'exit-result-incorrect';
+        indicator.textContent = r.is_correct ? 'Correct!' : (r.explanation || 'Incorrect');
+        qDiv.appendChild(indicator);
     });
 }
 
