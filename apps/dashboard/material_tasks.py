@@ -239,59 +239,96 @@ def extract_material_with_vision(file_path: str, material_type: str, subject: st
     if not page_images:
         return []
 
-    # Type-specific extraction prompts
+    # Type-specific extraction prompts (improved based on testing)
     PROMPTS = {
-        'worksheet': f"""Analyze this {subject} worksheet for {grade_level} students and extract ALL questions.
+        'worksheet': f"""Analyze this {subject} worksheet for {grade_level} students and extract ALL questions and activities.
 
-For EACH question, extract:
-- "question_number": the question number
-- "question_text": the full question text
-- "question_type": one of "multiple_choice", "fill_in_blank", "short_answer", "matching", "calculation", "diagram_interpretation", "data_analysis", "essay", "true_false"
-- "answer": the correct answer if visible (from answer key)
-- "marks": mark allocation if shown
-- "figure_description": describe any diagram/figure/table associated with the question
-- "vocabulary_terms": key subject terms used in the question
-- "command_word": the action verb (define, describe, explain, compare, calculate, etc.)
+For EACH question or activity, extract:
+- "question_number": the question/activity number (e.g., "1", "2a", "Activity 3")
+- "question_text": the FULL question text including all instructions
+- "question_type": classify PRECISELY as one of:
+  "multiple_choice" (A/B/C/D options),
+  "fill_in_blank" (complete a sentence/paragraph with missing words),
+  "definition_recall" (define a term or concept),
+  "short_answer" (write 1-3 sentences),
+  "matching" (match items from two columns/lists),
+  "calculation" (compute a numerical answer),
+  "diagram_interpretation" (analyze a figure/map/chart),
+  "data_analysis" (interpret data in a table/graph),
+  "true_false" (true or false),
+  "labeling" (label parts of a diagram),
+  "essay" (extended written response)
+- "answer": the correct answer if visible (from answer key or word bank)
+- "marks": mark allocation as a number if shown, or null if not shown
+- "figure_description": describe any diagram/figure/table/map associated with the question. If none, set to null
+- "vocabulary_terms": key subject-specific terms used in the question
+- "command_word": the main action verb (define, describe, explain, compare, list, state, name, identify, give, use, etc.)
 
-Return a JSON array of question objects. Extract EVERY question — do not skip any.""",
+IMPORTANT:
+- Distinguish between "fill_in_blank" (gap-fill in a sentence) and "definition_recall" (define a term)
+- If a worksheet has Parts (A, B, C, D) or Activities, extract questions from ALL parts
+- If an activity has multiple sub-tasks (match these, fill in these, answer these), extract EACH sub-task as a separate item
+- A word-search with 15 definitions = 15 separate definition_recall items
+- A table to complete with 5 rows = 5 separate items
+- Extract MORE items rather than fewer — granularity is better
 
-        'question_bank': f"""Analyze this {subject} exam paper / question bank for {grade_level} students.
+Return a JSON array. Extract EVERY question from EVERY part — do not skip any.""",
 
-For EACH question, extract:
-- "question_number": the full question number (e.g., "1a", "2bi")
-- "question_text": the full question text
-- "question_type": "multiple_choice", "short_answer", "structured", "source_based", "essay", "calculation", "data_analysis"
-- "marks": mark allocation (e.g., 2, 3, 6)
-- "command_word": the action verb (state, describe, explain, suggest, evaluate, etc.)
-- "source_description": if the question references a source (map, table, diagram, photo), describe it
-- "answer_guidance": model answer or marking points if visible
-- "topic": what curriculum topic this tests
+        'question_bank': f"""Analyze this {subject} exam paper for {grade_level} students. Extract EVERY question including all sub-parts.
 
-Return a JSON array. Extract EVERY question including sub-parts (a, b, c, i, ii).""",
+For EACH question and sub-question, extract:
+- "question_number": the full number including sub-parts (e.g., "1", "2(i)", "3a(ii)", "Part 1 Q5")
+- "question_text": the FULL question text
+- "question_type": classify as:
+  "multiple_choice" (circle/underline A/B/C/D),
+  "short_answer" (1-2 line answer),
+  "structured" (guided multi-part question),
+  "source_based" (analyze a source then answer),
+  "map_reading" (use an OS/topographic map),
+  "fill_in_blank" (complete sentences),
+  "matching" (match columns/items),
+  "labeling" (identify features on a diagram),
+  "data_analysis" (interpret table/graph data),
+  "essay" (extended writing, 3+ marks)
+- "marks": the mark allocation as a NUMBER (from the [N] brackets). Must be an integer, not null
+- "command_word": the main instruction verb (State, Name, Identify, Describe, Explain, Suggest, Give, Draw, Compare, Discuss, Using information from...)
+- "source_description": describe the source material if the question references one (map extract, photograph, diagram, table, bar chart, text extract). Set to null if no source
+- "topic": which curriculum topic this question tests (weather, industry, trade, rivers, coasts, volcanoes, map skills, population, tourism, etc.)
+- "section": which section of the paper (e.g., "Section A Part 1", "Section B Q3")
 
-        'textbook': f"""Analyze these {subject} textbook pages for {grade_level} students.
+CRITICAL: Extract EVERY sub-part as a separate item. Q1(i), Q1(ii) are separate items. Include questions that reference diagrams/photographs even if you cannot see the image clearly — describe what the source appears to be.
 
-Extract:
-- "key_concepts": list of key concepts/definitions taught
-- "worked_examples": any worked examples with step-by-step solutions
-- "vocabulary": key terms with definitions
-- "figures": description of each diagram, map, chart, or image
-- "activities": any student activities or exercises
-- "local_context": any Seychelles-specific examples or data
+Return a JSON array.""",
 
-Return a JSON array of extracted items.""",
+        'textbook': f"""Analyze these {subject} textbook pages for {grade_level} students. Extract every piece of educational content.
 
-        'notes': f"""Analyze these {subject} teacher notes for {grade_level} students.
+For EACH distinct concept, definition, example, or figure, create a separate item with:
+- "item_type": "definition", "concept", "example", "worked_example", "figure", "activity", "key_fact", "local_context"
+- "title": short title for this item
+- "content": the full text content
+- "vocabulary_terms": key terms defined or used
+- "figure_description": describe any diagram/map/chart (null if none)
+- "seychelles_context": any Seychelles-specific data or examples (null if none)
 
-Extract:
-- "topics": main topics covered
-- "key_points": key teaching points
-- "explanations": detailed explanations of concepts
-- "examples": examples used (especially local/Seychelles context)
-- "activities": suggested student activities
-- "emphasis": concepts that receive extra emphasis or repetition
+Extract each definition, each example, and each key fact as SEPARATE items. Do NOT group multiple concepts into one item.
 
-Return a JSON array of extracted items.""",
+Return a JSON array.""",
+
+        'notes': f"""Analyze these {subject} teaching notes for {grade_level} students. Extract every piece of content as individual items.
+
+For EACH concept, definition, fact, example, or activity, create a separate item:
+- "item_type": "definition", "key_fact", "explanation", "example", "local_example", "activity", "statistic", "comparison"
+- "title": short descriptive title
+- "content": the full text
+- "vocabulary_terms": subject-specific terms used
+- "seychelles_data": any Seychelles-specific statistics, examples, or facts (null if none)
+- "related_topic": which curriculum topic this relates to
+
+IMPORTANT: Extract EACH definition as a separate item. Each statistic as a separate item. Each Seychelles-specific fact as a separate item. The more granular, the better — we need these for content generation.
+
+For example, if notes define "GNP", "HDI", "MEDC", "LEDC" — that is 4 separate definition items, NOT one grouped item.
+
+Return a JSON array.""",
     }
 
     prompt = PROMPTS.get(material_type, PROMPTS.get('textbook'))
@@ -324,20 +361,29 @@ Return a JSON array of extracted items.""",
                 })
         content_blocks.append({"type": "text", "text": prompt})
 
-        try:
-            response = client.generate(
-                messages=[{"role": "user", "content": content_blocks}],
-                system_prompt=system_prompt,
-                max_tokens=8000,
-            )
+        for attempt in range(2):
+            try:
+                response = client.generate(
+                    messages=[{"role": "user", "content": content_blocks}],
+                    system_prompt=system_prompt,
+                    max_tokens=8000,
+                )
 
-            from apps.llm.json_utils import parse_llm_json
-            items = parse_llm_json(response.content, expect_array=True)
-            if items and isinstance(items, list):
-                all_items.extend(items)
-        except Exception as e:
-            logger.warning(f"Material vision extraction batch failed: {e}")
-            continue
+                from apps.llm.json_utils import parse_llm_json
+                items = parse_llm_json(response.content, expect_array=True)
+                if items and isinstance(items, list):
+                    all_items.extend(items)
+                    print(f"[MaterialVision] Batch {batch_start//batch_size+1}: {len(items)} items", flush=True)
+                else:
+                    print(f"[MaterialVision] Batch {batch_start//batch_size+1}: empty/invalid JSON, attempt {attempt+1}", flush=True)
+                    if attempt == 0:
+                        continue  # Retry once
+                break
+            except Exception as e:
+                print(f"[MaterialVision] Batch {batch_start//batch_size+1} attempt {attempt+1} failed: {e}", flush=True)
+                if attempt == 0:
+                    continue  # Retry once
+                break
 
     print(f"[MaterialVision] {material_type}: extracted {len(all_items)} items from {len(page_images)} pages", flush=True)
     return all_items
