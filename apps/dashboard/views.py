@@ -1949,8 +1949,11 @@ def process_pending_materials(request, course_id):
     # Link unlinked materials from the curriculum upload to this course
     TeachingMaterialUpload.objects.filter(material_q, course__isnull=True).update(course=course)
 
+    # Include both 'pending' and stuck 'processing' materials (0 chunks = never actually processed)
     all_pending = TeachingMaterialUpload.objects.filter(
-        course=course, status='pending'
+        course=course,
+    ).filter(
+        Q(status='pending') | Q(status='processing', chunks_created=0) | Q(status='failed')
     )
     count = all_pending.count()
 
