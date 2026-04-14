@@ -492,7 +492,8 @@ def extract_curriculum_with_vision(file_path: str, subject: str, grade_level: st
     if not page_images:
         return None
 
-    print(f"[VisionExtractor] {len(page_images)} pages rendered for {subject} {grade_level}", flush=True)
+    is_math = subject.lower() in ('mathematics', 'math', 'maths')
+    print(f"[VisionExtractor] {len(page_images)} pages rendered for {subject} {grade_level} (math={is_math})", flush=True)
 
     # Process pages in batches — extract structure from each batch
     all_units = []
@@ -510,7 +511,58 @@ def extract_curriculum_with_vision(file_path: str, subject: str, grade_level: st
         page_range = f"pages {batch[0]['page_num']}-{batch[-1]['page_num']}"
         print(f"[VisionExtractor] Processing {page_range}...", flush=True)
 
-        extraction_prompt = f"""Analyze these curriculum document pages and extract ALL units with their complete structure.
+        is_math = subject.lower() in ('mathematics', 'math', 'maths')
+
+        if is_math:
+            extraction_prompt = f"""Analyze these MATHEMATICS curriculum pages and extract the complete structure.
+
+SUBJECT: {subject}
+
+This is a math termly plan organized by TOPICS and WEEKS. Each topic has TWO columns:
+- CORE (SET 3+): The foundational objectives every student must achieve
+- EXTENDED (SETS 1&2): The deeper/harder objectives for higher-ability students
+
+For EACH topic on these pages, extract:
+1. unit_title: The strand code and topic name (e.g., "Measures (M4) - Metric Measures")
+2. grade_level: The secondary level (S1, S2, S3, etc.)
+3. terminal_objectives: The CORE (SET 3+) objectives — extract EVERY bullet point from the Core column
+4. enabling_objectives: The EXTENDED (SETS 1&2) objectives — extract EVERY bullet point from the Extended column
+5. teaching_strategies: Assessment methods listed
+6. resources: Textbooks and materials listed
+7. weeks: How many weeks allocated (e.g., "2 weeks")
+
+IMPORTANT: Keep Core and Extended SEPARATE:
+- terminal_objectives = CORE column only
+- enabling_objectives = EXTENDED column only
+Do NOT merge them. Do NOT skip any bullet points.
+
+Return a JSON array:
+[{{
+    "unit_title": "Measures (M4) - Metric Measures",
+    "grade_level": "S3",
+    "weeks": "2 weeks",
+    "terminal_objectives": [
+        "List units for area",
+        "Estimate area",
+        "List units of volume",
+        "Estimate volume and capacity",
+        "Convert units of volume and capacity",
+        "Solve simple problems involving the area, volume and capacity"
+    ],
+    "enabling_objectives": [
+        "List units for area",
+        "Convert units of area",
+        "Convert units of volume and capacity",
+        "Convert units and volume",
+        "Solve problems involving area, volume, capacity and conversion of units of measures"
+    ],
+    "teaching_strategies": ["verbal questions", "class discussion", "end of topic tests"],
+    "resources": ["Maths In Action Bk 2", "Complete Mathematics for Cambridge Secondary 1"]
+}}]
+
+Return ONLY valid JSON."""
+        else:
+            extraction_prompt = f"""Analyze these curriculum document pages and extract ALL units with their complete structure.
 
 SUBJECT: {subject}
 
@@ -660,42 +712,67 @@ Return ONLY valid JSON."""
         tos = u.get('terminal_objectives', [])
         eos = u.get('enabling_objectives', [])
 
-        # Build lessons from terminal objectives (1 TO per 20-min lesson)
-        lesson_objectives = tos if tos else eos
+        # Build lessons — different strategy for math vs other subjects
         lessons = []
-        chunk_size = 1  # One TO per lesson for focused 20-min sessions
+        max_eos_per_lesson = 3  # For 20-min lessons
 
-        # Build TO chunks first, then distribute EOs evenly across them
-        to_chunks = []
-        for start in range(0, len(lesson_objectives), chunk_size):
-            chunk = lesson_objectives[start:start + chunk_size]
-            if chunk:
-                to_chunks.append(chunk)
+        if is_math or (len(tos) <= 1 and len(eos) > 3):
+            # MATH: Unit = Topic, TOs = Core, EOs = Extended
+            # ONE Extended objective per lesson — math needs depth:
+            # teach → worked example → practice from multiple angles → common mistakes
+            math_eos_per_lesson = 1
+            for start in range(0, max(len(eos), 1), math_eos_per_lesson):
+                lesson_eos = eos[start:start + math_eos_per_lesson]
+                if not lesson_eos:
+                    # If no extended objectives, use core objectives
+                    if tos:
+                        lesson_eos = tos[start:start + math_eos_per_lesson]
+                    if not lesson_eos:
+                        continue
+                # Use first EO as lesson objective
+                lesson_title = create_lesson_title(lesson_eos[0])
+                lessons.append({
+                    'title': lesson_title,
+                    'objective': lesson_eos[0],
+                    'enabling_objectives': tos,  # All core objectives for the unit
+                    'teaching_steps': lesson_eos,  # The specific extended EOs for this lesson
+                    'teaching_strategies': u.get('teaching_strategies', []),
+                    'resources': u.get('resources', []),
+                    'assessment_methods': u.get('assessment', []),
+                    'order': len(lessons) + 1,
+                })
+        else:
+            # GEOGRAPHY / multi-TO subjects: 1 TO per lesson, EOs distributed
+            lesson_objectives = tos if tos else eos
+            chunk_size = 1
 
-        num_lessons = len(to_chunks) or 1
+            to_chunks = []
+            for start in range(0, len(lesson_objectives), chunk_size):
+                chunk = lesson_objectives[start:start + chunk_size]
+                if chunk:
+                    to_chunks.append(chunk)
 
-        # Distribute EOs evenly across lessons in sequential order
-        eos_per_lesson = len(eos) // num_lessons if num_lessons else 0
-        eos_remainder = len(eos) % num_lessons if num_lessons else 0
-        eo_idx = 0
+            num_lessons = len(to_chunks) or 1
+            eos_per_lesson = len(eos) // num_lessons if num_lessons else 0
+            eos_remainder = len(eos) % num_lessons if num_lessons else 0
+            eo_idx = 0
 
-        for lesson_num, chunk in enumerate(to_chunks):
-            # Each lesson gets eos_per_lesson EOs, capped based on lesson duration
-            n_eos = eos_per_lesson + (1 if lesson_num < eos_remainder else 0)
-            n_eos = min(n_eos, 3)  # Default cap; pipeline adjusts based on duration
-            lesson_eos = eos[eo_idx:eo_idx + n_eos]
-            eo_idx += n_eos
+            for lesson_num, chunk in enumerate(to_chunks):
+                n_eos = eos_per_lesson + (1 if lesson_num < eos_remainder else 0)
+                n_eos = min(n_eos, max_eos_per_lesson)
+                lesson_eos = eos[eo_idx:eo_idx + n_eos]
+                eo_idx += n_eos
 
-            lessons.append({
-                'title': create_lesson_title(chunk[0]),
-                'objective': chunk[0],
-                'enabling_objectives': chunk,
-                'teaching_steps': lesson_eos,
-                'teaching_strategies': u.get('teaching_strategies', []),
-                'resources': u.get('resources', []),
-                'assessment_methods': u.get('assessment', []),
-                'order': len(lessons) + 1,
-            })
+                lessons.append({
+                    'title': create_lesson_title(chunk[0]),
+                    'objective': chunk[0],
+                    'enabling_objectives': chunk,
+                    'teaching_steps': lesson_eos,
+                    'teaching_strategies': u.get('teaching_strategies', []),
+                    'resources': u.get('resources', []),
+                    'assessment_methods': u.get('assessment', []),
+                    'order': len(lessons) + 1,
+                })
 
         units.append({
             'number': len(units) + 1,
