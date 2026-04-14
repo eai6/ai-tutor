@@ -622,17 +622,32 @@ def course_detail(request, course_id):
     
     # Check if any lesson is currently generating (course-wide generation in progress)
     from apps.dashboard.models import TeachingMaterialUpload, CurriculumUpload
-    # Show materials linked to this course directly or via its curriculum upload (ID-based)
-    material_q = Q(course=course)
-    if course.curriculum_upload_id:
-        material_q |= Q(curriculum_upload_id=course.curriculum_upload_id)
-    else:
-        # Fallback for courses created before this FK was added
-        related_upload_ids = list(
-            CurriculumUpload.objects.filter(created_course=course).values_list('id', flat=True)
+
+    # Find the curriculum upload that created this course
+    upload_id = course.curriculum_upload_id
+    if not upload_id:
+        cu = CurriculumUpload.objects.filter(created_course=course).first()
+        upload_id = cu.id if cu else None
+
+    # Clean up wrongly-linked materials (from previous broad subject matching bug)
+    # Only keep materials that were uploaded with this curriculum or directly to this course
+    if upload_id:
+        wrongly_linked = TeachingMaterialUpload.objects.filter(
+            course=course
+        ).exclude(
+            curriculum_upload_id=upload_id
+        ).exclude(
+            curriculum_upload__isnull=True  # keep materials uploaded directly to course
         )
-        if related_upload_ids:
-            material_q |= Q(curriculum_upload_id__in=related_upload_ids)
+        bad_count = wrongly_linked.count()
+        if bad_count > 0:
+            wrongly_linked.update(course=None)
+            logger.info(f"Unlinked {bad_count} wrongly-linked materials from course {course.id}")
+
+    # Show materials linked to this course or from its curriculum upload
+    material_q = Q(course=course)
+    if upload_id:
+        material_q |= Q(curriculum_upload_id=upload_id)
     materials = TeachingMaterialUpload.objects.filter(material_q).distinct()
 
     # Check both: any lesson with 'generating' status, OR an active upload still processing

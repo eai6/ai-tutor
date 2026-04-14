@@ -761,11 +761,8 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
         lesson_objective=lesson.objective or '',
         subject=subject,
         exam_context=exam_context,
-        seychelles_context=seychelles_context,
+        seychelles_context=seychelles_context + objectives_context,
     )
-    # Append objectives for systematic assessment coverage
-    if objectives_context:
-        prompt += "\n" + objectives_context
     # Append real assessment format examples from worksheets/exams
     if assessment_format_context:
         prompt += "\n" + assessment_format_context
