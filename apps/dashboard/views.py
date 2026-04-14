@@ -730,22 +730,19 @@ def curriculum_upload(request):
         # Handle optional material attachments (per-entry: files + title + type + grade)
         # Each material entry has: files (multiple), title, type, grade
         # Files within an entry share the same title/type/grade
+        # Save teaching materials (but DON'T process them yet)
+        # Materials are processed later from the course detail page
+        # after the curriculum is fully parsed and courses are created
         material_files_list = request.FILES.getlist('material_files')
+        materials_saved = 0
         if material_files_list and request.POST.get('attach_material'):
             material_titles = request.POST.getlist('material_titles')
             material_types = request.POST.getlist('material_types')
             material_grades = request.POST.getlist('material_grades')
 
-            from apps.dashboard.material_tasks import process_teaching_material
-            from apps.dashboard.background_tasks import run_async
-
             mat_dir = os.path.join(settings.MEDIA_ROOT, 'material_uploads')
             os.makedirs(mat_dir, exist_ok=True)
 
-            material_ids_to_process = []
-
-            # Map files to entries: each file input can have multiple files,
-            # but they share the same title/type/grade from their entry
             entry_idx = 0
             for material_file in material_files_list:
                 mat_path = os.path.join(mat_dir, material_file.name)
@@ -756,11 +753,9 @@ def curriculum_upload(request):
                 file_title = material_titles[entry_idx] if entry_idx < len(material_titles) else os.path.splitext(material_file.name)[0]
                 file_type = material_types[entry_idx] if entry_idx < len(material_types) else 'textbook'
                 file_grade = material_grades[entry_idx] if entry_idx < len(material_grades) else grade_level
-
-                # Use the per-material grade level, falling back to curriculum-level grade
                 mat_grade = file_grade if file_grade else grade_level
 
-                material_record = TeachingMaterialUpload.objects.create(
+                TeachingMaterialUpload.objects.create(
                     institution=institution,
                     uploaded_by=request.user,
                     file_path=mat_path,
@@ -770,57 +765,13 @@ def curriculum_upload(request):
                     grade_level=mat_grade,
                     material_type=file_type,
                     description='',
+                    status='pending',  # Not processed yet
                     curriculum_upload=upload_record,
                 )
+                materials_saved += 1
 
-                material_ids_to_process.append(material_record.id)
-
-            # Process materials concurrently with adaptive throttling
-            # If DB connections exhaust, reduce batch size and retry
-            def _process_material_batch(ids):
-                import time
-                import django.db
-
-                batch_size = len(ids)  # Start fully concurrent
-                idx = 0
-
-                while idx < len(ids):
-                    batch = ids[idx:idx + batch_size]
-                    threads = []
-
-                    for mid in batch:
-                        try:
-                            t = run_async(process_teaching_material, mid)
-                            threads.append(t)
-                        except Exception as e:
-                            err = str(e).lower()
-                            if 'connection' in err or 'slot' in err or 'too many' in err:
-                                # Reduce batch size and retry this batch
-                                django.db.connections.close_all()
-                                batch_size = max(1, batch_size - 3)
-                                logger.warning(
-                                    f"DB connection pressure — reducing batch to {batch_size}, "
-                                    f"waiting 5s before retrying"
-                                )
-                                time.sleep(5)
-                                break  # Retry from current idx
-                            else:
-                                logger.error(f"Material {mid} launch failed: {e}")
-                                threads.append(None)
-                    else:
-                        # All launched — wait for completion, then next batch
-                        for t in threads:
-                            if t and hasattr(t, 'join'):
-                                t.join(timeout=300)
-                        idx += batch_size
-                        continue
-                    # break hit — retry same idx with smaller batch
-                    continue
-
-            if material_ids_to_process:
-                run_async(_process_material_batch, material_ids_to_process)
-
-        messages.success(request, "Curriculum uploaded! Processing will begin shortly.")
+        mat_msg = f" {materials_saved} teaching material(s) saved (will be processed after curriculum)." if materials_saved else ""
+        messages.success(request, f"Curriculum uploaded! Processing will begin shortly.{mat_msg}")
         return redirect('dashboard:curriculum_process', upload_id=upload_record.id)
 
     # GET - show upload form
@@ -1868,6 +1819,55 @@ def lesson_session_report(request, lesson_id):
     }
 
     return render(request, 'dashboard/lesson_session_report.html', context)
+
+
+@teacher_required
+@require_POST
+def process_pending_materials(request, course_id):
+    """Process all pending teaching materials for a course."""
+    from apps.dashboard.models import TeachingMaterialUpload
+    from apps.dashboard.material_tasks import process_teaching_material
+    from apps.dashboard.background_tasks import run_async
+
+    institution = request.staff_ctx['institution']
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
+
+    pending = TeachingMaterialUpload.objects.filter(
+        course=course, status='pending'
+    )
+    # Also include materials linked via curriculum_upload but not yet linked to course
+    pending_unlinked = TeachingMaterialUpload.objects.filter(
+        curriculum_upload__created_course=course, status='pending', course__isnull=True
+    )
+    # Link unlinked materials to course
+    pending_unlinked.update(course=course)
+
+    all_pending = TeachingMaterialUpload.objects.filter(
+        course=course, status='pending'
+    )
+    count = all_pending.count()
+
+    if count == 0:
+        messages.info(request, "No pending materials to process.")
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    # Process sequentially in background to avoid overwhelming resources
+    material_ids = list(all_pending.values_list('id', flat=True))
+
+    def _process_all(ids):
+        import django.db
+        django.db.connections.close_all()
+        for mid in ids:
+            try:
+                print(f"[ProcessMaterials] Processing material {mid}", flush=True)
+                process_teaching_material(mid)
+            except Exception as e:
+                print(f"[ProcessMaterials] Material {mid} failed: {e}", flush=True)
+
+    run_async(_process_all, material_ids)
+
+    messages.success(request, f"Processing {count} material(s) in background.")
+    return redirect('dashboard:course_detail', course_id=course.id)
 
 
 # ============================================================================

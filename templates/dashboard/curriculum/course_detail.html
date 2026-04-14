@@ -264,9 +264,15 @@
             <h3 class="card-title" style="margin: 0;">Teaching Materials{% if materials %} ({{ materials|length }}){% endif %}</h3>
         </div>
         {% if can_edit_content %}
-        <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); var el=document.getElementById('material-upload-form'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; var body=this.closest('.card').querySelector('.collapsible-body'); if(body.classList.contains('collapsed')){toggleCollapse(this.closest('.collapsible-header'));}">
-            + Upload Material
-        </button>
+        <div style="display:flex;gap:0.5rem;" onclick="event.stopPropagation();">
+            <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary btn-sm" onclick="this.disabled=true;this.innerHTML='Processing...';">Process Pending Materials</button>
+            </form>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="var el=document.getElementById('material-upload-form'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; var body=this.closest('.card').querySelector('.collapsible-body'); if(body.classList.contains('collapsed')){toggleCollapse(this.closest('.collapsible-header'));}">
+                + Upload Material
+            </button>
+        </div>
         {% endif %}
     </div>
     <div class="collapsible-body collapsed" style="max-height: 600px;">
