@@ -1329,6 +1329,8 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
 
                 upload.add_log(f"   📁 {unit.title}")
 
+                target_duration = getattr(upload, 'lesson_duration_minutes', 20) or 20
+
                 for lesson_idx, lesson_data in enumerate(unit_data.get('lessons', [])):
                     lesson, l_created = Lesson.objects.update_or_create(
                         unit=unit,
@@ -1336,13 +1338,14 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                         defaults={
                             'objective': lesson_data.get('objective', ''),
                             'order_index': lesson_idx,
-                            'estimated_minutes': 20,
+                            'estimated_minutes': target_duration,
                             'is_published': False,
                             'enabling_objectives': lesson_data.get('enabling_objectives', []),
                             'metadata': {
                                 'key_concepts': lesson_data.get('key_concepts', []),
                                 'teaching_steps': lesson_data.get('teaching_steps', []),
                                 'from_curriculum_upload': upload.id,
+                                'target_duration': target_duration,
                             }
                         }
                     )

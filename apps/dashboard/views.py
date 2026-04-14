@@ -744,12 +744,15 @@ def curriculum_upload(request):
 
         from apps.dashboard.models import CurriculumUpload, TeachingMaterialUpload
 
+        lesson_duration = int(request.POST.get('lesson_duration', 20))
+
         upload_record = CurriculumUpload.objects.create(
             institution=institution,
             uploaded_by=request.user,
             file_path=file_path,
             subject_name=subject_name,
             grade_level=grade_level,
+            lesson_duration_minutes=lesson_duration,
             status='pending'
         )
 

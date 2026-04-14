@@ -118,7 +118,7 @@ class LessonSummarySchema(BaseModel):
 
 class GeneratedLessonContent(BaseModel):
     """Complete generated lesson content following the 5E pedagogical model."""
-    steps: List[LessonStepSchema] = Field(description="12-18 concept-grouped lesson steps")
+    steps: List[LessonStepSchema] = Field(description="5-6 concept-grouped lesson steps for a 20-minute lesson")
     lesson_summary: Optional[LessonSummarySchema] = None
 
 
@@ -429,6 +429,12 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         except Exception as e:
             logger.warning(f"Failed to load Seychelles context: {e}")
 
+        # Calculate step budget from lesson duration
+        target_minutes = lesson.estimated_minutes or 20
+        # ~3 min per step: 10min=3 steps, 20min=6 steps, 30min=8 steps, 40min=10 steps
+        max_steps = max(3, min(10, target_minutes // 3))
+        max_eos = max(1, min(5, (max_steps - 2) // 2))  # Reserve 1 engage + 1 evaluate
+
         # Prompt focuses on CONTENT, not FORMAT — instructor handles the schema
         prompt = f"""Create a complete tutoring session for this lesson.
 
@@ -437,25 +443,28 @@ OBJECTIVE: {lesson.objective or 'Master the concepts in this lesson'}
 UNIT: {unit.title}
 SUBJECT: {subject}
 GRADE: {grade} (Seychelles secondary school)
+LESSON DURATION: {target_minutes} minutes
 
 TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}
-Create 6-8 CONCEPT-GROUPED steps (MAXIMUM 8). This is a focused 20-minute lesson.
+Create {max_steps - 1}-{max_steps} CONCEPT-GROUPED steps (MAXIMUM {max_steps}). This is a focused {target_minutes}-minute lesson.
+Each lesson covers 1 terminal objective with {max_eos} enabling objectives. Keep it tight.
 
 STRUCTURE:
-1 ENGAGE step (concept_tag = "")
-Then FOR EACH CONCEPT (1-2 concepts):
-  1 teach or worked_example step → 1 practice step
-  All steps in the same concept share the SAME concept_tag (e.g. "relief_rainfall")
+1 ENGAGE step — brief hook, 2-3 sentences max
+Then FOR EACH ENABLING OBJECTIVE ({max_eos} EOs):
+  1 teach step → 1 practice step (paired)
   The practice step MUST have question, expected_answer, and hints
-1 EVALUATE step at the end (concept_tag = "")
+1 EVALUATE quiz step at the end
 
-concept_tag RULES:
-- Use lowercase_with_underscores, descriptive of the concept (e.g. "pythagorean_theorem", "convection_currents")
-- ALL steps teaching/practicing the SAME concept share the SAME tag
+KEEP IT SHORT: Each teach step should be 3-5 sentences of instruction, not a full lecture.
+
+enabling_objective RULES:
+- Set each step's enabling_objective field to the EXACT TEXT of the enabling objective it covers
+- ALL steps teaching/practicing the SAME EO share the SAME enabling_objective text
 - ENGAGE and EVALUATE steps use "" (empty string)
-- Each concept block MUST end with a practice or quiz step
+- Each EO block MUST end with a practice or quiz step
 
 STEP TYPES:
 - teach: Direct instruction (tutor explains)
@@ -540,7 +549,8 @@ CONTENT GUIDELINES:
         """Save generated steps to database."""
         from apps.curriculum.models import LessonStep
 
-        MAX_STEPS = 8
+        target_minutes = lesson.estimated_minutes or 20
+        MAX_STEPS = max(3, min(10, target_minutes // 3))
         if len(steps) > MAX_STEPS:
             logger.warning(
                 f"[ContentGen] [{lesson.title}] Trimming {len(steps)} steps to {MAX_STEPS}"

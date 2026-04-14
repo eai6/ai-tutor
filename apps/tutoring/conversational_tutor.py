@@ -112,6 +112,11 @@ DELIBERATE PRACTICE AT THE EDGE OF ABILITY
   or a new concept: "You've clearly got this -- let's level up."
 - If they struggle, slow down, provide a simpler variant, and build back up.
 - Never let practice become mindless repetition of something already mastered.
+- NEVER re-explain a concept the student already demonstrated understanding of.
+  If they got it right, say "Great!" and move on immediately. Do not rephrase
+  or summarize what they just proved they know.
+- Keep responses SHORT. 2-3 sentences for feedback, 3-5 sentences for teaching.
+  Long responses waste time. This is a 20-minute lesson — every exchange counts.
 - Use the [STUDENT PROFILE] data if available to calibrate difficulty.
 </principle>
 
@@ -3342,13 +3347,13 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         step_type = step.step_type or 'teach'
         exchanges = self.step_exchange_count
 
-        # 1. Hard cap: always advance after 8 exchanges on any step
-        if exchanges >= 8:
+        # 1. Hard cap: always advance after 6 exchanges on any step
+        if exchanges >= 6:
             logger.info(f"Hard cap: advancing step {self.current_topic_index} after {exchanges} exchanges")
             return True
 
         # 2. Min exchange floor
-        min_exchanges = {'teach': 2, 'worked_example': 2}.get(step_type, 1)
+        min_exchanges = {'teach': 1, 'worked_example': 1}.get(step_type, 1)
         if exchanges < min_exchanges:
             return False
 
@@ -3360,7 +3365,7 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         # 4. Practice attempt cap
         if step_type in ('practice', 'quiz'):
             max_attempts = getattr(step, 'max_attempts', 3) or 3
-            if exchanges >= max_attempts + 2:
+            if exchanges >= max_attempts + 1:
                 logger.info(f"Practice attempt cap: advancing step {self.current_topic_index} after {exchanges} exchanges")
                 return True
 

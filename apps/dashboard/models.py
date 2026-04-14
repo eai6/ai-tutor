@@ -62,6 +62,12 @@ class CurriculumUpload(models.Model):
     lessons_created = models.IntegerField(default=0)
     steps_created = models.IntegerField(default=0)  # Lesson steps generated
     
+    # Lesson configuration
+    lesson_duration_minutes = models.PositiveIntegerField(
+        default=20,
+        help_text="Target lesson duration in minutes (controls steps and EOs per lesson)"
+    )
+
     # Processing log
     processing_log = models.TextField(blank=True)
     teacher_feedback = models.TextField(blank=True)  # Store teacher feedback

@@ -680,8 +680,9 @@ Return ONLY valid JSON."""
         eo_idx = 0
 
         for lesson_num, chunk in enumerate(to_chunks):
-            # Each lesson gets eos_per_lesson EOs, plus 1 extra for the first 'remainder' lessons
+            # Each lesson gets eos_per_lesson EOs, capped based on lesson duration
             n_eos = eos_per_lesson + (1 if lesson_num < eos_remainder else 0)
+            n_eos = min(n_eos, 3)  # Default cap; pipeline adjusts based on duration
             lesson_eos = eos[eo_idx:eo_idx + n_eos]
             eo_idx += n_eos
 
@@ -693,7 +694,6 @@ Return ONLY valid JSON."""
                 'teaching_strategies': u.get('teaching_strategies', []),
                 'resources': u.get('resources', []),
                 'assessment_methods': u.get('assessment', []),
-                'estimated_minutes': 20,
                 'order': len(lessons) + 1,
             })
 
