@@ -660,19 +660,26 @@ def course_detail(request, course_id):
         or active_upload is not None
     )
 
-    # Course-level content quality tier (most common tier across lessons)
-    from collections import Counter
-    tier_counts = Counter()
-    for unit in units:
-        for lesson in unit.lessons.all():
-            if lesson.content_quality:
-                tier_counts[lesson.content_quality] += 1
-    course_tier = tier_counts.most_common(1)[0][0] if tier_counts else 'tier_3'
+    # Course-level content quality tier (based on what materials are available)
+    completed_materials = materials.filter(status='completed')
+    mat_types = set(completed_materials.values_list('material_type', flat=True))
+    has_worksheets = bool(mat_types & {'worksheet', 'question_bank'})
+    has_textbooks = bool(mat_types & {'textbook', 'notes'})
+    has_curriculum = True  # Always true — course exists from curriculum upload
+
+    if has_worksheets and has_textbooks:
+        course_tier = 'tier_1'  # Fully Resourced
+    elif has_worksheets or has_textbooks:
+        course_tier = 'tier_2'  # Syllabus + Materials
+    elif has_curriculum:
+        course_tier = 'tier_3'  # Syllabus Only
+    else:
+        course_tier = 'tier_4'  # Framework Only
     tier_labels = {
-        'tier_1': ('Tier 1 — Fully Resourced', '#065f46', '#d1fae5'),
-        'tier_2': ('Tier 2 — Syllabus + Exam', '#1e40af', '#dbeafe'),
-        'tier_3': ('Tier 3 — Syllabus Only', '#92400e', '#fef3c7'),
-        'tier_4': ('Tier 4 — Framework Only', '#991b1b', '#fee2e2'),
+        'tier_1': ('Fully Resourced', '#065f46', '#d1fae5'),
+        'tier_2': ('Syllabus + Materials', '#1e40af', '#dbeafe'),
+        'tier_3': ('Syllabus Only', '#92400e', '#fef3c7'),
+        'tier_4': ('Framework Only', '#991b1b', '#fee2e2'),
     }
     course_tier_label, course_tier_color, course_tier_bg = tier_labels.get(
         course_tier, ('Tier 3', '#92400e', '#fef3c7')
