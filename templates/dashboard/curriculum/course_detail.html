@@ -141,6 +141,10 @@
     .collapsible-body.collapsed {
         max-height: 0 !important;
     }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
 </style>
 {% endblock %}
 
@@ -215,6 +219,43 @@
                     <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-edit-form').style.display='none'; document.getElementById('course-header-display').style.display='flex';">Cancel</button>
                 </div>
             </form>
+
+            <!-- Re-parse section -->
+            <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+                <h4 style="font-size: 0.875rem; color: var(--gray-700); margin-bottom: 0.75rem;">Re-parse & Re-plan Lessons</h4>
+                <p style="font-size: 0.8125rem; color: var(--gray-500); margin-bottom: 0.75rem;">
+                    Re-analyze the original curriculum document with a different lesson duration. This will delete existing units/lessons and recreate them.
+                </p>
+                <form method="post" action="{% url 'dashboard:course_edit' course.id %}" onsubmit="return confirm('This will delete all existing units and lessons for this course and re-parse from the curriculum document. Continue?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reparse">
+                    <input type="hidden" name="title" value="{{ course.title }}">
+                    <input type="hidden" name="description" value="{{ course.description }}">
+                    <input type="hidden" name="grade_level" value="{{ course.grade_level }}">
+                    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <div>
+                            <label style="font-size: 0.8125rem; font-weight: 500; color: var(--gray-600);">Lesson Duration</label>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+                                <label style="display:flex;align-items:center;gap:0.25rem;padding:0.375rem 0.75rem;border:2px solid var(--gray-200);border-radius:6px;cursor:pointer;font-size:0.8125rem;">
+                                    <input type="radio" name="lesson_duration" value="10" style="accent-color:var(--primary);"> 10m
+                                </label>
+                                <label style="display:flex;align-items:center;gap:0.25rem;padding:0.375rem 0.75rem;border:2px solid var(--primary);border-radius:6px;cursor:pointer;font-size:0.8125rem;background:var(--primary-light);">
+                                    <input type="radio" name="lesson_duration" value="20" checked style="accent-color:var(--primary);"> 20m
+                                </label>
+                                <label style="display:flex;align-items:center;gap:0.25rem;padding:0.375rem 0.75rem;border:2px solid var(--gray-200);border-radius:6px;cursor:pointer;font-size:0.8125rem;">
+                                    <input type="radio" name="lesson_duration" value="30" style="accent-color:var(--primary);"> 30m
+                                </label>
+                                <label style="display:flex;align-items:center;gap:0.25rem;padding:0.375rem 0.75rem;border:2px solid var(--gray-200);border-radius:6px;cursor:pointer;font-size:0.8125rem;">
+                                    <input type="radio" name="lesson_duration" value="40" style="accent-color:var(--primary);"> 40m
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-sm" style="background: #dc2626; color: #fff; border: none; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600; margin-top: 1.25rem;">
+                            Re-parse & Re-plan
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -267,7 +308,14 @@
         <div style="display:flex;gap:0.5rem;" onclick="event.stopPropagation();">
             <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-primary btn-sm" onclick="this.disabled=true;this.innerHTML='Processing...';">Process Pending Materials</button>
+                {% if materials_processing %}
+                <button type="button" class="btn btn-primary btn-sm" disabled style="opacity:0.7;">
+                    <span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle;margin-right:0.375rem;"></span>
+                    Processing...
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-primary btn-sm" onclick="this.disabled=true;this.innerHTML='Starting...';">Process Pending Materials</button>
+                {% endif %}
             </form>
             <button type="button" class="btn btn-secondary btn-sm" onclick="showUploadForm(this)">
                 + Upload Material
@@ -275,7 +323,7 @@
         </div>
         {% endif %}
     </div>
-    <div class="collapsible-body collapsed" style="max-height: 600px;">
+    <div class="collapsible-body collapsed" style="max-height: 2000px;">
         <div class="card-body" style="padding: 0;">
             {% if materials %}
             <table class="table">
@@ -627,5 +675,10 @@ function showUploadForm(btn) {
         form.scrollIntoView({behavior: 'smooth', block: 'nearest'});
     }
 }
+
+// Auto-refresh when materials are processing
+{% if materials_processing %}
+setTimeout(function() { window.location.reload(); }, 10000);
+{% endif %}
 </script>
 {% endblock %}

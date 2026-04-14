@@ -691,6 +691,7 @@ def course_detail(request, course_id):
         'is_generating': is_generating,
         'active_upload': active_upload,
         'materials': materials,
+        'materials_processing': materials.filter(status='processing').exists(),
         'material_types': TeachingMaterialUpload.MaterialType.choices,
         'is_platform_wide': is_platform_wide,
         'course_read_only': course_read_only,
@@ -1957,22 +1958,29 @@ def process_pending_materials(request, course_id):
         messages.info(request, "No pending materials to process.")
         return redirect('dashboard:course_detail', course_id=course.id)
 
-    # Process sequentially in background to avoid overwhelming resources
+    # Mark all as 'processing' immediately so UI shows status change
     material_ids = list(all_pending.values_list('id', flat=True))
+    all_pending.update(status='processing')
 
     def _process_all(ids):
         import django.db
         django.db.connections.close_all()
-        for mid in ids:
+        for i, mid in enumerate(ids):
             try:
-                print(f"[ProcessMaterials] Processing material {mid}", flush=True)
+                print(f"[ProcessMaterials] Processing material {mid} ({i+1}/{len(ids)})", flush=True)
                 process_teaching_material(mid)
+                print(f"[ProcessMaterials] Done {mid}", flush=True)
             except Exception as e:
                 print(f"[ProcessMaterials] Material {mid} failed: {e}", flush=True)
+                # Mark as failed so it doesn't stay in 'processing' forever
+                try:
+                    TeachingMaterialUpload.objects.filter(id=mid).update(status='failed')
+                except Exception:
+                    pass
 
     run_async(_process_all, material_ids)
 
-    messages.success(request, f"Processing {count} material(s) in background.")
+    messages.success(request, f"Processing {count} material(s). This page will auto-refresh to show progress.")
     return redirect('dashboard:course_detail', course_id=course.id)
 
 
@@ -3470,6 +3478,49 @@ def course_edit(request, course_id):
     course.description = description
     course.grade_level = grade_level
     course.save(update_fields=['title', 'description', 'grade_level', 'updated_at'])
+
+    # Check if re-parse was requested
+    if request.POST.get('action') == 'reparse':
+        new_duration = int(request.POST.get('lesson_duration', 20))
+        from apps.dashboard.models import CurriculumUpload
+        from apps.dashboard.background_tasks import run_async
+
+        # Find the curriculum upload that created this course
+        upload = None
+        if course.curriculum_upload_id:
+            upload = CurriculumUpload.objects.filter(id=course.curriculum_upload_id).first()
+        if not upload:
+            upload = CurriculumUpload.objects.filter(created_course=course).first()
+
+        if not upload or not upload.file_path:
+            messages.error(request, "No curriculum file found to re-parse. Please upload a new curriculum.")
+            return redirect('dashboard:course_detail', course_id=course.id)
+
+        # Update the upload's duration setting
+        upload.lesson_duration_minutes = new_duration
+        upload.status = 'processing'
+        upload.processing_log = ''
+        upload.save()
+
+        # Delete existing units/lessons (they'll be recreated)
+        course.units.all().delete()
+
+        # Re-run the pipeline in background
+        from apps.curriculum.pipeline import complete_curriculum_upload
+        def _reparse(upload_id):
+            import django.db
+            django.db.connections.close_all()
+            try:
+                # Re-extract structure
+                from apps.curriculum.pipeline import process_curriculum_upload
+                process_curriculum_upload(upload_id, skip_review=True)
+            except Exception as e:
+                print(f"[Reparse] FAILED: {e}", flush=True)
+                import traceback; traceback.print_exc()
+
+        run_async(_reparse, upload.id)
+        messages.success(request, f"Re-parsing curriculum with {new_duration}-minute lessons. This will take a few minutes.")
+        return redirect('dashboard:curriculum_process', upload_id=upload.id)
 
     messages.success(request, f"Course updated.")
     return redirect('dashboard:course_detail', course_id=course.id)
