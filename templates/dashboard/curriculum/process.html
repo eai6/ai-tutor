@@ -331,16 +331,18 @@
                     Content is being generated for each lesson. This page will auto-refresh every 10 seconds.
                 </p>
                 {% else %}
-                <p style="color: var(--gray-400); font-size: 0.875rem;">This may take a few minutes</p>
+                <p style="color: var(--gray-400); font-size: 0.875rem;">This may take a few minutes. This page refreshes automatically.</p>
                 {% endif %}
             </div>
-            
-            {% if upload.processing_log %}
+
+            <!-- Always show progress log during processing -->
             <div style="margin-top: 1rem;">
                 <h4 style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 0.5rem;">📋 Progress Log</h4>
-                <pre id="progress-log" style="background: var(--gray-900); color: #10B981; padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{{ upload.processing_log }}</pre>
+                <pre id="progress-log" style="background: var(--gray-900); color: #10B981; padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{% if upload.processing_log %}{{ upload.processing_log }}{% else %}Waiting for processing to start...{% endif %}</pre>
             </div>
-            {% endif %}
+
+            <!-- Auto-refresh every 8 seconds while processing -->
+            <script>setTimeout(function(){ window.location.reload(); }, 8000);</script>
             
             {% if upload.created_course %}
             <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--gray-100); text-align: center;">
