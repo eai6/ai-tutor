@@ -172,12 +172,28 @@ class CurriculumKnowledgeBase:
         """Get or create the curriculum collection."""
         if not self._chromadb_available:
             return None
-        
-        return self.chroma_client.get_or_create_collection(
-            name=self.collection_name,
-            embedding_function=self.embedding_fn,
-            metadata={"institution_id": self.institution_id}
-        )
+
+        try:
+            return self.chroma_client.get_or_create_collection(
+                name=self.collection_name,
+                embedding_function=self.embedding_fn,
+                metadata={"institution_id": self.institution_id}
+            )
+        except Exception as e:
+            if 'embedding function' in str(e).lower() or 'conflict' in str(e).lower():
+                # Embedding function changed (e.g., openai -> sentence_transformer)
+                # Delete old collection and recreate with new embedding
+                logger.warning(f"Embedding conflict for {self.collection_name} — recreating collection: {e}")
+                try:
+                    self.chroma_client.delete_collection(name=self.collection_name)
+                except Exception:
+                    pass
+                return self.chroma_client.get_or_create_collection(
+                    name=self.collection_name,
+                    embedding_function=self.embedding_fn,
+                    metadata={"institution_id": self.institution_id}
+                )
+            raise
     
     # ========================================================================
     # STEP 1 & 2: PARSE AND VECTORIZE
