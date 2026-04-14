@@ -36,6 +36,7 @@ def process_teaching_material(upload_id: int):
         upload.add_log("Starting processing...")
 
         # Step 1: LLM vision extraction for rich structured data
+        print(f"[Material] Step 1: Vision extraction for {upload.original_filename} (type={upload.material_type})", flush=True)
         if upload.file_path and upload.file_path.lower().endswith('.pdf'):
             try:
                 vision_data = extract_material_with_vision(
@@ -45,18 +46,19 @@ def process_teaching_material(upload_id: int):
                     grade_level=upload.grade_level,
                 )
                 if vision_data:
-                    # Store structured extraction in metadata
-                    metadata = upload.description or ''
-                    if not metadata:
-                        metadata = ''
-                    # Save to processing_log for now, store in KB chunks
                     upload.add_log(f"Vision extraction: {len(vision_data)} items extracted")
+                    print(f"[Material] Vision: {len(vision_data)} items from {upload.original_filename}", flush=True)
                     _index_vision_data(upload, vision_data)
+                else:
+                    print(f"[Material] Vision: no items extracted", flush=True)
             except Exception as e:
                 upload.add_log(f"Vision extraction skipped: {e}")
-                print(f"[MaterialVision] {upload.original_filename} failed: {e}", flush=True)
+                print(f"[Material] Vision FAILED for {upload.original_filename}: {e}", flush=True)
+        else:
+            print(f"[Material] Skipping vision (not PDF)", flush=True)
 
         # Step 2: Standard text extraction and KB indexing
+        print(f"[Material] Step 2: Text extraction + KB indexing for {upload.original_filename}", flush=True)
         from apps.accounts.models import Institution
         kb = CurriculumKnowledgeBase(institution_id=upload.institution_id or Institution.get_global().id)
 
@@ -357,11 +359,16 @@ def _match_worksheet_to_objectives(upload, kb) -> int:
         return 0
 
     # Query KB for worksheet chunks
-    worksheet_chunks = kb.query(
-        query_text=f"{upload.title} {upload.subject_name} worksheet exercises questions",
+    worksheet_result = kb.query_for_content_generation(
+        lesson_title=upload.title,
+        lesson_objective=f"{upload.subject_name} worksheet exercises questions",
+        unit_title='',
+        subject=upload.subject_name,
+        grade_level=upload.grade_level or '',
         n_results=20,
     )
-    if not worksheet_chunks or not worksheet_chunks.get('chunks'):
+    worksheet_chunks = {'chunks': [c for c in (worksheet_result.chunks if worksheet_result else [])]}
+    if not worksheet_chunks.get('chunks'):
         return 0
 
     worksheet_text = "\n".join(

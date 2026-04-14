@@ -646,13 +646,17 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
     assessment_format_context = ""
     try:
         # Find worksheet and exam questions from KB that were vision-extracted
-        worksheet_results = kb.query(
-            query_text=f"{lesson.title} {lesson.objective or ''} questions assessment",
+        worksheet_results = kb.query_for_content_generation(
+            lesson_title=lesson.title,
+            lesson_objective=lesson.objective or '',
+            unit_title=lesson.unit.title if lesson.unit else '',
+            subject=subject,
+            grade_level=lesson.unit.course.grade_level or '',
             n_results=10,
         )
-        if worksheet_results and worksheet_results.get('chunks'):
+        if worksheet_results and worksheet_results.chunks:
             format_examples = []
-            for chunk in worksheet_results['chunks'][:8]:
+            for chunk in worksheet_results.chunks[:8]:
                 meta = chunk.get('metadata', {})
                 chunk_type = meta.get('chunk_type', '')
                 if chunk_type in ('vision_worksheet', 'vision_question_bank'):

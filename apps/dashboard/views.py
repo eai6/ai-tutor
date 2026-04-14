@@ -898,7 +898,7 @@ def curriculum_generate(request, upload_id):
     else:
         upload = get_object_or_404(CurriculumUpload, id=upload_id)
 
-    if upload.status not in ('pending', 'failed'):
+    if upload.status not in ('pending', 'failed', 'processing'):
         return JsonResponse({'error': 'Already processing'}, status=400)
 
     # Start processing in background thread (avoids Gunicorn 120s timeout)
