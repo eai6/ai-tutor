@@ -269,7 +269,7 @@
                 {% csrf_token %}
                 <button type="submit" class="btn btn-primary btn-sm" onclick="this.disabled=true;this.innerHTML='Processing...';">Process Pending Materials</button>
             </form>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="var el=document.getElementById('material-upload-form'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; var body=this.closest('.card').querySelector('.collapsible-body'); if(body.classList.contains('collapsed')){toggleCollapse(this.closest('.collapsible-header'));}">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="showUploadForm(this)">
                 + Upload Material
             </button>
         </div>
@@ -603,6 +603,23 @@ function toggleCollapse(header) {
     if (!body) return;
     header.classList.toggle('collapsed');
     body.classList.toggle('collapsed');
+}
+
+function showUploadForm(btn) {
+    var form = document.getElementById('material-upload-form');
+    var card = btn.closest('.card');
+    var header = card.querySelector('.collapsible-header');
+    var body = card.querySelector('.collapsible-body');
+    // Expand the section if collapsed
+    if (body && body.classList.contains('collapsed')) {
+        header.classList.remove('collapsed');
+        body.classList.remove('collapsed');
+    }
+    // Toggle the upload form
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    if (form.style.display === 'block') {
+        form.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
 }
 </script>
 {% endblock %}

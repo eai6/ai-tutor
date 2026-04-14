@@ -622,7 +622,10 @@ def course_detail(request, course_id):
     
     # Check if any lesson is currently generating (course-wide generation in progress)
     from apps.dashboard.models import TeachingMaterialUpload, CurriculumUpload
-    materials = TeachingMaterialUpload.objects.filter(course=course)
+    # Show materials linked directly to course OR via the curriculum upload that created it
+    materials = TeachingMaterialUpload.objects.filter(
+        Q(course=course) | Q(curriculum_upload__created_course=course)
+    ).distinct()
 
     # Check both: any lesson with 'generating' status, OR an active upload still processing
     active_upload = CurriculumUpload.objects.filter(
