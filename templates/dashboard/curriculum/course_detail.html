@@ -391,7 +391,7 @@
                         <td>{{ m.chunks_created }}</td>
                         <td style="white-space: nowrap;">
                             <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.5rem;">Details</a>
-                            {% if can_edit_content and m.status != 'processing' %}
+                            {% if can_edit_content and m.status != 'completed' %}
                             <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
                                 {% csrf_token %}
                                 <input type="hidden" name="material_ids" value="{{ m.id }}">
