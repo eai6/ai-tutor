@@ -383,17 +383,17 @@ def generate_lesson_structure(
             from apps.curriculum.curriculum_parser import extract_curriculum_with_vision
             print(f"[generate_lesson_structure] Trying LLM vision extraction on {file_path}...", flush=True)
             vision_result = extract_curriculum_with_vision(file_path, subject, grade_level)
-                if vision_result and vision_result.units:
-                    total_lessons = sum(len(u.get('lessons', [])) for u in vision_result.units)
-                    total_tos = sum(len(u.get('terminal_objectives', [])) for u in vision_result.units)
-                    print(f"[generate_lesson_structure] Vision: {len(vision_result.units)} units, {total_lessons} lessons, {total_tos} TOs", flush=True)
-                    if total_lessons >= 3:
-                        return {
-                            'subject': subject,
-                            'grade_level': grade_level,
-                            'units': vision_result.units,
-                            'total_lessons': total_lessons,
-                        }
+            if vision_result and vision_result.units:
+                total_lessons = sum(len(u.get('lessons', [])) for u in vision_result.units)
+                total_tos = sum(len(u.get('terminal_objectives', [])) for u in vision_result.units)
+                print(f"[generate_lesson_structure] Vision: {len(vision_result.units)} units, {total_lessons} lessons, {total_tos} TOs", flush=True)
+                if total_lessons >= 3:
+                    return {
+                        'subject': subject,
+                        'grade_level': grade_level,
+                        'units': vision_result.units,
+                        'total_lessons': total_lessons,
+                    }
         except Exception as e:
             print(f"[generate_lesson_structure] Vision extraction failed: {e}", flush=True)
             import traceback; traceback.print_exc()
@@ -1311,53 +1311,53 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
 
             # Create units and lessons for this grade
             for unit_idx, unit_data in enumerate(grade_units):
-            unit, u_created = Unit.objects.update_or_create(
-                course=course,
-                title=unit_data['title'],
-                defaults={
-                    'description': unit_data.get('description', ''),
-                    'order_index': unit_idx,
-                    'grade_level': unit_data.get('grade_level', ''),
-                    'terminal_objectives': unit_data.get('terminal_objectives', []),
-                    'enabling_objectives': unit_data.get('enabling_objectives', []),
-                }
-            )
-            
-            if u_created:
-                units_created += 1
-            
-            upload.add_log(f"   📁 {unit.title}")
-            
-            for lesson_idx, lesson_data in enumerate(unit_data.get('lessons', [])):
-                lesson, l_created = Lesson.objects.update_or_create(
-                    unit=unit,
-                    title=lesson_data['title'],
+                unit, u_created = Unit.objects.update_or_create(
+                    course=course,
+                    title=unit_data['title'],
                     defaults={
-                        'objective': lesson_data.get('objective', ''),
-                        'order_index': lesson_idx,
-                        'estimated_minutes': 20,
-                        'is_published': False,
-                        'enabling_objectives': lesson_data.get('enabling_objectives', []),
-                        'metadata': {
-                            'key_concepts': lesson_data.get('key_concepts', []),
-                            'teaching_steps': lesson_data.get('teaching_steps', []),
-                            'from_curriculum_upload': upload.id,
-                        }
+                        'description': unit_data.get('description', ''),
+                        'order_index': unit_idx,
+                        'grade_level': unit_data.get('grade_level', ''),
+                        'terminal_objectives': unit_data.get('terminal_objectives', []),
+                        'enabling_objectives': unit_data.get('enabling_objectives', []),
                     }
                 )
-                
-                if l_created:
-                    lessons_created += 1
-                    
-                    # Create initial teaching step
-                    LessonStep.objects.get_or_create(
-                        lesson=lesson,
-                        order_index=0,
+
+                if u_created:
+                    units_created += 1
+
+                upload.add_log(f"   📁 {unit.title}")
+
+                for lesson_idx, lesson_data in enumerate(unit_data.get('lessons', [])):
+                    lesson, l_created = Lesson.objects.update_or_create(
+                        unit=unit,
+                        title=lesson_data['title'],
                         defaults={
-                            'step_type': 'teach',
-                            'teacher_script': f"Today we will learn about: {lesson.objective or lesson.title}",
+                            'objective': lesson_data.get('objective', ''),
+                            'order_index': lesson_idx,
+                            'estimated_minutes': 20,
+                            'is_published': False,
+                            'enabling_objectives': lesson_data.get('enabling_objectives', []),
+                            'metadata': {
+                                'key_concepts': lesson_data.get('key_concepts', []),
+                                'teaching_steps': lesson_data.get('teaching_steps', []),
+                                'from_curriculum_upload': upload.id,
+                            }
                         }
                     )
+
+                    if l_created:
+                        lessons_created += 1
+
+                        # Create initial teaching step
+                        LessonStep.objects.get_or_create(
+                            lesson=lesson,
+                            order_index=0,
+                            defaults={
+                                'step_type': 'teach',
+                                'teacher_script': f"Today we will learn about: {lesson.objective or lesson.title}",
+                            }
+                        )
         
         upload.units_created = units_created
         upload.lessons_created = lessons_created
