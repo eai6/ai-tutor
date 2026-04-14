@@ -729,8 +729,17 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
     teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
 
     # Use teaching_steps as EOs if available, otherwise fall back to enabling_objectives
-    # (In the curriculum parser, enabling_objectives = TO chunks, teaching_steps = actual EOs)
     eo_list = teaching_steps if teaching_steps else terminal_objs
+
+    # If still empty, collect unique EOs from lesson steps
+    if not eo_list:
+        from apps.curriculum.models import LessonStep
+        seen = set()
+        for step in LessonStep.objects.filter(lesson=lesson).order_by('order_index'):
+            eo = step.enabling_objective or ''
+            if eo and eo not in seen:
+                seen.add(eo)
+                eo_list.append(eo)
 
     if terminal_objs:
         to_lines = "\n".join(f"  TO{i+1}: {to}" for i, to in enumerate(terminal_objs))
