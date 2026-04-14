@@ -3621,8 +3621,14 @@ Which concept numbers were meaningfully covered?"""
         """
         q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
 
+        # Safety: if student_answer is a list/dict, it's NOT an MCQ answer
+        if isinstance(student_answer, (list, dict)):
+            if q_type == 'mcq':
+                q_type = 'fill_in_blank' if isinstance(student_answer, list) else 'matching'
+
         if q_type == 'mcq':
-            return (student_answer or '').upper().strip() == (question.correct_answer or '').upper().strip()
+            ans = student_answer if isinstance(student_answer, str) else str(student_answer or '')
+            return ans.upper().strip() == (question.correct_answer or '').upper().strip()
 
         data = question.answer_data or {}
 
@@ -3657,8 +3663,11 @@ Which concept numbers were meaningfully covered?"""
             matched = sum(1 for kw in keywords if kw.lower() in text)
             return matched >= min_kw
 
-        # Unknown type — default to incorrect
-        return False
+        # Unknown type — try string comparison as last resort
+        try:
+            return str(student_answer or '').lower().strip() == str(question.correct_answer or '').lower().strip()
+        except Exception:
+            return False
 
     def submit_exit_ticket(self, answers) -> TutorMessage:
         """Process exit ticket submission using the pre-selected randomized questions.
@@ -3686,6 +3695,9 @@ Which concept numbers were meaningfully covered?"""
             # Support both old format (plain string) and new format ({type, answer})
             if isinstance(raw_answer, dict) and 'answer' in raw_answer:
                 student_answer = raw_answer['answer']
+            elif isinstance(raw_answer, dict) and 'type' not in raw_answer and len(raw_answer) > 0:
+                # Matching answer: dict of {left: right} pairs
+                student_answer = raw_answer
             else:
                 student_answer = raw_answer
 
