@@ -1851,15 +1851,24 @@ def process_pending_materials(request, course_id):
     institution = request.staff_ctx['institution']
     course = get_scoped_object_or_404(Course, institution, id=course_id)
 
-    pending = TeachingMaterialUpload.objects.filter(
-        course=course, status='pending'
-    )
-    # Also include materials linked via curriculum_upload but not yet linked to course
-    pending_unlinked = TeachingMaterialUpload.objects.filter(
-        curriculum_upload__created_course=course, status='pending', course__isnull=True
-    )
-    # Link unlinked materials to course
-    pending_unlinked.update(course=course)
+    # Find ALL pending materials related to this course (same broad query as course detail)
+    from apps.dashboard.models import CurriculumUpload
+    material_q = Q(course=course)
+    related_upload_ids = list(CurriculumUpload.objects.filter(
+        created_course=course
+    ).values_list('id', flat=True))
+    if not related_upload_ids:
+        subject_word = course.title.split()[0] if course.title else ''
+        if subject_word:
+            related_upload_ids = list(CurriculumUpload.objects.filter(
+                subject_name__iexact=subject_word,
+                institution=course.institution,
+            ).values_list('id', flat=True))
+    if related_upload_ids:
+        material_q |= Q(curriculum_upload_id__in=related_upload_ids)
+
+    # Link unlinked materials to this course so processing can find them
+    TeachingMaterialUpload.objects.filter(material_q, course__isnull=True).update(course=course)
 
     all_pending = TeachingMaterialUpload.objects.filter(
         course=course, status='pending'

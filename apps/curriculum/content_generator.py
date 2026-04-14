@@ -731,8 +731,15 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
         to_lines = "\n".join(f"  TO{i+1}: {to}" for i, to in enumerate(terminal_objs))
         objectives_context += f"\nTERMINAL OBJECTIVES (each must be assessed by at least 2 questions):\n{to_lines}\n"
     if teaching_steps:
-        ts_lines = "\n".join(f"  - {ts}" for ts in teaching_steps)
-        objectives_context += f"\nENABLING OBJECTIVES / TEACHING STEPS:\n{ts_lines}\n"
+        ts_lines = "\n".join(f"  EO{i+1}: {ts}" for i, ts in enumerate(teaching_steps))
+        objectives_context += f"""
+ENABLING OBJECTIVES (the concept_tag for EVERY question MUST be one of these):
+{ts_lines}
+
+CRITICAL: The concept_tag field must be the EXACT text of one of the enabling objectives above (e.g. "Define the terms Development, Globalization, MEDC, NIC, LEDC").
+Do NOT invent short labels — use the full enabling objective text so assessments link directly to teaching steps.
+Every enabling objective must be assessed by at least 1 question. Distribute questions across all EOs.
+"""
 
     prompt = EXIT_TICKET_PROMPT.format(
         lesson_title=lesson.title,
