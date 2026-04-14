@@ -641,6 +641,7 @@ class ConversationalTutor:
         self.is_remediation = state.get('is_remediation', False)
         self.remediation_attempt = state.get('remediation_attempt', 0)
         self.failed_exit_questions = state.get('failed_exit_questions', [])
+        self._failed_eos = state.get('failed_eos', [])
 
         # Track whether last answer was correct
         self.last_answer_correct = state.get('last_practice_correct', False)
@@ -707,6 +708,7 @@ class ConversationalTutor:
             'is_remediation': getattr(self, 'is_remediation', False),
             'remediation_attempt': getattr(self, 'remediation_attempt', 0),
             'failed_exit_questions': getattr(self, 'failed_exit_questions', []),
+            'failed_eos': getattr(self, '_failed_eos', []),
             # Track whether last answer was correct
             'last_practice_correct': getattr(self, 'last_answer_correct', False),
             # Review mode flag (P4-2)
@@ -2925,12 +2927,25 @@ PREREQUISITE GAPS DETECTED:
 {chr(10).join(f'  - {name}' for name in gap_names)}
 Address these gaps FIRST before re-teaching the failed concepts.
 """
+            failed_eos = getattr(self, '_failed_eos', [])
+            eo_context = ""
+            if failed_eos:
+                eo_lines = "\n".join(f"  - {eo}" for eo in failed_eos[:4])
+                eo_context = f"""
+ENABLING OBJECTIVES TO REMEDIATE:
+{eo_lines}
+
+Work through each enabling objective one at a time:
+1. RE-TEACH the concept using a DIFFERENT explanation than before
+2. Give a simple example
+3. Ask a check question to verify understanding
+4. Move to the next EO once they demonstrate understanding
+"""
             return f"""
 REMEDIATION MODE (Attempt #{attempt})
-The student failed the exit ticket and is reviewing {failed_count} concepts they got wrong.
-{prereq_gap_context}
-Focus ONLY on missed concepts. Use DIFFERENT explanations than before.
-Break concepts into smaller steps. Be encouraging."""
+The student scored {failed_count} wrong on the exit ticket.
+{eo_context}{prereq_gap_context}
+Be encouraging. Break concepts into smaller steps. Use different examples than before."""
 
         # Light context based on step position
         if self.current_topic_index < len(self.steps):
@@ -2946,18 +2961,22 @@ Break concepts into smaller steps. Be encouraging."""
         return ""  # The step directive is sufficient
 
     def _remediation_steps_complete(self) -> bool:
-        """Check if all failed exit ticket concepts have been re-covered during remediation."""
+        """Check if remediation has covered enough ground.
+
+        Uses exchange count as proxy — remediation should teach for at least
+        2 exchanges per failed EO before retrying the exit ticket.
+        """
         if not getattr(self, 'is_remediation', False):
             return False
 
-        failed_ids = {fq['id'] for fq in getattr(self, 'failed_exit_questions', [])}
-        if not failed_ids:
+        failed_eos = getattr(self, '_failed_eos', [])
+        min_exchanges = max(4, len(failed_eos) * 2)  # At least 2 exchanges per failed EO
+
+        # Safety valve: max 15 exchanges in remediation
+        if self.exchange_count >= 15:
             return True
 
-        for concept in self.exit_ticket_concepts:
-            if concept['id'] in failed_ids and not concept.get('covered'):
-                return False
-        return True
+        return self.exchange_count >= min_exchanges
 
     def _get_uncovered_concepts(self) -> List[Dict]:
         """Get list of exit ticket concepts not yet covered."""
@@ -3764,37 +3783,36 @@ Which concept numbers were meaningfully covered?"""
         )
     
     def _start_remediation(
-        self, 
-        results: List[Dict], 
-        score: int, 
+        self,
+        results: List[Dict],
+        score: int,
         failed_questions: List[Dict]
     ) -> TutorMessage:
         """
-        Start targeted remediation for failed exit ticket questions.
-        
-        This resets the session to instruction phase, but now focused
-        specifically on the concepts the student got wrong.
+        Start targeted remediation based on failed ENABLING OBJECTIVES.
+
+        Identifies which EOs the student missed on the exit ticket
+        (via concept_tag = EO text), then re-teaches those specific objectives.
         """
-        # Track remediation state
-        self.failed_exit_questions = failed_questions
         self.remediation_attempt = getattr(self, 'remediation_attempt', 0) + 1
         self.is_remediation = True
 
-        # Wire RemediationService for targeted remediation plan (R5)
-        try:
-            from apps.tutoring.personalization import RemediationService
-            remediation_service = RemediationService(self.student, self.lesson)
-            self._remediation_plan = remediation_service.get_remediation_plan(
-                exit_ticket_score=score / len(results) if results else 0,
-            )
-            if self._remediation_plan.get('prerequisite_gaps'):
-                gap_names = [s.name for s in self._remediation_plan['prerequisite_gaps'][:5]]
-                logger.info(f"Remediation plan: prerequisite gaps = {gap_names}")
-        except Exception as e:
-            logger.warning(f"Failed to get remediation plan: {e}")
-            self._remediation_plan = None
+        # Extract failed enabling objectives from exit ticket concept_tags
+        from apps.tutoring.models import ExitTicketQuestion
+        failed_eos = set()
+        for fq in failed_questions:
+            q = ExitTicketQuestion.objects.filter(id=fq['id']).first()
+            if q and q.concept_tag:
+                failed_eos.add(q.concept_tag)
 
-        # Mark failed concepts as NOT covered (need to re-teach)
+        # If no EO tags found, fall back to question text
+        if not failed_eos:
+            failed_eos = {fq['question'][:100] for fq in failed_questions[:5]}
+
+        self.failed_exit_questions = failed_questions
+        self._failed_eos = list(failed_eos)
+
+        # Mark failed EO concepts as NOT covered
         failed_ids = {fq['id'] for fq in failed_questions}
         for concept in self.exit_ticket_concepts:
             if concept['id'] in failed_ids:
@@ -3802,13 +3820,11 @@ Which concept numbers were meaningfully covered?"""
 
         # Reset to tutoring state for targeted review
         self.session_state = SessionState.TUTORING
-        self.exchange_count = 0  # Reset for remediation safety valve
-        
-        # Save state with remediation info
+        self.exchange_count = 0
+
         self._save_state()
-        
-        # Generate encouraging remediation message
-        failed_count = len(failed_questions)
+
+        # Generate EO-focused remediation message
         message = self._generate_remediation_opening(score, len(results), failed_questions)
         
         # Save the message
@@ -3829,31 +3845,32 @@ Which concept numbers were meaningfully covered?"""
         )
     
     def _generate_remediation_opening(
-        self, 
-        score: int, 
-        total: int, 
+        self,
+        score: int,
+        total: int,
         failed_questions: List[Dict]
     ) -> str:
-        """Generate an encouraging message to start remediation."""
-        # Build context about what they got wrong
-        failed_topics = []
-        for fq in failed_questions[:3]:  # Show first 3
-            failed_topics.append(f"- {fq['question'][:80]}...")
-        
+        """Generate EO-focused remediation opening."""
+        failed_eos = getattr(self, '_failed_eos', [])
+
+        eo_list = "\n".join(f"  - {eo}" for eo in failed_eos[:4]) if failed_eos else "  - (general review needed)"
+
         prompt = f"""The student just completed the exit ticket but didn't pass.
 Score: {score}/{total} (needed 8 to pass)
 Attempt number: {self.remediation_attempt}
 
-Questions they got wrong:
-{chr(10).join(failed_topics)}
+ENABLING OBJECTIVES they need to work on:
+{eo_list}
 
 Generate an encouraging message that:
 1. Acknowledges their effort positively (no shame!)
-2. Explains we'll review the specific concepts they missed
-3. Reassures them this is normal - learning takes practice
-4. Starts with a question about one of the concepts they missed
+2. Names the specific enabling objectives they'll review (use the EO text above)
+3. Reassures them this is normal — learning takes practice
+4. Starts teaching the FIRST enabling objective from the list above
+5. Ask a simple question to check their understanding of that first EO
 
-Keep it warm and supportive. 2-3 sentences + a question to start the review."""
+Keep it warm, supportive, and focused. 3-4 sentences + a question.
+Do NOT just ask a quiz question — actually RE-TEACH the concept first, then check understanding."""
 
         return self._generate_response(prompt)
     
