@@ -441,15 +441,15 @@ GRADE: {grade} (Seychelles secondary school)
 TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}
-Create 12-18 CONCEPT-GROUPED steps. The student must master each concept before moving to the next.
+Create 6-8 CONCEPT-GROUPED steps (MAXIMUM 8). This is a focused 20-minute lesson.
 
 STRUCTURE:
-1-2 ENGAGE steps (concept_tag = "")
-Then FOR EACH CONCEPT (2-4 concepts):
-  1-2 teach steps → 0-1 worked_example → 1 practice step
+1 ENGAGE step (concept_tag = "")
+Then FOR EACH CONCEPT (1-2 concepts):
+  1 teach or worked_example step → 1 practice step
   All steps in the same concept share the SAME concept_tag (e.g. "relief_rainfall")
   The practice step MUST have question, expected_answer, and hints
-1-2 EVALUATE steps at the end (concept_tag = "")
+1 EVALUATE step at the end (concept_tag = "")
 
 concept_tag RULES:
 - Use lowercase_with_underscores, descriptive of the concept (e.g. "pythagorean_theorem", "convection_currents")
@@ -540,6 +540,13 @@ CONTENT GUIDELINES:
         """Save generated steps to database."""
         from apps.curriculum.models import LessonStep
 
+        MAX_STEPS = 8
+        if len(steps) > MAX_STEPS:
+            logger.warning(
+                f"[ContentGen] [{lesson.title}] Trimming {len(steps)} steps to {MAX_STEPS}"
+            )
+            steps = steps[:MAX_STEPS]
+
         for step_data in steps:
             step, created = LessonStep.objects.update_or_create(
                 lesson=lesson,
@@ -611,9 +618,9 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
         from apps.accounts.models import Institution
         institution_id = lesson.unit.course.institution_id or Institution.get_global().id
 
-    # Skip if already has exit ticket with enough questions
+    # Skip if already has exit ticket with any questions
     existing = ExitTicket.objects.filter(lesson=lesson).first()
-    if existing and existing.questions.count() >= 10:
+    if existing and existing.questions.exists():
         return {'success': True, 'skipped': True, 'questions_created': 0}
 
     # Get LLM client

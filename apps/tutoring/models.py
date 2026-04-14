@@ -70,6 +70,8 @@ class TutorSession(models.Model):
     # Timing
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)
+    started_lesson_at = models.DateTimeField(null=True, blank=True, help_text="When the student started the lesson content")
+    completed_lesson_at = models.DateTimeField(null=True, blank=True, help_text="When the student completed the lesson content")
     
     # Optional summary (generated at end)
     summary = models.TextField(blank=True)
@@ -87,6 +89,17 @@ class TutorSession(models.Model):
         related_name='reviewed_flags'
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def lesson_duration_minutes(self):
+        """Time spent on the lesson in minutes."""
+        if self.started_lesson_at and self.completed_lesson_at:
+            delta = self.completed_lesson_at - self.started_lesson_at
+            return round(delta.total_seconds() / 60, 1)
+        if self.started_lesson_at and self.ended_at:
+            delta = self.ended_at - self.started_lesson_at
+            return round(delta.total_seconds() / 60, 1)
+        return None
 
     class Meta:
         ordering = ['-started_at']

@@ -167,7 +167,7 @@
                 <h2 style="margin: 0;">{{ lesson.title }}</h2>
                 <div class="lesson-meta">
                     <span class="lesson-meta-item">📚 {{ unit.title }}</span>
-                    <span class="lesson-meta-item">⏱️ {{ lesson.estimated_minutes|default:40 }} min</span>
+                    <span class="lesson-meta-item">⏱️ {{ lesson.estimated_minutes|default:20 }} min</span>
                     {% if lesson.is_published %}
                         <span class="lesson-meta-item" style="color: var(--success);">✓ Published</span>
                     {% else %}

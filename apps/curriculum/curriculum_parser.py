@@ -660,10 +660,10 @@ Return ONLY valid JSON."""
         tos = u.get('terminal_objectives', [])
         eos = u.get('enabling_objectives', [])
 
-        # Build lessons from terminal objectives (2 TOs per 20-min lesson)
+        # Build lessons from terminal objectives (1 TO per 20-min lesson)
         lesson_objectives = tos if tos else eos
         lessons = []
-        chunk_size = min(2, max(1, len(lesson_objectives) // 4)) if lesson_objectives else 2
+        chunk_size = 1  # One TO per lesson for focused 20-min sessions
 
         # Build TO chunks first, then distribute EOs evenly across them
         to_chunks = []
@@ -1485,11 +1485,11 @@ def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurr
             e for e in eos if e not in lesson_objectives
         ]
 
-        # Group terminal objectives into lessons (1-2 TOs per 20-minute lesson)
+        # Group terminal objectives into lessons (1 TO per 20-minute lesson)
         # Attach relevant enabling objectives as teaching steps for content generation
         raw_eos = unit.get('enabling_objectives', [])  # The raw extracted EOs
         lessons = []
-        chunk_size = min(2, max(1, len(lesson_objectives) // 4)) if lesson_objectives else 2
+        chunk_size = 1  # One TO per lesson for focused 20-min sessions
         for start in range(0, len(lesson_objectives), chunk_size):
             chunk = lesson_objectives[start:start + chunk_size]
             if not chunk:

@@ -128,7 +128,7 @@ class Lesson(models.Model):
         help_text="What the student will learn/be able to do"
     )
     estimated_minutes = models.PositiveIntegerField(
-        default=15,
+        default=20,
         help_text="Estimated time to complete"
     )
     mastery_rule = models.CharField(

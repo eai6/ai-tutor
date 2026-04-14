@@ -2528,7 +2528,12 @@ def lesson_detail(request, lesson_id):
         )
     else:
         lesson = get_object_or_404(Lesson, id=lesson_id)
-    
+
+    # Auto-fix legacy 40-min lessons
+    if lesson.estimated_minutes == 40:
+        lesson.estimated_minutes = 20
+        lesson.save(update_fields=['estimated_minutes'])
+
     # Get all steps
     steps = lesson.steps.all().order_by('order_index')
     

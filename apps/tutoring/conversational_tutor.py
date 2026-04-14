@@ -1150,6 +1150,11 @@ Keep it to 2-3 sentences."""
         """
         self._step_just_advanced = False
 
+        # Track lesson start time on first interaction
+        if not self.session.started_lesson_at:
+            self.session.started_lesson_at = timezone.now()
+            self.session.save(update_fields=['started_lesson_at'])
+
         # Save student message
         self._save_turn("student", student_input)
         self.conversation.append({"role": "user", "content": student_input})
@@ -1245,6 +1250,11 @@ Keep it to 2-3 sentences."""
         Returns context dict, or None if exit_ticket phase.
         """
         self._step_just_advanced = False
+
+        # Track lesson start time on first interaction
+        if not self.session.started_lesson_at:
+            self.session.started_lesson_at = timezone.now()
+            self.session.save(update_fields=['started_lesson_at'])
 
         # Save student message
         self._save_turn("student", student_input)
@@ -3506,6 +3516,7 @@ Which concept numbers were meaningfully covered?"""
         self.session_state = SessionState.COMPLETED
         self.session.status = TutorSession.Status.COMPLETED
         self.session.ended_at = timezone.now()
+        self.session.completed_lesson_at = timezone.now()
         self.session.mastery_achieved = True
         self._save_state()
         self.session.save()
@@ -3658,6 +3669,7 @@ Which concept numbers were meaningfully covered?"""
         self.session_state = SessionState.COMPLETED
         self.session.status = TutorSession.Status.COMPLETED
         self.session.ended_at = timezone.now()
+        self.session.completed_lesson_at = timezone.now()
         self.session.mastery_achieved = True
         self._save_state()
         self.session.save()

@@ -139,7 +139,10 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
         skipped = 0
         for lesson in lessons:
             existing_steps = lesson.steps.count()
-            if existing_steps >= 5:
+            if lesson.content_status == 'completed' and existing_steps >= 5:
+                skipped += 1
+                log(f"   ⏭️ {lesson.title} (completed with {existing_steps} steps)")
+            elif existing_steps >= 5:
                 skipped += 1
                 log(f"   ⏭️ {lesson.title} (already has {existing_steps} steps)")
             else:
