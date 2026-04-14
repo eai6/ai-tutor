@@ -721,6 +721,10 @@ class ConversationalTutor:
             'turn_media': getattr(self, '_turn_media', {}),
             # Worked example deduplication (Issue 1)
             'shown_worked_example_indices': list(getattr(self, 'shown_worked_example_indices', set())),
+            # Covered enabling objectives (for competency report)
+            'covered_enabling_objectives': [
+                o['objective'] for o in getattr(self, 'enabling_objectives', []) if o.get('covered')
+            ],
             # Difficulty signal (ZPD adjustment)
             'difficulty_level': getattr(self, 'difficulty_level', 0),
             # Correct-answer streak for in-conversation gamification
@@ -3196,13 +3200,30 @@ Break concepts into smaller steps. Be encouraging."""
                 self._step_just_advanced = True
 
     def _get_eo_skill(self, eo_text: str):
-        """Look up the Skill linked to an enabling objective text."""
+        """Look up the Skill linked to an enabling objective text.
+
+        Tries exact match first, then partial match for LLM text variations.
+        """
         from apps.tutoring.skills_models import Skill
-        return Skill.objects.filter(
-            enabling_objective_text=eo_text.strip(),
+        text = eo_text.strip()
+        if not text:
+            return None
+        course = self.lesson.unit.course
+        # Exact match
+        skill = Skill.objects.filter(
+            enabling_objective_text=text,
             is_enabling_objective=True,
-            course=self.lesson.unit.course,
+            course=course,
         ).first()
+        if skill:
+            return skill
+        # Partial match — first 50 chars (LLM may truncate or rephrase)
+        skill = Skill.objects.filter(
+            enabling_objective_text__icontains=text[:50],
+            is_enabling_objective=True,
+            course=course,
+        ).first()
+        return skill
 
     def _mark_step_objective_covered(self, step_index: int):
         """Mark the enabling objective of the given step as covered (P1.2)."""
