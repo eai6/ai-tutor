@@ -3624,18 +3624,64 @@ Which concept numbers were meaningfully covered?"""
         (no LLM) for speed and consistency.
         """
         q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
+        data = question.answer_data or {}
 
         # Safety: if student_answer is a list/dict, it's NOT an MCQ answer
         if isinstance(student_answer, (list, dict)):
             if q_type == 'mcq':
                 q_type = 'fill_in_blank' if isinstance(student_answer, list) else 'matching'
 
+        # MCQ: deterministic — letter match only
         if q_type == 'mcq':
             ans = student_answer if isinstance(student_answer, str) else str(student_answer or '')
             return ans.upper().strip() == (question.correct_answer or '').upper().strip()
 
-        data = question.answer_data or {}
+        # All other types: use LLM-based evaluation
+        return self._llm_grade_exit_question(question, student_answer, q_type, data)
 
+    def _llm_grade_exit_question(self, question, student_answer, q_type: str, data: dict) -> bool:
+        """Use LLM to evaluate non-MCQ exit ticket answers semantically."""
+
+        # Build context based on question type
+        if q_type == 'fill_in_blank':
+            blanks = data.get('blanks', [])
+            student_blanks = student_answer if isinstance(student_answer, list) else [student_answer]
+            correct_info = f"Expected answers: {', '.join(blanks)}"
+            student_info = f"Student filled in: {', '.join(str(b) for b in student_blanks)}"
+        elif q_type == 'matching':
+            pairs = data.get('pairs', [])
+            correct_info = "Correct pairs: " + "; ".join(f"{p['left']} → {p['right']}" for p in pairs)
+            student_map = student_answer if isinstance(student_answer, dict) else {}
+            student_info = "Student matched: " + "; ".join(f"{k} → {v}" for k, v in student_map.items())
+        else:  # short_answer, data_interpretation
+            model_answer = data.get('model_answer', '')
+            keywords = data.get('keywords', [])
+            correct_info = f"Model answer: {model_answer}"
+            if keywords:
+                correct_info += f"\nKey concepts: {', '.join(keywords)}"
+            student_info = f"Student answer: {student_answer}"
+
+        # Try LLM evaluation
+        if self.instructor_client:
+            try:
+                eval_prompt = (
+                    f"QUESTION: {question.question_text}\n"
+                    f"TYPE: {q_type}\n"
+                    f"{correct_info}\n"
+                    f"{student_info}\n\n"
+                    f"Grade this answer. The student does NOT need exact wording — "
+                    f"accept synonyms, paraphrasing, and equivalent meaning. "
+                    f"For fill-in-blank: accept if the meaning is right even if spelling differs slightly. "
+                    f"For matching: accept if the majority of pairs are correctly matched. "
+                    f"For written answers: accept if they demonstrate understanding of the key concepts.\n\n"
+                    f"Reply ONLY with the single word 'correct' or 'incorrect'."
+                )
+                eval_response = self._generate_response(eval_prompt, max_tokens=10)
+                return 'correct' in eval_response.lower()
+            except Exception as e:
+                logger.warning(f"LLM grading failed, falling back to deterministic: {e}")
+
+        # Fallback: deterministic grading if LLM unavailable
         if q_type == 'fill_in_blank':
             blanks = data.get('blanks', [])
             alternatives = data.get('accept_alternatives', [])
@@ -3646,9 +3692,9 @@ Which concept numbers were meaningfully covered?"""
                 accepted = {expected.lower()}
                 if idx < len(alternatives):
                     accepted.update(a.lower() for a in alternatives[idx])
-                if given in accepted:
+                if given in accepted or expected.lower() in given:
                     correct_count += 1
-            return correct_count == len(blanks)
+            return correct_count >= max(1, len(blanks) // 2 + 1) if blanks else False
 
         if q_type == 'matching':
             pairs = data.get('pairs', [])
@@ -3658,20 +3704,14 @@ Which concept numbers were meaningfully covered?"""
                 1 for left, right in student_map.items()
                 if correct_map.get(left.lower(), '') == right.lower()
             )
-            return correct_count == len(correct_map)
+            return correct_count >= max(1, len(correct_map) // 2 + 1) if correct_map else False
 
-        if q_type in ('short_answer', 'data_interpretation'):
-            keywords = data.get('keywords', [])
-            min_kw = data.get('min_keywords', 2)
-            text = (student_answer if isinstance(student_answer, str) else '').lower()
-            matched = sum(1 for kw in keywords if kw.lower() in text)
-            return matched >= min_kw
-
-        # Unknown type — try string comparison as last resort
-        try:
-            return str(student_answer or '').lower().strip() == str(question.correct_answer or '').lower().strip()
-        except Exception:
-            return False
+        # short_answer / data_interpretation fallback
+        keywords = data.get('keywords', [])
+        min_kw = data.get('min_keywords', 2)
+        text = (student_answer if isinstance(student_answer, str) else '').lower()
+        matched = sum(1 for kw in keywords if kw.lower() in text)
+        return matched >= min_kw
 
     def submit_exit_ticket(self, answers) -> TutorMessage:
         """Process exit ticket submission using the pre-selected randomized questions.
