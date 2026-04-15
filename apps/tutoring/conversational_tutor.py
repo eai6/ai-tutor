@@ -2178,10 +2178,22 @@ Apply the cognitive_load and targeted_remediation principles {intensity}:
         Shared by _generate_contextual_response() and respond_stream()
         to prevent the two copies from diverging.
         """
-        current_guidance = self._get_current_guidance()
+        # During remediation, override step guidance with EO-focused instructions
+        if getattr(self, 'is_remediation', False):
+            failed_eos = getattr(self, '_failed_eos', [])
+            eo_list = "\n".join(f"  - {eo}" for eo in failed_eos) if failed_eos else "  - (review general concepts)"
+            current_guidance = (
+                f"REMEDIATION: The student scored below 8/10 on the exit ticket.\n"
+                f"Focus on these enabling objectives they got wrong:\n{eo_list}\n\n"
+                f"For each EO: re-teach with a DIFFERENT explanation than before, "
+                f"give a new example, then ask a check question.\n"
+                f"Do NOT repeat the original lesson steps. Use fresh approaches."
+            )
+        else:
+            current_guidance = self._get_current_guidance()
         step_phase_instructions = self._get_step_phase_instructions()
         concept_coverage = self._get_concept_coverage_summary()
-        next_concept = self._get_next_uncovered_concept()
+        next_concept = self._get_next_uncovered_concept() if not getattr(self, 'is_remediation', False) else ""
         student_profile = self._build_student_profile_block()
         difficulty_block = self._build_difficulty_signal_block()
         worked_example_block = self._build_worked_example_block()
@@ -2192,10 +2204,14 @@ Apply the cognitive_load and targeted_remediation principles {intensity}:
         hint_block = self._build_hint_request_block(student_input)
 
         # Step progress indicator
-        step_num = min(self.current_topic_index + 1, len(self.steps))
-        total_steps = len(self.steps)
-        display_phase = self._get_display_phase().upper()
-        step_progress = f"STEP PROGRESS: {step_num}/{total_steps} | Phase: {display_phase}"
+        if getattr(self, 'is_remediation', False):
+            failed_eos = getattr(self, '_failed_eos', [])
+            step_progress = f"REMEDIATION MODE | Reviewing {len(failed_eos)} enabling objective(s)"
+        else:
+            step_num = min(self.current_topic_index + 1, len(self.steps))
+            total_steps = len(self.steps)
+            display_phase = self._get_display_phase().upper()
+            step_progress = f"STEP PROGRESS: {step_num}/{total_steps} | Phase: {display_phase}"
 
         # Build media reminder — always present so LLM never claims it can't show images
         media_reminder = ""
@@ -2872,6 +2888,8 @@ Follow the current step; this concept will be covered in sequence."""
 
     def _get_display_phase(self) -> str:
         """Get the display phase from the current step's 5E phase label."""
+        if getattr(self, 'is_remediation', False):
+            return 'remediation'
         if self.session_state == SessionState.TUTORING:
             if self.current_topic_index < len(self.steps):
                 step = self.steps[self.current_topic_index]
