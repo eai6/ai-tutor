@@ -58,11 +58,24 @@ SHORT_ANSWER format (show working):
 DATA_INTERPRETATION format (table/chart with calculation):
 {{"question_type": "data_interpretation", "question": "Study the data and calculate:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'><tr style='background:#f4f4f5'><th style='padding:8px;border:1px solid #e4e4e7'>Item</th><th style='padding:8px;border:1px solid #e4e4e7'>Price (SCR)</th><th style='padding:8px;border:1px solid #e4e4e7'>Quantity</th></tr><tr><td style='padding:8px;border:1px solid #e4e4e7'>Fish</td><td style='padding:8px;border:1px solid #e4e4e7'>45</td><td style='padding:8px;border:1px solid #e4e4e7'>3</td></tr><tr><td style='padding:8px;border:1px solid #e4e4e7'>Rice</td><td style='padding:8px;border:1px solid #e4e4e7'>25</td><td style='padding:8px;border:1px solid #e4e4e7'>2</td></tr></table>", "model_answer": "Fish cost = 45 × 3 = SCR 135. Rice cost = 25 × 2 = SCR 50. Total = 135 + 50 = SCR 185", "keywords": ["135", "50", "185"], "min_keywords": 2}}, "explanation": "Calculate each item total then sum", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
 
-INCLUDE SVG DIAGRAMS where relevant:
-- Coordinate grids for scatter/graph questions
-- Geometric shapes with labeled dimensions
-- Number lines for number/fraction questions
-Example: <svg width='200' height='200' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
+VISUAL CONTENT — MANDATORY FOR GRAPH/GEOMETRY/DATA TOPICS:
+For questions about scatter diagrams, graphs, geometry, or data:
+- MCQ questions MUST include a "source" field with an SVG diagram showing the visual
+- DATA_INTERPRETATION questions MUST include SVG charts in data_description
+- Use the source field for MCQ: {{"question_type": "mcq", "source": "<svg>...</svg>", "question": "Based on the diagram above...", ...}}
+
+SVG EXAMPLES:
+Scatter diagram with plotted points:
+<svg width='350' height='280' xmlns='http://www.w3.org/2000/svg'><rect x='40' y='10' width='300' height='240' fill='#fafafa' stroke='#e4e4e7'/><line x1='40' y1='250' x2='340' y2='250' stroke='#18181b' stroke-width='2'/><line x1='40' y1='250' x2='40' y2='10' stroke='#18181b' stroke-width='2'/><text x='180' y='275' font-size='11' text-anchor='middle'>Temperature (°C)</text><text x='15' y='130' font-size='11' text-anchor='middle' transform='rotate(-90,15,130)'>Fish catch (kg)</text><circle cx='80' cy='210' r='4' fill='#3b82f6'/><circle cx='120' cy='180' r='4' fill='#3b82f6'/><circle cx='180' cy='140' r='4' fill='#3b82f6'/><circle cx='240' cy='90' r='4' fill='#3b82f6'/><circle cx='300' cy='50' r='4' fill='#3b82f6'/><text x='50' y='265' font-size='9'>0</text><text x='120' y='265' font-size='9'>10</text><text x='200' y='265' font-size='9'>20</text><text x='280' y='265' font-size='9'>30</text><text x='30' y='253' font-size='9'>0</text><text x='25' y='173' font-size='9'>50</text><text x='20' y='93' font-size='9'>100</text></svg>
+
+Coordinate grid:
+<svg width='250' height='250' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='10' width='210' height='210' fill='#fafafa' stroke='#e4e4e7'/><line x1='30' y1='220' x2='240' y2='220' stroke='#18181b' stroke-width='2'/><line x1='30' y1='220' x2='30' y2='10' stroke='#18181b' stroke-width='2'/><text x='30' y='235' font-size='9'>0</text><text x='72' y='235' font-size='9'>2</text><text x='114' y='235' font-size='9'>4</text><text x='156' y='235' font-size='9'>6</text><text x='198' y='235' font-size='9'>8</text></svg>
+
+Geometric shape:
+<svg width='200' height='150' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
+
+AT LEAST 5 of the 20 MCQ questions (Q16-35) must include a source diagram.
+ALL 3 DATA_INTERPRETATION questions (Q13-15) must include a visual.
 
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (straightforward calculations, single step)
