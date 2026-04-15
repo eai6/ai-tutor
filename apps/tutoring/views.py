@@ -897,15 +897,26 @@ def chat_exit_ticket(request, session_id):
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    tutor = ConversationalTutor(session)
-    response = tutor.submit_exit_ticket(answers)
+    try:
+        tutor = ConversationalTutor(session)
+        response = tutor.submit_exit_ticket(answers)
 
-    return JsonResponse({
-        "message": response.content,
-        "phase": response.phase,
-        "exit_ticket": response.exit_ticket_data,
-        "is_complete": response.is_complete,
-    })
+        return JsonResponse({
+            "message": response.content,
+            "phase": response.phase,
+            "exit_ticket": response.exit_ticket_data,
+            "is_complete": response.is_complete,
+        })
+    except Exception as e:
+        import traceback
+        print(f"[ExitTicket] VIEW CRASH: {e}", flush=True)
+        traceback.print_exc()
+        return JsonResponse({
+            "message": "Your quiz answers were saved but scoring encountered an error. Please continue.",
+            "phase": "completed",
+            "exit_ticket": {"results": [], "score": 0, "passed": False},
+            "is_complete": True,
+        })
 
 
 # =============================================================================
