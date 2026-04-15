@@ -1213,6 +1213,14 @@ Keep it to 2-3 sentences."""
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media, gen_request = self._parse_media_signal(response)
         clean_response, artifact_html = self._parse_artifact_signal(clean_response)
+
+        # Verify calculations in math responses
+        if self.lesson.unit.course.is_math:
+            from apps.tutoring.math_tools import verify_calculations
+            clean_response, corrections = verify_calculations(clean_response)
+            if corrections:
+                logger.info(f"[MathCheck] Fixed {len(corrections)} calculation(s) in response")
+
         media = [parsed_media] if parsed_media else []
 
         # On-the-fly image generation via safety pipeline
@@ -1324,6 +1332,13 @@ Keep it to 2-3 sentences."""
         """
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_content, parsed_media, gen_request = self._parse_media_signal(full_response)
+
+        # Verify calculations in math responses
+        if self.lesson.unit.course.is_math:
+            from apps.tutoring.math_tools import verify_calculations
+            clean_content, corrections = verify_calculations(clean_content)
+            if corrections:
+                logger.info(f"[MathCheck] Fixed {len(corrections)} calculation(s) in response")
 
         # Media from LLM signal, with fallback for phantom references
         media = [parsed_media] if parsed_media else []
@@ -3658,7 +3673,48 @@ Which concept numbers were meaningfully covered?"""
         return self._llm_grade_exit_question(question, student_answer, q_type, data)
 
     def _llm_grade_exit_question(self, question, student_answer, q_type: str, data: dict) -> bool:
-        """Use LLM to evaluate non-MCQ exit ticket answers semantically."""
+        """Use LLM to evaluate non-MCQ exit ticket answers semantically.
+        For math: tries numerical comparison first, falls back to LLM."""
+
+        # Math: try numerical comparison first (no LLM needed for calculation answers)
+        is_math = self.lesson.unit.course.is_math if self.lesson.unit and self.lesson.unit.course else False
+        if is_math and q_type == 'fill_in_blank':
+            blanks = data.get('blanks', [])
+            student_blanks = student_answer if isinstance(student_answer, list) else [student_answer]
+            from apps.tutoring.math_tools import safe_eval_expression
+            correct_count = 0
+            for idx, expected in enumerate(blanks):
+                given = str(student_blanks[idx] if idx < len(student_blanks) else '').strip()
+                # Try numerical comparison
+                expected_val = safe_eval_expression(expected)
+                given_val = safe_eval_expression(given)
+                if expected_val is not None and given_val is not None:
+                    if abs(expected_val - given_val) < 0.01:
+                        correct_count += 1
+                        continue
+                # Fallback: string match
+                if given.lower() == expected.lower():
+                    correct_count += 1
+            if correct_count >= max(1, len(blanks) // 2 + 1):
+                return True
+            if correct_count == 0 and blanks:
+                return False  # Clearly wrong, skip LLM
+
+        if is_math and q_type in ('short_answer', 'data_interpretation'):
+            # For math short answers, check if the key numerical result is present
+            model_answer = data.get('model_answer', '')
+            keywords = data.get('keywords', [])
+            text = str(student_answer or '').strip()
+            from apps.tutoring.math_tools import safe_eval_expression
+            # Extract numbers from both answers
+            import re as _re
+            student_numbers = set(_re.findall(r'-?\d+\.?\d*', text))
+            expected_numbers = set(kw for kw in keywords if _re.match(r'-?\d+\.?\d*$', kw))
+            if expected_numbers:
+                matched = len(student_numbers & expected_numbers)
+                min_kw = data.get('min_keywords', 2)
+                if matched >= min_kw:
+                    return True
 
         # Build context based on question type
         if q_type == 'fill_in_blank':
@@ -3682,12 +3738,18 @@ Which concept numbers were meaningfully covered?"""
         # Try LLM evaluation
         if self.instructor_client:
             try:
+                math_note = (
+                    "For MATH answers: check the NUMERICAL RESULT is correct. "
+                    "The working/method matters less than getting the right number. "
+                    "Use Python to verify: eval the expression if needed. "
+                ) if is_math else ""
                 eval_prompt = (
                     f"QUESTION: {question.question_text}\n"
                     f"TYPE: {q_type}\n"
                     f"{correct_info}\n"
                     f"{student_info}\n\n"
-                    f"Grade this answer. The student does NOT need exact wording — "
+                    f"Grade this answer. {math_note}"
+                    f"The student does NOT need exact wording — "
                     f"accept synonyms, paraphrasing, and equivalent meaning. "
                     f"For fill-in-blank: accept if the meaning is right even if spelling differs slightly. "
                     f"For matching: accept if the majority of pairs are correctly matched. "
