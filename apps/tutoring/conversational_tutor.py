@@ -4017,7 +4017,7 @@ Which concept numbers were meaningfully covered?"""
                 'score': score, 
                 'passed': False,
                 'remediation_started': True,
-                'failed_count': failed_count,
+                'failed_count': len(failed_questions),
             },
         )
     
