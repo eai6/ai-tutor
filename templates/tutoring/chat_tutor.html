@@ -2404,7 +2404,7 @@ async function speakResponse(text, bubbleEl, force = false) {
     stopCurrentAudio();
     const myGen = speakGeneration;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
     try {
         const resp = await fetch('/tutor/api/speak/', {
             method: 'POST',
@@ -2417,7 +2417,10 @@ async function speakResponse(text, bubbleEl, force = false) {
         });
         clearTimeout(timeout);
         if (myGen !== speakGeneration) return;
-        if (!resp.ok) return;
+        if (!resp.ok) {
+            console.warn('TTS failed:', resp.status);
+            return;
+        }
 
         const contentType = resp.headers.get('content-type') || '';
         const isJSON = contentType.includes('application/json');
