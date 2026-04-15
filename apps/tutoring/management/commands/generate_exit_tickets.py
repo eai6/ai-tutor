@@ -13,6 +13,64 @@ from apps.curriculum.models import Lesson, Course
 from apps.tutoring.models import ExitTicket
 
 
+MATH_EXIT_TICKET_PROMPT = """Generate a MATHEMATICS question bank (35 questions) for a summative assessment (exit ticket) on this lesson.
+
+LESSON: {lesson_title}
+OBJECTIVE: {lesson_objective}
+SUBJECT: {subject}
+{exam_context}{seychelles_context}
+QUESTION FORMAT MIX — generate in THIS EXACT ORDER:
+Questions 1-5: FILL_IN_BLANK (calculation with blank for the answer)
+Questions 6-9: MATCHING (match expressions to their solutions/simplified forms)
+Questions 10-12: SHORT_ANSWER (multi-step calculation requiring working out)
+Questions 13-15: DATA_INTERPRETATION (read data from table/chart and calculate)
+Questions 16-35: MCQ (multiple choice with numerical/algebraic options)
+
+YOU MUST generate ALL 5 types. The first 15 questions MUST NOT be MCQ.
+
+MATHEMATICS RULES — EVERY question must:
+- Require CALCULATION, not description or explanation
+- Have NUMERICAL or ALGEBRAIC answers, not paragraphs of text
+- Use command words: "Work out", "Calculate", "Simplify", "Solve", "Find", "Evaluate"
+- NOT use: "Explain why", "Describe", "Discuss" (these are for geography/humanities)
+
+REQUIREMENTS:
+1. Generate EXACTLY 35 questions
+2. Each question MUST have concept_tag = EXACT TEXT of an enabling objective from below
+3. EVERY enabling objective must be assessed by at least 1 question
+4. Use Seychelles context in word problems (SCR prices, fish catches, island areas)
+5. Vary difficulty: easy calculations → harder numbers → word problems → multi-step
+
+OUTPUT FORMAT (JSON array):
+
+MCQ format (numerical/algebraic options):
+{{"question_type": "mcq", "question": "Simplify 3(x + 4) - 2x", "option_a": "x + 12", "option_b": "5x + 4", "option_c": "x + 4", "option_d": "3x + 12", "correct": "A", "explanation": "3(x+4) - 2x = 3x + 12 - 2x = x + 12", "difficulty": "easy", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
+
+FILL_IN_BLANK format (calculation result):
+{{"question_type": "fill_in_blank", "question": "Work out the following:", "answer_data": {{"text_template": "20 + 5 × 3 = ___", "blanks": ["35"], "accept_alternatives": [["35.0"]]}}, "explanation": "Using BIDMAS: multiply first (5×3=15), then add (20+15=35)", "difficulty": "easy", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
+
+MATCHING format (expressions to solutions):
+{{"question_type": "matching", "question": "Match each expression to its simplified form:", "answer_data": {{"pairs": [{{"left": "3x + 2x", "right": "5x"}}, {{"left": "4y - y", "right": "3y"}}, {{"left": "2(x + 3)", "right": "2x + 6"}}], "distractor_rights": ["6x", "5y"]}}, "explanation": "Combine like terms or expand brackets", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
+
+SHORT_ANSWER format (show working):
+{{"question_type": "short_answer", "question": "A fisherman in Seychelles sells tuna at SCR 45 per kg. He catches 3 fish weighing 2.5kg, 4.2kg, and 3.8kg. Calculate the total revenue. Show your working.", "answer_data": {{"model_answer": "Total weight = 2.5 + 4.2 + 3.8 = 10.5 kg. Revenue = 10.5 × 45 = SCR 472.50", "keywords": ["10.5", "472.50", "45"], "min_keywords": 2}}, "explanation": "Add the weights first, then multiply by price per kg", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
+
+DATA_INTERPRETATION format (table/chart with calculation):
+{{"question_type": "data_interpretation", "question": "Study the data and calculate:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'><tr style='background:#f4f4f5'><th style='padding:8px;border:1px solid #e4e4e7'>Item</th><th style='padding:8px;border:1px solid #e4e4e7'>Price (SCR)</th><th style='padding:8px;border:1px solid #e4e4e7'>Quantity</th></tr><tr><td style='padding:8px;border:1px solid #e4e4e7'>Fish</td><td style='padding:8px;border:1px solid #e4e4e7'>45</td><td style='padding:8px;border:1px solid #e4e4e7'>3</td></tr><tr><td style='padding:8px;border:1px solid #e4e4e7'>Rice</td><td style='padding:8px;border:1px solid #e4e4e7'>25</td><td style='padding:8px;border:1px solid #e4e4e7'>2</td></tr></table>", "model_answer": "Fish cost = 45 × 3 = SCR 135. Rice cost = 25 × 2 = SCR 50. Total = 135 + 50 = SCR 185", "keywords": ["135", "50", "185"], "min_keywords": 2}}, "explanation": "Calculate each item total then sum", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
+
+INCLUDE SVG DIAGRAMS where relevant:
+- Coordinate grids for scatter/graph questions
+- Geometric shapes with labeled dimensions
+- Number lines for number/fraction questions
+Example: <svg width='200' height='200' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
+
+DIFFICULTY DISTRIBUTION (out of 35):
+- Questions 1-12: easy (straightforward calculations, single step)
+- Questions 13-25: medium (multi-step, word problems with Seychelles context)
+- Questions 26-35: hard (complex problems, reverse/inverse, problem solving)
+
+Generate the 35 questions now:"""
+
 EXIT_TICKET_PROMPT = """Generate a mixed-format question bank (35 questions) for a summative assessment (exit ticket) on this lesson.
 
 LESSON: {lesson_title}

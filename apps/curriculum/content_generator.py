@@ -801,13 +801,26 @@ Do NOT invent short labels like "industry_definition" — use the FULL enabling 
 Every enabling objective must be assessed by at least 1 question. Distribute questions across all EOs.
 """
 
-    prompt = EXIT_TICKET_PROMPT.format(
-        lesson_title=lesson.title,
-        lesson_objective=lesson.objective or '',
-        subject=subject,
-        exam_context=exam_context,
-        seychelles_context=seychelles_context + objectives_context,
-    )
+    # Use math-specific or general exit ticket prompt
+    is_math = lesson.unit.course.is_math if lesson.unit and lesson.unit.course else False
+    if is_math:
+        from apps.tutoring.management.commands.generate_exit_tickets import MATH_EXIT_TICKET_PROMPT
+        prompt = MATH_EXIT_TICKET_PROMPT.format(
+            lesson_title=lesson.title,
+            lesson_objective=lesson.objective or '',
+            subject=subject,
+            exam_context=exam_context,
+            seychelles_context=seychelles_context + objectives_context,
+        )
+    else:
+        prompt = EXIT_TICKET_PROMPT.format(
+            lesson_title=lesson.title,
+            lesson_objective=lesson.objective or '',
+            subject=subject,
+            exam_context=exam_context,
+            seychelles_context=seychelles_context + objectives_context,
+        )
+
     # Append real assessment format examples from worksheets/exams
     if assessment_format_context:
         prompt += "\n" + assessment_format_context

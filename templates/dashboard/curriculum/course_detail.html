@@ -309,10 +309,6 @@
         </div>
         {% if can_edit_content %}
         <div style="display:flex;gap:0.5rem;" onclick="event.stopPropagation();">
-            <form method="post" action="{% url 'dashboard:reindex_materials' course.id %}" style="display:inline;" title="Re-index completed materials into the knowledge base">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm" style="font-size:0.75rem;background:#f59e0b;color:#fff;border:none;" onclick="this.innerHTML='Reindexing...';">Reindex KB</button>
-            </form>
             <button type="button" class="btn btn-secondary btn-sm" onclick="showUploadForm(this)">
                 + Upload Material
             </button>
