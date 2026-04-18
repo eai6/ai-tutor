@@ -3839,6 +3839,16 @@ def lesson_live_monitor(request, lesson_id):
         .order_by('-started_at')
     )
 
+    # Latest exit-ticket attempt per session — the engine only writes
+    # exit_ticket_score to engine_state when the student passes, so pulling
+    # from ExitTicketAttempt covers both pass and fail (remediation) paths.
+    from apps.tutoring.models import ExitTicketAttempt
+    latest_attempts = {}
+    for att in (ExitTicketAttempt.objects
+                .filter(exit_ticket__lesson=lesson, session__in=sessions)
+                .order_by('session_id', '-completed_at')):
+        latest_attempts.setdefault(att.session_id, att)
+
     now = timezone.now()
     IDLE_THRESHOLD_SECONDS = 5 * 60
     total_lesson_steps = lesson.steps.count()
@@ -3876,6 +3886,12 @@ def lesson_live_monitor(request, lesson_id):
         if total_lesson_steps:
             current_step = min(current_step, total_lesson_steps)
 
+        attempt = latest_attempts.get(session.id)
+        exit_score = attempt.score if attempt else None
+        exit_passed = attempt.passed if attempt else None
+        exit_total = 10  # exit tickets are fixed at 10 questions
+        has_exit_review = bool(attempt)
+
         session_data.append({
             'session': session,
             'student_name': session.student.get_full_name() or session.student.username,
@@ -3889,8 +3905,10 @@ def lesson_live_monitor(request, lesson_id):
             'display_phase': state.get('display_phase', ''),
             'is_remediation': is_remediation,
             'duration_minutes': duration,
-            'exit_score': state.get('exit_ticket_score'),
-            'exit_total': state.get('exit_ticket_total'),
+            'exit_score': exit_score,
+            'exit_total': exit_total,
+            'exit_passed': exit_passed,
+            'has_exit_review': has_exit_review,
             'covered_eos': state.get('covered_enabling_objectives', []),
             'failed_eos': state.get('exit_ticket_failed_eos', []),
         })
@@ -4061,3 +4079,107 @@ def session_chat_history(request, session_id):
         'failed_eos': state.get('exit_ticket_failed_eos', []),
     }
     return render(request, 'dashboard/session_chat_history.html', context)
+
+
+@staff_required
+def session_exit_review(request, session_id):
+    """Review a student's exit ticket: each question with their answer vs the correct answer."""
+    from apps.tutoring.models import ExitTicketAttempt, ExitTicketQuestion
+
+    institution = request.staff_ctx['institution']
+    qs = TutorSession.objects.all()
+    qs = filter_by_institution(qs, institution)
+    session = get_object_or_404(qs.select_related('student', 'lesson'), id=session_id)
+
+    attempts = list(
+        ExitTicketAttempt.objects
+        .filter(session=session)
+        .select_related('exit_ticket')
+        .order_by('-completed_at')
+    )
+    if not attempts:
+        messages.info(request, "This student hasn't completed the exit ticket yet.")
+        return redirect('dashboard:lesson_monitor', lesson_id=session.lesson_id)
+
+    latest = attempts[0]
+
+    # Map stored answers (in presentation order) back to the question records
+    # via the engine_state's selected_exit_ticket_ids (same randomized order).
+    state = session.engine_state or {}
+    selected_ids = state.get('selected_exit_ticket_ids', [])
+    q_map = {q.id: q for q in ExitTicketQuestion.objects.filter(id__in=selected_ids)}
+    ordered_questions = [q_map[qid] for qid in selected_ids if qid in q_map]
+
+    stored_answers = latest.answers if isinstance(latest.answers, list) else []
+
+    def _mcq_letter(q, raw):
+        """Best-effort: render the student's MCQ selection as a letter (A-D)."""
+        if not raw:
+            return ''
+        s = str(raw).strip()
+        if len(s) == 1 and s.upper() in 'ABCD':
+            return s.upper()
+        for letter in 'ABCD':
+            opt = getattr(q, f'option_{letter.lower()}', '') or ''
+            if opt and opt.strip().lower() == s.lower():
+                return letter
+        return s
+
+    items = []
+    for i, q in enumerate(ordered_questions):
+        ans = stored_answers[i] if i < len(stored_answers) else {}
+        if not isinstance(ans, dict):
+            ans = {}
+        selected = ans.get('selected', '')
+        is_correct = ans.get('correct', False)
+        q_type = ans.get('question_type') or getattr(q, 'question_type', 'mcq') or 'mcq'
+        selected_letter = _mcq_letter(q, selected) if q_type == 'mcq' else ''
+
+        options = []
+        if q_type == 'mcq':
+            for letter in ('A', 'B', 'C', 'D'):
+                text = getattr(q, f'option_{letter.lower()}', '') or ''
+                if text:
+                    options.append({
+                        'letter': letter,
+                        'text': text,
+                        'is_selected': letter == selected_letter,
+                        'is_correct_option': letter == q.correct_answer,
+                    })
+
+        correct_answer_display = ''
+        if q_type != 'mcq' and q.answer_data:
+            ad = q.answer_data
+            correct_answer_display = (
+                ad.get('model_answer')
+                or ', '.join(ad.get('blanks', []))
+                or ad.get('data_description', '')
+            )
+
+        items.append({
+            'index': i + 1,
+            'question_text': q.question_text,
+            'explanation': q.explanation,
+            'question_type': q_type,
+            'options': options,
+            'selected_letter': selected_letter,
+            'selected_text': selected,
+            'correct_letter': q.correct_answer,
+            'correct_answer_display': correct_answer_display,
+            'is_correct': is_correct,
+            'concept_tag': ans.get('concept_tag', '') or q.concept_tag,
+        })
+
+    context = {
+        **request.staff_ctx,
+        'session': session,
+        'lesson': session.lesson,
+        'student_name': session.student.get_full_name() or session.student.username,
+        'attempt': latest,
+        'all_attempts': attempts,
+        'items': items,
+        'score': latest.score,
+        'total': len(ordered_questions) or 10,
+        'passed': latest.passed,
+    }
+    return render(request, 'dashboard/session_exit_review.html', context)

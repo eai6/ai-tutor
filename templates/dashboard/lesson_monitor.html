@@ -181,7 +181,6 @@
             <th>Status</th>
             <th>Phase</th>
             <th>Step</th>
-            <th>Cognitive Load</th>
             <th>Exchanges</th>
             <th>Duration</th>
             <th>Exit Score</th>
@@ -199,25 +198,19 @@
             </td>
             <td>{{ s.display_phase|default:"--" }}</td>
             <td>{% if s.is_remediation %}<span style="color:#71717a;">--</span>{% else %}{{ s.current_step }}/{{ s.total_steps }}{% endif %}</td>
-            <td>
-                {% widthratio s.cognitive_load 1 100 as cog_pct %}
-                <div class="cog-bar">
-                    <div class="cog-fill {% if s.cognitive_load <= 0.3 %}cog-green{% elif s.cognitive_load <= 0.7 %}cog-yellow{% else %}cog-red{% endif %}"
-                         style="width:{% widthratio s.cognitive_load 1 100 %}%;"></div>
-                </div>
-                <span style="font-size:0.75rem;color:#71717a;margin-left:4px;">{{ s.cognitive_load|floatformat:2 }}</span>
-            </td>
             <td>{{ s.exchange_count }}</td>
             <td>{% if s.duration_minutes is not None %}{{ s.duration_minutes }} min{% else %}--{% endif %}</td>
             <td>
                 {% if s.exit_score is not None %}
-                    {{ s.exit_score }}/{{ s.exit_total|default:"10" }}
+                    <span style="font-weight:600;{% if s.exit_passed %}color:#16a34a;{% else %}color:#dc2626;{% endif %}">{{ s.exit_score }}/{{ s.exit_total }}</span>
+                    {% if s.exit_passed %}<span style="font-size:0.7rem;color:#16a34a;">PASS</span>{% else %}<span style="font-size:0.7rem;color:#dc2626;">FAIL</span>{% endif %}
                 {% else %}
                     --
                 {% endif %}
             </td>
             <td>
                 <a href="{% url 'dashboard:session_chat_history' s.session.id %}" class="btn-view">View Chat</a>
+                {% if s.has_exit_review %}<a href="{% url 'dashboard:session_exit_review' s.session.id %}" class="btn-view" style="margin-left:4px;">Review</a>{% endif %}
             </td>
         </tr>
         {% endfor %}

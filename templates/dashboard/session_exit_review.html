@@ -1,0 +1,177 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Exit Ticket Review — {{ student_name }}{% endblock %}
+{% block page_title %}Exit Ticket Review{% endblock %}
+
+{% block extra_css %}
+<style>
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.review-header h2 { margin: 0; font-size: 1.25rem; }
+.review-meta { color: #71717a; font-size: 0.875rem; margin-top: 0.25rem; }
+
+.score-banner {
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.score-banner.pass { background: #dcfce7; color: #166534; }
+.score-banner.fail { background: #fee2e2; color: #991b1b; }
+.score-big { font-size: 2rem; font-weight: 800; line-height: 1; }
+
+.question-card {
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    margin-bottom: 0.875rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    border-left: 4px solid #e4e4e7;
+}
+.question-card.correct { border-left-color: #16a34a; }
+.question-card.incorrect { border-left-color: #dc2626; }
+
+.q-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+.q-num { font-weight: 700; color: #52525b; }
+.q-tag { font-size: 0.7rem; color: #71717a; font-weight: 500; }
+.q-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.375rem;
+    font-weight: 700;
+}
+.q-badge.correct { background: #dcfce7; color: #166534; }
+.q-badge.incorrect { background: #fee2e2; color: #991b1b; }
+
+.q-text { font-size: 0.95rem; color: #18181b; margin: 0.5rem 0 0.75rem; }
+
+.options { list-style: none; padding: 0; margin: 0; }
+.options li {
+    padding: 0.5rem 0.75rem;
+    margin: 0.25rem 0;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    background: #fafafa;
+    color: #3f3f46;
+}
+.options li.selected.correct { background: #dcfce7; color: #166534; font-weight: 600; }
+.options li.selected.incorrect { background: #fee2e2; color: #991b1b; font-weight: 600; }
+.options li.correct-answer { background: #dcfce7; color: #166534; }
+.options .marker { font-weight: 700; min-width: 1.5rem; }
+.options .note { margin-left: auto; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+
+.free-answer {
+    background: #fafafa;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    color: #3f3f46;
+    white-space: pre-wrap;
+    margin-top: 0.5rem;
+}
+
+.explanation {
+    margin-top: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    background: #eff6ff;
+    border-left: 3px solid #3b82f6;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    color: #1e40af;
+}
+
+.back-link { color: #3b82f6; text-decoration: none; font-size: 0.875rem; }
+.back-link:hover { text-decoration: underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="back-link">← Back to Live Monitor</a>
+
+<div class="review-header" style="margin-top: 0.75rem;">
+    <div>
+        <h2>{{ student_name }}</h2>
+        <div class="review-meta">
+            {{ lesson.title }}
+            &middot; Attempt {{ all_attempts|length }}{% if all_attempts|length > 1 %} (most recent shown){% endif %}
+            {% if attempt.completed_at %} &middot; Submitted {{ attempt.completed_at|date:"M j, H:i" }}{% endif %}
+        </div>
+    </div>
+    <a href="{% url 'dashboard:session_chat_history' session.id %}" class="btn-view">View Chat Transcript</a>
+</div>
+
+<div class="score-banner {% if passed %}pass{% else %}fail{% endif %}">
+    <div class="score-big">{{ score }}/{{ total }}</div>
+    <div>
+        {% if passed %}PASSED{% else %}DID NOT PASS{% endif %}
+        <div style="font-weight:400;font-size:0.8rem;margin-top:0.125rem;">
+            {% if passed %}Student mastered the exit ticket.{% else %}Passing threshold is 8/10. Student entered remediation.{% endif %}
+        </div>
+    </div>
+</div>
+
+{% if items %}
+{% for item in items %}
+<div class="question-card {% if item.is_correct %}correct{% else %}incorrect{% endif %}">
+    <div class="q-head">
+        <div>
+            <span class="q-num">Q{{ item.index }}</span>
+            {% if item.concept_tag %}<span class="q-tag">· {{ item.concept_tag }}</span>{% endif %}
+        </div>
+        <span class="q-badge {% if item.is_correct %}correct{% else %}incorrect{% endif %}">
+            {% if item.is_correct %}✓ Correct{% else %}✗ Incorrect{% endif %}
+        </span>
+    </div>
+
+    <div class="q-text">{{ item.question_text }}</div>
+
+    {% if item.question_type == 'mcq' %}
+    <ul class="options">
+        {% for opt in item.options %}
+        <li class="{% if opt.is_selected %}selected {% if item.is_correct %}correct{% else %}incorrect{% endif %}{% endif %}{% if opt.is_correct_option and not opt.is_selected %} correct-answer{% endif %}">
+            <span class="marker">{{ opt.letter }}.</span>
+            <span>{{ opt.text }}</span>
+            {% if opt.is_selected %}<span class="note">Student picked</span>{% elif opt.is_correct_option %}<span class="note">Correct</span>{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div>
+        <div style="font-size:0.75rem;color:#71717a;font-weight:600;margin-bottom:0.25rem;">Student's answer</div>
+        <div class="free-answer">{{ item.selected_text|default:"(no answer)" }}</div>
+        {% if item.correct_answer_display %}
+        <div style="font-size:0.75rem;color:#71717a;font-weight:600;margin-top:0.75rem;margin-bottom:0.25rem;">Expected answer</div>
+        <div class="free-answer" style="background:#dcfce7;color:#166534;">{{ item.correct_answer_display }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if item.explanation %}
+    <div class="explanation"><strong>Explanation:</strong> {{ item.explanation }}</div>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div style="text-align:center;padding:3rem;color:#a1a1aa;">
+    No question data available for this attempt.
+</div>
+{% endif %}
+{% endblock %}
