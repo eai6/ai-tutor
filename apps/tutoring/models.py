@@ -420,6 +420,23 @@ class ExitTicketAttempt(models.Model):
         return f"{self.student.username} - {self.exit_ticket.lesson.title}: {self.score}/10"
 
 
+class TeacherGuidance(models.Model):
+    """Guidance from teacher or Monitor AI injected into a tutor session."""
+    session = models.ForeignKey(TutorSession, on_delete=models.CASCADE, related_name='guidances')
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, help_text="Teacher who sent this, or null for Monitor AI")
+    message = models.TextField(help_text="Guidance instruction for the tutor engine")
+    is_from_ai = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True, help_text="Whether this guidance is currently applied")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        source = "Monitor AI" if self.is_from_ai else (self.author.get_full_name() if self.author else "Teacher")
+        return f"{source}: {self.message[:50]}"
+
+
 # Import skills models so Django discovers them for migrations
 from apps.tutoring.skills_models import (  # noqa: E402, F401
     Skill,

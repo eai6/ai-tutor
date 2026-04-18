@@ -69,6 +69,9 @@ urlpatterns = [
     path('reports/', views.reports_overview, name='reports'),
     path('class/<int:course_id>/readiness/', views.class_readiness_report, name='class_readiness'),
     path('lesson/<int:lesson_id>/session-report/', views.lesson_session_report, name='lesson_session_report'),
+    path('lesson/<int:lesson_id>/monitor/', views.lesson_live_monitor, name='lesson_monitor'),
+    path('lesson/<int:lesson_id>/send-guidance/', views.send_guidance, name='send_guidance'),
+    path('session/<int:session_id>/chat-history/', views.session_chat_history, name='session_chat_history'),
     
     # Settings
     path('settings/', views.settings_page, name='settings'),

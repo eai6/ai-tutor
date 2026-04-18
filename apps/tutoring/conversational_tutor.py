@@ -693,6 +693,11 @@ class ConversationalTutor:
         # Correct-answer streak for in-conversation gamification
         self._correct_streak = state.get('correct_streak', 0)
 
+        # Cognitive load adaptation
+        self.cognitive_load = state.get('cognitive_load', 0.5)
+        self.consecutive_wrong = state.get('consecutive_wrong', 0)
+        self.consecutive_correct_streak = state.get('consecutive_correct_streak', 0)
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -754,6 +759,10 @@ class ConversationalTutor:
             'difficulty_level': getattr(self, 'difficulty_level', 0),
             # Correct-answer streak for in-conversation gamification
             'correct_streak': getattr(self, '_correct_streak', 0),
+            # Cognitive load adaptation
+            'cognitive_load': getattr(self, 'cognitive_load', 0.5),
+            'consecutive_wrong': getattr(self, 'consecutive_wrong', 0),
+            'consecutive_correct_streak': getattr(self, 'consecutive_correct_streak', 0),
             # Enabling objective coverage (P1.2)
             'covered_objectives': [
                 o['objective'] for o in getattr(self, 'enabling_objectives', [])
@@ -1989,19 +1998,43 @@ IMPORTANT: Any question you ask must be complete and self-contained. Never say "
 Prioritize uncovered objectives in your teaching. Ensure each is explicitly addressed before the session ends.
 [/ENABLING OBJECTIVES]"""
 
-    def _build_difficulty_signal_block(self) -> str:
-        """Build [DIFFICULTY ADJUSTMENT] context block based on student signal.
+    def _build_teacher_guidance_block(self) -> str:
+        """Build context block with active teacher/monitor guidance."""
+        from apps.tutoring.models import TeacherGuidance
+        guidances = TeacherGuidance.objects.filter(
+            session=self.session, is_active=True
+        ).order_by('-created_at')[:3]
 
-        The difficulty_level ranges from -2 (too hard) to +2 (too easy).
-        Returns an empty string when level is 0 (no adjustment needed).
-        """
-        level = getattr(self, 'difficulty_level', 0)
-        if level == 0:
+        if not guidances:
             return ""
 
+        lines = []
+        for g in guidances:
+            source = "MONITOR AI" if g.is_from_ai else "TEACHER"
+            lines.append(f"[{source}]: {g.message}")
+
+        return (
+            "\n\n[TEACHER/MONITOR GUIDANCE — follow these instructions]:\n"
+            + "\n".join(lines)
+            + "\nApply this guidance in your next response.\n"
+        )
+
+    def _build_difficulty_signal_block(self) -> str:
+        """Build [DIFFICULTY ADJUSTMENT] + [COGNITIVE LOAD] context blocks.
+
+        Combines:
+        1. difficulty_level (-2 to +2) — explicit student signal (ZPD)
+        2. cognitive_load (0.0-1.0) — implicit load from correctness/confusion patterns
+
+        Returns an empty string when both are neutral.
+        """
+        blocks = []
+
+        # --- Explicit difficulty signal (ZPD) ---
+        level = getattr(self, 'difficulty_level', 0)
         if level >= 1:
             intensity = "moderately" if level == 1 else "significantly"
-            return f"""[DIFFICULTY ADJUSTMENT]
+            blocks.append(f"""[DIFFICULTY ADJUSTMENT]
 The student has signaled this material is TOO EASY for them (confidence level: {level}/2).
 Apply the expertise_reversal principle {intensity}:
 - SKIP intermediate explanation steps — do NOT ask the student to explain basic sub-steps they clearly understand.
@@ -2011,11 +2044,10 @@ Apply the expertise_reversal principle {intensity}:
 - Use concise, peer-level language — no over-scaffolding.
 - If they get it right on the first try, acknowledge briefly and advance: "Solid. Let's try something harder."
 CRITICAL: When the student answers correctly, do NOT revert to asking them to explain intermediate steps. Trust their demonstrated competence.
-[/DIFFICULTY ADJUSTMENT]"""
-
-        else:
+[/DIFFICULTY ADJUSTMENT]""")
+        elif level <= -1:
             intensity = "moderately" if level == -1 else "significantly"
-            return f"""[DIFFICULTY ADJUSTMENT]
+            blocks.append(f"""[DIFFICULTY ADJUSTMENT]
 The student has signaled this material is TOO HARD for them (struggle level: {abs(level)}/2).
 Apply the cognitive_load and targeted_remediation principles {intensity}:
 - Break the current concept into SMALLER sub-steps than the directive specifies.
@@ -2025,7 +2057,30 @@ Apply the cognitive_load and targeted_remediation principles {intensity}:
 - If they struggle, offer a hint proactively rather than waiting for a second attempt.
 - Be extra encouraging — normalize difficulty: "This is a tough one. Let's break it down together."
 - Consider whether a prerequisite gap is the real issue.
-[/DIFFICULTY ADJUSTMENT]"""
+[/DIFFICULTY ADJUSTMENT]""")
+
+        # --- Implicit cognitive load signal ---
+        load = getattr(self, 'cognitive_load', 0.5)
+        if load >= 0.7:
+            blocks.append(
+                "\n[COGNITIVE LOAD: HIGH — Student is struggling]\n"
+                "- Use SIMPLER language and shorter sentences\n"
+                "- Break the current concept into SMALLER steps\n"
+                "- Give a worked example BEFORE asking them to try\n"
+                "- Provide hints IMMEDIATELY, don't wait for a second attempt\n"
+                "- Be extra encouraging — acknowledge effort, not just correctness\n"
+                "- If they've been wrong 3+ times, try a COMPLETELY different approach\n"
+            )
+        elif load <= 0.3:
+            blocks.append(
+                "\n[COGNITIVE LOAD: LOW — Student is doing well]\n"
+                "- Challenge them with harder variations\n"
+                "- Skip worked examples — go straight to practice\n"
+                "- Ask them to explain their reasoning, not just give answers\n"
+                "- Introduce connections to other concepts\n"
+            )
+
+        return "\n".join(blocks)
 
     def _build_worked_example_block(self) -> str:
         """Build [WORKED EXAMPLE] context block for teach/worked_example steps (R14).
@@ -2215,6 +2270,9 @@ Apply the cognitive_load and targeted_remediation principles {intensity}:
         interleaved_block = self._build_interleaved_practice_block()
         enabling_obj_block = self._build_enabling_objectives_block()
 
+        # Teacher/Monitor AI guidance
+        guidance_block = self._build_teacher_guidance_block()
+
         # Detect explicit hint requests and inject graduated hint instruction
         hint_block = self._build_hint_request_block(student_input)
 
@@ -2272,7 +2330,7 @@ CURRENT STEP DIRECTIVE (follow this exactly):
 {difficulty_block}
 
 {enabling_obj_block}
-
+{guidance_block}
 Generate your response following these rules:
 1. EXECUTE the CURRENT STEP DIRECTIVE above — deliver its content, ask its question, or walk through its example
 2. Do NOT skip ahead, invent your own questions, or deviate from the current step
@@ -3218,6 +3276,22 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
             self._correct_streak = getattr(self, '_correct_streak', 0) + 1
         else:
             self._correct_streak = 0
+
+        # Update cognitive load based on correctness
+        if is_correct:
+            self.consecutive_wrong = 0
+            self.consecutive_correct_streak = getattr(self, 'consecutive_correct_streak', 0) + 1
+            # Decrease load (student is doing well)
+            self.cognitive_load = max(0.0, self.cognitive_load - 0.1)
+        else:
+            self.consecutive_correct_streak = 0
+            self.consecutive_wrong = getattr(self, 'consecutive_wrong', 0) + 1
+            # Increase load (student is struggling)
+            self.cognitive_load = min(1.0, self.cognitive_load + 0.15)
+
+        # Confusion signals increase load
+        if any(signal in input_lower for signal in confusion_signals):
+            self.cognitive_load = min(1.0, self.cognitive_load + 0.1)
 
         # Record skill practice via SkillAssessmentService (R2)
         try:

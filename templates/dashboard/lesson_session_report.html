@@ -185,6 +185,9 @@
         <h2>Session Report: {{ lesson.title }}</h2>
         <div class="report-meta">{{ unit.title }} &mdash; {{ course.title }}</div>
     </div>
+    <div>
+        <a href="{% url 'dashboard:lesson_monitor' lesson.id %}" style="display:inline-block;padding:6px 14px;border-radius:6px;font-size:0.8125rem;font-weight:600;text-decoration:none;background:#8b5cf6;color:#fff;">Live Monitor</a>
+    </div>
 </div>
 
 <!-- Summary Cards -->

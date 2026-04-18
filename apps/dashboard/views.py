@@ -3809,3 +3809,154 @@ def reindex_materials(request, course_id):
     run_async(_reindex, material_ids)
     messages.success(request, f"Reindexing {count} materials into knowledge base.")
     return redirect('dashboard:course_detail', course_id=course.id)
+
+
+# ============================================================================
+# Live Monitor & Chat History
+# ============================================================================
+
+@staff_required
+def lesson_live_monitor(request, lesson_id):
+    """Real-time monitoring of active tutoring sessions for a lesson."""
+    from apps.curriculum.models import Lesson
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        lesson = get_object_or_404(
+            Lesson,
+            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            id=lesson_id,
+        )
+    else:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    sessions = TutorSession.objects.filter(lesson=lesson).select_related('student').order_by('-started_at')
+
+    session_data = []
+    for session in sessions:
+        state = session.engine_state or {}
+        duration = None
+        if session.started_lesson_at:
+            if session.ended_at:
+                duration = round((session.ended_at - session.started_lesson_at).total_seconds() / 60, 1)
+            else:
+                duration = round((timezone.now() - session.started_lesson_at).total_seconds() / 60, 1)
+
+        steps_raw = state.get('steps', [])
+        total_steps = len(steps_raw) if isinstance(steps_raw, list) else 0
+
+        session_data.append({
+            'session': session,
+            'student_name': session.student.get_full_name() or session.student.username,
+            'status': session.status,
+            'cognitive_load': state.get('cognitive_load', 0.5),
+            'current_step': state.get('current_topic_index', 0) + 1,
+            'total_steps': total_steps,
+            'exchange_count': state.get('exchange_count', 0),
+            'display_phase': state.get('display_phase', ''),
+            'is_remediation': state.get('is_remediation', False),
+            'duration_minutes': duration,
+            'exit_score': state.get('exit_ticket_score'),
+            'exit_total': state.get('exit_ticket_total'),
+            'covered_eos': state.get('covered_enabling_objectives', []),
+            'failed_eos': state.get('exit_ticket_failed_eos', []),
+        })
+
+    context = {
+        **request.staff_ctx,
+        'lesson': lesson,
+        'course': lesson.unit.course,
+        'sessions': session_data,
+        'active_count': sum(1 for s in session_data if s['status'] == 'active'),
+        'completed_count': sum(1 for s in session_data if s['status'] == 'completed'),
+        'struggling_count': sum(1 for s in session_data if s['status'] == 'active' and s['cognitive_load'] > 0.7),
+    }
+    return render(request, 'dashboard/lesson_monitor.html', context)
+
+
+@teacher_required
+@require_POST
+def send_guidance(request, lesson_id):
+    """Send teacher guidance to active tutor sessions."""
+    from apps.tutoring.models import TutorSession, TeacherGuidance
+    from apps.curriculum.models import Lesson
+
+    institution = request.staff_ctx['institution']
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    session_ids = request.POST.getlist('session_ids')
+    message = request.POST.get('message', '').strip()
+    is_ai = request.POST.get('ai_guidance') == '1'
+
+    if is_ai:
+        # Generate AI guidance based on class patterns
+        sessions = TutorSession.objects.filter(lesson=lesson, status='active')
+        struggling = []
+        for s in sessions:
+            state = s.engine_state or {}
+            if state.get('cognitive_load', 0.5) > 0.7:
+                name = s.student.get_full_name() or s.student.username
+                struggling.append(f"{name} (load: {state.get('cognitive_load', 0.5):.1f})")
+
+        if struggling:
+            message = (
+                f"Monitor AI detected {len(struggling)} struggling student(s): "
+                f"{', '.join(struggling[:5])}. "
+                f"For these students: use simpler language, provide more worked examples, "
+                f"and break concepts into smaller steps. Be extra encouraging."
+            )
+        else:
+            message = "All students are progressing well. Continue at current pace."
+        session_ids = ['all']
+
+    if not message:
+        messages.error(request, "Please enter a guidance message.")
+        return redirect('dashboard:lesson_monitor', lesson_id=lesson.id)
+
+    # Determine target sessions
+    if 'all' in session_ids:
+        target_sessions = TutorSession.objects.filter(lesson=lesson, status='active')
+    else:
+        target_sessions = TutorSession.objects.filter(id__in=[int(x) for x in session_ids if x.isdigit()])
+
+    count = 0
+    for session in target_sessions:
+        TeacherGuidance.objects.create(
+            session=session,
+            author=request.user if not is_ai else None,
+            message=message,
+            is_from_ai=is_ai,
+        )
+        count += 1
+
+    source = "Monitor AI" if is_ai else "Teacher"
+    messages.success(request, f"{source} guidance sent to {count} session(s).")
+    return redirect('dashboard:lesson_monitor', lesson_id=lesson.id)
+
+
+@staff_required
+def session_chat_history(request, session_id):
+    """View the full chat history of a tutoring session."""
+    from apps.tutoring.models import SessionTurn
+
+    institution = request.staff_ctx['institution']
+    qs = TutorSession.objects.all()
+    qs = filter_by_institution(qs, institution)
+    session = get_object_or_404(qs.select_related('student', 'lesson'), id=session_id)
+
+    turns = SessionTurn.objects.filter(session=session).order_by('created_at')
+    state = session.engine_state or {}
+
+    context = {
+        **request.staff_ctx,
+        'session': session,
+        'turns': turns,
+        'lesson': session.lesson,
+        'student_name': session.student.get_full_name() or session.student.username,
+        'cognitive_load': state.get('cognitive_load', 0.5),
+        'exit_score': state.get('exit_ticket_score'),
+        'exit_total': state.get('exit_ticket_total'),
+        'covered_eos': state.get('covered_enabling_objectives', []),
+        'failed_eos': state.get('exit_ticket_failed_eos', []),
+    }
+    return render(request, 'dashboard/session_chat_history.html', context)

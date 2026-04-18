@@ -1,0 +1,275 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Live Monitor — {{ lesson.title }}{% endblock %}
+{% block page_title %}Live Monitor{% endblock %}
+
+{% block extra_css %}
+<style>
+.monitor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.monitor-header h2 { margin: 0; font-size: 1.25rem; }
+.monitor-meta { color: #71717a; font-size: 0.875rem; margin-top: 0.25rem; }
+
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+.summary-card {
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.summary-card .number {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1;
+}
+.summary-card .label {
+    font-size: 0.75rem;
+    color: #71717a;
+    margin-top: 0.375rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.number.green { color: #059669; }
+.number.blue { color: #2563eb; }
+.number.red { color: #dc2626; }
+.number.gray { color: #6b7280; }
+
+.session-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.session-table th {
+    background: #f4f4f5;
+    padding: 0.625rem 0.875rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #71717a;
+    letter-spacing: 0.05em;
+}
+.session-table td {
+    padding: 0.75rem 0.875rem;
+    font-size: 0.875rem;
+    border-top: 1px solid #f4f4f5;
+    vertical-align: middle;
+}
+.session-table tr:hover td { background: #fafafa; }
+
+.badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.badge-active { background: #d1fae5; color: #059669; }
+.badge-completed { background: #dbeafe; color: #2563eb; }
+.badge-abandoned { background: #f3f4f6; color: #6b7280; }
+.badge-remediation { background: #fef3c7; color: #d97706; }
+
+.cog-bar {
+    width: 60px;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+}
+.cog-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+.cog-green { background: #10b981; }
+.cog-yellow { background: #f59e0b; }
+.cog-red { background: #ef4444; }
+
+.btn-view {
+    display: inline-block;
+    padding: 0.25rem 0.625rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: #fff;
+    background: #6366f1;
+}
+.btn-view:hover { background: #4f46e5; }
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+.back-link:hover { text-decoration: underline; }
+
+.refresh-note {
+    font-size: 0.75rem;
+    color: #a1a1aa;
+    margin-top: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="back-link">&larr; Back to Lesson</a>
+
+<div class="monitor-header">
+    <div>
+        <h2>{{ lesson.title }}</h2>
+        <div class="monitor-meta">{{ course.name }} &mdash; Live Session Monitor</div>
+    </div>
+    <div>
+        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn-view" style="background:#6366f1;">Session Report</a>
+    </div>
+</div>
+
+<div class="summary-cards">
+    <div class="summary-card">
+        <div class="number blue">{{ active_count }}</div>
+        <div class="label">Active</div>
+    </div>
+    <div class="summary-card">
+        <div class="number green">{{ completed_count }}</div>
+        <div class="label">Completed</div>
+    </div>
+    <div class="summary-card">
+        <div class="number red">{{ struggling_count }}</div>
+        <div class="label">Struggling</div>
+    </div>
+    <div class="summary-card">
+        <div class="number gray">{{ sessions|length }}</div>
+        <div class="label">Total</div>
+    </div>
+</div>
+
+{% if sessions %}
+<table class="session-table">
+    <thead>
+        <tr>
+            <th>Student</th>
+            <th>Status</th>
+            <th>Phase</th>
+            <th>Step</th>
+            <th>Cognitive Load</th>
+            <th>Exchanges</th>
+            <th>Duration</th>
+            <th>Exit Score</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in sessions %}
+        <tr>
+            <td style="font-weight:600;">{{ s.student_name }}</td>
+            <td>
+                <span class="badge badge-{{ s.status }}">{{ s.status }}</span>
+                {% if s.is_remediation %}<span class="badge badge-remediation" style="margin-left:4px;">Remediation</span>{% endif %}
+            </td>
+            <td>{{ s.display_phase|default:"--" }}</td>
+            <td>{{ s.current_step }}/{{ s.total_steps }}</td>
+            <td>
+                {% widthratio s.cognitive_load 1 100 as cog_pct %}
+                <div class="cog-bar">
+                    <div class="cog-fill {% if s.cognitive_load <= 0.3 %}cog-green{% elif s.cognitive_load <= 0.7 %}cog-yellow{% else %}cog-red{% endif %}"
+                         style="width:{% widthratio s.cognitive_load 1 100 %}%;"></div>
+                </div>
+                <span style="font-size:0.75rem;color:#71717a;margin-left:4px;">{{ s.cognitive_load|floatformat:2 }}</span>
+            </td>
+            <td>{{ s.exchange_count }}</td>
+            <td>{% if s.duration_minutes is not None %}{{ s.duration_minutes }} min{% else %}--{% endif %}</td>
+            <td>
+                {% if s.exit_score is not None %}
+                    {{ s.exit_score }}/{{ s.exit_total|default:"10" }}
+                {% else %}
+                    --
+                {% endif %}
+            </td>
+            <td>
+                <a href="{% url 'dashboard:session_chat_history' s.session.id %}" class="btn-view">View Chat</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div style="text-align:center;padding:3rem;color:#a1a1aa;">
+    No sessions found for this lesson yet.
+</div>
+{% endif %}
+
+<!-- Teacher Guidance Section -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Send Guidance to Students</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{% url 'dashboard:send_guidance' lesson.id %}">
+            {% csrf_token %}
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end;">
+                <div>
+                    <label class="form-label">Select student(s)</label>
+                    <select name="session_ids" class="form-control" multiple style="height: auto;">
+                        <option value="all">All Active Students</option>
+                        {% for s in sessions %}
+                        {% if s.status == 'active' %}
+                        <option value="{{ s.session.id }}">{{ s.student_name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div></div>
+            </div>
+            <div class="form-group" style="margin-top: 0.75rem;">
+                <label class="form-label">Guidance message</label>
+                <textarea name="message" class="form-control" rows="2" placeholder="e.g., 'Slow down and use simpler examples for this student' or 'Skip to the next concept, they've mastered this one'" required></textarea>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                <button type="submit" class="btn btn-primary btn-sm">Send to Selected</button>
+                <button type="submit" name="ai_guidance" value="1" class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none;">Generate AI Guidance</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="refresh-note">Auto-refreshes every 10 seconds for active sessions.</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    // Auto-refresh if there are active sessions
+    const activeCount = {{ active_count }};
+    if (activeCount > 0) {
+        setTimeout(function() {
+            window.location.reload();
+        }, 10000);
+    }
+})();
+</script>
+{% endblock %}

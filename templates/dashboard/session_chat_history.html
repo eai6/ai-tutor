@@ -1,0 +1,272 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Chat History — {{ student_name }}{% endblock %}
+{% block page_title %}Chat History{% endblock %}
+
+{% block extra_css %}
+<style>
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.chat-header h2 { margin: 0; font-size: 1.25rem; }
+.chat-meta { color: #71717a; font-size: 0.875rem; margin-top: 0.25rem; }
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+.back-link:hover { text-decoration: underline; }
+
+/* Info cards */
+.info-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+.info-card {
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    font-size: 0.875rem;
+}
+.info-card .info-label {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #a1a1aa;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+.info-card .info-value {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.cog-bar-lg {
+    width: 80px;
+    height: 10px;
+    background: #e5e7eb;
+    border-radius: 5px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+}
+.cog-fill {
+    height: 100%;
+    border-radius: 5px;
+}
+.cog-green { background: #10b981; }
+.cog-yellow { background: #f59e0b; }
+.cog-red { background: #ef4444; }
+
+/* EO coverage */
+.eo-section {
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+}
+.eo-section h3 {
+    font-size: 0.875rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+.eo-tag {
+    display: inline-block;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0.125rem;
+}
+.eo-covered { background: #d1fae5; color: #059669; }
+.eo-failed { background: #fee2e2; color: #dc2626; }
+
+/* Exit ticket results */
+.exit-result {
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+}
+.exit-result h3 {
+    font-size: 0.875rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+.exit-score-big {
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+.exit-pass { color: #059669; }
+.exit-fail { color: #dc2626; }
+
+/* Chat conversation */
+.chat-container {
+    background: #f4f4f5;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+.chat-bubble {
+    max-width: 75%;
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    margin-bottom: 0.625rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+.bubble-tutor {
+    background: #fff;
+    color: #1f2937;
+    border-bottom-left-radius: 0.25rem;
+    margin-right: auto;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+.bubble-student {
+    background: #dbeafe;
+    color: #1e3a5f;
+    border-bottom-right-radius: 0.25rem;
+    margin-left: auto;
+}
+.bubble-system {
+    background: #fef3c7;
+    color: #92400e;
+    margin: 0.5rem auto;
+    text-align: center;
+    font-size: 0.75rem;
+    max-width: 90%;
+    border-radius: 0.5rem;
+}
+.bubble-role {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #a1a1aa;
+    margin-bottom: 0.25rem;
+}
+.bubble-time {
+    font-size: 0.625rem;
+    color: #a1a1aa;
+    margin-top: 0.25rem;
+}
+.bubble-wrapper {
+    display: flex;
+    flex-direction: column;
+}
+.bubble-wrapper.right {
+    align-items: flex-end;
+}
+.bubble-wrapper.left {
+    align-items: flex-start;
+}
+.bubble-wrapper.center {
+    align-items: center;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="back-link">&larr; Back to Monitor</a>
+
+<div class="chat-header">
+    <div>
+        <h2>{{ student_name }}</h2>
+        <div class="chat-meta">{{ lesson.title }} &mdash; Started {{ session.started_at|date:"M d, Y H:i" }}</div>
+    </div>
+    <div>
+        <span style="display:inline-block;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.6875rem;font-weight:700;text-transform:uppercase;
+            {% if session.status == 'active' %}background:#d1fae5;color:#059669;{% elif session.status == 'completed' %}background:#dbeafe;color:#2563eb;{% else %}background:#f3f4f6;color:#6b7280;{% endif %}">
+            {{ session.status }}
+        </span>
+    </div>
+</div>
+
+<div class="info-cards">
+    <div class="info-card">
+        <div class="info-label">Cognitive Load</div>
+        <div class="info-value">
+            <div class="cog-bar-lg">
+                <div class="cog-fill {% if cognitive_load <= 0.3 %}cog-green{% elif cognitive_load <= 0.7 %}cog-yellow{% else %}cog-red{% endif %}"
+                     style="width:{% widthratio cognitive_load 1 100 %}%;"></div>
+            </div>
+            <span style="margin-left:6px;">{{ cognitive_load|floatformat:2 }}</span>
+        </div>
+    </div>
+    {% if session.lesson_duration_minutes %}
+    <div class="info-card">
+        <div class="info-label">Duration</div>
+        <div class="info-value">{{ session.lesson_duration_minutes }} min</div>
+    </div>
+    {% endif %}
+    <div class="info-card">
+        <div class="info-label">Messages</div>
+        <div class="info-value">{{ turns|length }}</div>
+    </div>
+</div>
+
+{% if covered_eos or failed_eos %}
+<div class="eo-section">
+    <h3>Enabling Objectives</h3>
+    {% for eo in covered_eos %}
+        <span class="eo-tag eo-covered">{{ eo }}</span>
+    {% endfor %}
+    {% for eo in failed_eos %}
+        <span class="eo-tag eo-failed">{{ eo }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if exit_score is not None %}
+<div class="exit-result">
+    <h3>Exit Ticket</h3>
+    <span class="exit-score-big {% if exit_score >= 8 %}exit-pass{% else %}exit-fail{% endif %}">
+        {{ exit_score }}/{{ exit_total|default:"10" }}
+    </span>
+    <span style="margin-left:0.5rem;font-size:0.875rem;color:#71717a;">
+        {% if exit_score >= 8 %}Passed{% else %}Did not pass{% endif %}
+    </span>
+</div>
+{% endif %}
+
+<div class="chat-container">
+    {% for turn in turns %}
+        {% if turn.role == 'system' %}
+        <div class="bubble-wrapper center">
+            <div class="chat-bubble bubble-system">{{ turn.content|truncatewords:50 }}</div>
+        </div>
+        {% elif turn.role == 'student' %}
+        <div class="bubble-wrapper right">
+            <div class="bubble-role">{{ student_name }}</div>
+            <div class="chat-bubble bubble-student">{{ turn.content }}</div>
+            <div class="bubble-time">{{ turn.created_at|date:"H:i" }}</div>
+        </div>
+        {% else %}
+        <div class="bubble-wrapper left">
+            <div class="bubble-role">Tutor</div>
+            <div class="chat-bubble bubble-tutor">{{ turn.content }}</div>
+            <div class="bubble-time">{{ turn.created_at|date:"H:i" }}</div>
+        </div>
+        {% endif %}
+    {% empty %}
+        <div style="text-align:center;color:#a1a1aa;padding:2rem;">No messages in this session.</div>
+    {% endfor %}
+</div>
+{% endblock %}
