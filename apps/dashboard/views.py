@@ -3883,6 +3883,28 @@ def lesson_live_monitor(request, lesson_id):
             'failed_eos': state.get('exit_ticket_failed_eos', []),
         })
 
+    # Monitor AI: auto-issue guidance to tutors for struggling students,
+    # debounced to once per 5 min per lesson so page refreshes don't spam.
+    _maybe_run_monitor_ai(lesson, session_data)
+
+    # Surface recent AI guidance so the teacher can see what the Monitor AI
+    # has told the tutors (read-only banner, no form).
+    from apps.tutoring.models import TeacherGuidance
+    recent_ai_guidances = list(
+        TeacherGuidance.objects
+        .filter(session__lesson=lesson, is_from_ai=True)
+        .select_related('session__student')
+        .order_by('-created_at')[:5]
+        .values('message', 'created_at', 'session__student__first_name',
+                'session__student__last_name', 'session__student__username')
+    )
+    for g in recent_ai_guidances:
+        first = g.pop('session__student__first_name', '') or ''
+        last = g.pop('session__student__last_name', '') or ''
+        username = g.pop('session__student__username', '') or ''
+        full = f"{first} {last}".strip()
+        g['student_name'] = full or username
+
     context = {
         **request.staff_ctx,
         'lesson': lesson,
@@ -3895,8 +3917,50 @@ def lesson_live_monitor(request, lesson_id):
             1 for s in session_data
             if s['status'] == 'active' and not s['is_idle'] and s['cognitive_load'] > 0.7
         ),
+        'recent_ai_guidances': recent_ai_guidances,
     }
     return render(request, 'dashboard/lesson_monitor.html', context)
+
+
+def _maybe_run_monitor_ai(lesson, session_data):
+    """Debounced Monitor-AI pass: if no AI guidance has been issued for this
+    lesson in the last 5 minutes, scan active sessions and inject guidance
+    into the tutor for anyone with cognitive_load > 0.7."""
+    from apps.tutoring.models import TutorSession, TeacherGuidance
+
+    debounce_since = timezone.now() - timedelta(minutes=5)
+    recent = TeacherGuidance.objects.filter(
+        session__lesson=lesson,
+        is_from_ai=True,
+        created_at__gte=debounce_since,
+    ).exists()
+    if recent:
+        return
+
+    struggling_ids = [
+        s['session'].id for s in session_data
+        if s['status'] == 'active' and not s['is_idle'] and s['cognitive_load'] > 0.7
+    ]
+    if not struggling_ids:
+        return
+
+    sessions = TutorSession.objects.filter(id__in=struggling_ids).select_related('student')
+    for session in sessions:
+        state = session.engine_state or {}
+        load = state.get('cognitive_load', 0.5)
+        phase = state.get('display_phase', '')
+        msg = (
+            f"Monitor AI: this student's cognitive load is {load:.2f} (high). "
+            f"Slow down, use simpler language, provide one worked example at a time, "
+            f"and break the current concept into smaller steps. Be extra encouraging. "
+            f"Currently in phase: {phase or 'unknown'}."
+        )
+        TeacherGuidance.objects.create(
+            session=session,
+            author=None,
+            message=msg,
+            is_from_ai=True,
+        )
 
 
 @teacher_required

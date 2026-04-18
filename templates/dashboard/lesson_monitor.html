@@ -229,39 +229,25 @@
 </div>
 {% endif %}
 
-<!-- Teacher Guidance Section -->
-<div class="card" style="margin-top: 1.5rem;">
+{% if recent_ai_guidances %}
+<!-- AI Monitor: Recent guidance sent to tutors -->
+<div class="card" style="margin-top: 1.5rem;border-left:4px solid #8b5cf6;">
     <div class="card-header">
-        <h3 class="card-title">Send Guidance to Students</h3>
+        <h3 class="card-title" style="color:#8b5cf6;">Monitor AI — Recent guidance to tutors</h3>
     </div>
     <div class="card-body">
-        <form method="post" action="{% url 'dashboard:send_guidance' lesson.id %}">
-            {% csrf_token %}
-            <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end;">
-                <div>
-                    <label class="form-label">Select student(s)</label>
-                    <select name="session_ids" class="form-control" multiple style="height: auto;">
-                        <option value="all">All Active Students</option>
-                        {% for s in sessions %}
-                        {% if s.status == 'active' %}
-                        <option value="{{ s.session.id }}">{{ s.student_name }}</option>
-                        {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-                <div></div>
-            </div>
-            <div class="form-group" style="margin-top: 0.75rem;">
-                <label class="form-label">Guidance message</label>
-                <textarea name="message" class="form-control" rows="2" placeholder="e.g., 'Slow down and use simpler examples for this student' or 'Skip to the next concept, they've mastered this one'" required></textarea>
-            </div>
-            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                <button type="submit" class="btn btn-primary btn-sm">Send to Selected</button>
-                <button type="submit" name="ai_guidance" value="1" class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none;">Generate AI Guidance</button>
-            </div>
-        </form>
+        {% for g in recent_ai_guidances %}
+        <div style="padding:0.75rem 0;border-bottom:1px solid #f4f4f5;font-size:0.875rem;">
+            <div style="color:#71717a;font-size:0.75rem;margin-bottom:0.25rem;">{{ g.student_name }} &middot; {{ g.created_at|date:"H:i" }}</div>
+            <div>{{ g.message }}</div>
+        </div>
+        {% endfor %}
+        <div style="color:#a1a1aa;font-size:0.75rem;margin-top:0.75rem;">
+            Monitor AI reviews active sessions automatically every 5 minutes and injects guidance into the tutor for struggling students.
+        </div>
     </div>
 </div>
+{% endif %}
 
 <div class="refresh-note">Auto-refreshes every 10 seconds for active sessions.</div>
 {% endblock %}
