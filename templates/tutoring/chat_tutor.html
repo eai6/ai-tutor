@@ -1213,7 +1213,7 @@ function phaseLabel(phase) {
 
 function updateStepProgress(data) {
     if (data.step_number && data.total_steps) {
-        if (data.phase === 'exit_ticket' || data.phase === 'completed') {
+        if (data.phase === 'exit_ticket' || data.phase === 'completed' || data.phase === 'remediation') {
             stepProgress.textContent = '';
         } else {
             stepProgress.textContent = data.step_number + '/' + data.total_steps;
