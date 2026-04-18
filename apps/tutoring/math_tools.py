@@ -34,7 +34,65 @@ def verify_calculations(text: str) -> tuple[str, list[dict]]:
             return a - b
         return None
 
-    # First handle chained expressions: a op b op c = result
+    # FIRST: handle sequential-equals chains: a op1 b = c op2 d = e
+    # e.g., "75 × 3 + 15 = 225 + 15 = 240" or "12 × 5 = 60 + 3 = 63"
+    # This catches two bugs the simple binary pattern misses:
+    #   1. The simple pattern greedy-consumes "= 15" from the first step,
+    #      hiding "15 + 15 = 240" from the second-step check.
+    #   2. An intermediate like "75 × 3 = 15" is wrong but only visible
+    #      in context (the student expected 225).
+    double_eq_pattern = (
+        r'(\d+(?:\.\d+)?)\s*([×x*÷/+\-−])\s*(\d+(?:\.\d+)?)'
+        r'\s*=\s*(\d+(?:\.\d+)?)'
+        r'\s*([×x*÷/+\-−])\s*(\d+(?:\.\d+)?)'
+        r'\s*=\s*(\d+(?:\.\d+)?)'
+    )
+
+    def replace_double_eq(match):
+        a, op1, b, c_claimed, op2, d, e_claimed = match.groups()
+        step1 = calc(a, op1, b)
+        if step1 is None:
+            return match.group(0)
+        c_correct = step1
+        # For step 2, use the student-shown intermediate (c_claimed) so we
+        # don't mask a bad intermediate — we'll flag that separately.
+        step2 = calc(c_claimed, op2, d)
+        if step2 is None:
+            return match.group(0)
+        e_correct = step2
+
+        c_is_wrong = abs(c_correct - float(c_claimed)) >= 0.01
+        e_is_wrong = abs(e_correct - float(e_claimed)) >= 0.01
+
+        if not c_is_wrong and not e_is_wrong:
+            return match.group(0)
+
+        # Replace with corrected arithmetic. If the intermediate was wrong,
+        # rebuild the final using the CORRECT intermediate so the tutor's
+        # narrative stays internally consistent.
+        c_out = f"{c_correct:g}" if c_is_wrong else c_claimed
+        final_for_e = calc(str(c_correct), op2, d) if c_is_wrong else e_correct
+        e_out = f"{final_for_e:g}" if (c_is_wrong or e_is_wrong) else e_claimed
+
+        if c_is_wrong:
+            corrections.append({
+                'expression': f"{a} {op1} {b}",
+                'claimed': c_claimed,
+                'correct': f"{c_correct:g}",
+            })
+            logger.warning(f"[MathCheck] Fixed step1: {a} {op1} {b} = {c_claimed} → {c_correct:g}")
+        if e_is_wrong or c_is_wrong:
+            corrections.append({
+                'expression': f"{c_out} {op2} {d}",
+                'claimed': e_claimed,
+                'correct': e_out,
+            })
+            logger.warning(f"[MathCheck] Fixed step2: {c_out} {op2} {d} = {e_claimed} → {e_out}")
+        return f"{a} {op1} {b} = {c_out} {op2} {d} = {e_out}"
+
+    text = re.sub(double_eq_pattern, replace_double_eq, text)
+
+    # SECOND: handle chained expressions: a op b op c = result
     # e.g., "8 × 2.5 + 15 = 35" or "20 - 3 + 5 = 22"
     # Must run BEFORE simple pattern to avoid partial matches
     chain_pattern = r'(\d+(?:\.\d+)?)\s*([×x*÷/+\-−])\s*(\d+(?:\.\d+)?)\s*([+\-−])\s*(\d+(?:\.\d+)?)\s*=\s*(\d+(?:\.\d+)?)'
