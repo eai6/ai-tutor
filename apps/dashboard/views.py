@@ -3834,6 +3834,7 @@ def lesson_live_monitor(request, lesson_id):
         TutorSession.objects
         .filter(lesson=lesson)
         .select_related('student')
+        .prefetch_related('turns')
         .annotate(last_turn_at=Max('turns__created_at'))
         .order_by('-started_at')
     )
@@ -3846,13 +3847,21 @@ def lesson_live_monitor(request, lesson_id):
     for session in sessions:
         state = session.engine_state or {}
 
-        # Active engagement window: ended_at -> last turn -> started_lesson_at.
-        # Without this, sessions that the student abandoned (closed tab) keep
-        # accumulating wall-clock minutes on the dashboard forever.
-        last_activity = session.ended_at or session.last_turn_at or session.started_lesson_at
+        # Active engagement: sum gaps between consecutive turns, clipping any
+        # gap > 5 min so a student who left the tab open for days doesn't rack
+        # up wall-clock minutes. Gives "time actually tutoring" not "wall clock".
         duration = None
-        if session.started_lesson_at and last_activity:
-            duration = round((last_activity - session.started_lesson_at).total_seconds() / 60, 1)
+        turn_times = sorted(t.created_at for t in session.turns.all())
+        if turn_times:
+            active_seconds = 0.0
+            prev = session.started_lesson_at or turn_times[0]
+            for t in turn_times:
+                active_seconds += min((t - prev).total_seconds(), IDLE_THRESHOLD_SECONDS)
+                prev = t
+            # Include time since last turn if still active
+            if session.status == 'active' and not session.ended_at:
+                active_seconds += min((now - prev).total_seconds(), IDLE_THRESHOLD_SECONDS)
+            duration = round(active_seconds / 60, 1)
 
         is_idle = False
         idle_minutes = None
