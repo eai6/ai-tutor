@@ -17,7 +17,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Count, Avg, Q, F
+from django.db.models import Count, Avg, Q, F, Max
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from django.core.paginator import Paginator
@@ -3830,17 +3830,36 @@ def lesson_live_monitor(request, lesson_id):
     else:
         lesson = get_object_or_404(Lesson, id=lesson_id)
 
-    sessions = TutorSession.objects.filter(lesson=lesson).select_related('student').order_by('-started_at')
+    sessions = (
+        TutorSession.objects
+        .filter(lesson=lesson)
+        .select_related('student')
+        .annotate(last_turn_at=Max('turns__created_at'))
+        .order_by('-started_at')
+    )
+
+    now = timezone.now()
+    IDLE_THRESHOLD_SECONDS = 5 * 60
 
     session_data = []
     for session in sessions:
         state = session.engine_state or {}
+
+        # Active engagement window: ended_at -> last turn -> started_lesson_at.
+        # Without this, sessions that the student abandoned (closed tab) keep
+        # accumulating wall-clock minutes on the dashboard forever.
+        last_activity = session.ended_at or session.last_turn_at or session.started_lesson_at
         duration = None
-        if session.started_lesson_at:
-            if session.ended_at:
-                duration = round((session.ended_at - session.started_lesson_at).total_seconds() / 60, 1)
-            else:
-                duration = round((timezone.now() - session.started_lesson_at).total_seconds() / 60, 1)
+        if session.started_lesson_at and last_activity:
+            duration = round((last_activity - session.started_lesson_at).total_seconds() / 60, 1)
+
+        is_idle = False
+        idle_minutes = None
+        if session.status == 'active' and session.last_turn_at:
+            seconds_since_turn = (now - session.last_turn_at).total_seconds()
+            if seconds_since_turn > IDLE_THRESHOLD_SECONDS:
+                is_idle = True
+                idle_minutes = round(seconds_since_turn / 60)
 
         steps_raw = state.get('steps', [])
         total_steps = len(steps_raw) if isinstance(steps_raw, list) else 0
@@ -3849,6 +3868,8 @@ def lesson_live_monitor(request, lesson_id):
             'session': session,
             'student_name': session.student.get_full_name() or session.student.username,
             'status': session.status,
+            'is_idle': is_idle,
+            'idle_minutes': idle_minutes,
             'cognitive_load': state.get('cognitive_load', 0.5),
             'current_step': state.get('current_topic_index', 0) + 1,
             'total_steps': total_steps,
@@ -3867,9 +3888,13 @@ def lesson_live_monitor(request, lesson_id):
         'lesson': lesson,
         'course': lesson.unit.course,
         'sessions': session_data,
-        'active_count': sum(1 for s in session_data if s['status'] == 'active'),
+        'active_count': sum(1 for s in session_data if s['status'] == 'active' and not s['is_idle']),
+        'idle_count': sum(1 for s in session_data if s['is_idle']),
         'completed_count': sum(1 for s in session_data if s['status'] == 'completed'),
-        'struggling_count': sum(1 for s in session_data if s['status'] == 'active' and s['cognitive_load'] > 0.7),
+        'struggling_count': sum(
+            1 for s in session_data
+            if s['status'] == 'active' and not s['is_idle'] and s['cognitive_load'] > 0.7
+        ),
     }
     return render(request, 'dashboard/lesson_monitor.html', context)
 

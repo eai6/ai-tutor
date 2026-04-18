@@ -85,6 +85,7 @@
 .badge-completed { background: #dbeafe; color: #2563eb; }
 .badge-abandoned { background: #f3f4f6; color: #6b7280; }
 .badge-remediation { background: #fef3c7; color: #d97706; }
+.badge-idle { background: #f3f4f6; color: #6b7280; }
 
 .cog-bar {
     width: 60px;
@@ -155,6 +156,10 @@
         <div class="label">Active</div>
     </div>
     <div class="summary-card">
+        <div class="number gray">{{ idle_count }}</div>
+        <div class="label">Idle</div>
+    </div>
+    <div class="summary-card">
         <div class="number green">{{ completed_count }}</div>
         <div class="label">Completed</div>
     </div>
@@ -189,6 +194,7 @@
             <td style="font-weight:600;">{{ s.student_name }}</td>
             <td>
                 <span class="badge badge-{{ s.status }}">{{ s.status }}</span>
+                {% if s.is_idle %}<span class="badge badge-idle" style="margin-left:4px;" title="No activity for {{ s.idle_minutes }} min">Idle {{ s.idle_minutes }}m</span>{% endif %}
                 {% if s.is_remediation %}<span class="badge badge-remediation" style="margin-left:4px;">Remediation</span>{% endif %}
             </td>
             <td>{{ s.display_phase|default:"--" }}</td>
