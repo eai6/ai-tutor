@@ -3840,6 +3840,7 @@ def lesson_live_monitor(request, lesson_id):
 
     now = timezone.now()
     IDLE_THRESHOLD_SECONDS = 5 * 60
+    total_lesson_steps = lesson.steps.count()
 
     session_data = []
     for session in sessions:
@@ -3861,8 +3862,10 @@ def lesson_live_monitor(request, lesson_id):
                 is_idle = True
                 idle_minutes = round(seconds_since_turn / 60)
 
-        steps_raw = state.get('steps', [])
-        total_steps = len(steps_raw) if isinstance(steps_raw, list) else 0
+        is_remediation = state.get('is_remediation', False)
+        current_step = state.get('current_topic_index', 0) + 1
+        if total_lesson_steps:
+            current_step = min(current_step, total_lesson_steps)
 
         session_data.append({
             'session': session,
@@ -3871,11 +3874,11 @@ def lesson_live_monitor(request, lesson_id):
             'is_idle': is_idle,
             'idle_minutes': idle_minutes,
             'cognitive_load': state.get('cognitive_load', 0.5),
-            'current_step': state.get('current_topic_index', 0) + 1,
-            'total_steps': total_steps,
+            'current_step': current_step,
+            'total_steps': total_lesson_steps,
             'exchange_count': state.get('exchange_count', 0),
             'display_phase': state.get('display_phase', ''),
-            'is_remediation': state.get('is_remediation', False),
+            'is_remediation': is_remediation,
             'duration_minutes': duration,
             'exit_score': state.get('exit_ticket_score'),
             'exit_total': state.get('exit_ticket_total'),

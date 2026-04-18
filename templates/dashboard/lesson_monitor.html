@@ -198,7 +198,7 @@
                 {% if s.is_remediation %}<span class="badge badge-remediation" style="margin-left:4px;">Remediation</span>{% endif %}
             </td>
             <td>{{ s.display_phase|default:"--" }}</td>
-            <td>{{ s.current_step }}/{{ s.total_steps }}</td>
+            <td>{% if s.is_remediation %}<span style="color:#71717a;">--</span>{% else %}{{ s.current_step }}/{{ s.total_steps }}{% endif %}</td>
             <td>
                 {% widthratio s.cognitive_load 1 100 as cog_pct %}
                 <div class="cog-bar">
