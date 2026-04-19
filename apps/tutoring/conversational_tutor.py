@@ -4074,7 +4074,7 @@ Which concept numbers were meaningfully covered?"""
                     answer_data.append({
                         'concept_tag': r.get('concept_tag', ''),
                         'correct': r.get('is_correct', False),
-                        'selected': str(r.get('selected', ''))[:200],
+                        'selected': r.get('selected', ''),
                         'question_type': r.get('question_type', 'mcq'),
                     })
                 ExitTicketAttempt.objects.create(
@@ -4198,7 +4198,7 @@ Which concept numbers were meaningfully covered?"""
                     answer_data.append({
                         'concept_tag': r.get('concept_tag', ''),
                         'correct': r.get('is_correct', False),
-                        'selected': str(r.get('selected', ''))[:200],
+                        'selected': r.get('selected', ''),
                         'question_type': r.get('question_type', 'mcq'),
                     })
                 ExitTicketAttempt.objects.create(

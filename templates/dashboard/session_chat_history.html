@@ -200,10 +200,10 @@
 </div>
 
 <div class="info-cards">
-    {% if session.lesson_duration_minutes %}
+    {% if duration_minutes is not None %}
     <div class="info-card">
-        <div class="info-label">Duration</div>
-        <div class="info-value">{{ session.lesson_duration_minutes }} min</div>
+        <div class="info-label">Active Duration</div>
+        <div class="info-value">{{ duration_minutes }} min</div>
     </div>
     {% endif %}
     <div class="info-card">

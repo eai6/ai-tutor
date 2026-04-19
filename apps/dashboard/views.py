@@ -3891,6 +3891,9 @@ def lesson_live_monitor(request, lesson_id):
         exit_passed = attempt.passed if attempt else None
         exit_total = 10  # exit tickets are fixed at 10 questions
         has_exit_review = bool(attempt)
+        # Treat as completed if the session is done OR latest attempt passed
+        # (covers teacher overrides that bumped a student to passing).
+        is_completed = session.status == 'completed' or bool(exit_passed)
 
         session_data.append({
             'session': session,
@@ -3909,6 +3912,7 @@ def lesson_live_monitor(request, lesson_id):
             'exit_total': exit_total,
             'exit_passed': exit_passed,
             'has_exit_review': has_exit_review,
+            'is_completed': is_completed,
             'covered_eos': state.get('covered_enabling_objectives', []),
             'failed_eos': state.get('exit_ticket_failed_eos', []),
         })
@@ -3940,9 +3944,9 @@ def lesson_live_monitor(request, lesson_id):
         'lesson': lesson,
         'course': lesson.unit.course,
         'sessions': session_data,
-        'active_count': sum(1 for s in session_data if s['status'] == 'active' and not s['is_idle']),
-        'idle_count': sum(1 for s in session_data if s['is_idle']),
-        'completed_count': sum(1 for s in session_data if s['status'] == 'completed'),
+        'active_count': sum(1 for s in session_data if s['status'] == 'active' and not s['is_idle'] and not s['is_completed']),
+        'idle_count': sum(1 for s in session_data if s['is_idle'] and not s['is_completed']),
+        'completed_count': sum(1 for s in session_data if s['is_completed']),
         'struggling_count': sum(
             1 for s in session_data
             if s['status'] == 'active' and not s['is_idle'] and s['cognitive_load'] > 0.7
@@ -4066,6 +4070,21 @@ def session_chat_history(request, session_id):
     turns = SessionTurn.objects.filter(session=session).order_by('created_at')
     state = session.engine_state or {}
 
+    # Active engagement (same calc as live monitor — clip turn-to-turn gaps > 5 min
+    # so multi-day sessions don't show 4-digit minute totals).
+    IDLE_CAP_SECONDS = 5 * 60
+    duration_minutes = None
+    turn_times = list(turns.values_list('created_at', flat=True))
+    if turn_times:
+        active_seconds = 0.0
+        prev = session.started_lesson_at or turn_times[0]
+        for t in turn_times:
+            active_seconds += min((t - prev).total_seconds(), IDLE_CAP_SECONDS)
+            prev = t
+        if session.status == 'active' and not session.ended_at:
+            active_seconds += min((timezone.now() - prev).total_seconds(), IDLE_CAP_SECONDS)
+        duration_minutes = round(active_seconds / 60, 1)
+
     context = {
         **request.staff_ctx,
         'session': session,
@@ -4073,6 +4092,7 @@ def session_chat_history(request, session_id):
         'lesson': session.lesson,
         'student_name': session.student.get_full_name() or session.student.username,
         'cognitive_load': state.get('cognitive_load', 0.5),
+        'duration_minutes': duration_minutes,
         'exit_score': state.get('exit_ticket_score'),
         'exit_total': state.get('exit_ticket_total'),
         'covered_eos': state.get('covered_enabling_objectives', []),
@@ -4290,9 +4310,21 @@ def session_exit_review_override(request, attempt_id):
     attempt.passed = attempt.score >= 8
     attempt.save(update_fields=['answers', 'score', 'passed'])
 
+    # If the override pushed a failing session over the pass line, complete it.
+    session = attempt.session
+    session_completed = False
+    if attempt.passed and session and session.status != TutorSession.Status.COMPLETED:
+        session.status = TutorSession.Status.COMPLETED
+        session.ended_at = session.ended_at or timezone.now()
+        session.completed_lesson_at = session.completed_lesson_at or timezone.now()
+        session.mastery_achieved = True
+        session.save(update_fields=['status', 'ended_at', 'completed_lesson_at', 'mastery_achieved'])
+        session_completed = True
+
     return JsonResponse({
         'ok': True,
         'score': attempt.score,
         'passed': attempt.passed,
         'is_correct': is_correct,
+        'session_completed': session_completed,
     })
