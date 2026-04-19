@@ -3142,22 +3142,45 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         return ""  # The step directive is sufficient
 
     def _remediation_steps_complete(self) -> bool:
-        """Check if remediation has covered enough ground.
+        """Check if remediation has covered enough ground before re-presenting exit ticket.
 
-        Uses exchange count as proxy — remediation should teach for at least
-        2 exchanges per failed EO before retrying the exit ticket.
+        Requires BOTH:
+          - A meaningful floor of exchanges per failed EO (so student gets real re-teaching)
+          - All failed concepts re-covered (keyword check) OR safety valve hit
         """
         if not getattr(self, 'is_remediation', False):
             return False
 
         failed_eos = getattr(self, '_failed_eos', [])
-        min_exchanges = max(4, len(failed_eos) * 2)  # At least 2 exchanges per failed EO
+        n_failed = max(1, len(failed_eos))
+        # At least 3 exchanges per failed EO, hard floor of 6 — prevents premature re-quiz
+        min_exchanges = max(6, n_failed * 3)
 
         # Safety valve: max 15 exchanges in remediation
         if self.exchange_count >= 15:
+            logger.info(f"[Remediation] Safety valve fired at {self.exchange_count} exchanges")
             return True
 
-        return self.exchange_count >= min_exchanges
+        if self.exchange_count < min_exchanges:
+            return False
+
+        # Floor met — also require that the concepts we're remediating got re-covered
+        failed_ids = {fq['id'] for fq in getattr(self, 'failed_exit_questions', [])}
+        if failed_ids:
+            uncovered_failed = [
+                c for c in self.exit_ticket_concepts
+                if c['id'] in failed_ids and not c.get('covered')
+            ]
+            if uncovered_failed:
+                logger.info(
+                    f"[Remediation] {self.exchange_count} exchanges done but "
+                    f"{len(uncovered_failed)}/{len(failed_ids)} failed concepts still uncovered"
+                )
+                return False
+
+        logger.info(f"[Remediation] Complete: {self.exchange_count} exchanges, "
+                    f"failed EOs re-covered. Re-presenting exit ticket.")
+        return True
 
     def _get_uncovered_concepts(self) -> List[Dict]:
         """Get list of exit ticket concepts not yet covered."""
