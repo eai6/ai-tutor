@@ -200,16 +200,6 @@
 </div>
 
 <div class="info-cards">
-    <div class="info-card">
-        <div class="info-label">Cognitive Load</div>
-        <div class="info-value">
-            <div class="cog-bar-lg">
-                <div class="cog-fill {% if cognitive_load <= 0.3 %}cog-green{% elif cognitive_load <= 0.7 %}cog-yellow{% else %}cog-red{% endif %}"
-                     style="width:{% widthratio cognitive_load 1 100 %}%;"></div>
-            </div>
-            <span style="margin-left:6px;">{{ cognitive_load|floatformat:2 }}</span>
-        </div>
-    </div>
     {% if session.lesson_duration_minutes %}
     <div class="info-card">
         <div class="info-label">Duration</div>

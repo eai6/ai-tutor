@@ -73,6 +73,7 @@ urlpatterns = [
     path('lesson/<int:lesson_id>/send-guidance/', views.send_guidance, name='send_guidance'),
     path('session/<int:session_id>/chat-history/', views.session_chat_history, name='session_chat_history'),
     path('session/<int:session_id>/exit-review/', views.session_exit_review, name='session_exit_review'),
+    path('exit-attempt/<int:attempt_id>/override/', views.session_exit_review_override, name='session_exit_review_override'),
     
     # Settings
     path('settings/', views.settings_page, name='settings'),

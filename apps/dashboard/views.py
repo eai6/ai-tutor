@@ -4125,15 +4125,29 @@ def session_exit_review(request, session_id):
                 return letter
         return s
 
+    import ast
+    def _maybe_parse(raw):
+        """Storage stringifies answers via str(...) — recover lists/dicts when possible."""
+        if not isinstance(raw, str):
+            return raw
+        s = raw.strip()
+        if s.startswith(('[', '{')) and s.endswith((']', '}')):
+            try:
+                return ast.literal_eval(s)
+            except (ValueError, SyntaxError):
+                return raw
+        return raw
+
     items = []
     for i, q in enumerate(ordered_questions):
         ans = stored_answers[i] if i < len(stored_answers) else {}
         if not isinstance(ans, dict):
             ans = {}
-        selected = ans.get('selected', '')
+        selected = _maybe_parse(ans.get('selected', ''))
         is_correct = ans.get('correct', False)
         q_type = ans.get('question_type') or getattr(q, 'question_type', 'mcq') or 'mcq'
         selected_letter = _mcq_letter(q, selected) if q_type == 'mcq' else ''
+        ad = q.answer_data or {}
 
         options = []
         if q_type == 'mcq':
@@ -4147,14 +4161,61 @@ def session_exit_review(request, session_id):
                         'is_correct_option': letter == q.correct_answer,
                     })
 
-        correct_answer_display = ''
-        if q_type != 'mcq' and q.answer_data:
-            ad = q.answer_data
-            correct_answer_display = (
-                ad.get('model_answer')
-                or ', '.join(ad.get('blanks', []))
-                or ad.get('data_description', '')
+        # Type-specific reconstruction so the teacher sees what the student saw
+        fill_template = ''
+        fill_blanks_correct = []
+        fill_student_blanks = []
+        matching_rows = []
+        data_description = ''
+
+        if q_type == 'fill_in_blank':
+            fill_template = ad.get('text_template', '') or ''
+            fill_blanks_correct = ad.get('blanks', []) or []
+            # Student answer is typically a list of strings (one per blank)
+            if isinstance(selected, list):
+                fill_student_blanks = [str(b) for b in selected]
+            elif isinstance(selected, str):
+                fill_student_blanks = [selected]
+        elif q_type == 'matching':
+            pairs = ad.get('pairs', []) or []
+            student_map = selected if isinstance(selected, dict) else {}
+            for p in pairs:
+                left = p.get('left', '')
+                correct_right = p.get('right', '')
+                student_right = student_map.get(left, '') if isinstance(student_map, dict) else ''
+                matching_rows.append({
+                    'left': left,
+                    'student_right': student_right,
+                    'correct_right': correct_right,
+                    'is_match': str(student_right).strip().lower() == str(correct_right).strip().lower(),
+                })
+        elif q_type in ('short_answer', 'data_interpretation'):
+            data_description = ad.get('data_description', '') or ''
+
+        # Best-guess "expected answer" string for non-MCQ
+        if q_type == 'fill_in_blank':
+            correct_answer_display = ', '.join(fill_blanks_correct)
+        elif q_type == 'matching':
+            correct_answer_display = '; '.join(
+                f"{r['left']} → {r['correct_right']}" for r in matching_rows
             )
+        elif q_type in ('short_answer', 'data_interpretation'):
+            correct_answer_display = ad.get('model_answer', '') or ''
+        else:
+            correct_answer_display = ''
+
+        # Render student answer for free-text/list cases
+        if q_type == 'fill_in_blank':
+            selected_display = ', '.join(fill_student_blanks) or '(no answer)'
+        elif q_type == 'matching':
+            selected_display = '; '.join(
+                f"{r['left']} → {r['student_right'] or '(blank)'}" for r in matching_rows
+            )
+        elif isinstance(selected, (list, dict)):
+            import json as _json
+            selected_display = _json.dumps(selected)
+        else:
+            selected_display = str(selected) if selected else ''
 
         items.append({
             'index': i + 1,
@@ -4163,7 +4224,12 @@ def session_exit_review(request, session_id):
             'question_type': q_type,
             'options': options,
             'selected_letter': selected_letter,
-            'selected_text': selected,
+            'selected_text': selected_display,
+            'fill_template': fill_template,
+            'fill_blanks_correct': fill_blanks_correct,
+            'fill_student_blanks': fill_student_blanks,
+            'matching_rows': matching_rows,
+            'data_description': data_description,
             'correct_letter': q.correct_answer,
             'correct_answer_display': correct_answer_display,
             'is_correct': is_correct,
@@ -4176,6 +4242,7 @@ def session_exit_review(request, session_id):
         'lesson': session.lesson,
         'student_name': session.student.get_full_name() or session.student.username,
         'attempt': latest,
+        'attempt_id': latest.id,
         'all_attempts': attempts,
         'items': items,
         'score': latest.score,
@@ -4183,3 +4250,49 @@ def session_exit_review(request, session_id):
         'passed': latest.passed,
     }
     return render(request, 'dashboard/session_exit_review.html', context)
+
+
+@staff_required
+@require_POST
+def session_exit_review_override(request, attempt_id):
+    """Teacher overrides the correct/incorrect mark on a single exit-ticket question.
+
+    Body: {"index": <0-based question index>, "is_correct": true/false}
+    Recomputes attempt.score and attempt.passed from the updated answers list.
+    """
+    from apps.tutoring.models import ExitTicketAttempt
+
+    institution = request.staff_ctx['institution']
+    qs = ExitTicketAttempt.objects.select_related('session__lesson__unit__course')
+    if institution is not None:
+        qs = qs.filter(
+            Q(session__lesson__unit__course__institution=institution)
+            | Q(session__lesson__unit__course__institution__isnull=True)
+        )
+    attempt = get_object_or_404(qs, id=attempt_id)
+
+    try:
+        data = json.loads(request.body)
+        idx = int(data.get('index'))
+        is_correct = bool(data.get('is_correct'))
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid payload'}, status=400)
+
+    answers = attempt.answers if isinstance(attempt.answers, list) else []
+    if idx < 0 or idx >= len(answers):
+        return JsonResponse({'error': 'Index out of range'}, status=400)
+
+    answers[idx] = {**(answers[idx] if isinstance(answers[idx], dict) else {}),
+                    'correct': is_correct,
+                    'teacher_override': True}
+    attempt.answers = answers
+    attempt.score = sum(1 for a in answers if isinstance(a, dict) and a.get('correct'))
+    attempt.passed = attempt.score >= 8
+    attempt.save(update_fields=['answers', 'score', 'passed'])
+
+    return JsonResponse({
+        'ok': True,
+        'score': attempt.score,
+        'passed': attempt.passed,
+        'is_correct': is_correct,
+    })

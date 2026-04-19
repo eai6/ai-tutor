@@ -36,6 +36,7 @@
     margin-bottom: 0.875rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     border-left: 4px solid #e4e4e7;
+    transition: border-color 0.2s;
 }
 .question-card.correct { border-left-color: #16a34a; }
 .question-card.incorrect { border-left-color: #dc2626; }
@@ -46,6 +47,7 @@
     align-items: flex-start;
     gap: 1rem;
     margin-bottom: 0.5rem;
+    flex-wrap: wrap;
 }
 .q-num { font-weight: 700; color: #52525b; }
 .q-tag { font-size: 0.7rem; color: #71717a; font-weight: 500; }
@@ -57,8 +59,9 @@
 }
 .q-badge.correct { background: #dcfce7; color: #166534; }
 .q-badge.incorrect { background: #fee2e2; color: #991b1b; }
+.q-override-tag { font-size: 0.65rem; color: #6366f1; font-weight: 700; margin-left: 0.25rem; }
 
-.q-text { font-size: 0.95rem; color: #18181b; margin: 0.5rem 0 0.75rem; }
+.q-text { font-size: 0.95rem; color: #18181b; margin: 0.5rem 0 0.75rem; font-weight: 500; }
 
 .options { list-style: none; padding: 0; margin: 0; }
 .options li {
@@ -78,6 +81,38 @@
 .options .marker { font-weight: 700; min-width: 1.5rem; }
 .options .note { margin-left: auto; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
 
+.fill-template { font-size: 0.95rem; line-height: 1.7; padding: 0.75rem; background: #fafafa; border-radius: 0.375rem; }
+.fill-blank-pill {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    margin: 0 0.15rem;
+}
+.fill-blank-pill.correct { background: #dcfce7; color: #166534; }
+.fill-blank-pill.incorrect { background: #fee2e2; color: #991b1b; }
+.fill-blank-pill.empty { background: #f3f4f6; color: #71717a; font-style: italic; }
+
+.matching-table { width: 100%; border-collapse: collapse; margin-top: 0.25rem; }
+.matching-table th, .matching-table td {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #f4f4f5;
+}
+.matching-table th { color: #71717a; font-size: 0.7rem; text-transform: uppercase; font-weight: 700; }
+.matching-table td.match-correct { color: #166534; font-weight: 600; }
+.matching-table td.match-incorrect { color: #991b1b; font-weight: 600; }
+
+.data-desc {
+    background: #fafafa;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+    color: #3f3f46;
+}
+
 .free-answer {
     background: #fafafa;
     padding: 0.75rem;
@@ -85,8 +120,10 @@
     font-size: 0.875rem;
     color: #3f3f46;
     white-space: pre-wrap;
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
 }
+.free-answer.expected { background: #dcfce7; color: #166534; }
+.label { font-size: 0.7rem; color: #71717a; font-weight: 700; text-transform: uppercase; margin-top: 0.75rem; margin-bottom: 0.25rem; letter-spacing: 0.04em; }
 
 .explanation {
     margin-top: 0.75rem;
@@ -97,6 +134,31 @@
     font-size: 0.85rem;
     color: #1e40af;
 }
+
+.override-bar {
+    margin-top: 0.875rem;
+    padding-top: 0.625rem;
+    border-top: 1px dashed #e4e4e7;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: #71717a;
+}
+.override-btn {
+    padding: 0.25rem 0.625rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid #e4e4e7;
+    background: #fff;
+    color: #3f3f46;
+    cursor: pointer;
+}
+.override-btn:hover { background: #fafafa; }
+.override-btn.active.correct { background: #16a34a; color: #fff; border-color: #16a34a; }
+.override-btn.active.incorrect { background: #dc2626; color: #fff; border-color: #dc2626; }
+.override-spinner { font-size: 0.7rem; color: #6366f1; }
 
 .back-link { color: #3b82f6; text-decoration: none; font-size: 0.875rem; }
 .back-link:hover { text-decoration: underline; }
@@ -118,25 +180,26 @@
     <a href="{% url 'dashboard:session_chat_history' session.id %}" class="btn-view">View Chat Transcript</a>
 </div>
 
-<div class="score-banner {% if passed %}pass{% else %}fail{% endif %}">
-    <div class="score-big">{{ score }}/{{ total }}</div>
+<div class="score-banner {% if passed %}pass{% else %}fail{% endif %}" id="score-banner">
+    <div class="score-big" id="score-display">{{ score }}/{{ total }}</div>
     <div>
-        {% if passed %}PASSED{% else %}DID NOT PASS{% endif %}
+        <span id="pass-label">{% if passed %}PASSED{% else %}DID NOT PASS{% endif %}</span>
         <div style="font-weight:400;font-size:0.8rem;margin-top:0.125rem;">
-            {% if passed %}Student mastered the exit ticket.{% else %}Passing threshold is 8/10. Student entered remediation.{% endif %}
+            Passing threshold is 8/10. Score updates automatically when you override a question below.
         </div>
     </div>
 </div>
 
 {% if items %}
 {% for item in items %}
-<div class="question-card {% if item.is_correct %}correct{% else %}incorrect{% endif %}">
+<div class="question-card {% if item.is_correct %}correct{% else %}incorrect{% endif %}" data-card-index="{{ forloop.counter0 }}">
     <div class="q-head">
         <div>
             <span class="q-num">Q{{ item.index }}</span>
+            <span style="font-size:0.7rem;color:#a1a1aa;text-transform:uppercase;font-weight:600;margin-left:0.25rem;">{{ item.question_type|cut:"_"|title }}</span>
             {% if item.concept_tag %}<span class="q-tag">· {{ item.concept_tag }}</span>{% endif %}
         </div>
-        <span class="q-badge {% if item.is_correct %}correct{% else %}incorrect{% endif %}">
+        <span class="q-badge {% if item.is_correct %}correct{% else %}incorrect{% endif %}" data-badge>
             {% if item.is_correct %}✓ Correct{% else %}✗ Incorrect{% endif %}
         </span>
     </div>
@@ -153,20 +216,67 @@
         </li>
         {% endfor %}
     </ul>
-    {% else %}
-    <div>
-        <div style="font-size:0.75rem;color:#71717a;font-weight:600;margin-bottom:0.25rem;">Student's answer</div>
-        <div class="free-answer">{{ item.selected_text|default:"(no answer)" }}</div>
-        {% if item.correct_answer_display %}
-        <div style="font-size:0.75rem;color:#71717a;font-weight:600;margin-top:0.75rem;margin-bottom:0.25rem;">Expected answer</div>
-        <div class="free-answer" style="background:#dcfce7;color:#166534;">{{ item.correct_answer_display }}</div>
-        {% endif %}
+
+    {% elif item.question_type == 'fill_in_blank' %}
+    {% if item.fill_template %}
+    <div class="label">Sentence</div>
+    <div class="fill-template">{{ item.fill_template }}</div>
+    {% endif %}
+    <div class="label">Student's blank{{ item.fill_student_blanks|length|pluralize }}</div>
+    <div class="free-answer">
+        {% for b in item.fill_student_blanks %}<span class="fill-blank-pill {% if item.is_correct %}correct{% else %}incorrect{% endif %}">{{ b|default:"(blank)" }}</span>{% empty %}{{ item.selected_text|default:"(no answer)" }}{% endfor %}
     </div>
+    <div class="label">Expected</div>
+    <div class="free-answer expected">
+        {% for b in item.fill_blanks_correct %}<span class="fill-blank-pill correct">{{ b }}</span>{% empty %}{{ item.correct_answer_display|default:"—" }}{% endfor %}
+    </div>
+
+    {% elif item.question_type == 'matching' %}
+    <table class="matching-table">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Student matched</th>
+                <th>Correct match</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in item.matching_rows %}
+            <tr>
+                <td>{{ row.left }}</td>
+                <td class="{% if row.is_match %}match-correct{% else %}match-incorrect{% endif %}">{{ row.student_right|default:"(blank)" }}</td>
+                <td>{{ row.correct_right }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% else %}
+    {# short_answer / data_interpretation / fallback #}
+    {% if item.data_description %}
+    <div class="label">Data shown to student</div>
+    <div class="data-desc">{{ item.data_description|safe }}</div>
+    {% endif %}
+    <div class="label">Student's answer</div>
+    <div class="free-answer">{{ item.selected_text|default:"(no answer)" }}</div>
+    {% if item.correct_answer_display %}
+    <div class="label">Expected answer</div>
+    <div class="free-answer expected">{{ item.correct_answer_display }}</div>
+    {% endif %}
     {% endif %}
 
     {% if item.explanation %}
     <div class="explanation"><strong>Explanation:</strong> {{ item.explanation }}</div>
     {% endif %}
+
+    <div class="override-bar">
+        <span>Teacher override:</span>
+        <button type="button" class="override-btn correct {% if item.is_correct %}active{% endif %}"
+                data-mark="correct" data-index="{{ forloop.counter0 }}">✓ Mark Correct</button>
+        <button type="button" class="override-btn incorrect {% if not item.is_correct %}active{% endif %}"
+                data-mark="incorrect" data-index="{{ forloop.counter0 }}">✗ Mark Incorrect</button>
+        <span class="override-spinner" data-spinner></span>
+    </div>
 </div>
 {% endfor %}
 {% else %}
@@ -174,4 +284,69 @@
     No question data available for this attempt.
 </div>
 {% endif %}
+
+<script>
+(function() {
+    const ATTEMPT_ID = {{ attempt_id }};
+    const TOTAL = {{ total }};
+
+    function csrfToken() {
+        const m = document.cookie.match(/csrftoken=([^;]+)/);
+        return m ? m[1] : '';
+    }
+
+    function updateScore(score, passed) {
+        document.getElementById('score-display').textContent = score + '/' + TOTAL;
+        const banner = document.getElementById('score-banner');
+        banner.classList.toggle('pass', passed);
+        banner.classList.toggle('fail', !passed);
+        document.getElementById('pass-label').textContent = passed ? 'PASSED' : 'DID NOT PASS';
+    }
+
+    document.querySelectorAll('.override-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const card = btn.closest('.question-card');
+            const idx = parseInt(btn.dataset.index, 10);
+            const isCorrect = btn.dataset.mark === 'correct';
+            const spinner = card.querySelector('[data-spinner]');
+            spinner.textContent = 'Saving…';
+
+            try {
+                const resp = await fetch(`/dashboard/exit-attempt/${ATTEMPT_ID}/override/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken(),
+                    },
+                    body: JSON.stringify({ index: idx, is_correct: isCorrect }),
+                });
+                if (!resp.ok) throw new Error('Server returned ' + resp.status);
+                const data = await resp.json();
+
+                // Update card visuals
+                card.classList.toggle('correct', isCorrect);
+                card.classList.toggle('incorrect', !isCorrect);
+                const badge = card.querySelector('[data-badge]');
+                badge.classList.toggle('correct', isCorrect);
+                badge.classList.toggle('incorrect', !isCorrect);
+                badge.innerHTML = (isCorrect ? '✓ Correct' : '✗ Incorrect') + ' <span class="q-override-tag">EDITED</span>';
+
+                // Update active button
+                card.querySelectorAll('.override-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Update score banner
+                updateScore(data.score, data.passed);
+
+                spinner.textContent = 'Saved';
+                setTimeout(() => { spinner.textContent = ''; }, 1500);
+            } catch (err) {
+                console.error(err);
+                spinner.textContent = 'Failed — try again';
+                spinner.style.color = '#dc2626';
+            }
+        });
+    });
+})();
+</script>
 {% endblock %}
