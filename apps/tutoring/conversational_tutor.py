@@ -2691,9 +2691,9 @@ Follow the current step; this concept will be covered in sequence."""
         # Track which catalog IDs belong to which step
         step_media_positions = {}  # {step_index: [catalog_id, ...]}
         for step_idx, step in enumerate(self.steps):
-            if not step.media or 'images' not in step.media:
+            if not step.media:
                 continue
-            for img in step.media['images']:
+            for img in step.media.get('images', []) or []:
                 url = img.get('url')
                 if not url:
                     continue
@@ -2714,6 +2714,27 @@ Follow the current step; this concept will be covered in sequence."""
                     'description': alt or caption,
                 }))
                 seen_urls[url] = len(media_items)  # 1-indexed catalog ID
+                step_media_positions.setdefault(step_idx, []).append(len(media_items))
+
+            # Widgets — interactive specs. Numbered alongside images so the
+            # LLM can select either via the same |||MEDIA:N||| signal.
+            for widget in step.media.get('widgets', []) or []:
+                widget_type = widget.get('widget_type')
+                title = widget.get('title') or ''
+                if not widget_type or not title:
+                    continue
+                alt = widget.get('alt_text', '') or title
+                caption = widget.get('caption', '') or title
+                label = f"{title} (widget: {widget_type})"
+                media_items.append((label, {
+                    'type': 'widget',
+                    'widget_type': widget_type,
+                    'params': widget.get('params', {}),
+                    'title': title,
+                    'alt': alt,
+                    'caption': caption,
+                    'description': alt,
+                }))
                 step_media_positions.setdefault(step_idx, []).append(len(media_items))
 
         # From KB figure descriptions (textbook/worksheet figures)
@@ -2766,6 +2787,9 @@ Follow the current step; this concept will be covered in sequence."""
         catalog = "\n\n<media_catalog>\n"
         catalog += "AVAILABLE MEDIA (use ID number to reference):\n"
         catalog += "\n".join(lines)
+        catalog += "\n\nEntries tagged '(widget: ...)' are interactive components"
+        catalog += "\n(sliders, live plots). Reference them the same way as images —"
+        catalog += "\n|||MEDIA:N||| attaches either kind to your response."
         catalog += "\n\nTo show media, write EXACTLY |||MEDIA:N||| as the LAST line."
         catalog += "\nDo NOT embed media references anywhere in your response text."
         catalog += "\nUse at most ONE media item per response."

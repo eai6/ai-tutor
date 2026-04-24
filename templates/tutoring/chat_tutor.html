@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ lesson.title }} - AI Tutor{% endblock %}
 
@@ -1155,6 +1156,7 @@ body {
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="{% static 'js/widgets.js' %}"></script>
 {% if is_math_lesson %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.css" integrity="sha384-/L6i+LN3dyoaK2jYG5ZLh5u13cjdsPDcFOSNJeFBFa/KgVXR5kOfTdiN3ft1uMAq" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.js" integrity="sha384-H6s1ZrH2CKpFpqR680poRdStIRJGXty7fSkxAcIfxwl9iu6A4BOPtTk7vQ58Ovio" crossorigin="anonymous"></script>
@@ -1252,6 +1254,21 @@ function renderArtifactIframe(html) {
 
 function openArtifactPanel(mediaItem) {
     if (!isDesktop()) return false;
+    if (mediaItem && mediaItem.type === 'widget') {
+        artifactTitle.textContent = mediaItem.title || mediaItem.caption || 'Interactive';
+        artifactBody.innerHTML = '';
+        const mount = document.createElement('div');
+        mount.style.cssText = 'width:100%;max-width:420px;padding:12px';
+        artifactBody.appendChild(mount);
+        if (window.AfricaTutorWidgets) {
+            window.AfricaTutorWidgets.render(mount, mediaItem);
+        } else {
+            mount.textContent = 'Widget runtime not loaded.';
+        }
+        artifactPanel.classList.add('open');
+        addThumbnail(mediaItem);
+        return true;
+    }
     artifactTitle.textContent = mediaItem.caption || mediaItem.alt || 'Image';
     let html = `<div style="display:flex;flex-direction:column;align-items:center;width:100%">`;
     html += `<img src="${mediaItem.url}" alt="${mediaItem.alt || ''}">`;
@@ -1270,25 +1287,42 @@ function closeArtifactPanel() {
     artifactZoomReset();
 }
 
+function mediaKey(m) {
+    // Widgets have no URL; key them by type + widget_type + title.
+    if (m && m.type === 'widget') return `widget:${m.widget_type}:${m.title || ''}`;
+    return m && m.url ? m.url : null;
+}
 function addThumbnail(mediaItem) {
+    const key = mediaKey(mediaItem);
+    if (!key) return;
     // Skip if already in thumbnail strip
-    if (sessionMedia.find(m => m.url === mediaItem.url)) return;
+    if (sessionMedia.find(m => mediaKey(m) === key)) return;
     sessionMedia.push(mediaItem);
-    const img = document.createElement('img');
-    img.className = 'artifact-thumb';
-    img.src = mediaItem.url;
-    img.alt = mediaItem.alt || '';
-    img.title = mediaItem.caption || mediaItem.alt || 'Image';
-    img.onclick = () => {
+    let thumb;
+    if (mediaItem.type === 'widget') {
+        thumb = document.createElement('div');
+        thumb.className = 'artifact-thumb';
+        thumb.style.cssText =
+            'display:flex;align-items:center;justify-content:center;' +
+            'background:#eef2ff;color:#3730a3;font-size:0.7rem;font-weight:600;' +
+            'padding:4px;text-align:center;line-height:1.1';
+        thumb.textContent = mediaItem.title || 'Widget';
+        thumb.title = mediaItem.caption || mediaItem.title || 'Interactive widget';
+    } else {
+        thumb = document.createElement('img');
+        thumb.className = 'artifact-thumb';
+        thumb.src = mediaItem.url;
+        thumb.alt = mediaItem.alt || '';
+        thumb.title = mediaItem.caption || mediaItem.alt || 'Image';
+    }
+    thumb.onclick = () => {
         openArtifactPanel(mediaItem);
-        // Update active state
         artifactThumbnails.querySelectorAll('.artifact-thumb').forEach(t => t.classList.remove('active'));
-        img.classList.add('active');
+        thumb.classList.add('active');
     };
-    // Mark as active
     artifactThumbnails.querySelectorAll('.artifact-thumb').forEach(t => t.classList.remove('active'));
-    img.classList.add('active');
-    artifactThumbnails.appendChild(img);
+    thumb.classList.add('active');
+    artifactThumbnails.appendChild(thumb);
 }
 
 // Close panel if window resizes below breakpoint
@@ -1420,10 +1454,20 @@ function addMessage(role, content, media = [], artifactHtml = null) {
     const avatar = role === 'tutor' ? '🎓' : '👤';
 
     let mediaHtml = '';
+    const inlineWidgets = [];  // render after innerHTML is set
     if (media && media.length > 0) {
         mediaHtml = '<div class="message-media">';
         for (const m of media) {
-            if (m.type === 'image' || m.type === 'diagram' || m.type === 'chart' || m.type === 'illustration') {
+            if (m.type === 'widget') {
+                if (isDesktop() && openArtifactPanel(m)) {
+                    mediaHtml += `<div class="widget-panel-trigger" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:#eef2ff;color:#3730a3;border-radius:6px;font-size:0.82rem;cursor:pointer;margin-top:6px" role="button">🧩 ${m.title || 'Interactive widget'} <span style="font-size:0.72rem;opacity:0.7">· open</span></div>`;
+                } else {
+                    // Inline render on mobile — placeholder div, filled after innerHTML set.
+                    const slotId = 'widget-slot-' + Math.random().toString(36).slice(2);
+                    mediaHtml += `<div class="inline-widget-slot" id="${slotId}" style="margin-top:8px;padding:10px;background:#fafafa;border:1px solid #e4e4e7;border-radius:8px"></div>`;
+                    inlineWidgets.push({ slotId, mediaItem: m });
+                }
+            } else if (m.type === 'image' || m.type === 'diagram' || m.type === 'chart' || m.type === 'illustration') {
                 if (isDesktop() && openArtifactPanel(m)) {
                     mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
                 } else {
@@ -1471,6 +1515,21 @@ function addMessage(role, content, media = [], artifactHtml = null) {
             speakResponse(plainText, bubble, true);
         });
     }
+
+    // Render inline widgets (mobile, or desktop fallback) into their slots
+    for (const w of inlineWidgets) {
+        const slot = div.querySelector('#' + w.slotId);
+        if (slot && window.AfricaTutorWidgets) {
+            window.AfricaTutorWidgets.render(slot, w.mediaItem);
+        }
+    }
+
+    // Widget panel trigger (desktop): re-open panel on click
+    div.querySelectorAll('.widget-panel-trigger').forEach((trigger, i) => {
+        const widgetMedia = (media || []).filter(m => m.type === 'widget')[i];
+        if (!widgetMedia) return;
+        trigger.addEventListener('click', () => openArtifactPanel(widgetMedia));
+    });
 
     // Bind click handlers to inline thumbnails (desktop)
     div.querySelectorAll('.media-panel-trigger').forEach(trigger => {
@@ -1652,10 +1711,19 @@ function createStreamingMessage() {
 
 function updateStreamingMessage(div, content, media = []) {
     let mediaHtml = '';
+    const inlineWidgets = [];
     if (media && media.length > 0) {
         mediaHtml = '<div class="message-media">';
         for (const m of media) {
-            if (m.type === 'image' || m.type === 'diagram' || m.type === 'chart' || m.type === 'illustration') {
+            if (m.type === 'widget') {
+                if (isDesktop() && openArtifactPanel(m)) {
+                    mediaHtml += `<div class="widget-panel-trigger" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:#eef2ff;color:#3730a3;border-radius:6px;font-size:0.82rem;cursor:pointer;margin-top:6px" role="button">🧩 ${m.title || 'Interactive widget'} <span style="font-size:0.72rem;opacity:0.7">· open</span></div>`;
+                } else {
+                    const slotId = 'widget-slot-' + Math.random().toString(36).slice(2);
+                    mediaHtml += `<div class="inline-widget-slot" id="${slotId}" style="margin-top:8px;padding:10px;background:#fafafa;border:1px solid #e4e4e7;border-radius:8px"></div>`;
+                    inlineWidgets.push({ slotId, mediaItem: m });
+                }
+            } else if (m.type === 'image' || m.type === 'diagram' || m.type === 'chart' || m.type === 'illustration') {
                 if (isDesktop() && openArtifactPanel(m)) {
                     mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
                 } else {
@@ -1669,6 +1737,19 @@ function updateStreamingMessage(div, content, media = []) {
     div.querySelector('.bubble').innerHTML = marked.parse(sanitizeContent(content)) + mediaHtml;
     // Render LaTeX math (KaTeX, math lessons only)
     renderMath(div.querySelector('.bubble'));
+    // Fill inline widget slots
+    for (const w of inlineWidgets) {
+        const slot = div.querySelector('#' + w.slotId);
+        if (slot && window.AfricaTutorWidgets) {
+            window.AfricaTutorWidgets.render(slot, w.mediaItem);
+        }
+    }
+    // Widget panel trigger (desktop)
+    div.querySelectorAll('.widget-panel-trigger').forEach((trigger, i) => {
+        const widgetMedia = (media || []).filter(m => m.type === 'widget')[i];
+        if (!widgetMedia) return;
+        trigger.addEventListener('click', () => openArtifactPanel(widgetMedia));
+    });
     // Bind click handlers for inline thumbnails
     div.querySelectorAll('.media-panel-trigger').forEach(trigger => {
         trigger.addEventListener('click', () => {

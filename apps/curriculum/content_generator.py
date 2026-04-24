@@ -17,6 +17,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from apps.curriculum.widgets import MediaWidget
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,8 +39,13 @@ class MediaImage(BaseModel):
 
 
 class StepMedia(BaseModel):
-    """Media assets for a lesson step."""
+    """Media assets for a lesson step.
+
+    Images are static; widgets are declarative specs for interactive
+    visualizations (sliders, plots, etc.) — see apps.curriculum.widgets.
+    """
     images: List[MediaImage] = Field(default_factory=list)
+    widgets: List[MediaWidget] = Field(default_factory=list)
 
 
 class VocabItem(BaseModel):
@@ -523,7 +530,76 @@ CONTENT GUIDELINES:
    options explicitly or phrase the question as open-ended
 9. The expected_answer MUST directly and completely answer the question as phrased.
    If the question asks "which is smallest", the expected_answer must name the smallest
-   item, not just explain a comparison method"""
+   item, not just explain a comparison method
+
+INTERACTIVE WIDGETS (media.widgets):
+Some concepts are taught better by a live, manipulable widget than by a static
+image. A step may include AT MOST ONE widget in `media.widgets`. Prefer static
+images for most steps; propose a widget ONLY when the concept is genuinely
+data-driven or parametric. Every widget is reviewed by a teacher before
+publish, so propose freely when it fits — but wrong formulas are harmful, so
+ground them in authoritative sources (UN HDI, CDC BMI, textbook definitions).
+
+Available widget types:
+
+1) composite_index_explorer — N sliders feed a weighted formula producing a
+   score and a band label. Use for: HDI, BMI, weighted averages, simple
+   composite indicators. NOT for: open-ended calculation.
+   Params shape:
+     {{
+       "inputs": [
+         {{"key": "income_idx", "label": "Income (index 0–1)",
+          "min": 0, "max": 1, "default": 0.5, "step": 0.01}}
+       ],
+       "formula": "(income_idx + life_idx + edu_idx) / 3",
+       "output_label": "HDI",
+       "output_min": 0, "output_max": 1, "precision": 3,
+       "bands": [
+         {{"label": "Low", "min": 0.0, "color": "#ef4444"}},
+         {{"label": "Medium", "min": 0.55, "color": "#f59e0b"}},
+         {{"label": "High", "min": 0.70, "color": "#10b981"}},
+         {{"label": "Very High", "min": 0.80, "color": "#3b82f6"}}
+       ],
+       "references": [{{"label": "Norway", "value": 0.966}}]
+     }}
+
+2) function_plotter — plots y = f(x, params) with sliders for named
+   parameters. Use for: linear/quadratic/exponential/trig graphs, growth
+   curves, cost-vs-quantity. NOT for: non-functional data.
+   Params shape:
+     {{
+       "expression": "m*x + c",
+       "x_min": -10, "x_max": 10,
+       "x_label": "x", "y_label": "y",
+       "parameters": [
+         {{"key": "m", "label": "slope m", "min": -5, "max": 5,
+          "default": 1, "step": 0.1}},
+         {{"key": "c", "label": "intercept c", "min": -10, "max": 10,
+          "default": 0, "step": 0.5}}
+       ]
+     }}
+   Allowed functions: abs, min, max, round, sqrt, log, log10, exp, sin, cos,
+   tan, asin, acos, atan, pow. Allowed constants: pi, e. No other names.
+
+3) fraction_decimal_percent — synchronized bar / pie / number-line showing
+   how a fraction, decimal, and percentage refer to the same value. Use for:
+   early number sense (Cycles 2-3), percentage-of-a-quantity.
+   Params shape:
+     {{
+       "denominator": 10, "default_numerator": 3,
+       "show_bar": true, "show_pie": true, "show_number_line": true
+     }}
+
+Widget envelope:
+  {{"widget_type": "<one of the three>",
+   "title": "HDI Explorer",
+   "caption": "Move sliders to see how income, life expectancy, and schooling combine into the HDI score.",
+   "alt_text": "Three sliders feeding a bar with HDI development bands.",
+   "params": {{ ... per type above ... }}}}
+
+When the step includes a widget, the teacher_script MUST reference it
+explicitly (e.g. "Move the income slider to 0.3 — what band does the HDI
+land in?"). Keep restraint: most steps should have NO widget."""
 
         from apps.llm.prompts import get_prompt_or_default
         system_prompt = get_prompt_or_default(
