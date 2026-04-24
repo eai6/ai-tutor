@@ -2980,17 +2980,18 @@ def lesson_approve(request, lesson_id):
 def step_edit(request, step_id):
     """Edit a lesson step."""
     from apps.curriculum.models import LessonStep
-    
+    from apps.curriculum.widget_presets import preset_groups
+
     institution = request.staff_ctx['institution']
-    
+
     lookup = {'id': step_id}
     if institution is not None:
         lookup['lesson__unit__course__institution'] = institution
     step = get_object_or_404(LessonStep, **lookup)
-    
+
     lesson = step.lesson
     total_steps = lesson.steps.count()
-    
+
     # Phase options for 5E model
     phases = [
         ('engage', 'Engage'),
@@ -2999,6 +3000,9 @@ def step_edit(request, step_id):
         ('elaborate', 'Elaborate'),
         ('evaluate', 'Evaluate'),
     ]
+
+    # Widget preset library (same list every render).
+    widget_groups = preset_groups()
     
     if request.method == 'POST':
         action = request.POST.get('action', '')
@@ -3052,6 +3056,7 @@ def step_edit(request, step_id):
                 'lesson': lesson,
                 'total_steps': total_steps,
                 'phases': phases,
+                'widget_preset_groups': widget_groups,
             }
             return render(request, 'dashboard/curriculum/step_edit.html', context)
 
@@ -3091,6 +3096,7 @@ def step_edit(request, step_id):
                 'lesson': lesson,
                 'total_steps': total_steps,
                 'phases': phases,
+                'widget_preset_groups': widget_groups,
             }
             return render(request, 'dashboard/curriculum/step_edit.html', context)
 
@@ -3122,6 +3128,7 @@ def step_edit(request, step_id):
                 'lesson': lesson,
                 'total_steps': total_steps,
                 'phases': phases,
+                'widget_preset_groups': widget_groups,
             }
             return render(request, 'dashboard/curriculum/step_edit.html', context)
 
@@ -3141,6 +3148,82 @@ def step_edit(request, step_id):
                 'lesson': lesson,
                 'total_steps': total_steps,
                 'phases': phases,
+                'widget_preset_groups': widget_groups,
+            }
+            return render(request, 'dashboard/curriculum/step_edit.html', context)
+
+        # -------------------------------------------------------------
+        # Widget actions (mirror the image CRUD flow above)
+        # -------------------------------------------------------------
+        if action in ('add_widget', 'update_widget', 'delete_widget'):
+            import json as _json
+            from apps.curriculum.widgets import MediaWidget
+            from apps.curriculum.widget_presets import get_preset_spec
+            if not step.media:
+                step.media = {}
+            if 'widgets' not in step.media or not isinstance(step.media['widgets'], list):
+                step.media['widgets'] = []
+            widgets = step.media['widgets']
+
+            if action == 'add_widget':
+                preset_key = request.POST.get('preset', '').strip()
+                try:
+                    spec = get_preset_spec(preset_key)
+                except KeyError:
+                    messages.warning(request, f"Unknown preset: {preset_key}")
+                else:
+                    try:
+                        validated = MediaWidget.model_validate(spec).model_dump()
+                        widgets.append(validated)
+                        step.save()
+                        messages.success(
+                            request,
+                            f"Added '{validated.get('title')}' widget — edit the spec below to customize.",
+                        )
+                    except Exception as exc:
+                        messages.error(request, f"Failed to add widget: {exc}")
+
+            elif action == 'update_widget':
+                try:
+                    widget_index = int(request.POST.get('widget_index', '-1'))
+                except ValueError:
+                    widget_index = -1
+                raw = request.POST.get('widget_spec', '').strip()
+                if not (0 <= widget_index < len(widgets)):
+                    messages.warning(request, "Invalid widget index.")
+                elif not raw:
+                    messages.warning(request, "Widget spec cannot be empty.")
+                else:
+                    try:
+                        spec = _json.loads(raw)
+                        validated = MediaWidget.model_validate(spec).model_dump()
+                        widgets[widget_index] = validated
+                        step.save()
+                        messages.success(request, "Widget saved.")
+                    except _json.JSONDecodeError as exc:
+                        messages.error(request, f"Spec is not valid JSON: {exc.msg} (line {exc.lineno})")
+                    except Exception as exc:
+                        messages.error(request, f"Widget spec rejected: {exc}")
+
+            elif action == 'delete_widget':
+                try:
+                    widget_index = int(request.POST.get('widget_index', '-1'))
+                except ValueError:
+                    widget_index = -1
+                if 0 <= widget_index < len(widgets):
+                    widgets.pop(widget_index)
+                    step.save()
+                    messages.success(request, "Widget removed.")
+                else:
+                    messages.warning(request, "Invalid widget index.")
+
+            context = {
+                **request.staff_ctx,
+                'step': step,
+                'lesson': lesson,
+                'total_steps': total_steps,
+                'phases': phases,
+                'widget_preset_groups': widget_groups,
             }
             return render(request, 'dashboard/curriculum/step_edit.html', context)
 
@@ -3177,8 +3260,9 @@ def step_edit(request, step_id):
         'lesson': lesson,
         'total_steps': total_steps,
         'phases': phases,
+        'widget_preset_groups': widget_groups,
     }
-    
+
     return render(request, 'dashboard/curriculum/step_edit.html', context)
 
 

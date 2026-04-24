@@ -1,4 +1,6 @@
 {% extends "dashboard/base.html" %}
+{% load static %}
+{% load dashboard_extras %}
 
 {% block title %}Edit Step{% endblock %}
 {% block page_title %}Edit Step {{ step.order_index|add:1 }}{% endblock %}
@@ -26,6 +28,10 @@
     .media-editor { border: 1px solid var(--gray-200); border-radius: 8px; padding: 1rem; background: var(--gray-50); }
     .media-item-card { background: white; border: 1px solid var(--gray-200); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.75rem; }
     .media-item-card img { max-width: 100%; max-height: 250px; border-radius: 6px; margin-bottom: 0.5rem; }
+
+    .widget-preview { background: white; border: 1px dashed var(--gray-300); border-radius: 6px; padding: 12px; margin-bottom: 0.5rem; }
+    .widget-spec { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; min-height: 180px; white-space: pre; }
+    .widget-type-pill { display: inline-block; padding: 2px 8px; background: #eef2ff; color: #3730a3; border-radius: 999px; font-size: 0.72rem; font-weight: 500; }
 </style>
 {% endblock %}
 
@@ -170,12 +176,70 @@
                     </div>
                 </div>
             </div>
-            
+
             <div style="display: flex; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200);">
                 <button type="submit" class="btn btn-primary">Save Changes</button>
                 <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
+    </div>
+
+    {# Widgets section lives OUTSIDE the step-save form because each widget #}
+    {# edit/add/delete is its own POST — HTML forbids nested <form> elements. #}
+    <div class="card-body" style="border-top: 1px solid var(--gray-200);">
+        <div class="form-group">
+            <label>Interactive Widgets</label>
+            <small>Declarative specs for sliders / live plots / synchronized fraction views. Specs are reviewed here before students see them.</small>
+            <div class="media-editor" style="margin-top: 0.5rem;">
+                {% if step.media.widgets %}
+                    {% for widget in step.media.widgets %}
+                    <div class="media-item-card">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <strong>{{ widget.title|default:"Widget" }}</strong>
+                                <span class="widget-type-pill" style="margin-left: 0.5rem;">{{ widget.widget_type }}</span>
+                            </div>
+                            <button type="button" class="btn btn-sm" style="color: var(--danger); border-color: var(--danger);" onclick="confirmDeleteWidget({{ forloop.counter0 }})">
+                                Delete
+                            </button>
+                        </div>
+                        <div class="widget-preview" id="widget-preview-{{ forloop.counter0 }}" data-widget-json="{{ widget|safe_json }}"></div>
+                        <form method="post" style="margin-top: 0.5rem;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update_widget">
+                            <input type="hidden" name="widget_index" value="{{ forloop.counter0 }}">
+                            <label style="font-size: 0.8rem; font-weight: 500; color: var(--gray-600);">Spec (JSON)</label>
+                            <textarea name="widget_spec" class="form-control widget-spec" spellcheck="false">{{ widget|safe_json_pretty }}</textarea>
+                            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                                <button type="submit" class="btn btn-secondary btn-sm">Save Spec</button>
+                                <small style="color: var(--gray-500); align-self: center;">Invalid specs are rejected with an error.</small>
+                            </div>
+                        </form>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p style="color: var(--gray-500); margin: 0;">No widgets attached to this step.</p>
+                {% endif %}
+
+                <div style="margin-top: 0.75rem; padding-top: 0.75rem; {% if step.media.widgets %}border-top: 1px solid var(--gray-200);{% endif %}">
+                    <form method="post" style="display: inline-flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_widget">
+                        <select name="preset" class="form-control" style="width: auto; font-size: 0.85rem; max-width: 100%;">
+                            {% for group in widget_preset_groups %}
+                            <optgroup label="{{ group.label }}">
+                                {% for preset in group.presets %}
+                                <option value="{{ preset.key }}">{{ preset.label }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm">+ Add Widget</button>
+                        <span style="font-size: 0.75rem; color: var(--gray-500);">Pick a preset — each lands pre-filled and editable.</span>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -246,5 +310,61 @@ function confirmDeleteImage(imageIndex) {
     document.getElementById('image-action-index').value = imageIndex;
     form.submit();
 }
+
+// -------------------------------------------------------------------
+// Widget preview + delete
+// -------------------------------------------------------------------
+(function () {
+    function renderPreviews() {
+        if (!window.AfricaTutorWidgets) return;
+        document.querySelectorAll('.widget-preview').forEach(function (node) {
+            var raw = node.getAttribute('data-widget-json');
+            if (!raw) return;
+            try {
+                var spec = JSON.parse(raw);
+                // MediaWidget dict matches the mediaItem shape used by the chat.
+                // Surface `type` so the renderer path works identically.
+                spec.type = 'widget';
+                node.innerHTML = '';
+                window.AfricaTutorWidgets.render(node, spec);
+            } catch (err) {
+                node.textContent = 'Preview error: ' + err.message;
+            }
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', renderPreviews);
+    } else {
+        renderPreviews();
+    }
+})();
+
+function confirmDeleteWidget(widgetIndex) {
+    if (!confirm('Remove this widget from the step?')) return;
+    // Grab a CSRF token from any existing form on the page.
+    var csrf = document.querySelector('input[name=csrfmiddlewaretoken]');
+    if (!csrf) { alert('CSRF token missing — reload and try again.'); return; }
+    var form = document.createElement('form');
+    form.method = 'post';
+    form.style.display = 'none';
+    var csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrf.value;
+    form.appendChild(csrfInput);
+    var actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'delete_widget';
+    form.appendChild(actionInput);
+    var idxInput = document.createElement('input');
+    idxInput.type = 'hidden';
+    idxInput.name = 'widget_index';
+    idxInput.value = String(widgetIndex);
+    form.appendChild(idxInput);
+    document.body.appendChild(form);
+    form.submit();
+}
 </script>
+<script src="{% static 'js/widgets.js' %}"></script>
 {% endblock %}
