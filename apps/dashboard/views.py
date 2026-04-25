@@ -2822,8 +2822,15 @@ def lesson_detail(request, lesson_id):
     exit_ticket_count = 0
     exit_questions = []
     if exit_ticket:
-        exit_questions = exit_ticket.questions.all().order_by('order_index')
-        exit_ticket_count = exit_questions.count()
+        exit_questions = list(exit_ticket.questions.all().order_by('order_index'))
+        exit_ticket_count = len(exit_questions)
+        # Pre-serialize plot_spec to a JSON string so the template can
+        # drop it straight into a textarea for editing.
+        for q in exit_questions:
+            if q.answer_data and isinstance(q.answer_data, dict):
+                spec = q.answer_data.get('plot_spec')
+                if spec:
+                    q.plot_spec_json = json.dumps(spec, indent=2, ensure_ascii=False)
     
     # Students who completed
     students_completed = TutorSession.objects.filter(
@@ -2899,6 +2906,35 @@ def exit_question_edit(request, question_id):
             if field == 'correct_answer':
                 value = value[:1].upper()
             setattr(question, field, value)
+
+    # Plot spec edit / remove (interactive Chart.js plot for
+    # data_interpretation questions)
+    if 'plot_spec' in data or data.get('remove_plot_spec'):
+        from apps.tutoring.plot_spec import coerce_plot_spec
+        ad = question.answer_data or {}
+        if not isinstance(ad, dict):
+            ad = {}
+        if data.get('remove_plot_spec'):
+            ad.pop('plot_spec', None)
+        else:
+            cleaned, err = coerce_plot_spec(data['plot_spec'])
+            if err:
+                return JsonResponse({'success': False, 'error': err}, status=400)
+            ad['plot_spec'] = cleaned
+        question.answer_data = ad
+
+    # Free-form answer_data fields a teacher might tweak
+    if 'data_description' in data or 'model_answer' in data or 'keywords' in data:
+        ad = question.answer_data or {}
+        if not isinstance(ad, dict):
+            ad = {}
+        for k in ('data_description', 'model_answer'):
+            if k in data:
+                ad[k] = data[k]
+        if 'keywords' in data and isinstance(data['keywords'], list):
+            ad['keywords'] = [str(k) for k in data['keywords']]
+        question.answer_data = ad
+
     question.save()
     return JsonResponse({'success': True})
 

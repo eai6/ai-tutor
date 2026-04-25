@@ -556,9 +556,50 @@
 
                     {% elif question.question_type == 'short_answer' or question.question_type == 'data_interpretation' %}
                     <!-- Short Answer / Data Interpretation -->
-                    {% if question.answer_data.data_description %}
+                    {% if question.answer_data.plot_spec %}
+                    <div class="lesson-plot-preview" data-qid="{{ question.id }}" data-spec='{{ question.answer_data.plot_spec|safe|escapejs }}' style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:#fff;padding:0.75rem;">
+                        {% if question.answer_data.plot_spec.title %}
+                        <div style="font-weight:600;font-size:0.85rem;margin-bottom:6px;">{{ question.answer_data.plot_spec.title }}</div>
+                        {% endif %}
+                        <canvas style="max-height:240px;"></canvas>
+                        {% if question.answer_data.plot_spec.source %}
+                        <div style="font-size:0.7rem;color:var(--gray-500);margin-top:6px;">Source: {{ question.answer_data.plot_spec.source }}</div>
+                        {% endif %}
+                    </div>
+                    <div style="margin-bottom:0.5rem;display:flex;gap:0.4rem;">
+                        <button type="button" onclick="togglePlotEditor({{ question.id }})" class="btn btn-sm btn-secondary" style="font-size:0.75rem;">✎ Edit plot</button>
+                        <button type="button" onclick="deletePlotSpec({{ question.id }})" class="btn btn-sm" style="font-size:0.75rem;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;">Remove plot</button>
+                    </div>
+                    <div id="plot-editor-{{ question.id }}" style="display:none;border:1px dashed #bfdbfe;border-radius:6px;padding:0.75rem;background:#f8fafc;margin-bottom:0.5rem;">
+                        <div style="font-size:0.78rem;color:var(--gray-600);margin-bottom:0.4rem;">
+                            Edit the JSON spec, click <strong>Preview</strong> to verify, then <strong>Save</strong>.
+                            <details style="display:inline;margin-left:0.5rem;"><summary style="cursor:pointer;color:var(--accent);">schema</summary>
+                                <pre style="font-size:0.7rem;background:#fff;padding:0.5rem;border-radius:4px;margin-top:0.3rem;">{
+  "type": "bar"|"line"|"pie"|"doughnut"|"scatter",
+  "title": "...",
+  "x_label": "...", "y_label": "...",
+  "labels": ["A","B","C"],
+  "datasets": [{"label":"...", "data":[1,2,3]}],
+  "source": "..."
+}</pre>
+                            </details>
+                        </div>
+                        <textarea id="plot-spec-input-{{ question.id }}" rows="10" style="width:100%;font-family:monospace;font-size:0.78rem;padding:0.4rem;border:1px solid var(--gray-300);border-radius:4px;">{{ question.plot_spec_json }}</textarea>
+                        <div style="display:flex;gap:0.4rem;margin-top:0.4rem;align-items:center;">
+                            <button type="button" onclick="previewPlotEdit({{ question.id }})" class="btn btn-sm btn-secondary" style="font-size:0.75rem;">Preview</button>
+                            <button type="button" onclick="savePlotEdit({{ question.id }})" class="btn btn-sm btn-primary" style="font-size:0.75rem;">Save</button>
+                            <span id="plot-spec-status-{{ question.id }}" style="font-size:0.75rem;"></span>
+                        </div>
+                        <canvas id="plot-spec-preview-{{ question.id }}" style="max-height:240px;margin-top:0.5rem;background:#fff;border:1px solid var(--gray-200);border-radius:4px;padding:6px;"></canvas>
+                    </div>
+                    {% elif question.answer_data.data_description %}
                     <div class="rendered-html-frame" style="margin-bottom: 0.5rem; border: 1px solid #bfdbfe; border-radius: 6px; overflow: hidden; background: #f8fafc; padding: 0.75rem;">
                         {{ question.answer_data.data_description|safe }}
+                    </div>
+                    {% endif %}
+                    {% if question.question_type == 'data_interpretation' and not question.answer_data.plot_spec %}
+                    <div style="margin-bottom:0.5rem;">
+                        <button type="button" onclick="addPlotToQuestion({{ question.id }})" class="btn btn-sm btn-secondary" style="font-size:0.75rem;">+ Add interactive plot</button>
                     </div>
                     {% endif %}
                     {% if question.answer_data.model_answer %}
@@ -891,5 +932,188 @@ function _updatePrereqCount() {
         }
     });
 }
+
+// Render Chart.js previews for any data_interpretation plot_specs in
+// the exit ticket question bank. Wait for Chart.js to load first.
+function _waitForChart(retries, fn) {
+    if (typeof Chart !== 'undefined') return fn();
+    if (retries <= 0) return;
+    setTimeout(() => _waitForChart(retries - 1, fn), 100);
+}
+_waitForChart(50, function _renderPlotPreviews() {
+    document.querySelectorAll('.lesson-plot-preview').forEach((wrap, idx) => {
+        const canvas = wrap.querySelector('canvas');
+        let spec;
+        try { spec = JSON.parse(wrap.dataset.spec); } catch(e) { return; }
+        renderPlotPreview(canvas, spec, '_chart_' + idx);
+    });
+});
+
+const PLOT_COLORS = ['rgba(99,102,241,0.7)','rgba(16,185,129,0.7)','rgba(245,158,11,0.7)','rgba(239,68,68,0.7)','rgba(139,92,246,0.7)'];
+
+function renderPlotPreview(canvas, spec, slot) {
+    if (typeof Chart === 'undefined' || !canvas) return null;
+    // Tear down any existing chart on the same canvas.
+    if (canvas._chartInstance) {
+        try { canvas._chartInstance.destroy(); } catch (e) {}
+    }
+    const allowed = new Set(['bar','line','pie','doughnut','scatter']);
+    const type = allowed.has(spec.type) ? spec.type : 'bar';
+    const datasets = (spec.datasets || []).map((ds, i) => {
+        const color = ds.color || PLOT_COLORS[i % PLOT_COLORS.length];
+        const base = {
+            label: ds.label || ('Series ' + (i + 1)),
+            backgroundColor: color,
+            borderColor: color.replace(/,\s*0\.7\)/, ', 1)'),
+            borderWidth: 2,
+        };
+        if (type === 'scatter' && Array.isArray(ds.points)) {
+            base.data = ds.points.map(([x, y]) => ({ x, y }));
+            base.showLine = false; base.pointRadius = 5;
+        } else {
+            base.data = Array.isArray(ds.data) ? ds.data : [];
+            if (type === 'line') { base.tension = 0.2; base.fill = false; }
+        }
+        return base;
+    });
+    try {
+        canvas._chartInstance = new Chart(canvas, {
+            type,
+            data: { labels: spec.labels || [], datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: datasets.length > 1 || ['pie','doughnut'].includes(type), position: 'bottom' } },
+                scales: ['pie','doughnut'].includes(type) ? {} : {
+                    x: { title: { display: !!spec.x_label, text: spec.x_label || '' } },
+                    y: { title: { display: !!spec.y_label, text: spec.y_label || '' }, beginAtZero: true },
+                },
+            },
+        });
+        return canvas._chartInstance;
+    } catch (e) {
+        console.warn('Plot render failed', e);
+        return null;
+    }
+}
+
+// ─── Plot editor (raw JSON + live preview) ────────────────────────────
+function togglePlotEditor(qid) {
+    const wrap = document.getElementById(`plot-editor-${qid}`);
+    if (!wrap) return;
+    wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+}
+
+function previewPlotEdit(qid) {
+    const ta = document.getElementById(`plot-spec-input-${qid}`);
+    const status = document.getElementById(`plot-spec-status-${qid}`);
+    const canvas = document.getElementById(`plot-spec-preview-${qid}`);
+    if (!ta || !canvas || !status) return;
+    let spec;
+    try {
+        spec = JSON.parse(ta.value);
+    } catch (e) {
+        status.textContent = 'Invalid JSON: ' + e.message;
+        status.style.color = '#dc2626';
+        return;
+    }
+    const inst = renderPlotPreview(canvas, spec, 'edit-' + qid);
+    if (inst) {
+        status.textContent = 'Preview rendered.';
+        status.style.color = '#059669';
+    } else {
+        status.textContent = 'Preview failed (see console).';
+        status.style.color = '#dc2626';
+    }
+}
+
+async function savePlotEdit(qid) {
+    const ta = document.getElementById(`plot-spec-input-${qid}`);
+    const status = document.getElementById(`plot-spec-status-${qid}`);
+    if (!ta || !status) return;
+    let spec;
+    try { spec = JSON.parse(ta.value); }
+    catch (e) {
+        status.textContent = 'Cannot save invalid JSON.';
+        status.style.color = '#dc2626';
+        return;
+    }
+    status.textContent = 'Saving…';
+    status.style.color = 'var(--gray-500)';
+    try {
+        const r = await fetch(`/dashboard/curriculum/exit-question/${qid}/edit/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '',
+            },
+            body: JSON.stringify({ plot_spec: spec }),
+        });
+        const data = await r.json();
+        if (!r.ok || data.error) {
+            status.textContent = 'Save failed: ' + (data.error || r.status);
+            status.style.color = '#dc2626';
+            return;
+        }
+        status.textContent = 'Saved.';
+        status.style.color = '#059669';
+        // Update the visible preview above the edit panel.
+        const previewWrap = document.querySelector(`.lesson-plot-preview[data-qid="${qid}"]`);
+        if (previewWrap) {
+            previewWrap.dataset.spec = JSON.stringify(spec);
+            const previewCanvas = previewWrap.querySelector('canvas');
+            if (previewCanvas) renderPlotPreview(previewCanvas, spec, 'preview-' + qid);
+        }
+    } catch (e) {
+        status.textContent = 'Network error: ' + e.message;
+        status.style.color = '#dc2626';
+    }
+}
+
+async function deletePlotSpec(qid) {
+    if (!confirm('Remove the plot from this question? The fallback data_description (if any) will be used instead.')) return;
+    try {
+        const r = await fetch(`/dashboard/curriculum/exit-question/${qid}/edit/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '',
+            },
+            body: JSON.stringify({ remove_plot_spec: true }),
+        });
+        if (r.ok) location.reload();
+    } catch (e) { alert('Delete failed: ' + e.message); }
+}
+
+// Seed a starter plot_spec on a question that doesn't have one yet,
+// then reload so the editor UI appears.
+async function addPlotToQuestion(qid) {
+    const starter = {
+        type: 'bar',
+        title: 'New chart',
+        x_label: 'Category',
+        y_label: 'Value',
+        labels: ['A', 'B', 'C'],
+        datasets: [
+            { label: 'Series 1', data: [10, 20, 15] },
+        ],
+        source: '',
+    };
+    try {
+        const r = await fetch(`/dashboard/curriculum/exit-question/${qid}/edit/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '',
+            },
+            body: JSON.stringify({ plot_spec: starter }),
+        });
+        if (r.ok) location.reload();
+        else {
+            const err = await r.json().catch(() => ({}));
+            alert('Could not add plot: ' + (err.error || r.status));
+        }
+    } catch (e) { alert('Network error: ' + e.message); }
+}
 </script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 {% endblock %}

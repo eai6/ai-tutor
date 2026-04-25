@@ -1171,6 +1171,7 @@ body {
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 {% if is_math_lesson %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.css" integrity="sha384-/L6i+LN3dyoaK2jYG5ZLh5u13cjdsPDcFOSNJeFBFa/KgVXR5kOfTdiN3ft1uMAq" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.js" integrity="sha384-H6s1ZrH2CKpFpqR680poRdStIRJGXty7fSkxAcIfxwl9iu6A4BOPtTk7vQ58Ovio" crossorigin="anonymous"></script>
@@ -1806,12 +1807,17 @@ const EXIT_SECTIONS = [
     { key: 'written', letter: 'D', name: 'Written Response', instruction: 'Write your answer in the space provided.' },
 ];
 
+// Holds plot specs that need to be rendered after the exit-ticket DOM
+// is built. Drained by drainPendingPlots() once the modal is shown.
+let pendingPlots = [];
+
 function showExitTicket() {
     if (!exitTicketData) return;
     document.getElementById('input-area').style.display = 'none';
 
     const container = document.getElementById('exit-questions');
     container.innerHTML = '';
+    pendingPlots = [];
 
     // Progress indicator
     const totalQ = exitTicketData.questions.length;
@@ -1908,7 +1914,22 @@ function showExitTicket() {
             } else if (qType === 'short_answer' || qType === 'data_interpretation') {
                 const ad = q.answer_data || {};
                 let dataDesc = '';
-                if (ad.data_description) {
+                // Preferred path: Chart.js plot_spec from the content generator.
+                if (ad.plot_spec) {
+                    const canvasId = `exit-plot-${origIdx}`;
+                    dataDesc = `<div class="data-description-plot" style="background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:12px 16px;margin-bottom:8px;">`;
+                    if (ad.plot_spec.title) {
+                        dataDesc += `<div style="font-weight:600;font-size:0.95rem;margin-bottom:6px;">${escapeHtml(ad.plot_spec.title)}</div>`;
+                    }
+                    dataDesc += `<canvas id="${canvasId}" style="max-height:300px;"></canvas>`;
+                    if (ad.plot_spec.source) {
+                        dataDesc += `<div style="font-size:0.7rem;color:#71717a;margin-top:6px;">Source: ${escapeHtml(ad.plot_spec.source)}</div>`;
+                    }
+                    dataDesc += `</div>`;
+                    // Defer rendering until the canvas is in the DOM.
+                    pendingPlots.push({ canvasId, spec: ad.plot_spec });
+                } else if (ad.data_description) {
+                    // Legacy path: HTML or plain text data_description.
                     if (/<[a-z][\s\S]*>/i.test(ad.data_description) && window.DOMPurify) {
                         const clean = DOMPurify.sanitize(ad.data_description);
                         dataDesc = `<div class="data-description-rich"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:250px;border:none;"></iframe></div>`;
@@ -1932,6 +1953,11 @@ function showExitTicket() {
     });
 
     document.getElementById('exit-modal').style.display = 'flex';
+
+    // Render Chart.js plots for any data_interpretation questions that
+    // shipped a plot_spec. Deferred so the canvases are guaranteed to
+    // be in the DOM when Chart.js looks them up.
+    setTimeout(drainPendingPlots, 0);
 
     // Auto-resize iframes to fit their content
     setTimeout(function() {
@@ -2090,6 +2116,133 @@ function continueAfterExit() {
         document.getElementById('input-area').style.display = 'block';
         addMessage('tutor', data.message);
     }
+}
+
+// ─── Chart.js plot rendering for exit-ticket data_interpretation questions ───
+
+const _PLOT_COLORS = [
+    'rgba(99, 102, 241, 0.7)',   // indigo
+    'rgba(16, 185, 129, 0.7)',   // emerald
+    'rgba(245, 158, 11, 0.7)',   // amber
+    'rgba(239, 68, 68, 0.7)',    // red
+    'rgba(139, 92, 246, 0.7)',   // violet
+    'rgba(20, 184, 166, 0.7)',   // teal
+    'rgba(236, 72, 153, 0.7)',   // pink
+];
+
+function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
+ * Convert a normalized plot_spec into a Chart.js config.
+ * Spec shape (LLM-friendly, kept simple):
+ *   {
+ *     type: 'bar' | 'line' | 'pie' | 'doughnut' | 'scatter',
+ *     title?: string,
+ *     x_label?: string, y_label?: string,
+ *     labels?: [string],
+ *     datasets: [
+ *       { label: string, data?: [number], points?: [[x,y]], color?: string }
+ *     ],
+ *     source?: string,
+ *   }
+ */
+function specToChartConfig(spec) {
+    const allowed = new Set(['bar', 'line', 'pie', 'doughnut', 'scatter']);
+    const type = allowed.has(spec.type) ? spec.type : 'bar';
+    const datasets = (spec.datasets || []).map((ds, i) => {
+        const color = ds.color || _PLOT_COLORS[i % _PLOT_COLORS.length];
+        const base = {
+            label: ds.label || ('Series ' + (i + 1)),
+            backgroundColor: color,
+            borderColor: color.replace(/,\s*0\.7\)/, ', 1)'),
+            borderWidth: 2,
+        };
+        if (type === 'scatter' && Array.isArray(ds.points)) {
+            base.data = ds.points.map(([x, y]) => ({ x, y }));
+            base.showLine = false;
+            base.pointRadius = 5;
+        } else {
+            base.data = Array.isArray(ds.data) ? ds.data : [];
+            if (type === 'line') {
+                base.tension = 0.2;
+                base.fill = false;
+            }
+        }
+        return base;
+    });
+
+    const showLegend = datasets.length > 1 || ['pie', 'doughnut'].includes(type);
+    const config = {
+        type: type,
+        data: { labels: spec.labels || [], datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: showLegend, position: 'bottom' },
+            },
+            scales: ['pie', 'doughnut'].includes(type) ? {} : {
+                x: {
+                    title: { display: !!spec.x_label, text: spec.x_label || '' },
+                },
+                y: {
+                    title: { display: !!spec.y_label, text: spec.y_label || '' },
+                    beginAtZero: true,
+                },
+            },
+        },
+    };
+    return config;
+}
+
+function drainPendingPlots() {
+    if (typeof Chart === 'undefined') {
+        // Chart.js failed to load — fall back gracefully by writing
+        // the spec as a simple table.
+        pendingPlots.forEach(p => {
+            const canvas = document.getElementById(p.canvasId);
+            if (canvas && canvas.parentElement) {
+                canvas.parentElement.innerHTML = plotSpecAsTable(p.spec);
+            }
+        });
+        pendingPlots = [];
+        return;
+    }
+    pendingPlots.forEach(p => {
+        const canvas = document.getElementById(p.canvasId);
+        if (!canvas) return;
+        try {
+            new Chart(canvas, specToChartConfig(p.spec));
+        } catch (e) {
+            console.warn('Chart render failed', e);
+            if (canvas.parentElement) {
+                canvas.parentElement.innerHTML = plotSpecAsTable(p.spec);
+            }
+        }
+    });
+    pendingPlots = [];
+}
+
+function plotSpecAsTable(spec) {
+    // No-Chart-js fallback: render the data as a plain HTML table so
+    // the question is still answerable.
+    const headers = ['', ...(spec.labels || [])];
+    const rows = (spec.datasets || []).map(ds => {
+        const cells = (ds.data || ds.points || []).map(v => Array.isArray(v) ? v.join(',') : v);
+        return `<tr><th>${escapeHtml(ds.label)}</th>${cells.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`;
+    }).join('');
+    return `<table class="data-description-fallback" style="width:100%;border-collapse:collapse">
+        <thead><tr>${headers.map(h => `<th style="padding:6px 10px;border:1px solid #e4e4e7;background:#f4f4f5;">${escapeHtml(h)}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function showExitResults(results) {

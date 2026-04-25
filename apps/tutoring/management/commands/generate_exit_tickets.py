@@ -55,8 +55,18 @@ MATCHING format (expressions to solutions):
 SHORT_ANSWER format (show working):
 {{"question_type": "short_answer", "question": "A fisherman in Seychelles sells tuna at SCR 45 per kg. He catches 3 fish weighing 2.5kg, 4.2kg, and 3.8kg. Calculate the total revenue. Show your working.", "answer_data": {{"model_answer": "Total weight = 2.5 + 4.2 + 3.8 = 10.5 kg. Revenue = 10.5 × 45 = SCR 472.50", "keywords": ["10.5", "472.50", "45"], "min_keywords": 2}}, "explanation": "Add the weights first, then multiply by price per kg", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
 
-DATA_INTERPRETATION format (table/chart with calculation):
-{{"question_type": "data_interpretation", "question": "Study the data and calculate:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'><tr style='background:#f4f4f5'><th style='padding:8px;border:1px solid #e4e4e7'>Item</th><th style='padding:8px;border:1px solid #e4e4e7'>Price (SCR)</th><th style='padding:8px;border:1px solid #e4e4e7'>Quantity</th></tr><tr><td style='padding:8px;border:1px solid #e4e4e7'>Fish</td><td style='padding:8px;border:1px solid #e4e4e7'>45</td><td style='padding:8px;border:1px solid #e4e4e7'>3</td></tr><tr><td style='padding:8px;border:1px solid #e4e4e7'>Rice</td><td style='padding:8px;border:1px solid #e4e4e7'>25</td><td style='padding:8px;border:1px solid #e4e4e7'>2</td></tr></table>", "model_answer": "Fish cost = 45 × 3 = SCR 135. Rice cost = 25 × 2 = SCR 50. Total = 135 + 50 = SCR 185", "keywords": ["135", "50", "185"], "min_keywords": 2}}, "explanation": "Calculate each item total then sum", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
+DATA_INTERPRETATION format (PREFERRED — interactive plot via plot_spec):
+{{"question_type": "data_interpretation", "question": "Study the chart of weekly fish prices and calculate the average:", "answer_data": {{"plot_spec": {{"type": "line", "title": "Tuna prices in Seychelles, weeks 1–6", "x_label": "Week", "y_label": "Price (SCR / kg)", "labels": ["W1", "W2", "W3", "W4", "W5", "W6"], "datasets": [{{"label": "Tuna", "data": [42, 45, 50, 48, 46, 44]}}], "source": "Hypothetical data"}}, "model_answer": "Total = 42+45+50+48+46+44 = 275. Mean = 275 / 6 ≈ 45.83 SCR/kg", "keywords": ["275", "45.83", "mean"], "min_keywords": 2}}, "explanation": "Sum the weekly prices and divide by 6", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
+
+DATA_INTERPRETATION fallback (only for genuinely tabular non-chartable data):
+{{"question_type": "data_interpretation", "question": "Study the data and calculate:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'>...</table>", "model_answer": "...", "keywords": [...], "min_keywords": 2}}, "explanation": "...", "difficulty": "medium", "concept_tag": "..."}}
+
+PLOT_SPEC SCHEMA (for the math exit ticket too — interactive Chart.js):
+- type ∈ {{"bar","line","pie","doughnut","scatter"}}
+- For non-scatter: provide labels (categorical x-axis) + each dataset has data: [number, ...] aligned with labels.
+- For scatter: each dataset has points: [[x,y], [x,y], ...] (omit data + labels).
+- Always include a meaningful title. Bar/line/scatter should also include x_label and y_label.
+- Numbers must be plain numbers, no commas, no units inside the value (units belong in y_label).
 
 VISUAL CONTENT — MANDATORY FOR GRAPH/GEOMETRY/DATA TOPICS:
 For questions about scatter diagrams, graphs, geometry, or data:
@@ -131,18 +141,26 @@ MATCHING format:
 SHORT_ANSWER format:
 {{"question_type": "short_answer", "question": "Explain why HDI is considered a better measure of development than GNP.", "answer_data": {{"model_answer": "HDI is better because it measures health, education and income, not just economic output.", "keywords": ["health", "education", "income", "not just economic"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
 
-DATA_INTERPRETATION format:
-{{"question_type": "data_interpretation", "question": "Study the data below and answer:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'><tr style='background:#f4f4f5'><th style='padding:8px 12px;border:1px solid #e4e4e7'>Country</th><th style='padding:8px 12px;border:1px solid #e4e4e7'>GNP ($)</th><th style='padding:8px 12px;border:1px solid #e4e4e7'>HDI</th></tr><tr><td style='padding:8px 12px;border:1px solid #e4e4e7'>Country A</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>500</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>0.40</td></tr><tr><td style='padding:8px 12px;border:1px solid #e4e4e7'>Country B</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>2,000</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>0.65</td></tr><tr><td style='padding:8px 12px;border:1px solid #e4e4e7'>Country C</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>800</td><td style='padding:8px 12px;border:1px solid #e4e4e7'>0.75</td></tr></table>", "model_answer": "Country C has the highest HDI despite not having the highest GNP, showing that wealth alone does not determine development.", "keywords": ["Country C", "highest HDI", "wealth", "development"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
+DATA_INTERPRETATION format (PREFERRED — interactive plot):
+{{"question_type": "data_interpretation", "question": "Study the chart and answer:", "answer_data": {{"plot_spec": {{"type": "bar", "title": "GNP and HDI for three countries", "x_label": "Country", "y_label": "Value", "labels": ["Country A", "Country B", "Country C"], "datasets": [{{"label": "GNP ($)", "data": [500, 2000, 800]}}, {{"label": "HDI (×1000)", "data": [400, 650, 750]}}], "source": "Hypothetical data"}}, "model_answer": "Country C has the highest HDI despite not having the highest GNP, showing that wealth alone does not determine development.", "keywords": ["Country C", "highest HDI", "wealth", "development"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
+
+DATA_INTERPRETATION fallback (when a plot doesn't fit — use ONLY when the data is intrinsically tabular and not chartable):
+{{"question_type": "data_interpretation", "question": "Study the table and answer:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'>...</table>", "model_answer": "...", "keywords": [...], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "..."}}
 
 RICH VISUAL CONTENT REQUIREMENTS:
-1. DATA_INTERPRETATION questions MUST include rich HTML in data_description:
-   - Use HTML tables with inline styles for data (population stats, GNP figures, trade data, etc.)
-   - Use <img> tags to reference figures from uploaded textbooks/worksheets when available
-   - Create SVG diagrams for simple visuals (bar charts, pie charts, maps) using inline SVG
-   Example SVG bar chart:
-   <svg width='300' height='150' xmlns='http://www.w3.org/2000/svg'><rect x='20' y='20' width='40' height='100' fill='#3b82f6'/><text x='30' y='140' font-size='10'>A</text><rect x='80' y='50' width='40' height='70' fill='#10b981'/><text x='90' y='140' font-size='10'>B</text><rect x='140' y='80' width='40' height='40' fill='#f59e0b'/><text x='150' y='140' font-size='10'>C</text></svg>
+1. DATA_INTERPRETATION questions MUST include either a `plot_spec` (preferred) OR a `data_description`:
+   - PREFERRED: emit a `plot_spec` JSON object that the frontend renders as an interactive Chart.js plot.
+   - `plot_spec.type` ∈ {{"bar","line","pie","doughnut","scatter"}}
+   - For non-scatter: `labels` is the categorical axis; each dataset has `data: [number, ...]` matching `labels` length.
+   - For scatter: each dataset has `points: [[x,y], [x,y], ...]` instead of `data`.
+   - Always include a meaningful `title`. For bar/line/scatter, include `x_label` and `y_label`.
+   - Numbers must be plain numbers (no commas, no units in the value).
+   - Cite a `source` when the data is from a real dataset; otherwise leave blank or set to "Hypothetical data".
+   - FALLBACK to `data_description` (HTML table or `<img>` reference) only when a plot genuinely cannot represent the data.
 
-2. At least 2 of the 3 DATA_INTERPRETATION questions must include a visual (table, chart, or diagram)
+2. At least 2 of the 3 DATA_INTERPRETATION questions must include a `plot_spec` chart (the third can be tabular if the data is non-chartable).
+
+3. Do NOT use SVG bar charts in `data_description` — Chart.js plot_spec replaces them.
 
 3. For MATH subjects: include SVG diagrams where relevant:
    - Number lines for number/fraction questions

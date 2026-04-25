@@ -895,6 +895,19 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 else:
                     ad = q.get('answer_data', {}) or {}
                     ad.update(objective_data)
+                    # Validate + clean plot_spec on data_interpretation
+                    # questions so a malformed LLM payload doesn't break
+                    # the frontend renderer. See apps/tutoring/plot_spec.py.
+                    if q_type == 'data_interpretation' and ad.get('plot_spec'):
+                        from apps.tutoring.plot_spec import coerce_plot_spec
+                        cleaned_spec, err = coerce_plot_spec(ad['plot_spec'])
+                        if err:
+                            logger.warning(
+                                f"[ExitTicket] dropping malformed plot_spec: {err}"
+                            )
+                            ad.pop('plot_spec', None)
+                        else:
+                            ad['plot_spec'] = cleaned_spec
                     kwargs['answer_data'] = ad
                 ExitTicketQuestion.objects.create(**kwargs)
 
