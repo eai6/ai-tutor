@@ -506,16 +506,34 @@ def student_detail(request, student_id):
         'lesson__order_index'
     )
 
-    # Get all sessions
-    sessions = filter_by_institution(
-        TutorSession.objects.filter(student=student),
-        institution
-    ).select_related('lesson').order_by('-started_at')[:20]
+    # Get all sessions — include group sessions where the student was a
+    # secondary participant (not just sessions they own). A secondary
+    # participant gets credit toward mastery + the group session shows up
+    # in their activity. See memory/group_lessons_plan.md.
+    sessions_q = Q(student=student) | Q(participants__student=student, participants__is_active=True)
+    sessions = (
+        filter_by_institution(
+            TutorSession.objects.filter(sessions_q).distinct(),
+            institution,
+        )
+        .select_related('lesson')
+        .prefetch_related('participants__student')
+        .order_by('-started_at')[:20]
+    )
+    for s in sessions:
+        s.is_group_for_student = (
+            s.participants.filter(is_active=True).count() > 1
+            and s.student_id != student.id
+        )
 
     # Stats
+    all_sessions_qs = filter_by_institution(
+        TutorSession.objects.filter(sessions_q).distinct(),
+        institution,
+    )
     stats = {
-        'total_sessions': filter_by_institution(TutorSession.objects.filter(student=student), institution).count(),
-        'completed_sessions': filter_by_institution(TutorSession.objects.filter(student=student, status='completed'), institution).count(),
+        'total_sessions': all_sessions_qs.count(),
+        'completed_sessions': all_sessions_qs.filter(status='completed').count(),
         'mastered_lessons': progress_list.filter(mastery_level='mastered').count(),
         'in_progress_lessons': progress_list.filter(mastery_level='in_progress').count(),
     }

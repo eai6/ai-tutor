@@ -50,8 +50,24 @@ class EvaluationResult(BaseModel):
 
 
 class StepEvaluationResult(BaseModel):
-    """Merged evaluator: answer correctness + step completion in one call."""
-    answer_correct: bool = Field(description="Did the student answer correctly?")
+    """Merged evaluator: answer correctness + step completion in one call.
+
+    answer_correct can be None when the student wasn't being asked a
+    specific verifiable question — e.g. they're acknowledging a teach
+    step, asking a clarifying question, or expressing confusion. None
+    means "no evidence either way" and downstream code should treat it
+    as a no-op (don't penalize the student, don't advance the streak).
+    """
+    answer_correct: Optional[bool] = Field(
+        default=None,
+        description=(
+            "True if the student demonstrably answered correctly. "
+            "False if the student demonstrably answered incorrectly. "
+            "null/None if no specific question with a verifiable answer "
+            "was being evaluated (e.g. teach steps, conversational "
+            "engagement, clarifying questions, confusion signals)."
+        ),
+    )
     step_complete: bool = Field(description="Is this step done — ready to advance?")
     reasoning: str = Field(default="", description="Brief explanation (for logging)")
 
@@ -3476,7 +3492,24 @@ RECENT CONVERSATION:
 STUDENT JUST SAID: {student_input[:500]}
 TUTOR REPLIED: {tutor_response[:500]}
 
-1. Did the student answer correctly (if a question was asked)?
+INSTRUCTIONS FOR answer_correct:
+- Return TRUE if the student gave a clear, demonstrably correct answer
+  to a specific question.
+- Return FALSE only when the student gave a clear, demonstrably wrong
+  answer to a specific question.
+- Return NULL when none of these apply: the student is acknowledging
+  the teaching ("ok", "got it", "interesting"), asking their own
+  question, expressing confusion, sharing tangential thoughts, or there
+  was no expected_answer to compare against. Default to NULL when
+  uncertain — never penalize a student for engaging conversationally.
+
+INSTRUCTIONS FOR step_complete:
+- Apply the COMPLETION CRITERIA above. A step is NOT complete just
+  because the student is engaged; it is complete when the criteria are
+  met or the student has demonstrated mastery of this step's objective.
+
+1. Did the student demonstrably answer correctly, demonstrably answer
+   incorrectly, or was there nothing to evaluate (return null)?
 2. Is this step complete — should the system advance to the next step?"""
 
         try:
@@ -3735,9 +3768,15 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         # Layer 1 (deterministic) short-circuits the LLM evaluator when
         # we already have a numeric-equality verdict. The LLM is unreliable
         # for math correctness and this is the core math-tutor fix.
+        # is_correct can be True / False / None. None means "no evidence
+        # either way" — student was engaging conversationally, asked a
+        # clarifying question, or there was no expected_answer to compare
+        # against. Downstream code treats None as "do not penalize, do not
+        # advance the streak".
         eval_layer = None
         eval_reasoning = None
         step_eval_result = None
+        is_correct: Optional[bool] = None
         if math_check is not None:
             is_correct = math_check.is_correct
             eval_layer = 'deterministic_numeric'
@@ -3746,41 +3785,55 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
             if step_type in ('practice', 'quiz', 'teach', 'worked_example') and self.instructor_client:
                 step_eval_result = self._evaluate_step(student_input, tutor_response)
             if step_eval_result is not None:
-                is_correct = step_eval_result.answer_correct
+                is_correct = step_eval_result.answer_correct  # may be None
                 eval_layer = 'llm_evaluator'
                 eval_reasoning = getattr(step_eval_result, 'reasoning', '') or ''
             else:
-                is_correct = self._keyword_evaluate_response(tutor_response)['correct']
+                # Keyword fallback only applies when the tutor's response
+                # gives a clear positive/negative signal. Otherwise leave
+                # is_correct as None.
+                kw = self._keyword_evaluate_response(tutor_response)
+                is_correct = kw.get('correct') if kw.get('signal') else None
                 eval_layer = 'keyword_fallback'
                 eval_reasoning = 'no instructor client; used keyword heuristic'
 
+        # Tri-state handling — None means "no signal", neither penalize
+        # nor advance. is_correct is True / False / None.
+        verdict_correct = (is_correct is True)
+        verdict_wrong = (is_correct is False)
+
         # Detect success — update strength tracking
-        if is_correct:
+        if verdict_correct:
             self.practice_correct += 1
             current_topic = self._get_current_topic()[:50]
             if current_topic not in self.student_strengths:
                 self.student_strengths.append(current_topic)
 
-        # Track practice attempts
-        if step_type in ('practice', 'quiz'):
+        # Track practice attempts (only when there was an actual answer
+        # being evaluated — avoids inflating practice_total with
+        # conversational engagement).
+        if step_type in ('practice', 'quiz') and (verdict_correct or verdict_wrong):
             self.practice_total += 1
 
-        # Update last_answer_correct for concept boundary gating
-        self.last_answer_correct = is_correct
+        # Update last_answer_correct for concept boundary gating. Keep
+        # the previous value when there is no new signal so that
+        # conversational engagement doesn't reset state.
+        if is_correct is not None:
+            self.last_answer_correct = is_correct
 
-        # Update correct-answer streak for in-conversation gamification
-        if is_correct:
+        # Update correct-answer streak for in-conversation gamification.
+        if verdict_correct:
             self._correct_streak = getattr(self, '_correct_streak', 0) + 1
-        else:
+        elif verdict_wrong:
             self._correct_streak = 0
 
         # Update cognitive load based on correctness
-        if is_correct:
+        if verdict_correct:
             self.consecutive_wrong = 0
             self.consecutive_correct_streak = getattr(self, 'consecutive_correct_streak', 0) + 1
             # Decrease load (student is doing well)
             self.cognitive_load = max(0.0, self.cognitive_load - 0.1)
-        else:
+        elif verdict_wrong:
             self.consecutive_correct_streak = 0
             self.consecutive_wrong = getattr(self, 'consecutive_wrong', 0) + 1
             # Increase load (student is struggling)
@@ -3790,14 +3843,21 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         if any(signal in input_lower for signal in confusion_signals):
             self.cognitive_load = min(1.0, self.cognitive_load + 0.1)
 
-        # Record skill practice via SkillAssessmentService (R2)
+        # Record skill practice via SkillAssessmentService (R2). Only
+        # log the practice if we actually evaluated an answer; logging
+        # was_correct=False on every conversational engagement would
+        # destroy the skill-graph signal.
         try:
-            if self.lesson_skills and self.skill_assessment_service:
+            if (
+                self.lesson_skills
+                and self.skill_assessment_service
+                and (verdict_correct or verdict_wrong)
+            ):
                 current_skill = self._get_current_skill()
                 if current_skill:
                     self.skill_assessment_service.record_practice(
                         skill=current_skill,
-                        was_correct=is_correct,
+                        was_correct=verdict_correct,
                         lesson_step=current_step,
                         practice_type='remediation' if self.is_remediation else 'initial',
                         hints_used=0,
@@ -3806,15 +3866,21 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
             logger.warning(f"Failed to record skill practice: {e}")
 
         # Record EO-linked skill practice (P1.2 enabling objective mastery)
+        # Only when we have a clear verdict — see comment on the previous
+        # record_practice block.
         try:
-            if self.skill_assessment_service and current_step:
+            if (
+                self.skill_assessment_service
+                and current_step
+                and (verdict_correct or verdict_wrong)
+            ):
                 eo_text = getattr(current_step, 'enabling_objective', '')
                 if eo_text:
                     eo_skill = self._get_eo_skill(eo_text)
                     if eo_skill:
                         self.skill_assessment_service.record_practice(
                             skill=eo_skill,
-                            was_correct=is_correct,
+                            was_correct=verdict_correct,
                             lesson_step=current_step,
                             practice_type='remediation' if self.is_remediation else 'initial',
                             hints_used=0,
@@ -3977,8 +4043,13 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
     def _keyword_evaluate_response(self, tutor_response: str) -> dict:
         """Keyword-based correctness check (fallback for LLM evaluator).
 
-        Checks negative signals first to avoid false positives from phrases
-        like 'not quite right' matching the word 'right'.
+        Returns {"correct": bool, "signal": bool}.
+          - signal=True when the tutor response contains a clear
+            positive or negative correctness signal.
+          - signal=False when the tutor said something neutral (no
+            evidence either way). Callers should treat signal=False as
+            None / no-op rather than implicitly False, otherwise every
+            conversational engagement is mis-counted as wrong.
         """
         response_lower = tutor_response.lower()
         negative_signals = [
@@ -3987,14 +4058,15 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
             "not the answer", "let's try", "let's reconsider",
         ]
         if any(s in response_lower for s in negative_signals):
-            return {"correct": False}
+            return {"correct": False, "signal": True}
         positive_signals = [
             "correct", "excellent", "great job", "perfect",
             "well done", "good job", "exactly right", "that's right",
             "you got it", "nice work", "spot on",
         ]
-        is_correct = any(s in response_lower for s in positive_signals)
-        return {"correct": is_correct}
+        if any(s in response_lower for s in positive_signals):
+            return {"correct": True, "signal": True}
+        return {"correct": False, "signal": False}
 
     def _should_advance_step(self, student_input: str, tutor_response: str, is_correct: bool, eval_result=None) -> bool:
         """Determine if the current step is complete using merged LLM evaluator.

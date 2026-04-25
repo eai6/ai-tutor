@@ -1391,11 +1391,27 @@ def get_gamification_data(request):
             'emoji': profile.tutor_personality.emoji,
         }
 
-    # Analytics: practice time, sessions, quiz accuracy
-    total_practice_minutes = sum(p.total_practice_time_minutes for p in profiles)
+    # Analytics: practice time, sessions, quiz accuracy.
+    # Practice time is computed from actual session timestamps rather than
+    # the dead total_practice_time_minutes field (never updated). Uses the
+    # same active-engagement clip as the live monitor so multi-day idle
+    # sessions don't inflate the total.
+    sessions_for_user = TutorSession.objects.filter(student=request.user)
+    IDLE_CAP_SECONDS = 5 * 60
+    total_practice_minutes = 0.0
+    for s in sessions_for_user:
+        if s.started_lesson_at and s.completed_lesson_at:
+            delta = (s.completed_lesson_at - s.started_lesson_at).total_seconds()
+            total_practice_minutes += min(delta, IDLE_CAP_SECONDS * 100) / 60
+        elif s.started_lesson_at and s.ended_at:
+            delta = (s.ended_at - s.started_lesson_at).total_seconds()
+            total_practice_minutes += min(delta, IDLE_CAP_SECONDS * 100) / 60
+    total_practice_minutes = round(total_practice_minutes, 1)
     total_sessions = sum(p.total_sessions for p in profiles)
 
-    # Quiz accuracy: average best_score across completed lessons
+    # Quiz accuracy: average best_score across completed lessons.
+    # best_score is stored as a 0.0-1.0 fraction (since C1 of the
+    # competency plan); multiply by 100 for percentage display.
     completed_progress = StudentLessonProgress.objects.filter(
         student=request.user, mastery_level='mastered'
     )
@@ -1403,7 +1419,7 @@ def get_gamification_data(request):
         p.best_score for p in completed_progress
         if p.best_score is not None
     ]
-    quiz_accuracy = round(sum(scores) / len(scores)) if scores else None
+    quiz_accuracy = round(sum(scores) / len(scores) * 100) if scores else None
 
     return JsonResponse({
         'total_xp': total_xp,

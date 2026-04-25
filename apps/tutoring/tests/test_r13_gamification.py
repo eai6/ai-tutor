@@ -3,6 +3,7 @@
 from unittest.mock import patch, MagicMock
 from apps.tutoring.tests.fixtures import BaseTutoringTestCase
 from apps.tutoring.skills_models import StudentKnowledgeProfile
+from apps.tutoring.models import TutorSession
 
 
 class TestR13Gamification(BaseTutoringTestCase):
@@ -129,18 +130,33 @@ class TestGamificationAPI(BaseTutoringTestCase):
         self.factory = __import__('django.test', fromlist=['RequestFactory']).RequestFactory()
 
     def test_gamification_returns_analytics_fields(self):
-        """API should return total_practice_minutes, mastered_lessons_count, quiz_accuracy."""
+        """API should return total_practice_minutes (computed from session
+        timestamps now, not the dead total_practice_time_minutes field),
+        mastered_lessons_count, quiz_accuracy."""
         from django.test import RequestFactory
+        from datetime import timedelta
+        from django.utils import timezone
         from apps.tutoring.views import get_gamification_data
 
-        # Create a profile with some data
+        # Profile (xp/streak still come from here, practice time does not)
         profile = StudentKnowledgeProfile.objects.create(
             student=self.student_user,
             course=self.course,
             total_xp=500,
-            total_practice_time_minutes=45,
             total_sessions=3,
             current_streak_days=2,
+        )
+
+        # Real session with timestamps so total_practice_minutes computes > 0
+        now = timezone.now()
+        TutorSession.objects.create(
+            institution=self.institution,
+            student=self.student_user,
+            lesson=self.lesson,
+            status='completed',
+            started_lesson_at=now - timedelta(minutes=15),
+            completed_lesson_at=now,
+            engine_state={},
         )
 
         factory = RequestFactory()
@@ -152,7 +168,9 @@ class TestGamificationAPI(BaseTutoringTestCase):
         data = json.loads(response.content)
 
         self.assertIn('total_practice_minutes', data)
-        self.assertEqual(data['total_practice_minutes'], 45)
+        # ~15 minutes from the fixture session above
+        self.assertGreater(data['total_practice_minutes'], 14)
+        self.assertLess(data['total_practice_minutes'], 16)
         self.assertIn('total_sessions', data)
         self.assertEqual(data['total_sessions'], 3)
         self.assertIn('mastered_lessons_count', data)
