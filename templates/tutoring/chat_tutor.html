@@ -14,6 +14,7 @@
                 <h1 class="lesson-name">{{ lesson.title }}</h1>
                 <span class="phase-badge" id="phase-badge">Starting...</span>
                 <span class="step-progress" id="step-progress"></span>
+                <div class="participants-bar" id="participants-bar" style="display:flex;gap:0.35rem;align-items:center;margin-top:0.25rem;flex-wrap:wrap;font-size:0.8rem;"></div>
             </div>
             <button class="audio-toggle" id="audio-toggle" onclick="toggleAudioMode()" title="Toggle audio mode">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1332,6 +1333,82 @@ function renderHistory(history) {
     scrollToBottom();
 }
 
+async function refreshParticipants() {
+    if (!sessionId) return;
+    try {
+        const r = await fetch(`/tutor/api/chat/${sessionId}/participants/`);
+        if (!r.ok) return;
+        const data = await r.json();
+        const bar = document.getElementById('participants-bar');
+        if (!bar) return;
+        bar.innerHTML = '';
+        const active = (data.participants || []).filter(p => p.is_active);
+        active.forEach(p => {
+            const chip = document.createElement('span');
+            chip.style.cssText = 'display:inline-flex;align-items:center;gap:0.25rem;padding:0.1rem 0.5rem;border-radius:1rem;background:var(--border);color:var(--muted);';
+            chip.textContent = p.is_primary ? `⭐ ${p.username}` : p.username;
+            if (!p.is_primary) {
+                const x = document.createElement('button');
+                x.textContent = '×';
+                x.style.cssText = 'border:none;background:transparent;color:var(--danger);cursor:pointer;padding:0;font-weight:700;';
+                x.title = 'Remove from group';
+                x.onclick = () => removeParticipant(p.user_id);
+                chip.appendChild(x);
+            }
+            bar.appendChild(chip);
+        });
+        if (data.allow_group_mode && active.length < (data.max_group_size || 4)) {
+            const addBtn = document.createElement('button');
+            addBtn.textContent = '+ Add student';
+            addBtn.style.cssText = 'border:1px dashed var(--border);background:transparent;color:var(--accent);border-radius:1rem;padding:0.1rem 0.6rem;cursor:pointer;font-size:0.8rem;';
+            addBtn.onclick = showAddParticipantModal;
+            bar.appendChild(addBtn);
+        }
+    } catch (e) {
+        console.error('Participants refresh failed', e);
+    }
+}
+
+function showAddParticipantModal() {
+    const username = prompt('Second student\'s username:');
+    if (!username) return;
+    const password = prompt(`Password for ${username}:`);
+    if (!password) return;
+    addParticipant(username, password);
+}
+
+async function addParticipant(username, password) {
+    try {
+        const r = await fetch(`/tutor/api/chat/${sessionId}/participants/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+            body: JSON.stringify({username, password}),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+            alert('Could not add student: ' + (data.error || 'unknown'));
+            return;
+        }
+        refreshParticipants();
+    } catch (e) {
+        console.error('Add participant failed', e);
+        alert('Network error adding student.');
+    }
+}
+
+async function removeParticipant(userId) {
+    if (!confirm('Remove this student from the group session?')) return;
+    try {
+        const r = await fetch(`/tutor/api/chat/${sessionId}/participants/${userId}/`, {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCookie('csrftoken')},
+        });
+        if (r.ok) refreshParticipants();
+    } catch (e) {
+        console.error('Remove participant failed', e);
+    }
+}
+
 async function startSession() {
     showTyping(true);
 
@@ -1359,6 +1436,7 @@ async function startSession() {
         }
 
         sessionId = data.session_id;
+        refreshParticipants();
 
         // Render conversation history if present (resume or completed)
         if (data.history && data.history.length > 0) {
@@ -1914,18 +1992,35 @@ async function submitExitTicket() {
         if (data.exit_ticket && data.exit_ticket.results) {
             showExitResults(data.exit_ticket.results);
 
-            // Show score summary and "Review & Continue" button (not auto-dismiss)
-            const score = data.exit_ticket.results.filter(r => r.is_correct).length;
-            const total = data.exit_ticket.results.length;
-            const passed = score >= 8;
-            const container = document.getElementById('exit-questions');
+            // Competency block from the server (C5). Falls back to client
+            // compute for older servers that haven't been upgraded yet.
+            const competency = data.exit_ticket.competency || null;
+            const score = competency ? competency.score : data.exit_ticket.results.filter(r => r.is_correct).length;
+            const total = competency ? competency.total : data.exit_ticket.results.length;
+            const threshold = competency ? competency.passing_threshold : 8;
+            const passed = score >= threshold;
+            const scorePct = competency ? Math.round(competency.score_pct * 100) : Math.round(score / Math.max(total, 1) * 100);
+            const thresholdPct = competency ? Math.round(competency.passing_threshold_pct * 100) : Math.round(threshold / Math.max(total, 1) * 100);
+            const bestPct = competency && competency.best_score_pct !== null ? Math.round(competency.best_score_pct * 100) : null;
+            const attempts = competency ? competency.attempts_count : null;
+            const weakConcepts = competency ? competency.weak_concepts : [];
 
+            const container = document.getElementById('exit-questions');
             const summaryDiv = document.createElement('div');
             summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid #e4e4e7;';
+            const weakHtml = (weakConcepts && weakConcepts.length)
+                ? `<div style="font-size:0.85rem;color:#71717a;margin-top:0.75rem;">Areas to revisit: <strong>${weakConcepts.slice(0, 3).map(c => c).join(', ')}</strong></div>`
+                : '';
+            const bestHtml = (bestPct !== null)
+                ? `<div style="font-size:0.8125rem;color:#71717a;margin-top:0.25rem;">Your best: <strong>${bestPct}%</strong> · ${attempts} attempt${attempts === 1 ? '' : 's'}</div>`
+                : '';
             summaryDiv.innerHTML = `
-                <div style="font-size:2rem;font-weight:800;color:${passed ? '#10b981' : '#ef4444'};margin-bottom:0.5rem;">${score} / ${total}</div>
-                <div style="font-size:1rem;color:#71717a;margin-bottom:1rem;">${passed ? 'Great work! You passed!' : 'Keep going — review the explanations above, then continue.'}</div>
-                <div style="font-size:0.8125rem;color:#a1a1aa;margin-bottom:1.5rem;">Scroll up to review your answers and explanations.</div>
+                <div style="font-size:2rem;font-weight:800;color:${passed ? '#10b981' : '#ef4444'};margin-bottom:0.25rem;">${score} / ${total}</div>
+                <div style="font-size:0.95rem;color:#71717a;">${scorePct}% — passing threshold ${thresholdPct}%</div>
+                ${bestHtml}
+                <div style="font-size:1rem;color:#71717a;margin-top:1rem;margin-bottom:0.5rem;">${passed ? 'Great work! You passed!' : 'Keep going — review the explanations above, then continue.'}</div>
+                ${weakHtml}
+                <div style="font-size:0.8125rem;color:#a1a1aa;margin-top:1rem;margin-bottom:1.5rem;">Scroll up to review your answers and explanations.</div>
                 <button onclick="continueAfterExit()" class="btn btn-primary" style="font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;">
                     ${passed ? '✓ Continue' : '→ Continue to Review'}
                 </button>

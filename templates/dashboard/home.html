@@ -19,11 +19,12 @@
     </div>
     
     <div class="stat-card">
-        <div class="stat-label">Average Mastery</div>
-        <div class="stat-value">{{ avg_mastery }}%</div>
+        <div class="stat-label">Avg Lesson Competency</div>
+        <div class="stat-value">{{ avg_competency }}%</div>
         <div class="progress-bar" style="margin-top: 0.5rem;">
-            <div class="progress-fill success" style="width: {{ avg_mastery }}%;"></div>
+            <div class="progress-fill success" style="width: {{ avg_competency }}%;"></div>
         </div>
+        <div class="stat-change">{{ avg_mastery }}% students mastered</div>
     </div>
     
     <div class="stat-card">
@@ -78,6 +79,7 @@
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                             {{ session.student.first_name }} {{ session.student.last_name }}
+                            {% if session.is_group %}<span class="badge" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;">👥 group</span>{% endif %}
                         </div>
                         <div style="font-size: 0.8125rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                             {{ session.lesson.title }}

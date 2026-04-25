@@ -218,6 +218,15 @@ def dashboard_home(request):
     if denominator > 0:
         avg_mastery = round((progress_stats['mastered'] / denominator) * 100)
 
+    # avg_competency (C4): average best_score across all populated progress rows,
+    # as a percentage. Source of truth = exit ticket attempts via StudentLessonProgress.
+    from django.db.models import Avg
+    avg_competency_data = filter_by_institution(
+        StudentLessonProgress.objects.exclude(best_score__isnull=True),
+        institution,
+    ).aggregate(avg=Avg('best_score'))
+    avg_competency = round((avg_competency_data['avg'] or 0.0) * 100)
+
     # Students at risk (started but no activity in 7 days)
     at_risk_students = filter_by_institution(
         TutorSession.objects.filter(student_id__in=student_ids),
@@ -274,6 +283,7 @@ def dashboard_home(request):
         'completed_sessions': completed_sessions,
         'mastery_sessions': mastery_sessions,
         'avg_mastery': avg_mastery,
+        'avg_competency': avg_competency,
         'at_risk_count': at_risk_students,
         'recent_sessions': recent_sessions,
         'course_progress': course_progress,
@@ -1643,57 +1653,30 @@ def lesson_session_report(request, lesson_id):
 
     total_objectives = len(teaching_steps)
 
-    # ── Per-objective competency (based on exit ticket + session data) ──
+    # ── Per-objective competency (C4: exit-ticket only, single source of truth) ──
+    # For each EO, count students whose BEST exit ticket attempt answered
+    # at least one question tagged with this EO's concept_tag correctly.
+    # Legacy fallbacks to engine_state.covered_enabling_objectives and
+    # StudentSkillMastery have been removed per memory/lesson_competency_plan.md.
+    from apps.tutoring.competency import best_attempt
     objectives_data = []
-
-    # Get all completed sessions for tracking which EOs were covered
-    for i, eo_text in enumerate(teaching_steps):
-        # Count students who demonstrated this EO:
-        # 1. Got an exit ticket question right for this EO (concept_tag match)
-        # 2. Or completed the step with this EO correctly during tutoring
+    for eo_text in teaching_steps:
         achieved = 0
         for sid in student_ids:
-            # Check exit ticket: did student answer correctly for this EO?
-            from apps.tutoring.models import ExitTicketAttempt
-            attempt = ExitTicketAttempt.objects.filter(
-                exit_ticket__lesson=lesson, student_id=sid
-            ).order_by('-completed_at').first()
-
-            eo_achieved = False
-            if attempt and attempt.answers:
-                # Check if any answer for this EO's concept_tag was correct
-                for ans in (attempt.answers if isinstance(attempt.answers, list) else []):
-                    if isinstance(ans, dict) and ans.get('concept_tag', '') == eo_text and ans.get('correct'):
-                        eo_achieved = True
-                        break
-
-            # Fallback: check if student completed session (they covered the step)
-            if not eo_achieved:
-                student_session = sessions.filter(student_id=sid, status='completed').first()
-                if student_session:
-                    # Check engine_state for covered objectives
-                    state = student_session.engine_state or {}
-                    covered_eos = state.get('covered_enabling_objectives', [])
-                    if eo_text in covered_eos:
-                        eo_achieved = True
-
-            # Last fallback: check StudentSkillMastery if it exists
-            if not eo_achieved:
-                mastery = StudentSkillMastery.objects.filter(
-                    skill__enabling_objective_text__icontains=eo_text[:50],
-                    skill__is_enabling_objective=True,
-                    student_id=sid,
-                    mastery_level__gte=mastery_threshold,
-                ).first()
-                if mastery:
-                    eo_achieved = True
-
-            if eo_achieved:
-                achieved += 1
-
+            student = User.objects.filter(id=sid).first()
+            if not student:
+                continue
+            attempt = best_attempt(student, lesson)
+            if not attempt or not attempt.answers:
+                continue
+            for ans in (attempt.answers if isinstance(attempt.answers, list) else []):
+                if not isinstance(ans, dict):
+                    continue
+                if ans.get('concept_tag', '') == eo_text and ans.get('correct'):
+                    achieved += 1
+                    break
         not_achieved = total_students - achieved
         pct = round(achieved / total_students * 100) if total_students else 0
-
         objectives_data.append({
             'objective': eo_text,
             'objective_type': 'enabling',

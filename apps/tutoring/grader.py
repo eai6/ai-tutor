@@ -54,6 +54,166 @@ def normalize_answer(answer: str) -> str:
     return " ".join(answer.lower().strip().split())
 
 
+# --- Numeric parsing for math answers (reusable across grader + tutor engine) ---
+
+# Common unit suffixes we strip before parsing. Extend as needed.
+_UNIT_SUFFIX_RE = re.compile(
+    r"\s*(kg|g|mg|m|cm|mm|km|l|ml|s|h|hr|hrs|min|mins|seconds?|minutes?|hours?|"
+    r"years?|yrs?|days?|meters?|grams?|litres?|liters?|degrees?|°|°c|°f)\b",
+    re.IGNORECASE,
+)
+
+_MIXED_NUMBER_RE = re.compile(r"^(-?)(\d+)[\s\-_]+(\d+)/(\d+)$")
+_FRACTION_RE = re.compile(r"^(-?\d+)/(\d+)$")
+
+
+def parse_math_answer(text: str) -> Optional[float]:
+    """Parse a single student or expected answer string as a float.
+
+    Handles:
+      - Integers / decimals: "42", "5.25"
+      - Improper fractions: "21/4" -> 5.25
+      - Mixed numbers: "3 3/4" -> 3.75, "-3 3/4" -> -3.75
+      - Percentages: "75%" -> 0.75
+      - Currency: "$42" -> 42.0
+      - Thousands commas: "1,234" -> 1234.0
+      - Trailing units stripped: "5 1/4 kg" -> 5.25, "90 degrees" -> 90.0
+
+    Returns None if the string cannot be parsed as a single number.
+    """
+    if text is None:
+        return None
+
+    s = str(text).strip()
+    if not s:
+        return None
+
+    # Percentage handling: strip trailing % and divide by 100 at the end.
+    is_percent = s.endswith("%")
+    if is_percent:
+        s = s[:-1].strip()
+
+    # Strip currency prefix.
+    if s.startswith("$"):
+        s = s[1:].strip()
+
+    # Strip trailing unit words ("5 1/4 kg" -> "5 1/4", "90 degrees" -> "90").
+    # Only strip if a unit suffix is present at the end of the string.
+    s_no_unit = _UNIT_SUFFIX_RE.sub("", s).strip()
+    if s_no_unit:
+        s = s_no_unit
+
+    # Remove thousands commas only when they sit between digits (avoid breaking
+    # pathological "1,2,3" inputs, which we treat as None).
+    s = re.sub(r"(?<=\d),(?=\d{3}(\D|$))", "", s)
+
+    # Mixed number: "3 3/4" or "-3 3/4". Group 1 is the optional sign.
+    m = _MIXED_NUMBER_RE.match(s)
+    if m:
+        sign, whole, num, den = m.group(1), m.group(2), m.group(3), m.group(4)
+        try:
+            whole_f = float(whole)
+            num_f = float(num)
+            den_f = float(den)
+            if den_f == 0:
+                return None
+            value = whole_f + num_f / den_f
+            if sign == "-":
+                value = -value
+            return _apply_percent(value, is_percent)
+        except ValueError:
+            return None
+
+    # Improper fraction: "21/4" or "-21/4".
+    m = _FRACTION_RE.match(s)
+    if m:
+        num, den = m.group(1), m.group(2)
+        try:
+            den_f = float(den)
+            if den_f == 0:
+                return None
+            return _apply_percent(float(num) / den_f, is_percent)
+        except ValueError:
+            return None
+
+    # Plain int/float, or fallback fails cleanly.
+    try:
+        return _apply_percent(float(s), is_percent)
+    except ValueError:
+        return None
+
+
+def _apply_percent(value: float, is_percent: bool) -> float:
+    return value / 100.0 if is_percent else value
+
+
+def numeric_equals(a: float, b: float, tolerance: float = 1e-6) -> bool:
+    """Relative-tolerance equality for floats.
+
+    Uses absolute tolerance when the reference is near zero.
+    """
+    if a is None or b is None:
+        return False
+    if a == b:
+        return True
+    denom = max(abs(a), abs(b))
+    if denom < tolerance:
+        return abs(a - b) <= tolerance
+    return abs(a - b) / denom <= tolerance
+
+
+@dataclass
+class MathCheckResult:
+    """Outcome of a deterministic math answer check.
+
+    Returned by check_math_answer() when both sides parse as numbers.
+    None is returned when parsing fails; caller should fall through to
+    LLM evaluation.
+    """
+    is_correct: bool
+    student_parsed: float
+    expected_parsed: float
+    reasoning: str
+
+
+def check_math_answer(
+    student_answer: str,
+    expected_answer: str,
+    tolerance: float = None,
+) -> Optional[MathCheckResult]:
+    """Deterministic math answer comparison.
+
+    Parses both sides via parse_math_answer() and compares numerically.
+    Returns None if either side fails to parse -- caller falls through to
+    the LLM evaluator for free-text explanations.
+
+    Tolerance default: 1e-3 when either side had a decimal point (real-world
+    measurement), otherwise 1e-6 (exact for rationals).
+    """
+    student_parsed = parse_math_answer(student_answer)
+    expected_parsed = parse_math_answer(expected_answer)
+
+    if student_parsed is None or expected_parsed is None:
+        return None
+
+    if tolerance is None:
+        has_decimal = "." in (student_answer or "") or "." in (expected_answer or "")
+        tolerance = 1e-3 if has_decimal else 1e-6
+
+    is_correct = numeric_equals(student_parsed, expected_parsed, tolerance=tolerance)
+    reasoning = (
+        f"numeric match: {student_parsed} == {expected_parsed}"
+        if is_correct
+        else f"numeric mismatch: student={student_parsed} vs expected={expected_parsed}"
+    )
+    return MathCheckResult(
+        is_correct=is_correct,
+        student_parsed=student_parsed,
+        expected_parsed=expected_parsed,
+        reasoning=reasoning,
+    )
+
+
 def grade_exact_match(student_answer: str, expected_answer: str) -> GradingOutcome:
     """
     Grade by exact match (after normalization).
@@ -88,44 +248,35 @@ def grade_numeric(
 ) -> GradingOutcome:
     """
     Grade numeric answers with tolerance.
-    Handles various formats: "42", "42.0", "$42", "42%", etc.
+    Handles: integers, decimals, improper fractions ("21/4"), mixed numbers
+    ("3 3/4"), percentages ("75%"), currency ("$42"), and trailing units
+    ("5 1/4 kg").
     """
-    def extract_number(s: str) -> Optional[float]:
-        """Extract numeric value from string."""
-        # Remove common prefixes/suffixes
-        cleaned = re.sub(r'[$%,]', '', s.strip())
-        try:
-            return float(cleaned)
-        except ValueError:
-            return None
-    
-    student_num = extract_number(student_answer)
-    expected_num = extract_number(expected_answer)
-    
+    student_num = parse_math_answer(student_answer)
+    expected_num = parse_math_answer(expected_answer)
+
     if student_num is None:
         return GradingOutcome(
             result=GradeResult.INCORRECT,
             feedback="I couldn't understand that as a number. Please enter a numeric answer.",
             score=0.0,
         )
-    
+
     if expected_num is None:
         # Fallback to exact match if expected isn't numeric
         return grade_exact_match(student_answer, expected_answer)
-    
-    # Check if within tolerance
-    if abs(student_num - expected_num) <= tolerance * abs(expected_num) if expected_num != 0 else abs(student_num) <= tolerance:
+
+    if numeric_equals(student_num, expected_num, tolerance=tolerance):
         return GradingOutcome(
             result=GradeResult.CORRECT,
             feedback="Correct!",
             score=1.0,
         )
-    else:
-        return GradingOutcome(
-            result=GradeResult.INCORRECT,
-            feedback="That's not the right answer.",
-            score=0.0,
-        )
+    return GradingOutcome(
+        result=GradeResult.INCORRECT,
+        feedback="That's not the right answer.",
+        score=0.0,
+    )
 
 
 def grade_true_false(student_answer: str, expected_answer: str) -> GradingOutcome:

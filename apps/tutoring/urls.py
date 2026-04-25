@@ -10,6 +10,7 @@ app_name = 'tutoring'
 urlpatterns = [
     # Lesson list API
     path('api/lessons/', views.lesson_list, name='lesson_list'),
+    path('api/lessons/<int:lesson_id>/competency/', views.lesson_competency, name='lesson_competency'),
 
     # Chat-based AI Tutor API (active)
     path('api/chat/start/<int:lesson_id>/', views.chat_start_session, name='chat_start_session'),
@@ -17,6 +18,10 @@ urlpatterns = [
     path('api/chat/<int:session_id>/exit-ticket/', views.chat_exit_ticket, name='chat_exit_ticket'),
     path('api/chat/<int:session_id>/review/', views.chat_start_review, name='chat_start_review'),
     path('api/chat/<int:session_id>/difficulty-signal/', views.chat_difficulty_signal, name='chat_difficulty_signal'),
+
+    # Group lessons — participant management
+    path('api/chat/<int:session_id>/participants/', views.session_participants, name='session_participants'),
+    path('api/chat/<int:session_id>/participants/<int:user_id>/', views.session_participant_remove, name='session_participant_remove'),
 
     # Audio — STT + TTS
     path('api/chat/<int:session_id>/transcribe/', views.transcribe_audio, name='transcribe_audio'),

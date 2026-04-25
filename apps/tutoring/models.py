@@ -101,12 +101,72 @@ class TutorSession(models.Model):
             return round(delta.total_seconds() / 60, 1)
         return None
 
+    @property
+    def active_students(self):
+        """Return the queryset of active participants in this session.
+
+        Falls back to the primary-student single-user case for legacy
+        sessions where SessionParticipant rows were never created (pre-G1).
+        """
+        qs = User.objects.filter(
+            group_sessions__session=self,
+            group_sessions__is_active=True,
+        )
+        if qs.exists():
+            return qs
+        return User.objects.filter(id=self.student_id)
+
+    @property
+    def is_group(self) -> bool:
+        """True when this session has more than one active participant."""
+        return SessionParticipant.objects.filter(
+            session=self, is_active=True,
+        ).count() > 1
+
     class Meta:
         ordering = ['-started_at']
         verbose_name = "Tutor Session"
 
     def __str__(self):
         return f"{self.student.username} - {self.lesson.title} ({self.status})"
+
+
+class SessionParticipant(models.Model):
+    """Links a student to a TutorSession for group-lesson support.
+
+    Every TutorSession has at least one SessionParticipant (the primary
+    student). Additional participants are added when students join a group
+    session on the same device. All participants get credit: one
+    StudentLessonProgress update and one ExitTicketAttempt row per
+    participant when the session completes.
+
+    See memory/group_lessons_plan.md.
+    """
+
+    session = models.ForeignKey(
+        TutorSession,
+        on_delete=models.CASCADE,
+        related_name='participants',
+    )
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='group_sessions',
+    )
+    joined_at = models.DateTimeField(auto_now_add=True)
+    left_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    is_primary = models.BooleanField(
+        default=False,
+        help_text="True for the session 'owner' (the student who started the session).",
+    )
+
+    class Meta:
+        unique_together = [('session', 'student')]
+        indexes = [models.Index(fields=['session', 'is_active'])]
+
+    def __str__(self):
+        return f"{self.student.username} -> session {self.session_id} (active={self.is_active})"
 
 
 class SessionTurn(models.Model):
@@ -198,9 +258,22 @@ class StudentLessonProgress(models.Model):
     best_score = models.FloatField(
         null=True,
         blank=True,
-        help_text="Best quiz score as percentage"
+        help_text=(
+            "Best exit-ticket score as a fraction in [0.0, 1.0]. "
+            "Populated on every exit ticket submission. Monotonic (never demoted)."
+        ),
     )
-    
+
+    attempts_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of exit ticket attempts across all sessions for this lesson.",
+    )
+    last_attempt_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the student most recently submitted the exit ticket.",
+    )
+
     last_session_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

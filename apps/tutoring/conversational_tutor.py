@@ -33,6 +33,8 @@ from django.conf import settings
 
 from apps.curriculum.models import Lesson, LessonStep
 from apps.tutoring.models import TutorSession, SessionTurn, StudentLessonProgress
+from apps.tutoring.grader import check_math_answer, MathCheckResult
+from apps.tutoring.praise_filter import strip_praise_if_wrong
 
 logger = logging.getLogger(__name__)
 
@@ -698,6 +700,13 @@ class ConversationalTutor:
         self.consecutive_wrong = state.get('consecutive_wrong', 0)
         self.consecutive_correct_streak = state.get('consecutive_correct_streak', 0)
 
+        # Bare-answer count per step (M9 — pedagogy layer 4). Keys stringified
+        # because JSON object keys are strings; we coerce on read.
+        raw_bare_counts = state.get('bare_answer_counts_by_step', {}) or {}
+        self.bare_answer_counts_by_step: Dict[int, int] = {
+            int(k): int(v) for k, v in raw_bare_counts.items()
+        }
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -763,6 +772,10 @@ class ConversationalTutor:
             'cognitive_load': getattr(self, 'cognitive_load', 0.5),
             'consecutive_wrong': getattr(self, 'consecutive_wrong', 0),
             'consecutive_correct_streak': getattr(self, 'consecutive_correct_streak', 0),
+            # Bare-answer counts per step (M9). JSON requires string keys.
+            'bare_answer_counts_by_step': {
+                str(k): v for k, v in getattr(self, 'bare_answer_counts_by_step', {}).items()
+            },
             # Enabling objective coverage (P1.2)
             'covered_objectives': [
                 o['objective'] for o in getattr(self, 'enabling_objectives', [])
@@ -1211,6 +1224,44 @@ Keep it to 2-3 sentences."""
         # Get curriculum context from knowledge base
         kb_context = self._get_knowledge_context(student_input)
 
+        # Deterministic math check BEFORE response generation (Layer 1 + 2 of
+        # math-tutor false-positive fix). When the expected answer is numeric
+        # and the student's reply parses as a number, we compute correctness
+        # up-front and inject a signal into the system prompt so the LLM
+        # cannot hallucinate praise for a wrong answer. See
+        # memory/math_tutor_fix_plan.md.
+        self._pending_math_check = self._deterministic_math_check(student_input)
+        # Bare-answer detection (M9 / Layer 4). Tracked even when the
+        # deterministic check didn't produce a verdict so metadata is
+        # consistent for teacher review.
+        self._pending_bare_answer = False
+        if self._pending_math_check is not None:
+            try:
+                is_math_step = self.lesson.unit.course.is_math
+            except Exception:
+                is_math_step = False
+            step_type = ''
+            if self.current_topic_index < len(self.steps):
+                step_type = self.steps[self.current_topic_index].step_type or ''
+            if is_math_step and step_type in ('practice', 'quiz'):
+                self._pending_bare_answer = self._is_bare_math_answer(student_input)
+                if self._pending_bare_answer:
+                    self.bare_answer_counts_by_step[self.current_topic_index] = (
+                        self.bare_answer_counts_by_step.get(self.current_topic_index, 0) + 1
+                    )
+            self._pending_math_student_input = student_input
+            logger.info(
+                "[MathCheck] session=%s step=%s is_correct=%s bare=%s student=%s expected=%s",
+                self.session.id,
+                self.current_topic_index,
+                self._pending_math_check.is_correct,
+                self._pending_bare_answer,
+                self._pending_math_check.student_parsed,
+                self._pending_math_check.expected_parsed,
+            )
+        else:
+            self._pending_math_student_input = None
+
         # Generate response — LLM picks media via |||MEDIA:N||| tail-line signal
         response = self._generate_contextual_response(
             student_input,
@@ -1218,6 +1269,16 @@ Keep it to 2-3 sentences."""
             media_context="",
             visual_requested=bool(visual_request)
         )
+
+        # Cache the math check for analyze/persistence, then clear the
+        # per-turn signal so it cannot leak into later generations this turn
+        # (e.g. exit-ticket intro, fallback responses).
+        turn_math_check = self._pending_math_check
+        turn_math_student_input = getattr(self, '_pending_math_student_input', student_input)
+        turn_bare_answer = getattr(self, '_pending_bare_answer', False)
+        self._pending_math_check = None
+        self._pending_math_student_input = None
+        self._pending_bare_answer = False
 
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media, gen_request = self._parse_media_signal(response)
@@ -1229,6 +1290,26 @@ Keep it to 2-3 sentences."""
             clean_response, corrections = verify_calculations(clean_response)
             if corrections:
                 logger.info(f"[MathCheck] Fixed {len(corrections)} calculation(s) in response")
+
+        # Post-generation praise filter (Layer 3). Defense-in-depth: strip
+        # praise when the deterministic math check said wrong OR when the
+        # student gave a bare answer (no working). For bare answers, praise
+        # must be withheld regardless of numeric correctness — per
+        # math_teaching Rule 1, there is no confirmation without working.
+        praise_stripped = False
+        should_strip = (
+            (turn_math_check is not None and turn_math_check.is_correct is False)
+            or turn_bare_answer
+        )
+        if should_strip:
+            clean_response, praise_stripped = strip_praise_if_wrong(
+                clean_response, is_correct=False,
+            )
+            if praise_stripped:
+                logger.info(
+                    "[MathCheck] Praise filter triggered session=%s step=%s bare=%s",
+                    self.session.id, self.current_topic_index, turn_bare_answer,
+                )
 
         media = [parsed_media] if parsed_media else []
 
@@ -1246,8 +1327,20 @@ Keep it to 2-3 sentences."""
                 if step_media:
                     media = [step_media[0]]
 
-        # Analyze student response for adaptation
-        self._analyze_student_response(student_input, clean_response)
+        # Analyze student response for adaptation (returns metadata dict).
+        turn_metadata = self._analyze_student_response(
+            student_input, clean_response, math_check=turn_math_check,
+        )
+        if praise_stripped:
+            turn_metadata['praise_stripped'] = True
+        if turn_bare_answer:
+            turn_metadata['bare_answer'] = True
+            step_bare_count = self.bare_answer_counts_by_step.get(
+                self.current_topic_index, 0,
+            )
+            turn_metadata['bare_answer_count_for_step'] = step_bare_count
+            if step_bare_count >= 3:
+                turn_metadata['bare_answer_flagged'] = True
 
         # Record media for this turn (for resume artifact panel)
         if media:
@@ -1261,7 +1354,7 @@ Keep it to 2-3 sentences."""
             self.session_state = SessionState.EXIT_TICKET
             self._save_state()
             # Save tutor response first, then return exit ticket
-            self._save_turn("tutor", clean_response)
+            self._save_turn("tutor", clean_response, metadata=turn_metadata)
             self.conversation.append({"role": "assistant", "content": clean_response})
             return self._handle_exit_ticket()
 
@@ -1269,7 +1362,7 @@ Keep it to 2-3 sentences."""
         if getattr(self, 'is_remediation', False) and self._remediation_steps_complete():
             self.session_state = SessionState.EXIT_TICKET
             self._save_state()
-            self._save_turn("tutor", clean_response)
+            self._save_turn("tutor", clean_response, metadata=turn_metadata)
             self.conversation.append({"role": "assistant", "content": clean_response})
             return self._handle_exit_ticket()
 
@@ -1277,7 +1370,7 @@ Keep it to 2-3 sentences."""
         if getattr(self, 'is_remediation', False) and self.exchange_count >= 15:
             self.session_state = SessionState.EXIT_TICKET
             self._save_state()
-            self._save_turn("tutor", clean_response)
+            self._save_turn("tutor", clean_response, metadata=turn_metadata)
             self.conversation.append({"role": "assistant", "content": clean_response})
             return self._handle_exit_ticket()
 
@@ -1285,7 +1378,7 @@ Keep it to 2-3 sentences."""
         self._save_state()
 
         # Save CLEAN tutor response (no signal tags in DB)
-        self._save_turn("tutor", clean_response)
+        self._save_turn("tutor", clean_response, metadata=turn_metadata)
         self.conversation.append({"role": "assistant", "content": clean_response})
 
         return self._create_message(clean_response, media=media, artifact_html=artifact_html)
@@ -1318,6 +1411,26 @@ Keep it to 2-3 sentences."""
         # Get curriculum context from knowledge base
         kb_context = self._get_knowledge_context(student_input)
 
+        # Deterministic math check BEFORE response generation (mirrors
+        # respond()). Keeps streaming path consistent if it is re-enabled.
+        self._pending_math_check = self._deterministic_math_check(student_input)
+        self._pending_math_student_input = student_input if self._pending_math_check else None
+        self._pending_bare_answer = False
+        if self._pending_math_check is not None:
+            try:
+                is_math_step = self.lesson.unit.course.is_math
+            except Exception:
+                is_math_step = False
+            step_type = ''
+            if self.current_topic_index < len(self.steps):
+                step_type = self.steps[self.current_topic_index].step_type or ''
+            if is_math_step and step_type in ('practice', 'quiz'):
+                self._pending_bare_answer = self._is_bare_math_answer(student_input)
+                if self._pending_bare_answer:
+                    self.bare_answer_counts_by_step[self.current_topic_index] = (
+                        self.bare_answer_counts_by_step.get(self.current_topic_index, 0) + 1
+                    )
+
         # Exit ticket is handled separately (non-streamable)
         if self.session_state == SessionState.EXIT_TICKET:
             return None
@@ -1339,6 +1452,15 @@ Keep it to 2-3 sentences."""
         post-processing (concept tracking, state save).
         Returns metadata dict including clean_content for the done chunk.
         """
+        # Cache + clear per-turn math check (signal must not leak to other
+        # generations in the same turn).
+        turn_math_check = self._pending_math_check
+        turn_math_student_input = getattr(self, '_pending_math_student_input', student_input)
+        turn_bare_answer = getattr(self, '_pending_bare_answer', False)
+        self._pending_math_check = None
+        self._pending_math_student_input = None
+        self._pending_bare_answer = False
+
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_content, parsed_media, gen_request = self._parse_media_signal(full_response)
 
@@ -1348,6 +1470,22 @@ Keep it to 2-3 sentences."""
             clean_content, corrections = verify_calculations(clean_content)
             if corrections:
                 logger.info(f"[MathCheck] Fixed {len(corrections)} calculation(s) in response")
+
+        # Post-generation praise filter (Layer 3, streaming parity).
+        praise_stripped = False
+        should_strip = (
+            (turn_math_check is not None and turn_math_check.is_correct is False)
+            or turn_bare_answer
+        )
+        if should_strip:
+            clean_content, praise_stripped = strip_praise_if_wrong(
+                clean_content, is_correct=False,
+            )
+            if praise_stripped:
+                logger.info(
+                    "[MathCheck] Praise filter triggered (stream) session=%s step=%s bare=%s",
+                    self.session.id, self.current_topic_index, turn_bare_answer,
+                )
 
         # Media from LLM signal, with fallback for phantom references
         media = [parsed_media] if parsed_media else []
@@ -1373,8 +1511,20 @@ Keep it to 2-3 sentences."""
             turn_index = len(self.conversation)  # index before appending
             self._turn_media[str(turn_index)] = media[0]
 
-        # Analyze student response for adaptation
-        self._analyze_student_response(student_input, clean_content)
+        # Analyze student response for adaptation (returns metadata dict)
+        turn_metadata = self._analyze_student_response(
+            student_input, clean_content, math_check=turn_math_check,
+        )
+        if praise_stripped:
+            turn_metadata['praise_stripped'] = True
+        if turn_bare_answer:
+            turn_metadata['bare_answer'] = True
+            step_bare_count = self.bare_answer_counts_by_step.get(
+                self.current_topic_index, 0,
+            )
+            turn_metadata['bare_answer_count_for_step'] = step_bare_count
+            if step_bare_count >= 3:
+                turn_metadata['bare_answer_flagged'] = True
 
         # Check if all steps complete — trigger exit ticket (NOT during remediation)
         show_exit_ticket = False
@@ -1406,7 +1556,7 @@ Keep it to 2-3 sentences."""
         self._save_state()
 
         # Save CLEAN tutor response (no signal tags in DB)
-        self._save_turn("tutor", clean_content)
+        self._save_turn("tutor", clean_content, metadata=turn_metadata)
         self.conversation.append({"role": "assistant", "content": clean_content})
 
         step_num = min(self.current_topic_index + 1, len(self.steps)) if self.steps else 0
@@ -2620,13 +2770,62 @@ Follow the current step; this concept will be covered in sequence."""
                 "\n</math_teaching>"
             )
 
+        # Append group-session block when there is more than one active
+        # participant (G3). The tutor addresses the group collectively.
+        system_prompt += self._build_group_session_block()
+
         # Append Seychelles context library (P1.5)
         system_prompt += self._build_seychelles_context_block()
 
         # Append media catalog so the LLM knows what figures are available
         system_prompt += self._build_media_catalog()
 
+        # Inject deterministic math evaluation signal if the pre-response
+        # check produced a definite result. Must go LAST so it is the final
+        # thing the LLM reads before generating (highest-salience position).
+        pending_check = getattr(self, '_pending_math_check', None)
+        if pending_check is not None:
+            student_input = getattr(self, '_pending_math_student_input', '') or ''
+            bare = getattr(self, '_pending_bare_answer', False)
+            bare_count = self.bare_answer_counts_by_step.get(
+                self.current_topic_index, 0,
+            )
+            system_prompt += self._build_math_eval_signal_block(
+                pending_check,
+                student_input,
+                bare_answer=bare,
+                bare_answer_count_for_step=bare_count,
+            )
+
         return system_prompt
+
+    def _build_group_session_block(self) -> str:
+        """Render group-session addressing block when the session has more
+        than one active participant.
+
+        See memory/group_lessons_plan.md.
+        """
+        try:
+            if not self.session.is_group:
+                return ""
+            students = list(self.session.active_students.values_list("username", flat=True))
+        except Exception:
+            return ""
+        if len(students) < 2:
+            return ""
+        names = ", ".join(students)
+        return (
+            "\n\n<group_session>"
+            f"\nThis is a GROUP session with {len(students)} students: {names}."
+            "\nAddress them as a group (\"everyone\", \"all of you\", \"you all\") or"
+            " by name when appropriate."
+            "\nThey share one device and answer as a collective — do not ask"
+            " individual students to take turns unless they explicitly"
+            " coordinate it themselves. Their answers represent the group's"
+            " shared thinking. When someone is confused, encourage a peer"
+            " to explain in their own words."
+            "\n</group_session>"
+        )
 
     def _build_seychelles_context_block(self) -> str:
         """Build Seychelles context library block for the system prompt (P1.5)."""
@@ -3003,6 +3202,140 @@ Follow the current step; this concept will be covered in sequence."""
             return 'explain'
         return self.session_state.value  # "exit_ticket" or "completed"
 
+    def _deterministic_math_check(self, student_input: str) -> Optional[MathCheckResult]:
+        """Pre-generation deterministic math answer check (Layer 1 of the
+        math-tutor false-positive fix).
+
+        Runs BEFORE the tutor LLM is called, so its result can be injected
+        into the system prompt — forcing the LLM to treat the student's
+        answer as already-known-correct or already-known-wrong.
+
+        Returns None when the check is inapplicable:
+          - lesson is not math
+          - no current step
+          - step has no expected_answer
+          - either student_input or expected_answer cannot be parsed numerically
+
+        When None is returned, the caller falls through to the existing LLM
+        evaluator path (which handles free-text explanations, multi-part
+        answers, etc.).
+
+        See memory/math_tutor_fix_plan.md Phase M2.
+        """
+        try:
+            if not self.lesson.unit.course.is_math:
+                return None
+        except Exception:
+            return None
+
+        if self.current_topic_index >= len(self.steps):
+            return None
+
+        step = self.steps[self.current_topic_index]
+        expected = (step.expected_answer or "").strip()
+        if not expected:
+            return None
+
+        student_stripped = (student_input or "").strip()
+        if not student_stripped:
+            return None
+
+        return check_math_answer(student_stripped, expected)
+
+    # Pattern for detecting "bare" math answers: short input that parses as a
+    # number and contains no explanatory words. A bare answer on a practice/
+    # quiz step violates the math rule "working before evaluation."
+    _BARE_WORKING_MARKERS = re.compile(
+        r"\b(because|since|so|then|i (got|think|found|divided|multiplied|added|subtracted)"
+        r"|first|next|after|therefore|step|\bwork|\btotal|divide|multiply|add|subtract"
+        r"|numerator|denominator|ratio|convert)\b",
+        re.IGNORECASE,
+    )
+
+    def _is_bare_math_answer(self, student_input: str) -> bool:
+        """Return True when the student's reply looks like a naked numeric
+        answer with no working/explanation (M9 pedagogy layer).
+
+        Heuristic:
+          - Input has content and parses as a single number
+          - Input is short (<= 40 chars)
+          - Input contains none of the 'working' marker words
+        """
+        if not student_input:
+            return False
+        text = student_input.strip()
+        if len(text) > 40:
+            return False
+        parsed = check_math_answer(text, text)  # cheap reuse of parser
+        if parsed is None:
+            return False
+        if self._BARE_WORKING_MARKERS.search(text):
+            return False
+        return True
+
+    def _build_math_eval_signal_block(
+        self,
+        check: MathCheckResult,
+        student_input: str,
+        bare_answer: bool = False,
+        bare_answer_count_for_step: int = 0,
+    ) -> str:
+        """Render the <evaluation_signal> block appended to the system prompt
+        when a deterministic math check produced a definite result."""
+        verdict = "CORRECT" if check.is_correct else "INCORRECT"
+        if bare_answer:
+            # Regardless of correctness, a bare answer must not be confirmed
+            # without working (math_teaching Rule 1). The signal therefore
+            # forces the tutor to ask for working FIRST.
+            guidance = (
+                "The student submitted a BARE numeric answer with no working"
+                " shown. Per math_teaching Rule 1, you MUST NOT say 'correct',"
+                " 'right', 'brilliant', 'you got it', or equivalent praise,"
+                " even if the answer happens to match.\n"
+                f"Echo the student's answer back verbatim ('You said"
+                f" {student_input.strip()[:80]}'), then ask them to walk you"
+                " through each step they took. Only after you see the working"
+                " should you confirm correctness or diagnose a subskill gap."
+            )
+            if bare_answer_count_for_step >= 2:
+                guidance += (
+                    "\nNOTE: This is the third+ bare answer on this step. Be"
+                    " patient — gently model what 'showing working' looks like"
+                    " by writing out one example step yourself, then invite"
+                    " them to try the next step that way."
+                )
+        elif check.is_correct:
+            guidance = (
+                "The student's numeric answer matches the expected answer.\n"
+                "You may confirm correctness, but STILL follow Rule 1 of the"
+                " math_teaching block — if the student has not shown their"
+                " working, ask them to walk you through their steps before"
+                " moving on. Do not skip to the next concept without"
+                " verifying the working matches the answer."
+            )
+        else:
+            guidance = (
+                "The student's numeric answer does NOT match the expected"
+                " answer. You MUST NOT say 'correct', 'right', 'brilliant',"
+                " 'well done', 'you got it', 'exactly', 'perfect', or any"
+                " equivalent praise. Do not state the correct answer yet.\n"
+                "Echo the student's answer back to them verbatim ('You said"
+                f" {student_input.strip()[:80]}'), then ask them to walk you"
+                " through how they got it. Use the math_teaching rules to"
+                " diagnose which subskill failed."
+            )
+        block = (
+            "\n\n<evaluation_signal>"
+            f"\nStudent's answer (parsed): {check.student_parsed}"
+            f"\nExpected answer (parsed): {check.expected_parsed}"
+            f"\nVerdict: {verdict}"
+            f"\nBare answer (no working shown): {bare_answer}"
+            f"\nReasoning: {check.reasoning}"
+            f"\n{guidance}"
+            "\n</evaluation_signal>"
+        )
+        return block
+
     def _evaluate_step(self, student_input: str, tutor_response: str) -> Optional[StepEvaluationResult]:
         """Merged LLM evaluator: answer correctness + step completion in one call.
 
@@ -3286,8 +3619,21 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
     # STUDENT ANALYSIS
     # =========================================================================
 
-    def _analyze_student_response(self, student_input: str, tutor_response: str):
-        """Analyze student response to adapt future instruction and track concept coverage."""
+    def _analyze_student_response(
+        self,
+        student_input: str,
+        tutor_response: str,
+        math_check: Optional[MathCheckResult] = None,
+    ) -> Dict:
+        """Analyze student response to adapt future instruction and track concept coverage.
+
+        When math_check is provided (from the pre-generation deterministic
+        numeric comparison), its verdict takes precedence over the LLM
+        evaluator — numeric equality is always authoritative for math.
+
+        Returns a metadata dict suitable for attaching to the tutor turn's
+        SessionTurn.metadata JSONField (see M4 of math_tutor_fix_plan.md).
+        """
         input_lower = student_input.lower()
         response_lower = tutor_response.lower()
         combined_text = f"{input_lower} {response_lower}"
@@ -3304,14 +3650,27 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         current_step = self.steps[self.current_topic_index] if self.current_topic_index < len(self.steps) else None
         step_type = (current_step.step_type or 'teach') if current_step else 'teach'
 
+        # Layer 1 (deterministic) short-circuits the LLM evaluator when
+        # we already have a numeric-equality verdict. The LLM is unreliable
+        # for math correctness and this is the core math-tutor fix.
+        eval_layer = None
+        eval_reasoning = None
         step_eval_result = None
-        if step_type in ('practice', 'quiz', 'teach', 'worked_example') and self.instructor_client:
-            step_eval_result = self._evaluate_step(student_input, tutor_response)
-
-        if step_eval_result is not None:
-            is_correct = step_eval_result.answer_correct
+        if math_check is not None:
+            is_correct = math_check.is_correct
+            eval_layer = 'deterministic_numeric'
+            eval_reasoning = math_check.reasoning
         else:
-            is_correct = self._keyword_evaluate_response(tutor_response)['correct']
+            if step_type in ('practice', 'quiz', 'teach', 'worked_example') and self.instructor_client:
+                step_eval_result = self._evaluate_step(student_input, tutor_response)
+            if step_eval_result is not None:
+                is_correct = step_eval_result.answer_correct
+                eval_layer = 'llm_evaluator'
+                eval_reasoning = getattr(step_eval_result, 'reasoning', '') or ''
+            else:
+                is_correct = self._keyword_evaluate_response(tutor_response)['correct']
+                eval_layer = 'keyword_fallback'
+                eval_reasoning = 'no instructor client; used keyword heuristic'
 
         # Detect success — update strength tracking
         if is_correct:
@@ -3421,6 +3780,19 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
                 self._mark_step_objective_covered(self.current_topic_index)
                 self.current_topic_index = len(self.steps)
                 self._step_just_advanced = True
+
+        # Build metadata dict for tutor-turn persistence (M4).
+        metadata: Dict = {
+            'is_correct': bool(is_correct),
+            'eval_layer': eval_layer,
+            'eval_reasoning': (eval_reasoning or '')[:500],
+            'step_index': self.current_topic_index,
+            'step_type': step_type,
+        }
+        if math_check is not None:
+            metadata['student_answer_parsed'] = math_check.student_parsed
+            metadata['expected_answer_parsed'] = math_check.expected_parsed
+        return metadata
 
     def _get_eo_skill(self, eo_text: str):
         """Look up the Skill linked to an enabling objective text.
@@ -4017,7 +4389,13 @@ Which concept numbers were meaningfully covered?"""
                 'explanation': q.explanation,
             })
 
-        passed = correct >= 8
+        # Use the lesson's configured passing_score (no longer hardcoded
+        # to 8 — that was a bug). Fallback of 8 preserves behavior for
+        # older lessons that didn't explicitly set the field.
+        from apps.tutoring.models import ExitTicket
+        exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
+        passing_threshold = exit_ticket.passing_score if exit_ticket else 8
+        passed = correct >= passing_threshold
 
         self.session.mastery_achieved = passed
 
@@ -4028,6 +4406,61 @@ Which concept numbers were meaningfully covered?"""
             # FAILED - Start remediation!
             return self._start_remediation(results, correct, failed_questions)
     
+    def _update_competency(self, score: int, total: int, passed: bool) -> None:
+        """Update StudentLessonProgress fields for every active participant.
+
+        Source of truth: ExitTicketAttempt rows. This method is idempotent
+        and monotonic:
+          - best_score only rises (0.0-1.0 fraction).
+          - mastery_level only promotes (never demotes from 'mastered').
+          - attempts_count increments by 1 per call (one per submission).
+
+        In group sessions every active participant is updated with the same
+        score. See memory/group_lessons_plan.md.
+        """
+        score_pct = (score / total) if total else 0.0
+        score_pct = max(0.0, min(1.0, round(score_pct, 4)))
+
+        # Collect participants. Fallback to the legacy single-student session
+        # owner so this works before G1 ships and for solo sessions after.
+        try:
+            participants = list(self.session.active_students)
+        except Exception:
+            participants = []
+        if not participants:
+            participants = [self.student]
+
+        now = timezone.now()
+        for student in participants:
+            progress, _ = StudentLessonProgress.objects.get_or_create(
+                student=student,
+                lesson=self.lesson,
+                defaults={'institution': self.session.institution},
+            )
+            changed = False
+            if progress.best_score is None or score_pct > progress.best_score:
+                progress.best_score = score_pct
+                changed = True
+            progress.attempts_count = (progress.attempts_count or 0) + 1
+            progress.last_attempt_at = now
+            if passed and progress.mastery_level != 'mastered':
+                progress.mastery_level = 'mastered'
+                changed = True
+            elif progress.mastery_level == 'not_started' and progress.attempts_count > 0:
+                # Student has an attempt now; move off 'not_started'.
+                progress.mastery_level = 'in_progress'
+                changed = True
+            # Always save since attempts_count / last_attempt_at changed.
+            progress.save(
+                update_fields=[
+                    'best_score',
+                    'attempts_count',
+                    'last_attempt_at',
+                    'mastery_level',
+                    'updated_at',
+                ]
+            )
+
     def _complete_session_with_results(self, results: List[Dict], score: int) -> TutorMessage:
         """Complete the session with exit ticket results."""
         self.session_state = SessionState.COMPLETED
@@ -4063,12 +4496,12 @@ Which concept numbers were meaningfully covered?"""
         self._save_state()
         self.session.save()
 
-        # Record ExitTicketAttempt for competency reporting
+        # Record ExitTicketAttempt per active participant (G3: group-aware)
         try:
             from apps.tutoring.models import ExitTicket, ExitTicketAttempt
             exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
             if exit_ticket:
-                # Build per-question answer data
+                # Build per-question answer data (shared across participants)
                 answer_data = []
                 for r in results:
                     answer_data.append({
@@ -4077,30 +4510,27 @@ Which concept numbers were meaningfully covered?"""
                         'selected': r.get('selected', ''),
                         'question_type': r.get('question_type', 'mcq'),
                     })
-                ExitTicketAttempt.objects.create(
-                    exit_ticket=exit_ticket,
-                    student=self.student,
-                    session=self.session,
-                    score=score,
-                    passed=True,
-                    answers=answer_data,
-                    completed_at=timezone.now(),
-                )
+                try:
+                    participants = list(self.session.active_students)
+                except Exception:
+                    participants = []
+                if not participants:
+                    participants = [self.student]
+                for participant in participants:
+                    ExitTicketAttempt.objects.create(
+                        exit_ticket=exit_ticket,
+                        student=participant,
+                        session=self.session,
+                        score=score,
+                        passed=True,
+                        answers=answer_data,
+                        completed_at=timezone.now(),
+                    )
         except Exception as e:
             logger.warning(f"Failed to save ExitTicketAttempt: {e}")
 
-        # Update progress
-        progress, _ = StudentLessonProgress.objects.get_or_create(
-            student=self.student,
-            lesson=self.lesson,
-            defaults={'institution': self.session.institution}
-        )
-        progress.mastery_level = 'mastered'
-        total_questions = len(results) or 1
-        score_pct = round(score / total_questions * 100, 1)
-        if progress.best_score is None or score_pct > progress.best_score:
-            progress.best_score = score_pct
-        progress.save()
+        # Update progress (shared helper for pass + fail paths).
+        self._update_competency(score=score, total=len(results), passed=True)
 
         # ── Gamification: XP + streak + achievements ──
         xp_earned = 0
@@ -4188,7 +4618,11 @@ Which concept numbers were meaningfully covered?"""
         self.remediation_attempt = getattr(self, 'remediation_attempt', 0) + 1
         self.is_remediation = True
 
-        # Record ExitTicketAttempt for competency reporting (failed attempt)
+        # Update competency (failed attempt still counts toward best_score and
+        # attempt count; mastery only promotes, never demotes).
+        self._update_competency(score=score, total=len(results), passed=False)
+
+        # Record ExitTicketAttempt per active participant (G3: group-aware)
         try:
             from apps.tutoring.models import ExitTicket, ExitTicketAttempt
             exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
@@ -4201,15 +4635,22 @@ Which concept numbers were meaningfully covered?"""
                         'selected': r.get('selected', ''),
                         'question_type': r.get('question_type', 'mcq'),
                     })
-                ExitTicketAttempt.objects.create(
-                    exit_ticket=exit_ticket,
-                    student=self.student,
-                    session=self.session,
-                    score=score,
-                    passed=False,
-                    answers=answer_data,
-                    completed_at=timezone.now(),
-                )
+                try:
+                    participants = list(self.session.active_students)
+                except Exception:
+                    participants = []
+                if not participants:
+                    participants = [self.student]
+                for participant in participants:
+                    ExitTicketAttempt.objects.create(
+                        exit_ticket=exit_ticket,
+                        student=participant,
+                        session=self.session,
+                        score=score,
+                        passed=False,
+                        answers=answer_data,
+                        completed_at=timezone.now(),
+                    )
         except Exception as e:
             logger.warning(f"Failed to save ExitTicketAttempt: {e}")
 
@@ -4305,12 +4746,20 @@ Do NOT just ask a quiz question — actually RE-TEACH the concept first, then ch
     # HELPERS
     # =========================================================================
     
-    def _save_turn(self, role: str, content: str):
-        """Save a conversation turn."""
+    def _save_turn(self, role: str, content: str, metadata: Optional[Dict] = None):
+        """Save a conversation turn.
+
+        metadata is an optional JSON-serializable dict attached to the
+        SessionTurn.metadata JSONField. Used (for example) to record
+        answer-evaluation results on tutor turns so the teacher dashboard
+        and regression queries can see why the tutor judged a given
+        student answer.
+        """
         SessionTurn.objects.create(
             session=self.session,
             role=role,
             content=content,
+            metadata=metadata or {},
         )
     
     def _parse_media_signal(self, text: str) -> Tuple[str, Optional[Dict], Optional[Dict]]:

@@ -277,6 +277,13 @@ def lesson_catalog(request):
                 else:
                     status = 'not_started'
 
+                # Competency indicator (C5): best_score as 0-100% for the card.
+                competency_pct = None
+                attempts_count = 0
+                if progress and progress.best_score is not None:
+                    competency_pct = round((progress.best_score or 0.0) * 100)
+                    attempts_count = progress.attempts_count or 0
+
                 # Check prerequisites
                 unmet = [
                     pr for pr in prereq_map.get(lesson.id, [])
@@ -289,6 +296,8 @@ def lesson_catalog(request):
                     'objective': lesson.objective,
                     'estimated_minutes': lesson.estimated_minutes,
                     'status': status,
+                    'competency_pct': competency_pct,
+                    'attempts_count': attempts_count,
                     'locked': len(unmet) > 0,
                     'unmet_prerequisites': [{'id': u.id, 'title': u.title} for u in unmet],
                 })
@@ -573,6 +582,28 @@ def chat_start_session(request, lesson_id):
             institution=session_institution,
             status=TutorSession.Status.ACTIVE,
         )
+
+        # Record the primary participant (G1). Every session has at least
+        # one SessionParticipant — the owner.
+        from apps.tutoring.models import SessionParticipant
+        SessionParticipant.objects.get_or_create(
+            session=session,
+            student=request.user,
+            defaults={'is_primary': True, 'is_active': True},
+        )
+
+        # Optional: initial_participants in request body to start a group
+        # session in one call. Each entry is {username, password} for a
+        # student who is physically on the same device. Rejected if the
+        # lesson disallows group mode or the student is cross-institution.
+        try:
+            body = json.loads(request.body or "{}")
+        except (ValueError, TypeError):
+            body = {}
+        initial = body.get("initial_participants") or []
+        if initial and lesson.allow_group_mode:
+            for entry in initial[: max(lesson.max_group_size - 1, 0)]:
+                _try_add_participant(session, entry, institution)
 
         # Ensure a progress record exists (won't downgrade if already mastered)
         StudentLessonProgress.objects.get_or_create(
@@ -901,10 +932,26 @@ def chat_exit_ticket(request, session_id):
         tutor = ConversationalTutor(session)
         response = tutor.submit_exit_ticket(answers)
 
+        # Enrich response with competency snapshot (C3): score_pct, threshold_pct,
+        # per_concept, best_score_pct, mastery_level. See
+        # memory/lesson_competency_plan.md.
+        from apps.tutoring.competency import attempt_response_block
+        from apps.tutoring.models import ExitTicket, StudentLessonProgress
+        exit_ticket = ExitTicket.objects.filter(lesson=session.lesson).first()
+        progress = StudentLessonProgress.objects.filter(
+            student=request.user, lesson=session.lesson,
+        ).first()
+        results = (response.exit_ticket_data or {}).get("results", [])
+        score = (response.exit_ticket_data or {}).get("score", 0)
+        competency = attempt_response_block(score, results, exit_ticket, progress)
+
+        enriched_exit_ticket = dict(response.exit_ticket_data or {})
+        enriched_exit_ticket["competency"] = competency
+
         return JsonResponse({
             "message": response.content,
             "phase": response.phase,
-            "exit_ticket": response.exit_ticket_data,
+            "exit_ticket": enriched_exit_ticket,
             "is_complete": response.is_complete,
         })
     except Exception as e:
@@ -917,6 +964,173 @@ def chat_exit_ticket(request, session_id):
             "exit_ticket": {"results": [], "score": 0, "passed": False},
             "is_complete": True,
         })
+
+
+def _try_add_participant(session, entry: dict, primary_institution) -> dict:
+    """Helper: authenticate a secondary student by (username, password) and
+    create a SessionParticipant row. Returns a dict describing the outcome;
+    never raises. See memory/group_lessons_plan.md.
+    """
+    from django.contrib.auth import authenticate
+    from apps.tutoring.models import SessionParticipant
+
+    username = (entry or {}).get("username", "")
+    password = (entry or {}).get("password", "")
+    if not username or not password:
+        return {"ok": False, "error": "username_and_password_required"}
+
+    user = authenticate(username=username, password=password)
+    if not user or not user.is_active:
+        return {"ok": False, "error": "invalid_credentials"}
+
+    if user.id == session.student_id:
+        return {"ok": False, "error": "already_primary"}
+
+    # Same-institution gate
+    if primary_institution is not None:
+        in_same_institution = user.memberships.filter(
+            institution=primary_institution, is_active=True,
+        ).exists()
+        if not in_same_institution:
+            return {"ok": False, "error": "different_institution"}
+
+    # Max group size gate
+    lesson = session.lesson
+    if not lesson.allow_group_mode:
+        return {"ok": False, "error": "group_mode_disabled"}
+    current_active = SessionParticipant.objects.filter(
+        session=session, is_active=True,
+    ).count()
+    if current_active >= (lesson.max_group_size or 4):
+        return {"ok": False, "error": "group_full"}
+
+    # Already a participant?
+    existing = SessionParticipant.objects.filter(
+        session=session, student=user,
+    ).first()
+    if existing:
+        if not existing.is_active:
+            existing.is_active = True
+            existing.left_at = None
+            existing.save(update_fields=["is_active", "left_at"])
+        return {
+            "ok": True,
+            "participant": {
+                "id": existing.id, "user_id": user.id, "username": user.username,
+                "is_primary": existing.is_primary, "is_active": existing.is_active,
+            },
+        }
+
+    participant = SessionParticipant.objects.create(
+        session=session, student=user, is_active=True, is_primary=False,
+    )
+    return {
+        "ok": True,
+        "participant": {
+            "id": participant.id, "user_id": user.id, "username": user.username,
+            "is_primary": False, "is_active": True,
+        },
+    }
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def session_participants(request, session_id):
+    """List participants (GET) or add one (POST) for a session."""
+    from apps.tutoring.models import SessionParticipant
+
+    session = get_object_or_404(
+        TutorSession, id=session_id, student=request.user,
+    )
+
+    if request.method == "GET":
+        rows = SessionParticipant.objects.filter(session=session).select_related("student")
+        return JsonResponse({
+            "session_id": session.id,
+            "is_group": session.is_group,
+            "max_group_size": session.lesson.max_group_size,
+            "allow_group_mode": session.lesson.allow_group_mode,
+            "participants": [
+                {
+                    "id": p.id,
+                    "user_id": p.student_id,
+                    "username": p.student.username,
+                    "is_primary": p.is_primary,
+                    "is_active": p.is_active,
+                    "joined_at": p.joined_at.isoformat() if p.joined_at else None,
+                }
+                for p in rows
+            ],
+        })
+
+    # POST: add a participant
+    try:
+        body = json.loads(request.body or "{}")
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    institution = get_user_institution(request.user)
+    result = _try_add_participant(session, body, institution)
+    if not result.get("ok"):
+        status = 400
+        if result.get("error") == "invalid_credentials":
+            status = 401
+        elif result.get("error") == "group_full":
+            status = 409
+        return JsonResponse({"error": result.get("error")}, status=status)
+    return JsonResponse(result)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["DELETE", "POST"])
+def session_participant_remove(request, session_id, user_id):
+    """Mark a participant as left (is_active=False, left_at=now).
+
+    The primary student cannot leave; they must end the session instead.
+    Accessible to the primary student of the session.
+    """
+    from apps.tutoring.models import SessionParticipant
+
+    session = get_object_or_404(
+        TutorSession, id=session_id, student=request.user,
+    )
+    participant = get_object_or_404(
+        SessionParticipant, session=session, student_id=user_id,
+    )
+    if participant.is_primary:
+        return JsonResponse({"error": "cannot_remove_primary"}, status=400)
+    participant.is_active = False
+    participant.left_at = timezone.now()
+    participant.save(update_fields=["is_active", "left_at"])
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_http_methods(["GET"])
+def lesson_competency(request, lesson_id):
+    """Return the student's competency snapshot for a single lesson.
+
+    Used by the student progress UI and the teacher dashboard. Sourced
+    entirely from ExitTicketAttempt rows (single source of truth).
+    """
+    from django.db.models import Q
+    from apps.curriculum.models import Lesson
+    from apps.tutoring.competency import competency_snapshot
+
+    student = request.user
+    # Institution scoping: only allow access to lessons the student can see.
+    memberships = student.memberships.filter(is_active=True)
+    allowed_institutions = [m.institution_id for m in memberships]
+    lesson = get_object_or_404(
+        Lesson.objects.filter(
+            Q(unit__course__institution_id__in=allowed_institutions)
+            | Q(unit__course__institution__isnull=True),
+        ),
+        id=lesson_id,
+    )
+    return JsonResponse(competency_snapshot(student, lesson))
 
 
 # =============================================================================

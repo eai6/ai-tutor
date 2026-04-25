@@ -1,0 +1,121 @@
+"""Tests for the praise-filter defense-in-depth layer of the math-tutor
+false-positive fix. See memory/math_tutor_fix_plan.md Phase M3."""
+
+import unittest
+
+from apps.tutoring.praise_filter import strip_praise_if_wrong
+
+
+class TestStripPraiseIfWrong(unittest.TestCase):
+    def test_passes_through_when_correct(self):
+        text = "Brilliant, you've got it! 21/4 = 5 1/4."
+        result, modified = strip_praise_if_wrong(text, is_correct=True)
+        self.assertEqual(result, text)
+        self.assertFalse(modified)
+
+    def test_passes_through_when_none(self):
+        text = "Brilliant, you've got it!"
+        result, modified = strip_praise_if_wrong(text, is_correct=None)
+        self.assertEqual(result, text)
+        self.assertFalse(modified)
+
+    def test_strips_single_praise(self):
+        text = "Brilliant, Vaani! Let's try another one."
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        self.assertNotIn("Brilliant", result)
+        # Rest of the text should survive
+        self.assertIn("Let's try another one", result)
+
+    def test_production_bug_exact_case(self):
+        """The exact wrong response from the screenshot."""
+        text = (
+            "Brilliant, Vaani! You've got it — 21/4 = 5 1/4 kg. "
+            "You correctly divided 21 by 4 to get 5 whole groups with 1 left over."
+        )
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        result_lower = result.lower()
+        self.assertNotIn("brilliant", result_lower)
+        self.assertNotIn("you've got it", result_lower)
+        self.assertNotIn("you got it", result_lower)
+
+    def test_heavy_praise_replaces_first_sentence(self):
+        text = "Brilliant, perfect, excellent work, exactly right! Now let's move on."
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        # Heavy praise should be replaced, not just stripped
+        self.assertNotIn("Brilliant", result)
+        self.assertNotIn("perfect", result.lower())
+        self.assertIn("Let's check this one together", result)
+        self.assertIn("Now let's move on", result)
+
+    def test_preserves_second_sentence_with_correct_in_context(self):
+        """'The correct next step' in the explanation isn't praise."""
+        text = (
+            "You got it! The correct next step is to divide by the common factor."
+        )
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        self.assertNotIn("You got it", result)
+        # 'The correct next step' survives
+        self.assertIn("correct next step", result)
+
+    def test_no_praise_no_change(self):
+        text = "Let me check that — can you show me how you got 3 3/4?"
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertFalse(modified)
+        self.assertEqual(result, text)
+
+    def test_sentence_starter_correct_with_exclamation(self):
+        text = "Correct! 21/4 is indeed 5 1/4."
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        self.assertFalse(result.lower().startswith("correct"))
+
+    def test_that_is_right(self):
+        text = "That's right! You divided correctly."
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        self.assertNotIn("That's right", result)
+
+    def test_yes_starter(self):
+        text = "Yes! Perfect answer."
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        # Both 'Yes!' at start and 'Perfect' should be stripped
+        self.assertFalse(result.lower().startswith("yes"))
+        self.assertNotIn("Perfect", result)
+
+    def test_empty_string(self):
+        result, modified = strip_praise_if_wrong("", is_correct=False)
+        self.assertEqual(result, "")
+        self.assertFalse(modified)
+
+    def test_praise_stripped_from_later_sentences_too(self):
+        """Full-text scan: the production bug had praise in sentence 2
+        ('Brilliant, Vaani! You've got it — ...'), so stripping must cover
+        all sentences. Rare collisions like 'brilliant mathematician' in a
+        later sentence are considered acceptable collateral."""
+        text = (
+            "Let's look at this. The answer 5 1/4 is brilliant math history."
+        )
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        self.assertNotIn("brilliant", result.lower())
+        self.assertIn("Let's look at this", result)
+        self.assertIn("math history", result)
+
+    def test_light_strip_preserves_content(self):
+        """Medium-size first sentence with one praise word should survive
+        most of its content."""
+        text = "That's correct — you divided the fraction the right way."
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        self.assertNotIn("That's correct", result)
+        # The rest of the sentence (content) should survive
+        self.assertIn("divided", result)
+
+
+if __name__ == "__main__":
+    unittest.main()

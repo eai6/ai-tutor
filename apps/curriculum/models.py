@@ -175,6 +175,18 @@ class Lesson(models.Model):
     # Flexible metadata (key concepts, skills, image suggestions, etc.)
     metadata = models.JSONField(default=dict, blank=True)
 
+    # Group lessons (G1). When True, students can start this lesson as a
+    # group — multiple students share one device and answer collectively.
+    # See memory/group_lessons_plan.md.
+    allow_group_mode = models.BooleanField(
+        default=True,
+        help_text="Whether students may complete this lesson together as a group.",
+    )
+    max_group_size = models.PositiveIntegerField(
+        default=4,
+        help_text="Maximum number of students allowed in a group session for this lesson.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

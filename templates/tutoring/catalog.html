@@ -202,6 +202,26 @@
                     <div class="lesson-info">
                         <h4>{{ forloop.counter }}. {{ lesson.title }}</h4>
                         <p>{{ lesson.objective }}</p>
+                        {% if lesson.competency_pct is not None %}
+                        <div class="competency-bar" style="margin-top:0.4rem;">
+                            <div class="competency-label" style="font-size:0.75rem; color:var(--muted); display:flex; justify-content:space-between;">
+                                <span>
+                                    {% if lesson.competency_pct >= 80 %}
+                                        <span style="color:var(--success);">●</span>
+                                    {% elif lesson.competency_pct >= 50 %}
+                                        <span style="color:var(--warning);">●</span>
+                                    {% else %}
+                                        <span style="color:var(--danger);">●</span>
+                                    {% endif %}
+                                    {{ lesson.competency_pct }}% competency
+                                </span>
+                                <span>{{ lesson.attempts_count }} attempt{{ lesson.attempts_count|pluralize }}</span>
+                            </div>
+                            <div class="progress-bar" style="height:4px; background:var(--border); border-radius:2px; margin-top:0.2rem;">
+                                <div style="width:{{ lesson.competency_pct }}%; height:100%; background:{% if lesson.competency_pct >= 80 %}var(--success){% elif lesson.competency_pct >= 50 %}var(--warning){% else %}var(--danger){% endif %}; border-radius:2px;"></div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                     <div class="lesson-meta">
                         <span class="time">⏱️ {{ lesson.estimated_minutes }} min</span>
