@@ -268,6 +268,9 @@
                     {% if turn.metadata.bare_answer_flagged %}<span style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;" title="3+ bare answers on this step — review">flagged</span>{% endif %}
                 {% endif %}
                 {% if turn.metadata.praise_stripped %}<span title="Praise words stripped from this response" style="background:#ede9fe;color:#5b21b6;padding:0.05rem 0.45rem;border-radius:999px;">praise stripped</span>{% endif %}
+                {% for issue in turn.metadata.validator_issues %}
+                    <span title="Socratic validator flagged this turn" style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;">{{ issue }}</span>
+                {% endfor %}
             </div>
             {% if turn.metadata.eval_reasoning %}
             <details style="font-size:0.7rem;color:#71717a;margin-top:0.2rem;">

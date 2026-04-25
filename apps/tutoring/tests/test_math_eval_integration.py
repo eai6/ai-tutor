@@ -160,15 +160,18 @@ class MathTutoringIntegrationTest(TestCase):
         self.assertFalse(tutor.last_answer_correct)
 
     def test_correct_math_answer_is_accepted(self):
-        """Correct-answer case: the tutor may praise, is_correct=True."""
+        """Correct bare answer: the verdict is correct, but praise still
+        gets stripped (M9 bare-answer gate + Socratic validator V1)."""
         tutor, session, _ = self._make_tutor(
             "That's exactly right — 21/4 = 5 1/4. Great work!"
         )
         msg = tutor.respond("5 1/4")
 
+        # Verdict is correct: state advances and the analyzer marks it.
         self.assertTrue(tutor.last_answer_correct)
-        # Content passes through unchanged (no stripping on correct).
-        self.assertIn("5 1/4", msg.content)
+        # But praise words must be stripped because the answer was bare.
+        self.assertNotIn("exactly", msg.content.lower())
+        self.assertNotIn("brilliant", msg.content.lower())
 
     def test_equivalent_fraction_form_accepted(self):
         """Student gives the improper fraction form (21/4) instead of

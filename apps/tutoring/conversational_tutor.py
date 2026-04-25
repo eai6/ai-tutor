@@ -35,6 +35,7 @@ from apps.curriculum.models import Lesson, LessonStep
 from apps.tutoring.models import TutorSession, SessionTurn, StudentLessonProgress
 from apps.tutoring.grader import check_math_answer, MathCheckResult
 from apps.tutoring.praise_filter import strip_praise_if_wrong
+from apps.tutoring.validator import validate_tutor_response
 
 logger = logging.getLogger(__name__)
 
@@ -1356,6 +1357,27 @@ Keep it to 2-3 sentences."""
             if step_bare_count >= 3:
                 turn_metadata['bare_answer_flagged'] = True
 
+        # Socratic validator V1 — universal praise gate + structural checks.
+        # Runs AFTER the math-specific praise filter so it acts as a
+        # catch-all for non-math subjects where the math check didn't fire.
+        # See memory/socratic_validator_plan.md.
+        current_step = (
+            self.steps[self.current_topic_index]
+            if self.current_topic_index < len(self.steps)
+            else None
+        )
+        validation = validate_tutor_response(
+            clean_response,
+            is_correct=turn_metadata.get('is_correct'),
+            bare_answer=turn_bare_answer,
+            step_type=(current_step.step_type if current_step else None),
+        )
+        if validation.content != clean_response:
+            clean_response = validation.content
+        if validation.issues:
+            turn_metadata['validator_issues'] = list(validation.issues)
+            turn_metadata['validator_passed'] = validation.passed
+
         # Record media for this turn (for resume artifact panel)
         if media:
             turn_index = len(self.conversation)  # index before appending
@@ -1539,6 +1561,24 @@ Keep it to 2-3 sentences."""
             turn_metadata['bare_answer_count_for_step'] = step_bare_count
             if step_bare_count >= 3:
                 turn_metadata['bare_answer_flagged'] = True
+
+        # Socratic validator V1 (streaming parity).
+        current_step = (
+            self.steps[self.current_topic_index]
+            if self.current_topic_index < len(self.steps)
+            else None
+        )
+        validation = validate_tutor_response(
+            clean_content,
+            is_correct=turn_metadata.get('is_correct'),
+            bare_answer=turn_bare_answer,
+            step_type=(current_step.step_type if current_step else None),
+        )
+        if validation.content != clean_content:
+            clean_content = validation.content
+        if validation.issues:
+            turn_metadata['validator_issues'] = list(validation.issues)
+            turn_metadata['validator_passed'] = validation.passed
 
         # Check if all steps complete — trigger exit ticket (NOT during remediation)
         show_exit_ticket = False
@@ -2708,6 +2748,34 @@ Follow the current step; this concept will be covered in sequence."""
         # Inject tutor personality modifier if student has one selected
         if personality_prompt:
             system_prompt += f"\n\n<personality>\n{personality_prompt}\n</personality>"
+
+        # Universal Socratic rules — apply to every subject, not just math.
+        # See memory/socratic_validator_plan.md.
+        system_prompt += (
+            "\n\n<socratic_rules>"
+            "\nThese rules apply to EVERY subject (not just math):"
+            "\n"
+            "\n1. NEVER praise an answer until you've seen the student's reasoning."
+            "\n   Words like 'brilliant', 'perfect', 'exactly right', 'you got it',"
+            "\n   'great job', 'spot on', 'well done', 'excellent' are forbidden when"
+            "\n   the student gave a one-line answer with no explanation. Instead"
+            "\n   ask 'What makes you think that?' or 'Walk me through how you got"
+            "\n   there.'"
+            "\n"
+            "\n2. ASK A QUESTION. Almost every turn should END with a question that"
+            "\n   moves the student forward. Rare exception: a wrap-up turn after"
+            "\n   the student has demonstrated mastery."
+            "\n"
+            "\n3. ONE NEW IDEA AT A TIME. Do not list 5 facts in a single turn."
+            "\n   Introduce one concept, ask the student to engage with it, then"
+            "\n   layer the next concept based on their response."
+            "\n"
+            "\n4. BE HONEST WHEN YOU'RE UNCERTAIN. If you're stating a specific"
+            "\n   number, comparison, or named fact, only do so when it's grounded"
+            "\n   in the curriculum context provided to you below. If you're not"
+            "\n   sure, say so and ask the student to look it up — never invent."
+            "\n</socratic_rules>"
+        )
 
         # Append math-specific instructions
         if self.lesson.unit.course.is_math:
