@@ -3064,6 +3064,44 @@ def lesson_approve(request, lesson_id):
 
 
 @teacher_required
+@require_POST
+def lesson_group_settings(request, lesson_id):
+    """Update group-session settings on a lesson:
+      - allow_group_mode (bool)
+      - max_group_size (int)
+      - group_requires_approval (bool) — when True, group sessions are
+        gated until a teacher approves them. False = auto-approve.
+    See memory/group_lessons_v2_plan.md.
+    """
+    from apps.curriculum.models import Lesson
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        lesson = get_object_or_404(
+            Lesson,
+            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            id=lesson_id,
+        )
+    else:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    lesson.allow_group_mode = request.POST.get('allow_group_mode') == 'on'
+    lesson.group_requires_approval = request.POST.get('group_requires_approval') == 'on'
+    try:
+        size = int(request.POST.get('max_group_size', '4') or 4)
+    except (ValueError, TypeError):
+        size = 4
+    lesson.max_group_size = max(2, min(size, 10))
+    lesson.save(update_fields=[
+        'allow_group_mode',
+        'group_requires_approval',
+        'max_group_size',
+    ])
+    messages.success(request, "Group session settings updated.")
+    return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
+
+@teacher_required
 def step_edit(request, step_id):
     """Edit a lesson step."""
     from apps.curriculum.models import LessonStep
