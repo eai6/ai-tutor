@@ -54,7 +54,7 @@ class UnitAdmin(admin.ModelAdmin):
 @admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
     list_display = ['title', 'unit', 'content_quality', 'teacher_approved', 'is_published', 'estimated_minutes']
-    list_filter = ['is_published', 'content_quality', 'teacher_approved', 'mastery_rule', 'unit__course__institution']
+    list_filter = ['is_published', 'content_quality', 'teacher_approved', 'unit__course__institution']
     search_fields = ['title', 'objective']
     inlines = [LessonStepInline]
 
@@ -63,7 +63,10 @@ class LessonAdmin(admin.ModelAdmin):
             'fields': ('unit', 'title', 'objective')
         }),
         ('Settings', {
-            'fields': ('order_index', 'estimated_minutes', 'mastery_rule', 'is_published')
+            'fields': ('order_index', 'estimated_minutes', 'is_published')
+        }),
+        ('Group lessons', {
+            'fields': ('allow_group_mode', 'max_group_size', 'group_requires_approval'),
         }),
         ('Content Quality', {
             'fields': ('content_quality', 'teacher_approved', 'teacher_approved_at', 'teacher_approved_by'),

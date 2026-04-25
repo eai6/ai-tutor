@@ -40,6 +40,30 @@ class Course(models.Model):
         help_text="e.g., 'Grade 3', 'High School', 'Adult'"
     )
     is_published = models.BooleanField(default=False)
+
+    # Subject classification (M8 / memory/math_tutor_fix_plan.md). Replaces
+    # the fragile MATH_KEYWORDS title heuristic. is_math now prefers this
+    # field when set, falling back to the keyword check for legacy rows
+    # that haven't been classified yet.
+    class SubjectType(models.TextChoices):
+        MATH = 'math', 'Math'
+        SCIENCE = 'science', 'Science'
+        HUMANITIES = 'humanities', 'Humanities'
+        LANGUAGE = 'language', 'Language'
+        OTHER = 'other', 'Other'
+
+    subject_type = models.CharField(
+        max_length=20,
+        choices=SubjectType.choices,
+        blank=True,
+        default='',
+        help_text=(
+            "Canonical subject classification. Drives is_math and "
+            "subject-specific tutor rules. Empty falls back to the legacy "
+            "MATH_KEYWORDS title heuristic."
+        ),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -50,6 +74,9 @@ class Course(models.Model):
 
     @property
     def is_math(self):
+        if self.subject_type:
+            return self.subject_type == self.SubjectType.MATH
+        # Legacy fallback for unclassified courses.
         return any(kw in (self.title or '').lower() for kw in self.MATH_KEYWORDS)
 
     def __str__(self):
@@ -100,11 +127,10 @@ class Lesson(models.Model):
     """
     A single teaching unit with a clear objective and mastery criteria.
     """
-    class MasteryRule(models.TextChoices):
-        STREAK_3 = 'streak_3', '3 correct in a row'
-        STREAK_5 = 'streak_5', '5 correct in a row'
-        PASS_QUIZ = 'pass_quiz', 'Pass exit quiz (80%+)'
-        COMPLETE_ALL = 'complete_all', 'Complete all steps'
+    # NOTE (C6): MasteryRule enum + Lesson.mastery_rule field removed
+    # 2026-04-25. Mastery is exit-ticket-driven (see
+    # memory/lesson_competency_plan.md). Lesson.mastery_rule was a dead
+    # field never consulted by tutor logic.
 
     class ContentStatus(models.TextChoices):
         EMPTY = 'empty', 'Empty'
@@ -130,11 +156,6 @@ class Lesson(models.Model):
     estimated_minutes = models.PositiveIntegerField(
         default=20,
         help_text="Estimated time to complete"
-    )
-    mastery_rule = models.CharField(
-        max_length=20,
-        choices=MasteryRule.choices,
-        default=MasteryRule.STREAK_3
     )
     order_index = models.PositiveIntegerField(default=0)
     is_published = models.BooleanField(default=False)

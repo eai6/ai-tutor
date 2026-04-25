@@ -124,7 +124,6 @@ Use simple language appropriate for young learners.''',
             defaults={
                 'objective': 'Students will be able to add two-digit numbers without carrying',
                 'estimated_minutes': 10,
-                'mastery_rule': Lesson.MasteryRule.STREAK_3,
                 'order_index': 0,
                 'is_published': True,
             }

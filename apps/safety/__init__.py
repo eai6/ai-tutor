@@ -443,8 +443,9 @@ class DataPrivacy:
             export_data['progress'].append({
                 'lesson': p.lesson.title,
                 'mastery_level': p.mastery_level,
-                'total_attempts': p.total_attempts,
-                'total_correct': p.total_correct,
+                'attempts_count': p.attempts_count,
+                'best_score': p.best_score,
+                'last_attempt_at': p.last_attempt_at.isoformat() if p.last_attempt_at else None,
             })
         
         return export_data

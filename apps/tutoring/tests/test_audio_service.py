@@ -1,10 +1,17 @@
-"""Tests for audio_service.py — Piper TTS + faster-whisper STT."""
+"""Tests for audio_service.py — Piper TTS + faster-whisper STT.
+
+These tests target the Whisper/Piper paths specifically, so they pin
+STT_BACKEND='whisper' and TTS_BACKEND='piper' at the test level. Without
+this pin, a local .env that sets STT_BACKEND/TTS_BACKEND=elevenlabs
+silently bypasses the mocked Whisper/Piper helpers and the tests fail.
+"""
 
 import os
 from unittest.mock import patch, MagicMock
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 
+@override_settings(STT_BACKEND='whisper')
 class TestTranscribe(TestCase):
     """Unit tests for audio_service.transcribe()."""
 
@@ -68,6 +75,7 @@ class TestTranscribe(TestCase):
         self.assertTrue(call_path.endswith(".wav"))
 
 
+@override_settings(TTS_BACKEND='piper')
 class TestSynthesize(TestCase):
     """Unit tests for audio_service.synthesize().
 

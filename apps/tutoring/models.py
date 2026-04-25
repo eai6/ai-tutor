@@ -270,12 +270,9 @@ class StudentLessonProgress(models.Model):
         choices=MasteryLevel.choices,
         default=MasteryLevel.NOT_STARTED
     )
-    correct_streak = models.PositiveIntegerField(
-        default=0,
-        help_text="Current streak of correct answers"
-    )
-    total_attempts = models.PositiveIntegerField(default=0)
-    total_correct = models.PositiveIntegerField(default=0)
+    # NOTE (C6): correct_streak / total_attempts / total_correct were removed
+    # in 2026-04-25. They were dead fields never updated by any code path.
+    # Use ExitTicketAttempt + StudentLessonProgress.attempts_count instead.
     best_score = models.FloatField(
         null=True,
         blank=True,

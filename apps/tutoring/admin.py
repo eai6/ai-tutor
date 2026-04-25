@@ -43,8 +43,8 @@ class SessionTurnAdmin(admin.ModelAdmin):
 
 @admin.register(StudentLessonProgress)
 class StudentLessonProgressAdmin(admin.ModelAdmin):
-    list_display = ['student', 'lesson', 'mastery_level', 'correct_streak', 'total_attempts']
-    list_filter = ['mastery_level', 'institution']
+    list_display = ['student', 'lesson', 'mastery_level', 'best_score', 'attempts_count']
+    list_filter = ['mastery_level', 'last_completion_was_group', 'institution']
     search_fields = ['student__username', 'lesson__title']
 
 

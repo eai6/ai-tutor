@@ -415,9 +415,8 @@ class Command(BaseCommand):
                     lesson=lesson,
                     defaults={
                         "mastery_level": mastery,
-                        "total_attempts": random.randint(1, 3),
-                        "total_correct": random.randint(5, 15),
-                        "best_score": round(eo_pct * 100, 1),
+                        "attempts_count": random.randint(1, 3),
+                        "best_score": round(eo_pct, 4),
                         "last_session_at": session_end if is_completed else session_start,
                     },
                 )

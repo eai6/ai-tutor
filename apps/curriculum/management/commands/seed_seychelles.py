@@ -468,7 +468,6 @@ class Command(BaseCommand):
                     defaults={
                         'objective': lesson_data['objective'],
                         'estimated_minutes': 20,
-                        'mastery_rule': Lesson.MasteryRule.PASS_QUIZ,
                         'order_index': i,
                         'is_published': True,
                     }

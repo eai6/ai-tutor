@@ -4632,6 +4632,21 @@ Which concept numbers were meaningfully covered?"""
         self.remediation_attempt = getattr(self, 'remediation_attempt', 0) + 1
         self.is_remediation = True
 
+        # Use RemediationService to identify weak skills + prerequisite gaps
+        # for the failed exit ticket. Persisted on self for downstream use
+        # (system prompt context, dashboard reporting). See
+        # apps/tutoring/tests/test_r5_remediation_wiring.py.
+        try:
+            from apps.tutoring.personalization import RemediationService
+            remediation_service = RemediationService(self.student, self.lesson)
+            total_count = len(results) or 1
+            self._remediation_plan = remediation_service.get_remediation_plan(
+                exit_ticket_score=score / total_count,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get remediation plan: {e}")
+            self._remediation_plan = None
+
         # Update competency (failed attempt still counts toward best_score and
         # attempt count; mastery only promotes, never demotes).
         self._update_competency(score=score, total=len(results), passed=False)
