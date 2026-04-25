@@ -1,0 +1,72 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Group Approvals — Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Group Session Approvals</h1>
+    <p class="muted">Group lessons that need your approval before students can begin. Approve or deny — denial keeps the primary student in a solo session and removes others.</p>
+</div>
+
+{% if pending %}
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        {% for item in pending %}
+        <div class="approval-row" style="padding:1rem 1.5rem;border-bottom:1px solid var(--gray-100);" data-session="{{ item.session.id }}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+                <div style="flex:1;min-width:280px;">
+                    <div style="font-weight:600;font-size:1rem;">{{ item.session.lesson.title }}</div>
+                    <div style="font-size:0.875rem;color:var(--gray-500);margin-top:0.25rem;">
+                        {{ item.session.lesson.unit.course.title }} · started {{ item.session.started_at|timesince }} ago
+                    </div>
+                    <div style="margin-top:0.5rem;font-size:0.9rem;">
+                        <strong>Primary:</strong> {{ item.session.student.username }}
+                    </div>
+                    <div style="margin-top:0.25rem;font-size:0.9rem;">
+                        <strong>Group ({{ item.participants|length }}):</strong>
+                        {% for p in item.participants %}
+                            <span class="badge" style="background:var(--gray-100);color:var(--gray-700);margin-right:0.25rem;">{{ p.username }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.5rem;">
+                    <button class="btn btn-success" onclick="decideGroup({{ item.session.id }}, 'approve')">Approve</button>
+                    <button class="btn btn-danger" onclick="decideGroup({{ item.session.id }}, 'deny')">Deny</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body empty-state">
+        <p>No group sessions awaiting approval.</p>
+    </div>
+</div>
+{% endif %}
+
+<script>
+async function decideGroup(sessionId, decision) {
+    if (decision === 'deny' && !confirm('Deny this group? Other students will be removed and the primary student will continue solo.')) return;
+    try {
+        const csrf = document.cookie.split('; ').find(c => c.startsWith('csrftoken='));
+        const token = csrf ? csrf.split('=')[1] : '';
+        const r = await fetch(`/dashboard/group-approvals/${sessionId}/decide/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': token},
+            body: JSON.stringify({decision}),
+        });
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            alert('Failed: ' + (err.error || r.status));
+            return;
+        }
+        const row = document.querySelector(`.approval-row[data-session="${sessionId}"]`);
+        if (row) row.remove();
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
+{% endblock %}

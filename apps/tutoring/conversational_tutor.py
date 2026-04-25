@@ -1201,6 +1201,20 @@ Keep it to 2-3 sentences."""
         """
         self._step_just_advanced = False
 
+        # H3: short-circuit when group session is awaiting teacher approval.
+        # See memory/group_lessons_v2_plan.md.
+        if self.session.group_approval_status == TutorSession.GroupApprovalStatus.PENDING:
+            return TutorMessage(
+                content=(
+                    "⏳ Your group session is awaiting teacher approval. "
+                    "Please wait while your teacher reviews — once approved, "
+                    "I'll be ready to start. If you want to continue solo, "
+                    "have the other students leave the session."
+                ),
+                phase="awaiting_approval",
+                is_complete=False,
+            )
+
         # Track lesson start time on first interaction
         if not self.session.started_lesson_at:
             self.session.started_lesson_at = timezone.now()
@@ -4416,7 +4430,8 @@ Which concept numbers were meaningfully covered?"""
           - attempts_count increments by 1 per call (one per submission).
 
         In group sessions every active participant is updated with the same
-        score. See memory/group_lessons_plan.md.
+        score, and last_completion_was_group is set to True (H5).
+        See memory/group_lessons_plan.md and memory/group_lessons_v2_plan.md.
         """
         score_pct = (score / total) if total else 0.0
         score_pct = max(0.0, min(1.0, round(score_pct, 4)))
@@ -4429,6 +4444,7 @@ Which concept numbers were meaningfully covered?"""
             participants = []
         if not participants:
             participants = [self.student]
+        was_group = len(participants) > 1
 
         now = timezone.now()
         for student in participants:
@@ -4437,25 +4453,23 @@ Which concept numbers were meaningfully covered?"""
                 lesson=self.lesson,
                 defaults={'institution': self.session.institution},
             )
-            changed = False
             if progress.best_score is None or score_pct > progress.best_score:
                 progress.best_score = score_pct
-                changed = True
             progress.attempts_count = (progress.attempts_count or 0) + 1
             progress.last_attempt_at = now
+            progress.last_completion_session = self.session
+            progress.last_completion_was_group = was_group
             if passed and progress.mastery_level != 'mastered':
                 progress.mastery_level = 'mastered'
-                changed = True
             elif progress.mastery_level == 'not_started' and progress.attempts_count > 0:
-                # Student has an attempt now; move off 'not_started'.
                 progress.mastery_level = 'in_progress'
-                changed = True
-            # Always save since attempts_count / last_attempt_at changed.
             progress.save(
                 update_fields=[
                     'best_score',
                     'attempts_count',
                     'last_attempt_at',
+                    'last_completion_session',
+                    'last_completion_was_group',
                     'mastery_level',
                     'updated_at',
                 ]

@@ -54,6 +54,13 @@ def get_staff_context(request):
         if institution is not None:
             flag_qs = flag_qs.filter(institution=institution)
 
+        approvals_qs = TutorSession.objects.filter(
+            group_approval_status=TutorSession.GroupApprovalStatus.PENDING,
+            status=TutorSession.Status.ACTIVE,
+        )
+        if institution is not None:
+            approvals_qs = approvals_qs.filter(institution=institution)
+
         return {
             'membership': None,
             'institution': institution,
@@ -61,6 +68,7 @@ def get_staff_context(request):
             'all_schools': all_schools,
             'is_aggregated': institution is None,
             'unreviewed_flag_count': flag_qs.count(),
+            'pending_group_approvals_count': approvals_qs.count(),
             'can_edit_content': True,  # Superadmin always has full access
         }
 
@@ -89,6 +97,11 @@ def get_staff_context(request):
     flag_qs = TutorSession.objects.filter(
         is_flagged=True, flag_reviewed=False, institution=institution
     )
+    approvals_qs = TutorSession.objects.filter(
+        group_approval_status=TutorSession.GroupApprovalStatus.PENDING,
+        status=TutorSession.Status.ACTIVE,
+        institution=institution,
+    )
 
     from apps.accounts.models import PlatformConfig
     config = PlatformConfig.load()
@@ -100,6 +113,7 @@ def get_staff_context(request):
         'all_schools': staff_schools if len(staff_schools) > 1 else [],
         'is_aggregated': False,
         'unreviewed_flag_count': flag_qs.count(),
+        'pending_group_approvals_count': approvals_qs.count(),
         'can_edit_content': config.teachers_can_edit_content,
     }
 
@@ -289,9 +303,99 @@ def dashboard_home(request):
         'course_progress': course_progress,
         'activity_data': json.dumps(activity_data),
         'progress_stats': progress_stats,
+        'pending_group_approvals_count': pending_group_approvals_count(institution),
     }
-    
+
     return render(request, 'dashboard/home.html', context)
+
+
+# ============================================================================
+# Group session approvals (memory/group_lessons_v2_plan.md H4)
+# ============================================================================
+
+def pending_group_approvals_count(institution) -> int:
+    """Count of group sessions awaiting teacher approval for the given
+    institution. Used in the dashboard nav badge."""
+    qs = TutorSession.objects.filter(
+        group_approval_status=TutorSession.GroupApprovalStatus.PENDING,
+        status=TutorSession.Status.ACTIVE,
+    )
+    return filter_by_institution(qs, institution).count()
+
+
+@teacher_required
+def group_approvals_page(request):
+    """Page listing pending group session approvals for this institution."""
+    institution = request.staff_ctx['institution']
+    qs = TutorSession.objects.filter(
+        group_approval_status=TutorSession.GroupApprovalStatus.PENDING,
+        status=TutorSession.Status.ACTIVE,
+    ).select_related('lesson', 'lesson__unit', 'lesson__unit__course', 'student')
+    qs = filter_by_institution(qs, institution)
+
+    pending = []
+    for session in qs.order_by('-started_at'):
+        active_participants = session.participants.filter(
+            is_active=True,
+        ).select_related('student')
+        pending.append({
+            'session': session,
+            'participants': [p.student for p in active_participants],
+        })
+
+    context = {
+        **request.staff_ctx,
+        'pending': pending,
+    }
+    return render(request, 'dashboard/group_approvals.html', context)
+
+
+@teacher_required
+@require_POST
+def group_approval_decide(request, session_id):
+    """Approve or deny a pending group session.
+
+    POST body: {"decision": "approve"} or {"decision": "deny"}
+    Decision is recorded with the teacher's user + a timestamp.
+    On deny: secondary participants are deactivated; primary continues solo.
+    """
+    institution = request.staff_ctx['institution']
+    qs = filter_by_institution(TutorSession.objects.all(), institution)
+    session = get_object_or_404(qs, id=session_id)
+
+    if session.group_approval_status != TutorSession.GroupApprovalStatus.PENDING:
+        return JsonResponse({"error": "not_pending"}, status=400)
+
+    try:
+        body = json.loads(request.body or "{}")
+    except (ValueError, TypeError):
+        body = {}
+    decision = (body.get("decision") or request.POST.get("decision") or "").lower()
+    if decision not in ("approve", "deny"):
+        return JsonResponse({"error": "invalid_decision"}, status=400)
+
+    if decision == "approve":
+        session.group_approval_status = TutorSession.GroupApprovalStatus.APPROVED
+    else:
+        session.group_approval_status = TutorSession.GroupApprovalStatus.DENIED
+        # Deactivate non-primary participants on deny.
+        from apps.tutoring.models import SessionParticipant
+        SessionParticipant.objects.filter(
+            session=session, is_active=True, is_primary=False,
+        ).update(is_active=False, left_at=timezone.now())
+
+    session.group_approval_decided_by = request.user
+    session.group_approval_decided_at = timezone.now()
+    session.save(update_fields=[
+        'group_approval_status',
+        'group_approval_decided_by',
+        'group_approval_decided_at',
+    ])
+    return JsonResponse({
+        "ok": True,
+        "session_id": session.id,
+        "status": session.group_approval_status,
+    })
 
 
 # ============================================================================

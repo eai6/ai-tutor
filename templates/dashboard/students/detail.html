@@ -86,6 +86,7 @@
                         ">
                             {{ lesson.lesson.title|truncatewords:3 }}
                             {% if lesson.mastery_level == 'mastered' %}✓{% endif %}
+                            {% if lesson.last_completion_was_group %}<span title="Completed as part of a group">👥</span>{% endif %}
                         </div>
                         {% endfor %}
                     </div>

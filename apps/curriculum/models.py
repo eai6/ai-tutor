@@ -186,6 +186,14 @@ class Lesson(models.Model):
         default=4,
         help_text="Maximum number of students allowed in a group session for this lesson.",
     )
+    group_requires_approval = models.BooleanField(
+        default=False,
+        help_text=(
+            "When True, group sessions for this lesson are blocked until a "
+            "teacher approves them. Prevents students adding many friends "
+            "just to skip the lesson. See memory/group_lessons_v2_plan.md."
+        ),
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

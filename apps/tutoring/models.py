@@ -90,6 +90,27 @@ class TutorSession(models.Model):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
+    # Group session approval (H3 / memory/group_lessons_v2_plan.md)
+    class GroupApprovalStatus(models.TextChoices):
+        NOT_REQUIRED = 'not_required', 'Not Required'
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        DENIED = 'denied', 'Denied'
+
+    group_approval_status = models.CharField(
+        max_length=20,
+        choices=GroupApprovalStatus.choices,
+        default=GroupApprovalStatus.NOT_REQUIRED,
+    )
+    group_approval_decided_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='group_approvals',
+    )
+    group_approval_decided_at = models.DateTimeField(null=True, blank=True)
+
     @property
     def lesson_duration_minutes(self):
         """Time spent on the lesson in minutes."""
@@ -272,6 +293,21 @@ class StudentLessonProgress(models.Model):
         null=True,
         blank=True,
         help_text="When the student most recently submitted the exit ticket.",
+    )
+    last_completion_session = models.ForeignKey(
+        'TutorSession',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='completed_progress_records',
+        help_text="The session that earned mastery (or the most recent attempt session).",
+    )
+    last_completion_was_group = models.BooleanField(
+        default=False,
+        help_text=(
+            "True when the last attempt session had multiple active "
+            "participants (group lesson). Filterable for teacher reports."
+        ),
     )
 
     last_session_at = models.DateTimeField(null=True, blank=True)

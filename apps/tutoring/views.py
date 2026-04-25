@@ -969,15 +969,24 @@ def chat_exit_ticket(request, session_id):
 def _try_add_participant(session, entry: dict, primary_institution) -> dict:
     """Helper: authenticate a secondary student by (username, password) and
     create a SessionParticipant row. Returns a dict describing the outcome;
-    never raises. See memory/group_lessons_plan.md.
+    never raises. See memory/group_lessons_plan.md and
+    memory/group_lessons_v2_plan.md.
     """
     from django.contrib.auth import authenticate
-    from apps.tutoring.models import SessionParticipant
+    from apps.tutoring.models import SessionParticipant, TutorSession
 
     username = (entry or {}).get("username", "")
     password = (entry or {}).get("password", "")
     if not username or not password:
         return {"ok": False, "error": "username_and_password_required"}
+
+    # H2: Lock participants once the lesson has actually started (any
+    # student message sent). The group must be formed BEFORE the first
+    # turn — initial_participants on chat_start_session is the sanctioned
+    # path; mid-lesson adds are rejected.
+    state = session.engine_state or {}
+    if (state.get('exchange_count', 0) or 0) > 0:
+        return {"ok": False, "error": "lesson_already_started"}
 
     user = authenticate(username=username, password=password)
     if not user or not user.is_active:
@@ -1013,8 +1022,10 @@ def _try_add_participant(session, entry: dict, primary_institution) -> dict:
             existing.is_active = True
             existing.left_at = None
             existing.save(update_fields=["is_active", "left_at"])
+        _maybe_trigger_group_approval(session)
         return {
             "ok": True,
+            "requires_approval": session.group_approval_status == TutorSession.GroupApprovalStatus.PENDING,
             "participant": {
                 "id": existing.id, "user_id": user.id, "username": user.username,
                 "is_primary": existing.is_primary, "is_active": existing.is_active,
@@ -1024,13 +1035,30 @@ def _try_add_participant(session, entry: dict, primary_institution) -> dict:
     participant = SessionParticipant.objects.create(
         session=session, student=user, is_active=True, is_primary=False,
     )
+    _maybe_trigger_group_approval(session)
     return {
         "ok": True,
+        "requires_approval": session.group_approval_status == TutorSession.GroupApprovalStatus.PENDING,
         "participant": {
             "id": participant.id, "user_id": user.id, "username": user.username,
             "is_primary": False, "is_active": True,
         },
     }
+
+
+def _maybe_trigger_group_approval(session) -> None:
+    """When the session becomes a group AND the lesson requires teacher
+    approval, flip the status to 'pending'. No-op once the session is
+    already in a non-not_required state (idempotent on subsequent adds)."""
+    from apps.tutoring.models import TutorSession
+    if not session.lesson.group_requires_approval:
+        return
+    if not session.is_group:
+        return
+    if session.group_approval_status != TutorSession.GroupApprovalStatus.NOT_REQUIRED:
+        return
+    session.group_approval_status = TutorSession.GroupApprovalStatus.PENDING
+    session.save(update_fields=['group_approval_status'])
 
 
 @login_required
@@ -1046,11 +1074,16 @@ def session_participants(request, session_id):
 
     if request.method == "GET":
         rows = SessionParticipant.objects.filter(session=session).select_related("student")
+        state = session.engine_state or {}
+        lesson_started = (state.get('exchange_count', 0) or 0) > 0
         return JsonResponse({
             "session_id": session.id,
             "is_group": session.is_group,
             "max_group_size": session.lesson.max_group_size,
             "allow_group_mode": session.lesson.allow_group_mode,
+            "lesson_started": lesson_started,
+            "group_requires_approval": session.lesson.group_requires_approval,
+            "group_approval_status": session.group_approval_status,
             "participants": [
                 {
                     "id": p.id,
@@ -1077,6 +1110,8 @@ def session_participants(request, session_id):
         if result.get("error") == "invalid_credentials":
             status = 401
         elif result.get("error") == "group_full":
+            status = 409
+        elif result.get("error") == "lesson_already_started":
             status = 409
         return JsonResponse({"error": result.get("error")}, status=status)
     return JsonResponse(result)
