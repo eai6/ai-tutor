@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from apps.tutoring.praise_filter import strip_praise_if_wrong, _PRAISE_RE
+from apps.tutoring.fact_verifier import verify_response, FactCheckResult
 
 
 # Issues we record. Strings rather than enums so they serialize cleanly
@@ -31,7 +32,8 @@ from apps.tutoring.praise_filter import strip_praise_if_wrong, _PRAISE_RE
 ISSUE_NO_QUESTION = "no_question"
 ISSUE_UNFOUNDED_PRAISE_STRIPPED = "unfounded_praise_stripped"
 ISSUE_INFO_DUMP = "info_dump_warning"
-ISSUE_NUMERIC_CLAIM_UNVERIFIED = "numeric_claim_unverified"  # used by V2
+ISSUE_NUMERIC_CLAIM_UNVERIFIED = "numeric_claim_unverified"
+ISSUE_NUMERIC_CLAIM_CONTRADICTED = "numeric_claim_contradicted"
 
 
 @dataclass
@@ -42,11 +44,18 @@ class ValidationResult:
     layers_run: List[str] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
 
+    # Issues considered "soft" — logged for teacher review but don't
+    # flip `passed` to False. Numeric_claim_unverified is soft because
+    # the LLM judge often defaults to "unverified" when retrieved
+    # evidence is sparse, not because the tutor is wrong.
+    _SOFT_ISSUES = frozenset({
+        ISSUE_INFO_DUMP,
+        ISSUE_NUMERIC_CLAIM_UNVERIFIED,
+    })
+
     @property
     def passed(self) -> bool:
-        # No issues at all = clean pass. info_dump_warning is "soft" — not
-        # a fail.
-        return all(i == ISSUE_INFO_DUMP for i in self.issues)
+        return all(i in self._SOFT_ISSUES for i in self.issues)
 
 
 # Patterns that constitute a question (broader than '?' alone — some
@@ -87,8 +96,11 @@ def validate_tutor_response(
     is_correct: Optional[bool],
     bare_answer: bool,
     step_type: Optional[str] = None,
+    lesson=None,
+    llm_client=None,
+    fact_check: bool = True,
 ) -> ValidationResult:
-    """Run V1 layers over a tutor response.
+    """Run V1+V2 validator layers over a tutor response.
 
     Args:
       response: the cleaned tutor reply (after media-signal parsing).
@@ -98,6 +110,10 @@ def validate_tutor_response(
       bare_answer: True when the student replied with a naked numeric
                    answer on a practice/quiz step.
       step_type: 'teach' | 'worked_example' | 'practice' | 'quiz' | 'summary'.
+      lesson: Lesson model instance — required for L4 fact-check.
+      llm_client: BaseLLMClient — required for L4 LLM judge.
+      fact_check: when False, skips L4 entirely (used in tests / when
+                  callers want fast-path validation).
 
     Returns:
       ValidationResult with the (possibly modified) content, the list
@@ -106,6 +122,7 @@ def validate_tutor_response(
     issues: List[str] = []
     layers_run: List[str] = []
     content = response or ""
+    extra_meta: dict = {}
 
     # L1 — structural
     layers_run.append("structural")
@@ -131,6 +148,22 @@ def validate_tutor_response(
             content = new_content
             issues.append(ISSUE_UNFOUNDED_PRAISE_STRIPPED)
 
+    # L4 — factual claim verification (V2). Gated to responses that
+    # contain detectable numeric / named claims so we don't burn LLM
+    # budget on conversational turns. Failures are non-blocking; we
+    # log them to metadata for teacher review.
+    if fact_check and lesson is not None and llm_client is not None:
+        layers_run.append("fact_check")
+        fc: FactCheckResult = verify_response(
+            content, lesson=lesson, llm_client=llm_client,
+        )
+        extra_meta.update(fc.to_metadata())
+        if fc.contradicted_claims:
+            issues.append(ISSUE_NUMERIC_CLAIM_CONTRADICTED)
+        unverified = [c for c in fc.claims if c.status == "unverified"]
+        if unverified:
+            issues.append(ISSUE_NUMERIC_CLAIM_UNVERIFIED)
+
     return ValidationResult(
         content=content,
         issues=issues,
@@ -138,5 +171,6 @@ def validate_tutor_response(
         metadata={
             "info_concept_count": info_score,
             "ends_with_question": _ends_with_question(content),
+            **extra_meta,
         },
     )

@@ -271,7 +271,22 @@
                 {% for issue in turn.metadata.validator_issues %}
                     <span title="Socratic validator flagged this turn" style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;">{{ issue }}</span>
                 {% endfor %}
+                {% if turn.metadata.factual_claims_checked %}
+                    <span title="Factual claims checked against curriculum + Seychelles context" style="background:#dbeafe;color:#1e40af;padding:0.05rem 0.45rem;border-radius:999px;">{{ turn.metadata.factual_claims_checked }} claim{{ turn.metadata.factual_claims_checked|pluralize }} fact-checked</span>
+                {% endif %}
             </div>
+            {% if turn.metadata.factual_claims_contradicted %}
+            <div style="font-size:0.72rem;color:#991b1b;margin-top:0.2rem;">
+                ⚠ Contradicted by curriculum:
+                {% for c in turn.metadata.factual_claims_contradicted %}<span style="background:#fee2e2;padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
+            </div>
+            {% endif %}
+            {% if turn.metadata.factual_claims_unverified %}
+            <div style="font-size:0.72rem;color:#92400e;margin-top:0.2rem;">
+                Unverified (no curriculum support found):
+                {% for c in turn.metadata.factual_claims_unverified %}<span style="background:#fef3c7;padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
+            </div>
+            {% endif %}
             {% if turn.metadata.eval_reasoning %}
             <details style="font-size:0.7rem;color:#71717a;margin-top:0.2rem;">
                 <summary style="cursor:pointer;">why?</summary>

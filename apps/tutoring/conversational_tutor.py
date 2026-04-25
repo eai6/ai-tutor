@@ -1387,12 +1387,23 @@ Keep it to 2-3 sentences."""
             is_correct=turn_metadata.get('is_correct'),
             bare_answer=turn_bare_answer,
             step_type=(current_step.step_type if current_step else None),
+            lesson=self.lesson,
+            llm_client=self.llm_client,
         )
         if validation.content != clean_response:
             clean_response = validation.content
         if validation.issues:
             turn_metadata['validator_issues'] = list(validation.issues)
             turn_metadata['validator_passed'] = validation.passed
+        # Always attach fact-check metadata (counts + unverified claims)
+        # so the teacher dashboard can show it even on clean turns.
+        for k in (
+            'factual_claims_checked', 'factual_claims_unverified',
+            'factual_claims_contradicted', 'fact_check_skipped',
+            'fact_check_skip_reason',
+        ):
+            if k in validation.metadata:
+                turn_metadata[k] = validation.metadata[k]
 
         # Record media for this turn (for resume artifact panel)
         if media:
@@ -1589,12 +1600,21 @@ Keep it to 2-3 sentences."""
             is_correct=turn_metadata.get('is_correct'),
             bare_answer=turn_bare_answer,
             step_type=(current_step.step_type if current_step else None),
+            lesson=self.lesson,
+            llm_client=self.llm_client,
         )
         if validation.content != clean_content:
             clean_content = validation.content
         if validation.issues:
             turn_metadata['validator_issues'] = list(validation.issues)
             turn_metadata['validator_passed'] = validation.passed
+        for k in (
+            'factual_claims_checked', 'factual_claims_unverified',
+            'factual_claims_contradicted', 'fact_check_skipped',
+            'fact_check_skip_reason',
+        ):
+            if k in validation.metadata:
+                turn_metadata[k] = validation.metadata[k]
 
         # Check if all steps complete — trigger exit ticket (NOT during remediation)
         show_exit_ticket = False
