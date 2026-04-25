@@ -117,5 +117,49 @@ class PedagogicalLayerTest(unittest.TestCase):
         self.assertFalse(with_praise_strip.passed)
 
 
+class RegenerationTriggerTest(unittest.TestCase):
+    """V3: ValidationResult.needs_regeneration flag."""
+
+    def test_passes_no_regen(self):
+        from apps.tutoring.validator import (
+            validate_tutor_response, ValidationResult,
+        )
+        result = validate_tutor_response(
+            "Walk me through what you'd try?",
+            is_correct=None, bare_answer=False, step_type='practice',
+        )
+        self.assertFalse(result.needs_regeneration)
+
+    def test_unfounded_praise_does_not_trigger_regen(self):
+        from apps.tutoring.validator import validate_tutor_response
+        # Praise is patched inline (stripped); not a regen trigger.
+        result = validate_tutor_response(
+            "Brilliant! That's it. Let's move on.",
+            is_correct=False, bare_answer=False, step_type='practice',
+        )
+        self.assertFalse(result.needs_regeneration)
+
+    def test_contradicted_claim_triggers_regen(self):
+        from apps.tutoring.validator import (
+            ValidationResult, ISSUE_NUMERIC_CLAIM_CONTRADICTED,
+        )
+        result = ValidationResult(
+            content="x", issues=[ISSUE_NUMERIC_CLAIM_CONTRADICTED],
+        )
+        self.assertTrue(result.needs_regeneration)
+        self.assertFalse(result.passed)
+
+    def test_unverified_alone_is_soft(self):
+        from apps.tutoring.validator import (
+            ValidationResult, ISSUE_NUMERIC_CLAIM_UNVERIFIED,
+        )
+        result = ValidationResult(
+            content="x", issues=[ISSUE_NUMERIC_CLAIM_UNVERIFIED],
+        )
+        # soft — does not trigger regen, treated as passed
+        self.assertFalse(result.needs_regeneration)
+        self.assertTrue(result.passed)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -53,9 +53,19 @@ class ValidationResult:
         ISSUE_NUMERIC_CLAIM_UNVERIFIED,
     })
 
+    # Issues that should trigger regeneration (V3) — strong evidence
+    # the tutor is wrong, can't be patched in place.
+    _REGEN_ISSUES = frozenset({
+        ISSUE_NUMERIC_CLAIM_CONTRADICTED,
+    })
+
     @property
     def passed(self) -> bool:
         return all(i in self._SOFT_ISSUES for i in self.issues)
+
+    @property
+    def needs_regeneration(self) -> bool:
+        return any(i in self._REGEN_ISSUES for i in self.issues)
 
 
 # Patterns that constitute a question (broader than '?' alone — some

@@ -1405,6 +1405,52 @@ Keep it to 2-3 sentences."""
             if k in validation.metadata:
                 turn_metadata[k] = validation.metadata[k]
 
+        # V3 — regenerate once on hard fail. Capped to a single retry so
+        # one bad turn can't blow up latency or LLM cost.
+        if validation.needs_regeneration:
+            logger.info(
+                "[Validator] regenerating session=%s (issues=%s)",
+                self.session.id, validation.issues,
+            )
+            try:
+                self._pending_regen_constraint = self._build_regen_constraint_block(validation)
+                regen_raw = self._generate_contextual_response(
+                    student_input,
+                    kb_context,
+                    media_context="",
+                    visual_requested=bool(visual_request),
+                )
+            finally:
+                self._pending_regen_constraint = None
+
+            regen_clean, regen_media, regen_gen = self._parse_media_signal(regen_raw)
+            regen_clean, regen_artifact = self._parse_artifact_signal(regen_clean)
+            # Skip math praise filter on regen — issues that triggered
+            # regen aren't praise-related, and we want a clean second
+            # chance from the LLM.
+            revalidation = validate_tutor_response(
+                regen_clean,
+                is_correct=turn_metadata.get('is_correct'),
+                bare_answer=turn_bare_answer,
+                step_type=(current_step.step_type if current_step else None),
+                lesson=self.lesson,
+                llm_client=self.llm_client,
+                fact_check=False,  # avoid second fact-check (latency cap)
+            )
+            clean_response = revalidation.content
+            turn_metadata['regenerated'] = True
+            turn_metadata['regeneration_reason'] = list(validation.issues)
+            if revalidation.issues:
+                # Merge issues from second pass for full audit trail
+                turn_metadata['validator_issues'] = list(
+                    set(turn_metadata.get('validator_issues', [])) | set(revalidation.issues)
+                )
+            # Update media if regen produced a different signal
+            if regen_media:
+                media = [regen_media]
+            if regen_artifact:
+                artifact_html = regen_artifact
+
         # Record media for this turn (for resume artifact panel)
         if media:
             turn_index = len(self.conversation)  # index before appending
@@ -2898,6 +2944,12 @@ Follow the current step; this concept will be covered in sequence."""
         # Append media catalog so the LLM knows what figures are available
         system_prompt += self._build_media_catalog()
 
+        # Regeneration constraint (V3) — appended when retrying after a
+        # validator hard-fail. Highest-priority block.
+        regen = getattr(self, '_pending_regen_constraint', None)
+        if regen:
+            system_prompt += regen
+
         # Inject deterministic math evaluation signal if the pre-response
         # check produced a definite result. Must go LAST so it is the final
         # thing the LLM reads before generating (highest-salience position).
@@ -3319,6 +3371,44 @@ Follow the current step; this concept will be covered in sequence."""
                 return getattr(step, 'phase', '') or 'explain'
             return 'explain'
         return self.session_state.value  # "exit_ticket" or "completed"
+
+    def _build_regen_constraint_block(self, validation) -> str:
+        """Build a system-prompt block injected on regeneration (V3).
+
+        Tells the LLM what was wrong with the previous response so it
+        can produce a better one. Only fires when validation reported
+        contradicted factual claims — i.e., curriculum-grounded evidence
+        contradicts something the tutor said.
+        """
+        contradicted = (validation.metadata or {}).get(
+            'factual_claims_contradicted', []) or []
+        unverified = (validation.metadata or {}).get(
+            'factual_claims_unverified', []) or []
+        parts = ["\n\n<regeneration_required>"]
+        parts.append(
+            "Your PREVIOUS attempt at this turn made claims the curriculum"
+            " contradicts. Rewrite the response. Do NOT repeat the same"
+            " incorrect claims.")
+        if contradicted:
+            parts.append(
+                "Curriculum CONTRADICTS these claims (do not restate them):"
+            )
+            for c in contradicted[:5]:
+                parts.append(f"  - {c}")
+        if unverified:
+            parts.append(
+                "These claims have NO curriculum support — only state them"
+                " if you can ground them in the curriculum context, otherwise"
+                " avoid the specific number / fact:"
+            )
+            for c in unverified[:5]:
+                parts.append(f"  - {c}")
+        parts.append(
+            "Be honest about uncertainty. End with a question. Keep it"
+            " concise (one new idea at a time)."
+        )
+        parts.append("</regeneration_required>")
+        return "\n".join(parts)
 
     def _deterministic_math_check(self, student_input: str) -> Optional[MathCheckResult]:
         """Pre-generation deterministic math answer check (Layer 1 of the
