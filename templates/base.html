@@ -240,6 +240,7 @@
                     {{ user.first_name|default:user.username }}
                 </div>
                 <a href="{% url 'accounts:logout' %}" class="logout-link">Logout</a>
+                <a href="{% url 'accounts:delete_account' %}" class="logout-link" style="color:#dc2626;" title="Permanently delete your account">Delete</a>
             </div>
             {% else %}
             <a href="{% url 'accounts:login' %}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Sign In</a>

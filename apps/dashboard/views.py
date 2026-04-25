@@ -252,7 +252,25 @@ def dashboard_home(request):
     # Recent activity
     recent_sessions = filter_by_institution(
         TutorSession.objects.all(), institution
-    ).select_related('student', 'lesson').order_by('-started_at')[:10]
+    ).select_related('student', 'lesson').prefetch_related(
+        'participants__student'
+    ).order_by('-started_at')[:10]
+    # Annotate each session with its active participant usernames so the
+    # template can show the full list under group sessions without an
+    # N+1 query (G6 polish).
+    for s in recent_sessions:
+        active_users = [
+            p.student for p in s.participants.all() if p.is_active
+        ]
+        s.active_participant_users = active_users
+        if len(active_users) > 1:
+            primary = next(
+                (u for u in active_users if u.id == s.student_id), None,
+            )
+            others = [u for u in active_users if u.id != s.student_id]
+            s.group_label = ", ".join(
+                ([primary.username] if primary else []) + [u.username for u in others]
+            )
 
     # Course progress
     courses = filter_by_institution(
@@ -3127,6 +3145,172 @@ def lesson_group_settings(request, lesson_id):
     ])
     messages.success(request, "Group session settings updated.")
     return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
+
+@teacher_required
+@require_POST
+def delete_student(request, student_id):
+    """Teacher-initiated student deletion.
+
+    A teacher (staff member) may delete any student that belongs to one
+    of their institutions. Cascade-deletes the student's tutoring history
+    along with the user (Membership, StudentProfile, sessions, turns,
+    progress, exit ticket attempts).
+    """
+    from django.contrib.auth.models import User
+    from apps.safety import SafetyAuditLog
+    from apps.accounts.models import Membership
+
+    institution = request.staff_ctx['institution']
+    target = get_object_or_404(User, id=student_id)
+
+    # Cannot delete yourself via this endpoint (use self-delete).
+    if target.id == request.user.id:
+        messages.error(request, "Use the account-deletion page to delete your own account.")
+        return redirect('dashboard:student_detail', student_id=student_id)
+
+    # Only delete students within the staff member's institution.
+    teacher_inst_ids = list(
+        request.user.memberships.filter(is_active=True, role='staff')
+        .values_list('institution_id', flat=True)
+    )
+    if institution is not None:
+        teacher_inst_ids.append(institution.id)
+    student_in_scope = Membership.objects.filter(
+        user=target,
+        role='student',
+        is_active=True,
+        institution_id__in=teacher_inst_ids,
+    ).exists()
+    if not student_in_scope and not request.user.is_staff:
+        messages.error(request, "You can only delete students from your school.")
+        return redirect('dashboard:student_list')
+
+    # Refuse to delete a staff member through this endpoint.
+    if Membership.objects.filter(user=target, role='staff', is_active=True).exists():
+        messages.error(request, "This account is a staff account, not a student.")
+        return redirect('dashboard:student_list')
+
+    username = target.username
+    SafetyAuditLog.log(
+        'account_deleted',
+        user=request.user,
+        details={
+            'mode': 'teacher_deletes_student',
+            'target_user_id': target.id,
+            'target_username': username,
+        },
+        severity='warning',
+        request=request,
+    )
+    target.delete()
+    messages.success(request, f"Student '{username}' has been deleted.")
+    return redirect('dashboard:student_list')
+
+
+@staff_required
+def staff_list(request):
+    """Admin-only list of staff members for an institution.
+
+    Superadmins see all staff; institution admins see staff for their
+    selected institution. Each row links to a delete action.
+    """
+    from django.contrib.auth.models import User
+    from apps.accounts.models import Membership
+
+    if not request.user.is_staff:
+        # Restrict to platform admins for now (consistent with staff invite).
+        messages.error(request, "Admin access required.")
+        return redirect('dashboard:home')
+
+    institution = request.staff_ctx['institution']
+    qs = Membership.objects.filter(role='staff').select_related(
+        'user', 'institution',
+    )
+    if institution is not None:
+        qs = qs.filter(institution=institution)
+
+    staff_rows = []
+    seen_users = set()
+    for m in qs.order_by('user__username'):
+        if m.user_id in seen_users:
+            continue
+        seen_users.add(m.user_id)
+        staff_rows.append({
+            'user': m.user,
+            'institution': m.institution,
+            'is_active': m.is_active,
+            'is_self': m.user_id == request.user.id,
+        })
+
+    context = {**request.staff_ctx, 'staff_rows': staff_rows}
+    return render(request, 'dashboard/staff_list.html', context)
+
+
+@staff_required
+@require_POST
+def delete_staff(request, user_id):
+    """Admin-initiated staff (teacher) deletion.
+
+    Restricted to platform admins (request.user.is_staff). Refuses to
+    delete the requester themselves.
+    """
+    from django.contrib.auth.models import User
+    from apps.safety import SafetyAuditLog
+
+    if not request.user.is_staff:
+        messages.error(request, "Admin access required.")
+        return redirect('dashboard:home')
+
+    target = get_object_or_404(User, id=user_id)
+    if target.id == request.user.id:
+        messages.error(request, "Use the account-deletion page to delete your own account.")
+        return redirect('dashboard:staff_list')
+
+    username = target.username
+    SafetyAuditLog.log(
+        'account_deleted',
+        user=request.user,
+        details={
+            'mode': 'admin_deletes_staff',
+            'target_user_id': target.id,
+            'target_username': username,
+        },
+        severity='warning',
+        request=request,
+    )
+    target.delete()
+    messages.success(request, f"Staff account '{username}' has been deleted.")
+    return redirect('dashboard:staff_list')
+
+
+@teacher_required
+@require_POST
+def course_subject_type(request, course_id):
+    """Update Course.subject_type. Drives is_math + subject-specific tutor
+    rules. See memory/math_tutor_fix_plan.md M8.
+    """
+    from apps.curriculum.models import Course
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        course = get_object_or_404(
+            Course,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=course_id,
+        )
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    new_value = request.POST.get('subject_type', '').strip()
+    valid = {choice[0] for choice in Course.SubjectType.choices}
+    if new_value and new_value not in valid:
+        messages.error(request, "Invalid subject type.")
+    else:
+        course.subject_type = new_value
+        course.save(update_fields=['subject_type'])
+        messages.success(request, f"Subject type set to '{new_value or 'auto-detect'}'.")
+    return redirect('dashboard:course_detail', course_id=course.id)
 
 
 @teacher_required

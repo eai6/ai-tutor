@@ -537,6 +537,51 @@ def logout_view(request):
 
 
 @login_required
+def delete_account(request):
+    """Self-service account deletion.
+
+    GET shows a confirmation page (with password input). POST validates
+    the password, audit-logs the deletion, then deletes the user and all
+    cascade-linked data (sessions, turns, progress, profile, memberships).
+    The user is logged out and redirected to the landing page.
+    """
+    from django.contrib.auth import authenticate
+    from apps.safety import SafetyAuditLog
+
+    if request.method == 'POST':
+        password = request.POST.get('password', '')
+        confirm = request.POST.get('confirm', '')
+        if confirm.strip().lower() != 'delete':
+            messages.error(request, 'Please type "DELETE" exactly to confirm.')
+            return render(request, 'accounts/delete_account.html')
+        # Re-authenticate
+        if not authenticate(username=request.user.username, password=password):
+            messages.error(request, 'Password incorrect. Account NOT deleted.')
+            return render(request, 'accounts/delete_account.html')
+
+        user_id = request.user.id
+        username = request.user.username
+        SafetyAuditLog.log(
+            'account_deleted',
+            user=request.user,
+            details={'mode': 'self', 'username': username},
+            severity='warning',
+            request=request,
+        )
+        # Hard delete — cascades through all FKs (Membership, StudentProfile,
+        # TutorSession, SessionTurn, StudentLessonProgress, etc.).
+        request.user.delete()
+        logout(request)
+        messages.success(
+            request,
+            f"Account '{username}' has been permanently deleted.",
+        )
+        return redirect('accounts:landing')
+
+    return render(request, 'accounts/delete_account.html')
+
+
+@login_required
 def bulk_student_upload(request):
     """Bulk register students via CSV upload.
 

@@ -177,6 +177,20 @@
                 {% if course.grade_level %}
                 <p style="color: var(--gray-500); margin: 0; font-size: 0.875rem;">Grade: {{ course.grade_level }}</p>
                 {% endif %}
+                {# Subject classification (M8) — drives is_math + tutor rules #}
+                <form method="post" action="{% url 'dashboard:course_subject_type' course.id %}" style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem;">
+                    {% csrf_token %}
+                    <label style="font-size:0.8125rem;color:var(--gray-500);">Subject:</label>
+                    <select name="subject_type" onchange="this.form.submit()" {% if not can_edit_content %}disabled{% endif %} style="padding:0.2rem 0.5rem;font-size:0.8125rem;border:1px solid var(--gray-200);border-radius:4px;">
+                        <option value="" {% if not course.subject_type %}selected{% endif %}>Auto-detect from title</option>
+                        <option value="math" {% if course.subject_type == 'math' %}selected{% endif %}>Math</option>
+                        <option value="science" {% if course.subject_type == 'science' %}selected{% endif %}>Science</option>
+                        <option value="humanities" {% if course.subject_type == 'humanities' %}selected{% endif %}>Humanities</option>
+                        <option value="language" {% if course.subject_type == 'language' %}selected{% endif %}>Language</option>
+                        <option value="other" {% if course.subject_type == 'other' %}selected{% endif %}>Other</option>
+                    </select>
+                    {% if course.is_math %}<span title="Math-specific tutor rules apply (working before evaluation, named subskills, etc.)" style="font-size:0.7rem;background:#ede9fe;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:999px;">math rules on</span>{% endif %}
+                </form>
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <a href="{% url 'dashboard:class_readiness' course.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">Class Readiness Report</a>

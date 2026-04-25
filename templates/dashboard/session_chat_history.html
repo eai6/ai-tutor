@@ -252,6 +252,30 @@
         <div class="bubble-wrapper left">
             <div class="bubble-role">Tutor</div>
             <div class="chat-bubble bubble-tutor">{{ turn.content }}</div>
+            {# Eval metadata + bare-answer flag (M4 / M9) — answers the
+               teacher's question "why was this answer marked correct?" #}
+            {% if turn.metadata.eval_layer %}
+            <div class="bubble-meta" style="font-size:0.7rem;color:#71717a;margin-top:0.25rem;display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+                {% if turn.metadata.is_correct %}
+                    <span style="background:#dcfce7;color:#166534;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;">✓ correct</span>
+                {% else %}
+                    <span style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;">✗ incorrect</span>
+                {% endif %}
+                <span title="How this turn was evaluated">via {{ turn.metadata.eval_layer }}</span>
+                {% if turn.metadata.student_answer_parsed is not None %}<span>· parsed: {{ turn.metadata.student_answer_parsed }}{% if turn.metadata.expected_answer_parsed is not None %} vs expected {{ turn.metadata.expected_answer_parsed }}{% endif %}</span>{% endif %}
+                {% if turn.metadata.bare_answer %}
+                    <span title="Student gave a bare numeric answer with no working" style="background:#fef3c7;color:#92400e;padding:0.05rem 0.45rem;border-radius:999px;">bare answer</span>
+                    {% if turn.metadata.bare_answer_flagged %}<span style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;" title="3+ bare answers on this step — review">flagged</span>{% endif %}
+                {% endif %}
+                {% if turn.metadata.praise_stripped %}<span title="Praise words stripped from this response" style="background:#ede9fe;color:#5b21b6;padding:0.05rem 0.45rem;border-radius:999px;">praise stripped</span>{% endif %}
+            </div>
+            {% if turn.metadata.eval_reasoning %}
+            <details style="font-size:0.7rem;color:#71717a;margin-top:0.2rem;">
+                <summary style="cursor:pointer;">why?</summary>
+                <span>{{ turn.metadata.eval_reasoning }}</span>
+            </details>
+            {% endif %}
+            {% endif %}
             <div class="bubble-time">{{ turn.created_at|date:"H:i" }}</div>
         </div>
         {% endif %}

@@ -43,6 +43,12 @@ urlpatterns = [
     path('curriculum/lesson/<int:lesson_id>/publish/', views.lesson_publish, name='lesson_publish'),
     path('curriculum/lesson/<int:lesson_id>/approve/', views.lesson_approve, name='lesson_approve'),
     path('curriculum/lesson/<int:lesson_id>/group-settings/', views.lesson_group_settings, name='lesson_group_settings'),
+    path('curriculum/course/<int:course_id>/subject-type/', views.course_subject_type, name='course_subject_type'),
+
+    # Account deletion (memory)
+    path('students/<int:student_id>/delete/', views.delete_student, name='delete_student'),
+    path('staff/', views.staff_list, name='staff_list'),
+    path('staff/<int:user_id>/delete/', views.delete_staff, name='delete_staff'),
     path('curriculum/step/<int:step_id>/edit/', views.step_edit, name='step_edit'),
     path('curriculum/exit-question/<int:question_id>/edit/', views.exit_question_edit, name='exit_question_edit'),
     path('curriculum/lesson/<int:lesson_id>/prerequisites/', views.lesson_prerequisite_edit, name='lesson_prerequisite_edit'),

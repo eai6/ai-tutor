@@ -1,0 +1,51 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Staff{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Staff Accounts</h1>
+    <p class="muted">Platform admins (you) can delete teacher / staff accounts. Deletions cascade through their content + audit trail.</p>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead style="background:var(--gray-50);">
+                <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
+                    <th style="padding:0.75rem 1rem;">Username</th>
+                    <th style="padding:0.75rem 1rem;">Name</th>
+                    <th style="padding:0.75rem 1rem;">Email</th>
+                    <th style="padding:0.75rem 1rem;">Institution</th>
+                    <th style="padding:0.75rem 1rem;">Status</th>
+                    <th style="padding:0.75rem 1rem;text-align:right;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in staff_rows %}
+                <tr style="border-top:1px solid var(--gray-100);">
+                    <td style="padding:0.75rem 1rem;font-weight:600;">{{ row.user.username }}{% if row.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);margin-left:0.4rem;">(you)</span>{% endif %}</td>
+                    <td style="padding:0.75rem 1rem;">{{ row.user.first_name }} {{ row.user.last_name }}</td>
+                    <td style="padding:0.75rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ row.user.email }}</td>
+                    <td style="padding:0.75rem 1rem;">{{ row.institution.name|default:"—" }}</td>
+                    <td style="padding:0.75rem 1rem;">
+                        {% if row.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}
+                        {% if row.user.is_staff %}<span class="badge" style="background:#ede9fe;color:#5b21b6;margin-left:0.25rem;">Admin</span>{% endif %}
+                    </td>
+                    <td style="padding:0.75rem 1rem;text-align:right;">
+                        {% if not row.is_self %}
+                        <form method="post" action="{% url 'dashboard:delete_staff' row.user.id %}" style="display:inline;" onsubmit="return confirm('Permanently delete staff account &quot;{{ row.user.username }}&quot;? This cascades through their data and cannot be undone.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Delete</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--gray-500);">No staff accounts found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

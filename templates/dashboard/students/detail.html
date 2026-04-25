@@ -29,6 +29,12 @@
                 </div>
                 {% endif %}
             </div>
+            <div>
+                <form method="post" action="{% url 'dashboard:delete_student' student.id %}" onsubmit="return confirm('Permanently delete student account &quot;{{ student.username }}&quot;? This removes their tutoring history and exit ticket attempts and cannot be undone.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">Delete student</button>
+                </form>
+            </div>
         </div>
     </div>
 </div>

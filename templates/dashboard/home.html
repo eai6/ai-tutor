@@ -79,11 +79,16 @@
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                             {{ session.student.first_name }} {{ session.student.last_name }}
-                            {% if session.is_group %}<span class="badge" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;">👥 group</span>{% endif %}
+                            {% if session.is_group %}<span class="badge" title="{{ session.group_label|default:'' }}" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;cursor:help;">👥 +{{ session.active_participant_users|length|add:'-1' }}</span>{% endif %}
                         </div>
                         <div style="font-size: 0.8125rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                             {{ session.lesson.title }}
                         </div>
+                        {% if session.is_group %}
+                        <div style="font-size: 0.75rem; color: var(--gray-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.15rem;">
+                            with {% for u in session.active_participant_users %}{% if u.id != session.student_id %}{{ u.username }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
                     <div>
                         {% if session.mastery_achieved %}
