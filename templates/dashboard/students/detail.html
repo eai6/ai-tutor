@@ -72,21 +72,36 @@
                         <div class="progress-fill {% if pct >= 70 %}success{% endif %}" style="width: {{ pct|default:0 }}%;"></div>
                     </div>
                     
-                    <!-- Lesson list -->
-                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                    <!-- Lesson list (C4 rich display) -->
+                    <div style="display: flex; flex-direction: column; gap: 0.4rem;">
                         {% for lesson in cp.lessons %}
-                        <div style="padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8125rem;
+                        <div style="padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; border: 1px solid;
                             {% if lesson.mastery_level == 'mastered' %}
-                                background: #D1FAE5; color: #065F46;
+                                background: #ecfdf5; color: #065F46; border-color: #a7f3d0;
                             {% elif lesson.mastery_level == 'in_progress' %}
-                                background: #FEF3C7; color: #92400E;
+                                background: #fffbeb; color: #92400E; border-color: #fde68a;
                             {% else %}
-                                background: var(--gray-100); color: var(--gray-500);
+                                background: var(--gray-50); color: var(--gray-500); border-color: var(--gray-200);
                             {% endif %}
                         ">
-                            {{ lesson.lesson.title|truncatewords:3 }}
-                            {% if lesson.mastery_level == 'mastered' %}✓{% endif %}
-                            {% if lesson.last_completion_was_group %}<span title="Completed as part of a group">👥</span>{% endif %}
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                                <span style="font-weight:600;">
+                                    {% if lesson.mastery_level == 'mastered' %}✓{% elif lesson.mastery_level == 'in_progress' %}◐{% else %}○{% endif %}
+                                    {{ lesson.lesson.title }}
+                                    {% if lesson.last_completion_was_group %}<span title="Completed as part of a group" style="margin-left:0.25rem;">👥</span>{% endif %}
+                                </span>
+                                {% if lesson.best_score_pct is not None %}
+                                <span style="font-size:0.78rem;color:var(--gray-500);">
+                                    Best <strong>{{ lesson.best_score_pct }}%</strong>
+                                    · {{ lesson.attempts_count|default:0 }} attempt{{ lesson.attempts_count|pluralize }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% if lesson.weak_concepts %}
+                            <div style="margin-top:0.3rem;font-size:0.75rem;color:#b45309;">
+                                Weak: {% for c in lesson.weak_concepts %}<span style="background:#fef3c7;padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>

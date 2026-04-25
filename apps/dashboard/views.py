@@ -514,7 +514,8 @@ def student_detail(request, student_id):
         if count > 0:
             course_lesson_counts[course.id] = {'course': course, 'count': count}
 
-    # Group progress by course
+    # Group progress by course (with rich competency breakdown — C4)
+    from apps.tutoring.competency import best_attempt, per_concept_breakdown
     courses_progress = {}
     for p in progress_list:
         course = p.lesson.unit.course
@@ -526,6 +527,19 @@ def student_detail(request, student_id):
                 'mastered': 0,
                 'total': total_in_course,
             }
+        # Annotate progress with per-concept weak areas (lazy: only for
+        # lessons that have an attempt).
+        if p.best_score is not None:
+            p.best_score_pct = round((p.best_score or 0.0) * 100)
+            attempt = best_attempt(student, p.lesson)
+            if attempt:
+                rows = per_concept_breakdown(attempt)
+                p.weak_concepts = [r['concept'] for r in rows if r['pct'] < 0.7][:3]
+            else:
+                p.weak_concepts = []
+        else:
+            p.best_score_pct = None
+            p.weak_concepts = []
         courses_progress[course.id]['lessons'].append(p)
         if p.mastery_level == 'mastered':
             courses_progress[course.id]['mastered'] += 1
@@ -1991,6 +2005,19 @@ def lesson_session_report(request, lesson_id):
             'instruction': instruction,
         })
 
+    # Group session breakdown (G6): for every session that had >1 active
+    # participant, list the participants so teachers can see which lessons
+    # were completed collaboratively.
+    group_sessions = []
+    for s in sessions.prefetch_related('participants__student').order_by('-started_at'):
+        active = s.participants.filter(is_active=True)
+        if active.count() > 1:
+            group_sessions.append({
+                'session': s,
+                'participants': [p.student for p in active],
+                'is_completed': s.status == TutorSession.Status.COMPLETED,
+            })
+
     context = {
         **request.staff_ctx,
         'lesson': lesson,
@@ -2012,6 +2039,7 @@ def lesson_session_report(request, lesson_id):
         'recommendation_type': recommendation_type,
         'recommendation_action': recommendation_action,
         'next_lesson': next_lesson,
+        'group_sessions': group_sessions,
     }
 
     return render(request, 'dashboard/lesson_session_report.html', context)

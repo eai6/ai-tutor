@@ -11,10 +11,16 @@
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </a>
             <div class="header-center">
-                <h1 class="lesson-name">{{ lesson.title }}</h1>
-                <span class="phase-badge" id="phase-badge">Starting...</span>
-                <span class="step-progress" id="step-progress"></span>
-                <div class="participants-bar" id="participants-bar" style="display:flex;gap:0.35rem;align-items:center;margin-top:0.25rem;flex-wrap:wrap;font-size:0.8rem;"></div>
+                <div class="header-title-row">
+                    <h1 class="lesson-name">{{ lesson.title }}</h1>
+                    <span class="phase-badge" id="phase-badge">Starting...</span>
+                    <span class="step-progress" id="step-progress"></span>
+                </div>
+                <div class="participants-bar" id="participants-bar" style="display:flex;gap:0.35rem;align-items:center;flex-wrap:wrap;font-size:0.8rem;"></div>
+            </div>
+            <div class="header-difficulty" id="header-difficulty">
+                <button class="difficulty-btn too-hard" id="btn-too-hard" onclick="sendDifficultySignal('too_hard')" title="This is too difficult for me">Too hard?</button>
+                <button class="difficulty-btn too-easy" id="btn-too-easy" onclick="sendDifficultySignal('too_easy')" title="This is too easy for me">Too easy?</button>
             </div>
             <button class="audio-toggle" id="audio-toggle" onclick="toggleAudioMode()" title="Toggle audio mode">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -41,15 +47,7 @@
                 </div>
             </main>
 
-            <!-- Difficulty Signal Buttons -->
-            <div class="difficulty-controls" id="difficulty-controls">
-                <button class="difficulty-btn too-hard" id="btn-too-hard" onclick="sendDifficultySignal('too_hard')" title="This is too difficult for me">
-                    Too hard?
-                </button>
-                <button class="difficulty-btn too-easy" id="btn-too-easy" onclick="sendDifficultySignal('too_easy')" title="This is too easy for me">
-                    Too easy?
-                </button>
-            </div>
+            <!-- Difficulty buttons moved to header (.header-difficulty) -->
 
             <!-- Input Area -->
             <footer class="chat-input-area" id="input-area">
@@ -216,9 +214,23 @@ body {
 
 .header-center {
     display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.header-title-row {
+    display: flex;
     align-items: center;
     gap: 0.75rem;
     min-width: 0;
+    width: 100%;
+}
+
+.audio-toggle {
+    flex-shrink: 0;
 }
 
 .lesson-name {
@@ -601,13 +613,15 @@ body {
 }
 
 /* ── Typing Indicator ── */
+/* Anchored to the tutor side (left of the chat container) so it visually
+   reads as "the tutor is typing" rather than floating in the centered
+   message column. */
 .typing-indicator {
     display: none;
     align-items: flex-start;
     gap: 0.75rem;
-    max-width: 768px;
-    margin: 0 auto;
     padding: 0 0.5rem;
+    align-self: flex-start;
 }
 .typing-indicator.show { display: flex; }
 .typing-indicator .avatar {
@@ -977,24 +991,21 @@ body {
 .cta-btn:hover { background: #27272a; }
 
 /* ── Difficulty Signal Buttons ── */
-.difficulty-controls {
+/* Difficulty signal buttons live in the header (.header-difficulty) */
+.header-difficulty {
     display: flex;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.375rem 1rem;
-    max-width: 768px;
-    margin: 0 auto;
+    gap: 0.35rem;
+    flex-shrink: 0;
 }
 .difficulty-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
-    padding: 0.375rem 0.875rem;
+    padding: 0.3rem 0.65rem;
     border: 1.5px solid #e4e4e7;
     border-radius: 999px;
     background: #fff;
     color: #71717a;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -1003,6 +1014,10 @@ body {
 .difficulty-btn:hover { border-color: #a1a1aa; color: #18181b; }
 .difficulty-btn.active.too-easy { border-color: #7C3AED; background: #EDE9FE; color: #7C3AED; }
 .difficulty-btn.active.too-hard { border-color: #F59E0B; background: #FEF3C7; color: #D97706; }
+@media (max-width: 640px) {
+    /* Hide labels on very narrow screens, show emoji-only buttons */
+    .header-difficulty .difficulty-btn { padding: 0.3rem 0.5rem; font-size: 0.7rem; }
+}
 
 /* ── In-Conversation Gamification ── */
 .message.tutor .bubble.correct-glow {

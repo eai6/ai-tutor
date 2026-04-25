@@ -380,4 +380,38 @@
 </div>
 {% endif %}
 
+{# Group sessions section (G6) — sessions where >1 student worked together #}
+{% if group_sessions %}
+<div class="section-title" style="margin-top:2rem;">👥 Group Sessions ({{ group_sessions|length }})</div>
+<div style="background:#fff;border-radius:0.75rem;overflow:hidden;border:1px solid var(--gray-200);">
+    <table style="width:100%;border-collapse:collapse;">
+        <thead style="background:var(--gray-50);">
+            <tr style="text-align:left;font-size:0.78rem;color:var(--gray-500);text-transform:uppercase;">
+                <th style="padding:0.75rem 1rem;">Started</th>
+                <th style="padding:0.75rem 1rem;">Participants</th>
+                <th style="padding:0.75rem 1rem;">Status</th>
+                <th style="padding:0.75rem 1rem;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for gs in group_sessions %}
+            <tr style="border-top:1px solid var(--gray-100);">
+                <td style="padding:0.75rem 1rem;font-size:0.85rem;">{{ gs.session.started_at|date:"M j, H:i" }}</td>
+                <td style="padding:0.75rem 1rem;">
+                    {% for s in gs.participants %}<span class="badge" style="background:var(--gray-100);color:var(--gray-700);font-size:0.75rem;margin-right:0.25rem;">{{ s.username }}</span>{% endfor %}
+                </td>
+                <td style="padding:0.75rem 1rem;font-size:0.85rem;">
+                    {% if gs.is_completed %}<span style="color:#059669;">✓ completed</span>{% else %}<span style="color:#d97706;">in progress</span>{% endif %}
+                    {% if gs.session.group_approval_status == 'pending' %}<span class="badge" style="background:#fef3c7;color:#92400e;margin-left:0.25rem;">pending approval</span>{% elif gs.session.group_approval_status == 'denied' %}<span class="badge" style="background:#fee2e2;color:#991b1b;margin-left:0.25rem;">denied</span>{% endif %}
+                </td>
+                <td style="padding:0.75rem 1rem;text-align:right;">
+                    <a href="{% url 'dashboard:session_chat_history' gs.session.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:4px;padding:4px 10px;text-decoration:none;font-size:0.78rem;">View chat</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 {% endblock %}
