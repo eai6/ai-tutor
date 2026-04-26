@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { drizzle, type ExpoSQLiteDatabase } from 'drizzle-orm/expo-sqlite';
 
@@ -7,7 +8,19 @@ const DB_NAME = 'aitutor.db';
 
 let _db: ExpoSQLiteDatabase<typeof schema> | null = null;
 
+export function isSqliteAvailable(): boolean {
+  // expo-sqlite's web build requires SharedArrayBuffer (cross-origin
+  // isolation), which Chrome only exposes when the page is served with
+  // COOP/COEP headers. The Expo dev server doesn't always satisfy that
+  // out of the box, so we fall back to a localStorage-backed shim on
+  // web for now (see src/db/queries/lesson-packs.ts).
+  return Platform.OS !== 'web';
+}
+
 export function getDb(): ExpoSQLiteDatabase<typeof schema> {
+  if (!isSqliteAvailable()) {
+    throw new Error('SQLite is not available on this platform — use the web shim.');
+  }
   if (_db) return _db;
   const sqlite = SQLite.openDatabaseSync(DB_NAME);
   _db = drizzle(sqlite, { schema });
@@ -19,6 +32,7 @@ export function getDb(): ExpoSQLiteDatabase<typeof schema> {
 // against a clean install. drizzle-kit-generated SQL belongs here once the
 // CLI is wired up.
 export function ensureSchema() {
+  if (!isSqliteAvailable()) return;
   const sqlite = SQLite.openDatabaseSync(DB_NAME);
   sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS courses (
