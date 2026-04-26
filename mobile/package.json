@@ -1,0 +1,46 @@
+{
+  "name": "mobile",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "drizzle:generate": "drizzle-kit generate",
+    "schema:gen": "openapi-typescript http://localhost:8000/api/v1/schema/ -o src/api/schema.ts"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-community/netinfo": "11.4.1",
+    "@tanstack/react-query": "^5.100.5",
+    "axios": "^1.15.2",
+    "drizzle-orm": "^0.45.2",
+    "expo": "~54.0.33",
+    "expo-constants": "~18.0.13",
+    "expo-file-system": "~19.0.21",
+    "expo-linking": "~8.0.11",
+    "expo-network": "~8.0.8",
+    "expo-router": "~6.0.23",
+    "expo-secure-store": "~15.0.8",
+    "expo-sqlite": "~16.0.10",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-hook-form": "^7.74.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "babel-plugin-module-resolver": "^5.0.3",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
