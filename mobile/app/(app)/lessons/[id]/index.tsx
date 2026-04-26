@@ -1,17 +1,24 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getLesson, listLessonSteps } from '@/api/curriculum';
 import { extractErrorMessage } from '@/api/client';
+import { getLesson, listLessonSteps } from '@/api/curriculum';
+import { fetchOfflinePack } from '@/api/offline-pack';
+import { startSession } from '@/api/sessions';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
+import { loadPack, savePack } from '@/db/queries/lesson-packs';
 import { colors, spacing, typography } from '@/theme';
 
 export default function LessonDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const lessonId = Number(id);
+  const router = useRouter();
+  const qc = useQueryClient();
+  const [startError, setStartError] = useState<string | null>(null);
 
   const lessonQ = useQuery({
     queryKey: ['lesson', lessonId],
@@ -23,6 +30,34 @@ export default function LessonDetailScreen() {
     queryKey: ['lesson-steps', lessonId],
     queryFn: () => listLessonSteps(lessonId),
     enabled: Number.isFinite(lessonId),
+  });
+
+  const packQ = useQuery({
+    queryKey: ['pack-local', lessonId],
+    queryFn: () => loadPack(lessonId),
+    enabled: Number.isFinite(lessonId),
+  });
+
+  const downloadM = useMutation({
+    mutationFn: async (refresh: boolean) => {
+      const pack = await fetchOfflinePack(lessonId, refresh);
+      await savePack(pack);
+      return pack;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pack-local', lessonId] });
+    },
+  });
+
+  const startM = useMutation({
+    mutationFn: () => startSession(lessonId),
+    onSuccess: (resp) => {
+      setStartError(null);
+      router.push(`/(app)/tutor/${resp.session_id}`);
+    },
+    onError: (err) => {
+      setStartError(extractErrorMessage(err, 'Could not start session'));
+    },
   });
 
   if (lessonQ.isLoading) {
@@ -49,6 +84,11 @@ export default function LessonDetailScreen() {
 
   const lesson = lessonQ.data;
   const steps = stepsQ.data ?? [];
+  const pack = packQ.data;
+  const isDownloaded = !!pack;
+  const downloadError = downloadM.error
+    ? extractErrorMessage(downloadM.error, 'Download failed')
+    : null;
 
   return (
     <Screen scroll={false}>
@@ -63,12 +103,46 @@ export default function LessonDetailScreen() {
         </View>
 
         <Button
-          title="Start tutoring session"
-          onPress={() => {
-            // Phase E will route to /tutor/[sessionId]; for now just stub.
-            alert('Tutor chat ships in Phase E.');
-          }}
+          title={startM.isPending ? 'Starting…' : 'Start tutoring session'}
+          onPress={() => startM.mutate()}
+          loading={startM.isPending}
         />
+        {startError ? <Text style={styles.error}>{startError}</Text> : null}
+
+        <Card style={styles.packCard}>
+          <Text style={typography.h3}>Offline content</Text>
+          {isDownloaded ? (
+            <>
+              <Text style={[typography.small, styles.muted]}>
+                Pack v{pack.version} · saved{' '}
+                {pack.downloaded_at ? new Date(pack.downloaded_at).toLocaleDateString() : ''}
+              </Text>
+              <Button
+                title="Review offline"
+                variant="secondary"
+                onPress={() => router.push(`/(app)/lessons/${lessonId}/review`)}
+              />
+              <Button
+                title={downloadM.isPending ? 'Refreshing…' : 'Refresh pack'}
+                variant="secondary"
+                loading={downloadM.isPending}
+                onPress={() => downloadM.mutate(true)}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={[typography.small, styles.muted]}>
+                Download to read this lesson and take the exit ticket without internet.
+              </Text>
+              <Button
+                title={downloadM.isPending ? 'Downloading…' : 'Download for offline'}
+                onPress={() => downloadM.mutate(false)}
+                loading={downloadM.isPending}
+              />
+            </>
+          )}
+          {downloadError ? <Text style={styles.error}>{downloadError}</Text> : null}
+        </Card>
 
         <View style={styles.section}>
           <Text style={typography.h3}>Lesson outline</Text>
@@ -105,6 +179,7 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   header: { gap: spacing.xs },
   muted: { color: colors.textMuted },
+  packCard: { gap: spacing.sm },
   section: { gap: spacing.md, marginTop: spacing.md },
   stepCard: { gap: spacing.xs },
   script: { marginTop: spacing.xs },

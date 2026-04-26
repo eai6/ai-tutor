@@ -252,6 +252,18 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()
 ]
+# In DEBUG, default-allow the Expo web dev server origins so local browser
+# testing works without extra env vars. Production must set
+# CORS_ALLOWED_ORIGINS explicitly.
+if DEBUG and not CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS = [
+        'http://localhost:8081',
+        'http://127.0.0.1:8081',
+        'http://localhost:19006',
+        'http://127.0.0.1:19006',
+        'http://localhost:8082',
+        'http://127.0.0.1:8082',
+    ]
 CORS_ALLOW_CREDENTIALS = True
 # Only allow CORS on the API surface — never on /admin/, /tutor/, /dashboard/.
 CORS_URLS_REGEX = r'^/api/.*$'

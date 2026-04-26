@@ -42,6 +42,7 @@ urlpatterns = [
     path('sessions/<int:session_id>/exit-ticket/', session_views.submit_exit_ticket, name='session_exit_ticket'),
     path('sessions/<int:session_id>/review/', session_views.start_review, name='session_review'),
     path('sessions/<int:session_id>/sync/', sync_views.sync, name='session_sync'),
+    path('sessions/<int:session_id>/turns/', resource_views.SessionTurnList.as_view(), name='session_turns'),
 
     # Progress
     path('progress/', resource_views.ProgressList.as_view(), name='progress_list'),

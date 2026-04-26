@@ -9,11 +9,14 @@ Mobile client for the AI Tutor platform. Talks to the Django REST API at `/api/v
 - `expo-secure-store` for JWT, `expo-sqlite` + Drizzle for offline cache
 - `axios` for HTTP with auth/refresh interceptors
 
-## Phase C status (this commit)
+## Phase status
 
-Tier 1 screens implemented: login, register, courses list, lessons-by-course, lesson detail, progress, settings. JWT login + refresh works against `/api/v1/auth/*`.
-
-Tier 2 (online tutor chat), Tier 3 (offline tutor + sync), and on-device LLM are not implemented yet — see plan.
+- **C — scaffold + auth + courses/lessons** ✅
+- **D — pack download + offline content review** ✅ (MCQ exit ticket graded locally)
+- **E — online tutor chat** ✅ (calls `/sessions/<id>/respond/`)
+- F — policy-as-data state-machine runner (next)
+- G — on-device inference (`llama.rn`) — gated on Phase B M0 result
+- H — sync layer (offline → server)
 
 ## Run locally
 
@@ -25,8 +28,14 @@ Tier 2 (online tutor chat), Tier 3 (offline tutor + sync), and on-device LLM are
 
 # 2. Install + start Expo:
 npm install --legacy-peer-deps
-npx expo start
+npx expo start --web    # opens in Chrome at http://localhost:8081
+# or:
+npx expo start          # iOS / Android via Expo Go / dev client
 ```
+
+The Django dev server in DEBUG mode whitelists `localhost:8081` /
+`localhost:19006` for CORS automatically — no env var needed when
+testing in Chrome on the same machine.
 
 iOS simulator and Android emulator default to `localhost`. Real devices need the LAN IP of the API host:
 

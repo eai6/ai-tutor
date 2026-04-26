@@ -38,7 +38,15 @@ export default function AppLayout() {
         options={{ href: null }}
       />
       <Tabs.Screen
-        name="lessons/[id]"
+        name="lessons/[id]/index"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="lessons/[id]/review"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="tutor/[sessionId]"
         options={{ href: null }}
       />
     </Tabs>

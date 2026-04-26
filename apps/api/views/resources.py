@@ -10,9 +10,10 @@ from apps.api.serializers.curriculum import (
 )
 from apps.api.serializers.tutoring import (
     TutorSessionSerializer, StudentLessonProgressSerializer,
+    SessionTurnSerializer,
 )
 from apps.curriculum.models import Course, Lesson, LessonStep
-from apps.tutoring.models import TutorSession, StudentLessonProgress
+from apps.tutoring.models import TutorSession, StudentLessonProgress, SessionTurn
 
 
 class CourseList(InstitutionScopedMixin, generics.ListAPIView):
@@ -78,6 +79,28 @@ class SessionDetail(generics.RetrieveAPIView):
         return TutorSession.objects.filter(
             Q(student=user) | Q(participants__student=user, participants__is_active=True),
         ).distinct().prefetch_related('participants__student').select_related('lesson')
+
+
+class SessionTurnList(generics.ListAPIView):
+    """GET /api/v1/sessions/<session_id>/turns/ — paged turn history.
+
+    Mobile chat screen reads this on mount to rehydrate the conversation.
+    """
+    permission_classes = [IsAuthenticated, IsInstitutionMember]
+    serializer_class = SessionTurnSerializer
+
+    def get_queryset(self):
+        from django.db.models import Q
+        user = self.request.user
+        session_id = self.kwargs['session_id']
+        owns = TutorSession.objects.filter(
+            id=session_id,
+        ).filter(
+            Q(student=user) | Q(participants__student=user, participants__is_active=True),
+        ).exists()
+        if not owns:
+            return SessionTurn.objects.none()
+        return SessionTurn.objects.filter(session_id=session_id).order_by('created_at')
 
 
 class ProgressList(generics.ListAPIView):

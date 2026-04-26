@@ -137,6 +137,29 @@ class SyncEndpointTest(TestCase):
         self.session.refresh_from_db()
         self.assertEqual(self.session.engine_state.get('current_topic_index'), 2)
 
+    def test_turns_endpoint_returns_session_history(self):
+        c = self._client()
+        SessionTurn.objects.create(session=self.session, role='student', content='hi')
+        SessionTurn.objects.create(session=self.session, role='tutor', content='hello back')
+        resp = c.get(f'/api/v1/sessions/{self.session.id}/turns/')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        rows = resp.json()['results']
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['role'], 'student')
+        self.assertEqual(rows[1]['content'], 'hello back')
+
+    def test_turns_endpoint_hides_other_users_session(self):
+        other = User.objects.create_user(username='other2', password='pw-123456')
+        Membership.objects.create(user=other, institution=self.institution, role='student')
+        SessionTurn.objects.create(session=self.session, role='student', content='private')
+        c = APIClient()
+        token = c.post('/api/v1/auth/login/', {'username': 'other2', 'password': 'pw-123456'}, format='json').json()['access']
+        c.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+        resp = c.get(f'/api/v1/sessions/{self.session.id}/turns/')
+        # Empty results, not 403 — we filter via queryset rather than 403.
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()['results'], [])
+
     def test_sync_rejects_other_users_session(self):
         other = User.objects.create_user(username='other', password='pw-123456')
         Membership.objects.create(user=other, institution=self.institution, role='student')
