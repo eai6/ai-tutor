@@ -216,3 +216,89 @@ class ModelConfig(models.Model):
         if not config:
             config = cls.objects.filter(is_active=True).first()
         return config
+
+
+class MobileInferenceModel(models.Model):
+    """Catalog of on-device LLMs available to the React Native mobile app.
+
+    Mirror of apps/llm/client.py BaseLLMClient pattern, but for the on-device
+    inference backends (llama.rn / executorch / mlx). Admins add rows here;
+    the mobile app's Model Store reads them via /api/v1/mobile/models/.
+
+    See memory/mobile_rn_plan.md (three-layer inference abstraction).
+    """
+
+    class Family(models.TextChoices):
+        GEMMA_3N = 'gemma_3n', 'Gemma 3n'
+        QWEN_3_5 = 'qwen_3_5', 'Qwen 3.5'
+        LLAMA_3_2 = 'llama_3_2', 'Llama 3.2'
+        PHI_3_5 = 'phi_3_5', 'Phi 3.5'
+        OTHER = 'other', 'Other'
+
+    class Runtime(models.TextChoices):
+        LLAMA_CPP = 'llama_cpp', 'llama.cpp (GGUF)'
+        EXECUTORCH = 'executorch', 'ExecuTorch'
+        MEDIAPIPE = 'mediapipe', 'MediaPipe LLM Inference'
+        MLX = 'mlx', 'MLX (iOS)'
+
+    class DeviceTier(models.TextChoices):
+        FLAGSHIP = 'flagship', 'Flagship (iPhone 14+ / Pixel 7+)'
+        MID = 'mid', 'Mid-range (~3yr-old phones)'
+        LOW = 'low', 'Low-end (older / entry-level)'
+
+    id = models.CharField(
+        max_length=100, primary_key=True,
+        help_text='Stable identifier, e.g. "qwen-3-5-2b-q4-k-m"',
+    )
+    display_name = models.CharField(max_length=200)
+    family = models.CharField(max_length=30, choices=Family.choices)
+    size_mb = models.PositiveIntegerField(help_text='Approximate on-disk size at the chosen quantization.')
+    ram_required_mb = models.PositiveIntegerField(help_text='RAM headroom needed for inference.')
+    download_url = models.URLField(max_length=500)
+    checksum_sha256 = models.CharField(
+        max_length=64, blank=True,
+        help_text='SHA-256 of the model file. Verified by the app post-download.',
+    )
+    license = models.CharField(
+        max_length=80, default='Apache 2.0',
+        help_text='License the weights are distributed under (e.g. "Apache 2.0", "Gemma").',
+    )
+    runtime = models.CharField(max_length=30, choices=Runtime.choices)
+    capabilities = models.JSONField(
+        default=dict,
+        help_text='{"text": true, "image": false, "audio": false, "video": false}',
+    )
+    chat_template = models.TextField(
+        blank=True, default='',
+        help_text='Jinja-like chat template the client renders before inference.',
+    )
+    system_prompt_style = models.CharField(
+        max_length=30,
+        choices=[
+            ('system_role', 'system role message'),
+            ('prepend_user', 'prepend to first user message'),
+            ('none', 'no system prompt'),
+        ],
+        default='system_role',
+    )
+    recommended_tier = models.CharField(
+        max_length=20, choices=DeviceTier.choices, default=DeviceTier.MID,
+    )
+    quality_scores = models.JSONField(
+        default=dict, blank=True,
+        help_text='{"math": 0.8, "science": 0.85, ...} from the M0 bake-off.',
+    )
+    is_active = models.BooleanField(default=True)
+    min_app_version = models.CharField(
+        max_length=20, blank=True,
+        help_text='Hide this model from app builds older than this.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['recommended_tier', 'size_mb']
+        verbose_name = 'Mobile Inference Model'
+
+    def __str__(self):
+        return f"{self.display_name} ({self.id})"

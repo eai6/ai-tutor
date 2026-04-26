@@ -26,6 +26,7 @@ from apps.dashboard.views_health import health_check
 urlpatterns = [
     path('health/', health_check),
     path('admin/', admin.site.urls),
+    path('api/v1/', include('apps.api.urls', namespace='api')),
     path('', include('apps.accounts.urls')),  # Landing page at root
     path('tutor/', include('apps.tutoring.urls')),
     path('dashboard/', include('apps.dashboard.urls')),

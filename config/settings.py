@@ -36,6 +36,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Third-party (mobile API — memory/mobile_rn_plan.md Phase A)
+    'corsheaders',
+    'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
+    'drf_spectacular',
     # Our apps
     'apps.accounts',
     'apps.curriculum',
@@ -44,11 +49,15 @@ INSTALLED_APPS = [
     'apps.llm',
     'apps.safety',
     'apps.dashboard',
+    'apps.api',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    # CORS must run BEFORE CommonMiddleware so preflight responses are
+    # not stripped of CORS headers. See django-cors-headers docs.
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -191,3 +200,69 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+
+# =============================================================================
+# REST API for the React Native mobile app — Phase A of memory/mobile_rn_plan.md
+# =============================================================================
+
+from datetime import timedelta  # noqa: E402
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        # Mobile uses JWT bearer tokens; web uses the existing session
+        # cookie. Both work transparently for any DRF endpoint.
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/min',
+        'user': '300/min',
+    },
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'JTI_CLAIM': 'jti',
+}
+
+# CORS — locked down by default. Override CORS_ALLOWED_ORIGINS in .env to add
+# the mobile dev server (Expo defaults to http://localhost:8081 + the device
+# IP). For the production build, the mobile app sends Authorization headers
+# from a non-browser context, so CORS doesn't apply — but Expo dev does run
+# in a browser-ish environment.
+CORS_ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()
+]
+CORS_ALLOW_CREDENTIALS = True
+# Only allow CORS on the API surface — never on /admin/, /tutor/, /dashboard/.
+CORS_URLS_REGEX = r'^/api/.*$'
+
+# OpenAPI schema (drf-spectacular). Used by the RN repo to generate
+# TypeScript types via `openapi-typescript`.
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'AI Tutor Mobile API',
+    'DESCRIPTION': 'REST API consumed by the React Native mobile client.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/v1/',
+}

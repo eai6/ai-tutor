@@ -156,3 +156,8 @@ gunicorn>=22.0.0
 psycopg2-binary>=2.9.9
 dj-database-url>=2.1.0
 whitenoise>=6.6.0
+# REST API for the React Native mobile app (Phase A of memory/mobile_rn_plan.md)
+djangorestframework>=3.15.0
+djangorestframework-simplejwt>=5.3.0
+django-cors-headers>=4.3.0
+drf-spectacular>=0.27.0
