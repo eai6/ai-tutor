@@ -513,7 +513,6 @@
                 <td data-label="Status" style="padding:0.75rem 1rem;font-size:0.85rem;">
                     <span>
                         {% if gs.is_completed %}<span style="color:#059669;">✓ completed</span>{% else %}<span style="color:#d97706;">in progress</span>{% endif %}
-                        {% if gs.session.group_approval_status == 'pending' %}<span class="badge" style="background:#fef3c7;color:#92400e;margin-left:0.25rem;">pending approval</span>{% elif gs.session.group_approval_status == 'denied' %}<span class="badge" style="background:#fee2e2;color:#991b1b;margin-left:0.25rem;">denied</span>{% endif %}
                     </span>
                 </td>
                 <td style="padding:0.75rem 1rem;text-align:right;">

@@ -1218,20 +1218,6 @@ Keep it to 2-3 sentences."""
         """
         self._step_just_advanced = False
 
-        # H3: short-circuit when group session is awaiting teacher approval.
-        # See memory/group_lessons_v2_plan.md.
-        if self.session.group_approval_status == TutorSession.GroupApprovalStatus.PENDING:
-            return TutorMessage(
-                content=(
-                    "⏳ Your group session is awaiting teacher approval. "
-                    "Please wait while your teacher reviews — once approved, "
-                    "I'll be ready to start. If you want to continue solo, "
-                    "have the other students leave the session."
-                ),
-                phase="awaiting_approval",
-                is_complete=False,
-            )
-
         # Track lesson start time on first interaction
         if not self.session.started_lesson_at:
             self.session.started_lesson_at = timezone.now()

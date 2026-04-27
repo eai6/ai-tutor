@@ -232,23 +232,17 @@
         </div>
         {% endif %}
 
-        {# Group session settings (memory/group_lessons_v2_plan.md) #}
         <details style="margin-top:1rem;padding:1rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
             <summary style="cursor:pointer;font-weight:600;color:#374151;">
                 👥 Group session settings
-                {% if lesson.group_requires_approval %}<span style="font-size:0.75rem;background:#fef3c7;color:#92400e;padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">teacher approval required</span>
-                {% elif lesson.allow_group_mode %}<span style="font-size:0.75rem;background:#dcfce7;color:#166534;padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">auto-approve</span>
+                {% if lesson.allow_group_mode %}<span style="font-size:0.75rem;background:#dcfce7;color:#166534;padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">enabled</span>
                 {% else %}<span style="font-size:0.75rem;background:#f3f4f6;color:#6b7280;padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">solo only</span>{% endif %}
             </summary>
             <form method="post" action="{% url 'dashboard:lesson_group_settings' lesson.id %}" style="margin-top:1rem;display:flex;flex-direction:column;gap:0.85rem;">
                 {% csrf_token %}
                 <label style="display:flex;align-items:center;gap:0.5rem;color:#374151;">
                     <input type="checkbox" name="allow_group_mode" {% if lesson.allow_group_mode %}checked{% endif %}>
-                    <span><strong>Allow group sessions</strong> — students may complete this lesson together on one device.</span>
-                </label>
-                <label style="display:flex;align-items:center;gap:0.5rem;color:#374151;">
-                    <input type="checkbox" name="group_requires_approval" {% if lesson.group_requires_approval %}checked{% endif %}>
-                    <span><strong>Require my approval before a group session starts</strong> — when enabled, students wait until you approve under <em>Group Approvals</em>. Prevents adding many students just to skip the lesson. Leave unchecked for auto-approve.</span>
+                    <span><strong>Allow group sessions</strong> — students may complete this lesson together on one device. When enabled, group sessions start immediately (no separate teacher approval).</span>
                 </label>
                 <label style="display:flex;align-items:center;gap:0.5rem;color:#374151;">
                     <span><strong>Max group size:</strong></span>

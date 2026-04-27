@@ -54,13 +54,6 @@ def get_staff_context(request):
         if institution is not None:
             flag_qs = flag_qs.filter(institution=institution)
 
-        approvals_qs = TutorSession.objects.filter(
-            group_approval_status=TutorSession.GroupApprovalStatus.PENDING,
-            status=TutorSession.Status.ACTIVE,
-        )
-        if institution is not None:
-            approvals_qs = approvals_qs.filter(institution=institution)
-
         validator_count = _validator_flagged_count(institution)
 
         return {
@@ -70,7 +63,6 @@ def get_staff_context(request):
             'all_schools': all_schools,
             'is_aggregated': institution is None,
             'unreviewed_flag_count': flag_qs.count() + validator_count,
-            'pending_group_approvals_count': approvals_qs.count(),
             'can_edit_content': True,  # Superadmin always has full access
         }
 
@@ -99,11 +91,6 @@ def get_staff_context(request):
     flag_qs = TutorSession.objects.filter(
         is_flagged=True, flag_reviewed=False, institution=institution
     )
-    approvals_qs = TutorSession.objects.filter(
-        group_approval_status=TutorSession.GroupApprovalStatus.PENDING,
-        status=TutorSession.Status.ACTIVE,
-        institution=institution,
-    )
     validator_count = _validator_flagged_count(institution)
 
     from apps.accounts.models import PlatformConfig
@@ -116,7 +103,6 @@ def get_staff_context(request):
         'all_schools': staff_schools if len(staff_schools) > 1 else [],
         'is_aggregated': False,
         'unreviewed_flag_count': flag_qs.count() + validator_count,
-        'pending_group_approvals_count': approvals_qs.count(),
         'can_edit_content': config.teachers_can_edit_content,
     }
 
@@ -343,99 +329,9 @@ def dashboard_home(request):
         'course_progress': course_progress,
         'activity_data': json.dumps(activity_data),
         'progress_stats': progress_stats,
-        'pending_group_approvals_count': pending_group_approvals_count(institution),
     }
 
     return render(request, 'dashboard/home.html', context)
-
-
-# ============================================================================
-# Group session approvals (memory/group_lessons_v2_plan.md H4)
-# ============================================================================
-
-def pending_group_approvals_count(institution) -> int:
-    """Count of group sessions awaiting teacher approval for the given
-    institution. Used in the dashboard nav badge."""
-    qs = TutorSession.objects.filter(
-        group_approval_status=TutorSession.GroupApprovalStatus.PENDING,
-        status=TutorSession.Status.ACTIVE,
-    )
-    return filter_by_institution(qs, institution).count()
-
-
-@teacher_required
-def group_approvals_page(request):
-    """Page listing pending group session approvals for this institution."""
-    institution = request.staff_ctx['institution']
-    qs = TutorSession.objects.filter(
-        group_approval_status=TutorSession.GroupApprovalStatus.PENDING,
-        status=TutorSession.Status.ACTIVE,
-    ).select_related('lesson', 'lesson__unit', 'lesson__unit__course', 'student')
-    qs = filter_by_institution(qs, institution)
-
-    pending = []
-    for session in qs.order_by('-started_at'):
-        active_participants = session.participants.filter(
-            is_active=True,
-        ).select_related('student')
-        pending.append({
-            'session': session,
-            'participants': [p.student for p in active_participants],
-        })
-
-    context = {
-        **request.staff_ctx,
-        'pending': pending,
-    }
-    return render(request, 'dashboard/group_approvals.html', context)
-
-
-@teacher_required
-@require_POST
-def group_approval_decide(request, session_id):
-    """Approve or deny a pending group session.
-
-    POST body: {"decision": "approve"} or {"decision": "deny"}
-    Decision is recorded with the teacher's user + a timestamp.
-    On deny: secondary participants are deactivated; primary continues solo.
-    """
-    institution = request.staff_ctx['institution']
-    qs = filter_by_institution(TutorSession.objects.all(), institution)
-    session = get_object_or_404(qs, id=session_id)
-
-    if session.group_approval_status != TutorSession.GroupApprovalStatus.PENDING:
-        return JsonResponse({"error": "not_pending"}, status=400)
-
-    try:
-        body = json.loads(request.body or "{}")
-    except (ValueError, TypeError):
-        body = {}
-    decision = (body.get("decision") or request.POST.get("decision") or "").lower()
-    if decision not in ("approve", "deny"):
-        return JsonResponse({"error": "invalid_decision"}, status=400)
-
-    if decision == "approve":
-        session.group_approval_status = TutorSession.GroupApprovalStatus.APPROVED
-    else:
-        session.group_approval_status = TutorSession.GroupApprovalStatus.DENIED
-        # Deactivate non-primary participants on deny.
-        from apps.tutoring.models import SessionParticipant
-        SessionParticipant.objects.filter(
-            session=session, is_active=True, is_primary=False,
-        ).update(is_active=False, left_at=timezone.now())
-
-    session.group_approval_decided_by = request.user
-    session.group_approval_decided_at = timezone.now()
-    session.save(update_fields=[
-        'group_approval_status',
-        'group_approval_decided_by',
-        'group_approval_decided_at',
-    ])
-    return JsonResponse({
-        "ok": True,
-        "session_id": session.id,
-        "status": session.group_approval_status,
-    })
 
 
 # ============================================================================
@@ -836,9 +732,16 @@ def course_detail(request, course_id):
         material_q |= Q(curriculum_upload_id=upload_id)
     materials = TeachingMaterialUpload.objects.filter(material_q).distinct()
 
-    # Check both: any lesson with 'generating' status, OR an active upload still processing
+    # Check both: any lesson with 'generating' status, OR an active upload
+    # still processing. Stale uploads (no updates in 5+ min) are ignored —
+    # they're almost always orphaned threads from a worker recycle, and
+    # treating them as "active" pins the page in a permanent auto-refresh
+    # loop that interrupts file uploads.
+    from datetime import timedelta
+    stale_cutoff = timezone.now() - timedelta(minutes=5)
     active_upload = CurriculumUpload.objects.filter(
         created_course=course, status='processing',
+        updated_at__gte=stale_cutoff,
     ).order_by('-created_at').first()
 
     is_generating = (
@@ -884,7 +787,9 @@ def course_detail(request, course_id):
         'is_generating': is_generating,
         'active_upload': active_upload,
         'materials': materials,
-        'materials_processing': materials.filter(status='processing').exists(),
+        'materials_processing': materials.filter(
+            status='processing', updated_at__gte=stale_cutoff,
+        ).exists(),
         'material_types': TeachingMaterialUpload.MaterialType.choices,
         'is_platform_wide': is_platform_wide,
         'course_read_only': course_read_only,
@@ -3245,11 +3150,9 @@ def lesson_approve(request, lesson_id):
 @require_POST
 def lesson_group_settings(request, lesson_id):
     """Update group-session settings on a lesson:
-      - allow_group_mode (bool)
+      - allow_group_mode (bool) — single gate. When enabled, group
+        sessions start immediately (no separate teacher approval).
       - max_group_size (int)
-      - group_requires_approval (bool) — when True, group sessions are
-        gated until a teacher approves them. False = auto-approve.
-    See memory/group_lessons_v2_plan.md.
     """
     from apps.curriculum.models import Lesson
 
@@ -3264,7 +3167,6 @@ def lesson_group_settings(request, lesson_id):
         lesson = get_object_or_404(Lesson, id=lesson_id)
 
     lesson.allow_group_mode = request.POST.get('allow_group_mode') == 'on'
-    lesson.group_requires_approval = request.POST.get('group_requires_approval') == 'on'
     try:
         size = int(request.POST.get('max_group_size', '4') or 4)
     except (ValueError, TypeError):
@@ -3272,7 +3174,6 @@ def lesson_group_settings(request, lesson_id):
     lesson.max_group_size = max(2, min(size, 10))
     lesson.save(update_fields=[
         'allow_group_mode',
-        'group_requires_approval',
         'max_group_size',
     ])
     messages.success(request, "Group session settings updated.")
@@ -3989,6 +3890,9 @@ def course_edit(request, course_id):
         course.units.all().delete()
 
         # Re-plan lessons only (skip text extraction + vectorization — already done)
+        # Auto-completes after replan: the user already explicitly chose to
+        # re-parse, so we don't ask them to "approve" the result on a separate
+        # page. They'd just see an empty course in between and think it failed.
         def _replan(upload_id, course_id, duration):
             import django.db
             django.db.connections.close_all()
@@ -4021,16 +3925,21 @@ def course_edit(request, course_id):
                 up.parsed_data = structure
                 up.save()
 
-                if lessons_count > 0:
-                    up.status = 'review'
-                    up.add_log("⏸️ Ready for review — check the structure then approve.")
-                    up.save()
-                else:
+                if lessons_count <= 0:
                     up.status = 'failed'
                     up.error_message = 'No lessons extracted'
+                    up.add_log("❌ No lessons extracted — leaving course empty. Try uploading the curriculum again.")
                     up.save()
+                    print(f"[Reparse] FAILED: 0 lessons extracted", flush=True)
+                    return
 
-                print(f"[Reparse] Done: {units_count} units, {lessons_count} lessons", flush=True)
+                # Auto-complete: rebuild units/lessons immediately. Without
+                # this, the course stays empty until the teacher visits the
+                # curriculum_process page and clicks Approve.
+                up.add_log("🛠️ Re-creating units & lessons from new structure...")
+                up.save()
+                complete_curriculum_upload(up.id)
+                print(f"[Reparse] Done: {units_count} units, {lessons_count} lessons (auto-completed)", flush=True)
 
             except Exception as e:
                 print(f"[Reparse] FAILED: {e}", flush=True)
@@ -4045,8 +3954,8 @@ def course_edit(request, course_id):
                     pass
 
         run_async(_replan, upload.id, course.id, new_duration)
-        messages.success(request, f"Re-planning lessons with {new_duration}-minute target. Vision extraction will analyze the PDF pages.")
-        return redirect('dashboard:curriculum_process', upload_id=upload.id)
+        messages.success(request, f"Re-planning lessons with {new_duration}-minute target. Vision extraction will analyze the PDF pages — refresh in ~1 minute to see the new units.")
+        return redirect('dashboard:course_detail', course_id=course.id)
 
     messages.success(request, f"Course updated.")
     return redirect('dashboard:course_detail', course_id=course.id)

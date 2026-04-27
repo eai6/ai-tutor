@@ -101,10 +101,6 @@ urlpatterns = [
     # School picker
     path('switch-school/', views.switch_school, name='switch_school'),
 
-    # Group session approvals (memory/group_lessons_v2_plan.md H4)
-    path('group-approvals/', views.group_approvals_page, name='group_approvals'),
-    path('group-approvals/<int:session_id>/decide/', views.group_approval_decide, name='group_approval_decide'),
-
     # Admin utilities
     path('admin/seed-demo/', views.seed_demo_school, name='seed_demo'),
 ]

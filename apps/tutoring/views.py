@@ -1022,10 +1022,9 @@ def _try_add_participant(session, entry: dict, primary_institution) -> dict:
             existing.is_active = True
             existing.left_at = None
             existing.save(update_fields=["is_active", "left_at"])
-        _maybe_trigger_group_approval(session)
         return {
             "ok": True,
-            "requires_approval": session.group_approval_status == TutorSession.GroupApprovalStatus.PENDING,
+            "requires_approval": False,
             "participant": {
                 "id": existing.id, "user_id": user.id, "username": user.username,
                 "is_primary": existing.is_primary, "is_active": existing.is_active,
@@ -1035,30 +1034,14 @@ def _try_add_participant(session, entry: dict, primary_institution) -> dict:
     participant = SessionParticipant.objects.create(
         session=session, student=user, is_active=True, is_primary=False,
     )
-    _maybe_trigger_group_approval(session)
     return {
         "ok": True,
-        "requires_approval": session.group_approval_status == TutorSession.GroupApprovalStatus.PENDING,
+        "requires_approval": False,
         "participant": {
             "id": participant.id, "user_id": user.id, "username": user.username,
             "is_primary": False, "is_active": True,
         },
     }
-
-
-def _maybe_trigger_group_approval(session) -> None:
-    """When the session becomes a group AND the lesson requires teacher
-    approval, flip the status to 'pending'. No-op once the session is
-    already in a non-not_required state (idempotent on subsequent adds)."""
-    from apps.tutoring.models import TutorSession
-    if not session.lesson.group_requires_approval:
-        return
-    if not session.is_group:
-        return
-    if session.group_approval_status != TutorSession.GroupApprovalStatus.NOT_REQUIRED:
-        return
-    session.group_approval_status = TutorSession.GroupApprovalStatus.PENDING
-    session.save(update_fields=['group_approval_status'])
 
 
 @login_required
@@ -1082,8 +1065,6 @@ def session_participants(request, session_id):
             "max_group_size": session.lesson.max_group_size,
             "allow_group_mode": session.lesson.allow_group_mode,
             "lesson_started": lesson_started,
-            "group_requires_approval": session.lesson.group_requires_approval,
-            "group_approval_status": session.group_approval_status,
             "participants": [
                 {
                     "id": p.id,
