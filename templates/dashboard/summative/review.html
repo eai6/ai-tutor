@@ -1,0 +1,142 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}{{ course.title }} — Summative Exam{% endblock %}
+{% block page_title %}{{ course.title }} — Summative Exam{% endblock %}
+
+{% block content %}
+<style>
+    .sm-pill { display:inline-block; padding:0.15rem 0.55rem; border-radius:999px; font-size:0.7rem; font-weight:600; }
+    .sm-pill.mcq { background:#dbeafe; color:#1e40af; }
+    .sm-pill.short_answer { background:#fef3c7; color:#92400e; }
+    .sm-pill.data_interpretation { background:#fae8ff; color:#86198f; }
+    .sm-pill.fill_in_blank { background:#e0e7ff; color:#3730a3; }
+    .sm-pill.matching { background:#fee2e2; color:#991b1b; }
+    .sm-pill.easy { background:#dcfce7; color:#166534; }
+    .sm-pill.medium { background:#f3f4f6; color:#374151; }
+    .sm-pill.hard { background:#fef3c7; color:#92400e; }
+    .sm-pill.tag { background:#ede9fe; color:#5b21b6; }
+    .qrow { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:0.85rem 1rem; margin-bottom:0.55rem; }
+    .qmeta { font-size:0.72rem; color:#6b7280; margin-top:0.25rem; }
+    .coverage-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:0.4rem; }
+    .coverage-cell { background:#fff; border:1px solid #e5e7eb; border-radius:6px; padding:0.4rem 0.65rem; font-size:0.78rem; display:flex; justify-content:space-between; gap:0.5rem; }
+    .coverage-cell.thin { background:#fef2f2; border-color:#fca5a5; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:var(--gray-500);font-size:0.85rem;text-decoration:none;">← Back to {{ course.title }}</a>
+    <div style="display:flex;gap:0.4rem;">
+        {% if summative %}
+        <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('Regenerate the summative? Existing questions will be replaced.');">↻ Regenerate</button>
+        </form>
+        <form method="post" action="{% url 'dashboard:summative_publish' course.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm" style="{% if summative.is_published %}background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;{% else %}background:#5b21b6;color:#fff;border:none;{% endif %}padding:0.45rem 0.9rem;border-radius:6px;font-weight:600;">
+                {% if summative.is_published %}Unpublish{% else %}Publish{% endif %}
+            </button>
+        </form>
+        {% else %}
+        <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">⚡ Generate Summative</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+{% if not summative %}
+<div class="card" style="text-align:center;padding:2.5rem 1.5rem;">
+    <h3 style="margin:0 0 0.5rem;color:var(--gray-700);">No summative exam yet</h3>
+    <p style="color:var(--gray-500);margin:0 0 1.25rem;font-size:0.92rem;">
+        Generate a 90-question summative covering every teaching objective in
+        <strong>{{ course.title }}</strong>. Each student attempt sees 30 questions
+        stratified across all objectives.
+    </p>
+    <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">⚡ Generate Summative</button>
+    </form>
+    <p style="color:var(--gray-400);font-size:0.78rem;margin-top:1rem;">
+        Generation queries the knowledge base for any uploaded question banks /
+        past exam papers and mirrors their format. Takes ~1–2 minutes.
+    </p>
+</div>
+{% else %}
+<div class="card" style="margin-bottom:1rem;">
+    <div class="card-header">
+        <h2 class="card-title">Bank summary</h2>
+        <span style="font-size:0.8rem;color:var(--gray-500);">
+            {% if summative.is_published %}<span style="color:#166534;font-weight:600;">● Published</span>{% else %}<span style="color:#92400e;font-weight:600;">● Draft</span>{% endif %}
+            · created {{ summative.created_at|date:"M j, H:i" }}
+        </span>
+    </div>
+    <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem 2rem;font-size:0.9rem;color:#111;margin-bottom:0.75rem;">
+            <div><strong>{{ coverage.total }}</strong> / {{ coverage.target_count }} questions in bank</div>
+            <div><strong>{{ coverage.unique_tags }}</strong> teaching objectives covered</div>
+            <div><strong>{{ summative.questions_per_attempt }}</strong> served per student attempt</div>
+            <div>Pass: {{ summative.passing_score }} of {{ summative.questions_per_attempt }} ({{ summative.passing_score|floatformat:0 }} of {{ summative.questions_per_attempt|floatformat:0 }})</div>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            {% for diff, n in coverage.by_difficulty.items %}
+            <span class="sm-pill {{ diff }}">{{ diff|capfirst }}: {{ n }}</span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div class="card-header">
+        <h2 class="card-title">Coverage by teaching objective</h2>
+        <span style="font-size:0.78rem;color:var(--gray-500);">objectives with &lt;2 questions are flagged</span>
+    </div>
+    <div class="card-body">
+        <div class="coverage-grid">
+            {% for tag, n in coverage.by_tag.items %}
+            <div class="coverage-cell {% if n < 2 %}thin{% endif %}" title="{{ tag }}">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ tag }}</span>
+                <strong>{{ n }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">All {{ questions|length }} questions</h2>
+    </div>
+    <div class="card-body" style="padding:0.75rem 1rem;">
+        {% for q in questions %}
+        <div class="qrow">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;flex-wrap:wrap;">
+                <div style="flex:1;min-width:240px;">
+                    <span class="sm-pill {{ q.question_type }}">{{ q.get_question_type_display }}</span>
+                    <span class="sm-pill {{ q.difficulty }}">{{ q.get_difficulty_display }}</span>
+                    {% if q.concept_tag %}<span class="sm-pill tag" title="{{ q.concept_tag }}">{{ q.concept_tag|truncatechars:60 }}</span>{% endif %}
+                    <div style="margin-top:0.5rem;color:#111;font-size:0.92rem;">{{ q.question_text }}</div>
+                    {% if q.question_type == 'mcq' %}
+                    <ol type="A" style="margin:0.5rem 0 0 1.25rem;padding:0;font-size:0.88rem;color:#374151;">
+                        <li>{{ q.option_a }}{% if q.correct_answer == 'A' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
+                        <li>{{ q.option_b }}{% if q.correct_answer == 'B' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
+                        <li>{{ q.option_c }}{% if q.correct_answer == 'C' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
+                        <li>{{ q.option_d }}{% if q.correct_answer == 'D' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
+                    </ol>
+                    {% endif %}
+                    {% if q.answer_data.figure_svg %}
+                    <div style="margin-top:0.5rem;max-width:480px;">{{ q.answer_data.figure_svg|safe }}</div>
+                    {% endif %}
+                    {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:#374151;"><strong>Answer:</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
+                    {% if q.explanation %}<div class="qmeta">{{ q.explanation }}</div>{% endif %}
+                </div>
+                <div style="font-size:0.7rem;color:var(--gray-400);">#{{ q.order_index|add:1 }}</div>
+            </div>
+        </div>
+        {% empty %}
+        <p style="color:var(--gray-500);padding:1rem;">No questions yet — generation may still be running. Refresh in a minute.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

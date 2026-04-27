@@ -116,6 +116,11 @@ urlpatterns = [
     # Help / FAQ (Pilot Task 3)
     path('help/', views.help_index, name='help_index'),
 
+    # Summative course exams
+    path('curriculum/course/<int:course_id>/summative/', views.summative_review, name='summative_review'),
+    path('curriculum/course/<int:course_id>/summative/generate/', views.summative_generate, name='summative_generate'),
+    path('curriculum/course/<int:course_id>/summative/publish/', views.summative_publish, name='summative_publish'),
+
     # Admin utilities
     path('admin/seed-demo/', views.seed_demo_school, name='seed_demo'),
 ]

@@ -5258,3 +5258,109 @@ def help_index(request):
     return render(request, 'help/index.html', {
         'is_staff_user': is_staff_user,
     })
+
+
+# ============================================================================
+# Course-level summative exams (Pilot)
+# ============================================================================
+
+@teacher_required
+@require_POST
+def summative_generate(request, course_id):
+    """Kick off summative generation for a course in the background."""
+    from apps.dashboard.background_tasks import run_async
+    from apps.tutoring.summative_generator import generate_summative_for_course
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        course = get_object_or_404(
+            Course,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=course_id,
+        )
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    def _run(cid):
+        import django.db
+        django.db.connections.close_all()
+        try:
+            from apps.curriculum.models import Course as _Course
+            c = _Course.objects.get(id=cid)
+            print(f"[Summative] starting generation for {c.title}", flush=True)
+            result = generate_summative_for_course(c)
+            print(f"[Summative] done: {result}", flush=True)
+        except Exception as e:
+            print(f"[Summative] FAILED: {e}", flush=True)
+            import traceback; traceback.print_exc()
+
+    run_async(_run, course.id)
+    messages.success(
+        request,
+        f"Generating summative exam for {course.title}. Check back in 1–2 minutes.",
+    )
+    return redirect('dashboard:summative_review', course_id=course.id)
+
+
+@teacher_required
+def summative_review(request, course_id):
+    """Teacher review of a course summative bank."""
+    from apps.tutoring.models import ExitTicket
+    from apps.tutoring.summative_selection import coverage_report
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        course = get_object_or_404(
+            Course,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=course_id,
+        )
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    summative = ExitTicket.objects.filter(
+        course=course,
+        assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
+    ).first()
+
+    coverage = None
+    questions = []
+    if summative:
+        coverage = coverage_report(summative)
+        questions = list(summative.questions.order_by('order_index'))
+
+    return render(request, 'dashboard/summative/review.html', {
+        **request.staff_ctx,
+        'course': course,
+        'summative': summative,
+        'coverage': coverage,
+        'questions': questions,
+    })
+
+
+@teacher_required
+@require_POST
+def summative_publish(request, course_id):
+    """Toggle is_published on the course summative."""
+    from apps.tutoring.models import ExitTicket
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        course = get_object_or_404(
+            Course,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=course_id,
+        )
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    summative = get_object_or_404(
+        ExitTicket,
+        course=course,
+        assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
+    )
+    summative.is_published = not summative.is_published
+    summative.save(update_fields=['is_published'])
+    state = 'published' if summative.is_published else 'unpublished'
+    messages.success(request, f"Summative exam {state} for {course.title}.")
+    return redirect('dashboard:summative_review', course_id=course.id)
