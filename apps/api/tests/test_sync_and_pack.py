@@ -63,6 +63,22 @@ class OfflinePackTest(TestCase):
         c.get(f'/api/v1/lessons/{self.lesson.id}/offline-pack/?refresh=1')
         self.assertEqual(LessonPackVersion.objects.filter(lesson=self.lesson).count(), 2)
 
+    def test_offline_pack_policy_v2_fields(self):
+        """v2 policy ships pieces the on-device runner needs to drive
+        the tutor without hitting the server."""
+        c = self._client()
+        resp = c.get(f'/api/v1/lessons/{self.lesson.id}/offline-pack/')
+        policy = resp.json()['policy']
+        self.assertEqual(policy['version'], 2)
+        self.assertIn('system_prompt_template', policy)
+        self.assertIn('context_chunks', policy)
+        self.assertIsInstance(policy['context_chunks'], list)
+        self.assertGreater(len(policy['system_prompt_template']), 100)
+        # 'teach' step has no answer expected → evaluator_kind 'none'
+        step0 = policy['steps'][0]
+        self.assertEqual(step0['evaluator_kind'], 'none')
+        self.assertIn('step_id', step0)
+
 
 class SyncEndpointTest(TestCase):
     @classmethod

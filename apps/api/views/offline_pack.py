@@ -40,28 +40,135 @@ from apps.tutoring.models import (
 )
 
 
+def _evaluator_kind_for(step) -> str:
+    """Pick the evaluator the mobile runner should use for this step.
+
+    Three modes:
+    - 'deterministic': numeric / mcq / true-false / short-text-with-expected.
+      Mobile grader handles entirely; no LLM call needed for correctness.
+    - 'llm': free-text / explanation answers. On-device LLM judges, with
+      mobile-side safety valves (max_attempts, min_exchanges).
+    - 'none': step doesn't expect an answer (teach / summary). Just
+      advance after the configured exchange count.
+    """
+    answer_type = (step.answer_type or '').lower()
+    if answer_type in ('none', ''):
+        return 'none'
+    if answer_type in ('multiple_choice', 'true_false', 'short_numeric'):
+        return 'deterministic'
+    if answer_type == 'free_text':
+        return 'deterministic' if (step.expected_answer or '').strip() else 'llm'
+    return 'llm'
+
+
+def _build_baked_system_prompt(lesson) -> str:
+    """Slim system prompt for the on-device tutor.
+
+    The full Python TUTOR_SYSTEM_PROMPT_TEMPLATE is ~16 KB / ~4K
+    tokens — way too much for a small on-device model's context
+    window, and a 0.5–3B model can't reliably follow that much
+    instruction anyway. The mobile runner appends per-turn
+    `<mobile_response_format>` + wrong-answer reminders + step
+    blocks on top of this baked prefix (see prompt-builder.ts).
+
+    Goal: identity + lesson context, ~600 chars / ~150 tokens.
+    """
+    institution = lesson.unit.course.institution
+    institution_name = institution.name if institution else 'our school'
+    grade_level = lesson.unit.course.grade_level or 'secondary school'
+    return (
+        f"You are a tutor for {grade_level} students in Seychelles. "
+        f"You teach by asking questions, not by giving answers.\n\n"
+        f"RULES — follow EVERY reply:\n"
+        f"1. End your reply with exactly ONE question. Never finish with a "
+        f"period. Always finish with a question mark.\n"
+        f"2. Never give the answer. Give a hint or ask a question instead.\n"
+        f"3. If the student is wrong, do not say 'correct', 'exactly', "
+        f"'great job', or 'right'. Just say what's missing and ask again.\n"
+        f"4. Keep replies short: 1–3 sentences plus the question. Under 60 words.\n\n"
+        f"EXAMPLE — what to do:\n"
+        f"Student: \"I think volcanoes are hot rocks\"\n"
+        f"You: \"Hot rocks is part of it. Where inside the Earth do those hot rocks come from?\"\n\n"
+        f"EXAMPLE — what NOT to do:\n"
+        f"Student: \"I think volcanoes are hot rocks\"\n"
+        f"You: \"That's right! Volcanoes are formed by magma rising from the mantle.\"\n"
+        f"(Wrong because you praised + revealed the answer + did not ask a question.)\n\n"
+        f"LESSON\n"
+        f"Title: {lesson.title}\n"
+        f"Goal: {lesson.objective or ''}\n"
+        f"Unit: {lesson.unit.title}\n"
+        f"Course: {lesson.unit.course.title}"
+    )
+
+
+def _collect_context_chunks(lesson, n: int = 6) -> list:
+    """Precomputed RAG snippets shipped with the pack.
+
+    Replaces live ChromaDB queries the server-side prompt builder
+    runs. Mobile runner concatenates these into the system prompt
+    instead of doing vector search on-device. The query is built
+    against the lesson's title + objective + step concept tags, so
+    the chunks are biased toward what THIS lesson covers.
+
+    Returns a list of {text, source} dicts, capped at `n`. Empty list
+    is fine — the mobile runner just gets a smaller system prompt.
+    """
+    try:
+        from apps.curriculum.knowledge_base import KnowledgeBase
+        institution_id = (
+            lesson.unit.course.institution_id if lesson.unit.course.institution_id else None
+        )
+        kb = KnowledgeBase(institution_id=institution_id)
+        result = kb.query_for_tutoring(lesson=lesson, n_results=n)
+    except Exception:
+        # KB unavailable (no ChromaDB, no vectors indexed for this
+        # institution, etc) — ship an empty list rather than failing
+        # the whole pack build.
+        return []
+
+    chunks: list = []
+    for chunk in (result.chunks or [])[:n]:
+        text = (chunk.get('text') or chunk.get('content') or '').strip()
+        if not text:
+            continue
+        meta = chunk.get('metadata') or {}
+        source_bits = [
+            meta.get('source_title') or meta.get('document_title') or '',
+            meta.get('section') or '',
+        ]
+        chunks.append({
+            'text': text[:800],
+            'source': ' / '.join(b for b in source_bits if b) or 'curriculum',
+        })
+    return chunks
+
+
 def _build_state_machine_policy(lesson) -> dict:
-    """Emit a simple state-machine policy the on-device runner consumes.
+    """Emit a self-contained state-machine policy the on-device runner consumes.
 
     See memory/offline_mobile_architecture.md ("policy-as-data state
-    machine"). The mobile runner doesn't reproduce the Python
-    ConversationalTutor logic — it walks the steps in order, applies
-    deterministic answer evaluation per answer_type, and uses the
-    on-device LLM only for the natural-language layer.
+    machine"). The mobile runner walks the steps in order, applies
+    deterministic answer evaluation per answer_type via the grader,
+    falls back to the on-device LLM only for free-text / explanation
+    steps, and never calls the server while running offline.
     """
     steps = list(lesson.steps.order_by('order_index'))
     return {
-        'version': 1,
+        'version': 2,
         'lesson_id': lesson.id,
         'session_states': ['tutoring', 'exit_ticket', 'completed'],
         'initial_state': 'tutoring',
+        'system_prompt_template': _build_baked_system_prompt(lesson),
+        'context_chunks': _collect_context_chunks(lesson),
         'steps': [
             {
                 'index': i,
+                'step_id': s.id,
                 'step_type': s.step_type,
                 'phase': s.phase,
                 'concept_tag': s.concept_tag,
                 'answer_type': s.answer_type,
+                'evaluator_kind': _evaluator_kind_for(s),
                 'expected_answer': s.expected_answer,
                 'max_attempts': s.max_attempts,
                 'min_exchanges_before_advance': 1,

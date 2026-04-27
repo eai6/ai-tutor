@@ -2967,6 +2967,21 @@ Follow the current step; this concept will be covered in sequence."""
                 bare_answer_count_for_step=bare_count,
             )
 
+        # Mobile clients pass X-Client-Form-Factor: mobile so we can keep
+        # responses short (small screens, typing on a phone). The view
+        # sets self.client_form_factor before calling start/respond/resume.
+        if getattr(self, 'client_form_factor', 'web') == 'mobile':
+            system_prompt += (
+                "\n\n<mobile_response_format>"
+                "\nThe student is on a phone. Keep responses SHORT:"
+                "\n- 1–3 short sentences per paragraph, max 2 paragraphs."
+                "\n- One question at a time, never multi-part."
+                "\n- Skip preamble like \"Great question!\" or restating what the student said."
+                "\n- Use simple plain prose. Avoid headers, long bullet lists, and tables."
+                "\n- ~80 words total per turn unless the student explicitly asks for more."
+                "\n</mobile_response_format>"
+            )
+
         return system_prompt
 
     def _build_group_session_block(self) -> str:

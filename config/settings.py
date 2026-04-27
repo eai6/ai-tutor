@@ -21,6 +21,9 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# In DEBUG, accept any host so LAN dev (mobile phone hitting Mac's IP) works.
+if DEBUG:
+    ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
@@ -267,6 +270,11 @@ if DEBUG and not CORS_ALLOWED_ORIGINS:
 CORS_ALLOW_CREDENTIALS = True
 # Only allow CORS on the API surface — never on /admin/, /tutor/, /dashboard/.
 CORS_URLS_REGEX = r'^/api/.*$'
+# Whitelist mobile-client custom headers so preflight passes.
+from corsheaders.defaults import default_headers as _default_cors_headers  # noqa: E402
+CORS_ALLOW_HEADERS = list(_default_cors_headers) + [
+    'x-client-form-factor',
+]
 
 # OpenAPI schema (drf-spectacular). Used by the RN repo to generate
 # TypeScript types via `openapi-typescript`.

@@ -34,6 +34,14 @@ def _serialize_tutor_message(msg):
     }
 
 
+def _client_form_factor(request) -> str:
+    """Read X-Client-Form-Factor header. Mobile clients ship 'mobile';
+    everything else is treated as 'web'. Used by the tutor to keep
+    responses concise on small screens."""
+    raw = (request.META.get('HTTP_X_CLIENT_FORM_FACTOR') or '').strip().lower()
+    return 'mobile' if raw == 'mobile' else 'web'
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsInstitutionMember])
 def start_session(request):
@@ -68,6 +76,7 @@ def start_session(request):
     ).first()
     if existing:
         tutor = ConversationalTutor(existing)
+        tutor.client_form_factor = _client_form_factor(request)
         msg = tutor.resume()
         return Response({
             'session_id': existing.id,
@@ -97,6 +106,7 @@ def start_session(request):
         defaults={'institution': session_institution, 'mastery_level': 'in_progress'},
     )
     tutor = ConversationalTutor(session)
+    tutor.client_form_factor = _client_form_factor(request)
     msg = tutor.start()
     return Response({'session_id': session.id, **_serialize_tutor_message(msg)},
                     status=status.HTTP_201_CREATED)
@@ -122,6 +132,7 @@ def respond(request, session_id):
         return Response({'detail': 'message required'}, status=400)
 
     tutor = ConversationalTutor(session)
+    tutor.client_form_factor = _client_form_factor(request)
     msg = tutor.respond(message)
     return Response(_serialize_tutor_message(msg))
 
