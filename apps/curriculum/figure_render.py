@@ -56,10 +56,17 @@ def render_figure_spec(spec: dict) -> Optional[str]:
     Returns the SVG string on success or None when the spec is
     invalid / unrenderable. Callers should fall back to whatever
     they were going to do without a figure.
+
+    Auto-correction: a single-dataset BAR whose values sum to ~360 or
+    ~100 (within 5%) is almost always parts-of-a-whole, not a magnitude
+    comparison. The LLM regularly picks 'bar' for "angles around a
+    point" questions and we silently coerce to 'pie' so the chart
+    actually communicates the proportions.
     """
     cleaned, err = coerce_plot_spec(spec)
     if err or not cleaned:
         return None
+    cleaned = _maybe_coerce_to_pie(cleaned)
     chart_type = cleaned['type']
     if chart_type == 'bar':
         return _render_bar(cleaned)
@@ -70,6 +77,45 @@ def render_figure_spec(spec: dict) -> Optional[str]:
     if chart_type == 'scatter':
         return _render_scatter(cleaned)
     return None
+
+
+def _maybe_coerce_to_pie(spec: dict) -> dict:
+    """Detect bar charts that should obviously be pies (parts of a whole).
+
+    Triggers only when ALL of:
+      - type is 'bar'
+      - exactly one dataset
+      - all values are non-negative
+      - values sum to 360 ± 5% (angles) or 100 ± 5% (percentages)
+      OR the title / labels contain 'angle', 'sector', 'percent', '%'.
+    """
+    try:
+        if (spec.get('type') or '').lower() != 'bar':
+            return spec
+        datasets = spec.get('datasets') or []
+        if len(datasets) != 1:
+            return spec
+        values = [_as_float(v) for v in (datasets[0].get('data') or [])]
+        if not values or any(v < 0 for v in values):
+            return spec
+        total = sum(values)
+        title_lower = (spec.get('title') or '').lower()
+        y_label_lower = (spec.get('y_label') or '').lower()
+        x_label_lower = (spec.get('x_label') or '').lower()
+        haystack = f"{title_lower} {y_label_lower} {x_label_lower}"
+        keywords = ('angle', 'degrees', '°', 'sector', 'percent', 'share', 'proportion')
+        looks_like_parts = any(kw in haystack for kw in keywords)
+
+        sums_to_360 = 342 <= total <= 378  # 360 ± 5%
+        sums_to_100 = 95 <= total <= 105   # 100 ± 5%
+
+        if sums_to_360 or sums_to_100 or (looks_like_parts and total > 0):
+            new_spec = dict(spec)
+            new_spec['type'] = 'pie'
+            return new_spec
+        return spec
+    except Exception:
+        return spec
 
 
 # ─── Renderers ────────────────────────────────────────────────────────

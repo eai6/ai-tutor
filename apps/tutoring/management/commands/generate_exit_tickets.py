@@ -69,16 +69,32 @@ FIGURE_SPEC SCHEMA — the server renders these to correct SVG:
 - Numbers must be plain numbers — no commas, no units in the value (units belong in y_label).
 - Cite a `source` string for real data; "Hypothetical data" is fine when invented.
 
+CHART-TYPE GUIDE — pick the right shape, not just any shape:
+- pie: parts of a whole. Values sum to a meaningful total (100% of a budget,
+  360° of angles around a point, market share, percentage breakdown).
+  IF VALUES SUM TO 100 OR 360, USE PIE — NEVER bar.
+- bar: comparing magnitudes that don't share a total (population by city,
+  test score per student, height of buildings).
+- line: a trend over an ordered axis, usually time (prices over weeks,
+  temperature over months).
+- scatter: relationship / correlation between two quantitative variables.
+
 VISUAL CONTENT RULES:
-- Chartable data → emit `figure_spec`. The server renders correct SVG with positions calculated from values.
+- Chartable data → emit `figure_spec` with the right chart type per the guide above.
+- NOT EVERY FIGURE IS A CHART. For geometry questions (a specific angle's
+  measure, a triangle's interior angles, a labelled rectangle/circle),
+  emit a precise inline SVG inside `data_description` rather than forcing a
+  bar/line `figure_spec` that won't communicate geometry. EXCEPTION: when
+  the question is "angles around a point sum to 360°" or any sectors-of-a-
+  circle question, use `figure_spec.type='pie'` — pie correctly visualises
+  proportions of a circle.
 - Non-chartable tabular reference data → emit `data_description` (HTML table only).
-- DO NOT emit inline `<svg>` charts. DO NOT emit `plot_spec` (legacy name).
-- Geometric shapes for math (area/perimeter) are the ONE exception — keep them as inline SVG since they're precise + cheap. See "Geometric shape" example below.
+- DO NOT emit inline `<svg>` charts (bar/line/pie). DO NOT emit `plot_spec` (legacy name).
 
-Geometric shape (math only — keep as inline SVG):
-<svg width='200' height='150' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
+Geometric shape (math only — inline SVG inside `data_description`):
+<svg width='220' height='180' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
 
-ALL 3 DATA_INTERPRETATION questions (Q13-15) must include a `figure_spec` (or, only when the data is intrinsically tabular, a `data_description` HTML table).
+ALL 3 DATA_INTERPRETATION questions (Q13-15) must include a `figure_spec` OR a `data_description` (HTML table or inline geometry SVG).
 
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (straightforward calculations, single step)
@@ -141,20 +157,51 @@ FIGURE_SPEC SCHEMA — the server renders these to correct SVG:
 - Numbers must be plain numbers — no commas, no units in the value (units belong in y_label).
 - Cite a `source` string for real data; "Hypothetical data" is fine when invented.
 
+CHART-TYPE GUIDE — pick the right shape, not just any shape:
+- pie: parts of a whole. Values sum to a meaningful total (100% of a budget,
+  360° of angles around a point, market share, percentage breakdown).
+  IF VALUES SUM TO 100 OR 360, USE PIE — NEVER bar.
+- bar: comparing magnitudes that don't share a total (population by city,
+  test score per student, height of buildings).
+- line: a trend over an ordered axis, usually time (prices over weeks,
+  temperature over months).
+- scatter: relationship / correlation between two quantitative variables.
+
 VISUAL CONTENT RULES:
-1. DATA_INTERPRETATION questions MUST have either a `figure_spec` (chart) or a `data_description` (HTML table):
-   - Default to `figure_spec`: structured JSON the server renders as correct SVG with bars/lines sized to actual values.
-   - Use `data_description` (HTML table) only when the data is genuinely tabular and not chartable.
+1. DATA_INTERPRETATION questions MUST have either a `figure_spec` (chart),
+   `data_description` (HTML table), or, for geometry questions, an inline
+   geometry SVG (see rule 3). They must NOT be all-text.
 
-2. DO NOT emit inline `<svg>` chart code. DO NOT emit `plot_spec` (legacy name — use `figure_spec` instead).
-   Charts are rendered by the server from `figure_spec`, not drawn by the LLM.
+2. NOT EVERY FIGURE IS A CHART. If the question is about **geometry** (a
+   specific angle's measure, a triangle's interior angles, a labelled
+   rectangle/circle), do NOT emit a bar/line/scatter `figure_spec`. Either:
+     a) Emit a small inline geometry SVG in `data_description` (preferred
+        for visualising one specific shape; see rule 3), OR
+     b) Use `figure_spec.type='pie'` if the question is "angles around a
+        point sum to 360°" or "sectors of a circle" — that IS proportional
+        data and pie charts visualise it correctly.
+   Bar charts of "angle in degrees per zone" do not communicate angle —
+   skip them.
 
-3. For MATH subjects: simple geometric shapes (area, perimeter, angles) STAY as inline SVG — they're precise and cheap. Use the example below.
-   Example: <svg width='200' height='200' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
+3. For MATH geometry shapes (specific angles, triangles, rectangles,
+   circles, polygons): emit precise inline SVG inside `data_description`.
+   Position every element with calculated coordinates; never invent positions.
+   Example: <svg width='220' height='220' xmlns='http://www.w3.org/2000/svg'>
+     <rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/>
+     <text x='70' y='25' font-size='12'>8 cm</text>
+     <text x='155' y='75' font-size='12'>5 cm</text>
+   </svg>
 
-4. For GEOGRAPHY subjects: use `figure_spec` for any chart. For raw tables of facts, use `data_description` HTML tables.
+4. DO NOT emit inline `<svg>` chart code (bar/line/pie). DO NOT emit
+   `plot_spec` (legacy — use `figure_spec`). Charts are rendered by the
+   server from `figure_spec`, not drawn by the LLM.
 
-5. For MCQ questions that need a chart: set `figure_spec` in answer_data so the server renders an SVG.
+5. For GEOGRAPHY subjects: use `figure_spec` for any chart-able data. Use
+   pie when values sum to 100%. For raw tables of facts, use
+   `data_description` HTML tables.
+
+6. For MCQ questions that need a chart: set `figure_spec` in answer_data so
+   the server renders an SVG. Apply the same chart-type guide above.
    {{"question_type": "mcq", "question": "Based on the chart above, which country...", "answer_data": {{"figure_spec": {{"type": "bar", ...}}}}, "option_a": "...", ...}}
 
 6. `data_description` content uses inline styles ONLY (no external CSS, no scripts). All HTML renders in a sandboxed iframe.
