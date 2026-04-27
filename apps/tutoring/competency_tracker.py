@@ -1,17 +1,16 @@
-"""Longitudinal competency tracking — per (student, teaching objective).
+"""Longitudinal competency tracking + baseline gating.
 
-A teaching objective is the atomic competency unit. Every assessment
-question is tagged with `concept_tag` = the teaching objective it
-assesses. This module aggregates *all* student attempts (per-lesson
-exit tickets + course summatives) and produces:
+Treats teaching objectives as the atomic competency unit. Aggregates
+per-student per-objective signals across all assessment attempts
+(summative + per-lesson exit tickets) to drive the dashboard. Also
+provides the baseline-summative gate that blocks a student from
+starting any lesson in a course until they've completed the course
+baseline.
 
-  - Per-student, per-objective: latest score, baseline score, final score,
-    delta, total attempts.
-  - Per-class (per-course): roll-up by objective showing how many students
-    have it at each measurement point.
-
-Used by the teacher dashboard's class-competency view and the
-per-student competency view. See `memory/summative_assessments_plan.md`.
+Every assessment question is tagged with `concept_tag` = the teaching
+objective it assesses. We aggregate per (student_id, normalized_tag)
+into baseline / latest / final / practice signals and roll up to
+class-level matrices for the dashboard.
 """
 
 from __future__ import annotations
@@ -265,3 +264,83 @@ def student_competency_table(course, student) -> dict:
             'attempts': attempts,
         })
     return {'objectives': rows}
+
+
+# ============================================================================
+# Baseline gate — blocks lesson access until course baseline is complete
+# ============================================================================
+
+def baseline_required_for(student, course):
+    """Return the published summative `ExitTicket` the student must take
+    before starting any lesson in `course`, or None if no gate applies.
+
+    The gate triggers when:
+      - The course has a summative ExitTicket with `is_published=True`, AND
+      - The student has NOT completed an attempt with `purpose='baseline'`.
+
+    Staff users bypass the gate. Courses without a published summative
+    do not gate (so courses still in setup are unaffected).
+    """
+    from apps.tutoring.models import ExitTicket, ExitTicketAttempt
+
+    if not student.is_authenticated:
+        return None
+    if student.is_staff or student.is_superuser:
+        return None
+
+    summative = ExitTicket.objects.filter(
+        course=course,
+        assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
+        is_published=True,
+    ).first()
+    if not summative:
+        return None
+
+    has_baseline = ExitTicketAttempt.objects.filter(
+        exit_ticket=summative,
+        student=student,
+        purpose=ExitTicketAttempt.Purpose.BASELINE,
+        completed_at__isnull=False,
+    ).exists()
+    return None if has_baseline else summative
+
+
+def student_skills_snapshot(student, course) -> dict:
+    """Return the student's per-objective skill snapshot for tutoring use.
+
+    Pulls the latest signal per objective (preferring baseline if no
+    later signal exists) so the conversational tutor can use it to
+    decide pacing / difficulty / which objectives to drill harder.
+
+    Returns:
+        {
+            'objective_tag': {
+                'pct': float,                # 0–100
+                'level': 'mastered' | 'developing' | 'weak' | 'unassessed',
+                'source': 'baseline' | 'latest' | 'final' | None,
+                'attempts': int,
+            }, ...
+        }
+    """
+    signals = collect_objective_signals_for_course(course, students=[student])
+    snapshot: dict = {}
+    for (sid, tag), bucket in signals.items():
+        if sid != student.id:
+            continue
+        chosen = bucket['latest'] or bucket['final'] or bucket['baseline']
+        if not chosen:
+            continue
+        pct = (chosen['correct'] / chosen['total']) * 100 if chosen['total'] else 0.0
+        if pct >= 70:
+            level = 'mastered'
+        elif pct >= 40:
+            level = 'developing'
+        else:
+            level = 'weak'
+        snapshot[tag] = {
+            'pct': pct,
+            'level': level,
+            'source': chosen.get('purpose'),
+            'attempts': bucket['all_attempts'],
+        }
+    return snapshot

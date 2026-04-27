@@ -160,7 +160,17 @@
             <h2>{{ selected_subject.title }}</h2>
             <p class="text-muted">{{ selected_subject.description }}</p>
         </div>
-        
+
+        {% if selected_subject.baseline_required %}
+        <div class="card" style="background:linear-gradient(135deg,#5b21b6 0%,#8b5cf6 100%);color:#fff;padding:1.4rem 1.6rem;margin-bottom:1.5rem;border-radius:14px;box-shadow:0 12px 28px rgba(91,33,182,0.25);">
+            <h3 style="margin:0 0 0.4rem;color:#fff;font-size:1.1rem;">🎯 Take your baseline first</h3>
+            <p style="margin:0 0 1rem;color:rgba(255,255,255,0.92);font-size:0.92rem;line-height:1.55;">
+                Lessons unlock after a quick baseline. It's not a test — we use it to figure out exactly what to teach you next, so you don't waste time on stuff you already know.
+            </p>
+            <a href="{{ selected_subject.baseline_url }}" style="display:inline-block;background:#fff;color:#5b21b6;font-weight:700;padding:0.6rem 1.2rem;border-radius:999px;text-decoration:none;font-size:0.95rem;">Start baseline →</a>
+        </div>
+        {% endif %}
+
         {% for unit in selected_subject.units %}
         <div class="unit-card card{% if not forloop.first %} collapsed{% endif %}">
             <div class="unit-header" onclick="toggleUnit(this)">

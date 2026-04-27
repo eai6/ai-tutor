@@ -316,6 +316,12 @@ def lesson_catalog(request):
             grade_display = student_grade
         else:
             grade_display = format_grade_display(course.grade_level)
+
+        # Baseline-summative gate signals for the UI: locked = hide
+        # lesson list + show "Take baseline" CTA.
+        from apps.tutoring.competency_tracker import baseline_required_for
+        baseline_summative = baseline_required_for(request.user, course) if request.user.is_authenticated else None
+
         subject_data = {
             'id': course.id,
             'title': course.title,
@@ -326,6 +332,8 @@ def lesson_catalog(request):
             'progress_percent': int((completed_lessons / total_lessons * 100)) if total_lessons > 0 else 0,
             'units': units_data,
             'grade_display': grade_display,
+            'baseline_required': bool(baseline_summative),
+            'baseline_url': f"/tutor/summative/{course.id}/" if baseline_summative else None,
         }
 
         # Only add courses that have at least 1 published lesson
@@ -434,6 +442,23 @@ def chat_tutor_interface(request, lesson_id):
         # Super admin — can access any published lesson
         lesson = get_object_or_404(Lesson, id=lesson_id, is_published=True)
 
+    # Baseline gate: students must complete the course's baseline summative
+    # before starting any lesson — gives us the pre-pilot competency map
+    # and enables targeted recommendations. See competency_tracker.py.
+    from apps.tutoring.competency_tracker import baseline_required_for
+    course = lesson.unit.course if lesson.unit else None
+    if course is not None:
+        baseline_summative = baseline_required_for(request.user, course)
+        if baseline_summative:
+            django_messages.info(
+                request,
+                f"Take the {course.title} baseline first — it unlocks the lessons "
+                f"and helps the tutor focus on what you actually need.",
+            )
+            return redirect(
+                f"/tutor/summative/{course.id}/?next=/tutor/chat/lesson/{lesson.id}/"
+            )
+
     # Prerequisite check — only block if no existing session
     has_session = TutorSession.objects.filter(
         student=request.user, lesson=lesson,
@@ -533,6 +558,23 @@ def chat_start_session(request, lesson_id):
                 "message": "You need to complete prerequisite lessons first.",
                 "unmet_prerequisites": unmet_prereqs,
             }, status=400)
+
+    # Baseline gate (defense-in-depth — chat_tutor_interface enforces it
+    # at GET time; this guards against direct POSTs that bypass the page.)
+    if not existing and not completed_session:
+        from apps.tutoring.competency_tracker import baseline_required_for
+        course = lesson.unit.course if lesson.unit else None
+        if course is not None:
+            baseline_summative = baseline_required_for(request.user, course)
+            if baseline_summative:
+                return JsonResponse({
+                    "error": "baseline_required",
+                    "message": (
+                        f"Take the {course.title} baseline summative first — "
+                        f"it unlocks the lessons."
+                    ),
+                    "baseline_url": f"/tutor/summative/{course.id}/?next=/tutor/chat/lesson/{lesson.id}/",
+                }, status=400)
 
     # Resolve institution for session creation (super admins use Global)
     session_institution = institution or lesson.unit.course.institution or Institution.get_global()
@@ -1614,6 +1656,9 @@ def summative_take(request, course_id):
                 },
             )
 
+    # Carry a `?next=` so the student returns to the lesson they tried
+    # to start (when this is a baseline gate redirect).
+    next_url = request.GET.get('next', '')
     return render(request, 'tutoring/summative/take.html', {
         'course': course,
         'summative': summative,
@@ -1621,6 +1666,8 @@ def summative_take(request, course_id):
         'questions': questions,
         'total_q': len(questions),
         'pass_threshold': summative.passing_score,
+        'is_baseline': attempt.purpose == 'baseline',
+        'next_url': next_url,
     })
 
 
@@ -1674,16 +1721,20 @@ def summative_submit(request, course_id):
     attempt.score = correct
     attempt.passed = passed
     attempt.completed_at = _tz.now()
+    # Preserve `next_url` so the review page can offer "continue to your lesson".
+    next_url = body.get("next_url") or ''
     attempt.answers = {
         'selected_question_ids': selected_ids,
         'responses': {str(k): v for k, v in answers_by_id.items()},
         'result': result,
+        'next_url': next_url if next_url.startswith('/') else '',
     }
     attempt.save()
 
+    review_url = f"/tutor/summative/{course.id}/review/{attempt.id}/"
     return JsonResponse({
         "ok": True,
-        "redirect": f"/tutor/summative/{course.id}/review/{attempt.id}/",
+        "redirect": review_url,
         "score": correct,
         "total": result['total'],
         "passed": passed,

@@ -82,9 +82,9 @@
 <div class="ex-wrap">
     <div class="ex-head">
         <div>
-            <h1>{{ course.title }} — Summative Exam</h1>
+            <h1>{{ course.title }} — {% if is_baseline %}Baseline Assessment{% else %}Summative Exam{% endif %}</h1>
             <div style="font-size:0.78rem;color:#6b7280;margin-top:0.2rem;">
-                {{ total_q }} questions · pass with {{ pass_threshold }} of {{ total_q }}
+                {{ total_q }} questions{% if is_baseline %} · this is your starting point — answer what you know, skip what you don't{% else %} · pass with {{ pass_threshold }} of {{ total_q }}{% endif %}
             </div>
         </div>
         <div style="display:flex;gap:0.6rem;align-items:center;">
@@ -93,9 +93,15 @@
         </div>
     </div>
 
+    {% if is_baseline %}
+    <div style="background:#ede9fe;border:1px solid #c4b5fd;color:#5b21b6;padding:0.75rem 1rem;border-radius:10px;font-size:0.88rem;margin-bottom:1rem;line-height:1.55;">
+        🎯 <strong>This is your baseline.</strong> Don't worry if you don't know everything — we use this to figure out exactly what to teach you. Just answer what you can, leave the rest blank.
+    </div>
+    {% else %}
     <div style="background:#fef3c7;border:1px solid #fde68a;color:#92400e;padding:0.75rem 1rem;border-radius:10px;font-size:0.85rem;margin-bottom:1rem;">
         ⚠️ Once you submit, you can't retake this exam without a teacher reset. Take your time.
     </div>
+    {% endif %}
 
     {% for q in questions %}
     <div class="ex-q" data-qid="{{ q.id }}" data-qtype="{{ q.question_type }}">
@@ -152,6 +158,7 @@
 (function() {
     const totalQ = {{ total_q|default:0 }};
     const submitUrl = "{% url 'tutoring:summative_submit' course.id %}";
+    const nextUrl = "{{ next_url|default:'' }}";
 
     function getCookie(name) {
         const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
@@ -226,7 +233,7 @@
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
                 credentials: 'same-origin',
-                body: JSON.stringify({ answers }),
+                body: JSON.stringify({ answers, next_url: nextUrl }),
             });
             const data = await r.json();
             if (!r.ok) {
