@@ -113,6 +113,9 @@ urlpatterns = [
     path('feedback/submit/', views.feedback_submit, name='feedback_submit'),
     path('feedback/<int:report_id>/resolve/', views.feedback_resolve, name='feedback_resolve'),
 
+    # Help / FAQ (Pilot Task 3)
+    path('help/', views.help_index, name='help_index'),
+
     # Admin utilities
     path('admin/seed-demo/', views.seed_demo_school, name='seed_demo'),
 ]

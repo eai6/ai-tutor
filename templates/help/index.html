@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Help & FAQ — AI Tutor{% endblock %}
+
+{% block content %}
+<style>
+    .help-wrap { max-width: 880px; margin: 1rem auto 4rem; padding: 0 1rem; }
+    .help-wrap h1 { font-size: 1.6rem; color: #111; margin: 0 0 0.5rem; }
+    .help-wrap > p.lead { color: #555; margin: 0 0 1.5rem; }
+    .help-section {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.1rem 1.4rem;
+        margin-bottom: 0.85rem;
+    }
+    .help-section summary {
+        cursor: pointer;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #111;
+        padding: 0.25rem 0;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    .help-section summary::-webkit-details-marker { display: none; }
+    .help-section summary::after {
+        content: '+';
+        margin-left: auto;
+        color: #8b5cf6;
+        font-weight: 700;
+        font-size: 1.2rem;
+    }
+    .help-section[open] summary::after { content: '–'; }
+    .help-section .body { padding-top: 0.8rem; color: #333; line-height: 1.6; font-size: 0.95rem; }
+    .help-section .body h4 { color: #111; margin: 1rem 0 0.4rem; font-size: 0.95rem; }
+    .help-section .body ol, .help-section .body ul { padding-left: 1.4rem; }
+    .help-section .body li { margin-bottom: 0.3rem; }
+    .video-slot {
+        background: #f3f4f6;
+        border: 1px dashed #d1d5db;
+        border-radius: 10px;
+        padding: 0.9rem 1rem;
+        margin: 0.8rem 0;
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+    .video-slot strong { color: #5b21b6; }
+    .help-tag {
+        display: inline-block;
+        font-size: 0.7rem;
+        background: #ede9fe;
+        color: #5b21b6;
+        padding: 0.1rem 0.55rem;
+        border-radius: 999px;
+        font-weight: 600;
+        margin-right: 0.35rem;
+    }
+    .help-tag.staff { background: #fef3c7; color: #92400e; }
+    code, kbd {
+        background: #f3f4f6;
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+</style>
+
+<div class="help-wrap">
+    <h1>Help &amp; FAQ</h1>
+    <p class="lead">Quick walkthroughs and answers to common questions. If something's still off, click <strong>Help / Feedback</strong> in the bottom-right corner of any page.</p>
+
+    <details class="help-section" open>
+        <summary><span class="help-tag">All</span> Getting started</summary>
+        <div class="body">
+            <p>This is a tutoring platform that walks students through one lesson at a time. Each lesson drills a single teaching objective and ends with a short check.</p>
+
+            <h4>Sign in</h4>
+            <ol>
+                <li>Go to the home page and click <strong>Sign In</strong>.</li>
+                <li>Use the username and password your teacher gave you.</li>
+                <li>Forgot your password? Use the <strong>Forgot password</strong> link — a reset email arrives in a minute.</li>
+            </ol>
+
+            <h4>Pick a lesson</h4>
+            <ol>
+                <li>From the home page, click on a course tile.</li>
+                <li>Scroll to the lesson list and tap the lesson you want to start.</li>
+                <li>Lessons that you've already mastered show a green check; the platform suggests the next one.</li>
+            </ol>
+
+            <div class="video-slot">📹 <strong>Video coming soon:</strong> 90-second walkthrough — sign in, pick a lesson, finish a lesson.</div>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag">All</span> During a lesson</summary>
+        <div class="body">
+            <p>The tutor is conversational — type your answer the way you'd write it on paper. The tutor will guide you when you're stuck.</p>
+
+            <h4>If a problem feels too hard or too easy</h4>
+            <p>Open the menu next to the input box and tap <strong>Too hard</strong> or <strong>Too easy</strong>. The tutor will adjust.</p>
+
+            <h4>If the tutor doesn't understand your answer</h4>
+            <p>Try rephrasing in shorter sentences, or use numbers / symbols (e.g. <code>x = 4</code>). If it keeps misreading you, hit <strong>Help / Feedback</strong> and tell us what you typed.</p>
+
+            <h4>Audio</h4>
+            <p>Tap the speaker icon on a tutor message to hear it read aloud (works best with headphones).</p>
+
+            <div class="video-slot">📹 <strong>Video coming soon:</strong> What to do when you're stuck.</div>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag">All</span> Group sessions (sharing a device)</summary>
+        <div class="body">
+            <p>If your school uses shared devices, you'll have a <strong>group</strong> created by your teacher. You can add a groupmate to your session before the lesson starts.</p>
+
+            <h4>How to add your groupmate</h4>
+            <ol>
+                <li>Open the lesson — at the top you'll see your name and a <strong>+ Add groupmate</strong> button.</li>
+                <li>Tap it. A list of students in your group appears.</li>
+                <li>Tap the name of the student sitting next to you. They join immediately — no password needed.</li>
+            </ol>
+
+            <h4>What if I don't see the button?</h4>
+            <p>Either your school is in <em>individual mode</em> (everyone takes lessons solo on their own device), or your teacher hasn't put you in a group yet. Tell your teacher.</p>
+
+            <h4>Can I add anyone?</h4>
+            <p>No — only students your teacher has placed in your group. This stops random pairings.</p>
+
+            <div class="video-slot">📹 <strong>Video coming soon:</strong> Starting a paired session, 60s.</div>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag">All</span> Exit tickets &amp; mastery</summary>
+        <div class="body">
+            <p>At the end of every lesson there's a short <strong>exit ticket</strong> — typically 10 questions. Pass it and you've mastered the lesson.</p>
+            <ul>
+                <li>You need to get most questions right to pass — the threshold is shown at the top.</li>
+                <li>If you don't pass, the tutor walks you through what you missed and you can retry.</li>
+                <li>You can review your finished exit tickets on the lesson page.</li>
+            </ul>
+        </div>
+    </details>
+
+    {% if is_staff_user %}
+    <details class="help-section">
+        <summary><span class="help-tag staff">Teachers</span> Uploading curriculum</summary>
+        <div class="body">
+            <p>From <strong>Curriculum → Upload</strong>:</p>
+            <ol>
+                <li>Pick the curriculum PDF.</li>
+                <li>Set the subject and grade level.</li>
+                <li>Choose lesson duration (we recommend 20 min for the pilot).</li>
+                <li>Optionally attach teaching materials (textbooks, worksheets, past exam papers). Each material gets its own type — that drives where it shows up in the AI tutoring.</li>
+                <li>Submit. The vision-extraction parser reads the PDF and produces one lesson per teaching objective. You'll be redirected to the course page; refresh after a minute or two.</li>
+            </ol>
+            <p>To re-parse with different lesson durations: open the course, expand <strong>Re-parse &amp; Re-plan Lessons</strong>, pick a duration, click <strong>Re-parse</strong>. This deletes existing lessons and rebuilds from the source PDF.</p>
+            <div class="video-slot">📹 <strong>Video coming soon:</strong> 3-minute curriculum upload walkthrough.</div>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag staff">Teachers</span> Setting up student groups</summary>
+        <div class="body">
+            <p>Open <strong>Students → Student Groups</strong>.</p>
+            <h4>Choose your school's session mode</h4>
+            <ul>
+                <li><strong>Shared device</strong> — students share devices and can add a groupmate to their session.</li>
+                <li><strong>Individual</strong> — every student works solo. The "Add groupmate" button is hidden.</li>
+            </ul>
+            <h4>Create a group</h4>
+            <ol>
+                <li>Type a name (e.g., "Pair A" or "Group 3").</li>
+                <li>Tick the students who belong to this group. Group sizes are flexible — pairs, triples, larger.</li>
+                <li>Click <strong>Create Group</strong>.</li>
+            </ol>
+            <h4>Move a student between groups</h4>
+            <p>Open the new group's <strong>Edit</strong>, tick the student. They're moved out of their previous active group automatically.</p>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag staff">Teachers</span> Live monitoring &amp; reports</summary>
+        <div class="body">
+            <h4>Live monitor</h4>
+            <p>From a course or lesson page, click <strong>Live Monitor</strong>. You'll see active sessions, current step, and time on task. Refreshes automatically.</p>
+
+            <h4>Session report</h4>
+            <p>Open <strong>Reports → Lesson session report</strong>. Shows who passed/failed/didn't take the exit ticket, broken down by student. Click a row to read the full chat transcript.</p>
+
+            <h4>Class readiness</h4>
+            <p>From a course page, <strong>Class Readiness Report</strong> shows which lessons each student has mastered, broken down by enabling objectives.</p>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag staff">Teachers</span> Generating &amp; reviewing exit tickets</summary>
+        <div class="body">
+            <ol>
+                <li>Open a lesson. The Generate Content button creates the tutoring steps + exit ticket question bank.</li>
+                <li>Click an exit-ticket question to edit the wording, options, or the embedded chart (data-interpretation questions render server-side from a structured spec).</li>
+                <li>Mark a question as a "data interpretation" question to get an automatically rendered chart.</li>
+            </ol>
+        </div>
+    </details>
+    {% endif %}
+
+    <details class="help-section">
+        <summary><span class="help-tag">All</span> Troubleshooting</summary>
+        <div class="body">
+            <h4>The page looks frozen or stuck "Loading…"</h4>
+            <p>Refresh the page. If it keeps happening, click <strong>Help / Feedback</strong> with the page URL.</p>
+
+            <h4>I get logged out unexpectedly</h4>
+            <p>Sessions last 2 weeks. If you're being kicked out sooner, your school may have stricter cookie settings — let us know.</p>
+
+            <h4>Tutor said something wrong / inappropriate</h4>
+            <p>Click the flag icon under the message. Teachers see flagged chats under <strong>Safety → Flagged Chats</strong>.</p>
+
+            <h4>Voice / audio doesn't play</h4>
+            <p>Some browsers block autoplay audio. Tap the speaker icon to start it manually. On mobile, make sure your silent switch is off.</p>
+
+            <h4>Images aren't loading</h4>
+            <p>Slow internet — give it a few seconds. The platform caches images so a second visit is faster.</p>
+
+            <h4>Still stuck?</h4>
+            <p>Click <strong>Help / Feedback</strong> bottom-right. Tell us:</p>
+            <ul>
+                <li>What you were trying to do</li>
+                <li>What you expected</li>
+                <li>What happened instead</li>
+            </ul>
+            <p>We'll see it within 24 hours.</p>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag">All</span> About this pilot</summary>
+        <div class="body">
+            <p>This is a Seychelles pilot of the AI Tutor platform, running through 2026. Some features are still being added — if you spot a rough edge, that's why. Click <strong>Help / Feedback</strong> and tell us; the things you flag get fixed.</p>
+            <p>Thanks for being part of it 🙏</p>
+        </div>
+    </details>
+</div>
+{% endblock %}

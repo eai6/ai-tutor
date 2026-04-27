@@ -5238,3 +5238,23 @@ def feedback_resolve(request, report_id):
             report.resolution_notes = notes
     report.save()
     return redirect('dashboard:feedback_list')
+
+
+# ============================================================================
+# Help / FAQ (Pilot Task 3)
+# ============================================================================
+
+@login_required
+def help_index(request):
+    """Single-page in-app help with collapsible sections + slots for short
+    instructional videos. Same page for students and teachers; sections
+    show conditionally on role. See `memory/pilot_launch_execution.md`."""
+    is_staff_user = (
+        request.user.is_staff
+        or Membership.objects.filter(
+            user=request.user, role='staff', is_active=True,
+        ).exists()
+    )
+    return render(request, 'help/index.html', {
+        'is_staff_user': is_staff_user,
+    })
