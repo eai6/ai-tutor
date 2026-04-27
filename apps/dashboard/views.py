@@ -5387,10 +5387,18 @@ def summative_publish(request, course_id):
 
 @teacher_required
 def class_competency(request, course_id):
-    """Class-level competency heat-map: each row is a teaching objective,
-    columns are baseline / latest / final / delta. Drives the pilot's
-    main analytics surface."""
-    from apps.tutoring.competency_tracker import class_competency_matrix
+    """Class competency map — the merged readiness + competency view.
+
+    Each row is a teaching objective. Columns: baseline / latest /
+    final / Δ / mastered. Plus class-wide summary stats and a
+    recommendation block (folded in from the legacy class_readiness
+    report). Source: ExitTicketAttempt rows (summative + per-lesson
+    exit tickets).
+    """
+    from apps.tutoring.competency_tracker import (
+        class_competency_matrix,
+        collect_objective_signals_for_course,
+    )
 
     institution = request.staff_ctx['institution']
     if institution is not None:
@@ -5418,12 +5426,93 @@ def class_competency(request, course_id):
 
     matrix = class_competency_matrix(course, students=roster_ids)
 
-    # Tag → list of students with attempts for the click-through panel.
+    # Class readiness score — average of "% of class mastered (latest ≥70)"
+    # across every objective, expressed 0-100. Falls back to 0 if no data.
+    objectives = matrix['objectives']
+    total_students = matrix['total_students']
+    if objectives and total_students:
+        readiness = sum(
+            (r['mastered_latest'] / total_students) * 100 for r in objectives
+        ) / len(objectives)
+    else:
+        readiness = 0
+    readiness = round(readiness)
+
+    # Struggling objectives = where avg_latest < 50% (or no class signal yet)
+    struggling = [
+        r for r in objectives
+        if r['avg_latest_pct'] is not None and r['avg_latest_pct'] < 50
+    ]
+    untouched = [r for r in objectives if r['avg_latest_pct'] is None]
+
+    if not objectives:
+        recommendation = "No teaching objectives yet — re-parse the curriculum to populate."
+        recommendation_type = 'warning'
+    elif total_students == 0:
+        recommendation = "No students enrolled at this school yet."
+        recommendation_type = 'warning'
+    elif matrix['students_attempted'] == 0:
+        recommendation = "Students haven't taken assessments yet — once they do, this fills in."
+        recommendation_type = 'warning'
+    elif not struggling:
+        recommendation = "Strong class — every objective is averaging 50%+. Keep moving."
+        recommendation_type = 'success'
+    elif len(struggling) <= 3:
+        names = ', '.join(f'"{r["tag"][:60]}"' for r in struggling[:3])
+        recommendation = f"Revisit before moving on: {names}."
+        recommendation_type = 'warning'
+    else:
+        recommendation = (
+            f"{len(struggling)} objectives below 50%. Consider re-teaching "
+            f"the weakest unit before continuing."
+        )
+        recommendation_type = 'danger'
+
+    # Per-student gaps: who's weak on the most objectives?
+    signals = collect_objective_signals_for_course(course, students=roster_ids)
+    student_weak: dict = {}
+    for (sid, tag), bucket in signals.items():
+        latest = bucket['latest']
+        if not latest or not latest['total']:
+            continue
+        pct = (latest['correct'] / latest['total']) * 100
+        if pct < 50:
+            student_weak.setdefault(sid, []).append({'tag': tag, 'pct': pct})
+
+    student_gaps = []
+    if student_weak:
+        from django.contrib.auth.models import User as _User
+        users = {u.id: u for u in _User.objects.filter(id__in=student_weak.keys())}
+        for sid, weak_list in student_weak.items():
+            weak_list.sort(key=lambda r: r['pct'])
+            user = users.get(sid)
+            if not user:
+                continue
+            student_gaps.append({
+                'student': user,
+                'weak_count': len(weak_list),
+                'weak_objectives': [w['tag'][:80] for w in weak_list[:5]],
+            })
+        student_gaps.sort(key=lambda x: -x['weak_count'])
+        student_gaps = student_gaps[:20]
+
     return render(request, 'dashboard/competency/class.html', {
         **request.staff_ctx,
         'course': course,
         'matrix': matrix,
+        'readiness': readiness,
+        'recommendation': recommendation,
+        'recommendation_type': recommendation_type,
+        'struggling_count': len(struggling),
+        'untouched_count': len(untouched),
+        'student_gaps': student_gaps,
     })
+
+
+@teacher_required
+def class_readiness_redirect(request, course_id):
+    """Legacy URL — class readiness merged into the competency map."""
+    return redirect('dashboard:class_competency', course_id=course_id)
 
 
 @teacher_required

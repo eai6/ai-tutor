@@ -100,8 +100,8 @@
                 <div style="font-size: 0.8125rem; color: var(--gray-500); margin-bottom: 0.75rem;">
                     {{ item.eo_count }} enabling objectives &middot; {{ item.session_count }} sessions
                 </div>
-                <a href="{% url 'dashboard:class_readiness' item.course.id %}" class="btn btn-sm btn-primary" style="font-size: 0.8125rem;">
-                    Class Readiness Report
+                <a href="{% url 'dashboard:class_competency' item.course.id %}" class="btn btn-sm btn-primary" style="font-size: 0.8125rem;">
+                    Class Competency &amp; Readiness
                 </a>
             </div>
             {% endfor %}

@@ -89,7 +89,7 @@ urlpatterns = [
     
     # Reports
     path('reports/', views.reports_overview, name='reports'),
-    path('class/<int:course_id>/readiness/', views.class_readiness_report, name='class_readiness'),
+    path('class/<int:course_id>/readiness/', views.class_readiness_redirect, name='class_readiness'),
     path('lesson/<int:lesson_id>/session-report/', views.lesson_session_report, name='lesson_session_report'),
     path('lesson/<int:lesson_id>/monitor/', views.lesson_live_monitor, name='lesson_monitor'),
     path('lesson/<int:lesson_id>/send-guidance/', views.send_guidance, name='send_guidance'),
