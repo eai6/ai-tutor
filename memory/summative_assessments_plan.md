@@ -43,22 +43,38 @@ and `figure_spec` via `answer_data`.
 
 `ExitTicketAttempt` likely needs no changes; we'll re-confirm when wiring.
 
-## Generator pipeline
+## Generator pipeline (revised 2026-04-27)
 
-`apps/tutoring/summative_generator.py` (new file):
+`apps/tutoring/summative_generator.py`:
 
-1. Collect every TO + EO across every lesson in the course (input objectives).
-2. Query KB:
-   - `material_type='question_bank'` materials → format/difficulty samples.
-   - `material_type='textbook' | 'notes' | 'worksheet'` → content samples.
-3. Build a single LLM prompt. Tell it to mirror the format/length/style of
-   the question_bank samples; cover every input objective; produce exactly
-   90 questions across the 5 supported types.
-4. Parse with the existing JSON-repair path; create
-   `ExitTicket(course=..., assessment_type='summative')` and 90
-   `ExitTicketQuestion` rows tagged with `concept_tag` = the EO/TO they
-   assess.
-5. Set `question_bank_size=90`, `questions_per_attempt=30`.
+The summative is built by **aggregating** each lesson's existing exit
+ticket bank, not via a single big LLM call. Single-call generation for
+90 questions has too many failure modes (truncation at the token cap,
+one bad question kills the parse, no retry granularity). The
+per-lesson exit-ticket pipeline is already small, robust, and proven —
+we reuse it.
+
+1. Walk every Lesson in the course (ordered by unit + lesson index).
+2. For each lesson: ensure it has an exit ticket. If absent, kick the
+   existing `apps.curriculum.content_generator.generate_exit_ticket_for_lesson`.
+   That generator is the same one that backs the per-lesson Generate
+   Content button — small ~35-question call, parallel-safe.
+3. Sample K questions from each lesson's exit ticket (K = target_count /
+   num_lessons, distributed evenly with a remainder pass). Bias the
+   sample toward a 30/45/20 easy/medium/hard mix.
+4. Tag each sampled question with `concept_tag` = the lesson's
+   teaching objective (so the stratified per-attempt selector can
+   guarantee coverage).
+5. Aggregate into a single `ExitTicket(course=..., assessment_type='summative')`.
+   Trim to `target_count` if we over-sample; pad to whatever's available
+   if we under-sample (rare).
+6. Run lesson workers in a `ThreadPoolExecutor(max_workers=3)`. One
+   bad lesson doesn't poison the bank — failures are isolated and
+   logged.
+
+Net new LLM cost: zero when exit tickets already exist (the common
+case after content generation has run). Otherwise: one normal exit-
+ticket call per missing lesson, in parallel.
 
 ## Stratified selection (per student attempt)
 
