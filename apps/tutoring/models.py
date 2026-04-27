@@ -12,7 +12,7 @@ ExitTicketAttempt: Records student attempts
 from django.db import models
 from django.contrib.auth.models import User
 from apps.accounts.models import Institution
-from apps.curriculum.models import Lesson, LessonStep
+from apps.curriculum.models import Lesson, LessonStep, Course
 from apps.llm.models import PromptPack, ModelConfig
 
 
@@ -341,50 +341,114 @@ class StudentLessonProgress(models.Model):
 
 class ExitTicket(models.Model):
     """
-    A standardized exit ticket (summative assessment) for a lesson.
-    
-    Each lesson should have exactly one exit ticket with 10 MCQ questions.
-    Students need 8/10 (80%) to pass.
+    A standardized assessment built from a question bank.
+
+    Two flavours, controlled by `assessment_type`:
+      - 'exit_ticket' (lesson-level): bank of ~30, 10 served per attempt.
+      - 'summative'    (course-level): bank of ~90, 30 served per attempt,
+        stratified to cover every TO + EO across the course.
+
+    Exactly one of `lesson` or `course` is set. See
+    memory/summative_assessments_plan.md.
     """
+    class AssessmentType(models.TextChoices):
+        EXIT_TICKET = 'exit_ticket', 'Exit Ticket (lesson-level)'
+        SUMMATIVE = 'summative', 'Summative Exam (course-level)'
+
+    assessment_type = models.CharField(
+        max_length=20,
+        choices=AssessmentType.choices,
+        default=AssessmentType.EXIT_TICKET,
+    )
+
     lesson = models.OneToOneField(
         Lesson,
         on_delete=models.CASCADE,
-        related_name='exit_ticket'
+        related_name='exit_ticket',
+        null=True, blank=True,
+        help_text="Set for assessment_type='exit_ticket'.",
     )
-    
+    course = models.OneToOneField(
+        Course,
+        on_delete=models.CASCADE,
+        related_name='summative_exam',
+        null=True, blank=True,
+        help_text="Set for assessment_type='summative'.",
+    )
+
     passing_score = models.PositiveIntegerField(
         default=8,
-        help_text="Minimum correct answers to pass (out of 10)"
+        help_text="Minimum correct answers to pass."
     )
-    
+
     time_limit_minutes = models.PositiveIntegerField(
         default=10,
-        help_text="Time limit for exit ticket (0 = no limit)"
+        help_text="Time limit in minutes (0 = no limit)."
     )
-    
+
+    question_bank_size = models.PositiveIntegerField(
+        default=30,
+        help_text="Target size of the question bank. 30 for exit tickets, 90 for summatives.",
+    )
+    questions_per_attempt = models.PositiveIntegerField(
+        default=10,
+        help_text="How many questions a student sees per attempt. 10 for exit tickets, 30 for summatives.",
+    )
+
+    is_published = models.BooleanField(
+        default=False,
+        help_text="Summatives only — when False, students can't take the exam.",
+    )
+
     instructions = models.TextField(
-        default="Answer all 10 questions. You need 8 correct to pass.",
+        default="Answer all questions. You need to pass the threshold to complete.",
         blank=True
     )
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Exit Ticket"
-        verbose_name_plural = "Exit Tickets"
+        verbose_name = "Exit Ticket / Summative"
+        verbose_name_plural = "Exit Tickets & Summatives"
+        constraints = [
+            models.CheckConstraint(
+                name='exitticket_lesson_xor_course',
+                condition=(
+                    models.Q(lesson__isnull=False, course__isnull=True)
+                    | models.Q(lesson__isnull=True, course__isnull=False)
+                ),
+            ),
+        ]
 
     def __str__(self):
-        return f"Exit Ticket: {self.lesson.title}"
-    
+        if self.assessment_type == self.AssessmentType.SUMMATIVE and self.course_id:
+            return f"Summative: {self.course.title}"
+        if self.lesson_id:
+            return f"Exit Ticket: {self.lesson.title}"
+        return f"ExitTicket #{self.pk}"
+
     @property
     def question_count(self):
         return self.questions.count()
-    
+
     @property
     def is_complete(self):
-        """Check if exit ticket has a full question bank (30+)."""
-        return self.question_count >= 30
+        """Check if the question bank is fully populated."""
+        return self.question_count >= self.question_bank_size
+
+    @property
+    def is_summative(self):
+        return self.assessment_type == self.AssessmentType.SUMMATIVE
+
+    @property
+    def parent_label(self):
+        """Human-readable label for what this assessment is attached to."""
+        if self.is_summative and self.course_id:
+            return self.course.title
+        if self.lesson_id:
+            return self.lesson.title
+        return "(unattached)"
 
 
 class ExitTicketQuestion(models.Model):

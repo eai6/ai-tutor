@@ -330,11 +330,11 @@
                     <div id="material-fields" class="material-fields" style="display: none;">
                         <div id="material-entries">
                             <!-- First entry (always shown) -->
-                            <div class="material-entry" style="border:1px solid var(--gray-200);border-radius:0.5rem;padding:1rem;margin-bottom:0.75rem;">
+                            <div class="material-entry" data-entry-index="0" style="border:1px solid var(--gray-200);border-radius:0.5rem;padding:1rem;margin-bottom:0.75rem;">
                                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
                                     <div class="form-group" style="grid-column:1/-1;">
                                         <label class="form-label">Files</label>
-                                        <input type="file" name="material_files" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple>
+                                        <input type="file" name="material_files_0" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Title</label>
@@ -473,19 +473,24 @@
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
-    // Add more material entries (per-file type selection)
+    // Add more material entries (per-file type selection).
+    // Each entry uses an indexed `material_files_${idx}` name so the
+    // server can match files to the entry's title/type/grade.
+    let nextEntryIdx = 1;
     function addMaterialEntry() {
         const container = document.getElementById('material-entries');
         const typeOptions = document.querySelector('.material-entry select').innerHTML;
+        const idx = nextEntryIdx++;
         const entry = document.createElement('div');
         entry.className = 'material-entry';
+        entry.dataset.entryIndex = String(idx);
         entry.style.cssText = 'border:1px solid var(--gray-200);border-radius:0.5rem;padding:1rem;margin-bottom:0.75rem;position:relative;';
         entry.innerHTML = `
             <button type="button" onclick="this.closest('.material-entry').remove()" style="position:absolute;top:0.5rem;right:0.5rem;background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:1.25rem;" title="Remove">&times;</button>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
                 <div class="form-group" style="grid-column:1/-1;">
                     <label class="form-label">Files</label>
-                    <input type="file" name="material_files" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple>
+                    <input type="file" name="material_files_${idx}" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Title</label>

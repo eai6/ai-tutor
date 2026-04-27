@@ -14,6 +14,13 @@ urlpatterns = [
     # Students
     path('students/', views.student_list, name='student_list'),
     path('students/<int:student_id>/', views.student_detail, name='student_detail'),
+
+    # Student groups (paired/grouped sessions for shared-device schools)
+    path('groups/', views.student_groups_list, name='student_groups'),
+    path('groups/create/', views.student_group_create, name='student_group_create'),
+    path('groups/<int:group_id>/update/', views.student_group_update, name='student_group_update'),
+    path('groups/<int:group_id>/archive/', views.student_group_archive, name='student_group_archive'),
+    path('groups/session-mode/', views.institution_session_mode, name='institution_session_mode'),
     
     # Curriculum
     path('curriculum/', views.curriculum_list, name='curriculum_list'),

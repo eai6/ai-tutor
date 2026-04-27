@@ -335,6 +335,164 @@ def dashboard_home(request):
 
 
 # ============================================================================
+# Student Groups (paired/grouped sessions — Seychelles pilot)
+# ============================================================================
+
+@teacher_required
+def student_groups_list(request):
+    """List all student groups for the current institution."""
+    from apps.accounts.models import StudentGroup
+
+    institution = request.staff_ctx['institution']
+    qs = StudentGroup.objects.all()
+    if institution is not None:
+        qs = qs.filter(institution=institution)
+    qs = qs.prefetch_related('students').order_by('-is_active', 'name')
+
+    # Roster of students for the create-form
+    roster_q = Membership.objects.filter(role='student', is_active=True)
+    if institution is not None:
+        roster_q = roster_q.filter(institution=institution)
+    roster = list(roster_q.select_related('user').order_by('user__last_name', 'user__first_name'))
+
+    # Map student id → active group (for "already in" hints)
+    active_group_by_user = {}
+    for g in qs.filter(is_active=True):
+        for s in g.students.all():
+            active_group_by_user[s.id] = g
+
+    context = {
+        **request.staff_ctx,
+        'groups': qs,
+        'roster': roster,
+        'active_group_by_user': active_group_by_user,
+        'session_modes': [
+            ('shared_device', 'Shared device (paired sessions)'),
+            ('individual', 'Individual accounts & devices'),
+        ],
+    }
+    return render(request, 'dashboard/student_groups/list.html', context)
+
+
+@teacher_required
+@require_POST
+def student_group_create(request):
+    """Create a new group with the selected students."""
+    from apps.accounts.models import StudentGroup
+
+    institution = request.staff_ctx['institution']
+    if institution is None:
+        messages.error(request, "Pick a specific school before creating groups.")
+        return redirect('dashboard:student_groups')
+
+    name = (request.POST.get('name') or '').strip()
+    if not name:
+        messages.error(request, "Group name is required.")
+        return redirect('dashboard:student_groups')
+
+    student_ids = [int(s) for s in request.POST.getlist('student_ids') if s.isdigit()]
+
+    if StudentGroup.objects.filter(institution=institution, name__iexact=name).exists():
+        messages.error(request, f"A group named '{name}' already exists.")
+        return redirect('dashboard:student_groups')
+
+    group = StudentGroup.objects.create(
+        institution=institution,
+        name=name,
+        created_by=request.user,
+    )
+    if student_ids:
+        # Move each chosen student out of any prior active group at this
+        # institution. A student belongs to one active group at a time.
+        StudentGroup.students.through.objects.filter(
+            user_id__in=student_ids,
+            studentgroup__institution=institution,
+            studentgroup__is_active=True,
+        ).delete()
+        group.students.add(*student_ids)
+
+    messages.success(request, f"Group '{group.name}' created with {group.member_count} student(s).")
+    return redirect('dashboard:student_groups')
+
+
+@teacher_required
+@require_POST
+def student_group_update(request, group_id):
+    """Rename a group or replace its membership."""
+    from apps.accounts.models import StudentGroup
+
+    institution = request.staff_ctx['institution']
+    qs = StudentGroup.objects.all()
+    if institution is not None:
+        qs = qs.filter(institution=institution)
+    group = get_object_or_404(qs, id=group_id)
+
+    new_name = (request.POST.get('name') or '').strip()
+    if new_name and new_name != group.name:
+        if StudentGroup.objects.filter(
+            institution=group.institution, name__iexact=new_name,
+        ).exclude(id=group.id).exists():
+            messages.error(request, f"Another group named '{new_name}' already exists.")
+            return redirect('dashboard:student_groups')
+        group.name = new_name
+
+    if 'student_ids' in request.POST:
+        student_ids = [int(s) for s in request.POST.getlist('student_ids') if s.isdigit()]
+        # Move students out of any *other* active group at this institution.
+        if student_ids:
+            StudentGroup.students.through.objects.filter(
+                user_id__in=student_ids,
+                studentgroup__institution=group.institution,
+                studentgroup__is_active=True,
+            ).exclude(studentgroup_id=group.id).delete()
+        group.students.set(student_ids)
+
+    group.save()
+    messages.success(request, f"Group '{group.name}' updated.")
+    return redirect('dashboard:student_groups')
+
+
+@teacher_required
+@require_POST
+def student_group_archive(request, group_id):
+    """Soft-archive a group (sets is_active=False). Reversible."""
+    from apps.accounts.models import StudentGroup
+
+    institution = request.staff_ctx['institution']
+    qs = StudentGroup.objects.all()
+    if institution is not None:
+        qs = qs.filter(institution=institution)
+    group = get_object_or_404(qs, id=group_id)
+
+    group.is_active = not group.is_active
+    group.save(update_fields=['is_active'])
+    state = 'restored' if group.is_active else 'archived'
+    messages.success(request, f"Group '{group.name}' {state}.")
+    return redirect('dashboard:student_groups')
+
+
+@teacher_required
+@require_POST
+def institution_session_mode(request):
+    """Toggle the institution's session_mode (shared_device | individual)."""
+    institution = request.staff_ctx['institution']
+    if institution is None:
+        messages.error(request, "Pick a specific school first.")
+        return redirect('dashboard:student_groups')
+
+    mode = request.POST.get('session_mode', '').strip()
+    valid = {c[0] for c in Institution.SessionMode.choices}
+    if mode not in valid:
+        messages.error(request, "Invalid session mode.")
+        return redirect('dashboard:student_groups')
+
+    institution.session_mode = mode
+    institution.save(update_fields=['session_mode'])
+    messages.success(request, f"Session mode set to '{institution.get_session_mode_display()}'.")
+    return redirect('dashboard:student_groups')
+
+
+# ============================================================================
 # Student Management
 # ============================================================================
 
@@ -855,15 +1013,13 @@ def curriculum_upload(request):
             status='pending'
         )
 
-        # Handle optional material attachments (per-entry: files + title + type + grade)
-        # Each material entry has: files (multiple), title, type, grade
-        # Files within an entry share the same title/type/grade
-        # Save teaching materials (but DON'T process them yet)
-        # Materials are processed later from the course detail page
-        # after the curriculum is fully parsed and courses are created
-        material_files_list = request.FILES.getlist('material_files')
+        # Handle optional material attachments (per-entry: files + title + type + grade).
+        # Each entry has its own file input named `material_files_<entry_idx>`
+        # so the server can match files to that entry's metadata. The
+        # parallel scalar lists (titles/types/grades) preserve DOM order;
+        # the entry's index in those lists matches the file-input suffix.
         materials_saved = 0
-        if material_files_list and request.POST.get('attach_material'):
+        if request.POST.get('attach_material'):
             material_titles = request.POST.getlist('material_titles')
             material_types = request.POST.getlist('material_types')
             material_grades = request.POST.getlist('material_grades')
@@ -871,32 +1027,41 @@ def curriculum_upload(request):
             mat_dir = os.path.join(settings.MEDIA_ROOT, 'material_uploads')
             os.makedirs(mat_dir, exist_ok=True)
 
-            entry_idx = 0
-            for material_file in material_files_list:
-                mat_path = os.path.join(mat_dir, material_file.name)
-                with open(mat_path, 'wb+') as dest:
-                    for chunk in material_file.chunks():
-                        dest.write(chunk)
-
-                file_title = material_titles[entry_idx] if entry_idx < len(material_titles) else os.path.splitext(material_file.name)[0]
+            for entry_idx, entry_title in enumerate(material_titles):
+                entry_files = request.FILES.getlist(f'material_files_{entry_idx}')
+                if not entry_files:
+                    continue
                 file_type = material_types[entry_idx] if entry_idx < len(material_types) else 'textbook'
                 file_grade = material_grades[entry_idx] if entry_idx < len(material_grades) else grade_level
-                mat_grade = file_grade if file_grade else grade_level
+                mat_grade = file_grade or grade_level
 
-                TeachingMaterialUpload.objects.create(
-                    institution=institution,
-                    uploaded_by=request.user,
-                    file_path=mat_path,
-                    original_filename=material_file.name,
-                    title=f"{file_title} - {os.path.splitext(material_file.name)[0]}" if len(material_files_list) > 1 else file_title,
-                    subject_name=subject_name,
-                    grade_level=mat_grade,
-                    material_type=file_type,
-                    description='',
-                    status='pending',  # Not processed yet
-                    curriculum_upload=upload_record,
-                )
-                materials_saved += 1
+                multi = len(entry_files) > 1
+                for material_file in entry_files:
+                    mat_path = os.path.join(mat_dir, material_file.name)
+                    with open(mat_path, 'wb+') as dest:
+                        for chunk in material_file.chunks():
+                            dest.write(chunk)
+
+                    base_title = entry_title.strip() or os.path.splitext(material_file.name)[0]
+                    final_title = (
+                        f"{base_title} - {os.path.splitext(material_file.name)[0]}"
+                        if multi else base_title
+                    )
+
+                    TeachingMaterialUpload.objects.create(
+                        institution=institution,
+                        uploaded_by=request.user,
+                        file_path=mat_path,
+                        original_filename=material_file.name,
+                        title=final_title,
+                        subject_name=subject_name,
+                        grade_level=mat_grade,
+                        material_type=file_type,
+                        description='',
+                        status='pending',  # Not processed yet
+                        curriculum_upload=upload_record,
+                    )
+                    materials_saved += 1
 
         mat_msg = f" {materials_saved} teaching material(s) saved (will be processed after curriculum)." if materials_saved else ""
         messages.success(request, f"Curriculum uploaded! Processing will begin shortly.{mat_msg}")

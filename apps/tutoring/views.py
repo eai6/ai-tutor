@@ -593,9 +593,11 @@ def chat_start_session(request, lesson_id):
         )
 
         # Optional: initial_participants in request body to start a group
-        # session in one call. Each entry is {username, password} for a
-        # student who is physically on the same device. Rejected if the
-        # lesson disallows group mode or the student is cross-institution.
+        # session in one call. Each entry is {user_id} for a teacher-
+        # pre-approved groupmate physically on the same device. Rejected
+        # if the lesson disallows group mode, the school is in
+        # 'individual' session mode, or the user isn't in the host's
+        # active StudentGroup.
         try:
             body = json.loads(request.body or "{}")
         except (ValueError, TypeError):
@@ -967,18 +969,25 @@ def chat_exit_ticket(request, session_id):
 
 
 def _try_add_participant(session, entry: dict, primary_institution) -> dict:
-    """Helper: authenticate a secondary student by (username, password) and
-    create a SessionParticipant row. Returns a dict describing the outcome;
-    never raises. See memory/group_lessons_plan.md and
-    memory/group_lessons_v2_plan.md.
-    """
-    from django.contrib.auth import authenticate
-    from apps.tutoring.models import SessionParticipant, TutorSession
+    """Helper: add a teacher-pre-approved groupmate to the session.
 
-    username = (entry or {}).get("username", "")
-    password = (entry or {}).get("password", "")
-    if not username or not password:
-        return {"ok": False, "error": "username_and_password_required"}
+    The session host (primary student) belongs to a teacher-formed
+    StudentGroup. The only students they can add are other members of
+    that same group. The school's `session_mode` must be 'shared_device'
+    — 'individual' schools never allow adds. See
+    `memory/pilot_launch_execution.md`.
+    """
+    from django.contrib.auth.models import User
+    from apps.tutoring.models import SessionParticipant
+    from apps.accounts.models import StudentGroup, Institution
+
+    user_id = (entry or {}).get("user_id")
+    try:
+        user_id = int(user_id) if user_id is not None else None
+    except (TypeError, ValueError):
+        user_id = None
+    if not user_id:
+        return {"ok": False, "error": "user_id_required"}
 
     # H2: Lock participants once the lesson has actually started (any
     # student message sent). The group must be formed BEFORE the first
@@ -988,20 +997,36 @@ def _try_add_participant(session, entry: dict, primary_institution) -> dict:
     if (state.get('exchange_count', 0) or 0) > 0:
         return {"ok": False, "error": "lesson_already_started"}
 
-    user = authenticate(username=username, password=password)
-    if not user or not user.is_active:
-        return {"ok": False, "error": "invalid_credentials"}
+    # School session-mode gate: 'individual' schools never allow add.
+    inst = primary_institution
+    if inst is None:
+        # Fall back to host's primary institution from session.
+        inst = session.institution
+    if inst is not None and inst.session_mode == Institution.SessionMode.INDIVIDUAL:
+        return {"ok": False, "error": "individual_mode_school"}
 
+    user = User.objects.filter(id=user_id, is_active=True).first()
+    if not user:
+        return {"ok": False, "error": "user_not_found"}
     if user.id == session.student_id:
         return {"ok": False, "error": "already_primary"}
 
     # Same-institution gate
-    if primary_institution is not None:
+    if inst is not None:
         in_same_institution = user.memberships.filter(
-            institution=primary_institution, is_active=True,
+            institution=inst, is_active=True,
         ).exists()
         if not in_same_institution:
             return {"ok": False, "error": "different_institution"}
+
+    # Pre-approved-groupmate gate. The candidate must share an active
+    # StudentGroup with the session host.
+    host = session.student
+    host_group = StudentGroup.get_active_group_for(host)
+    if host_group is None:
+        return {"ok": False, "error": "host_has_no_group"}
+    if not host_group.students.filter(id=user.id).exists():
+        return {"ok": False, "error": "not_in_host_group"}
 
     # Max group size gate
     lesson = session.lesson
@@ -1056,15 +1081,39 @@ def session_participants(request, session_id):
     )
 
     if request.method == "GET":
+        from apps.accounts.models import StudentGroup, Institution
+
         rows = SessionParticipant.objects.filter(session=session).select_related("student")
         state = session.engine_state or {}
         lesson_started = (state.get('exchange_count', 0) or 0) > 0
+
+        active_user_ids = {p.student_id for p in rows if p.is_active}
+        # School session mode (drives whether the chat UI shows the Add button)
+        inst = session.institution
+        session_mode = (
+            inst.session_mode if inst else Institution.SessionMode.SHARED_DEVICE
+        )
+        # Groupmates the host can pick from (excludes the host + already-active members)
+        host_group = StudentGroup.get_active_group_for(session.student)
+        groupmates = []
+        if host_group and session_mode == Institution.SessionMode.SHARED_DEVICE:
+            for s in host_group.students.exclude(pk=session.student_id).order_by('first_name', 'last_name'):
+                groupmates.append({
+                    "user_id": s.id,
+                    "username": s.username,
+                    "display_name": (s.get_full_name() or s.username),
+                    "in_session": s.id in active_user_ids,
+                })
+
         return JsonResponse({
             "session_id": session.id,
             "is_group": session.is_group,
             "max_group_size": session.lesson.max_group_size,
             "allow_group_mode": session.lesson.allow_group_mode,
             "lesson_started": lesson_started,
+            "session_mode": session_mode,
+            "host_group_name": host_group.name if host_group else None,
+            "groupmates": groupmates,
             "participants": [
                 {
                     "id": p.id,

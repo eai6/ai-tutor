@@ -14,10 +14,25 @@ class Institution(models.Model):
     Represents a school. Each Institution record is a distinct school
     managed by the platform. Staff and students belong to specific schools.
     """
+    class SessionMode(models.TextChoices):
+        SHARED_DEVICE = 'shared_device', 'Shared device (paired sessions)'
+        INDIVIDUAL = 'individual', 'Individual accounts & devices'
+
     name = models.CharField(max_length=255)
     slug = models.SlugField(unique=True, help_text="URL-friendly identifier")
     timezone = models.CharField(max_length=50, default='UTC')
     is_active = models.BooleanField(default=True)
+    session_mode = models.CharField(
+        max_length=20,
+        choices=SessionMode.choices,
+        default=SessionMode.SHARED_DEVICE,
+        help_text=(
+            "How students take lessons in this school. "
+            "'shared_device' lets paired students share a device — "
+            "students can only add a pre-approved groupmate to their "
+            "session. 'individual' hides the add-student button entirely."
+        ),
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -84,6 +99,75 @@ class Membership(models.Model):
     def is_staff(self):
         """Returns True if user has staff role."""
         return self.role == self.Role.STAFF
+
+
+class StudentGroup(models.Model):
+    """A teacher-formed pair (or small group) of students who share a
+    device for paired tutoring sessions.
+
+    Pilot constraint (Seychelles 2026-05-11): groups are formed by the
+    teacher (typically from baseline-assessment scores) and frozen for
+    the pilot. Students can only add a groupmate to their session — no
+    arbitrary username/password adds. See
+    `memory/pilot_launch_execution.md`.
+
+    A student should belong to at most one *active* group at a time.
+    Enforcement happens in the teacher dashboard (adding a student to a
+    new group removes them from any prior active group).
+    """
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name='student_groups',
+    )
+    name = models.CharField(
+        max_length=100,
+        help_text="Teacher-readable label, e.g., 'Pair A' or 'Group 1'.",
+    )
+    students = models.ManyToManyField(
+        User,
+        related_name='student_groups',
+        blank=True,
+        help_text="Students in this group/pair.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="When False, the group is archived and ignored by the session-add gate.",
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='created_student_groups',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['institution', 'name']
+        unique_together = [['institution', 'name']]
+
+    def __str__(self):
+        return f"{self.name} ({self.institution.name})"
+
+    @property
+    def member_count(self):
+        return self.students.count()
+
+    @classmethod
+    def get_active_group_for(cls, user):
+        """Return the user's active group (or None)."""
+        return cls.objects.filter(students=user, is_active=True).first()
+
+    @classmethod
+    def groupmates_of(cls, user):
+        """Return a queryset of users who share an active group with `user`,
+        excluding `user` themself. Used to populate the 'add a groupmate'
+        picker in the chat UI."""
+        group = cls.get_active_group_for(user)
+        if not group:
+            return User.objects.none()
+        return group.students.exclude(pk=user.pk)
 
 
 class TutorPersonality(models.Model):

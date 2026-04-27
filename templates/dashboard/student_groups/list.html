@@ -1,0 +1,188 @@
+{% extends "dashboard/base.html" %}
+{% load dashboard_extras %}
+
+{% block title %}Student Groups{% endblock %}
+{% block page_title %}Student Groups{% endblock %}
+
+{% block content %}
+<style>
+    .roster-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 0.5rem;
+        max-height: 320px;
+        overflow-y: auto;
+        padding: 0.5rem;
+        border: 1px solid var(--gray-200);
+        border-radius: 6px;
+        background: #fafafa;
+    }
+    .roster-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.6rem;
+        background: #fff;
+        border: 1px solid var(--gray-200);
+        border-radius: 6px;
+        font-size: 0.875rem;
+    }
+    .roster-row.in-other-group {
+        opacity: 0.7;
+    }
+    .group-card {
+        background: #fff;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 0.75rem;
+    }
+    .group-card.archived {
+        opacity: 0.65;
+        background: #f9fafb;
+    }
+    .group-members {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.5rem;
+    }
+    .member-pill {
+        background: var(--primary-light);
+        color: var(--primary);
+        border-radius: 999px;
+        padding: 0.15rem 0.65rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+</style>
+
+<div class="card" style="margin-bottom: 1rem;">
+    <div class="card-header">
+        <h2 class="card-title">Session Mode for {{ institution.name|default:"this school" }}</h2>
+    </div>
+    <div class="card-body">
+        <p style="color: var(--gray-600); font-size: 0.9rem; margin-bottom: 0.75rem;">
+            Choose how students take lessons in this school. <strong>Shared device</strong>
+            lets students share a device with their teacher-formed groupmates.
+            <strong>Individual</strong> hides the add-student button — every student takes
+            lessons solo on their own device.
+        </p>
+        {% if institution %}
+        <form method="post" action="{% url 'dashboard:institution_session_mode' %}" style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+            {% csrf_token %}
+            <select name="session_mode" class="form-control" style="max-width:300px;">
+                {% for code, label in session_modes %}
+                <option value="{{ code }}" {% if institution.session_mode == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm">Save mode</button>
+            <span style="color:var(--gray-500);font-size:0.8rem;">Current: <strong>{{ institution.get_session_mode_display }}</strong></span>
+        </form>
+        {% else %}
+        <p style="color:#991b1b;">Pick a specific school in the school picker to configure session mode.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1rem;">
+    <div class="card-header">
+        <h2 class="card-title">Create a New Group</h2>
+    </div>
+    <div class="card-body">
+        <p style="color: var(--gray-600); font-size: 0.9rem; margin-bottom: 0.75rem;">
+            Pick any number of students. A student in a previous active group is moved
+            into this new one when you save.
+        </p>
+        {% if institution %}
+        <form method="post" action="{% url 'dashboard:student_group_create' %}">
+            {% csrf_token %}
+            <div class="form-group" style="max-width:340px;">
+                <label class="form-label">Group name</label>
+                <input type="text" name="name" class="form-control" placeholder="e.g., Pair A, Group 3, Maths Pair S2-1" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Students</label>
+                <div class="roster-grid" id="create-roster">
+                    {% for m in roster %}
+                    <label class="roster-row {% if m.user.id in active_group_by_user %}in-other-group{% endif %}">
+                        <input type="checkbox" name="student_ids" value="{{ m.user.id }}">
+                        <span>{{ m.user.first_name }} {{ m.user.last_name }} <span style="color:var(--gray-400);">@{{ m.user.username }}</span></span>
+                        {% with cur=active_group_by_user|get_item:m.user.id %}
+                        {% if cur %}
+                        <span style="font-size:0.7rem;color:var(--gray-500);margin-left:auto;">in: {{ cur.name }}</span>
+                        {% endif %}
+                        {% endwith %}
+                    </label>
+                    {% empty %}
+                    <p style="color:var(--gray-500);">No students in this school yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Create Group</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">All Groups ({{ groups|length }})</h2>
+    </div>
+    <div class="card-body">
+        {% for group in groups %}
+        <div class="group-card {% if not group.is_active %}archived{% endif %}">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <h3 style="margin:0;font-size:1.05rem;">
+                    {{ group.name }}
+                    {% if not group.is_active %}<span style="font-size:0.7rem;background:#f3f4f6;color:#6b7280;padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">archived</span>{% endif %}
+                    <span style="font-size:0.75rem;color:var(--gray-500);font-weight:500;">{{ group.member_count }} student(s)</span>
+                </h3>
+                <div style="display:flex;gap:0.4rem;">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('edit-{{ group.id }}').style.display='block';this.style.display='none';">Edit</button>
+                    <form method="post" action="{% url 'dashboard:student_group_archive' group.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm" style="background:{% if group.is_active %}#fee2e2;color:#991b1b;border:1px solid #fca5a5{% else %}#dcfce7;color:#166534;border:1px solid #bbf7d0{% endif %};" onclick="return confirm('{% if group.is_active %}Archive{% else %}Restore{% endif %} this group?');">
+                            {% if group.is_active %}Archive{% else %}Restore{% endif %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div class="group-members">
+                {% for s in group.students.all %}
+                <span class="member-pill">{{ s.first_name }} {{ s.last_name }}</span>
+                {% empty %}
+                <span style="color:var(--gray-500);font-size:0.85rem;">No students yet — click Edit to add.</span>
+                {% endfor %}
+            </div>
+
+            <div id="edit-{{ group.id }}" style="display:none;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--gray-200);">
+                <form method="post" action="{% url 'dashboard:student_group_update' group.id %}">
+                    {% csrf_token %}
+                    <div class="form-group" style="max-width:340px;">
+                        <label class="form-label">Rename</label>
+                        <input type="text" name="name" class="form-control" value="{{ group.name }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Members (overwrites existing)</label>
+                        <div class="roster-grid">
+                            {% for m in roster %}
+                            <label class="roster-row">
+                                <input type="checkbox" name="student_ids" value="{{ m.user.id }}"
+                                  {% if m.user in group.students.all %}checked{% endif %}>
+                                <span>{{ m.user.first_name }} {{ m.user.last_name }} <span style="color:var(--gray-400);">@{{ m.user.username }}</span></span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('edit-{{ group.id }}').style.display='none';">Cancel</button>
+                </form>
+            </div>
+        </div>
+        {% empty %}
+        <p style="color:var(--gray-500);">No groups yet. Use the form above to create one.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
