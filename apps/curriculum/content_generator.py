@@ -20,6 +20,39 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
+def combined_objectives_for_lesson(lesson) -> List[str]:
+    """Return the merged objectives list for a lesson.
+
+    Combines the lesson's own enabling_objectives with the parent unit's
+    terminal_objectives into a single deduplicated, order-preserving
+    list of teaching steps.
+
+    Why: per the 2026-04-27 product call, we treat terminal + enabling
+    objectives as one flat list of "teaching steps" for both lesson
+    content generation and assessment generation. See
+    `~/.claude/projects/.../memory/feedback_teaching_steps_unification.md`.
+    """
+    eos = list(lesson.enabling_objectives or [])
+    tos: List[str] = []
+    unit = getattr(lesson, 'unit', None)
+    if unit is not None:
+        tos = list(unit.terminal_objectives or [])
+
+    # Order: TOs first (broader outcome), then EOs (granular skills).
+    # Dedup on case-insensitive whitespace-normalized key, preserve first occurrence.
+    seen = set()
+    merged: List[str] = []
+    for obj in tos + eos:
+        if not obj:
+            continue
+        key = ' '.join(str(obj).split()).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(str(obj).strip())
+    return merged
+
+
 # ============================================================================
 # PYDANTIC MODELS — Schema contract for LLM structured output
 # ============================================================================
@@ -391,17 +424,24 @@ base your media descriptions on these figures so generated images match the text
 {chr(10).join(fig_lines)}
 """
 
-        # Build enabling objectives section (terminal objectives = assessment targets)
-        enabling_objectives = lesson.enabling_objectives or []
+        # Build the unified "teaching steps" objectives list (unit's
+        # terminal objectives + lesson's enabling objectives, deduped).
+        # See `combined_objectives_for_lesson` for the rationale.
+        teaching_steps_objectives = combined_objectives_for_lesson(lesson)
         enabling_obj_str = ""
-        if enabling_objectives:
-            eo_lines = "\n".join(f"  EO{i+1}: {obj}" for i, obj in enumerate(enabling_objectives))
+        if teaching_steps_objectives:
+            eo_lines = "\n".join(
+                f"  TS{i+1}: {obj}" for i, obj in enumerate(teaching_steps_objectives)
+            )
             enabling_obj_str = f"""
-TERMINAL OBJECTIVES (assessment targets — each MUST be covered):
+TEACHING STEPS (each MUST be covered — every one is a discrete skill or
+piece of knowledge the student needs to practice intensely):
 {eo_lines}
-Every terminal objective must be covered by at least one step.
-Set each step's terminal_objective field to the exact text of the TO it works toward.
-Set each step's enabling_objective field to the specific teaching step it addresses.
+Every teaching step must be covered by at least one tutoring step.
+Set each step's terminal_objective field to the exact text of the
+teaching step it works toward.
+Set each step's enabling_objective field to the specific sub-skill it
+addresses.
 """
 
         # Build teaching steps section (granular enabling objectives from syllabus)
@@ -537,10 +577,14 @@ CONTENT GUIDELINES:
    item, not just explain a comparison method"""
 
         from apps.llm.prompts import get_prompt_or_default
+        from apps.curriculum.dok_framework import dok_guidance_for
         system_prompt = get_prompt_or_default(
             self.institution_id, 'content_generation_prompt',
             "You are an expert curriculum designer creating engaging tutoring content for Seychelles secondary students.",
         )
+        # Webb's DOK rubric — anchors the cognitive demand of each
+        # teaching step. See apps/curriculum/dok_framework.py.
+        system_prompt = system_prompt + "\n\n" + dok_guidance_for("content")
 
         print(f"[ContentGen] [{lesson.title}] Calling instructor ({self._model_config.provider}/{self._model_config.model_name})...", flush=True)
         t0 = time.time()
@@ -800,15 +844,18 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
     except Exception:
         pass
 
-    # Build terminal objectives and enabling objectives context for exit ticket
+    # Build the unified "teaching steps" objectives list — same merge
+    # used for content generation: parent unit's terminal objectives +
+    # lesson's enabling objectives, deduplicated. Each item is a
+    # discrete skill/knowledge/attitude the assessment must drill.
     objectives_context = ""
-    terminal_objs = lesson.enabling_objectives or []
-    teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
-
-    # Use teaching_steps as EOs if available, otherwise fall back to enabling_objectives
-    eo_list = teaching_steps if teaching_steps else terminal_objs
-
-    # If still empty, collect unique EOs from lesson steps
+    eo_list = combined_objectives_for_lesson(lesson)
+    teaching_steps_meta = (lesson.metadata or {}).get('teaching_steps', [])
+    # If we still have nothing (no TOs, no EOs), fall back to the
+    # syllabus 'teaching_steps' metadata, then to objectives mined from
+    # already-generated LessonSteps.
+    if not eo_list and teaching_steps_meta:
+        eo_list = list(teaching_steps_meta)
     if not eo_list:
         from apps.curriculum.models import LessonStep
         seen = set()
@@ -818,16 +865,14 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
                 seen.add(eo)
                 eo_list.append(eo)
 
-    if terminal_objs:
-        to_lines = "\n".join(f"  TO{i+1}: {to}" for i, to in enumerate(terminal_objs))
-        objectives_context += f"\nTERMINAL OBJECTIVES (each must be assessed by at least 2 questions):\n{to_lines}\n"
     if eo_list:
-        eo_lines = "\n".join(f"  EO{i+1}: {eo}" for i, eo in enumerate(eo_list))
+        eo_lines = "\n".join(f"  TS{i+1}: {eo}" for i, eo in enumerate(eo_list))
         objectives_context += f"""
-ENABLING OBJECTIVES (the concept_tag for EVERY question MUST be one of these):
+TEACHING STEPS (the concept_tag for EVERY question MUST be one of these,
+and EACH step must be assessed by at least 2 questions):
 {eo_lines}
 
-CRITICAL: The concept_tag field must be the EXACT text of one of the enabling objectives above.
+CRITICAL: The concept_tag field must be the EXACT text of one of the teaching steps above.
 Example: "Define the terms Development, Globalization, MEDC, NIC, LEDC"
 Do NOT invent short labels like "industry_definition" — use the FULL enabling objective text.
 Every enabling objective must be assessed by at least 1 question. Distribute questions across all EOs.
@@ -861,11 +906,15 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
         prompt += "\n" + figure_context
 
     from apps.llm.prompts import get_prompt_or_default
+    from apps.curriculum.dok_framework import dok_guidance_for
     exit_sys_prompt = get_prompt_or_default(
         institution_id, 'exit_ticket_prompt',
         "You are an expert educational assessment designer.",
         json_required=True,
     )
+    # Webb's DOK rubric — every question targets a stated cognitive level.
+    # See apps/curriculum/dok_framework.py.
+    exit_sys_prompt = exit_sys_prompt + "\n\n" + dok_guidance_for("assessment")
 
     try:
         messages = [{"role": "user", "content": prompt}]

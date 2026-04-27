@@ -448,11 +448,14 @@ Return as JSON array:
 Return ONLY the JSON array, no other text."""
 
             from apps.llm.prompts import get_prompt_or_default
+            from apps.curriculum.dok_framework import dok_guidance_for
             system_prompt = get_prompt_or_default(
                 _resolve_institution_id(lesson=lesson), 'exit_ticket_prompt',
                 "You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text.",
                 json_required=True,
             )
+            # Webb's DOK rubric — every question targets a stated cognitive level.
+            system_prompt = system_prompt + "\n\n" + dok_guidance_for("assessment")
             messages = [{"role": "user", "content": prompt}]
 
             response = client.generate(messages, system_prompt, max_tokens=16000)
