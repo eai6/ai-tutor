@@ -48,6 +48,10 @@ urlpatterns = [
     # Logout
     path('logout/', views.logout_view, name='logout'),
 
+    # Platform terms (consent)
+    path('terms/', views.terms_page, name='terms'),
+    path('terms/accept/', views.terms_accept, name='terms_accept'),
+
     # Student settings (profile, password, delete-account entry)
     path('settings/', views.settings, name='settings'),
 

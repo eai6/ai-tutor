@@ -274,6 +274,12 @@ class StudentProfile(models.Model):
     skills_snapshot = models.JSONField(default=dict, blank=True)
     skills_snapshot_updated_at = models.DateTimeField(null=True, blank=True)
 
+    # Platform terms acceptance — version of `PlatformTerms` the student
+    # most recently accepted. When `PlatformTerms.active().version` is
+    # higher than this, the next login routes through `/terms/accept/`.
+    terms_accepted_version = models.PositiveIntegerField(default=0)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -426,3 +432,41 @@ class StaffInvitation(models.Model):
     def get_role_display(self):
         """Return human-readable role name."""
         return dict(Membership.Role.choices).get(self.role, self.role)
+
+
+class PlatformTerms(models.Model):
+    """Versioned platform terms / consent text shown at sign-up and on
+    re-acceptance when a new version is published.
+
+    Exactly one row should have `is_active=True` at a time. Existing
+    users whose `terms_accepted_version` is below the active version
+    are routed through `/terms/accept/` on next login.
+    """
+    version = models.PositiveIntegerField(unique=True)
+    title = models.CharField(max_length=200, default="AI Tutor — Terms")
+    summary = models.CharField(
+        max_length=300, blank=True,
+        help_text="One-line summary shown beside the checkbox at sign-up.",
+    )
+    body = models.TextField(help_text="Full terms text (Markdown / plain HTML).")
+    is_active = models.BooleanField(default=False)
+    effective_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-version']
+        verbose_name = "Platform terms"
+        verbose_name_plural = "Platform terms"
+
+    def __str__(self):
+        return f"v{self.version} {'(active)' if self.is_active else ''}"
+
+    @classmethod
+    def active(cls):
+        """Return the currently active terms row, or None."""
+        return cls.objects.filter(is_active=True).order_by('-version').first()
+
+    @classmethod
+    def active_version(cls) -> int:
+        active = cls.active()
+        return active.version if active else 0

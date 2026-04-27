@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Institution, Membership, StudentProfile, TutorPersonality
+from .models import Institution, Membership, StudentProfile, TutorPersonality, PlatformTerms
 
 
 @admin.register(Institution)
@@ -32,3 +32,16 @@ class TutorPersonalityAdmin(admin.ModelAdmin):
     list_filter = ['is_active']
     list_editable = ['is_active', 'sort_order']
     search_fields = ['name']
+
+
+@admin.register(PlatformTerms)
+class PlatformTermsAdmin(admin.ModelAdmin):
+    list_display = ['version', 'title', 'is_active', 'effective_date', 'created_at']
+    list_filter = ['is_active']
+    list_editable = ['is_active']
+    readonly_fields = ['created_at']
+    fieldsets = (
+        (None, {'fields': ('version', 'title', 'summary', 'is_active', 'effective_date')}),
+        ('Content', {'fields': ('body',), 'description': 'Markdown / plain text.'}),
+        ('Audit', {'fields': ('created_at',)}),
+    )

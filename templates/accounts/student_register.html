@@ -114,15 +114,27 @@
             
             <div class="form-group">
                 <label for="password_confirm">Confirm Password</label>
-                <input 
-                    type="password" 
-                    id="password_confirm" 
-                    name="password_confirm" 
+                <input
+                    type="password"
+                    id="password_confirm"
+                    name="password_confirm"
                     placeholder="Re-enter your password"
                     required
                 >
             </div>
-            
+
+            {% if active_terms %}
+            <div class="form-group" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:0.85rem 1rem;">
+                <label style="display:flex;gap:0.55rem;align-items:flex-start;font-weight:500;color:#111;cursor:pointer;">
+                    <input type="checkbox" name="accept_terms" required style="margin-top:0.25rem;transform:scale(1.15);accent-color:#5b21b6;">
+                    <span style="line-height:1.5;font-size:0.9rem;">
+                        I agree to the <a href="{% url 'accounts:terms' %}" target="_blank" style="color:#5b21b6;font-weight:600;">AI Tutor terms</a>.
+                        {% if active_terms.summary %}<br><span style="color:#6b7280;font-weight:400;font-size:0.82rem;">{{ active_terms.summary }}</span>{% endif %}
+                    </span>
+                </label>
+            </div>
+            {% endif %}
+
             <button type="submit" class="btn btn-primary btn-full">
                 Create Account →
             </button>

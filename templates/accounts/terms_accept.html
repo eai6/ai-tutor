@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Updated terms — AI Tutor{% endblock %}
+
+{% block content %}
+<style>
+    .ta-wrap { max-width: 720px; margin: 1.5rem auto 4rem; padding: 0 1rem; }
+    .ta-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 1.5rem 1.75rem; }
+    .ta-wrap h1 { font-size: 1.4rem; margin: 0 0 0.4rem; color: #111; }
+    .ta-meta { color: #6b7280; font-size: 0.85rem; margin-bottom: 1.25rem; }
+    .ta-body { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1.1rem 1.25rem; max-height: 360px; overflow-y: auto; line-height: 1.65; font-size: 0.92rem; color: #111; }
+    .ta-body h3 { color: #111; margin: 1.2rem 0 0.4rem; font-size: 1rem; }
+    .ta-error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; padding: 0.6rem 0.8rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 0.75rem; }
+    .ta-checkbox { display: flex; gap: 0.55rem; margin: 1.25rem 0 1rem; align-items: flex-start; }
+    .ta-checkbox input { margin-top: 0.25rem; transform: scale(1.15); accent-color: #5b21b6; }
+    .ta-actions { display: flex; gap: 0.6rem; justify-content: flex-end; }
+    .ta-btn { background: #5b21b6; color: #fff; border: none; padding: 0.65rem 1.4rem; border-radius: 999px; font-weight: 700; cursor: pointer; font-size: 0.95rem; }
+    .ta-btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+    .ta-link { color: #5b21b6; text-decoration: none; font-weight: 600; }
+</style>
+<div class="ta-wrap">
+    <div class="ta-card">
+        <h1>📜 Updated terms</h1>
+        <div class="ta-meta">
+            We've updated the AI Tutor terms — please read and agree to continue.
+            Version {{ terms.version }}{% if terms.effective_date %} · effective {{ terms.effective_date|date:"M j, Y" }}{% endif %} ·
+            <a href="{% url 'accounts:terms' %}" target="_blank" class="ta-link">open in new tab</a>
+        </div>
+
+        {% if error %}<div class="ta-error">{{ error }}</div>{% endif %}
+
+        <div class="ta-body">{{ terms.body|linebreaks }}</div>
+
+        <form method="post" action="">
+            {% csrf_token %}
+            {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+            <label class="ta-checkbox">
+                <input type="checkbox" name="accept_terms" required>
+                <span>I have read and agree to the AI Tutor terms above.{% if terms.summary %} <span style="color:#6b7280;">{{ terms.summary }}</span>{% endif %}</span>
+            </label>
+            <div class="ta-actions">
+                <a href="{% url 'accounts:logout' %}" class="ta-link" style="align-self:center;font-size:0.85rem;">Log out</a>
+                <button type="submit" class="ta-btn">I agree — continue</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

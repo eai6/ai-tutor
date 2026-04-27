@@ -49,34 +49,51 @@ def student_login(request):
     """Student login page."""
     if request.user.is_authenticated:
         return redirect_by_role(request.user)
-    
+
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
-        
+
         user = authenticate(request, username=username, password=password)
-        
+
         if user is not None:
             login(request, user)
             messages.success(request, f"Welcome back, {user.first_name or user.username}!")
+            # Route through terms-acceptance interstitial if a newer
+            # version was published since this user last agreed.
+            if _terms_acceptance_pending(user):
+                return redirect(f"/terms/accept/?next=/tutor/")
             return redirect('tutoring:catalog')
         else:
             return render(request, 'accounts/student_login.html', {
                 'error': "Invalid username or password.",
                 'username': username,
             })
-    
+
     return render(request, 'accounts/student_login.html')
+
+
+def _terms_acceptance_pending(user) -> bool:
+    """True if the user needs to re-accept the active terms."""
+    from apps.accounts.models import PlatformTerms
+    active_v = PlatformTerms.active_version()
+    if active_v == 0:
+        return False
+    profile = StudentProfile.objects.filter(user=user).first()
+    accepted_v = profile.terms_accepted_version if profile else 0
+    return accepted_v < active_v
 
 
 def student_register(request):
     """Student self-registration."""
     if request.user.is_authenticated:
         return redirect_by_role(request.user)
-    
+
+    from apps.accounts.models import PlatformTerms
     school_choices = PlatformConfig.get_school_choices()
     grade_choices = PlatformConfig.get_grade_choices()
-    
+    active_terms = PlatformTerms.active()
+
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         email = request.POST.get('email', '').strip()
@@ -87,33 +104,37 @@ def student_register(request):
         school = request.POST.get('school', '')
         grade_level = request.POST.get('grade_level', '')
         student_id = request.POST.get('student_id', '').strip()
-        
+        accepted_terms = request.POST.get('accept_terms') == 'on'
+
         errors = []
-        
+
         if not first_name:
             errors.append("Please enter your first name.")
-        
+
         if not username or len(username) < 3:
             errors.append("Username must be at least 3 characters.")
-        
+
         if User.objects.filter(username=username).exists():
             errors.append("Username already taken.")
-        
+
         if email and User.objects.filter(email=email).exists():
             errors.append("Email already registered.")
-        
+
         if len(password) < 6:
             errors.append("Password must be at least 6 characters.")
-        
+
         if password != password_confirm:
             errors.append("Passwords don't match.")
-        
+
         if not school:
             errors.append("Please select your school.")
-        
+
         if not grade_level:
             errors.append("Please select your grade level.")
-        
+
+        if active_terms and not accepted_terms:
+            errors.append("Please read and agree to the platform terms.")
+
         if errors:
             return render(request, 'accounts/student_register.html', {
                 'errors': errors,
@@ -126,6 +147,7 @@ def student_register(request):
                 'student_id': student_id,
                 'school_choices': school_choices,
                 'grade_choices': grade_choices,
+                'active_terms': active_terms,
             })
         
         # Create user
@@ -137,12 +159,15 @@ def student_register(request):
             last_name=last_name,
         )
         
-        # Create student profile
+        # Create student profile (record accepted terms version + timestamp)
+        from django.utils import timezone as _tz
         StudentProfile.objects.create(
             user=user,
             student_id=student_id,
             school=school,
             grade_level=grade_level,
+            terms_accepted_version=active_terms.version if active_terms else 0,
+            terms_accepted_at=_tz.now() if active_terms else None,
         )
         
         # Auto-assign to institution based on selected school
@@ -168,6 +193,7 @@ def student_register(request):
     return render(request, 'accounts/student_register.html', {
         'school_choices': school_choices,
         'grade_choices': grade_choices,
+        'active_terms': active_terms,
     })
 
 
@@ -197,6 +223,8 @@ def staff_login(request):
             if has_access:
                 login(request, user)
                 messages.success(request, f"Welcome, {user.first_name or user.username}!")
+                if _terms_acceptance_pending(user):
+                    return redirect(f"/terms/accept/?next=/dashboard/")
                 return redirect('dashboard:home')
             else:
                 return render(request, 'accounts/staff_login.html', {
@@ -229,7 +257,9 @@ def staff_self_register(request):
     if request.user.is_authenticated:
         return redirect_by_role(request.user)
 
+    from apps.accounts.models import PlatformTerms
     school_choices = PlatformConfig.get_school_choices()
+    active_terms = PlatformTerms.active()
 
     if request.method == 'POST':
         first_name = request.POST.get('first_name', '').strip()
@@ -239,6 +269,7 @@ def staff_self_register(request):
         school = request.POST.get('school', '')
         password = request.POST.get('password', '')
         password_confirm = request.POST.get('password_confirm', '')
+        accepted_terms = request.POST.get('accept_terms') == 'on'
 
         errors = []
 
@@ -265,6 +296,9 @@ def staff_self_register(request):
         if not school:
             errors.append("Please select your school.")
 
+        if active_terms and not accepted_terms:
+            errors.append("Please read and agree to the platform terms.")
+
         if errors:
             return render(request, 'accounts/staff_self_register.html', {
                 'errors': errors,
@@ -274,6 +308,7 @@ def staff_self_register(request):
                 'email': email,
                 'school': school,
                 'school_choices': school_choices,
+                'active_terms': active_terms,
             })
 
         # Create user (inactive — pending approval)
@@ -301,10 +336,24 @@ def staff_self_register(request):
                 is_active=False,
             )
 
+        # Record terms acceptance — staff use the same StudentProfile slot
+        # for now. Even though staff aren't students, this avoids a second
+        # acceptance model. (Staff just won't have grade_level set.)
+        if active_terms:
+            from django.utils import timezone as _tz
+            StudentProfile.objects.update_or_create(
+                user=user,
+                defaults={
+                    'terms_accepted_version': active_terms.version,
+                    'terms_accepted_at': _tz.now(),
+                },
+            )
+
         return render(request, 'accounts/staff_pending.html')
 
     return render(request, 'accounts/staff_self_register.html', {
         'school_choices': school_choices,
+        'active_terms': active_terms,
     })
 
 
@@ -757,4 +806,53 @@ def bulk_student_upload(request):
 
     return render(request, 'accounts/bulk_student_upload.html', {
         'school_choices': school_choices,
+    })
+
+
+# ============================================================================
+# Platform Terms — public page + acceptance interstitial
+# ============================================================================
+
+def terms_page(request):
+    """Public, unauthenticated render of the active platform terms."""
+    from apps.accounts.models import PlatformTerms
+    active = PlatformTerms.active()
+    return render(request, 'accounts/terms.html', {
+        'terms': active,
+    })
+
+
+@login_required
+def terms_accept(request):
+    """Interstitial — existing users with an outdated `terms_accepted_version`
+    are routed here on next login. POST records acceptance and bounces
+    them on to wherever they were headed."""
+    from apps.accounts.models import PlatformTerms, StudentProfile
+    from django.utils import timezone as _tz
+
+    active = PlatformTerms.active()
+    if not active:
+        return redirect('tutoring:catalog')
+
+    next_url = request.GET.get('next') or request.POST.get('next') or ''
+    if not next_url.startswith('/'):
+        next_url = ''
+
+    if request.method == 'POST':
+        if request.POST.get('accept_terms') != 'on':
+            return render(request, 'accounts/terms_accept.html', {
+                'terms': active,
+                'next_url': next_url,
+                'error': "Please tick the box to confirm you've read and agreed.",
+            })
+        profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+        profile.terms_accepted_version = active.version
+        profile.terms_accepted_at = _tz.now()
+        profile.save(update_fields=['terms_accepted_version', 'terms_accepted_at'])
+        messages.success(request, "Thanks — terms accepted.")
+        return redirect(next_url or 'tutoring:catalog')
+
+    return render(request, 'accounts/terms_accept.html', {
+        'terms': active,
+        'next_url': next_url,
     })
