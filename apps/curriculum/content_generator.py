@@ -982,24 +982,31 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 else:
                     ad = q.get('answer_data', {}) or {}
                     ad.update(objective_data)
-                    # plot_spec (legacy Chart.js) is renamed to
-                    # figure_spec — same JSON shape, but rendered to
-                    # inline SVG server-side. See figure_render.py.
-                    if 'plot_spec' in ad and 'figure_spec' not in ad:
+                    # Render figure from spec — single dispatcher handles
+                    # the full template catalog (charts, geometry, angles,
+                    # coords, stats, geography). The LLM may emit either
+                    # a `figure` key (new) with `kind`+fields, or the
+                    # legacy `figure_spec` (charts only). Both go through
+                    # the same renderer.
+                    if 'plot_spec' in ad and 'figure_spec' not in ad and 'figure' not in ad:
                         ad['figure_spec'] = ad.pop('plot_spec')
                     elif 'plot_spec' in ad:
                         ad.pop('plot_spec', None)
-                    spec = ad.get('figure_spec')
-                    if spec:
-                        from apps.curriculum.figure_render import render_figure_spec
-                        svg = render_figure_spec(spec)
+
+                    figure_payload = ad.get('figure') or ad.get('figure_spec')
+                    if figure_payload:
+                        from apps.curriculum.figure_templates import render_template
+                        svg = render_template(figure_payload)
                         if svg:
                             ad['figure_svg'] = svg
+                            ad.setdefault('figure_spec', figure_payload)
                         else:
                             logger.warning(
-                                f"[ExitTicket] dropping unrenderable figure_spec on Q{i}"
+                                f"[ExitTicket] dropping unrenderable figure on Q{i} "
+                                f"(kind={figure_payload.get('kind') if isinstance(figure_payload, dict) else '?'})"
                             )
                             ad.pop('figure_spec', None)
+                            ad.pop('figure', None)
                     kwargs['answer_data'] = ad
                 ExitTicketQuestion.objects.create(**kwargs)
 
@@ -1021,13 +1028,24 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
 
 
 def _generate_exit_ticket_figures(exit_ticket, lesson, institution_id: int) -> int:
-    """Generate images for exit ticket questions that describe figures.
+    """DISABLED — figures come from template rendering only.
 
-    Scans question text and answer_data for figure descriptions (e.g., "diagram showing...",
-    "map of...", "graph of..."), generates images, and stores URLs in the question's
-    answer_data for rendering.
+    This used to pull raster images from KB-extracted curriculum pages
+    and attach them as question figures. That path produced bugs like
+    a curriculum-document table being shown as the figure for an
+    angles-of-a-triangle question (2026-04-27).
 
-    Returns the number of figures generated.
+    The only valid figure source for exit tickets is now the
+    deterministic template renderer (`apps.curriculum.figure_templates`).
+    The LLM emits a `kind` + spec; we render it; we cache the SVG on
+    `answer_data.figure_svg`. No raster images, no KB matching.
+    """
+    return 0
+
+
+def _DEPRECATED_generate_exit_ticket_figures(exit_ticket, lesson, institution_id: int) -> int:
+    """OLD impl kept for reference — DO NOT call. Preserved only so a
+    grep finds the legacy logic if we need to audit what it used to do.
     """
     from apps.tutoring.models import ExitTicketQuestion
 

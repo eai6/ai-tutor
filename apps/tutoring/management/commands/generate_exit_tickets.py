@@ -61,13 +61,56 @@ DATA_INTERPRETATION format — emit a structured `figure_spec`; the server rende
 DATA_INTERPRETATION fallback (only for genuinely tabular non-chartable data, e.g. 2-column reference tables):
 {{"question_type": "data_interpretation", "question": "Study the data and calculate:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'>...</table>", "model_answer": "...", "keywords": [...], "min_keywords": 2}}, "explanation": "...", "difficulty": "medium", "concept_tag": "..."}}
 
-FIGURE_SPEC SCHEMA — the server renders these to correct SVG:
-- type ∈ {{"bar","line","pie","scatter"}} (doughnut maps to pie)
-- For bar/line/pie: provide `labels` (categorical x-axis) + each dataset has `data: [number, ...]` aligned with labels.
-- For scatter: each dataset has `points: [[x,y], ...]` (omit `data` and `labels`).
-- Always include a meaningful `title`. Bar/line/scatter should also include `x_label` and `y_label`.
-- Numbers must be plain numbers — no commas, no units in the value (units belong in y_label).
-- Cite a `source` string for real data; "Hypothetical data" is fine when invented.
+FIGURE CATALOG — the ONLY valid figures. Server renders each from a
+structured spec. NEVER emit raw <svg>. NEVER reference curriculum-page
+or worksheet images. NEVER set figure_url. The catalog is closed: if
+no kind fits the question, OMIT the figure.
+
+Set `answer_data.figure_spec` to {{ "kind": "<one_of_below>", ...fields }}.
+
+CHARTS — for data:
+  bar, line, pie, doughnut, scatter, histogram
+
+GEOMETRY — math shapes:
+  rectangle {{width,height,units?}}, square {{side,units?}},
+  triangle {{type:"right"|"equilateral"|"isoceles"|"scalene", sides?[3], angles?[3], units?}},
+  circle {{radius? OR diameter?, units?}}, regular_polygon {{sides:3-12, side_length?}},
+  parallelogram {{base,height}}, trapezium {{a,b,h}},
+  cuboid {{length,width,height}}, cylinder {{radius,height}},
+  compound_shape {{parts:[{{kind:"rectangle",x,y,width,height}}, ...]}}
+
+ANGLES — geometry-of-angles questions:
+  angle {{degrees}},
+  straight_line_angles {{angles:[]}} (sum 180),
+  point_angles {{angles:[], labels?}} (sum 360 — USE THIS for "angles around a point", NOT bar),
+  triangle_angles {{angles:[3]}} (sum 180),
+  parallel_lines {{configuration:"alternate"|"corresponding"|"co-interior", known_angle}},
+  polygon_angles {{sides:3-12}}
+
+NUMBER & COORDS:
+  number_line {{min,max,step?,marks?:[{{value,label?,type?}}]}},
+  fraction_bar {{numerator,denominator}},
+  coordinate_grid {{xmin,xmax,ymin,ymax,points?,lines?,curves?}}
+
+STATS:
+  box_plot {{min,q1,median,q3,max}},
+  stem_leaf {{rows:[{{stem,leaves:[]}}], key?}},
+  pictogram {{rows:[{{label,count}}], symbol?, key?}}
+
+GEOGRAPHY (mostly static — `kind` alone is enough):
+  earth_layers, volcano_cross,
+  plate_boundary {{type:"convergent"|"divergent"|"transform"}},
+  river_profile {{stage:"upper"|"middle"|"lower"}},
+  meander_oxbow,
+  coastal_features {{feature:"headland_bay"|"cliff_platform"|"spit"|"stack_arch"}},
+  weathering {{type:"freeze_thaw"|"exfoliation"|"chemical"}},
+  rock_cycle, water_cycle, compass_rose, seychelles_map, lat_long_grid
+
+Rules:
+- Numbers are plain numbers — no commas, no units inside values.
+- pie / point_angles values must sum to 100 (or 360 for angles).
+- For charts (bar/line/scatter/histogram) include a `title`; bar/line
+  also include `x_label`, `y_label`.
 
 CHART-TYPE GUIDE — pick the right shape, not just any shape:
 - pie: parts of a whole. Values sum to a meaningful total (100% of a budget,
@@ -149,13 +192,56 @@ DATA_INTERPRETATION format — emit a structured `figure_spec`; the server rende
 DATA_INTERPRETATION fallback (use ONLY when the data is intrinsically a tabular reference, not a chart):
 {{"question_type": "data_interpretation", "question": "Study the table and answer:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'>...</table>", "model_answer": "...", "keywords": [...], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "..."}}
 
-FIGURE_SPEC SCHEMA — the server renders these to correct SVG:
-- type ∈ {{"bar","line","pie","scatter"}} (doughnut maps to pie)
-- For bar/line/pie: provide `labels` (categorical x-axis) + each dataset has `data: [number, ...]` aligned with labels.
-- For scatter: each dataset has `points: [[x,y], ...]` (omit `data` and `labels`).
-- Always include a meaningful `title`. Bar/line/scatter should also include `x_label` and `y_label`.
-- Numbers must be plain numbers — no commas, no units in the value (units belong in y_label).
-- Cite a `source` string for real data; "Hypothetical data" is fine when invented.
+FIGURE CATALOG — the ONLY valid figures. Server renders each from a
+structured spec. NEVER emit raw <svg>. NEVER reference curriculum-page
+or worksheet images. NEVER set figure_url. The catalog is closed: if
+no kind fits the question, OMIT the figure.
+
+Set `answer_data.figure_spec` to {{ "kind": "<one_of_below>", ...fields }}.
+
+CHARTS — for data:
+  bar, line, pie, doughnut, scatter, histogram
+
+GEOMETRY — math shapes:
+  rectangle {{width,height,units?}}, square {{side,units?}},
+  triangle {{type:"right"|"equilateral"|"isoceles"|"scalene", sides?[3], angles?[3], units?}},
+  circle {{radius? OR diameter?, units?}}, regular_polygon {{sides:3-12, side_length?}},
+  parallelogram {{base,height}}, trapezium {{a,b,h}},
+  cuboid {{length,width,height}}, cylinder {{radius,height}},
+  compound_shape {{parts:[{{kind:"rectangle",x,y,width,height}}, ...]}}
+
+ANGLES — geometry-of-angles questions:
+  angle {{degrees}},
+  straight_line_angles {{angles:[]}} (sum 180),
+  point_angles {{angles:[], labels?}} (sum 360 — USE THIS for "angles around a point", NOT bar),
+  triangle_angles {{angles:[3]}} (sum 180),
+  parallel_lines {{configuration:"alternate"|"corresponding"|"co-interior", known_angle}},
+  polygon_angles {{sides:3-12}}
+
+NUMBER & COORDS:
+  number_line {{min,max,step?,marks?:[{{value,label?,type?}}]}},
+  fraction_bar {{numerator,denominator}},
+  coordinate_grid {{xmin,xmax,ymin,ymax,points?,lines?,curves?}}
+
+STATS:
+  box_plot {{min,q1,median,q3,max}},
+  stem_leaf {{rows:[{{stem,leaves:[]}}], key?}},
+  pictogram {{rows:[{{label,count}}], symbol?, key?}}
+
+GEOGRAPHY (mostly static — `kind` alone is enough):
+  earth_layers, volcano_cross,
+  plate_boundary {{type:"convergent"|"divergent"|"transform"}},
+  river_profile {{stage:"upper"|"middle"|"lower"}},
+  meander_oxbow,
+  coastal_features {{feature:"headland_bay"|"cliff_platform"|"spit"|"stack_arch"}},
+  weathering {{type:"freeze_thaw"|"exfoliation"|"chemical"}},
+  rock_cycle, water_cycle, compass_rose, seychelles_map, lat_long_grid
+
+Rules:
+- Numbers are plain numbers — no commas, no units inside values.
+- pie / point_angles values must sum to 100 (or 360 for angles).
+- For charts (bar/line/scatter/histogram) include a `title`; bar/line
+  also include `x_label`, `y_label`.
 
 CHART-TYPE GUIDE — pick the right shape, not just any shape:
 - pie: parts of a whole. Values sum to a meaningful total (100% of a budget,

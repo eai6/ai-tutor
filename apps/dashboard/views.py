@@ -4934,11 +4934,14 @@ def exit_ticket_figure_edit(request, question_id):
 
     GET: render the edit form (preview + raw JSON spec textarea).
     POST: validate the new spec, render to SVG, persist both.
+
+    Routes through the unified template renderer so any of the catalog
+    kinds (charts, geometry, angles, coords, stats, geography) can be
+    edited.
     """
     import json
     from apps.tutoring.models import ExitTicketQuestion
-    from apps.curriculum.figure_render import render_figure_spec
-    from apps.tutoring.plot_spec import coerce_plot_spec
+    from apps.curriculum.figure_templates import render_template
 
     question = _question_for_staff(request, question_id)
     if question is None:
@@ -4950,8 +4953,8 @@ def exit_ticket_figure_edit(request, question_id):
 
     error = None
     success = None
-    spec_text = json.dumps(answer_data.get('figure_spec', {}), indent=2) \
-        if answer_data.get('figure_spec') else ''
+    current_spec = answer_data.get('figure') or answer_data.get('figure_spec') or {}
+    spec_text = json.dumps(current_spec, indent=2) if current_spec else ''
 
     if request.method == 'POST':
         raw = (request.POST.get('figure_spec') or '').strip()
@@ -4963,27 +4966,30 @@ def exit_ticket_figure_edit(request, question_id):
             except json.JSONDecodeError as e:
                 error = f'Invalid JSON: {e.msg} (line {e.lineno})'
                 spec = None
-            if spec is not None:
-                cleaned, validation_err = coerce_plot_spec(spec)
-                if validation_err:
-                    error = validation_err
+            if spec is not None and isinstance(spec, dict):
+                svg = render_template(spec)
+                if not svg:
+                    kind = spec.get('kind') or spec.get('type') or '(unset)'
+                    error = (
+                        f'Could not render figure (kind="{kind}"). '
+                        f'Check that the kind is in the catalog and the spec is valid.'
+                    )
                 else:
-                    svg = render_figure_spec(cleaned)
-                    if not svg:
-                        error = 'Spec validated but renderer returned no SVG.'
-                    else:
-                        answer_data['figure_spec'] = cleaned
-                        answer_data['figure_svg'] = svg
-                        question.answer_data = answer_data
-                        question.save(update_fields=['answer_data'])
-                        success = 'Figure regenerated.'
-                        spec_text = json.dumps(cleaned, indent=2)
+                    answer_data['figure_spec'] = spec
+                    answer_data['figure_svg'] = svg
+                    # Strip any stale raster fields so the SVG wins.
+                    for legacy in ('figure_url', 'figure_source', 'figure_description'):
+                        answer_data.pop(legacy, None)
+                    question.answer_data = answer_data
+                    question.save(update_fields=['answer_data'])
+                    success = 'Figure rendered.'
+                    spec_text = json.dumps(spec, indent=2)
 
     return render(request, 'dashboard/exit_ticket_figure_edit.html', {
         'question': question,
         'spec_text': spec_text,
         'figure_svg': answer_data.get('figure_svg', ''),
-        'figure_url': answer_data.get('figure_url', ''),
+        'figure_url': '',  # raster figures retired
         'error': error,
         'success': success,
     })
@@ -5000,8 +5006,7 @@ def exit_ticket_figure_regenerate(request, question_id):
     """
     import json
     from apps.tutoring.models import ExitTicketQuestion
-    from apps.curriculum.figure_render import render_figure_spec
-    from apps.tutoring.plot_spec import coerce_plot_spec
+    from apps.curriculum.figure_templates import render_template, list_kinds
     from apps.llm.prompts import get_prompt_or_default
 
     if request.method != 'POST':
@@ -5037,15 +5042,21 @@ def exit_ticket_figure_regenerate(request, question_id):
         "You are an assistant that produces structured chart specs in JSON. "
         "Output ONLY a JSON object — no prose, no code fence."
     )
+    valid_kinds = ', '.join(list_kinds())
     user_prompt = (
         "Update this figure_spec based on the teacher's instruction.\n\n"
         f"QUESTION: {question.question_text}\n"
         f"CURRENT SPEC:\n{json.dumps(current_spec, indent=2) if current_spec else '(none)'}\n\n"
         f"TEACHER INSTRUCTION:\n{teacher_prompt}\n\n"
-        "Return the updated figure_spec JSON. Schema:\n"
-        "  {type: 'bar'|'line'|'pie'|'scatter', title, x_label, y_label,\n"
-        "   labels: [...], datasets: [{label, data: [numbers]}], source}\n"
-        "For scatter, datasets use `points: [[x,y],...]` instead of `data`.\n"
+        "Output a JSON object with a `kind` field set to ONE of these "
+        f"catalog kinds: {valid_kinds}.\n"
+        "Each kind has its own fields — set what makes sense for the question.\n"
+        "Examples:\n"
+        "  {\"kind\":\"bar\", \"title\":\"...\", \"labels\":[...], \"datasets\":[{\"data\":[...]}]}\n"
+        "  {\"kind\":\"pie\", \"title\":\"...\", \"labels\":[...], \"datasets\":[{\"data\":[...]}]}\n"
+        "  {\"kind\":\"triangle\", \"type\":\"right\", \"sides\":[3,4,5], \"units\":\"cm\"}\n"
+        "  {\"kind\":\"angle\", \"degrees\":48}\n"
+        "  {\"kind\":\"point_angles\", \"angles\":[80,100,90,90], \"labels\":[...]}\n"
         "Numbers must be plain numbers (no commas, no units). "
         "Do NOT wrap your output in markdown code fences."
     )
@@ -5064,18 +5075,22 @@ def exit_ticket_figure_regenerate(request, question_id):
     except Exception as e:
         return JsonResponse({'ok': False, 'error': f'Could not parse LLM JSON: {e}'}, status=500)
 
-    cleaned, validation_err = coerce_plot_spec(new_spec)
-    if validation_err:
-        return JsonResponse({'ok': False, 'error': f'LLM produced invalid spec: {validation_err}'}, status=500)
+    if not isinstance(new_spec, dict):
+        return JsonResponse({'ok': False, 'error': 'LLM produced non-object spec'}, status=500)
 
-    svg = render_figure_spec(cleaned)
+    from apps.curriculum.figure_templates import render_template
+    svg = render_template(new_spec)
     if not svg:
-        return JsonResponse({'ok': False, 'error': 'Renderer returned no SVG'}, status=500)
+        kind = new_spec.get('kind') or new_spec.get('type') or '(unset)'
+        return JsonResponse({
+            'ok': False,
+            'error': f'Could not render figure (kind="{kind}"). Spec must use a catalog kind.',
+        }, status=500)
 
     return JsonResponse({
         'ok': True,
-        'spec': cleaned,
-        'spec_text': json.dumps(cleaned, indent=2),
+        'spec': new_spec,
+        'spec_text': json.dumps(new_spec, indent=2),
         'svg': svg,
     })
 
