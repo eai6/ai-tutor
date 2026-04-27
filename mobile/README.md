@@ -76,3 +76,7 @@ npm run schema:gen
 ```
 
 (Requires `npx openapi-typescript` — install on demand.)
+
+
+  Username:  mobiletest                                                                                                                            
+  Password:  mobile-pass-1234

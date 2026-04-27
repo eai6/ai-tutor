@@ -14,7 +14,11 @@ export function setOnUnauthorized(fn: (() => void) | null) {
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 20_000,
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    // The backend tutor uses this to keep responses short on mobile.
+    'X-Client-Form-Factor': 'mobile',
+  },
 });
 
 apiClient.interceptors.request.use(async (config) => {

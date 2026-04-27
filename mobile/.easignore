@@ -1,0 +1,34 @@
+# mobile/ is a sub-directory of the Django repo. EAS picks up the
+# parent git tree by default — exclude everything outside mobile/
+# that isn't the JS app.
+
+# Python build artifacts (Django side)
+**/__pycache__/
+**/*.pyc
+
+# Django project files (siblings of mobile/)
+../apps/
+../config/
+../infra/
+../manage.py
+../venv/
+../db.sqlite3
+../media/
+../staticfiles/
+../archives/
+../docs/
+../seychelles_package/
+../openstax_resources*/
+../*.json
+../*.docx
+../requirements.txt
+
+# Node-side artifacts
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Misc
+*.log
+.DS_Store

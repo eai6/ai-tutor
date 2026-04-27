@@ -35,17 +35,25 @@ export interface StartSessionResponse extends TutorMessage {
   resumed?: boolean;
 }
 
+// Tutor responses go through the LLM, which can take 30s+ end-to-end.
+// Override the global axios timeout for these calls.
+const TUTOR_TIMEOUT_MS = 120_000;
+
 export async function startSession(lessonId: number): Promise<StartSessionResponse> {
-  const res = await apiClient.post<StartSessionResponse>('/sessions/', {
-    lesson_id: lessonId,
-  });
+  const res = await apiClient.post<StartSessionResponse>(
+    '/sessions/',
+    { lesson_id: lessonId },
+    { timeout: TUTOR_TIMEOUT_MS },
+  );
   return res.data;
 }
 
 export async function respond(sessionId: number, message: string): Promise<TutorMessage> {
-  const res = await apiClient.post<TutorMessage>(`/sessions/${sessionId}/respond/`, {
-    message,
-  });
+  const res = await apiClient.post<TutorMessage>(
+    `/sessions/${sessionId}/respond/`,
+    { message },
+    { timeout: TUTOR_TIMEOUT_MS },
+  );
   return res.data;
 }
 
@@ -74,6 +82,7 @@ export async function submitExitTicket(
   const res = await apiClient.post<ExitTicketResult>(
     `/sessions/${sessionId}/exit-ticket/`,
     { answers },
+    { timeout: TUTOR_TIMEOUT_MS },
   );
   return res.data;
 }

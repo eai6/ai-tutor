@@ -1,34 +1,32 @@
-import { useState } from 'react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { extractErrorMessage } from '@/api/client';
-import { getLesson, listLessonSteps } from '@/api/curriculum';
+import { getLesson } from '@/api/curriculum';
 import { fetchOfflinePack } from '@/api/offline-pack';
-import { startSession } from '@/api/sessions';
-import { Button } from '@/components/Button';
-import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
+import { SkeletonBlock } from '@/components/Skeleton';
 import { loadPack, savePack } from '@/db/queries/lesson-packs';
-import { colors, spacing, typography } from '@/theme';
+import { colors, radius, spacing, typography } from '@/theme';
 
 export default function LessonDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const lessonId = Number(id);
   const router = useRouter();
   const qc = useQueryClient();
-  const [startError, setStartError] = useState<string | null>(null);
 
   const lessonQ = useQuery({
     queryKey: ['lesson', lessonId],
     queryFn: () => getLesson(lessonId),
-    enabled: Number.isFinite(lessonId),
-  });
-
-  const stepsQ = useQuery({
-    queryKey: ['lesson-steps', lessonId],
-    queryFn: () => listLessonSteps(lessonId),
     enabled: Number.isFinite(lessonId),
   });
 
@@ -49,22 +47,14 @@ export default function LessonDetailScreen() {
     },
   });
 
-  const startM = useMutation({
-    mutationFn: () => startSession(lessonId),
-    onSuccess: (resp) => {
-      setStartError(null);
-      router.push(`/(app)/tutor/${resp.session_id}`);
-    },
-    onError: (err) => {
-      setStartError(extractErrorMessage(err, 'Could not start session'));
-    },
-  });
-
   if (lessonQ.isLoading) {
     return (
       <Screen scroll={false}>
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.primary} />
+        <Stack.Screen options={{ title: 'Lesson' }} />
+        <View style={styles.contentPad}>
+          <SkeletonBlock width={120} height={12} />
+          <SkeletonBlock width="80%" height={28} style={{ marginTop: spacing.sm }} />
+          <SkeletonBlock width="60%" height={16} style={{ marginTop: spacing.sm }} />
         </View>
       </Screen>
     );
@@ -83,107 +73,192 @@ export default function LessonDetailScreen() {
   }
 
   const lesson = lessonQ.data;
-  const steps = stepsQ.data ?? [];
   const pack = packQ.data;
   const isDownloaded = !!pack;
-  const downloadError = downloadM.error
-    ? extractErrorMessage(downloadM.error, 'Download failed')
-    : null;
 
   return (
     <Screen scroll={false}>
-      <Stack.Screen options={{ headerShown: true, title: lesson.unit_title }} />
+      <Stack.Screen options={{ title: lesson.unit_title }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={[typography.caption, styles.muted]}>{lesson.course_title}</Text>
-          <Text style={typography.h1}>{lesson.title}</Text>
+        {/* Hero — large title pattern */}
+        <View style={styles.hero}>
+          <Text style={[typography.caption, styles.muted]}>
+            {lesson.course_title.toUpperCase()}
+          </Text>
+          <Text style={typography.largeTitle}>{lesson.title}</Text>
           {lesson.objective ? (
-            <Text style={[typography.body, styles.muted]}>{lesson.objective}</Text>
+            <Text style={[typography.contentBody, styles.objective]}>{lesson.objective}</Text>
           ) : null}
         </View>
 
-        <Button
-          title={startM.isPending ? 'Starting…' : 'Start tutoring session'}
-          onPress={() => startM.mutate()}
-          loading={startM.isPending}
+        {/* Single purple CTA — chat screen handles cloud vs on-device */}
+        <PrimaryCTA
+          icon="sparkles"
+          label="Start tutor chat"
+          onPress={() => router.push(`/(app)/chat/${lessonId}`)}
         />
-        {startError ? <Text style={styles.error}>{startError}</Text> : null}
 
-        <Card style={styles.packCard}>
-          <Text style={typography.h3}>Offline content</Text>
-          {isDownloaded ? (
-            <>
-              <Text style={[typography.small, styles.muted]}>
-                Pack v{pack.version} · saved{' '}
-                {pack.downloaded_at ? new Date(pack.downloaded_at).toLocaleDateString() : ''}
-              </Text>
-              <Button
-                title="Review offline"
-                variant="secondary"
-                onPress={() => router.push(`/(app)/lessons/${lessonId}/review`)}
-              />
-              <Button
-                title={downloadM.isPending ? 'Refreshing…' : 'Refresh pack'}
-                variant="secondary"
+        {/* Offline pack — status row, not a card */}
+        <View style={styles.statusRow}>
+          <Ionicons
+            name={isDownloaded ? 'checkmark-circle' : 'cloud-download-outline'}
+            size={20}
+            color={isDownloaded ? colors.success : colors.textMuted}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={typography.bodyMedium}>
+              {isDownloaded ? 'Saved offline' : 'Available offline'}
+            </Text>
+            <Text style={[typography.small, styles.muted]}>
+              {isDownloaded
+                ? `Pack v${pack.version} · ${pack.downloaded_at ? new Date(pack.downloaded_at).toLocaleDateString() : ''}`
+                : 'Read this lesson + take exit ticket without internet.'}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {isDownloaded ? (
+              <>
+                <TextButton
+                  label="Review"
+                  onPress={() => router.push(`/(app)/lessons/${lessonId}/review`)}
+                />
+                <TextButton
+                  label={downloadM.isPending ? '…' : 'Refresh'}
+                  loading={downloadM.isPending}
+                  onPress={() => downloadM.mutate(true)}
+                />
+              </>
+            ) : (
+              <TextButton
+                label={downloadM.isPending ? 'Downloading…' : 'Download'}
                 loading={downloadM.isPending}
-                onPress={() => downloadM.mutate(true)}
-              />
-            </>
-          ) : (
-            <>
-              <Text style={[typography.small, styles.muted]}>
-                Download to read this lesson and take the exit ticket without internet.
-              </Text>
-              <Button
-                title={downloadM.isPending ? 'Downloading…' : 'Download for offline'}
                 onPress={() => downloadM.mutate(false)}
-                loading={downloadM.isPending}
               />
-            </>
-          )}
-          {downloadError ? <Text style={styles.error}>{downloadError}</Text> : null}
-        </Card>
-
-        <View style={styles.section}>
-          <Text style={typography.h3}>Lesson outline</Text>
-          {stepsQ.isLoading ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : steps.length === 0 ? (
-            <Text style={[typography.small, styles.muted]}>No steps published yet.</Text>
-          ) : (
-            steps.map((s, idx) => (
-              <Card key={s.id} style={styles.stepCard}>
-                <Text style={[typography.caption, styles.muted]}>
-                  Step {idx + 1} · {s.phase || s.step_type}
-                </Text>
-                {s.teacher_script ? (
-                  <Text style={[typography.body, styles.script]} numberOfLines={4}>
-                    {s.teacher_script}
-                  </Text>
-                ) : null}
-                {s.question ? (
-                  <Text style={[typography.small, styles.question]} numberOfLines={3}>
-                    Q: {s.question}
-                  </Text>
-                ) : null}
-              </Card>
-            ))
-          )}
+            )}
+          </View>
         </View>
+        {downloadM.error ? (
+          <Text style={styles.errorInline}>
+            {extractErrorMessage(downloadM.error, 'Download failed')}
+          </Text>
+        ) : null}
       </ScrollView>
     </Screen>
   );
 }
 
+interface CTAProps {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  loading?: boolean;
+  onPress: () => void;
+}
+
+function PrimaryCTA({ icon, label, loading, onPress }: CTAProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={loading}
+      style={({ pressed }) => [
+        styles.cta,
+        { opacity: loading ? 0.7 : pressed ? 0.85 : 1 },
+      ]}
+    >
+      {loading ? (
+        <ActivityIndicator color={colors.primaryText} />
+      ) : (
+        <Ionicons name={icon} size={18} color={colors.primaryText} />
+      )}
+      <Text style={styles.ctaLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+interface TextButtonProps {
+  label: string;
+  loading?: boolean;
+  onPress: () => void;
+}
+
+function TextButton({ label, loading, onPress }: TextButtonProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={loading}
+      style={({ pressed }) => [styles.textBtn, { opacity: pressed ? 0.6 : 1 }]}
+    >
+      <Text style={styles.textBtnLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
-  header: { gap: spacing.xs },
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.xl,
+  },
+  contentPad: { padding: spacing.xl, gap: spacing.sm },
+  hero: { gap: spacing.xs },
   muted: { color: colors.textMuted },
-  packCard: { gap: spacing.sm },
-  section: { gap: spacing.md, marginTop: spacing.md },
-  stepCard: { gap: spacing.xs },
-  script: { marginTop: spacing.xs },
-  question: { marginTop: spacing.xs, color: colors.text, fontStyle: 'italic' },
+  objective: { color: colors.text, marginTop: spacing.sm },
+
+  cta: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md + 4,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    minHeight: 56,
+  },
+  ctaLabel: {
+    color: colors.primaryText,
+    fontFamily: typography.h3.fontFamily,
+    fontSize: 16,
+  },
+
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.borderMuted,
+  },
+  textBtn: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  textBtnLabel: {
+    color: colors.text,
+    fontFamily: typography.smallMedium.fontFamily,
+    fontSize: 14,
+  },
+
+  offlineCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    marginTop: -spacing.sm,
+  },
+  offlineCtaLabel: {
+    color: colors.text,
+    fontFamily: typography.smallMedium.fontFamily,
+    fontSize: 14,
+  },
+  errorInline: { color: colors.danger, fontSize: 13, marginTop: -spacing.sm },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  error: { color: colors.danger },
+  error: { color: colors.danger, fontSize: 14 },
 });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 
@@ -42,9 +43,18 @@ export default function LoginScreen() {
 
   return (
     <Screen>
+      <View style={styles.brand}>
+        <View style={styles.logoCircle}>
+          <Ionicons name="sparkles" size={28} color={colors.primaryText} />
+        </View>
+        <Text style={styles.brandText}>AI Tutor</Text>
+      </View>
+
       <View style={styles.header}>
         <Text style={typography.h1}>Welcome back</Text>
-        <Text style={[typography.body, styles.subtitle]}>Sign in to continue your lessons.</Text>
+        <Text style={[typography.body, styles.subtitle]}>
+          Sign in to continue your lessons.
+        </Text>
       </View>
 
       <Controller
@@ -85,7 +95,12 @@ export default function LoginScreen() {
         )}
       />
 
-      {serverError ? <Text style={styles.serverError}>{serverError}</Text> : null}
+      {serverError ? (
+        <View style={styles.errorBar}>
+          <Ionicons name="alert-circle" size={16} color={colors.danger} />
+          <Text style={styles.serverError}>{serverError}</Text>
+        </View>
+      ) : null}
 
       <Button title="Sign in" onPress={handleSubmit(onSubmit)} loading={submitting} />
 
@@ -100,9 +115,34 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { gap: spacing.xs, marginBottom: spacing.lg, marginTop: spacing.xl },
+  brand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+  },
+  logoCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandText: { fontSize: 18, fontWeight: '700', color: colors.text },
+  header: { gap: spacing.xs, marginTop: spacing.xl, marginBottom: spacing.md },
   subtitle: { color: colors.textMuted },
-  serverError: { color: colors.danger, marginBottom: spacing.sm },
+  errorBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.dangerSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    marginBottom: spacing.sm,
+  },
+  serverError: { color: colors.danger, flex: 1, fontSize: 13 },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',

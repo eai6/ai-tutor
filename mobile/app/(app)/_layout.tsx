@@ -1,54 +1,25 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Stack } from 'expo-router';
 
 import { colors } from '@/theme';
 
-export default function AppLayout() {
+export default function AppStackLayout() {
   return (
-    <Tabs
+    <Stack
       screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        headerStyle: { backgroundColor: colors.bg },
+        headerTitleStyle: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+        headerTintColor: colors.text,
+        headerShadowVisible: false,
+        headerBackTitle: 'Back',
+        contentStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Courses',
-          tabBarIcon: ({ color, size }) => <Ionicons name="book" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="progress"
-        options={{
-          title: 'Progress',
-          tabBarIcon: ({ color, size }) => <Ionicons name="trophy" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="courses/[id]"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="lessons/[id]/index"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="lessons/[id]/review"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="tutor/[sessionId]"
-        options={{ href: null }}
-      />
-    </Tabs>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="courses/[id]" options={{ title: 'Lessons' }} />
+      <Stack.Screen name="lessons/[id]/index" options={{ title: 'Lesson' }} />
+      <Stack.Screen name="lessons/[id]/review" options={{ title: 'Review' }} />
+      <Stack.Screen name="chat/[lessonId]" options={{ title: 'Tutor' }} />
+      <Stack.Screen name="model-store" options={{ title: 'AI Model' }} />
+    </Stack>
   );
 }

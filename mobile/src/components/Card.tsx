@@ -1,26 +1,36 @@
 import { ReactNode } from 'react';
 import { Pressable, StyleSheet, View, ViewStyle } from 'react-native';
 
-import { colors, radius, spacing } from '@/theme';
+import { colors, elevation, radius, spacing } from '@/theme';
 
 interface Props {
   children: ReactNode;
   onPress?: () => void;
   style?: ViewStyle;
+  flat?: boolean;
 }
 
-export function Card({ children, onPress, style }: Props) {
+export function Card({ children, onPress, style, flat }: Props) {
+  const base = [styles.card, flat ? styles.flat : elevation, style];
   if (onPress) {
     return (
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [styles.card, { opacity: pressed ? 0.85 : 1 }, style]}
+        style={(state) => {
+          // react-native-web exposes `hovered` on the state object.
+          const hovered = (state as { hovered?: boolean }).hovered;
+          return [
+            ...base,
+            hovered ? styles.hovered : null,
+            state.pressed ? styles.pressed : null,
+          ];
+        }}
       >
         {children}
       </Pressable>
     );
   }
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <View style={base}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -29,6 +39,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     borderWidth: 1,
+    borderColor: colors.borderMuted,
+  },
+  flat: {
+    backgroundColor: colors.bgMuted,
+    borderColor: colors.borderMuted,
+  },
+  hovered: {
     borderColor: colors.border,
+    transform: [{ translateY: -1 }],
+  },
+  pressed: {
+    opacity: 0.92,
+    transform: [{ translateY: 0 }],
   },
 });
