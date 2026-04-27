@@ -21,16 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 def combined_objectives_for_lesson(lesson) -> List[str]:
-    """Return the merged objectives list for a lesson.
+    """Return the lesson's teaching objectives.
 
-    Combines the lesson's own enabling_objectives with the parent unit's
-    terminal_objectives into a single deduplicated, order-preserving
-    list of teaching steps.
+    Each lesson now owns ONE teaching objective (parser-enforced). This
+    helper still combines the lesson's `enabling_objectives` with the
+    parent unit's `terminal_objectives` for backwards compatibility with
+    legacy multi-objective lessons in the database — so a lesson that
+    pre-dates the 1:1 rule still pulls every relevant objective into
+    content + assessment generation.
 
-    Why: per the 2026-04-27 product call, we treat terminal + enabling
-    objectives as one flat list of "teaching steps" for both lesson
-    content generation and assessment generation. See
-    `~/.claude/projects/.../memory/feedback_teaching_steps_unification.md`.
+    Order: parent-unit TOs first, then the lesson's own EOs. Deduped
+    case-insensitively on whitespace-normalized text.
+
+    See `~/.claude/projects/.../memory/feedback_teaching_steps_unification.md`.
     """
     eos = list(lesson.enabling_objectives or [])
     tos: List[str] = []
@@ -434,14 +437,17 @@ base your media descriptions on these figures so generated images match the text
                 f"  TS{i+1}: {obj}" for i, obj in enumerate(teaching_steps_objectives)
             )
             enabling_obj_str = f"""
-TEACHING STEPS (each MUST be covered — every one is a discrete skill or
-piece of knowledge the student needs to practice intensely):
+TEACHING OBJECTIVE(S) (each MUST be covered — every one is a discrete
+skill, knowledge, or attitude the student needs to practice intensely):
 {eo_lines}
-Every teaching step must be covered by at least one tutoring step.
+Every teaching objective must be covered by at least one tutoring step.
 Set each step's terminal_objective field to the exact text of the
-teaching step it works toward.
-Set each step's enabling_objective field to the specific sub-skill it
-addresses.
+teaching objective it works toward.
+Set each step's enabling_objective field to the specific sub-skill or
+behaviour the step targets.
+For a 20-minute lesson there is typically ONE teaching objective; the
+4 tutoring steps drill that single objective intensely (warm-up →
+instruction → guided practice → check for understanding).
 """
 
         # Build teaching steps section (granular enabling objectives from syllabus)
@@ -500,7 +506,7 @@ TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}
 Create EXACTLY {max_steps} steps. This is a focused {target_minutes}-minute lesson — students should finish the whole flow in that window.
-Cover {max_eos} enabling objective{"s" if max_eos > 1 else ""} only. ONE terminal objective, kept tight.
+A 20-minute lesson drills ONE teaching objective intensely. The {max_steps} tutoring steps progress through DOK levels (recall → skill → strategic) all in service of that single objective. Do not introduce additional objectives.
 
 {"MATH LESSON STRUCTURE — exactly " + str(max_steps) + " steps:" if lesson.unit.course.is_math else "STRUCTURE — exactly " + str(max_steps) + " steps:"}
 {(
@@ -868,11 +874,11 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
     if eo_list:
         eo_lines = "\n".join(f"  TS{i+1}: {eo}" for i, eo in enumerate(eo_list))
         objectives_context += f"""
-TEACHING STEPS (the concept_tag for EVERY question MUST be one of these,
-and EACH step must be assessed by at least 2 questions):
+TEACHING OBJECTIVES (the concept_tag for EVERY question MUST be one of
+these, and EACH objective must be assessed by at least 2 questions):
 {eo_lines}
 
-CRITICAL: The concept_tag field must be the EXACT text of one of the teaching steps above.
+CRITICAL: The concept_tag field must be the EXACT text of one of the teaching objectives above.
 Example: "Define the terms Development, Globalization, MEDC, NIC, LEDC"
 Do NOT invent short labels like "industry_definition" — use the FULL enabling objective text.
 Every enabling objective must be assessed by at least 1 question. Distribute questions across all EOs.

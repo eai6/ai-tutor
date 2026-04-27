@@ -712,67 +712,38 @@ Return ONLY valid JSON."""
         tos = u.get('terminal_objectives', [])
         eos = u.get('enabling_objectives', [])
 
-        # Build lessons — different strategy for math vs other subjects
+        # Unified teaching-objectives rule (2026-04-27): one lesson per
+        # teaching objective. We flatten the unit's terminal + enabling
+        # objectives into a single ordered, deduplicated list — TOs first
+        # (broad outcomes), then EOs (granular skills). Each item becomes
+        # one 20-minute lesson that drills that single objective intensely.
+        seen = set()
+        teaching_objectives = []
+        for obj in (tos or []) + (eos or []):
+            if not obj:
+                continue
+            key = ' '.join(str(obj).split()).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            teaching_objectives.append(str(obj).strip())
+
         lessons = []
-        max_eos_per_lesson = 3  # For 20-min lessons
-
-        if is_math or (len(tos) <= 1 and len(eos) > 3):
-            # MATH: Unit = Topic, TOs = Core, EOs = Extended
-            # ONE Extended objective per lesson — math needs depth:
-            # teach → worked example → practice from multiple angles → common mistakes
-            math_eos_per_lesson = 1
-            for start in range(0, max(len(eos), 1), math_eos_per_lesson):
-                lesson_eos = eos[start:start + math_eos_per_lesson]
-                if not lesson_eos:
-                    # If no extended objectives, use core objectives
-                    if tos:
-                        lesson_eos = tos[start:start + math_eos_per_lesson]
-                    if not lesson_eos:
-                        continue
-                # Use first EO as lesson objective
-                lesson_title = create_lesson_title(lesson_eos[0])
-                lessons.append({
-                    'title': lesson_title,
-                    'objective': lesson_eos[0],
-                    'enabling_objectives': tos,  # All core objectives for the unit
-                    'teaching_steps': lesson_eos,  # The specific extended EOs for this lesson
-                    'teaching_strategies': u.get('teaching_strategies', []),
-                    'resources': u.get('resources', []),
-                    'assessment_methods': u.get('assessment', []),
-                    'order': len(lessons) + 1,
-                })
-        else:
-            # GEOGRAPHY / multi-TO subjects: 1 TO per lesson, EOs distributed
-            lesson_objectives = tos if tos else eos
-            chunk_size = 1
-
-            to_chunks = []
-            for start in range(0, len(lesson_objectives), chunk_size):
-                chunk = lesson_objectives[start:start + chunk_size]
-                if chunk:
-                    to_chunks.append(chunk)
-
-            num_lessons = len(to_chunks) or 1
-            eos_per_lesson = len(eos) // num_lessons if num_lessons else 0
-            eos_remainder = len(eos) % num_lessons if num_lessons else 0
-            eo_idx = 0
-
-            for lesson_num, chunk in enumerate(to_chunks):
-                n_eos = eos_per_lesson + (1 if lesson_num < eos_remainder else 0)
-                n_eos = min(n_eos, max_eos_per_lesson)
-                lesson_eos = eos[eo_idx:eo_idx + n_eos]
-                eo_idx += n_eos
-
-                lessons.append({
-                    'title': create_lesson_title(chunk[0]),
-                    'objective': chunk[0],
-                    'enabling_objectives': chunk,
-                    'teaching_steps': lesson_eos,
-                    'teaching_strategies': u.get('teaching_strategies', []),
-                    'resources': u.get('resources', []),
-                    'assessment_methods': u.get('assessment', []),
-                    'order': len(lessons) + 1,
-                })
+        for objective in teaching_objectives:
+            lessons.append({
+                'title': create_lesson_title(objective),
+                'objective': objective,
+                # Each lesson owns exactly ONE teaching objective. Stored
+                # in `enabling_objectives` for backward compatibility with
+                # the rest of the pipeline (content generator, exit-ticket
+                # generator, etc.).
+                'enabling_objectives': [objective],
+                'teaching_steps': [],
+                'teaching_strategies': u.get('teaching_strategies', []),
+                'resources': u.get('resources', []),
+                'assessment_methods': u.get('assessment', []),
+                'order': len(lessons) + 1,
+            })
 
         units.append({
             'number': len(units) + 1,

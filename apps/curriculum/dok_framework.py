@@ -4,9 +4,9 @@ Loaded into LLM system prompts for content generation, exit ticket
 generation, and summative assessment generation. The same rubric is
 used to:
 
-  - Guide *teaching*: each teaching step should be authored at an
-    explicit DOK level (and progress students up the levels within a
-    lesson).
+  - Guide *teaching*: each tutoring step should be authored at an
+    explicit DOK level so the lesson progresses students up the levels
+    while drilling its single teaching objective.
   - Guide *assessment*: each question targets a stated DOK level so
     a paper has a balanced mix (recall → strategic thinking → extended).
 
@@ -125,10 +125,11 @@ _RUBRIC = "\n\n".join(_level_block(lvl) for lvl in DOK_LEVELS)
 
 
 _CONTENT_GUIDANCE = """\
-DEPTH OF KNOWLEDGE (DOK) — guide for authoring teaching steps
+DEPTH OF KNOWLEDGE (DOK) — guide for authoring tutoring steps
 
-Use Webb's DOK framework to set the cognitive demand of each teaching
-step. Lessons should *progress* through the levels:
+A 20-minute lesson drills ONE teaching objective. Use Webb's DOK
+framework to set the cognitive demand of each tutoring step inside
+that lesson, and progress students up the levels:
 
   - Open with DOK 1 (recall) to anchor vocabulary and prerequisite facts.
   - Spend most steps at DOK 2 (skill/concept) — solve routine multi-step
@@ -136,11 +137,12 @@ step. Lessons should *progress* through the levels:
   - Reach at least one DOK 3 (strategic thinking) step toward the end —
     compare strategies, justify a conclusion, apply the concept in a
     new context.
-  - DOK 4 (extended thinking) is rare in a single 20-minute lesson; only
-    include if the curriculum explicitly requires a project-style task.
+  - DOK 4 (extended thinking) is rare in a single 20-minute lesson;
+    only include if the curriculum explicitly requires a project-style
+    task.
 
-When you author a teaching step, pick a level deliberately and use
-verbs from that level's signal-verb list. Do not author every step at
+When you author a tutoring step, pick a DOK level deliberately and use
+verbs from that level's signal-verb list. Do not keep every step at
 DOK 1 — students need transfer, not just recall.
 
 {rubric}
