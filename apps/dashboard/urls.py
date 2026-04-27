@@ -43,6 +43,14 @@ urlpatterns = [
     path('curriculum/lesson/<int:lesson_id>/publish/', views.lesson_publish, name='lesson_publish'),
     path('curriculum/lesson/<int:lesson_id>/approve/', views.lesson_approve, name='lesson_approve'),
     path('curriculum/lesson/<int:lesson_id>/group-settings/', views.lesson_group_settings, name='lesson_group_settings'),
+
+    # Exit-ticket figure editing (teacher dashboard)
+    path('exit-tickets/questions/<int:question_id>/figure/',
+         views.exit_ticket_figure_edit, name='exit_ticket_figure_edit'),
+    path('exit-tickets/questions/<int:question_id>/figure/regenerate/',
+         views.exit_ticket_figure_regenerate, name='exit_ticket_figure_regenerate'),
+    path('exit-tickets/questions/<int:question_id>/figure/delete/',
+         views.exit_ticket_figure_delete, name='exit_ticket_figure_delete'),
     path('curriculum/course/<int:course_id>/subject-type/', views.course_subject_type, name='course_subject_type'),
 
     # Account deletion (memory)

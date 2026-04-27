@@ -1267,7 +1267,11 @@ body {
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{# Chart.js was used for the interactive plot_spec exit-ticket renderer.
+   That feature was removed in favour of pipeline-generated images via
+   figure_url / figure_description. The renderer + drainPendingPlots()
+   helpers below are now dead but harmless — left in place for one
+   release in case any old answer_data still has plot_spec. #}
 {% if is_math_lesson %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.css" integrity="sha384-/L6i+LN3dyoaK2jYG5ZLh5u13cjdsPDcFOSNJeFBFa/KgVXR5kOfTdiN3ft1uMAq" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.js" integrity="sha384-H6s1ZrH2CKpFpqR680poRdStIRJGXty7fSkxAcIfxwl9iu6A4BOPtTk7vQ58Ovio" crossorigin="anonymous"></script>
@@ -2037,28 +2041,32 @@ function showExitTicket() {
             } else if (qType === 'short_answer' || qType === 'data_interpretation') {
                 const ad = q.answer_data || {};
                 let dataDesc = '';
-                // Preferred path: Chart.js plot_spec from the content generator.
-                if (ad.plot_spec) {
-                    const canvasId = `exit-plot-${origIdx}`;
-                    dataDesc = `<div class="data-description-plot" style="background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:12px 16px;margin-bottom:8px;">`;
-                    if (ad.plot_spec.title) {
-                        dataDesc += `<div style="font-weight:600;font-size:0.95rem;margin-bottom:6px;">${escapeHtml(ad.plot_spec.title)}</div>`;
-                    }
-                    dataDesc += `<canvas id="${canvasId}" style="max-height:300px;"></canvas>`;
-                    if (ad.plot_spec.source) {
-                        dataDesc += `<div style="font-size:0.7rem;color:#71717a;margin-top:6px;">Source: ${escapeHtml(ad.plot_spec.source)}</div>`;
-                    }
-                    dataDesc += `</div>`;
-                    // Defer rendering until the canvas is in the DOM.
-                    pendingPlots.push({ canvasId, spec: ad.plot_spec });
+                // Preferred path: server-rendered SVG from a figure_spec.
+                // Bar/line/pie/scatter sized correctly from actual values.
+                if (ad.figure_svg) {
+                    dataDesc = `<div class="data-description-figure" style="background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:8px;margin-bottom:8px;">`
+                        + ad.figure_svg
+                        + `</div>`;
+                } else if (ad.figure_url) {
+                    // Pipeline-generated raster image fallback.
+                    const altText = escapeHtml(ad.figure_description || 'Question figure');
+                    dataDesc = `<div class="data-description-figure" style="text-align:center;margin-bottom:8px;">`
+                        + `<img src="${escapeHtml(ad.figure_url)}" alt="${altText}" style="max-width:100%;border-radius:8px;border:1px solid #e4e4e7;">`
+                        + (ad.figure_source ? `<div style="font-size:0.7rem;color:#71717a;margin-top:4px;">Source: ${escapeHtml(ad.figure_source)}</div>` : ``)
+                        + `</div>`;
                 } else if (ad.data_description) {
-                    // Legacy path: HTML or plain text data_description.
+                    // HTML / plain-text data block (kept for non-chartable
+                    // tabular reference data).
                     if (/<[a-z][\s\S]*>/i.test(ad.data_description) && window.DOMPurify) {
                         const clean = DOMPurify.sanitize(ad.data_description);
                         dataDesc = `<div class="data-description-rich"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:250px;border:none;"></iframe></div>`;
                     } else {
                         dataDesc = `<div class="data-description">${ad.data_description}</div>`;
                     }
+                } else if (ad.figure_description) {
+                    // No image generated yet — fall back to the textual
+                    // description so the question is still answerable.
+                    dataDesc = `<div class="data-description" style="font-style:italic;color:#52525b;">${escapeHtml(ad.figure_description)}</div>`;
                 }
                 bodyHTML = `${dataDesc}
                 <textarea class="exit-textarea" data-q="${origIdx}" rows="3" placeholder="Type your answer..." oninput="collectTextAnswer(${origIdx}, this)"></textarea>`;

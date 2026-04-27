@@ -55,44 +55,30 @@ MATCHING format (expressions to solutions):
 SHORT_ANSWER format (show working):
 {{"question_type": "short_answer", "question": "A fisherman in Seychelles sells tuna at SCR 45 per kg. He catches 3 fish weighing 2.5kg, 4.2kg, and 3.8kg. Calculate the total revenue. Show your working.", "answer_data": {{"model_answer": "Total weight = 2.5 + 4.2 + 3.8 = 10.5 kg. Revenue = 10.5 × 45 = SCR 472.50", "keywords": ["10.5", "472.50", "45"], "min_keywords": 2}}, "explanation": "Add the weights first, then multiply by price per kg", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
 
-DATA_INTERPRETATION format (PREFERRED — interactive plot via plot_spec):
-{{"question_type": "data_interpretation", "question": "Study the chart of weekly fish prices and calculate the average:", "answer_data": {{"plot_spec": {{"type": "line", "title": "Tuna prices in Seychelles, weeks 1–6", "x_label": "Week", "y_label": "Price (SCR / kg)", "labels": ["W1", "W2", "W3", "W4", "W5", "W6"], "datasets": [{{"label": "Tuna", "data": [42, 45, 50, 48, 46, 44]}}], "source": "Hypothetical data"}}, "model_answer": "Total = 42+45+50+48+46+44 = 275. Mean = 275 / 6 ≈ 45.83 SCR/kg", "keywords": ["275", "45.83", "mean"], "min_keywords": 2}}, "explanation": "Sum the weekly prices and divide by 6", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
+DATA_INTERPRETATION format — emit a structured `figure_spec`; the server renders it as a correct SVG chart:
+{{"question_type": "data_interpretation", "question": "Study the chart of weekly fish prices and calculate the average:", "answer_data": {{"figure_spec": {{"type": "line", "title": "Tuna prices in Seychelles, weeks 1-6", "x_label": "Week", "y_label": "Price (SCR / kg)", "labels": ["W1", "W2", "W3", "W4", "W5", "W6"], "datasets": [{{"label": "Tuna", "data": [42, 45, 50, 48, 46, 44]}}], "source": "Hypothetical data"}}, "model_answer": "Total = 42+45+50+48+46+44 = 275. Mean = 275 / 6 ≈ 45.83 SCR/kg", "keywords": ["275", "45.83", "mean"], "min_keywords": 2}}, "explanation": "Sum the weekly prices and divide by 6", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
 
-DATA_INTERPRETATION fallback (only for genuinely tabular non-chartable data):
+DATA_INTERPRETATION fallback (only for genuinely tabular non-chartable data, e.g. 2-column reference tables):
 {{"question_type": "data_interpretation", "question": "Study the data and calculate:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'>...</table>", "model_answer": "...", "keywords": [...], "min_keywords": 2}}, "explanation": "...", "difficulty": "medium", "concept_tag": "..."}}
 
-PLOT_SPEC SCHEMA (for the math exit ticket too — interactive Chart.js):
-- type ∈ {{"bar","line","pie","doughnut","scatter"}}
-- For non-scatter: provide labels (categorical x-axis) + each dataset has data: [number, ...] aligned with labels.
-- For scatter: each dataset has points: [[x,y], [x,y], ...] (omit data + labels).
-- Always include a meaningful title. Bar/line/scatter should also include x_label and y_label.
-- Numbers must be plain numbers, no commas, no units inside the value (units belong in y_label).
+FIGURE_SPEC SCHEMA — the server renders these to correct SVG:
+- type ∈ {{"bar","line","pie","scatter"}} (doughnut maps to pie)
+- For bar/line/pie: provide `labels` (categorical x-axis) + each dataset has `data: [number, ...]` aligned with labels.
+- For scatter: each dataset has `points: [[x,y], ...]` (omit `data` and `labels`).
+- Always include a meaningful `title`. Bar/line/scatter should also include `x_label` and `y_label`.
+- Numbers must be plain numbers — no commas, no units in the value (units belong in y_label).
+- Cite a `source` string for real data; "Hypothetical data" is fine when invented.
 
-VISUAL CONTENT — MANDATORY FOR GRAPH/GEOMETRY/DATA TOPICS:
-For questions about scatter diagrams, graphs, geometry, or data:
-- MCQ questions MUST include a "source" field with an SVG diagram showing the visual
-- DATA_INTERPRETATION questions MUST include SVG charts in data_description
-- Use the source field for MCQ: {{"question_type": "mcq", "source": "<svg>...</svg>", "question": "Based on the diagram above...", ...}}
+VISUAL CONTENT RULES:
+- Chartable data → emit `figure_spec`. The server renders correct SVG with positions calculated from values.
+- Non-chartable tabular reference data → emit `data_description` (HTML table only).
+- DO NOT emit inline `<svg>` charts. DO NOT emit `plot_spec` (legacy name).
+- Geometric shapes for math (area/perimeter) are the ONE exception — keep them as inline SVG since they're precise + cheap. See "Geometric shape" example below.
 
-SVG GRIDLINE REQUIREMENT (MANDATORY for any scatter/coordinate/line plot):
-All scatter plots, coordinate grids, and line graphs MUST include:
-- Visible gridlines at every major tick on BOTH axes (stroke='#d4d4d8' stroke-width='1')
-- Tick marks with numeric labels on BOTH axes
-- Plot area large enough that gridlines are readable (min 300x240)
-Gridlines make points readable. A plot without gridlines is unacceptable — the student cannot read coordinates off a blank background.
-
-SVG EXAMPLES:
-Scatter diagram with plotted points (NOTE the gridlines — copy this pattern):
-<svg width='360' height='290' xmlns='http://www.w3.org/2000/svg'><rect x='40' y='10' width='300' height='240' fill='#fafafa' stroke='#e4e4e7'/><line x1='70' y1='10' x2='70' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='100' y1='10' x2='100' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='130' y1='10' x2='130' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='160' y1='10' x2='160' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='190' y1='10' x2='190' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='220' y1='10' x2='220' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='250' y1='10' x2='250' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='280' y1='10' x2='280' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='310' y1='10' x2='310' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='340' y1='10' x2='340' y2='250' stroke='#d4d4d8' stroke-width='1'/><line x1='40' y1='50' x2='340' y2='50' stroke='#d4d4d8' stroke-width='1'/><line x1='40' y1='90' x2='340' y2='90' stroke='#d4d4d8' stroke-width='1'/><line x1='40' y1='130' x2='340' y2='130' stroke='#d4d4d8' stroke-width='1'/><line x1='40' y1='170' x2='340' y2='170' stroke='#d4d4d8' stroke-width='1'/><line x1='40' y1='210' x2='340' y2='210' stroke='#d4d4d8' stroke-width='1'/><line x1='40' y1='250' x2='340' y2='250' stroke='#18181b' stroke-width='2'/><line x1='40' y1='250' x2='40' y2='10' stroke='#18181b' stroke-width='2'/><text x='180' y='280' font-size='11' text-anchor='middle'>Temperature (°C)</text><text x='15' y='130' font-size='11' text-anchor='middle' transform='rotate(-90,15,130)'>Fish catch (kg)</text><circle cx='80' cy='210' r='4' fill='#3b82f6'/><circle cx='120' cy='180' r='4' fill='#3b82f6'/><circle cx='180' cy='140' r='4' fill='#3b82f6'/><circle cx='240' cy='90' r='4' fill='#3b82f6'/><circle cx='300' cy='50' r='4' fill='#3b82f6'/><text x='35' y='265' font-size='10'>0</text><text x='100' y='265' font-size='10'>5</text><text x='160' y='265' font-size='10'>10</text><text x='220' y='265' font-size='10'>15</text><text x='280' y='265' font-size='10'>20</text><text x='28' y='253' font-size='10'>0</text><text x='20' y='213' font-size='10'>20</text><text x='20' y='173' font-size='10'>40</text><text x='20' y='133' font-size='10'>60</text><text x='20' y='93' font-size='10'>80</text><text x='15' y='53' font-size='10'>100</text></svg>
-
-Coordinate grid (NOTE the gridlines):
-<svg width='260' height='260' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='10' width='210' height='210' fill='#fafafa' stroke='#e4e4e7'/><line x1='72' y1='10' x2='72' y2='220' stroke='#d4d4d8' stroke-width='1'/><line x1='114' y1='10' x2='114' y2='220' stroke='#d4d4d8' stroke-width='1'/><line x1='156' y1='10' x2='156' y2='220' stroke='#d4d4d8' stroke-width='1'/><line x1='198' y1='10' x2='198' y2='220' stroke='#d4d4d8' stroke-width='1'/><line x1='240' y1='10' x2='240' y2='220' stroke='#d4d4d8' stroke-width='1'/><line x1='30' y1='178' x2='240' y2='178' stroke='#d4d4d8' stroke-width='1'/><line x1='30' y1='136' x2='240' y2='136' stroke='#d4d4d8' stroke-width='1'/><line x1='30' y1='94' x2='240' y2='94' stroke='#d4d4d8' stroke-width='1'/><line x1='30' y1='52' x2='240' y2='52' stroke='#d4d4d8' stroke-width='1'/><line x1='30' y1='10' x2='240' y2='10' stroke='#d4d4d8' stroke-width='1'/><line x1='30' y1='220' x2='240' y2='220' stroke='#18181b' stroke-width='2'/><line x1='30' y1='220' x2='30' y2='10' stroke='#18181b' stroke-width='2'/><text x='25' y='235' font-size='10'>0</text><text x='67' y='235' font-size='10'>2</text><text x='109' y='235' font-size='10'>4</text><text x='151' y='235' font-size='10'>6</text><text x='193' y='235' font-size='10'>8</text><text x='232' y='235' font-size='10'>10</text><text x='18' y='223' font-size='10'>0</text><text x='18' y='181' font-size='10'>2</text><text x='18' y='139' font-size='10'>4</text><text x='18' y='97' font-size='10'>6</text><text x='18' y='55' font-size='10'>8</text><text x='13' y='13' font-size='10'>10</text></svg>
-
-Geometric shape:
+Geometric shape (math only — keep as inline SVG):
 <svg width='200' height='150' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
 
-AT LEAST 5 of the 20 MCQ questions (Q16-35) must include a source diagram.
-ALL 3 DATA_INTERPRETATION questions (Q13-15) must include a visual.
+ALL 3 DATA_INTERPRETATION questions (Q13-15) must include a `figure_spec` (or, only when the data is intrinsically tabular, a `data_description` HTML table).
 
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (straightforward calculations, single step)
@@ -141,39 +127,37 @@ MATCHING format:
 SHORT_ANSWER format:
 {{"question_type": "short_answer", "question": "Explain why HDI is considered a better measure of development than GNP.", "answer_data": {{"model_answer": "HDI is better because it measures health, education and income, not just economic output.", "keywords": ["health", "education", "income", "not just economic"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
 
-DATA_INTERPRETATION format (PREFERRED — interactive plot):
-{{"question_type": "data_interpretation", "question": "Study the chart and answer:", "answer_data": {{"plot_spec": {{"type": "bar", "title": "GNP and HDI for three countries", "x_label": "Country", "y_label": "Value", "labels": ["Country A", "Country B", "Country C"], "datasets": [{{"label": "GNP ($)", "data": [500, 2000, 800]}}, {{"label": "HDI (×1000)", "data": [400, 650, 750]}}], "source": "Hypothetical data"}}, "model_answer": "Country C has the highest HDI despite not having the highest GNP, showing that wealth alone does not determine development.", "keywords": ["Country C", "highest HDI", "wealth", "development"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
+DATA_INTERPRETATION format — emit a structured `figure_spec`; the server renders it as a correct SVG chart:
+{{"question_type": "data_interpretation", "question": "Study the chart and answer:", "answer_data": {{"figure_spec": {{"type": "bar", "title": "GNP and HDI for three countries", "x_label": "Country", "y_label": "Value", "labels": ["Country A", "Country B", "Country C"], "datasets": [{{"label": "GNP ($)", "data": [500, 2000, 800]}}, {{"label": "HDI (×1000)", "data": [400, 650, 750]}}], "source": "Hypothetical data"}}, "model_answer": "Country C has the highest HDI despite not having the highest GNP, showing that wealth alone does not determine development.", "keywords": ["Country C", "highest HDI", "wealth", "development"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
 
-DATA_INTERPRETATION fallback (when a plot doesn't fit — use ONLY when the data is intrinsically tabular and not chartable):
+DATA_INTERPRETATION fallback (use ONLY when the data is intrinsically a tabular reference, not a chart):
 {{"question_type": "data_interpretation", "question": "Study the table and answer:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'>...</table>", "model_answer": "...", "keywords": [...], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "..."}}
 
-RICH VISUAL CONTENT REQUIREMENTS:
-1. DATA_INTERPRETATION questions MUST include either a `plot_spec` (preferred) OR a `data_description`:
-   - PREFERRED: emit a `plot_spec` JSON object that the frontend renders as an interactive Chart.js plot.
-   - `plot_spec.type` ∈ {{"bar","line","pie","doughnut","scatter"}}
-   - For non-scatter: `labels` is the categorical axis; each dataset has `data: [number, ...]` matching `labels` length.
-   - For scatter: each dataset has `points: [[x,y], [x,y], ...]` instead of `data`.
-   - Always include a meaningful `title`. For bar/line/scatter, include `x_label` and `y_label`.
-   - Numbers must be plain numbers (no commas, no units in the value).
-   - Cite a `source` when the data is from a real dataset; otherwise leave blank or set to "Hypothetical data".
-   - FALLBACK to `data_description` (HTML table or `<img>` reference) only when a plot genuinely cannot represent the data.
+FIGURE_SPEC SCHEMA — the server renders these to correct SVG:
+- type ∈ {{"bar","line","pie","scatter"}} (doughnut maps to pie)
+- For bar/line/pie: provide `labels` (categorical x-axis) + each dataset has `data: [number, ...]` aligned with labels.
+- For scatter: each dataset has `points: [[x,y], ...]` (omit `data` and `labels`).
+- Always include a meaningful `title`. Bar/line/scatter should also include `x_label` and `y_label`.
+- Numbers must be plain numbers — no commas, no units in the value (units belong in y_label).
+- Cite a `source` string for real data; "Hypothetical data" is fine when invented.
 
-2. At least 2 of the 3 DATA_INTERPRETATION questions must include a `plot_spec` chart (the third can be tabular if the data is non-chartable).
+VISUAL CONTENT RULES:
+1. DATA_INTERPRETATION questions MUST have either a `figure_spec` (chart) or a `data_description` (HTML table):
+   - Default to `figure_spec`: structured JSON the server renders as correct SVG with bars/lines sized to actual values.
+   - Use `data_description` (HTML table) only when the data is genuinely tabular and not chartable.
 
-3. Do NOT use SVG bar charts in `data_description` — Chart.js plot_spec replaces them.
+2. DO NOT emit inline `<svg>` chart code. DO NOT emit `plot_spec` (legacy name — use `figure_spec` instead).
+   Charts are rendered by the server from `figure_spec`, not drawn by the LLM.
 
-3. For MATH subjects: include SVG diagrams where relevant:
-   - Number lines for number/fraction questions
-   - Geometric shapes with labeled dimensions for area/perimeter questions
-   - Coordinate grids for algebra/graph questions
+3. For MATH subjects: simple geometric shapes (area, perimeter, angles) STAY as inline SVG — they're precise and cheap. Use the example below.
    Example: <svg width='200' height='200' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
 
-4. For GEOGRAPHY subjects: include data tables with real Seychelles/world data, and reference any available textbook figures via <img> tags
+4. For GEOGRAPHY subjects: use `figure_spec` for any chart. For raw tables of facts, use `data_description` HTML tables.
 
-5. For MCQ questions that involve reading a source: add a "source" field with HTML content:
-   {{"question_type": "mcq", "question": "Based on the source above, which country...", "source": "<table>...</table>", "option_a": "...", ...}}
+5. For MCQ questions that need a chart: set `figure_spec` in answer_data so the server renders an SVG.
+   {{"question_type": "mcq", "question": "Based on the chart above, which country...", "answer_data": {{"figure_spec": {{"type": "bar", ...}}}}, "option_a": "...", ...}}
 
-6. Use inline styles ONLY (no external CSS or scripts). All HTML renders in a sandboxed iframe.
+6. `data_description` content uses inline styles ONLY (no external CSS, no scripts). All HTML renders in a sandboxed iframe.
 
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (recall facts)

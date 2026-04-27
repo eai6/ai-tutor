@@ -556,50 +556,39 @@
 
                     {% elif question.question_type == 'short_answer' or question.question_type == 'data_interpretation' %}
                     <!-- Short Answer / Data Interpretation -->
-                    {% if question.answer_data.plot_spec %}
-                    <div class="lesson-plot-preview" data-qid="{{ question.id }}" data-spec='{{ question.answer_data.plot_spec|safe|escapejs }}' style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:#fff;padding:0.75rem;">
-                        {% if question.answer_data.plot_spec.title %}
-                        <div style="font-weight:600;font-size:0.85rem;margin-bottom:6px;">{{ question.answer_data.plot_spec.title }}</div>
-                        {% endif %}
-                        <canvas style="max-height:240px;"></canvas>
-                        {% if question.answer_data.plot_spec.source %}
-                        <div style="font-size:0.7rem;color:var(--gray-500);margin-top:6px;">Source: {{ question.answer_data.plot_spec.source }}</div>
-                        {% endif %}
+                    {% if question.answer_data.figure_svg %}
+                    <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:#fff;padding:0.75rem;">
+                        {{ question.answer_data.figure_svg|safe }}
                     </div>
-                    <div style="margin-bottom:0.5rem;display:flex;gap:0.4rem;">
-                        <button type="button" onclick="togglePlotEditor({{ question.id }})" class="btn btn-sm btn-secondary" style="font-size:0.75rem;">✎ Edit plot</button>
-                        <button type="button" onclick="deletePlotSpec({{ question.id }})" class="btn btn-sm" style="font-size:0.75rem;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;">Remove plot</button>
+                    <div style="margin-bottom:0.5rem;">
+                        <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
+                           class="btn btn-sm btn-secondary"
+                           style="font-size:0.75rem;text-decoration:none;">✎ Edit figure</a>
                     </div>
-                    <div id="plot-editor-{{ question.id }}" style="display:none;border:1px dashed #bfdbfe;border-radius:6px;padding:0.75rem;background:#f8fafc;margin-bottom:0.5rem;">
-                        <div style="font-size:0.78rem;color:var(--gray-600);margin-bottom:0.4rem;">
-                            Edit the JSON spec, click <strong>Preview</strong> to verify, then <strong>Save</strong>.
-                            <details style="display:inline;margin-left:0.5rem;"><summary style="cursor:pointer;color:var(--accent);">schema</summary>
-                                <pre style="font-size:0.7rem;background:#fff;padding:0.5rem;border-radius:4px;margin-top:0.3rem;">{
-  "type": "bar"|"line"|"pie"|"doughnut"|"scatter",
-  "title": "...",
-  "x_label": "...", "y_label": "...",
-  "labels": ["A","B","C"],
-  "datasets": [{"label":"...", "data":[1,2,3]}],
-  "source": "..."
-}</pre>
-                            </details>
-                        </div>
-                        <textarea id="plot-spec-input-{{ question.id }}" rows="10" style="width:100%;font-family:monospace;font-size:0.78rem;padding:0.4rem;border:1px solid var(--gray-300);border-radius:4px;">{{ question.plot_spec_json }}</textarea>
-                        <div style="display:flex;gap:0.4rem;margin-top:0.4rem;align-items:center;">
-                            <button type="button" onclick="previewPlotEdit({{ question.id }})" class="btn btn-sm btn-secondary" style="font-size:0.75rem;">Preview</button>
-                            <button type="button" onclick="savePlotEdit({{ question.id }})" class="btn btn-sm btn-primary" style="font-size:0.75rem;">Save</button>
-                            <span id="plot-spec-status-{{ question.id }}" style="font-size:0.75rem;"></span>
-                        </div>
-                        <canvas id="plot-spec-preview-{{ question.id }}" style="max-height:240px;margin-top:0.5rem;background:#fff;border:1px solid var(--gray-200);border-radius:4px;padding:6px;"></canvas>
+                    {% elif question.answer_data.figure_url %}
+                    <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:#fff;padding:0.75rem;text-align:center;">
+                        <img src="{{ question.answer_data.figure_url }}" alt="Question figure" style="max-width:100%;border-radius:4px;">
+                    </div>
+                    <div style="margin-bottom:0.5rem;">
+                        <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
+                           class="btn btn-sm btn-secondary"
+                           style="font-size:0.75rem;text-decoration:none;">✎ Edit figure</a>
                     </div>
                     {% elif question.answer_data.data_description %}
                     <div class="rendered-html-frame" style="margin-bottom: 0.5rem; border: 1px solid #bfdbfe; border-radius: 6px; overflow: hidden; background: #f8fafc; padding: 0.75rem;">
                         {{ question.answer_data.data_description|safe }}
                     </div>
-                    {% endif %}
-                    {% if question.question_type == 'data_interpretation' and not question.answer_data.plot_spec %}
                     <div style="margin-bottom:0.5rem;">
-                        <button type="button" onclick="addPlotToQuestion({{ question.id }})" class="btn btn-sm btn-secondary" style="font-size:0.75rem;">+ Add interactive plot</button>
+                        <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
+                           class="btn btn-sm btn-secondary"
+                           style="font-size:0.75rem;text-decoration:none;">✎ Add chart figure</a>
+                    </div>
+                    {% endif %}
+                    {% if question.question_type == 'data_interpretation' and not question.answer_data.figure_svg and not question.answer_data.figure_url and not question.answer_data.data_description %}
+                    <div style="margin-bottom:0.5rem;">
+                        <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
+                           class="btn btn-sm btn-secondary"
+                           style="font-size:0.75rem;text-decoration:none;">+ Add chart figure</a>
                     </div>
                     {% endif %}
                     {% if question.answer_data.model_answer %}
@@ -1115,5 +1104,8 @@ async function addPlotToQuestion(qid) {
     } catch (e) { alert('Network error: ' + e.message); }
 }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{# Chart.js removed — figures now render server-side via figure_render.py.
+   The legacy plot_spec helpers above (togglePlotEditor / addPlotToQuestion /
+   etc.) are dead code; the Edit-figure button now opens
+   /dashboard/exit-tickets/<qid>/figure/. #}
 {% endblock %}

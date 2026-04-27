@@ -4792,3 +4792,200 @@ def session_exit_review_override(request, attempt_id):
         'is_correct': is_correct,
         'session_completed': session_completed,
     })
+
+
+# ============================================================================
+# EXIT-TICKET FIGURE EDIT (Stage 2 of figure_spec rework)
+# ============================================================================
+
+@teacher_required
+def exit_ticket_figure_edit(request, question_id):
+    """Edit an exit-ticket question's figure_spec.
+
+    GET: render the edit form (preview + raw JSON spec textarea).
+    POST: validate the new spec, render to SVG, persist both.
+    """
+    import json
+    from apps.tutoring.models import ExitTicketQuestion
+    from apps.curriculum.figure_render import render_figure_spec
+    from apps.tutoring.plot_spec import coerce_plot_spec
+
+    question = _question_for_staff(request, question_id)
+    if question is None:
+        raise Http404("Question not found or not yours.")
+
+    answer_data = question.answer_data or {}
+    if not isinstance(answer_data, dict):
+        answer_data = {}
+
+    error = None
+    success = None
+    spec_text = json.dumps(answer_data.get('figure_spec', {}), indent=2) \
+        if answer_data.get('figure_spec') else ''
+
+    if request.method == 'POST':
+        raw = (request.POST.get('figure_spec') or '').strip()
+        if not raw:
+            error = 'Spec is empty.'
+        else:
+            try:
+                spec = json.loads(raw)
+            except json.JSONDecodeError as e:
+                error = f'Invalid JSON: {e.msg} (line {e.lineno})'
+                spec = None
+            if spec is not None:
+                cleaned, validation_err = coerce_plot_spec(spec)
+                if validation_err:
+                    error = validation_err
+                else:
+                    svg = render_figure_spec(cleaned)
+                    if not svg:
+                        error = 'Spec validated but renderer returned no SVG.'
+                    else:
+                        answer_data['figure_spec'] = cleaned
+                        answer_data['figure_svg'] = svg
+                        question.answer_data = answer_data
+                        question.save(update_fields=['answer_data'])
+                        success = 'Figure regenerated.'
+                        spec_text = json.dumps(cleaned, indent=2)
+
+    return render(request, 'dashboard/exit_ticket_figure_edit.html', {
+        'question': question,
+        'spec_text': spec_text,
+        'figure_svg': answer_data.get('figure_svg', ''),
+        'figure_url': answer_data.get('figure_url', ''),
+        'error': error,
+        'success': success,
+    })
+
+
+@teacher_required
+def exit_ticket_figure_regenerate(request, question_id):
+    """Regenerate the figure_spec via LLM from a teacher's prompt.
+
+    POST: read `prompt` from form, send the current spec + the
+    teacher's correction prompt to the LLM, parse a new spec, render
+    it, return the result for preview (does not save until the
+    teacher submits the main form).
+    """
+    import json
+    from apps.tutoring.models import ExitTicketQuestion
+    from apps.curriculum.figure_render import render_figure_spec
+    from apps.tutoring.plot_spec import coerce_plot_spec
+    from apps.llm.prompts import get_prompt_or_default
+
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    question = _question_for_staff(request, question_id)
+    if question is None:
+        return JsonResponse({'ok': False, 'error': 'not found'}, status=404)
+
+    teacher_prompt = (request.POST.get('prompt') or '').strip()
+    if not teacher_prompt:
+        return JsonResponse({'ok': False, 'error': 'prompt required'}, status=400)
+
+    answer_data = question.answer_data or {}
+    if not isinstance(answer_data, dict):
+        answer_data = {}
+    current_spec = answer_data.get('figure_spec', {})
+
+    institution_id = (
+        question.exit_ticket.lesson.unit.course.institution_id
+        if question.exit_ticket and question.exit_ticket.lesson else None
+    )
+
+    from apps.llm.client import get_llm_client_for_purpose
+    from apps.llm.json_utils import parse_llm_json
+
+    try:
+        llm_client = get_llm_client_for_purpose('exit_ticket_generation', institution_id)
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'LLM client unavailable: {e}'}, status=500)
+
+    sys_prompt = (
+        "You are an assistant that produces structured chart specs in JSON. "
+        "Output ONLY a JSON object — no prose, no code fence."
+    )
+    user_prompt = (
+        "Update this figure_spec based on the teacher's instruction.\n\n"
+        f"QUESTION: {question.question_text}\n"
+        f"CURRENT SPEC:\n{json.dumps(current_spec, indent=2) if current_spec else '(none)'}\n\n"
+        f"TEACHER INSTRUCTION:\n{teacher_prompt}\n\n"
+        "Return the updated figure_spec JSON. Schema:\n"
+        "  {type: 'bar'|'line'|'pie'|'scatter', title, x_label, y_label,\n"
+        "   labels: [...], datasets: [{label, data: [numbers]}], source}\n"
+        "For scatter, datasets use `points: [[x,y],...]` instead of `data`.\n"
+        "Numbers must be plain numbers (no commas, no units). "
+        "Do NOT wrap your output in markdown code fences."
+    )
+
+    try:
+        response = llm_client.generate(
+            [{'role': 'user', 'content': user_prompt}],
+            system_prompt=sys_prompt,
+            max_tokens=2000,
+        )
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'LLM call failed: {e}'}, status=500)
+
+    try:
+        new_spec = parse_llm_json(response.content)
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'Could not parse LLM JSON: {e}'}, status=500)
+
+    cleaned, validation_err = coerce_plot_spec(new_spec)
+    if validation_err:
+        return JsonResponse({'ok': False, 'error': f'LLM produced invalid spec: {validation_err}'}, status=500)
+
+    svg = render_figure_spec(cleaned)
+    if not svg:
+        return JsonResponse({'ok': False, 'error': 'Renderer returned no SVG'}, status=500)
+
+    return JsonResponse({
+        'ok': True,
+        'spec': cleaned,
+        'spec_text': json.dumps(cleaned, indent=2),
+        'svg': svg,
+    })
+
+
+@teacher_required
+def exit_ticket_figure_delete(request, question_id):
+    """Remove the figure (spec + svg + url) from a question."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    question = _question_for_staff(request, question_id)
+    if question is None:
+        return JsonResponse({'ok': False, 'error': 'not found'}, status=404)
+
+    answer_data = question.answer_data or {}
+    if not isinstance(answer_data, dict):
+        answer_data = {}
+    for key in ('figure_spec', 'figure_svg', 'figure_url', 'figure_source', 'figure_description'):
+        answer_data.pop(key, None)
+    question.answer_data = answer_data
+    question.save(update_fields=['answer_data'])
+    return JsonResponse({'ok': True})
+
+
+def _question_for_staff(request, question_id):
+    """Resolve an ExitTicketQuestion the staff member is allowed to
+    edit. Honors institution scoping the same way lesson_detail does.
+
+    Returns None when the question doesn't exist or the staff isn't
+    in the owning institution (and isn't an all-schools admin).
+    """
+    from apps.tutoring.models import ExitTicketQuestion
+
+    institution = request.staff_ctx.get('institution')
+    qs = ExitTicketQuestion.objects.select_related(
+        'exit_ticket__lesson__unit__course__institution'
+    )
+    if institution is not None:
+        qs = qs.filter(
+            Q(exit_ticket__lesson__unit__course__institution=institution)
+            | Q(exit_ticket__lesson__unit__course__institution__isnull=True)
+        )
+    return qs.filter(id=question_id).first()

@@ -1,0 +1,252 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Edit figure — Exit ticket question{% endblock %}
+{% block page_title %}Edit figure{% endblock %}
+
+{% block extra_css %}
+<style>
+    .figure-edit-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 1.5rem;
+        align-items: start;
+    }
+    @media (max-width: 900px) {
+        .figure-edit-grid { grid-template-columns: 1fr; }
+    }
+    .panel {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+    }
+    .panel h3 {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #475569;
+        margin: 0 0 0.5rem;
+    }
+    .question-text {
+        background: #f8fafc;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+    }
+    .preview-frame {
+        background: #fff;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        padding: 0.5rem;
+        text-align: center;
+    }
+    .preview-frame svg { max-width: 100%; height: auto; }
+    .preview-empty {
+        padding: 3rem 1rem;
+        color: #94a3b8;
+        font-style: italic;
+    }
+    textarea.spec {
+        width: 100%;
+        min-height: 320px;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 12.5px;
+        padding: 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        resize: vertical;
+        white-space: pre;
+    }
+    .actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .btn {
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 0.55rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .btn-primary { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-ghost { background: #fff; color: #334155; border-color: #cbd5e1; }
+    .btn-ghost:hover { background: #f1f5f9; }
+    .btn-danger { background: #fff; color: #b91c1c; border-color: #fecaca; }
+    .btn-danger:hover { background: #fef2f2; }
+    .alert {
+        padding: 0.6rem 0.85rem;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        margin-bottom: 0.75rem;
+    }
+    .alert-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .alert-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .prompt-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+    .prompt-row input[type="text"] {
+        flex: 1;
+        padding: 0.55rem 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-family: inherit;
+    }
+    .meta {
+        font-size: 0.78rem;
+        color: #64748b;
+        margin-top: 0.5rem;
+    }
+    .raw-figure-url img { max-width: 100%; border-radius: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="{% url 'dashboard:lesson_detail' question.exit_ticket.lesson.id %}"
+       style="font-size: 0.85rem; color: #64748b; text-decoration: none;">
+        ← Back to lesson
+    </a>
+</div>
+
+<div class="question-text">
+    <strong>Q{{ question.order_index|add:1 }}.</strong>
+    {{ question.question_text }}
+</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
+<div class="figure-edit-grid">
+
+    <div class="panel">
+        <h3>Preview</h3>
+        <div class="preview-frame" id="preview-frame">
+            {% if figure_svg %}
+                {{ figure_svg|safe }}
+            {% elif figure_url %}
+                <div class="raw-figure-url">
+                    <img src="{{ figure_url }}" alt="Question figure">
+                    <div class="meta">Pipeline-generated raster (no spec to edit — use Delete to clear, then add a spec).</div>
+                </div>
+            {% else %}
+                <div class="preview-empty">No figure attached.</div>
+            {% endif %}
+        </div>
+        <div class="meta">
+            Bars/lines/pies are sized from your data values — what you see is what students see.
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Spec (JSON)</h3>
+        <form method="post">
+            {% csrf_token %}
+            <textarea
+                name="figure_spec"
+                class="spec"
+                spellcheck="false"
+                placeholder='{
+  "type": "bar",
+  "title": "Tuna prices, weeks 1–6",
+  "x_label": "Week",
+  "y_label": "Price (SCR / kg)",
+  "labels": ["W1", "W2", "W3", "W4", "W5", "W6"],
+  "datasets": [{"label": "Tuna", "data": [42, 45, 50, 48, 46, 44]}],
+  "source": "Hypothetical"
+}'>{{ spec_text }}</textarea>
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Save &amp; render</button>
+                {% if figure_svg or figure_url %}
+                <button type="button" class="btn btn-danger" onclick="deleteFigure()">Delete figure</button>
+                {% endif %}
+            </div>
+        </form>
+
+        <h3 style="margin-top: 1.5rem;">Or fix with a prompt</h3>
+        <div class="prompt-row">
+            <input type="text" id="prompt-input"
+                   placeholder='e.g. "swap labels A and B" or "use values 45, 80, 20"'>
+            <button type="button" class="btn btn-ghost" onclick="regenerateFromPrompt()">
+                <span id="regen-btn-label">Regenerate</span>
+            </button>
+        </div>
+        <div class="meta">
+            Sends the current spec + your instruction to the LLM, then previews the result. Click <strong>Save &amp; render</strong> above to keep it.
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const QUESTION_ID = {{ question.id }};
+    const REGEN_URL = "{% url 'dashboard:exit_ticket_figure_regenerate' question.id %}";
+    const DELETE_URL = "{% url 'dashboard:exit_ticket_figure_delete' question.id %}";
+    const CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    async function regenerateFromPrompt() {
+        const prompt = document.getElementById('prompt-input').value.trim();
+        if (!prompt) return;
+        const btn = document.getElementById('regen-btn-label');
+        const original = btn.textContent;
+        btn.textContent = 'Thinking…';
+        try {
+            const resp = await fetch(REGEN_URL, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': CSRF,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'prompt=' + encodeURIComponent(prompt),
+            });
+            const data = await resp.json();
+            if (!data.ok) {
+                alert('Regenerate failed: ' + (data.error || 'unknown'));
+                return;
+            }
+            // Update preview + spec textarea (not yet saved).
+            document.getElementById('preview-frame').innerHTML = data.svg;
+            document.querySelector('textarea[name="figure_spec"]').value = data.spec_text;
+        } catch (e) {
+            alert('Network error: ' + e);
+        } finally {
+            btn.textContent = original;
+        }
+    }
+
+    async function deleteFigure() {
+        if (!confirm('Remove this figure entirely? You can recreate it from a spec.')) return;
+        try {
+            const resp = await fetch(DELETE_URL, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': CSRF },
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                location.reload();
+            } else {
+                alert('Delete failed: ' + (data.error || 'unknown'));
+            }
+        } catch (e) {
+            alert('Network error: ' + e);
+        }
+    }
+</script>
+{% endblock %}

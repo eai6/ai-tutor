@@ -927,19 +927,24 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 else:
                     ad = q.get('answer_data', {}) or {}
                     ad.update(objective_data)
-                    # Validate + clean plot_spec on data_interpretation
-                    # questions so a malformed LLM payload doesn't break
-                    # the frontend renderer. See apps/tutoring/plot_spec.py.
-                    if q_type == 'data_interpretation' and ad.get('plot_spec'):
-                        from apps.tutoring.plot_spec import coerce_plot_spec
-                        cleaned_spec, err = coerce_plot_spec(ad['plot_spec'])
-                        if err:
-                            logger.warning(
-                                f"[ExitTicket] dropping malformed plot_spec: {err}"
-                            )
-                            ad.pop('plot_spec', None)
+                    # plot_spec (legacy Chart.js) is renamed to
+                    # figure_spec — same JSON shape, but rendered to
+                    # inline SVG server-side. See figure_render.py.
+                    if 'plot_spec' in ad and 'figure_spec' not in ad:
+                        ad['figure_spec'] = ad.pop('plot_spec')
+                    elif 'plot_spec' in ad:
+                        ad.pop('plot_spec', None)
+                    spec = ad.get('figure_spec')
+                    if spec:
+                        from apps.curriculum.figure_render import render_figure_spec
+                        svg = render_figure_spec(spec)
+                        if svg:
+                            ad['figure_svg'] = svg
                         else:
-                            ad['plot_spec'] = cleaned_spec
+                            logger.warning(
+                                f"[ExitTicket] dropping unrenderable figure_spec on Q{i}"
+                            )
+                            ad.pop('figure_spec', None)
                     kwargs['answer_data'] = ad
                 ExitTicketQuestion.objects.create(**kwargs)
 
@@ -1032,14 +1037,18 @@ def _generate_exit_ticket_figures(exit_ticket, lesson, institution_id: int) -> i
 
     for q in questions:
         q_text = (q.question_text or '').lower()
-        needs_figure = any(kw in q_text for kw in FIGURE_KEYWORDS)
-
         answer_data = q.answer_data or {}
         if not isinstance(answer_data, dict):
             answer_data = {}
         data_desc = answer_data.get('data_description', '')
+        # The LLM now sets figure_description explicitly (the prompt no
+        # longer asks for plot_spec / inline-SVG charts). When present
+        # it takes priority over the keyword heuristic.
+        explicit_desc = (answer_data.get('figure_description') or '').strip()
+        needs_figure = bool(explicit_desc) or any(kw in q_text for kw in FIGURE_KEYWORDS)
 
-        # Skip if already has HTML content or existing image
+        # Skip if already has an HTML data block or an existing image
+        # URL we'd just be overwriting.
         if (data_desc and '<' in data_desc) or q.image or answer_data.get('figure_url'):
             continue
 
@@ -1068,10 +1077,16 @@ def _generate_exit_ticket_figures(exit_ticket, lesson, institution_id: int) -> i
             figures_generated += 1
             continue
 
-        # Step 2: Generate a new figure if the question describes one
+        # Step 2: Generate a new figure if the question describes one.
+        # Prefer the LLM's explicit figure_description over the question
+        # text — it's tailored to be image-prompt friendly.
         if needs_figure:
-            # Enrich the generation prompt with KB text context
-            description = f"Educational diagram for assessment: {q.question_text[:200]}"
+            if explicit_desc:
+                description = (
+                    f"Educational chart/diagram for an exit-ticket question: {explicit_desc}"
+                )
+            else:
+                description = f"Educational diagram for assessment: {q.question_text[:200]}"
             if kb_text_context:
                 description += f"\nContext from curriculum: {kb_text_context[:300]}"
 
@@ -1084,6 +1099,10 @@ def _generate_exit_ticket_figures(exit_ticket, lesson, institution_id: int) -> i
             if generated and generated.get('url'):
                 answer_data['figure_url'] = generated['url']
                 answer_data['figure_source'] = generated.get('source', 'generated')
+                # Preserve the original LLM description for accessibility
+                # (used as the alt text in the renderer).
+                if explicit_desc and not answer_data.get('figure_description'):
+                    answer_data['figure_description'] = explicit_desc
                 q.answer_data = answer_data
                 q.save(update_fields=['answer_data'])
                 figures_generated += 1
