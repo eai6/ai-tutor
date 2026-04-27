@@ -285,20 +285,20 @@
 <!-- Summary Cards -->
 <div class="summary-cards">
     <div class="summary-card">
-        <div class="number">{{ completed_count }}/{{ total_students }}</div>
-        <div class="label">Sessions Completed</div>
+        <div class="number">{{ assessed_count }}/{{ total_students }}</div>
+        <div class="label">Took Exit Ticket</div>
     </div>
     <div class="summary-card">
-        <div class="number {% if students_below_count == 0 %}green{% elif students_below_count <= 3 %}yellow{% else %}red{% endif %}">{{ avg_pct }}%</div>
-        <div class="label">Avg Competency</div>
+        <div class="number {% if assessed_count == 0 %}gray{% elif students_below_count == 0 %}green{% elif students_below_count <= 3 %}yellow{% else %}red{% endif %}">{% if assessed_count %}{{ avg_pct }}%{% else %}—{% endif %}</div>
+        <div class="label">Avg Competency{% if unassessed_count %}<span style="font-weight:400;color:#a1a1aa;display:block;font-size:0.625rem;text-transform:none;letter-spacing:0;">(assessed only)</span>{% endif %}</div>
     </div>
     <div class="summary-card">
         <div class="number {% if students_below_count == 0 %}green{% else %}red{% endif %}">{{ students_below_count }}</div>
         <div class="label">Below {{ move_on_threshold }}%</div>
     </div>
     <div class="summary-card">
-        <div class="number">{{ total_objectives }}</div>
-        <div class="label">Enabling Objectives</div>
+        <div class="number {% if unassessed_count == 0 %}green{% else %}gray{% endif %}">{{ unassessed_count }}</div>
+        <div class="label">Unassessed</div>
     </div>
 </div>
 
@@ -319,6 +319,10 @@
     <div style="flex:1;min-width:100px;padding:0.625rem;border-radius:0.5rem;text-align:center;background:#fee2e2;border:1px solid #fecaca;">
         <div style="font-size:1.25rem;font-weight:800;color:#dc2626;">{{ category_counts.BE }}</div>
         <div style="font-size:0.6875rem;font-weight:700;color:#dc2626;">BE</div>
+    </div>
+    <div style="flex:1;min-width:100px;padding:0.625rem;border-radius:0.5rem;text-align:center;background:#f3f4f6;border:1px solid #e5e7eb;" title="Has not yet taken the exit ticket">
+        <div style="font-size:1.25rem;font-weight:800;color:#6b7280;">{{ category_counts.UN }}</div>
+        <div style="font-size:0.6875rem;font-weight:700;color:#6b7280;">UN</div>
     </div>
 </div>
 
@@ -442,12 +446,16 @@
             <tr>
                 <td class="cell-title"><span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span></td>
                 <td data-label="Objectives">
-                    <span>
-                        <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">
-                            {{ s.achieved }}/{{ s.total }}
+                    {% if s.has_exit_attempt %}
+                        <span>
+                            <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">
+                                {{ s.achieved }}/{{ s.total }}
+                            </span>
+                            <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">({{ s.pct }}%)</span>
                         </span>
-                        <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">({{ s.pct }}%)</span>
-                    </span>
+                    {% else %}
+                        <span style="color:#a1a1aa;font-size:0.8125rem;">—</span>
+                    {% endif %}
                 </td>
                 <td data-label="Exit Quiz">
                     {% if s.exit_passed != None %}
@@ -456,11 +464,13 @@
                             <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">{{ s.exit_time }}</span>
                         </span>
                     {% else %}
-                        <span style="color:#a1a1aa;font-size:0.8125rem;">{{ s.exit_score }}</span>
+                        <span style="color:#a1a1aa;font-size:0.8125rem;">Not taken</span>
                     {% endif %}
                 </td>
                 <td data-label="Weak Areas">
-                    {% if s.weak_objectives %}
+                    {% if not s.has_exit_attempt %}
+                        <span style="color:#a1a1aa;font-size:0.75rem;">No data yet</span>
+                    {% elif s.weak_objectives %}
                         <div class="weak-list">{{ s.weak_objectives|join:", " }}</div>
                     {% else %}
                         <span style="color:#059669;font-size:0.75rem;">All objectives met</span>

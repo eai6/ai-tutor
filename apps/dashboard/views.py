@@ -1928,8 +1928,22 @@ def lesson_session_report(request, lesson_id):
             delta = (exit_attempt.completed_at - exit_attempt.started_at).total_seconds() / 60.0
             exit_time_minutes = round(delta, 1)
 
-        # Categorize student (BE/AE/ME/EE)
-        category = config.categorize_student(pct, exit_time_minutes if exit_attempt and exit_attempt.passed else None)
+        # Categorize student (BE/AE/ME/EE) — but ONLY when there's an
+        # actual exit-ticket attempt. Without one we have no real
+        # competency signal, so calling them Below Expectation is
+        # misleading; they're just Unassessed.
+        if exit_attempt is None:
+            category = {
+                'code': 'UN',
+                'label': 'Unassessed',
+                'color': '#6b7280',
+                'description': 'Has not yet taken the exit ticket.',
+            }
+        else:
+            category = config.categorize_student(
+                pct,
+                exit_time_minutes if exit_attempt.passed else None,
+            )
 
         students_data.append({
             'student': student,
@@ -1942,47 +1956,80 @@ def lesson_session_report(request, lesson_id):
             'exit_time': f"{exit_time_minutes:.0f} min" if exit_time_minutes else '—',
             'session_status': session.status if session else 'not_started',
             'weak_objectives': weak_objectives,
+            'has_exit_attempt': exit_attempt is not None,
         })
 
     students_data.sort(key=lambda s: s['pct'])
 
     # ── Category counts ──
-    category_counts = {'EE': 0, 'ME': 0, 'AE': 0, 'BE': 0}
+    category_counts = {'EE': 0, 'ME': 0, 'AE': 0, 'BE': 0, 'UN': 0}
     for s in students_data:
         category_counts[s['category']['code']] += 1
 
-    # ── Class competency: every student must meet threshold ──
-    move_on_threshold = config.threshold_move_on  # Default 70%
-    students_below = [s for s in students_data if s['pct'] < move_on_threshold]
-    all_above_threshold = len(students_below) == 0 and total_students > 0
+    # Split assessed vs unassessed so the move-on logic ignores
+    # students who haven't taken the exit ticket — those students
+    # aren't "below threshold", they just haven't been measured yet.
+    assessed_students = [s for s in students_data if s['category']['code'] != 'UN']
+    unassessed_students = [s for s in students_data if s['category']['code'] == 'UN']
+    unassessed_count = len(unassessed_students)
+    assessed_count = len(assessed_students)
 
-    avg_pct = round(sum(s['pct'] for s in students_data) / len(students_data)) if students_data else 0
+    # ── Class competency: every assessed student must meet threshold ──
+    move_on_threshold = config.threshold_move_on  # Default 70%
+    students_below = [s for s in assessed_students if s['pct'] < move_on_threshold]
+    all_assessed_above_threshold = len(students_below) == 0 and assessed_count > 0
+
+    # Class average — only count assessed students. Including 0% from
+    # unassessed students would drag the average down artificially.
+    avg_pct = round(sum(s['pct'] for s in assessed_students) / assessed_count) if assessed_count else 0
 
     # ── Recommendation ──
     weak_objectives = [o for o in objectives_data if o['pct'] < 50]
-    if all_above_threshold:
+    if assessed_count == 0 and unassessed_count > 0:
+        # No one has taken the exit ticket yet.
+        recommendation = (
+            f"No students have taken the exit ticket yet. Wait for at least "
+            f"{min(unassessed_count, 5)} student(s) to complete it, then re-run this report."
+        )
+        recommendation_type = 'warning'
+        recommendation_action = 'wait'
+    elif all_assessed_above_threshold and unassessed_count == 0:
         recommendation = (
             f"All {total_students} students have achieved at least {move_on_threshold}% of enabling objectives. "
             f"Class is ready to move to the next lesson."
         )
         recommendation_type = 'success'
         recommendation_action = 'proceed'
+    elif all_assessed_above_threshold and unassessed_count > 0:
+        # Everyone who took the ticket passed, but some haven't tried.
+        recommendation = (
+            f"All {assessed_count} assessed students have reached {move_on_threshold}%, but "
+            f"{unassessed_count} student(s) still need to take the exit ticket before the class is fully ready."
+        )
+        recommendation_type = 'warning'
+        recommendation_action = 'wait'
     elif len(students_below) <= 3 and total_students > 5:
         names = ', '.join(s['student'].get_full_name() or s['student'].username for s in students_below[:3])
+        unassessed_note = (
+            f" ({unassessed_count} also haven't taken the ticket.)" if unassessed_count else ""
+        )
         recommendation = (
-            f"{len(students_below)} student(s) are below the {move_on_threshold}% threshold: {names}. "
-            f"Consider targeted support for these students while moving on."
+            f"{len(students_below)} assessed student(s) are below the {move_on_threshold}% threshold: {names}. "
+            f"Consider targeted support for these students while moving on.{unassessed_note}"
         )
         recommendation_type = 'warning'
         recommendation_action = 'proceed_with_review'
     else:
         focus_areas = ', '.join(f"'{o['objective'][:50]}'" for o in weak_objectives[:3])
+        unassessed_note = (
+            f" {unassessed_count} student(s) haven't taken the exit ticket yet." if unassessed_count else ""
+        )
         recommendation = (
-            f"{len(students_below)}/{total_students} students are below the {move_on_threshold}% threshold. "
-            f"Recommend revisiting this lesson, focusing on: {focus_areas}."
+            f"{len(students_below)}/{assessed_count} assessed students are below the {move_on_threshold}% threshold. "
+            f"Recommend revisiting this lesson, focusing on: {focus_areas}.{unassessed_note}"
             if focus_areas else
-            f"{len(students_below)}/{total_students} students are below the {move_on_threshold}% threshold. "
-            f"Recommend revisiting this lesson."
+            f"{len(students_below)}/{assessed_count} assessed students are below the {move_on_threshold}% threshold. "
+            f"Recommend revisiting this lesson.{unassessed_note}"
         )
         recommendation_type = 'danger'
         recommendation_action = 'revisit'
@@ -2005,6 +2052,7 @@ def lesson_session_report(request, lesson_id):
 
     category_groups = []
     for cat_code, cat_meta in [
+        ('UN', {'label': 'Unassessed', 'color': '#6b7280', 'bg': '#f3f4f6', 'border': '#e5e7eb'}),
         ('BE', {'label': 'Below Expectation', 'color': '#dc2626', 'bg': '#fee2e2', 'border': '#fecaca'}),
         ('AE', {'label': 'Approaching Expectation', 'color': '#d97706', 'bg': '#fef3c7', 'border': '#fde68a'}),
         ('ME', {'label': 'Meeting Expectation', 'color': '#059669', 'bg': '#d1fae5', 'border': '#a7f3d0'}),
@@ -2022,7 +2070,13 @@ def lesson_session_report(request, lesson_id):
         common_weak = [obj for obj, _ in group_weak.most_common(5)]
 
         # Generate targeted instruction recommendation per group
-        if cat_code == 'BE':
+        if cat_code == 'UN':
+            instruction = (
+                "These students haven't taken the exit ticket yet. "
+                "Until they do, we have no competency data for them. "
+                "Nudge them to finish their tutor session and submit the exit ticket."
+            )
+        elif cat_code == 'BE':
             if common_weak:
                 instruction = (
                     f"These students need intensive support. Focus your next session on: "
@@ -2092,6 +2146,8 @@ def lesson_session_report(request, lesson_id):
         'avg_pct': avg_pct,
         'category_counts': category_counts,
         'students_below_count': len(students_below),
+        'unassessed_count': unassessed_count,
+        'assessed_count': assessed_count,
         'move_on_threshold': move_on_threshold,
         'recommendation': recommendation,
         'recommendation_type': recommendation_type,
