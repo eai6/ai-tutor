@@ -20,13 +20,29 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
 from django.shortcuts import redirect
+from django.http import FileResponse
 
 from apps.dashboard.views_health import health_check
+
+
+def service_worker(_request):
+    """Serve sw.js from the site root so its scope can cover the
+    whole app. Service workers can't control paths above their own
+    URL unless the response includes Service-Worker-Allowed."""
+    path_to_sw = settings.BASE_DIR / 'static' / 'pwa' / 'sw.js'
+    response = FileResponse(open(path_to_sw, 'rb'), content_type='application/javascript')
+    response['Cache-Control'] = 'no-cache'
+    response['Service-Worker-Allowed'] = '/'
+    return response
+
 
 urlpatterns = [
     path('health/', health_check),
     path('admin/', admin.site.urls),
     path('api/v1/', include('apps.api.urls', namespace='api')),
+    # PWA service worker — must live at the site root so it can
+    # control all paths under /. The actual file is in static/pwa/.
+    path('sw.js', service_worker, name='service_worker'),
     path('', include('apps.accounts.urls')),  # Landing page at root
     path('tutor/', include('apps.tutoring.urls')),
     path('dashboard/', include('apps.dashboard.urls')),

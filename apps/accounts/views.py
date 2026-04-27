@@ -582,6 +582,58 @@ def delete_account(request):
 
 
 @login_required
+def settings(request):
+    """Student-facing settings page — profile info + password change +
+    delete-account entry point.
+
+    Form actions are POSTed back to this same URL with a ?action= param
+    so we don't need separate routes for each subform.
+    """
+    from django.contrib.auth import update_session_auth_hash
+    from django.contrib.auth.forms import PasswordChangeForm
+
+    user = request.user
+    student_profile = StudentProfile.objects.filter(user=user).first()
+    membership = user.memberships.filter(is_active=True).first()
+
+    password_form = PasswordChangeForm(user)
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+
+        if action == 'profile':
+            user.first_name = (request.POST.get('first_name') or '').strip()
+            user.last_name = (request.POST.get('last_name') or '').strip()
+            email = (request.POST.get('email') or '').strip()
+            if email and '@' in email:
+                user.email = email
+            user.save()
+            if student_profile:
+                grade = (request.POST.get('grade_level') or '').strip()
+                if grade:
+                    student_profile.grade_level = grade
+                    student_profile.save()
+            messages.success(request, 'Profile updated.')
+            return redirect('accounts:settings')
+
+        if action == 'password':
+            password_form = PasswordChangeForm(user, request.POST)
+            if password_form.is_valid():
+                password_form.save()
+                update_session_auth_hash(request, password_form.user)
+                messages.success(request, 'Password changed.')
+                return redirect('accounts:settings')
+            # else: fall through to render with form errors
+
+    return render(request, 'accounts/settings.html', {
+        'user_obj': user,
+        'student_profile': student_profile,
+        'membership': membership,
+        'password_form': password_form,
+    })
+
+
+@login_required
 def bulk_student_upload(request):
     """Bulk register students via CSV upload.
 

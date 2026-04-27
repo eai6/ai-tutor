@@ -30,6 +30,34 @@
                     <line class="audio-off-icon" x1="17" y1="9" x2="23" y2="15" style="display:none"/>
                 </svg>
             </button>
+
+            {% comment %}Mobile-only overflow menu — collapses Too hard / Too easy / Audio
+               into a single kebab button on narrow screens. The desktop
+               buttons above are hidden via CSS at <=640px.{% endcomment %}
+            <button type="button"
+                    class="header-kebab"
+                    id="header-kebab"
+                    aria-label="More options"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    onclick="toggleHeaderMenu(event)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="5" r="2"/>
+                    <circle cx="12" cy="12" r="2"/>
+                    <circle cx="12" cy="19" r="2"/>
+                </svg>
+            </button>
+            <div class="header-menu" id="header-menu" role="menu" hidden>
+                <button type="button" role="menuitem" onclick="closeHeaderMenu(); sendDifficultySignal('too_hard');">
+                    <span class="hm-emoji" aria-hidden="true">😣</span> Too hard
+                </button>
+                <button type="button" role="menuitem" onclick="closeHeaderMenu(); sendDifficultySignal('too_easy');">
+                    <span class="hm-emoji" aria-hidden="true">😎</span> Too easy
+                </button>
+                <button type="button" role="menuitem" onclick="closeHeaderMenu(); toggleAudioMode();">
+                    <span class="hm-emoji" aria-hidden="true">🔊</span> Toggle audio
+                </button>
+            </div>
         </div>
     </header>
 
@@ -1014,9 +1042,77 @@ body {
 .difficulty-btn:hover { border-color: #a1a1aa; color: #18181b; }
 .difficulty-btn.active.too-easy { border-color: #7C3AED; background: #EDE9FE; color: #7C3AED; }
 .difficulty-btn.active.too-hard { border-color: #F59E0B; background: #FEF3C7; color: #D97706; }
+/* Mobile overflow menu — kebab + popover. Hidden on desktop; takes
+   over for the difficulty + audio buttons on narrow screens. */
+.header-kebab {
+    display: none;
+    background: transparent;
+    border: 1px solid #e4e4e7;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #18181b;
+    flex-shrink: 0;
+    padding: 0;
+}
+.header-kebab:active { background: #f4f4f5; }
+.header-menu {
+    position: absolute;
+    top: 100%;
+    right: 0.5rem;
+    margin-top: 0.25rem;
+    min-width: 180px;
+    background: #fff;
+    border: 1px solid #e4e4e7;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    padding: 0.25rem;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.header-menu[hidden] { display: none; }
+.header-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: none;
+    border: none;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+    color: #18181b;
+    text-align: left;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    width: 100%;
+}
+.header-menu button:hover, .header-menu button:active { background: #f4f4f5; }
+.header-menu .hm-emoji { font-size: 1rem; }
+.chat-header { position: relative; }
+
 @media (max-width: 640px) {
-    /* Hide labels on very narrow screens, show emoji-only buttons */
-    .header-difficulty .difficulty-btn { padding: 0.3rem 0.5rem; font-size: 0.7rem; }
+    /* Collapse all secondary header actions into the kebab menu. */
+    .header-difficulty { display: none; }
+    .audio-toggle { display: none; }
+    .header-kebab { display: inline-flex; }
+
+    /* Trim the title row so the lesson name + phase badge fit. */
+    .header-title-row { gap: 0.4rem; }
+    .lesson-name { font-size: 0.85rem; }
+    .phase-badge { font-size: 0.65rem; padding: 0.15rem 0.5rem; }
+    .step-progress { display: none; }
+
+    /* Hide the participants bar at this width — moves to a tap-to-show
+       affordance later if needed. */
+    #participants-bar { display: none !important; }
+
+    .chat-header { padding: 0.6rem 0.5rem; }
+    .chat-header-inner { gap: 0.4rem; padding: 0; }
 }
 
 /* ── In-Conversation Gamification ── */
@@ -1682,6 +1778,33 @@ async function sendMessage() {
         addMessage('tutor', 'Something went wrong. Please try again.');
     }
 }
+
+// ── Mobile header overflow menu (kebab) ──
+function toggleHeaderMenu(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('header-menu');
+    const btn = document.getElementById('header-kebab');
+    if (!menu || !btn) return;
+    const willOpen = menu.hasAttribute('hidden');
+    menu.toggleAttribute('hidden', !willOpen);
+    btn.setAttribute('aria-expanded', String(willOpen));
+}
+function closeHeaderMenu() {
+    const menu = document.getElementById('header-menu');
+    const btn = document.getElementById('header-kebab');
+    if (menu) menu.setAttribute('hidden', '');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+document.addEventListener('click', function (e) {
+    const menu = document.getElementById('header-menu');
+    const btn = document.getElementById('header-kebab');
+    if (!menu || menu.hasAttribute('hidden')) return;
+    if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+    closeHeaderMenu();
+});
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeHeaderMenu();
+});
 
 // ── Difficulty Signal ──
 let currentDifficultyLevel = 0;

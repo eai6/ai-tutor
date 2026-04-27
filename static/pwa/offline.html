@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>You're offline — AI Tutor</title>
+  <link rel="manifest" href="/static/pwa/manifest.webmanifest">
+  <meta name="theme-color" content="#FFF9F5">
+  <style>
+    :root {
+      --primary: #FF6B35;
+      --bg: #FFF9F5;
+      --text: #2D3436;
+      --muted: #636E72;
+      --card: #FFFFFF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      min-height: 100dvh;
+    }
+    .panel {
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      background: var(--card);
+      border-radius: 24px;
+      padding: 40px 28px;
+      box-shadow: 0 4px 20px rgba(45, 52, 54, 0.08);
+    }
+    .icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: rgba(255, 107, 53, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+    }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    p { color: var(--muted); font-size: 15px; line-height: 1.5; margin-bottom: 24px; }
+    button {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 9999px;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 12px 24px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button:active { transform: scale(0.98); }
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <div class="icon" aria-hidden="true">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"/>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+        <path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+        <line x1="12" y1="20" x2="12.01" y2="20"/>
+      </svg>
+    </div>
+    <h1>You're offline</h1>
+    <p>The tutor needs internet to think. Once you reconnect this page will reload automatically.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </main>
+  <script>
+    // Auto-reload on reconnect.
+    window.addEventListener('online', () => location.reload());
+  </script>
+</body>
+</html>

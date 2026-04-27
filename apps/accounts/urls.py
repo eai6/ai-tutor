@@ -48,7 +48,10 @@ urlpatterns = [
     # Logout
     path('logout/', views.logout_view, name='logout'),
 
-    # Self-service account deletion
+    # Student settings (profile, password, delete-account entry)
+    path('settings/', views.settings, name='settings'),
+
+    # Self-service account deletion (linked from settings page)
     path('delete-account/', views.delete_account, name='delete_account'),
 
     # Legacy routes (redirect)

@@ -57,6 +57,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # GZip dynamic responses (chat HTML, JSON tutor replies). WhiteNoise
+    # already compresses static assets; this catches everything else.
+    # Must come before WhiteNoise / CommonMiddleware per Django docs.
+    'django.middleware.gzip.GZipMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     # CORS must run BEFORE CommonMiddleware so preflight responses are
     # not stripped of CORS headers. See django-cors-headers docs.

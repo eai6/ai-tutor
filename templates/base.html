@@ -1,9 +1,21 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="{{ theme_primary|default:'#FF6B35' }}">
     <title>{% block title %}AI Tutor{% endblock %}</title>
+
+    {# PWA — installable, offline shell, branded splash #}
+    <link rel="manifest" href="{% static 'pwa/manifest.webmanifest' %}">
+    <link rel="apple-touch-icon" href="{% static 'pwa/apple-touch-icon.png' %}">
+    <link rel="icon" type="image/svg+xml" href="{% static 'pwa/icon.svg' %}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'pwa/icon-192.png' %}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="AI Tutor">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -100,22 +112,18 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            padding: 0.5rem 0.85rem;
             background: var(--bg-warm);
             border-radius: var(--radius-full);
             font-size: 0.875rem;
             font-weight: 600;
-        }
-        
-        .logout-link {
-            color: var(--text-muted);
+            color: var(--text-dark);
             text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 600;
+            transition: background 0.15s ease;
         }
-        
-        .logout-link:hover {
-            color: var(--primary);
+        .user-badge-link:hover, .user-badge-link:focus-visible {
+            background: #F0E6E0;
+            outline: none;
         }
         
         .user-avatar {
@@ -219,10 +227,58 @@
         .animate-in {
             animation: fadeInUp 0.4s ease-out forwards;
         }
+
+        /* Offline banner — slides in from the top when the network drops. */
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: var(--text-dark);
+            color: #fff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 0.55rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+            animation: slideDown 0.18s ease-out;
+        }
+        .offline-banner[hidden] { display: none; }
+        .offline-banner svg { width: 14px; height: 14px; }
+        @keyframes slideDown {
+            from { transform: translateY(-100%); }
+            to { transform: translateY(0); }
+        }
+
+        /* Tap targets — 44px min on mobile per Apple HIG / Material. */
+        @media (max-width: 640px) {
+            .btn { min-height: 44px; }
+            .header { padding: 0.75rem 1rem; }
+            .container { padding: 1rem; }
+            .user-badge { padding: 0.4rem 0.6rem; font-size: 0.8rem; gap: 0.4rem; }
+        }
+        @media (max-width: 420px) {
+            .user-badge-name { display: none; }
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <div class="offline-banner" id="offline-banner" role="status" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="1" y1="1" x2="23" y2="23"/>
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+            <path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+        </svg>
+        <span>You're offline — messages will send when you reconnect.</span>
+    </div>
+
     <header class="header">
         <div class="header-content">
             <a href="/tutor/" class="logo">
@@ -235,12 +291,13 @@
             </a>
             {% if user.is_authenticated %}
             <div class="user-menu">
-                <div class="user-badge">
+                <a href="{% url 'accounts:settings' %}" class="user-badge user-badge-link" title="Account settings">
                     <div class="user-avatar">{{ user.first_name|slice:":1"|default:user.username|slice:":1"|upper }}</div>
-                    {{ user.first_name|default:user.username }}
-                </div>
-                <a href="{% url 'accounts:logout' %}" class="logout-link">Logout</a>
-                <a href="{% url 'accounts:delete_account' %}" class="logout-link" style="color:#dc2626;" title="Permanently delete your account">Delete</a>
+                    <span class="user-badge-name">{{ user.first_name|default:user.username }}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--text-muted);">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </a>
             </div>
             {% else %}
             <a href="{% url 'accounts:login' %}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Sign In</a>
@@ -252,6 +309,16 @@
         {% block content %}{% endblock %}
     </main>
     
+    <script src="{% static 'js/network-helpers.js' %}" defer></script>
+    <script defer>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.NetHelpers) {
+                window.NetHelpers.installOfflineBanner();
+                window.NetHelpers.registerServiceWorker();
+            }
+        });
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

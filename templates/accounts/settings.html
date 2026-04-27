@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings — AI Tutor{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-page { max-width: 640px; margin: 0 auto; padding: 0; }
+    .settings-page h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.25rem; }
+    .settings-page .lead { color: var(--text-muted); margin-bottom: 1.5rem; }
+
+    .panel {
+        background: var(--bg-card);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+        padding: 1.5rem;
+        margin-bottom: 1.25rem;
+    }
+    .panel h2 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+    }
+    .panel .panel-sub {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-bottom: 1rem;
+    }
+
+    .field { margin-bottom: 1rem; }
+    .field label {
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.35rem;
+    }
+    .field input[type="text"],
+    .field input[type="email"],
+    .field input[type="password"],
+    .field select {
+        width: 100%;
+        padding: 0.75rem 0.875rem;
+        font-size: 1rem;
+        font-family: inherit;
+        border: 1px solid #e4e4e7;
+        border-radius: var(--radius-sm);
+        background: #fff;
+        color: var(--text-dark);
+        min-height: 44px;
+    }
+    .field input:focus, .field select:focus {
+        outline: 2px solid var(--primary);
+        outline-offset: -1px;
+        border-color: var(--primary);
+    }
+    .field-row { display: flex; gap: 0.75rem; }
+    .field-row > .field { flex: 1; }
+    @media (max-width: 480px) { .field-row { flex-direction: column; gap: 0; } }
+
+    .errorlist {
+        list-style: none;
+        padding: 0;
+        margin: 0.25rem 0 0;
+        font-size: 0.85rem;
+        color: var(--error);
+    }
+    .helptext {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+    }
+
+    .read-only-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 0.9rem;
+    }
+    .read-only-row:last-child { border-bottom: none; }
+    .read-only-row .ro-label { color: var(--text-muted); }
+    .read-only-row .ro-value { font-weight: 600; }
+
+    .messages-area {
+        margin-bottom: 1rem;
+    }
+    .alert {
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+    .alert-success { background: rgba(0, 184, 148, 0.12); color: #0a7857; }
+    .alert-error { background: rgba(255, 118, 117, 0.12); color: #b91c1c; }
+
+    .danger-zone {
+        border: 1px solid rgba(220, 38, 38, 0.25);
+        background: rgba(255, 118, 117, 0.06);
+    }
+    .danger-zone h2 { color: #b91c1c; }
+    .btn-danger {
+        background: transparent;
+        color: #b91c1c;
+        border: 1px solid rgba(220, 38, 38, 0.4);
+    }
+    .btn-danger:hover { background: rgba(220, 38, 38, 0.08); }
+
+    @media (max-width: 640px) {
+        .panel { padding: 1.25rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-page">
+    <h1>Settings</h1>
+    <p class="lead">Manage your account.</p>
+
+    {% if messages %}
+    <div class="messages-area">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── Account info (read + edit) ───────────────────────────────── #}
+    <section class="panel">
+        <h2>Account</h2>
+        <p class="panel-sub">Update the name and email we use for you.</p>
+
+        <div class="read-only-row">
+            <span class="ro-label">Username</span>
+            <span class="ro-value">{{ user_obj.username }}</span>
+        </div>
+        {% if membership %}
+        <div class="read-only-row">
+            <span class="ro-label">School</span>
+            <span class="ro-value">{{ membership.institution.name }}</span>
+        </div>
+        <div class="read-only-row">
+            <span class="ro-label">Role</span>
+            <span class="ro-value" style="text-transform: capitalize;">{{ membership.role }}</span>
+        </div>
+        {% endif %}
+
+        <form method="post" style="margin-top: 1rem;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="profile">
+            <div class="field-row">
+                <div class="field">
+                    <label for="first_name">First name</label>
+                    <input type="text" id="first_name" name="first_name" value="{{ user_obj.first_name }}" autocomplete="given-name">
+                </div>
+                <div class="field">
+                    <label for="last_name">Last name</label>
+                    <input type="text" id="last_name" name="last_name" value="{{ user_obj.last_name }}" autocomplete="family-name">
+                </div>
+            </div>
+            <div class="field">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" value="{{ user_obj.email }}" autocomplete="email" placeholder="you@example.com">
+                <p class="helptext">Used for password reset.</p>
+            </div>
+            {% if student_profile %}
+            <div class="field">
+                <label for="grade_level">Grade level</label>
+                <input type="text" id="grade_level" name="grade_level" value="{{ student_profile.grade_level|default:'' }}" placeholder="e.g. S3">
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Save profile</button>
+        </form>
+    </section>
+
+    {# ── Password change ──────────────────────────────────────────── #}
+    <section class="panel">
+        <h2>Password</h2>
+        <p class="panel-sub">Use a strong password you don't reuse elsewhere.</p>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="password">
+            <div class="field">
+                <label for="id_old_password">Current password</label>
+                <input type="password" name="old_password" id="id_old_password" autocomplete="current-password" required>
+                {% if password_form.old_password.errors %}
+                <ul class="errorlist">{% for e in password_form.old_password.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+            <div class="field">
+                <label for="id_new_password1">New password</label>
+                <input type="password" name="new_password1" id="id_new_password1" autocomplete="new-password" required>
+                {% if password_form.new_password1.errors %}
+                <ul class="errorlist">{% for e in password_form.new_password1.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+            <div class="field">
+                <label for="id_new_password2">Confirm new password</label>
+                <input type="password" name="new_password2" id="id_new_password2" autocomplete="new-password" required>
+                {% if password_form.new_password2.errors %}
+                <ul class="errorlist">{% for e in password_form.new_password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary">Change password</button>
+        </form>
+    </section>
+
+    {# ── Sign out ──────────────────────────────────────────────── #}
+    <section class="panel">
+        <h2>Session</h2>
+        <p class="panel-sub">Sign out on this device.</p>
+        <a href="{% url 'accounts:logout' %}" class="btn btn-secondary">Logout</a>
+    </section>
+
+    {# ── Delete account (kept clearly separate) ───────────────── #}
+    <section class="panel danger-zone">
+        <h2>Delete account</h2>
+        <p class="panel-sub">Permanently remove your account and all data we hold for you. This cannot be undone.</p>
+        <a href="{% url 'accounts:delete_account' %}" class="btn btn-danger">Delete my account</a>
+    </section>
+</div>
+{% endblock %}
