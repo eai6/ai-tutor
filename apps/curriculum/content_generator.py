@@ -436,11 +436,15 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         except Exception as e:
             logger.warning(f"Failed to load Seychelles context: {e}")
 
-        # Calculate step budget from lesson duration
+        # Calculate step budget from lesson duration.
+        # Target ~5 min per step; hard cap at 5 so a single live tutor
+        # session reliably fits a 20-30 min classroom slot.
+        # 10min → 3 (floor); 15min → 3; 20min → 4; 25min → 5; 30min+ → 5
         target_minutes = lesson.estimated_minutes or 20
-        # ~3 min per step: 10min=3 steps, 20min=6 steps, 30min=8 steps, 40min=10 steps
-        max_steps = max(3, min(10, target_minutes // 3))
-        max_eos = max(1, min(5, (max_steps - 2) // 2))  # Reserve 1 engage + 1 evaluate
+        max_steps = max(3, min(5, target_minutes // 5))
+        # Most lessons cover ONE enabling objective. Only the longest
+        # (5-step) variant gets a second EO.
+        max_eos = 2 if max_steps >= 5 else 1
 
         # Prompt focuses on CONTENT, not FORMAT — instructor handles the schema
         prompt = f"""Create a complete tutoring session for this lesson.
@@ -455,24 +459,31 @@ LESSON DURATION: {target_minutes} minutes
 TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}
-Create {max_steps - 1}-{max_steps} CONCEPT-GROUPED steps (MAXIMUM {max_steps}). This is a focused {target_minutes}-minute lesson.
-Each lesson covers 1 terminal objective with {max_eos} enabling objectives. Keep it tight.
+Create EXACTLY {max_steps} steps. This is a focused {target_minutes}-minute lesson — students should finish the whole flow in that window.
+Cover {max_eos} enabling objective{"s" if max_eos > 1 else ""} only. ONE terminal objective, kept tight.
 
-{"MATH LESSON STRUCTURE:" if lesson.unit.course.is_math else "STRUCTURE:"}
-1 ENGAGE step — real-world hook connecting to Seychelles life{"" if not lesson.unit.course.is_math else " (e.g., 'If tuna sells for SCR 45/kg and a fisherman catches 3.5kg...')"}
-Then FOR EACH ENABLING OBJECTIVE ({max_eos} EOs):
-  1 teach step → {"1 worked_example step → " if lesson.unit.course.is_math else ""}1 practice step
-  {"The worked_example MUST show a COMPLETE solution with every line of working" if lesson.unit.course.is_math else ""}
-  The practice step MUST have question, expected_answer ({"with full working steps" if lesson.unit.course.is_math else ""}), and hints
-1 EVALUATE quiz step at the end
+{"MATH LESSON STRUCTURE — exactly " + str(max_steps) + " steps:" if lesson.unit.course.is_math else "STRUCTURE — exactly " + str(max_steps) + " steps:"}
+{(
+    "Step 1 TEACH — explain the concept with a real-world Seychelles hook in the opening line (e.g., 'If tuna sells for SCR 45/kg and a fisherman catches 3.5kg...'). 4-6 sentences total.\n"
+    "Step 2 WORKED_EXAMPLE — solve a complete problem showing EVERY line of working.\n"
+    "Step 3 PRACTICE — DIFFERENT problem (not the same numbers); MUST have question + expected_answer (with full working steps) + hints.\n"
+    + ("Step 4 PRACTICE — second different problem.\n" if max_steps >= 5 else "")
+    + ("Step 5 QUIZ — short evaluation question." if max_steps >= 5 else "Step 4 QUIZ — short evaluation question.")
+) if lesson.unit.course.is_math else (
+    "Step 1 ENGAGE — real-world Seychelles hook + the lesson question. 2-3 sentences.\n"
+    "Step 2 TEACH — direct instruction. 4-6 sentences max — minimum effective dose.\n"
+    "Step 3 PRACTICE — student attempts a question; MUST have question + expected_answer + hints.\n"
+    + ("Step 4 TEACH — second EO concept (4-6 sentences).\n" if max_steps >= 5 else "")
+    + ("Step 5 QUIZ — short evaluation question." if max_steps >= 5 else "Step 4 QUIZ — short evaluation question.")
+)}
 
-{"KEEP IT SHORT: Each teach step should be 3-5 sentences of instruction, not a full lecture." if not lesson.unit.course.is_math else "MATH DEPTH: Each teach step explains the concept, then the worked_example shows EVERY step of the solution. Practice must be a DIFFERENT problem (not the same numbers)."}
+{"MATH DEPTH: worked_example shows every step. Practice/quiz problems use DIFFERENT numbers from the worked example." if lesson.unit.course.is_math else "KEEP TEACH STEPS SHORT: 4-6 sentences max, never a lecture. The student must do most of the talking."}
 
 enabling_objective RULES:
 - Set each step's enabling_objective field to the EXACT TEXT of the enabling objective it covers
 - ALL steps teaching/practicing the SAME EO share the SAME enabling_objective text
-- ENGAGE and EVALUATE steps use "" (empty string)
-- Each EO block MUST end with a practice or quiz step
+- ENGAGE and QUIZ/EVALUATE steps use "" (empty string)
+- The flow MUST end with a practice or quiz step
 
 STEP TYPES:
 - teach: Direct instruction (tutor explains)
@@ -574,11 +585,18 @@ CONTENT GUIDELINES:
             return {'success': False, 'error': str(e)}
 
     def _save_steps_to_db(self, lesson, steps: List[Dict]):
-        """Save generated steps to database."""
+        """Save generated steps to database.
+
+        Mirrors the budget in _generate_steps so the LLM's output is
+        capped to the same ceiling. After upserting the new steps,
+        deletes any leftover LessonStep rows with order_index >=
+        len(steps) — without this, regenerating a lesson with FEWER
+        steps would leave the old tail behind in the DB.
+        """
         from apps.curriculum.models import LessonStep
 
         target_minutes = lesson.estimated_minutes or 20
-        MAX_STEPS = max(3, min(10, target_minutes // 3))
+        MAX_STEPS = max(3, min(5, target_minutes // 5))
         if len(steps) > MAX_STEPS:
             logger.warning(
                 f"[ContentGen] [{lesson.title}] Trimming {len(steps)} steps to {MAX_STEPS}"
@@ -613,6 +631,20 @@ CONTENT GUIDELINES:
             )
 
             logger.debug(f"{'Created' if created else 'Updated'} step {step.order_index}: {step.step_type}")
+
+        # Drop orphan tail steps from a previous (longer) generation —
+        # otherwise regenerating a 6-step lesson into 4 steps leaves
+        # the old step 5 + 6 sitting in the DB.
+        kept_indices = {s.get('order_index', 0) for s in steps}
+        orphan_qs = LessonStep.objects.filter(lesson=lesson).exclude(
+            order_index__in=kept_indices,
+        )
+        orphan_count = orphan_qs.count()
+        if orphan_count:
+            logger.info(
+                f"[ContentGen] [{lesson.title}] Removing {orphan_count} orphan steps from prior generation"
+            )
+            orphan_qs.delete()
 
     def _extract_eo_skills(self, lesson):
         """Create Skill records from enabling objectives for SM-2 mastery tracking."""
