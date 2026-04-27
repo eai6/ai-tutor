@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% load dashboard_extras %}
+
+{% block title %}{{ course.title }} — Summative Results{% endblock %}
+
+{% block content %}
+<style>
+    .rv-wrap { max-width: 760px; margin: 1rem auto 4rem; padding: 0 1rem; }
+    .rv-hero {
+        background: linear-gradient(135deg, #5b21b6 0%, #8b5cf6 100%);
+        color: #fff;
+        border-radius: 16px;
+        padding: 1.6rem 1.8rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 12px 32px rgba(91,33,182,0.25);
+    }
+    .rv-hero.failed {
+        background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%);
+        box-shadow: 0 12px 32px rgba(180,83,9,0.25);
+    }
+    .rv-score { font-size: 2.6rem; font-weight: 800; line-height: 1; }
+    .rv-meta { color: rgba(255,255,255,0.9); font-size: 0.92rem; margin-top: 0.35rem; }
+    .rv-status { display: inline-block; background: rgba(255,255,255,0.2); padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; margin-top: 0.4rem; }
+
+    .rv-q {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 0.75rem;
+    }
+    .rv-q.correct { border-left: 4px solid #10b981; }
+    .rv-q.wrong { border-left: 4px solid #ef4444; }
+    .rv-stem { color: #111; font-size: 0.95rem; line-height: 1.55; margin: 0 0 0.5rem; }
+    .rv-stem .num { display: inline-block; background: #f3f4f6; color: #5b21b6; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; margin-right: 0.4rem; }
+    .rv-row { font-size: 0.86rem; color: #374151; margin: 0.3rem 0; }
+    .rv-row strong { color: #111; }
+    .rv-row.you { color: #6b21a8; }
+    .rv-row.correct { color: #047857; }
+    .rv-row.expl { color: #6b7280; font-style: italic; margin-top: 0.5rem; }
+    .rv-fig { margin: 0.5rem 0; max-width: 100%; }
+    .rv-fig svg { max-width: 100%; height: auto; }
+    .rv-objective {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.6rem 0.85rem;
+        margin-bottom: 0.4rem;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.86rem;
+    }
+    .rv-objective.weak { background: #fef2f2; border-color: #fca5a5; }
+</style>
+
+<div class="rv-wrap">
+    <div class="rv-hero {% if not attempt.passed %}failed{% endif %}">
+        <div style="font-size:0.85rem;opacity:0.9;">{{ course.title }} — Summative</div>
+        <div class="rv-score">{{ attempt.score }} / {{ result.total }}</div>
+        <div class="rv-meta">{{ result.percent|floatformat:0 }}% · pass with {{ summative.passing_score }}+ correct</div>
+        <span class="rv-status">{% if attempt.passed %}🎉 Passed{% else %}Below pass — keep practicing{% endif %}</span>
+    </div>
+
+    {% if result.by_concept %}
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1rem 1.2rem;margin-bottom:1rem;">
+        <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:#111;">By teaching objective</h3>
+        {% for tag, stats in result.by_concept.items %}
+        <div class="rv-objective {% if stats.correct == 0 %}weak{% endif %}">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ tag }}</span>
+            <strong>{{ stats.correct }} / {{ stats.total }}</strong>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <h3 style="margin:1.25rem 0 0.5rem;font-size:0.95rem;color:#111;">Question by question</h3>
+    {% for q in questions %}
+    {% with row=per_q_by_id|default_if_none:'' %}
+    <div class="rv-q {% if q.id in per_q_by_id and per_q_by_id|get_item:q.id|get_item:'is_correct' %}correct{% else %}wrong{% endif %}">
+        <p class="rv-stem"><span class="num">{{ forloop.counter }}</span>{{ q.question_text }}</p>
+        {% if q.answer_data.figure_svg %}<div class="rv-fig">{{ q.answer_data.figure_svg|safe }}</div>{% endif %}
+
+        <div class="rv-row you"><strong>Your answer:</strong>
+            {% with row=per_q_by_id|get_item:q.id %}
+                {% if row %}
+                    {% if row.student_answer %}{{ row.student_answer }}{% else %}<em>(blank)</em>{% endif %}
+                {% else %}<em>(blank)</em>{% endif %}
+            {% endwith %}
+        </div>
+        <div class="rv-row correct"><strong>Correct answer:</strong>
+            {% with row=per_q_by_id|get_item:q.id %}
+                {% if row %}{{ row.correct_answer }}{% endif %}
+            {% endwith %}
+        </div>
+        {% if q.explanation %}<div class="rv-row expl">{{ q.explanation }}</div>{% endif %}
+    </div>
+    {% endwith %}
+    {% endfor %}
+
+    <div style="text-align:center;margin-top:2rem;">
+        <a href="{% url 'tutoring:catalog' %}" style="color:#5b21b6;font-weight:600;text-decoration:none;font-size:0.95rem;">← Back to lessons</a>
+    </div>
+</div>
+{% endblock %}

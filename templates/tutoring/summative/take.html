@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} — Summative Exam{% endblock %}
+
+{% block content %}
+<style>
+    .ex-wrap { max-width: 760px; margin: 1rem auto 5rem; padding: 0 1rem; }
+    .ex-head {
+        position: sticky; top: 0; z-index: 200;
+        background: #fff;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 0.75rem 1rem;
+        margin: -1rem -1rem 1.25rem -1rem;
+        display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
+        justify-content: space-between;
+    }
+    .ex-head h1 { font-size: 1.05rem; margin: 0; color: #111; }
+    .ex-progress { background: #ede9fe; color: #5b21b6; padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+    .ex-q {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 1.1rem 1.25rem;
+        margin-bottom: 0.75rem;
+    }
+    .ex-q-stem { color: #111; font-size: 1rem; line-height: 1.6; margin: 0 0 0.85rem; }
+    .ex-q-num { display:inline-block; background:#f3f4f6; color:#5b21b6; padding:0.15rem 0.55rem; border-radius:999px; font-size:0.72rem; font-weight:700; margin-right:0.4rem; }
+    .ex-q-fig { margin: 0.5rem 0 0.85rem; max-width: 100%; }
+    .ex-q-fig svg { max-width: 100%; height: auto; }
+    .opt {
+        display: flex; gap: 0.6rem; align-items: flex-start;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        margin-bottom: 0.4rem;
+        cursor: pointer;
+        transition: border-color 0.12s ease, background 0.12s ease;
+        font-size: 0.95rem;
+        color: #111;
+    }
+    .opt:hover { border-color: #c4b5fd; }
+    .opt input[type=radio] { margin-top: 0.2rem; accent-color: #5b21b6; }
+    .opt.selected { border-color: #5b21b6; background: #ede9fe; }
+    .text-input, .textarea-input {
+        width: 100%;
+        padding: 0.6rem 0.8rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 0.95rem;
+        color: #111;
+        box-sizing: border-box;
+    }
+    .text-input:focus, .textarea-input:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
+    .textarea-input { min-height: 100px; resize: vertical; }
+    .blank-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; font-size: 0.92rem; color: #374151; }
+    .blank-row input { flex: 1; min-width: 200px; }
+    .match-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; }
+    .match-row .left { font-weight: 500; color: #111; min-width: 140px; }
+    .match-row select { flex: 1; min-width: 180px; padding: 0.45rem 0.7rem; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 0.9rem; }
+    .table-fig table { border-collapse: collapse; }
+    .table-fig th, .table-fig td { border: 1px solid #d1d5db; padding: 0.4rem 0.7rem; }
+    .ex-submit {
+        position: sticky; bottom: 1rem;
+        display: flex; gap: 0.5rem; justify-content: center;
+        margin: 1rem 0;
+    }
+    .ex-submit button {
+        background: #5b21b6; color: #fff; border: none;
+        padding: 0.85rem 2rem; border-radius: 999px;
+        font-size: 1rem; font-weight: 700; cursor: pointer;
+        box-shadow: 0 8px 24px rgba(91,33,182,0.3);
+    }
+    .ex-submit button[disabled] { opacity: 0.6; cursor: wait; }
+    .answered-bar {
+        height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden;
+        max-width: 200px; flex: 1;
+    }
+    .answered-fill { height: 100%; background: #8b5cf6; transition: width 0.2s ease; }
+</style>
+
+<div class="ex-wrap">
+    <div class="ex-head">
+        <div>
+            <h1>{{ course.title }} — Summative Exam</h1>
+            <div style="font-size:0.78rem;color:#6b7280;margin-top:0.2rem;">
+                {{ total_q }} questions · pass with {{ pass_threshold }} of {{ total_q }}
+            </div>
+        </div>
+        <div style="display:flex;gap:0.6rem;align-items:center;">
+            <div class="answered-bar"><div class="answered-fill" id="answered-fill" style="width:0%;"></div></div>
+            <span class="ex-progress" id="answered-count">0 / {{ total_q }}</span>
+        </div>
+    </div>
+
+    <div style="background:#fef3c7;border:1px solid #fde68a;color:#92400e;padding:0.75rem 1rem;border-radius:10px;font-size:0.85rem;margin-bottom:1rem;">
+        ⚠️ Once you submit, you can't retake this exam without a teacher reset. Take your time.
+    </div>
+
+    {% for q in questions %}
+    <div class="ex-q" data-qid="{{ q.id }}" data-qtype="{{ q.question_type }}">
+        <p class="ex-q-stem"><span class="ex-q-num">{{ forloop.counter }}</span>{{ q.question_text }}</p>
+
+        {% if q.answer_data.figure_svg %}
+        <div class="ex-q-fig">{{ q.answer_data.figure_svg|safe }}</div>
+        {% elif q.answer_data.data_description %}
+        <div class="ex-q-fig table-fig">{{ q.answer_data.data_description|safe }}</div>
+        {% endif %}
+
+        {% if q.question_type == 'mcq' %}
+            {% with options="A:option_a B:option_b C:option_c D:option_d"|cut:"" %}{% endwith %}
+            <label class="opt" data-letter="A"><input type="radio" name="q_{{ q.id }}" value="A"><span><strong>A.</strong> {{ q.option_a }}</span></label>
+            <label class="opt" data-letter="B"><input type="radio" name="q_{{ q.id }}" value="B"><span><strong>B.</strong> {{ q.option_b }}</span></label>
+            <label class="opt" data-letter="C"><input type="radio" name="q_{{ q.id }}" value="C"><span><strong>C.</strong> {{ q.option_c }}</span></label>
+            <label class="opt" data-letter="D"><input type="radio" name="q_{{ q.id }}" value="D"><span><strong>D.</strong> {{ q.option_d }}</span></label>
+        {% elif q.question_type == 'fill_in_blank' %}
+            {% if q.answer_data.text_template %}
+            <p style="color:#374151;font-size:0.9rem;margin:0 0 0.5rem;font-style:italic;">{{ q.answer_data.text_template }}</p>
+            {% endif %}
+            {% for blank in q.answer_data.blanks %}
+            <div class="blank-row"><span>Blank {{ forloop.counter }}:</span><input type="text" class="text-input" data-qid="{{ q.id }}" data-blank-index="{{ forloop.counter0 }}" autocomplete="off"></div>
+            {% endfor %}
+        {% elif q.question_type == 'matching' %}
+            {% with rights=q.answer_data.pairs %}
+            {% for pair in q.answer_data.pairs %}
+            <div class="match-row">
+                <span class="left">{{ pair.left }} →</span>
+                <select data-qid="{{ q.id }}" data-left="{{ pair.left }}">
+                    <option value="">(pick one)</option>
+                    {% for p in q.answer_data.pairs %}
+                    <option value="{{ p.right }}">{{ p.right }}</option>
+                    {% endfor %}
+                    {% for d in q.answer_data.distractor_rights %}
+                    <option value="{{ d }}">{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endfor %}
+            {% endwith %}
+        {% else %}
+            <textarea class="textarea-input" data-qid="{{ q.id }}" placeholder="Write your answer…"></textarea>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="ex-submit">
+        <button type="button" id="submit-btn">Submit exam</button>
+    </div>
+</div>
+
+<script>
+(function() {
+    const totalQ = {{ total_q|default:0 }};
+    const submitUrl = "{% url 'tutoring:summative_submit' course.id %}";
+
+    function getCookie(name) {
+        const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
+        return m ? decodeURIComponent(m[2]) : '';
+    }
+
+    function collectAnswers() {
+        const answers = {};
+        document.querySelectorAll('.ex-q').forEach(box => {
+            const qid = box.dataset.qid;
+            const qtype = box.dataset.qtype;
+            if (qtype === 'mcq') {
+                const sel = box.querySelector(`input[name="q_${qid}"]:checked`);
+                if (sel) answers[qid] = sel.value;
+            } else if (qtype === 'fill_in_blank') {
+                const inputs = box.querySelectorAll('input[type=text]');
+                const arr = [];
+                inputs.forEach((inp, i) => { arr[i] = inp.value.trim(); });
+                if (arr.some(v => v)) answers[qid] = arr;
+            } else if (qtype === 'matching') {
+                const selects = box.querySelectorAll('select');
+                const m = {};
+                selects.forEach(s => {
+                    const left = s.dataset.left;
+                    if (left && s.value) m[left] = s.value;
+                });
+                if (Object.keys(m).length) answers[qid] = m;
+            } else {
+                const ta = box.querySelector('textarea');
+                if (ta && ta.value.trim()) answers[qid] = ta.value.trim();
+            }
+        });
+        return answers;
+    }
+
+    function refreshProgress() {
+        const answers = collectAnswers();
+        const count = Object.keys(answers).length;
+        document.getElementById('answered-count').textContent = `${count} / ${totalQ}`;
+        const pct = totalQ ? Math.round((count / totalQ) * 100) : 0;
+        document.getElementById('answered-fill').style.width = pct + '%';
+    }
+
+    // Highlight selected radio cards
+    document.querySelectorAll('.ex-q[data-qtype=mcq]').forEach(box => {
+        box.querySelectorAll('input[type=radio]').forEach(r => {
+            r.addEventListener('change', () => {
+                box.querySelectorAll('.opt').forEach(l => l.classList.remove('selected'));
+                const lbl = box.querySelector(`.opt[data-letter="${r.value}"]`);
+                if (lbl) lbl.classList.add('selected');
+                refreshProgress();
+            });
+        });
+    });
+    document.querySelectorAll('.ex-q[data-qtype=fill_in_blank] input, .ex-q[data-qtype=matching] select, .ex-q textarea').forEach(el => {
+        el.addEventListener('input', refreshProgress);
+        el.addEventListener('change', refreshProgress);
+    });
+
+    document.getElementById('submit-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('submit-btn');
+        const answers = collectAnswers();
+        const count = Object.keys(answers).length;
+        if (count < totalQ) {
+            const skip = confirm(`You've only answered ${count} of ${totalQ}. Submit anyway? Unanswered questions count as wrong.`);
+            if (!skip) return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Submitting…';
+        try {
+            const r = await fetch(submitUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+                credentials: 'same-origin',
+                body: JSON.stringify({ answers }),
+            });
+            const data = await r.json();
+            if (!r.ok) {
+                alert('Submission failed: ' + (data.error || 'unknown error'));
+                btn.disabled = false;
+                btn.textContent = 'Submit exam';
+                return;
+            }
+            window.location.href = data.redirect;
+        } catch (e) {
+            alert('Network error. Try again.');
+            btn.disabled = false;
+            btn.textContent = 'Submit exam';
+        }
+    });
+})();
+</script>
+{% endblock %}

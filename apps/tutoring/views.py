@@ -1530,3 +1530,175 @@ def leaderboard(request):
         })
 
     return JsonResponse({'leaderboard': entries})
+
+
+# ============================================================================
+# Course Summative Exam (student-facing)
+# ============================================================================
+
+@login_required
+def summative_take(request, course_id):
+    """Student opens a course summative — picks 30 questions, renders the
+    exam. Reuses the in-progress attempt if the student already started.
+    """
+    from apps.curriculum.models import Course
+    from apps.tutoring.models import ExitTicket, ExitTicketAttempt
+    from apps.tutoring.summative_selection import select_questions_for_attempt
+
+    course = get_object_or_404(Course, id=course_id)
+
+    # Same-institution gate: students can only take their school's
+    # summative or platform-wide ones.
+    if course.institution_id is not None:
+        in_school = request.user.memberships.filter(
+            institution_id=course.institution_id, is_active=True,
+        ).exists()
+        if not in_school and not request.user.is_staff:
+            return render(request, 'tutoring/summative/not_available.html', {
+                'course': course,
+                'reason': 'You are not enrolled in this school.',
+            }, status=403)
+
+    summative = ExitTicket.objects.filter(
+        course=course,
+        assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
+    ).first()
+    if not summative or not summative.is_published:
+        return render(request, 'tutoring/summative/not_available.html', {
+            'course': course,
+            'reason': "This course's summative exam isn't published yet. Check back when your teacher releases it.",
+        })
+
+    # In-progress attempt? Reuse its question list so a refresh doesn't re-shuffle.
+    attempt = ExitTicketAttempt.objects.filter(
+        exit_ticket=summative,
+        student=request.user,
+        completed_at__isnull=True,
+    ).order_by('-started_at').first()
+
+    if attempt and attempt.answers.get('selected_question_ids'):
+        from apps.tutoring.models import ExitTicketQuestion
+        ids = attempt.answers.get('selected_question_ids') or []
+        q_map = {q.id: q for q in ExitTicketQuestion.objects.filter(id__in=ids)}
+        questions = [q_map[i] for i in ids if i in q_map]
+    else:
+        questions = select_questions_for_attempt(
+            summative,
+            count=summative.questions_per_attempt,
+            seed=request.user.id * 1_000_003,  # per-student deterministic
+        )
+        if not attempt:
+            attempt = ExitTicketAttempt.objects.create(
+                exit_ticket=summative,
+                student=request.user,
+                answers={
+                    'selected_question_ids': [q.id for q in questions],
+                    'responses': {},
+                },
+            )
+
+    return render(request, 'tutoring/summative/take.html', {
+        'course': course,
+        'summative': summative,
+        'attempt': attempt,
+        'questions': questions,
+        'total_q': len(questions),
+        'pass_threshold': summative.passing_score,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def summative_submit(request, course_id):
+    """Submit a summative attempt. Grades all answers deterministically
+    and redirects to the review page."""
+    from apps.curriculum.models import Course
+    from apps.tutoring.models import ExitTicket, ExitTicketAttempt, ExitTicketQuestion
+    from apps.tutoring.summative_grading import grade_attempt
+    from django.utils import timezone as _tz
+
+    course = get_object_or_404(Course, id=course_id)
+    summative = get_object_or_404(
+        ExitTicket,
+        course=course,
+        assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
+    )
+    attempt = ExitTicketAttempt.objects.filter(
+        exit_ticket=summative,
+        student=request.user,
+        completed_at__isnull=True,
+    ).order_by('-started_at').first()
+    if not attempt:
+        return JsonResponse({"error": "No in-progress attempt to submit."}, status=400)
+
+    try:
+        body = json.loads(request.body or "{}")
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "Invalid JSON."}, status=400)
+
+    raw_answers = body.get("answers") or {}
+    # Normalize keys to int (HTML form encoding may stringify them).
+    answers_by_id = {}
+    for k, v in raw_answers.items():
+        try:
+            answers_by_id[int(k)] = v
+        except (TypeError, ValueError):
+            continue
+
+    selected_ids = attempt.answers.get('selected_question_ids') or []
+    q_map = {q.id: q for q in ExitTicketQuestion.objects.filter(id__in=selected_ids)}
+    questions = [q_map[i] for i in selected_ids if i in q_map]
+
+    result = grade_attempt(questions, answers_by_id)
+    correct = result['correct']
+    passed = correct >= (summative.passing_score or 0)
+
+    attempt.score = correct
+    attempt.passed = passed
+    attempt.completed_at = _tz.now()
+    attempt.answers = {
+        'selected_question_ids': selected_ids,
+        'responses': {str(k): v for k, v in answers_by_id.items()},
+        'result': result,
+    }
+    attempt.save()
+
+    return JsonResponse({
+        "ok": True,
+        "redirect": f"/tutor/summative/{course.id}/review/{attempt.id}/",
+        "score": correct,
+        "total": result['total'],
+        "passed": passed,
+    })
+
+
+@login_required
+def summative_review(request, course_id, attempt_id):
+    """Show the student their summative results."""
+    from apps.curriculum.models import Course
+    from apps.tutoring.models import ExitTicketAttempt, ExitTicketQuestion
+
+    course = get_object_or_404(Course, id=course_id)
+    attempt = get_object_or_404(
+        ExitTicketAttempt,
+        id=attempt_id,
+        student=request.user,
+        exit_ticket__course=course,
+    )
+    summative = attempt.exit_ticket
+    selected_ids = attempt.answers.get('selected_question_ids') or []
+    q_map = {q.id: q for q in ExitTicketQuestion.objects.filter(id__in=selected_ids)}
+    questions = [q_map[i] for i in selected_ids if i in q_map]
+
+    per_q = (attempt.answers.get('result') or {}).get('per_question') or []
+    per_q_by_id = {row['question_id']: row for row in per_q}
+
+    return render(request, 'tutoring/summative/review.html', {
+        'course': course,
+        'summative': summative,
+        'attempt': attempt,
+        'questions': questions,
+        'per_q_by_id': per_q_by_id,
+        'result': attempt.answers.get('result') or {},
+    })
