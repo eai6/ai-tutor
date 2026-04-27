@@ -455,16 +455,96 @@
                 margin-left: 200px;
             }
         }
-        
+
+        /* Mobile: sidebar becomes an off-canvas drawer behind a
+           hamburger button; body shifts to full-width. */
+        .menu-btn {
+            display: none;
+            background: transparent;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--gray-700);
+            padding: 0;
+            margin-right: 0.75rem;
+            flex-shrink: 0;
+        }
+        .menu-btn:active { background: var(--gray-100); }
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 24, 39, 0.5);
+            z-index: 199;
+        }
+        .sidebar-backdrop.open { display: block; }
+        body.sidebar-open { overflow: hidden; }
+
         @media (max-width: 768px) {
+            .menu-btn { display: inline-flex; }
+            /* Sidebar slides in as a drawer, with the backdrop on top. */
             .sidebar {
-                display: none;
+                display: block;
+                width: 280px;
+                transform: translateX(-100%);
+                transition: transform 0.2s ease-out;
+                z-index: 200;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.18);
             }
-            .main-content {
-                margin-left: 0;
+            .sidebar.open { transform: translateX(0); }
+
+            .main-content { margin-left: 0; }
+
+            /* Tighter topbar at this width. */
+            .top-bar {
+                padding: 0.75rem 1rem;
+                gap: 0.5rem;
             }
+            .page-title { font-size: 1.05rem; }
+            .user-menu { gap: 0.5rem; min-width: 0; }
+            .user-info { display: none; }
+            /* School selector takes too much room when present.
+               Allow it to shrink. */
+            .user-menu select.form-control {
+                min-width: 0 !important;
+                width: auto !important;
+                max-width: 140px;
+                font-size: 0.78rem !important;
+            }
+
+            .content-area { padding: 1rem; }
+
             .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: 1fr !important;
+                gap: 0.75rem !important;
+            }
+
+            /* Generic cards stack rather than sit in 2-3 column grids
+               that overflow horizontally. */
+            .card-header {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+        }
+
+        /* Tables — desktop dashboard pages assume horizontal room.
+           Wrap them in scrollable containers below 768px so they
+           don't blow out the layout. */
+        @media (max-width: 768px) {
+            .content-area table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                white-space: nowrap;
+                font-size: 0.85rem;
+            }
+            .content-area table th,
+            .content-area table td {
+                padding: 0.5rem 0.75rem !important;
             }
         }
     </style>
@@ -473,7 +553,7 @@
 <body>
     <div class="dashboard-layout">
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="dashboard-sidebar">
             <div class="sidebar-header">
                 <a href="{% url 'dashboard:home' %}" class="sidebar-logo">
                     {% if theme_logo_url %}
@@ -606,9 +686,23 @@
             </nav>
         </aside>
         
+        <!-- Backdrop for mobile drawer -->
+        <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
+
         <!-- Main Content -->
         <main class="main-content">
             <header class="top-bar">
+                <button type="button" class="menu-btn" id="menu-btn"
+                        aria-label="Open navigation"
+                        aria-controls="dashboard-sidebar"
+                        aria-expanded="false"
+                        onclick="openSidebar()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
                 <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
                 <div class="user-menu">
                     {% if all_schools %}
@@ -649,6 +743,40 @@
         </main>
     </div>
     
+    <script>
+        // Mobile sidebar drawer — toggled by the hamburger button.
+        // Closes on backdrop tap, Escape, link tap, or viewport resize
+        // back above the mobile breakpoint.
+        function openSidebar() {
+            document.getElementById('dashboard-sidebar').classList.add('open');
+            document.getElementById('sidebar-backdrop').classList.add('open');
+            document.body.classList.add('sidebar-open');
+            document.getElementById('menu-btn').setAttribute('aria-expanded', 'true');
+        }
+        function closeSidebar() {
+            document.getElementById('dashboard-sidebar').classList.remove('open');
+            document.getElementById('sidebar-backdrop').classList.remove('open');
+            document.body.classList.remove('sidebar-open');
+            document.getElementById('menu-btn').setAttribute('aria-expanded', 'false');
+        }
+        // Tapping any nav link inside the drawer should close it.
+        document.querySelectorAll('#dashboard-sidebar .nav-link').forEach(function (link) {
+            link.addEventListener('click', function () {
+                if (window.matchMedia('(max-width: 768px)').matches) closeSidebar();
+            });
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeSidebar();
+        });
+        // If the user resizes back to desktop, drop the drawer state
+        // so the sidebar shows in its full form.
+        window.addEventListener('resize', function () {
+            if (!window.matchMedia('(max-width: 768px)').matches) {
+                closeSidebar();
+            }
+        });
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>
