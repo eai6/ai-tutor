@@ -24,10 +24,31 @@ def _normalize_tag(tag: str) -> str:
 
 
 def _per_question_rows(attempt) -> Iterable[dict]:
-    """Yield per-question rows from an attempt's stored result blob."""
-    res = (attempt.answers or {}).get('result') or {}
-    for row in res.get('per_question') or []:
-        yield row
+    """Yield per-question rows from an attempt's stored answers blob.
+
+    Two shapes coexist:
+      - Summative (new): answers = {'result': {'per_question': [...]}}.
+      - Legacy per-lesson exit ticket (`_complete_session_with_results`):
+        answers is a flat list of {concept_tag, correct, selected, ...}.
+    Normalize to the new shape.
+    """
+    answers = attempt.answers or {}
+    if isinstance(answers, dict):
+        res = answers.get('result') or {}
+        for row in res.get('per_question') or []:
+            yield row
+        return
+    if isinstance(answers, list):
+        for row in answers:
+            if not isinstance(row, dict):
+                continue
+            yield {
+                'concept_tag': row.get('concept_tag') or '',
+                'is_correct': bool(row.get('correct') or row.get('is_correct')),
+                'student_answer': row.get('selected') or row.get('student_answer') or '',
+                'correct_answer': row.get('correct_answer', ''),
+                'explanation': row.get('explanation', ''),
+            }
 
 
 def collect_objective_signals_for_course(course, students=None) -> dict:
@@ -344,3 +365,27 @@ def student_skills_snapshot(student, course) -> dict:
             'attempts': bucket['all_attempts'],
         }
     return snapshot
+
+
+def refresh_student_snapshot(student, course) -> dict:
+    """Recompute the snapshot for (student, course) and write the
+    course's slice into `StudentProfile.skills_snapshot`. Returns the
+    fresh slice. Idempotent — safe to call after every attempt.
+
+    The snapshot is denormalized so the tutor + recommendation engine
+    can read without running the aggregator. The full-fidelity source
+    of truth is still the ExitTicketAttempt rows.
+    """
+    from django.utils import timezone
+    from apps.accounts.models import StudentProfile
+
+    fresh_slice = student_skills_snapshot(student, course)
+    profile = StudentProfile.objects.filter(user=student).first()
+    if profile is None:
+        return fresh_slice
+    snap = profile.skills_snapshot or {}
+    snap[str(course.id)] = fresh_slice
+    profile.skills_snapshot = snap
+    profile.skills_snapshot_updated_at = timezone.now()
+    profile.save(update_fields=['skills_snapshot', 'skills_snapshot_updated_at'])
+    return fresh_slice

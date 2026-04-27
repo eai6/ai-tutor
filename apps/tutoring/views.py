@@ -319,8 +319,66 @@ def lesson_catalog(request):
 
         # Baseline-summative gate signals for the UI: locked = hide
         # lesson list + show "Take baseline" CTA.
-        from apps.tutoring.competency_tracker import baseline_required_for
+        from apps.tutoring.competency_tracker import baseline_required_for, student_skills_snapshot
         baseline_summative = baseline_required_for(request.user, course) if request.user.is_authenticated else None
+
+        # Targeted recommendations: once the baseline is done, mark the
+        # lesson covering the student's weakest objective as the
+        # "recommended next" lesson. Boosts time-on-weak-skill.
+        recommended_lesson_id = None
+        recommended_reason = ''
+        if request.user.is_authenticated and not baseline_summative:
+            try:
+                # Prefer the denormalized snapshot on StudentProfile
+                # (cheap read). Fall back to live aggregation if it's
+                # empty for this course (no attempts yet OR pre-rollout
+                # data without a populated snapshot).
+                profile = StudentProfile.objects.filter(user=request.user).first()
+                snapshot = (profile.skills_snapshot or {}).get(str(course.id)) if profile else None
+                if not snapshot:
+                    snapshot = student_skills_snapshot(request.user, course)
+                if snapshot:
+                    norm = lambda s: ' '.join((s or '').split()).strip()
+                    # Walk lessons in this course; for each, check the
+                    # student's worst objective. Pick the lesson whose
+                    # worst-objective pct is the lowest (and not yet
+                    # mastered in StudentLessonProgress).
+                    candidates = []
+                    from apps.curriculum.content_generator import combined_objectives_for_lesson
+                    for unit in course.units.prefetch_related('lessons').order_by('order_index'):
+                        for lesson in unit.lessons.order_by('order_index'):
+                            if not lesson.is_published:
+                                continue
+                            prog = progress_map.get(lesson.id)
+                            if prog and prog.mastery_level == 'mastered':
+                                continue
+                            objs = combined_objectives_for_lesson(lesson)
+                            worst_pct = None
+                            worst_obj = None
+                            for obj in objs:
+                                info = snapshot.get(norm(obj))
+                                if info and (worst_pct is None or info['pct'] < worst_pct):
+                                    worst_pct = info['pct']
+                                    worst_obj = obj
+                            if worst_pct is not None:
+                                candidates.append((worst_pct, lesson.id, worst_obj))
+                    if candidates:
+                        candidates.sort()  # lowest pct first
+                        worst_pct, recommended_lesson_id, worst_obj = candidates[0]
+                        recommended_reason = (
+                            f"You're at {worst_pct:.0f}% on \"{worst_obj}\" — let's drill it."
+                        )
+            except Exception as e:
+                logger.debug(f"Recommendation computation failed: {e}")
+
+        # Tag the recommended lesson in units_data so the template can highlight it.
+        if recommended_lesson_id:
+            for unit in units_data:
+                for lesson in unit['lessons']:
+                    if lesson['id'] == recommended_lesson_id:
+                        lesson['recommended'] = True
+                        lesson['recommended_reason'] = recommended_reason
+                        break
 
         subject_data = {
             'id': course.id,
@@ -334,6 +392,8 @@ def lesson_catalog(request):
             'grade_display': grade_display,
             'baseline_required': bool(baseline_summative),
             'baseline_url': f"/tutor/summative/{course.id}/" if baseline_summative else None,
+            'recommended_lesson_id': recommended_lesson_id,
+            'recommended_reason': recommended_reason,
         }
 
         # Only add courses that have at least 1 published lesson
@@ -1730,6 +1790,14 @@ def summative_submit(request, course_id):
         'next_url': next_url if next_url.startswith('/') else '',
     }
     attempt.save()
+
+    # Denormalize the per-objective snapshot onto StudentProfile so the
+    # tutor + catalog read it without re-aggregating.
+    try:
+        from apps.tutoring.competency_tracker import refresh_student_snapshot
+        refresh_student_snapshot(request.user, course)
+    except Exception as e:
+        logger.warning(f"snapshot refresh failed after summative submit: {e}")
 
     review_url = f"/tutor/summative/{course.id}/review/{attempt.id}/"
     return JsonResponse({

@@ -1,7 +1,4 @@
-{# Floating "Report a bug / send feedback" button + modal.
-   Included from `templates/base.html` (student) and
-   `templates/dashboard/base.html` (teacher). Authenticated users only.
-   Posts to `dashboard:feedback_submit`. See memory/pilot_launch_execution.md. #}
+{% comment %}Floating "Report a bug / send feedback" button + modal. Included from `templates/base.html` (student) and `templates/dashboard/base.html` (teacher). Authenticated users only. Posts to `dashboard:feedback_submit`. See memory/pilot_launch_execution.md.{% endcomment %}
 {% if user.is_authenticated %}
 <style>
     .fb-btn {

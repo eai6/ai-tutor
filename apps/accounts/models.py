@@ -258,6 +258,22 @@ class StudentProfile(models.Model):
         help_text="Reason for suspension (auto-filled from safety flags)"
     )
 
+    # Cross-course skills snapshot (denormalized from competency tracker
+    # so the tutor and recommendation engine can read without an
+    # aggregator query). Shape:
+    #   {
+    #     "<course_id>": {
+    #         "<teaching_objective>": {"pct": 65.0, "level": "developing",
+    #                                    "source": "baseline", "attempts": 1},
+    #         ...
+    #     },
+    #     ...
+    #   }
+    # Updated on every summative submit + every per-lesson exit-ticket
+    # attempt that has a result blob.
+    skills_snapshot = models.JSONField(default=dict, blank=True)
+    skills_snapshot_updated_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

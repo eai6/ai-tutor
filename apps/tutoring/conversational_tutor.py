@@ -2246,6 +2246,65 @@ IMPORTANT: Any question you ask must be complete and self-contained. Never say "
             if self._personalization:
                 lines.append(f"Pace recommendation: {self._personalization.recommended_pace}")
 
+            # Baseline-driven competency snapshot (per teaching objective).
+            # Drives whether the tutor fast-forwards (mastered), uses
+            # standard pacing (developing), or scaffolds heavily (weak).
+            try:
+                from apps.tutoring.competency_tracker import student_skills_snapshot
+                from apps.curriculum.content_generator import combined_objectives_for_lesson
+
+                course = self.lesson.unit.course if self.lesson.unit else None
+                if course:
+                    snapshot = student_skills_snapshot(self.student, course)
+                    lesson_objectives = combined_objectives_for_lesson(self.lesson)
+                    norm = lambda s: ' '.join((s or '').split()).strip()
+
+                    # Pacing directive for THIS lesson's objective(s).
+                    lesson_levels = []
+                    for obj in lesson_objectives:
+                        info = snapshot.get(norm(obj))
+                        if info:
+                            lesson_levels.append((obj, info))
+
+                    if lesson_levels:
+                        worst = min(lesson_levels, key=lambda kv: kv[1]['pct'])
+                        obj_text, info = worst
+                        level = info['level']
+                        pct = info['pct']
+                        if level == 'mastered':
+                            directive = (
+                                f"BASELINE PACE — student already shows {pct:.0f}% on "
+                                f"this objective. Keep it tight: a short check-for-understanding, "
+                                f"one applied problem, then move on. Do not over-teach."
+                            )
+                        elif level == 'developing':
+                            directive = (
+                                f"BASELINE PACE — student is {pct:.0f}% on this objective "
+                                f"(developing). Standard pacing: short teach, worked example, "
+                                f"guided practice, check."
+                            )
+                        else:  # weak
+                            directive = (
+                                f"BASELINE PACE — student is only {pct:.0f}% on this objective "
+                                f"(weak). Scaffold heavily: anchor in concrete examples, "
+                                f"use one-step problems before multi-step, check often."
+                            )
+                        lines.append(directive)
+
+                    # Course-wide weakest objectives (cross-lesson signal).
+                    weak_others = sorted(
+                        ((tag, info) for tag, info in snapshot.items()
+                         if info['level'] == 'weak' and norm(tag) not in {norm(o) for o in lesson_objectives}),
+                        key=lambda kv: kv[1]['pct'],
+                    )[:3]
+                    if weak_others:
+                        lines.append(
+                            "Other weak objectives in this course (avoid assuming they're known): "
+                            + "; ".join(f"{tag} ({info['pct']:.0f}%)" for tag, info in weak_others)
+                        )
+            except Exception as e:
+                logger.debug(f"Skills snapshot unavailable: {e}")
+
             lines.append("[/STUDENT PROFILE]")
             return "\n".join(lines)
 
@@ -4791,6 +4850,16 @@ Which concept numbers were meaningfully covered?"""
                         answers=answer_data,
                         completed_at=timezone.now(),
                     )
+                # Refresh denormalized skills snapshot on StudentProfile
+                # so the tutor + recommendation engine see the new data.
+                try:
+                    from apps.tutoring.competency_tracker import refresh_student_snapshot
+                    course = self.lesson.unit.course if self.lesson.unit else None
+                    if course:
+                        for participant in participants:
+                            refresh_student_snapshot(participant, course)
+                except Exception as e:
+                    logger.warning(f"snapshot refresh failed after exit ticket: {e}")
         except Exception as e:
             logger.warning(f"Failed to save ExitTicketAttempt: {e}")
 
