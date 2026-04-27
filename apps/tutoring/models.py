@@ -568,8 +568,19 @@ class ExitTicketQuestion(models.Model):
 
 class ExitTicketAttempt(models.Model):
     """
-    Records a student's attempt at an exit ticket.
+    Records a student's attempt at an exit ticket OR a course summative.
+
+    `purpose` distinguishes baseline (first take) vs final (post-course)
+    attempts on summatives, which drives the longitudinal competency
+    tracking surfaced on the dashboard. Per-lesson exit-ticket attempts
+    default to 'practice'.
     """
+    class Purpose(models.TextChoices):
+        PRACTICE = 'practice', 'Practice / lesson exit ticket'
+        BASELINE = 'baseline', 'Baseline (pre-course summative)'
+        FINAL = 'final', 'Final (post-course summative)'
+        RETAKE = 'retake', 'Retake'
+
     exit_ticket = models.ForeignKey(
         ExitTicket,
         on_delete=models.CASCADE,
@@ -587,13 +598,23 @@ class ExitTicketAttempt(models.Model):
         null=True,
         blank=True
     )
-    
+
+    purpose = models.CharField(
+        max_length=15,
+        choices=Purpose.choices,
+        default=Purpose.PRACTICE,
+        help_text=(
+            "What this attempt counts as. Baseline + Final on a summative "
+            "drive the dashboard's longitudinal competency view."
+        ),
+    )
+
     score = models.PositiveIntegerField(default=0)
     passed = models.BooleanField(default=False)
-    
+
     # Detailed answers: {question_id: {answer: 'A', correct: True}}
     answers = models.JSONField(default=dict)
-    
+
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
@@ -601,7 +622,13 @@ class ExitTicketAttempt(models.Model):
         ordering = ['-started_at']
 
     def __str__(self):
-        return f"{self.student.username} - {self.exit_ticket.lesson.title}: {self.score}/10"
+        if self.exit_ticket.lesson_id:
+            label = self.exit_ticket.lesson.title
+        elif self.exit_ticket.course_id:
+            label = f"{self.exit_ticket.course.title} (summative)"
+        else:
+            label = f"ExitTicket #{self.exit_ticket_id}"
+        return f"{self.student.username} - {label}: {self.score} [{self.purpose}]"
 
 
 class TeacherGuidance(models.Model):

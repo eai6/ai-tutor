@@ -5364,3 +5364,86 @@ def summative_publish(request, course_id):
     state = 'published' if summative.is_published else 'unpublished'
     messages.success(request, f"Summative exam {state} for {course.title}.")
     return redirect('dashboard:summative_review', course_id=course.id)
+
+
+# ============================================================================
+# Class & student competency dashboards (longitudinal, by teaching objective)
+# ============================================================================
+
+@teacher_required
+def class_competency(request, course_id):
+    """Class-level competency heat-map: each row is a teaching objective,
+    columns are baseline / latest / final / delta. Drives the pilot's
+    main analytics surface."""
+    from apps.tutoring.competency_tracker import class_competency_matrix
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        course = get_object_or_404(
+            Course,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=course_id,
+        )
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    # Roster — students at this institution.
+    if course.institution_id:
+        roster_ids = list(
+            Membership.objects.filter(
+                role='student', is_active=True,
+                institution_id=course.institution_id,
+            ).values_list('user_id', flat=True)
+        )
+    else:
+        roster_ids = list(
+            Membership.objects.filter(role='student', is_active=True)
+            .values_list('user_id', flat=True)
+        )
+
+    matrix = class_competency_matrix(course, students=roster_ids)
+
+    # Tag → list of students with attempts for the click-through panel.
+    return render(request, 'dashboard/competency/class.html', {
+        **request.staff_ctx,
+        'course': course,
+        'matrix': matrix,
+    })
+
+
+@teacher_required
+def student_competency(request, course_id, student_id):
+    """Per-student per-objective table. One row per teaching objective
+    showing baseline / latest / final / delta for this student."""
+    from apps.tutoring.competency_tracker import student_competency_table
+    from django.contrib.auth.models import User as _User
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        course = get_object_or_404(
+            Course,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=course_id,
+        )
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    student = get_object_or_404(_User, id=student_id)
+    table = student_competency_table(course, student)
+
+    # Compute summary stats
+    rows = table['objectives']
+    has_baseline = sum(1 for r in rows if r['baseline_pct'] is not None)
+    has_final = sum(1 for r in rows if r['final_pct'] is not None)
+    mastered_latest = sum(1 for r in rows if (r['latest_pct'] or 0) >= 70)
+
+    return render(request, 'dashboard/competency/student.html', {
+        **request.staff_ctx,
+        'course': course,
+        'student': student,
+        'rows': rows,
+        'total_objectives': len(rows),
+        'has_baseline': has_baseline,
+        'has_final': has_final,
+        'mastered_latest': mastered_latest,
+    })

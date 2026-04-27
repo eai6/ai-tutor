@@ -1,0 +1,138 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}{{ course.title }} — Competency Map{% endblock %}
+{% block page_title %}{{ course.title }} — Competency Map{% endblock %}
+
+{% block content %}
+<style>
+    .summary-row { display:flex; gap:1.5rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .summary-card {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.85rem 1.1rem; flex:1; min-width:180px;
+    }
+    .summary-card .label { font-size:0.75rem; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; }
+    .summary-card .value { font-size:1.4rem; font-weight:700; color:#111; line-height:1.1; margin-top:0.15rem; }
+
+    .matrix {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        overflow-x: auto;
+    }
+    .matrix table { width:100%; border-collapse:collapse; min-width: 720px; }
+    .matrix th, .matrix td { padding:0.5rem 0.75rem; text-align:left; font-size:0.85rem; vertical-align:top; }
+    .matrix thead th { background:#f9fafb; color:#6b7280; font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid #e5e7eb; position:sticky; top:0; }
+    .matrix tbody tr { border-bottom:1px solid #f3f4f6; }
+    .matrix tbody tr:hover { background:#fafafa; }
+    .matrix .obj { color:#111; font-weight:500; max-width:380px; }
+
+    .bar { width:100%; height:8px; background:#f3f4f6; border-radius:4px; overflow:hidden; margin-top:0.2rem; }
+    .bar-fill { height:100%; transition: width 0.3s ease; }
+    .bar-fill.baseline { background:#fbbf24; }
+    .bar-fill.latest { background:#8b5cf6; }
+    .bar-fill.final { background:#10b981; }
+
+    .pct { font-weight:600; color:#111; font-variant-numeric: tabular-nums; }
+    .pct-faint { color:#9ca3af; font-size:0.8rem; }
+    .delta-pos { color:#047857; font-weight:600; }
+    .delta-neg { color:#b91c1c; font-weight:600; }
+    .delta-zero { color:#6b7280; }
+
+    .legend { display:flex; gap:1rem; font-size:0.78rem; color:#6b7280; margin:0.5rem 0 1rem; flex-wrap:wrap; }
+    .legend-swatch { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:0.3rem; vertical-align:middle; }
+
+    .empty-state { text-align:center; padding:3rem 1rem; color:#6b7280; }
+    .empty-state h3 { color:#374151; margin:0.5rem 0; }
+</style>
+
+<div style="margin-bottom:1rem;">
+    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:#6b7280;font-size:0.85rem;text-decoration:none;">← Back to {{ course.title }}</a>
+</div>
+
+<p style="color:#4b5563;font-size:0.92rem;margin-bottom:1.25rem;line-height:1.55;">
+    Each row is one teaching objective — the atomic competency unit for this course. Columns track how the class moves from <strong>baseline</strong> (pre-course summative) to <strong>latest</strong> (most recent attempt — exit ticket or summative) to <strong>final</strong> (post-course summative).
+</p>
+
+<div class="summary-row">
+    <div class="summary-card">
+        <div class="label">Teaching objectives</div>
+        <div class="value">{{ matrix.objectives|length }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="label">Roster</div>
+        <div class="value">{{ matrix.total_students }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="label">Students attempted</div>
+        <div class="value">{{ matrix.students_attempted }}</div>
+    </div>
+</div>
+
+<div class="legend">
+    <span><span class="legend-swatch" style="background:#fbbf24;"></span>Baseline</span>
+    <span><span class="legend-swatch" style="background:#8b5cf6;"></span>Latest</span>
+    <span><span class="legend-swatch" style="background:#10b981;"></span>Final</span>
+    <span style="color:#9ca3af;">Empty cell = no student data yet for that measurement</span>
+</div>
+
+{% if matrix.objectives %}
+<div class="matrix">
+    <table>
+        <thead>
+            <tr>
+                <th style="width:42%;">Teaching objective</th>
+                <th>Students</th>
+                <th>Baseline</th>
+                <th>Latest</th>
+                <th>Final</th>
+                <th>Δ (final − baseline)</th>
+                <th>Mastered ≥70%</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in matrix.objectives %}
+            <tr>
+                <td class="obj">{{ r.tag }}</td>
+                <td><span class="pct-faint">{{ r.students_with_any }} / {{ matrix.total_students }}</span></td>
+                <td>
+                    {% if r.avg_baseline_pct is not None %}
+                    <span class="pct">{{ r.avg_baseline_pct|floatformat:0 }}%</span>
+                    <span class="pct-faint"> ({{ r.students_with_baseline }})</span>
+                    <div class="bar"><div class="bar-fill baseline" style="width: {{ r.avg_baseline_pct|floatformat:0 }}%;"></div></div>
+                    {% else %}<span class="pct-faint">—</span>{% endif %}
+                </td>
+                <td>
+                    {% if r.avg_latest_pct is not None %}
+                    <span class="pct">{{ r.avg_latest_pct|floatformat:0 }}%</span>
+                    <div class="bar"><div class="bar-fill latest" style="width: {{ r.avg_latest_pct|floatformat:0 }}%;"></div></div>
+                    {% else %}<span class="pct-faint">—</span>{% endif %}
+                </td>
+                <td>
+                    {% if r.avg_final_pct is not None %}
+                    <span class="pct">{{ r.avg_final_pct|floatformat:0 }}%</span>
+                    <span class="pct-faint"> ({{ r.students_with_final }})</span>
+                    <div class="bar"><div class="bar-fill final" style="width: {{ r.avg_final_pct|floatformat:0 }}%;"></div></div>
+                    {% else %}<span class="pct-faint">—</span>{% endif %}
+                </td>
+                <td>
+                    {% if r.delta_pct is not None %}
+                        {% if r.delta_pct > 0 %}<span class="delta-pos">+{{ r.delta_pct|floatformat:0 }} pts</span>
+                        {% elif r.delta_pct < 0 %}<span class="delta-neg">{{ r.delta_pct|floatformat:0 }} pts</span>
+                        {% else %}<span class="delta-zero">0</span>{% endif %}
+                    {% else %}<span class="pct-faint">—</span>{% endif %}
+                </td>
+                <td>
+                    <span class="pct">{{ r.mastered_latest }}</span>
+                    <span class="pct-faint"> / {{ matrix.total_students }}</span>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <div style="font-size:2.5rem;">📊</div>
+    <h3>No teaching objectives yet</h3>
+    <p>This course has no extracted teaching objectives. Re-parse the curriculum to populate them.</p>
+</div>
+{% endif %}
+{% endblock %}

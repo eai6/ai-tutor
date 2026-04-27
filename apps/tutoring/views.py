@@ -1582,15 +1582,32 @@ def summative_take(request, course_id):
         q_map = {q.id: q for q in ExitTicketQuestion.objects.filter(id__in=ids)}
         questions = [q_map[i] for i in ids if i in q_map]
     else:
+        # Pick stratified questions. Per-student-AND-attempt deterministic
+        # so a baseline vs final attempt see *different* shuffles (they're
+        # both supposed to test the same competencies, just at different
+        # points in time).
+        prior_completed = ExitTicketAttempt.objects.filter(
+            exit_ticket=summative,
+            student=request.user,
+            completed_at__isnull=False,
+        ).count()
         questions = select_questions_for_attempt(
             summative,
             count=summative.questions_per_attempt,
-            seed=request.user.id * 1_000_003,  # per-student deterministic
+            seed=request.user.id * 1_000_003 + prior_completed,
         )
         if not attempt:
+            # First completed attempt = baseline; second = final; rest = retakes.
+            if prior_completed == 0:
+                purpose = ExitTicketAttempt.Purpose.BASELINE
+            elif prior_completed == 1:
+                purpose = ExitTicketAttempt.Purpose.FINAL
+            else:
+                purpose = ExitTicketAttempt.Purpose.RETAKE
             attempt = ExitTicketAttempt.objects.create(
                 exit_ticket=summative,
                 student=request.user,
+                purpose=purpose,
                 answers={
                     'selected_question_ids': [q.id for q in questions],
                     'responses': {},

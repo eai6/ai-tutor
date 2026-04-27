@@ -121,6 +121,10 @@ urlpatterns = [
     path('curriculum/course/<int:course_id>/summative/generate/', views.summative_generate, name='summative_generate'),
     path('curriculum/course/<int:course_id>/summative/publish/', views.summative_publish, name='summative_publish'),
 
+    # Competency analytics (course-level baseline → final)
+    path('curriculum/course/<int:course_id>/competencies/', views.class_competency, name='class_competency'),
+    path('curriculum/course/<int:course_id>/competencies/student/<int:student_id>/', views.student_competency, name='student_competency'),
+
     # Admin utilities
     path('admin/seed-demo/', views.seed_demo_school, name='seed_demo'),
 ]
