@@ -9,6 +9,8 @@ Resources created:
   5. Storage Account + File Share (media / ChromaDB)
   6. PostgreSQL Flexible Server + Database
   7. Container App (Django)
+  8. Email Communication Service + Domain + Communication Service
+     (transactional email — password reset, etc.)
 """
 
 import pulumi
@@ -21,6 +23,7 @@ from pulumi_azure_native import (
     app,
     storage,
     dbforpostgresql,
+    communication,
 )
 
 config = Config("aitutor")
@@ -28,6 +31,15 @@ az_config = Config("azure-native")
 stack = pulumi.get_stack()
 location = az_config.require("location")
 custom_domain = config.get("custom-domain")  # e.g. "ai-tutor.wbg.edwardamoah.com"
+
+# Email custom domain — must be a subdomain you control DNS for.
+# Default: derived from custom-domain ("mail.<custom-domain>") if set.
+email_domain = config.get("email-domain") or (
+    f"mail.{custom_domain}" if custom_domain else None
+)
+# Sender address (the From: of outgoing transactional mail).
+email_sender_username = config.get("email-sender-username") or "noreply"
+email_from_display_name = config.get("email-from-display-name") or "AI Tutor"
 
 # ── Secrets from Pulumi config ──────────────────────────────────────────────
 db_password = config.require_secret("db-password")
@@ -199,7 +211,86 @@ database_url = Output.all(db_password, pg_server.fully_qualified_domain_name).ap
     lambda args: f"postgres://aitutoradmin:{args[0]}@{args[1]}:5432/aitutor?sslmode=require"
 )
 
-# ── 7. Container App ───────────────────────────────────────────────────────
+# ── 7. Email Communication Service ─────────────────────────────────────────
+# Three resources cooperate here:
+#   - EmailService:        Azure-managed SMTP infrastructure
+#   - Domain:              the custom subdomain (e.g. mail.example.com)
+#                          Set to CustomerManaged so emails come from
+#                          a verified domain you own.
+#   - CommunicationService: the operational endpoint — gives us the
+#                          connection string Django uses to send.
+#
+# Two-phase setup:
+#   1. `pulumi up` creates the resources. Domain returns its required
+#      DNS records as `verification_records` output.
+#   2. You add those DNS records at your registrar.
+#   3. Run `az communication email domain initiate-verification`
+#      for each record kind (Domain, SPF, DKIM, DKIM2, DMARC).
+#   4. Once Domain shows verified, sending works.
+#
+# The Container App env vars are wired in from `pulumi up` step 1 so
+# Django boots with the right backend; sends just fail until DNS is
+# verified.
+acs_connection_string = None  # filled in if ACS is configured
+acs_sender_address = None     # filled in if email_domain is set
+email_dns_outputs = {}        # surfaced to the user via pulumi stack output
+
+if email_domain:
+    email_service = communication.EmailService(
+        f"aitutor-{stack}-email",
+        email_service_name=f"aitutor-{stack}-email",
+        resource_group_name=rg.name,
+        # ACS Email is only available in a few regions. "United States"
+        # is broadly available. Keep this if location is centralus or
+        # any US region; switch to "Europe" if location is europe-*.
+        data_location="United States",
+    )
+
+    email_domain_resource = communication.Domain(
+        f"aitutor-{stack}-email-domain",
+        domain_name=email_domain,
+        email_service_name=email_service.name,
+        resource_group_name=rg.name,
+        location="global",  # required by ACS Domain
+        domain_management="CustomerManaged",
+        # Default user engagement tracking off (we're sending
+        # transactional, not marketing).
+        user_engagement_tracking="Disabled",
+    )
+
+    comm_service = communication.CommunicationService(
+        f"aitutor-{stack}-comm",
+        communication_service_name=f"aitutor-{stack}-comm",
+        resource_group_name=rg.name,
+        location="global",
+        data_location="United States",
+        linked_domains=[email_domain_resource.id],
+    )
+
+    # Build connection string from primary key.
+    keys = communication.list_communication_service_keys_output(
+        communication_service_name=comm_service.name,
+        resource_group_name=rg.name,
+    )
+    acs_connection_string = keys.primary_connection_string
+    acs_sender_address = Output.concat(email_sender_username, "@", email_domain)
+
+    # Emit DNS instructions as stack outputs.
+    email_dns_outputs = {
+        "email_domain": email_domain,
+        "email_sender_address": acs_sender_address,
+        "email_verification_records": email_domain_resource.verification_records,
+        "email_setup_help": (
+            "1) Add the DNS records above (Domain TXT, SPF TXT, DKIM CNAMEs, "
+            "DMARC TXT) at your DNS provider. "
+            "2) Run: az communication email domain initiate-verification "
+            f"-g {rg.name} --email-service-name aitutor-{stack}-email "
+            f"--name {email_domain} --verification-type {{Domain|SPF|DKIM|DKIM2|DMARC}}. "
+            "3) Wait for `az ... show` to show all five Verified, then test."
+        ),
+    }
+
+# ── 8. Container App ───────────────────────────────────────────────────────
 container_app_name = f"aitutor-{stack}-app"
 image = acr.login_server.apply(lambda s: f"{s}/aitutor:latest")
 
@@ -237,7 +328,12 @@ container_app = app.ContainerApp(
             app.SecretArgs(name="openai-api-key", value=openai_api_key),
             app.SecretArgs(name="google-api-key", value=google_api_key),
             app.SecretArgs(name="elevenlabs-api-key", value=elevenlabs_api_key),
-        ],
+        ] + ([
+            app.SecretArgs(
+                name="acs-connection-string",
+                value=acs_connection_string,
+            ),
+        ] if acs_connection_string is not None else []),
     ),
     template=app.TemplateArgs(
         containers=[
@@ -273,7 +369,20 @@ container_app = app.ContainerApp(
                     app.EnvironmentVarArgs(name="ELEVENLABS_API_KEY", secret_ref="elevenlabs-api-key"),
                     app.EnvironmentVarArgs(name="POSTHOG_DISABLED", value="true"),
                     app.EnvironmentVarArgs(name="INSTRUCTOR_TELEMETRY", value="false"),
-                ],
+                ] + ([
+                    app.EnvironmentVarArgs(
+                        name="AZURE_COMMUNICATION_CONNECTION_STRING",
+                        secret_ref="acs-connection-string",
+                    ),
+                    app.EnvironmentVarArgs(
+                        name="AZURE_COMMUNICATION_SENDER_ADDRESS",
+                        value=acs_sender_address,
+                    ),
+                    app.EnvironmentVarArgs(
+                        name="DEFAULT_FROM_EMAIL",
+                        value=Output.concat(email_from_display_name, " <", acs_sender_address, ">"),
+                    ),
+                ] if acs_connection_string is not None else []),
                 volume_mounts=[
                     app.VolumeMountArgs(
                         volume_name="media-volume",
@@ -325,3 +434,7 @@ pulumi.export("app_url", container_app.configuration.apply(
 ))
 pulumi.export("acr_login_server", acr.login_server)
 pulumi.export("resource_group", rg.name)
+
+# Email outputs — see DNS records the user must add at their registrar.
+for key, value in email_dns_outputs.items():
+    pulumi.export(key, value)

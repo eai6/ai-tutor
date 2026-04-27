@@ -186,15 +186,38 @@ LOGIN_REDIRECT_URL = '/tutor/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 
-# Email — defaults to console (prints to terminal).
-# To use Mailgun, set these in .env:
-#   EMAIL_BACKEND=django.core.mail.backends.smtp.SMTPBackend
-#   EMAIL_HOST=smtp.mailgun.org
-#   EMAIL_PORT=587
-#   EMAIL_HOST_USER=postmaster@your-domain.mailgun.org
-#   EMAIL_HOST_PASSWORD=your-mailgun-password
-#   DEFAULT_FROM_EMAIL=AI Tutor <noreply@your-domain.mailgun.org>
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+# Email — defaults to console (prints to terminal). Production uses
+# Azure Communication Services Email (transactional only) when the
+# connection string is provided. Pulumi wires this via:
+#   AZURE_COMMUNICATION_CONNECTION_STRING (secret)
+#   AZURE_COMMUNICATION_SENDER_ADDRESS    (e.g. noreply@mail.example.com)
+#   DEFAULT_FROM_EMAIL                    (e.g. "AI Tutor <noreply@...>")
+AZURE_COMMUNICATION_CONNECTION_STRING = os.getenv(
+    'AZURE_COMMUNICATION_CONNECTION_STRING', ''
+)
+AZURE_COMMUNICATION_SENDER_ADDRESS = os.getenv(
+    'AZURE_COMMUNICATION_SENDER_ADDRESS', ''
+)
+
+if AZURE_COMMUNICATION_CONNECTION_STRING:
+    # Production / live test path. Real delivery via ACS REST API.
+    EMAIL_BACKEND = os.getenv(
+        'EMAIL_BACKEND',
+        'apps.safety.email_backends.AzureCommunicationEmailBackend',
+    )
+else:
+    # Dev path — console prints emails to stdout. SMTP is still
+    # supported as an explicit override (Mailgun/Resend/etc.) for
+    # local testing without ACS:
+    #   EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+    #   EMAIL_HOST=smtp.resend.com
+    #   EMAIL_HOST_USER=resend
+    #   EMAIL_HOST_PASSWORD=re_xxx
+    EMAIL_BACKEND = os.getenv(
+        'EMAIL_BACKEND',
+        'django.core.mail.backends.console.EmailBackend',
+    )
+
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.mailgun.org')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = True
