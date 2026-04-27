@@ -533,17 +533,20 @@
 
         /* Tables — desktop dashboard pages assume horizontal room.
            Wrap them in scrollable containers below 768px so they
-           don't blow out the layout. */
+           don't blow out the layout. Opt-out classes (.session-table,
+           .obj-table, .responsive-cards) provide their own card-style
+           transform — see the lesson_monitor + lesson_session_report
+           templates. */
         @media (max-width: 768px) {
-            .content-area table {
+            .content-area table:not(.session-table):not(.obj-table):not(.responsive-cards) {
                 display: block;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
                 white-space: nowrap;
                 font-size: 0.85rem;
             }
-            .content-area table th,
-            .content-area table td {
+            .content-area table:not(.session-table):not(.obj-table):not(.responsive-cards) th,
+            .content-area table:not(.session-table):not(.obj-table):not(.responsive-cards) td {
                 padding: 0.5rem 0.75rem !important;
             }
         }

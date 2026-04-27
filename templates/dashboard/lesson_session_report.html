@@ -167,9 +167,101 @@
 .exit-badge.failed { background: #fee2e2; color: #991b1b; }
 
 @media (max-width: 768px) {
-    .summary-cards { grid-template-columns: repeat(2, 1fr); }
-    .obj-table th, .obj-table td { padding: 0.5rem; font-size: 0.8125rem; }
+    .report-header h2 { font-size: 1.05rem; }
+    .summary-cards { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+    .summary-card { padding: 0.75rem 0.5rem; }
+    .summary-card .number { font-size: 1.4rem; }
     .recommendation { flex-direction: column; }
+    .section-title { font-size: 0.95rem; }
+
+    /* Transform obj-table (used for both per-objective and per-student
+       breakdowns) into stacked cards. */
+    .obj-table {
+        display: block;
+        overflow: visible;
+        background: transparent;
+        box-shadow: none;
+        border-radius: 0;
+        white-space: normal;
+    }
+    .obj-table thead { display: none; }
+    .obj-table tbody { display: block; }
+    .obj-table tr {
+        display: block;
+        background: #fff;
+        border-radius: 0.625rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        padding: 0.75rem 0.875rem;
+        margin-bottom: 0.5rem;
+        border-top: none !important;
+    }
+    .obj-table tr:hover { background: #fff; }
+    .obj-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.3rem 0 !important;
+        border-top: none !important;
+        font-size: 0.8125rem;
+        white-space: normal;
+    }
+    .obj-table td::before {
+        content: attr(data-label);
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #71717a;
+        letter-spacing: 0.04em;
+        flex-shrink: 0;
+        padding-top: 2px;
+    }
+    /* The wide first column (objective text / student name) becomes a
+       block title. */
+    .obj-table td.cell-title {
+        display: block;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding-bottom: 0.4rem !important;
+        margin-bottom: 0.4rem;
+        border-bottom: 1px solid #f4f4f5;
+    }
+    .obj-table td.cell-title::before { content: ""; }
+
+    /* Group sessions table — same transform via .responsive-cards class. */
+    .responsive-cards { display: block; overflow: visible; }
+    .responsive-cards thead { display: none; }
+    .responsive-cards tbody { display: block; }
+    .responsive-cards tr {
+        display: block;
+        background: #fff;
+        border-radius: 0.625rem;
+        padding: 0.75rem 0.875rem !important;
+        margin: 0 0.5rem 0.5rem !important;
+        border-top: none !important;
+    }
+    .responsive-cards td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0 !important;
+        border-top: none !important;
+        font-size: 0.8125rem;
+        text-align: left !important;
+    }
+    .responsive-cards td::before {
+        content: attr(data-label);
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #71717a;
+        letter-spacing: 0.04em;
+    }
+
+    /* Category distribution row (EE / ME / AE / BE) — at full width
+       4-up cards are too small to read. Force 2-col on phone. */
+    .category-distribution > div { flex-basis: calc(50% - 0.25rem) !important; }
 }
 </style>
 {% endblock %}
@@ -211,7 +303,7 @@
 </div>
 
 <!-- Category Distribution -->
-<div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+<div class="category-distribution" style="display:flex;gap:0.5rem;margin-bottom:1.5rem;flex-wrap:wrap;">
     <div style="flex:1;min-width:100px;padding:0.625rem;border-radius:0.5rem;text-align:center;background:#ede9fe;border:1px solid #c4b5fd;">
         <div style="font-size:1.25rem;font-weight:800;color:#6366f1;">{{ category_counts.EE }}</div>
         <div style="font-size:0.6875rem;font-weight:700;color:#6366f1;">EE</div>
@@ -278,12 +370,12 @@
     <tbody>
         {% for obj in objectives_data %}
         <tr>
-            <td>
+            <td class="cell-title">
                 {% if obj.objective_type == 'terminal' %}<span style="font-size:0.5625rem;font-weight:700;color:#6366f1;background:#ede9fe;padding:1px 4px;border-radius:3px;margin-right:4px;">TO</span>{% elif obj.objective_type == 'enabling' %}<span style="font-size:0.5625rem;font-weight:700;color:#059669;background:#d1fae5;padding:1px 4px;border-radius:3px;margin-right:4px;">EO</span>{% endif %}
                 {{ obj.objective|truncatewords:18 }}
             </td>
-            <td><span class="bloom-tag">{{ obj.bloom }}</span></td>
-            <td>
+            <td data-label="Level"><span class="bloom-tag">{{ obj.bloom }}</span></td>
+            <td data-label="Competency">
                 <div class="competency-bar">
                     <div class="competency-bar-track">
                         <div class="competency-bar-fill {{ obj.color }}" style="width:{{ obj.pct }}%"></div>
@@ -291,9 +383,11 @@
                     <span class="competency-fraction">{{ obj.pct }}%</span>
                 </div>
             </td>
-            <td>
-                <span class="competency-fraction" style="color:{% if obj.pct >= 70 %}#059669{% elif obj.pct >= 40 %}#d97706{% else %}#dc2626{% endif %}">{{ obj.achieved }}/{{ obj.total }}</span>
-                achieved
+            <td data-label="Students">
+                <span>
+                    <span class="competency-fraction" style="color:{% if obj.pct >= 70 %}#059669{% elif obj.pct >= 40 %}#d97706{% else %}#dc2626{% endif %}">{{ obj.achieved }}/{{ obj.total }}</span>
+                    achieved
+                </span>
             </td>
         </tr>
         {% endfor %}
@@ -346,22 +440,26 @@
         <tbody>
             {% for s in group.students %}
             <tr>
-                <td><span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span></td>
-                <td>
-                    <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">
-                        {{ s.achieved }}/{{ s.total }}
+                <td class="cell-title"><span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span></td>
+                <td data-label="Objectives">
+                    <span>
+                        <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">
+                            {{ s.achieved }}/{{ s.total }}
+                        </span>
+                        <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">({{ s.pct }}%)</span>
                     </span>
-                    <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">({{ s.pct }}%)</span>
                 </td>
-                <td>
+                <td data-label="Exit Quiz">
                     {% if s.exit_passed != None %}
-                        <span class="exit-badge {% if s.exit_passed %}passed{% else %}failed{% endif %}">{{ s.exit_score }}</span>
-                        <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">{{ s.exit_time }}</span>
+                        <span>
+                            <span class="exit-badge {% if s.exit_passed %}passed{% else %}failed{% endif %}">{{ s.exit_score }}</span>
+                            <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">{{ s.exit_time }}</span>
+                        </span>
                     {% else %}
                         <span style="color:#a1a1aa;font-size:0.8125rem;">{{ s.exit_score }}</span>
                     {% endif %}
                 </td>
-                <td>
+                <td data-label="Weak Areas">
                     {% if s.weak_objectives %}
                         <div class="weak-list">{{ s.weak_objectives|join:", " }}</div>
                     {% else %}
@@ -384,7 +482,7 @@
 {% if group_sessions %}
 <div class="section-title" style="margin-top:2rem;">👥 Group Sessions ({{ group_sessions|length }})</div>
 <div style="background:#fff;border-radius:0.75rem;overflow:hidden;border:1px solid var(--gray-200);">
-    <table style="width:100%;border-collapse:collapse;">
+    <table class="responsive-cards" style="width:100%;border-collapse:collapse;">
         <thead style="background:var(--gray-50);">
             <tr style="text-align:left;font-size:0.78rem;color:var(--gray-500);text-transform:uppercase;">
                 <th style="padding:0.75rem 1rem;">Started</th>
@@ -396,13 +494,17 @@
         <tbody>
             {% for gs in group_sessions %}
             <tr style="border-top:1px solid var(--gray-100);">
-                <td style="padding:0.75rem 1rem;font-size:0.85rem;">{{ gs.session.started_at|date:"M j, H:i" }}</td>
-                <td style="padding:0.75rem 1rem;">
-                    {% for s in gs.participants %}<span class="badge" style="background:var(--gray-100);color:var(--gray-700);font-size:0.75rem;margin-right:0.25rem;">{{ s.username }}</span>{% endfor %}
+                <td data-label="Started" style="padding:0.75rem 1rem;font-size:0.85rem;">{{ gs.session.started_at|date:"M j, H:i" }}</td>
+                <td data-label="Participants" style="padding:0.75rem 1rem;">
+                    <span>
+                        {% for s in gs.participants %}<span class="badge" style="background:var(--gray-100);color:var(--gray-700);font-size:0.75rem;margin-right:0.25rem;">{{ s.username }}</span>{% endfor %}
+                    </span>
                 </td>
-                <td style="padding:0.75rem 1rem;font-size:0.85rem;">
-                    {% if gs.is_completed %}<span style="color:#059669;">✓ completed</span>{% else %}<span style="color:#d97706;">in progress</span>{% endif %}
-                    {% if gs.session.group_approval_status == 'pending' %}<span class="badge" style="background:#fef3c7;color:#92400e;margin-left:0.25rem;">pending approval</span>{% elif gs.session.group_approval_status == 'denied' %}<span class="badge" style="background:#fee2e2;color:#991b1b;margin-left:0.25rem;">denied</span>{% endif %}
+                <td data-label="Status" style="padding:0.75rem 1rem;font-size:0.85rem;">
+                    <span>
+                        {% if gs.is_completed %}<span style="color:#059669;">✓ completed</span>{% else %}<span style="color:#d97706;">in progress</span>{% endif %}
+                        {% if gs.session.group_approval_status == 'pending' %}<span class="badge" style="background:#fef3c7;color:#92400e;margin-left:0.25rem;">pending approval</span>{% elif gs.session.group_approval_status == 'denied' %}<span class="badge" style="background:#fee2e2;color:#991b1b;margin-left:0.25rem;">denied</span>{% endif %}
+                    </span>
                 </td>
                 <td style="padding:0.75rem 1rem;text-align:right;">
                     <a href="{% url 'dashboard:session_chat_history' gs.session.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:4px;padding:4px 10px;text-decoration:none;font-size:0.78rem;">View chat</a>

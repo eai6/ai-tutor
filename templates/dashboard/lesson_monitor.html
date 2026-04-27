@@ -134,6 +134,79 @@
     color: #a1a1aa;
     margin-top: 0.5rem;
 }
+
+/* Mobile: transform the 8-column session table into stacked cards.
+   Each <tr> becomes a card; each <td>::before shows the column
+   label. Overrides the base.html "tables → horizontal scroll" rule
+   because stacked cards read better at this density. */
+@media (max-width: 768px) {
+    .monitor-header h2 { font-size: 1.05rem; }
+    .summary-cards { gap: 0.5rem; }
+    .summary-card { padding: 0.75rem 0.5rem; }
+    .summary-card .number { font-size: 1.4rem; }
+
+    .session-table {
+        display: block;
+        overflow: visible;
+        background: transparent;
+        box-shadow: none;
+        border-radius: 0;
+        white-space: normal;
+    }
+    .session-table thead { display: none; }
+    .session-table tbody { display: block; }
+    .session-table tr {
+        display: block;
+        background: #fff;
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        padding: 0.875rem 1rem;
+        margin-bottom: 0.625rem;
+        border-top: none;
+    }
+    .session-table tr:hover td { background: transparent; }
+    .session-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0 !important;
+        border-top: none;
+        font-size: 0.875rem;
+        white-space: normal;
+    }
+    .session-table td::before {
+        content: attr(data-label);
+        font-size: 0.6875rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #71717a;
+        letter-spacing: 0.04em;
+        flex-shrink: 0;
+    }
+    /* Student name renders as the card title, not a labelled row. */
+    .session-table td.cell-student {
+        display: block;
+        font-size: 1rem;
+        font-weight: 700;
+        padding-bottom: 0.5rem !important;
+        margin-bottom: 0.5rem;
+        border-bottom: 1px solid #f4f4f5;
+    }
+    .session-table td.cell-student::before { content: ""; }
+    /* Action buttons span full width. */
+    .session-table td.cell-actions {
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+        padding-top: 0.625rem !important;
+        margin-top: 0.5rem;
+        border-top: 1px solid #f4f4f5;
+    }
+    .session-table td.cell-actions::before { content: ""; }
+    .btn-view { padding: 0.4rem 0.85rem; font-size: 0.75rem; }
+}
 </style>
 {% endblock %}
 
@@ -190,25 +263,29 @@
     <tbody>
         {% for s in sessions %}
         <tr>
-            <td style="font-weight:600;">{{ s.student_name }}</td>
-            <td>
-                <span class="badge badge-{{ s.status }}">{{ s.status }}</span>
-                {% if s.is_idle %}<span class="badge badge-idle" style="margin-left:4px;" title="No activity for {{ s.idle_minutes }} min">Idle {{ s.idle_minutes }}m</span>{% endif %}
-                {% if s.is_remediation %}<span class="badge badge-remediation" style="margin-left:4px;">Remediation</span>{% endif %}
+            <td class="cell-student" style="font-weight:600;">{{ s.student_name }}</td>
+            <td data-label="Status">
+                <span>
+                    <span class="badge badge-{{ s.status }}">{{ s.status }}</span>
+                    {% if s.is_idle %}<span class="badge badge-idle" style="margin-left:4px;" title="No activity for {{ s.idle_minutes }} min">Idle {{ s.idle_minutes }}m</span>{% endif %}
+                    {% if s.is_remediation %}<span class="badge badge-remediation" style="margin-left:4px;">Remediation</span>{% endif %}
+                </span>
             </td>
-            <td>{{ s.display_phase|default:"--" }}</td>
-            <td>{% if s.is_remediation %}<span style="color:#71717a;">--</span>{% else %}{{ s.current_step }}/{{ s.total_steps }}{% endif %}</td>
-            <td>{{ s.exchange_count }}</td>
-            <td>{% if s.duration_minutes is not None %}{{ s.duration_minutes }} min{% else %}--{% endif %}</td>
-            <td>
+            <td data-label="Phase">{{ s.display_phase|default:"--" }}</td>
+            <td data-label="Step">{% if s.is_remediation %}<span style="color:#71717a;">--</span>{% else %}{{ s.current_step }}/{{ s.total_steps }}{% endif %}</td>
+            <td data-label="Exchanges">{{ s.exchange_count }}</td>
+            <td data-label="Duration">{% if s.duration_minutes is not None %}{{ s.duration_minutes }} min{% else %}--{% endif %}</td>
+            <td data-label="Exit Score">
                 {% if s.exit_score is not None %}
-                    <span style="font-weight:600;{% if s.exit_passed %}color:#16a34a;{% else %}color:#dc2626;{% endif %}">{{ s.exit_score }}/{{ s.exit_total }}</span>
-                    {% if s.exit_passed %}<span style="font-size:0.7rem;color:#16a34a;">PASS</span>{% else %}<span style="font-size:0.7rem;color:#dc2626;">FAIL</span>{% endif %}
+                    <span>
+                        <span style="font-weight:600;{% if s.exit_passed %}color:#16a34a;{% else %}color:#dc2626;{% endif %}">{{ s.exit_score }}/{{ s.exit_total }}</span>
+                        {% if s.exit_passed %}<span style="font-size:0.7rem;color:#16a34a;">PASS</span>{% else %}<span style="font-size:0.7rem;color:#dc2626;">FAIL</span>{% endif %}
+                    </span>
                 {% else %}
                     --
                 {% endif %}
             </td>
-            <td>
+            <td class="cell-actions">
                 <a href="{% url 'dashboard:session_chat_history' s.session.id %}" class="btn-view">View Chat</a>
                 {% if s.has_exit_review %}<a href="{% url 'dashboard:session_exit_review' s.session.id %}" class="btn-view" style="margin-left:4px;">Review</a>{% endif %}
             </td>
