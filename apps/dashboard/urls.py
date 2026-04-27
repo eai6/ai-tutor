@@ -108,6 +108,11 @@ urlpatterns = [
     # School picker
     path('switch-school/', views.switch_school, name='switch_school'),
 
+    # Feedback / bug reports (Pilot Task 2)
+    path('feedback/', views.feedback_list, name='feedback_list'),
+    path('feedback/submit/', views.feedback_submit, name='feedback_submit'),
+    path('feedback/<int:report_id>/resolve/', views.feedback_resolve, name='feedback_resolve'),
+
     # Admin utilities
     path('admin/seed-demo/', views.seed_demo_school, name='seed_demo'),
 ]

@@ -240,9 +240,10 @@ if email_domain:
         f"aitutor-{stack}-email",
         email_service_name=f"aitutor-{stack}-email",
         resource_group_name=rg.name,
-        # ACS Email is only available in a few regions. "United States"
-        # is broadly available. Keep this if location is centralus or
-        # any US region; switch to "Europe" if location is europe-*.
+        # The Microsoft.Communication/EmailServices resource type is only
+        # provisioned in `global`. The `data_location` field is what
+        # actually controls where the data lives.
+        location="global",
         data_location="United States",
     )
 

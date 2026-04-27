@@ -215,3 +215,57 @@ class TeacherClass(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.grade_level})"
+
+class FeedbackReport(models.Model):
+    """In-app bug report / feedback submitted via the floating help
+    button. Visible to superadmins on `/dashboard/feedback/`. See
+    `memory/pilot_launch_execution.md` (Task 2)."""
+
+    class Kind(models.TextChoices):
+        BUG = 'bug', 'Bug'
+        FEEDBACK = 'feedback', 'Feedback'
+        IDEA = 'idea', 'Idea / suggestion'
+
+    class Severity(models.TextChoices):
+        LOW = 'low', 'Low'
+        MEDIUM = 'medium', 'Medium'
+        HIGH = 'high', 'High — pilot blocker'
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='feedback_reports',
+    )
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='feedback_reports',
+    )
+    kind = models.CharField(max_length=15, choices=Kind.choices, default=Kind.BUG)
+    severity = models.CharField(
+        max_length=10, choices=Severity.choices, default=Severity.MEDIUM,
+    )
+    message = models.TextField(help_text="What happened / what's wrong / what would help.")
+    page_url = models.CharField(max_length=500, blank=True, default='')
+    user_agent = models.CharField(max_length=500, blank=True, default='')
+
+    is_resolved = models.BooleanField(default=False)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='resolved_feedback_reports',
+    )
+    resolution_notes = models.TextField(blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        who = self.user.username if self.user else '(anon)'
+        return f"[{self.kind}] {who}: {self.message[:60]}"

@@ -308,7 +308,9 @@
     <main class="container">
         {% block content %}{% endblock %}
     </main>
-    
+
+    {% include "_includes/feedback_button.html" %}
+
     <script src="{% static 'js/network-helpers.js' %}" defer></script>
     <script defer>
         document.addEventListener('DOMContentLoaded', function () {

@@ -5119,3 +5119,122 @@ def _question_for_staff(request, question_id):
             | Q(exit_ticket__lesson__unit__course__institution__isnull=True)
         )
     return qs.filter(id=question_id).first()
+
+
+# ============================================================================
+# Feedback / Bug Reports (Pilot Task 2)
+# ============================================================================
+
+@login_required
+@require_POST
+def feedback_submit(request):
+    """Receive a bug report or feedback from any authenticated page."""
+    from apps.dashboard.models import FeedbackReport
+
+    try:
+        body = json.loads(request.body or "{}")
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    message = (body.get("message") or "").strip()
+    if not message:
+        return JsonResponse({"error": "Message is required"}, status=400)
+
+    kind = (body.get("kind") or "bug").strip()
+    if kind not in {c[0] for c in FeedbackReport.Kind.choices}:
+        kind = FeedbackReport.Kind.BUG
+
+    severity = (body.get("severity") or "medium").strip()
+    if severity not in {c[0] for c in FeedbackReport.Severity.choices}:
+        severity = FeedbackReport.Severity.MEDIUM
+
+    institution = None
+    membership = (
+        Membership.objects.filter(user=request.user, is_active=True)
+        .select_related('institution')
+        .first()
+    )
+    if membership:
+        institution = membership.institution
+
+    FeedbackReport.objects.create(
+        user=request.user,
+        institution=institution,
+        kind=kind,
+        severity=severity,
+        message=message[:4000],
+        page_url=(body.get("page_url") or "")[:500],
+        user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:500],
+    )
+    return JsonResponse({"ok": True})
+
+
+@login_required
+def feedback_list(request):
+    """Superadmin list of feedback reports. Staff see only their school's reports."""
+    from apps.dashboard.models import FeedbackReport
+
+    if not (request.user.is_staff or request.user.is_superuser):
+        ctx = get_staff_context(request)
+        if not ctx:
+            messages.error(request, "Staff access required.")
+            return redirect('dashboard:home')
+        institution = ctx['institution']
+    else:
+        institution = None
+
+    qs = FeedbackReport.objects.select_related('user', 'institution', 'resolved_by')
+    if institution is not None:
+        qs = qs.filter(institution=institution)
+
+    show = request.GET.get('show', 'open')
+    if show == 'open':
+        qs = qs.filter(is_resolved=False)
+    elif show == 'resolved':
+        qs = qs.filter(is_resolved=True)
+
+    paginator = Paginator(qs, 30)
+    page = paginator.get_page(request.GET.get('page', 1))
+
+    ctx = get_staff_context(request) or {}
+    return render(request, 'dashboard/feedback/list.html', {
+        **ctx,
+        'reports': page,
+        'show': show,
+        'open_count': FeedbackReport.objects.filter(is_resolved=False).count() if institution is None
+                      else FeedbackReport.objects.filter(is_resolved=False, institution=institution).count(),
+    })
+
+
+@login_required
+@require_POST
+def feedback_resolve(request, report_id):
+    """Mark a feedback report resolved (or reopen it)."""
+    from apps.dashboard.models import FeedbackReport
+
+    if not (request.user.is_staff or request.user.is_superuser):
+        ctx = get_staff_context(request)
+        if not ctx:
+            return JsonResponse({"error": "Staff only"}, status=403)
+        institution = ctx['institution']
+        qs = FeedbackReport.objects.all()
+        if institution is not None:
+            qs = qs.filter(institution=institution)
+    else:
+        qs = FeedbackReport.objects.all()
+
+    report = get_object_or_404(qs, id=report_id)
+    notes = (request.POST.get('notes') or '').strip()
+
+    if report.is_resolved:
+        report.is_resolved = False
+        report.resolved_at = None
+        report.resolved_by = None
+    else:
+        report.is_resolved = True
+        report.resolved_at = timezone.now()
+        report.resolved_by = request.user
+        if notes:
+            report.resolution_notes = notes
+    report.save()
+    return redirect('dashboard:feedback_list')

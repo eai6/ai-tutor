@@ -1,0 +1,252 @@
+{# Floating "Report a bug / send feedback" button + modal.
+   Included from `templates/base.html` (student) and
+   `templates/dashboard/base.html` (teacher). Authenticated users only.
+   Posts to `dashboard:feedback_submit`. See memory/pilot_launch_execution.md. #}
+{% if user.is_authenticated %}
+<style>
+    .fb-btn {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 8500;
+        background: #5b21b6;
+        color: #fff;
+        border: none;
+        border-radius: 999px;
+        padding: 10px 16px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        box-shadow: 0 6px 18px rgba(91,33,182,0.35);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .fb-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(91,33,182,0.42); }
+    .fb-btn svg { width: 16px; height: 16px; }
+    .fb-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.45);
+        z-index: 9000;
+        display: none;
+        align-items: center; justify-content: center;
+    }
+    .fb-overlay.open { display: flex; }
+    .fb-modal {
+        background: #fff;
+        border-radius: 14px;
+        padding: 1.4rem 1.6rem;
+        max-width: 480px;
+        width: 92%;
+        box-shadow: 0 16px 40px rgba(0,0,0,0.22);
+        font-family: inherit;
+    }
+    .fb-modal h3 { margin: 0 0 0.4rem; font-size: 1.1rem; color: #111; }
+    .fb-modal p.fb-help { margin: 0 0 1rem; font-size: 0.85rem; color: #555; }
+    .fb-row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+    .fb-pill {
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        font-size: 0.8rem;
+        color: #374151;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    .fb-pill.active { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+    .fb-textarea {
+        width: 100%;
+        min-height: 110px;
+        padding: 0.65rem 0.8rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        color: #111;
+        resize: vertical;
+        box-sizing: border-box;
+    }
+    .fb-textarea:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
+    .fb-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+    .fb-cancel {
+        background: #fff;
+        border: 1px solid #d1d5db;
+        color: #374151;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        font-weight: 500;
+        font-family: inherit;
+    }
+    .fb-submit {
+        background: #5b21b6;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1.1rem;
+        cursor: pointer;
+        font-weight: 600;
+        font-family: inherit;
+    }
+    .fb-submit[disabled] { opacity: 0.6; cursor: wait; }
+    .fb-success {
+        background: #ecfdf5;
+        border: 1px solid #6ee7b7;
+        color: #065f46;
+        padding: 0.6rem 0.8rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        margin-bottom: 0.75rem;
+        display: none;
+    }
+    .fb-error {
+        background: #fef2f2;
+        border: 1px solid #fca5a5;
+        color: #991b1b;
+        padding: 0.6rem 0.8rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        margin-bottom: 0.75rem;
+        display: none;
+    }
+    @media (max-width: 480px) {
+        .fb-btn { right: 12px; bottom: 12px; padding: 9px 14px; font-size: 0.8rem; }
+    }
+</style>
+
+<button type="button" class="fb-btn" id="fb-open" title="Report a bug or send feedback">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+    </svg>
+    Help / Feedback
+</button>
+
+<div class="fb-overlay" id="fb-overlay" role="dialog" aria-modal="true" aria-labelledby="fb-title">
+    <div class="fb-modal" onclick="event.stopPropagation();">
+        <h3 id="fb-title">Report a bug or send feedback</h3>
+        <p class="fb-help">Tell us what happened or what would help. We read every one.</p>
+        <div class="fb-success" id="fb-success">✅ Thanks — your message was sent. We'll review it soon.</div>
+        <div class="fb-error" id="fb-error"></div>
+
+        <div class="fb-row" id="fb-kind-row" data-value="bug">
+            <button type="button" class="fb-pill active" data-kind="bug">🐞 Bug</button>
+            <button type="button" class="fb-pill" data-kind="feedback">💬 Feedback</button>
+            <button type="button" class="fb-pill" data-kind="idea">💡 Idea</button>
+        </div>
+        <div class="fb-row" id="fb-severity-row" data-value="medium">
+            <button type="button" class="fb-pill" data-severity="low">Low</button>
+            <button type="button" class="fb-pill active" data-severity="medium">Medium</button>
+            <button type="button" class="fb-pill" data-severity="high">High — pilot blocker</button>
+        </div>
+
+        <textarea class="fb-textarea" id="fb-message" placeholder="Describe what happened, what you expected, or any feedback…"></textarea>
+
+        <div class="fb-actions">
+            <button type="button" class="fb-cancel" id="fb-cancel">Cancel</button>
+            <button type="button" class="fb-submit" id="fb-submit">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const overlay = document.getElementById('fb-overlay');
+    const openBtn = document.getElementById('fb-open');
+    const cancelBtn = document.getElementById('fb-cancel');
+    const submitBtn = document.getElementById('fb-submit');
+    const messageEl = document.getElementById('fb-message');
+    const successEl = document.getElementById('fb-success');
+    const errorEl = document.getElementById('fb-error');
+    const kindRow = document.getElementById('fb-kind-row');
+    const severityRow = document.getElementById('fb-severity-row');
+
+    function getCookie(name) {
+        const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
+        return m ? decodeURIComponent(m[2]) : '';
+    }
+
+    function setActive(row, attr, value) {
+        row.dataset.value = value;
+        row.querySelectorAll('.fb-pill').forEach(p => {
+            p.classList.toggle('active', p.dataset[attr] === value);
+        });
+    }
+
+    kindRow.addEventListener('click', (e) => {
+        const pill = e.target.closest('.fb-pill');
+        if (pill) setActive(kindRow, 'kind', pill.dataset.kind);
+    });
+    severityRow.addEventListener('click', (e) => {
+        const pill = e.target.closest('.fb-pill');
+        if (pill) setActive(severityRow, 'severity', pill.dataset.severity);
+    });
+
+    function openModal() {
+        successEl.style.display = 'none';
+        errorEl.style.display = 'none';
+        overlay.classList.add('open');
+        setTimeout(() => messageEl.focus(), 50);
+    }
+    function closeModal() {
+        overlay.classList.remove('open');
+        messageEl.value = '';
+        setActive(kindRow, 'kind', 'bug');
+        setActive(severityRow, 'severity', 'medium');
+    }
+
+    openBtn.addEventListener('click', openModal);
+    cancelBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    });
+
+    submitBtn.addEventListener('click', async () => {
+        const message = messageEl.value.trim();
+        if (!message) {
+            errorEl.textContent = 'Please describe what happened.';
+            errorEl.style.display = 'block';
+            return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
+        errorEl.style.display = 'none';
+
+        try {
+            const r = await fetch('{% url "dashboard:feedback_submit" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    message,
+                    kind: kindRow.dataset.value,
+                    severity: severityRow.dataset.value,
+                    page_url: window.location.href,
+                }),
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                errorEl.textContent = data.error || 'Submission failed. Please try again.';
+                errorEl.style.display = 'block';
+            } else {
+                successEl.style.display = 'block';
+                messageEl.value = '';
+                setTimeout(closeModal, 1500);
+            }
+        } catch (e) {
+            errorEl.textContent = 'Network error. Try again in a moment.';
+            errorEl.style.display = 'block';
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send';
+        }
+    });
+})();
+</script>
+{% endif %}
