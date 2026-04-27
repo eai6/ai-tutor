@@ -420,6 +420,20 @@ body {
 
 /* Media in messages */
 .message-media { margin-top: 0.75rem; }
+
+/* Offline-queued message — muted student bubble + small badge.
+   Drains automatically when the network comes back. */
+.message.student.queued .bubble {
+    opacity: 0.75;
+    border: 1px dashed rgba(255,255,255,0.5);
+}
+.message.student.queued .queued-badge {
+    margin-top: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 0.02em;
+}
 .message-media img {
     max-width: 100%;
     border-radius: 8px;
@@ -1265,13 +1279,15 @@ body {
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+{# marked + DOMPurify are render-blocking — moved to defer so first
+   paint isn't held up. The first message arrives several seconds
+   after page load, so the script downloads have plenty of time to
+   finish before they're called. #}
+<script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 {# Chart.js was used for the interactive plot_spec exit-ticket renderer.
-   That feature was removed in favour of pipeline-generated images via
-   figure_url / figure_description. The renderer + drainPendingPlots()
-   helpers below are now dead but harmless — left in place for one
-   release in case any old answer_data still has plot_spec. #}
+   That feature was removed in favour of server-rendered SVG via
+   figure_render.py. #}
 {% if is_math_lesson %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.css" integrity="sha384-/L6i+LN3dyoaK2jYG5ZLh5u13cjdsPDcFOSNJeFBFa/KgVXR5kOfTdiN3ft1uMAq" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.js" integrity="sha384-H6s1ZrH2CKpFpqR680poRdStIRJGXty7fSkxAcIfxwl9iu6A4BOPtTk7vQ58Ovio" crossorigin="anonymous"></script>
@@ -1643,9 +1659,9 @@ function addMessage(role, content, media = [], artifactHtml = null) {
         for (const m of media) {
             if (m.type === 'image' || m.type === 'diagram' || m.type === 'chart' || m.type === 'illustration') {
                 if (isDesktop() && openArtifactPanel(m)) {
-                    mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}"></div>`;
+                    mediaHtml += `<div class="media-panel-trigger" data-media-url="${m.url}" data-media-alt="${m.alt || ''}" data-media-caption="${m.caption || ''}"><img src="${m.url}" alt="${m.alt || ''}" loading="lazy" decoding="async"></div>`;
                 } else {
-                    mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}" class="inline-media-img" data-caption="${m.caption || ''}" style="cursor:pointer">`;
+                    mediaHtml += `<img src="${m.url}" alt="${m.alt || ''}" class="inline-media-img" data-caption="${m.caption || ''}" loading="lazy" decoding="async" style="cursor:pointer">`;
                     if (m.caption) mediaHtml += `<div class="caption">${m.caption}</div>`;
                 }
             }
@@ -1710,77 +1726,186 @@ function addMessage(role, content, media = [], artifactHtml = null) {
 
     chatMessages.insertBefore(div, typing);
     scrollToBottom();
+    return div;
 }
 
 let isSending = false;
+
+// ── Offline message queue ──
+// Students on flaky networks shouldn't lose work. When offline, the
+// student message goes into localStorage, the bubble renders with a
+// "Will send when online" badge, and the queue drains on reconnect.
+const QUEUE_KEY = () => `aitutor.queue.${sessionId}`;
+const queuedBubbles = new Map();  // queuedId -> bubble DOM node
+
+function loadQueue() {
+    try {
+        return JSON.parse(localStorage.getItem(QUEUE_KEY()) || '[]');
+    } catch { return []; }
+}
+function saveQueue(q) {
+    try { localStorage.setItem(QUEUE_KEY(), JSON.stringify(q)); } catch {}
+}
+function pushToQueue(text) {
+    const q = loadQueue();
+    const id = `q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    q.push({ id, text, ts: Date.now() });
+    saveQueue(q);
+    return id;
+}
+function removeFromQueue(id) {
+    const q = loadQueue().filter((m) => m.id !== id);
+    saveQueue(q);
+}
+
+function markBubbleQueued(bubble, id) {
+    if (!bubble) return;
+    queuedBubbles.set(id, bubble);
+    bubble.classList.add('queued');
+    if (!bubble.querySelector('.queued-badge')) {
+        const badge = document.createElement('div');
+        badge.className = 'queued-badge';
+        badge.innerHTML = '⏳ Will send when online';
+        bubble.appendChild(badge);
+    }
+}
+function markBubbleSent(id) {
+    const bubble = queuedBubbles.get(id);
+    if (!bubble) return;
+    bubble.classList.remove('queued');
+    const badge = bubble.querySelector('.queued-badge');
+    if (badge) badge.remove();
+    queuedBubbles.delete(id);
+}
+
+async function performSend(text) {
+    // Returns parsed JSON. Throws on hard failure (after retries).
+    const fetcher = (window.NetHelpers && window.NetHelpers.fetchWithRetry)
+        ? window.NetHelpers.fetchWithRetry
+        : fetch;
+    const response = await fetcher(`/tutor/api/chat/${sessionId}/respond/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({ message: text }),
+        // LLM calls can take 30-90s — give plenty of headroom.
+        timeoutMs: 120000,
+        retries: 2,
+    });
+    if (!response.ok && response.status !== 200) {
+        throw new Error(`Server returned ${response.status}`);
+    }
+    return await response.json();
+}
+
+function applyTutorResponse(data) {
+    if (data.error) {
+        addMessage('tutor', data.error);
+        return;
+    }
+    stopCurrentAudio();
+    addMessage('tutor', data.message, data.media || [], data.artifact_html);
+    if (data.is_correct) showCorrectFeedback(data.streak_count);
+    if (data.milestone) showMilestone(data.milestone, data.step_number, data.total_steps);
+    if (data.phase) phaseBadge.textContent = phaseLabel(data.phase);
+    updateStepProgress(data);
+    if (data.show_exit_ticket && data.exit_ticket) {
+        exitTicketData = data.exit_ticket;
+        setTimeout(() => showExitTicket(), 1000);
+        return 'done';
+    }
+    if (data.is_complete) {
+        showCompletion(data.message);
+        return 'done';
+    }
+}
 
 async function sendMessage() {
     const text = userInput.value.trim();
     if (!text || !sessionId || isSending) return;
 
     isSending = true;
+    sendBtn.disabled = true;
 
-    // Add student message
-    addMessage('student', text);
+    // Add student message bubble immediately (optimistic UI).
+    const bubble = addMessage('student', text);
     userInput.value = '';
     userInput.style.height = 'auto';
 
-    // Show typing
+    const isOffline = window.NetHelpers && !window.NetHelpers.isOnline();
+    if (isOffline) {
+        // Queue it; the reconnect handler drains the queue.
+        const queueId = pushToQueue(text);
+        markBubbleQueued(bubble, queueId);
+        isSending = false;
+        sendBtn.disabled = false;
+        userInput.focus();
+        return;
+    }
+
     showTyping(true);
-    sendBtn.disabled = true;
-
     try {
-        const response = await fetch(`/tutor/api/chat/${sessionId}/respond/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            body: JSON.stringify({ message: text }),
-        });
-
-        const data = await response.json();
+        const data = await performSend(text);
         showTyping(false);
         sendBtn.disabled = false;
         isSending = false;
-
-        if (data.error) {
-            addMessage('tutor', data.error);
-            return;
-        }
-
-        // Stop any in-flight TTS before showing new message
-        stopCurrentAudio();
-
-        // Display tutor response
-        addMessage('tutor', data.message, data.media || [], data.artifact_html);
-
-        // In-conversation gamification
-        if (data.is_correct) showCorrectFeedback(data.streak_count);
-        if (data.milestone) showMilestone(data.milestone, data.step_number, data.total_steps);
-
-        if (data.phase) {
-            phaseBadge.textContent = phaseLabel(data.phase);
-        }
-        updateStepProgress(data);
-        if (data.show_exit_ticket && data.exit_ticket) {
-            exitTicketData = data.exit_ticket;
-            setTimeout(() => showExitTicket(), 1000);
-            return;
-        }
-        if (data.is_complete) {
-            showCompletion(data.message);
-            return;
-        }
+        applyTutorResponse(data);
         userInput.focus();
-
     } catch (error) {
         console.error('Send error:', error);
         showTyping(false);
         sendBtn.disabled = false;
         isSending = false;
-        addMessage('tutor', 'Something went wrong. Please try again.');
+        // Network died mid-send — queue it instead of losing the
+        // student's work.
+        if (window.NetHelpers && !window.NetHelpers.isOnline()) {
+            const queueId = pushToQueue(text);
+            markBubbleQueued(bubble, queueId);
+        } else {
+            addMessage('tutor', '⚠️ Couldn\'t reach the server. Try again in a moment.');
+        }
     }
+}
+
+// Drain the queue when the network comes back. Sequential — never
+// race two tutor calls against the same session.
+async function drainQueue() {
+    if (!sessionId) return;
+    const q = loadQueue();
+    if (q.length === 0) return;
+    if (isSending) return;  // active send will finish first
+    isSending = true;
+    sendBtn.disabled = true;
+    for (const msg of q) {
+        if (window.NetHelpers && !window.NetHelpers.isOnline()) break;
+        try {
+            showTyping(true);
+            const data = await performSend(msg.text);
+            showTyping(false);
+            removeFromQueue(msg.id);
+            markBubbleSent(msg.id);
+            applyTutorResponse(data);
+        } catch (e) {
+            // Stop on first failure; reconnect handler will retry.
+            showTyping(false);
+            console.warn('drainQueue: stopped at', msg.id, e);
+            break;
+        }
+    }
+    isSending = false;
+    sendBtn.disabled = false;
+}
+
+// Wire reconnect → drain.
+if (window.NetHelpers) {
+    window.NetHelpers.onNetworkChange((online) => {
+        if (online) drainQueue();
+    });
+    // Also try on page load — there might be queued messages from a
+    // previous session that died.
+    setTimeout(drainQueue, 500);
 }
 
 // ── Mobile header overflow menu (kebab) ──
@@ -2174,13 +2299,18 @@ async function submitExitTicket() {
     }
 
     try {
-        const response = await fetch(`/tutor/api/chat/${sessionId}/exit-ticket/`, {
+        // Exit-ticket submit is critical (lots of student work). Use
+        // fetchWithRetry so a transient blip doesn't lose the answers.
+        const fetcher = (window.NetHelpers && window.NetHelpers.fetchWithRetry) || fetch;
+        const response = await fetcher(`/tutor/api/chat/${sessionId}/exit-ticket/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
             },
             body: JSON.stringify({ answers }),
+            timeoutMs: 90000,
+            retries: 3,
         });
 
         const data = await response.json();
