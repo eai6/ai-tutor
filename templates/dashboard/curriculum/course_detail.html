@@ -529,6 +529,23 @@
 {% endif %}
 
 {% if can_edit_content %}
+<div class="bulk-actions" style="background: #f5f3ff; border: 1px solid #ddd6fe; margin-top: 0.75rem;">
+    <span style="font-size: 1.25rem;">🔁</span>
+    <div style="flex: 1;">
+        <strong style="color: #5b21b6;">Regenerate all lessons</strong>
+        <div style="font-size: 0.8rem; color: #6d28d9;">Replaces lesson content + exit tickets across the whole course with the latest rich-content prompt. Mastery levels and the permanent competency transcript are preserved.</div>
+    </div>
+    <form method="post" action="{% url 'dashboard:course_regenerate_all' course.id %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary btn-sm" style="border-color:#a78bfa; color:#5b21b6;"
+                onclick="return confirm('Regenerate ALL lessons in this course?\n\nWhat happens:\n• Lesson steps replaced\n• Exit tickets regenerated\n• Past exit-ticket attempts cleared\n• Mastery levels PRESERVED\n• Permanent competency transcript PRESERVED\n\nRuns serially in the background — refresh to watch progress.');">
+            🔁 Regenerate all lessons
+        </button>
+    </form>
+</div>
+{% endif %}
+
+{% if can_edit_content %}
 <details class="card" style="margin: 1rem 0 2rem; padding: 0; overflow: hidden;">
     <summary style="cursor:pointer; padding:1rem 1.25rem; font-weight:600; color:#374151; font-size:0.95rem; background:#f9fafb; list-style:none; display:flex; justify-content:space-between; align-items:center;">
         <span>📅 Weekly assignments <span style="font-size:0.78rem;color:#6b7280;font-weight:500;margin-left:0.5rem;">— students see these in their weekly panel + Monday email</span></span>

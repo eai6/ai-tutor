@@ -1093,6 +1093,86 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
         return {'lesson': lesson.title, 'success': False, 'error': str(e)}
 
 
+def generate_complete_course(course_id: int, institution_id: int, log_fn=None):
+    """
+    Regenerate every lesson in a course, serially.
+
+    Calls `generate_complete_lesson` per lesson — keeps its CAS guard,
+    cancellation hooks, and content_status flow intact. Serial because
+    concurrent generation has CAS-raced before (see comments in
+    generate_complete_lesson).
+
+    Each lesson:
+      - has its steps + exit ticket wiped (so the regen produces fresh
+        content); StudentLessonProgress / StudentSkillMastery are NOT
+        touched (FKs preserve them via lesson_id stability) and the
+        permanent StudentCompetencyRecord transcript stands as the
+        durable history.
+      - then runs through the standard pipeline.
+
+    Returns a summary dict that the calling view can flash to the user.
+    """
+    import time
+    from apps.curriculum.models import Course, Lesson
+    from apps.tutoring.models import ExitTicket
+
+    connection.close()
+
+    course = Course.objects.get(id=course_id)
+    pipeline_start = time.time()
+
+    def log(msg):
+        print(f"[CourseRegen] {msg}", flush=True)
+        if log_fn:
+            log_fn(msg)
+        else:
+            logger.info(msg)
+
+    lessons = list(
+        Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
+    )
+    log(f"🚀 Starting course regen for '{course.title}' — {len(lessons)} lesson(s)")
+
+    summary = {
+        'course': course.title,
+        'total': len(lessons),
+        'success': 0,
+        'failed': 0,
+        'skipped': 0,
+        'lessons': [],
+    }
+
+    for i, lesson in enumerate(lessons, 1):
+        log(f"   [{i}/{len(lessons)}] {lesson.title}")
+        if lesson.content_status == 'generating':
+            log(f"      ⏭️ already generating — skipping")
+            summary['skipped'] += 1
+            summary['lessons'].append({'lesson': lesson.title, 'status': 'skipped'})
+            continue
+        # Wipe partial state (mirrors lesson_regenerate view).
+        lesson.steps.all().delete()
+        ExitTicket.objects.filter(lesson=lesson).delete()
+        lesson.content_status = 'empty'
+        lesson.updated_at = timezone.now()
+        lesson.save(update_fields=['content_status', 'updated_at'])
+        try:
+            result = generate_complete_lesson(lesson.id, institution_id, log_fn=log_fn)
+            if result.get('success'):
+                summary['success'] += 1
+            else:
+                summary['failed'] += 1
+            summary['lessons'].append({'lesson': lesson.title, 'status': 'ok' if result.get('success') else 'failed'})
+        except Exception as e:
+            log(f"      ❌ {lesson.title}: {e}")
+            summary['failed'] += 1
+            summary['lessons'].append({'lesson': lesson.title, 'status': 'failed', 'error': str(e)})
+
+    elapsed = time.time() - pipeline_start
+    log(f"✅ Course regen done in {elapsed:.1f}s — "
+        f"{summary['success']} ok, {summary['failed']} failed, {summary['skipped']} skipped")
+    return summary
+
+
 def _detect_figure_category(prompt: str) -> str:
     """Detect the image category from a figure generation prompt."""
     prompt_lower = prompt.lower()

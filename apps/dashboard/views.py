@@ -3173,6 +3173,50 @@ def lesson_prerequisite_edit(request, lesson_id):
 
 @teacher_required
 @require_POST
+def course_regenerate_all(request, course_id):
+    """Regenerate every lesson in a course, serially, in a background
+    thread. Used to roll out the rich-content prompt across an entire
+    course in one click.
+
+    Student data is preserved:
+      - StudentLessonProgress, StudentSkillMastery, TutorSession all
+        keep their FK targets (lesson_id is stable across
+        regeneration).
+      - StudentCompetencyRecord (the permanent transcript) is the
+        durable record of mastery regardless of regen / re-parse.
+      - What does get wiped per-lesson: LessonStep, ExitTicket
+        (questions), and ExitTicketAttempt history (cascade from
+        ExitTicket delete). Best-score and mastery_level survive on
+        StudentLessonProgress because we don't touch the lesson row.
+
+    See memory/course_regeneration_for_slow_learners.md (Phase 3).
+    """
+    from apps.curriculum.models import Course
+    from apps.dashboard.background_tasks import run_async, generate_complete_course
+    from apps.accounts.models import Institution
+
+    institution = request.staff_ctx['institution']
+    lookup = {'id': course_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    course = get_object_or_404(Course, **lookup)
+
+    inst = institution or course.institution or Institution.get_global()
+    run_async(generate_complete_course, course.id, inst.id)
+
+    lesson_count = course.units.aggregate(n=Count('lessons'))['n'] or 0
+    messages.success(
+        request,
+        f"Regenerating all {lesson_count} lesson(s) in '{course.title}'. "
+        f"This runs serially in the background and usually takes a few "
+        f"minutes per lesson — refresh this page to watch the status badges. "
+        f"Student mastery levels and the permanent competency transcript are preserved.",
+    )
+    return redirect('dashboard:course_detail', course_id=course.id)
+
+
+@teacher_required
+@require_POST
 def lesson_regenerate(request, lesson_id):
     """Regenerate full pipeline: steps, media, exit tickets, and skills.
 
