@@ -971,6 +971,27 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 instructions=f"Answer 10 questions about {lesson.title}. You need 8 correct to pass.",
             )
 
+            # Drop questions the deterministic validator flags as broken
+            # (rationalization patterns in explanation, math mismatch on
+            # fill-in-blank, MCQ option vs computed value mismatch).
+            from apps.tutoring.question_validator import is_broken
+            valid_questions = []
+            for q in questions:
+                reason = is_broken(q)
+                if reason:
+                    logger.warning(
+                        f"[ExitTicket] [{lesson.title}] dropped Q "
+                        f"({q.get('question', '')[:60]!r}): {reason}"
+                    )
+                else:
+                    valid_questions.append(q)
+            print(
+                f"[ContentGen] [{lesson.title}] validator kept "
+                f"{len(valid_questions)}/{len(questions)} questions",
+                flush=True,
+            )
+            questions = valid_questions
+
             for i, q in enumerate(questions):
                 q_type = q.get('question_type', 'mcq')
                 kwargs = {
