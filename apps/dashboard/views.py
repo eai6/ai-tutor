@@ -826,7 +826,10 @@ def course_detail(request, course_id):
             
             # Content stats
             steps_count = lesson.steps.count()
-            has_content = steps_count >= 5  # Lessons typically have 8-12 steps
+            # Has-content threshold matches the lesson-step floor in
+            # content_generator (`max_steps = max(4, ...)`). Pre-bump
+            # lessons that produced only 4 steps still count.
+            has_content = steps_count >= 3
             
             # Media stats - count images with URLs in step.media JSONField
             media_count = 0
@@ -3185,15 +3188,40 @@ def lesson_generate_content(request, lesson_id):
         lookup['unit__course__institution'] = institution
     lesson = get_object_or_404(Lesson, **lookup)
 
-    # Guard: skip if already has content
-    if lesson.steps.count() >= 5:
-        messages.info(request, f"'{lesson.title}' already has {lesson.steps.count()} steps.")
+    from apps.tutoring.models import ExitTicket
+
+    # Guard: skip if a generation is already running. Don't write to
+    # content_status here — that's how the previous code raced with
+    # the running worker (worker reads `_is_cancelled` after step 1
+    # and saw the view's write, then bailed out with "cancelled before
+    # media"). The worker's own guard + the auto-recovery on
+    # course_detail handle stuck states.
+    if lesson.content_status == 'generating':
+        messages.info(
+            request,
+            f"'{lesson.title}' is already generating. Wait a minute and refresh.",
+        )
         return redirect('dashboard:course_detail', course_id=lesson.unit.course.id)
 
-    # Reset stuck 'generating' status so the background task can proceed
-    if lesson.content_status == 'generating':
-        lesson.content_status = 'pending'
-        lesson.save(update_fields=['content_status'])
+    # Guard: skip if already has full content (steps + exit ticket).
+    has_steps = lesson.steps.count() >= 3
+    has_exit = ExitTicket.objects.filter(lesson=lesson, questions__isnull=False).exists()
+    if has_steps and has_exit:
+        messages.info(
+            request,
+            f"'{lesson.title}' already has {lesson.steps.count()} steps and an exit ticket. "
+            f"Use the Regenerate button if you want to rebuild.",
+        )
+        return redirect('dashboard:course_detail', course_id=lesson.unit.course.id)
+
+    # Partial state from a prior failed/cancelled run? Wipe before
+    # respawn so the worker rebuilds cleanly. (Without this,
+    # generate_exit_ticket_for_lesson skips when an exit ticket
+    # already exists, leaving the lesson with steps but 0 questions.)
+    lesson.steps.all().delete()
+    ExitTicket.objects.filter(lesson=lesson).delete()
+    lesson.content_status = 'empty'
+    lesson.save(update_fields=['content_status'])
 
     from apps.accounts.models import Institution
     inst = institution or lesson.unit.course.institution or Institution.get_global()
