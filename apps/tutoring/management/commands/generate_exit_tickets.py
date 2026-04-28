@@ -22,11 +22,12 @@ SUBJECT: {subject}
 QUESTION FORMAT MIX — generate in THIS EXACT ORDER:
 Questions 1-5: FILL_IN_BLANK (calculation with blank for the answer)
 Questions 6-9: MATCHING (match expressions to their solutions/simplified forms)
-Questions 10-12: SHORT_ANSWER (multi-step calculation requiring working out)
-Questions 13-15: DATA_INTERPRETATION (read data from table/chart and calculate)
-Questions 16-35: MCQ (multiple choice with numerical/algebraic options)
+Questions 10-13: SHORT_ANSWER (multi-step calculation requiring working out)
+Questions 14-35: MCQ (multiple choice with numerical/algebraic options)
 
-YOU MUST generate ALL 5 types. The first 15 questions MUST NOT be MCQ.
+YOU MUST generate ALL 4 types. DO NOT generate any data_interpretation
+questions — that type is disabled platform-wide. The first 13 questions
+MUST NOT be MCQ.
 
 MATHEMATICS RULES — EVERY question must:
 - Require CALCULATION, not description or explanation
@@ -55,11 +56,7 @@ MATCHING format (expressions to solutions):
 SHORT_ANSWER format (show working):
 {{"question_type": "short_answer", "question": "A fisherman in Seychelles sells tuna at SCR 45 per kg. He catches 3 fish weighing 2.5kg, 4.2kg, and 3.8kg. Calculate the total revenue. Show your working.", "answer_data": {{"model_answer": "Total weight = 2.5 + 4.2 + 3.8 = 10.5 kg. Revenue = 10.5 × 45 = SCR 472.50", "keywords": ["10.5", "472.50", "45"], "min_keywords": 2}}, "explanation": "Add the weights first, then multiply by price per kg", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
 
-DATA_INTERPRETATION format — emit a structured `figure_spec`; the server renders it as a correct SVG chart:
-{{"question_type": "data_interpretation", "question": "Study the chart of weekly fish prices and calculate the average:", "answer_data": {{"figure_spec": {{"type": "line", "title": "Tuna prices in Seychelles, weeks 1-6", "x_label": "Week", "y_label": "Price (SCR / kg)", "labels": ["W1", "W2", "W3", "W4", "W5", "W6"], "datasets": [{{"label": "Tuna", "data": [42, 45, 50, 48, 46, 44]}}], "source": "Hypothetical data"}}, "model_answer": "Total = 42+45+50+48+46+44 = 275. Mean = 275 / 6 ≈ 45.83 SCR/kg", "keywords": ["275", "45.83", "mean"], "min_keywords": 2}}, "explanation": "Sum the weekly prices and divide by 6", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
-
-DATA_INTERPRETATION fallback (only for genuinely tabular non-chartable data, e.g. 2-column reference tables):
-{{"question_type": "data_interpretation", "question": "Study the data and calculate:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'>...</table>", "model_answer": "...", "keywords": [...], "min_keywords": 2}}, "explanation": "...", "difficulty": "medium", "concept_tag": "..."}}
+DATA_INTERPRETATION is DISABLED. Do not generate questions of that type.
 
 FIGURE CATALOG — the ONLY valid figures. Server renders each from a
 structured spec. NEVER emit raw <svg>. NEVER reference curriculum-page
@@ -163,8 +160,6 @@ VISUAL CONTENT RULES:
 Geometric shape (math only — inline SVG inside `data_description`):
 <svg width='220' height='180' xmlns='http://www.w3.org/2000/svg'><rect x='30' y='30' width='120' height='80' fill='none' stroke='#18181b' stroke-width='2'/><text x='70' y='25' font-size='12'>8 cm</text><text x='155' y='75' font-size='12'>5 cm</text></svg>
 
-ALL 3 DATA_INTERPRETATION questions (Q13-15) must include a `figure_spec` OR a `data_description` (HTML table or inline geometry SVG).
-
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (straightforward calculations, single step)
 - Questions 13-25: medium (multi-step, word problems with Seychelles context)
@@ -181,11 +176,12 @@ SUBJECT: {subject}
 QUESTION FORMAT MIX — generate in THIS EXACT ORDER:
 Questions 1-5: FILL_IN_BLANK (sentence with blanks to complete)
 Questions 6-9: MATCHING (match terms to definitions)
-Questions 10-12: SHORT_ANSWER (1-3 sentence written response)
-Questions 13-15: DATA_INTERPRETATION (analyze data then answer)
-Questions 16-35: MCQ (multiple choice, 4 options each)
+Questions 10-13: SHORT_ANSWER (1-3 sentence written response)
+Questions 14-35: MCQ (multiple choice, 4 options each)
 
-YOU MUST generate ALL 5 types. The first 15 questions MUST NOT be MCQ.
+YOU MUST generate ALL 4 types. DO NOT generate any data_interpretation
+questions — that type is disabled platform-wide. The first 13 questions
+MUST NOT be MCQ.
 
 REQUIREMENTS:
 1. Generate EXACTLY 35 questions in the format mix above
@@ -212,11 +208,7 @@ MATCHING format:
 SHORT_ANSWER format:
 {{"question_type": "short_answer", "question": "Explain why HDI is considered a better measure of development than GNP.", "answer_data": {{"model_answer": "HDI is better because it measures health, education and income, not just economic output.", "keywords": ["health", "education", "income", "not just economic"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
 
-DATA_INTERPRETATION format — emit a structured `figure_spec`; the server renders it as a correct SVG chart:
-{{"question_type": "data_interpretation", "question": "Study the chart and answer:", "answer_data": {{"figure_spec": {{"type": "bar", "title": "GNP and HDI for three countries", "x_label": "Country", "y_label": "Value", "labels": ["Country A", "Country B", "Country C"], "datasets": [{{"label": "GNP ($)", "data": [500, 2000, 800]}}, {{"label": "HDI (×1000)", "data": [400, 650, 750]}}], "source": "Hypothetical data"}}, "model_answer": "Country C has the highest HDI despite not having the highest GNP, showing that wealth alone does not determine development.", "keywords": ["Country C", "highest HDI", "wealth", "development"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
-
-DATA_INTERPRETATION fallback (use ONLY when the data is intrinsically a tabular reference, not a chart):
-{{"question_type": "data_interpretation", "question": "Study the table and answer:", "answer_data": {{"data_description": "<table style='width:100%;border-collapse:collapse'>...</table>", "model_answer": "...", "keywords": [...], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "..."}}
+DATA_INTERPRETATION is DISABLED. Do not generate questions of that type.
 
 FIGURE CATALOG — the ONLY valid figures. Server renders each from a
 structured spec. NEVER emit raw <svg>. NEVER reference curriculum-page
@@ -306,9 +298,9 @@ CHART-TYPE GUIDE — pick the right shape, not just any shape:
 - scatter: relationship / correlation between two quantitative variables.
 
 VISUAL CONTENT RULES:
-1. DATA_INTERPRETATION questions MUST have either a `figure_spec` (chart),
-   `data_description` (HTML table), or, for geometry questions, an inline
-   geometry SVG (see rule 3). They must NOT be all-text.
+1. data_interpretation is disabled. Don't generate that question type.
+   MCQ / fill_in_blank / matching / short_answer questions can still
+   carry an optional `figure_spec` when a diagram genuinely helps.
 
 2. NOT EVERY FIGURE IS A CHART. If the question is about **geometry** (a
    specific angle's measure, a triangle's interior angles, a labelled

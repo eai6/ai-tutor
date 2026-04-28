@@ -65,7 +65,8 @@ def _ensure_exit_ticket_for(lesson, institution_id: int) -> int:
 def _sample_questions(et, k: int, rng: random.Random) -> List:
     """Pick up to k questions from a lesson exit-ticket bank, biased to
     the same difficulty mix we want overall (~30/45/20)."""
-    questions = list(et.questions.all())
+    # Skip data_interpretation — disabled platform-wide.
+    questions = list(et.questions.exclude(question_type='data_interpretation'))
     if not questions:
         return []
     if len(questions) <= k:

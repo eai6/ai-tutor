@@ -536,10 +536,13 @@ class ConversationalTutor:
                 id_order = {qid: idx for idx, qid in enumerate(selected_ids)}
                 questions = sorted(questions, key=lambda q: id_order.get(q.id, 0))
             else:
-                # New session: select 10 from the full bank
+                # New session: select 10 from the full bank.
+                # Skip data_interpretation — disabled platform-wide
+                # (figures unreliable; new banks won't generate them
+                # but legacy banks may still have them).
                 all_questions = list(ExitTicketQuestion.objects.filter(
-                    exit_ticket=exit_ticket
-                ).order_by('order_index'))
+                    exit_ticket=exit_ticket,
+                ).exclude(question_type='data_interpretation').order_by('order_index'))
 
                 if len(all_questions) > 10:
                     questions = self._select_randomized_questions(all_questions, count=10)

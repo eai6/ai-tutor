@@ -44,7 +44,12 @@ def select_questions_for_attempt(
     """
     rng = random.Random(seed)
 
-    questions = list(summative_exam.questions.all())
+    # data_interpretation is disabled platform-wide (figures unreliable);
+    # filter out any legacy questions of that type so existing banks
+    # still serve cleanly.
+    questions = list(
+        summative_exam.questions.exclude(question_type='data_interpretation')
+    )
     if not questions:
         return []
 
