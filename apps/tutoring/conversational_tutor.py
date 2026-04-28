@@ -4673,9 +4673,16 @@ Which concept numbers were meaningfully covered?"""
             lesson=self.lesson,
             defaults={'institution': self.session.institution}
         )
+        was_mastered = progress.mastery_level == 'mastered'
         progress.mastery_level = 'mastered'
         progress.save()
-        
+
+        # Permanent transcript entry — see record_lesson docstring. The
+        # idempotency guard means re-completing a lesson is a no-op.
+        if not was_mastered:
+            from apps.tutoring.skills_models import StudentCompetencyRecord
+            StudentCompetencyRecord.record_lesson(progress, session=self.session)
+
         return TutorMessage(
             content=f"🎉 Congratulations! You've completed {self.lesson.title}! You showed great understanding. Keep up the excellent work!",
             phase="completed",
@@ -4975,8 +4982,10 @@ Which concept numbers were meaningfully covered?"""
             progress.last_attempt_at = now
             progress.last_completion_session = self.session
             progress.last_completion_was_group = was_group
+            newly_mastered = False
             if passed and progress.mastery_level != 'mastered':
                 progress.mastery_level = 'mastered'
+                newly_mastered = True
             elif progress.mastery_level == 'not_started' and progress.attempts_count > 0:
                 progress.mastery_level = 'in_progress'
             progress.save(
@@ -4990,6 +4999,14 @@ Which concept numbers were meaningfully covered?"""
                     'updated_at',
                 ]
             )
+
+            # Permanent transcript entry — survives course re-parse /
+            # deletion via SET_NULL + snapshot fields. Best-effort; the
+            # helper swallows its own failures so live grading is never
+            # blocked. See memory/student_competency_persistence_plan.md.
+            if newly_mastered:
+                from apps.tutoring.skills_models import StudentCompetencyRecord
+                StudentCompetencyRecord.record_lesson(progress, session=self.session)
 
     def _complete_session_with_results(self, results: List[Dict], score: int) -> TutorMessage:
         """Complete the session with exit ticket results."""

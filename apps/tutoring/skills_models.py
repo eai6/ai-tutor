@@ -414,21 +414,26 @@ class StudentSkillMastery(models.Model):
         now = timezone.now()
         self.total_attempts += 1
         self.last_practiced = now
-        
+
+        # Capture before any state mutation so the post-save block can
+        # detect the LEARNING/REVIEWING → MASTERED transition and write
+        # a permanent transcript entry exactly once.
+        _previous_state = self.state
+
         # Infer quality if not provided
         if quality is None:
             quality = 4 if was_correct else 1
-        
+
         if was_correct:
             self.correct_attempts += 1
             self.current_streak += 1
             self.best_streak = max(self.best_streak, self.current_streak)
             self.last_correct = now
-            
+
             if not self.first_learned:
                 self.first_learned = now
-            
-            # Update state
+
+            # Update state.
             if self.mastery_level >= 0.8:
                 self.state = self.MasteryState.MASTERED
             elif self.repetition_count > 0:
@@ -481,8 +486,20 @@ class StudentSkillMastery(models.Model):
         
         # Schedule next review
         self.next_review_due = now + timedelta(days=self.interval_days)
-        
+
         self.save()
+
+        # Permanent transcript entry on the first transition to
+        # MASTERED. Idempotent for safety, but the previous-state guard
+        # means we usually skip the write. See
+        # memory/student_competency_persistence_plan.md.
+        if (
+            was_correct
+            and self.state == self.MasteryState.MASTERED
+            and _previous_state != self.MasteryState.MASTERED
+        ):
+            StudentCompetencyRecord.record_skill(self)
+
         return self
     
     def get_review_priority(self, for_lesson: Lesson = None):
@@ -773,3 +790,180 @@ class StudentAchievement(models.Model):
 
     def __str__(self):
         return f"{self.student.username} — {self.achievement.name}"
+
+
+class StudentCompetencyRecord(models.Model):
+    """Permanent transcript entry — earned at the moment of mastery,
+    decoupled from course/unit/lesson lifecycle.
+
+    Survives course re-parses, lesson rewrites, and even course
+    deletion via SET_NULL on source FKs + denormalised snapshot fields.
+    The student "owns" the record. Append-only.
+
+    See memory/student_competency_persistence_plan.md.
+    """
+
+    class Granularity(models.TextChoices):
+        LESSON = 'lesson', 'Lesson'
+        SKILL = 'skill', 'Skill'
+
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name='competency_records',
+    )
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='competency_records',
+    )
+    granularity = models.CharField(
+        max_length=10,
+        choices=Granularity.choices,
+    )
+
+    # Snapshot — survives deletion of source rows.
+    objective_text = models.TextField(
+        help_text="The lesson objective or skill name at the moment of mastery."
+    )
+    course_title_snapshot = models.CharField(max_length=200, blank=True, default='')
+    unit_title_snapshot = models.CharField(max_length=200, blank=True, default='')
+    lesson_title_snapshot = models.CharField(max_length=200, blank=True, default='')
+    skill_name_snapshot = models.CharField(max_length=200, blank=True, default='')
+    subject = models.CharField(max_length=20, blank=True, default='')
+    grade_level = models.CharField(max_length=10, blank=True, default='')
+
+    # Achievement metadata.
+    score = models.FloatField(
+        null=True, blank=True,
+        help_text="Best score 0.0–1.0 at the moment of earning (lesson granularity).",
+    )
+    earned_at = models.DateTimeField(default=timezone.now)
+    source_session = models.ForeignKey(
+        'TutorSession',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='competency_records_earned',
+    )
+
+    # Optional live pointers — SET_NULL so the source can be deleted
+    # without taking the transcript with it.
+    source_lesson = models.ForeignKey(
+        Lesson,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='competency_records',
+    )
+    source_skill = models.ForeignKey(
+        Skill,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='competency_records',
+    )
+    source_course = models.ForeignKey(
+        Course,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='competency_records',
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-earned_at']
+        indexes = [
+            models.Index(fields=['student', '-earned_at']),
+            models.Index(fields=['student', 'granularity']),
+            models.Index(fields=['institution', '-earned_at']),
+        ]
+        # One record per (student, lesson) and one per (student, skill).
+        # Both granularities share this constraint via NULL handling.
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student', 'source_lesson'],
+                condition=models.Q(granularity='lesson', source_lesson__isnull=False),
+                name='unique_student_lesson_competency',
+            ),
+            models.UniqueConstraint(
+                fields=['student', 'source_skill'],
+                condition=models.Q(granularity='skill', source_skill__isnull=False),
+                name='unique_student_skill_competency',
+            ),
+        ]
+
+    def __str__(self):
+        who = self.student.username
+        what = self.lesson_title_snapshot or self.skill_name_snapshot or self.objective_text[:40]
+        return f"{who} ✓ {what} ({self.granularity})"
+
+    @classmethod
+    def record_lesson(cls, progress, session=None):
+        """Write a lesson-granularity record from a StudentLessonProgress
+        that has just transitioned to 'mastered'. Idempotent — a second
+        call for the same (student, lesson) is a no-op via the unique
+        constraint. Best-effort: never raises; logs and returns None on
+        failure so the live tutoring path is unaffected.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            lesson = progress.lesson
+            unit = lesson.unit
+            course = unit.course
+            obj, created = cls.objects.get_or_create(
+                student=progress.student,
+                granularity=cls.Granularity.LESSON,
+                source_lesson=lesson,
+                defaults={
+                    'institution': progress.institution,
+                    'objective_text': lesson.objective or lesson.title,
+                    'course_title_snapshot': course.title,
+                    'unit_title_snapshot': unit.title,
+                    'lesson_title_snapshot': lesson.title,
+                    'subject': course.subject_type or '',
+                    'grade_level': course.grade_level or '',
+                    'score': progress.best_score,
+                    'earned_at': progress.last_attempt_at or timezone.now(),
+                    'source_session': session,
+                    'source_course': course,
+                },
+            )
+            return obj
+        except Exception as e:
+            logger.warning(f"StudentCompetencyRecord.record_lesson failed: {e}")
+            return None
+
+    @classmethod
+    def record_skill(cls, mastery, session=None):
+        """Write a skill-granularity record from a StudentSkillMastery
+        that has just transitioned to MASTERED. Same idempotency +
+        best-effort guarantees as record_lesson.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            skill = mastery.skill
+            course = skill.course
+            obj, created = cls.objects.get_or_create(
+                student=mastery.student,
+                granularity=cls.Granularity.SKILL,
+                source_skill=skill,
+                defaults={
+                    'institution': skill.institution,
+                    'objective_text': skill.description or skill.name,
+                    'course_title_snapshot': course.title if course else '',
+                    'unit_title_snapshot': skill.unit.title if skill.unit else '',
+                    'lesson_title_snapshot': skill.primary_lesson.title if skill.primary_lesson else '',
+                    'skill_name_snapshot': skill.name,
+                    'subject': course.subject_type if course else '',
+                    'grade_level': course.grade_level if course else '',
+                    'score': mastery.mastery_level,
+                    'earned_at': mastery.last_correct or timezone.now(),
+                    'source_session': session,
+                    'source_course': course,
+                },
+            )
+            return obj
+        except Exception as e:
+            logger.warning(f"StudentCompetencyRecord.record_skill failed: {e}")
+            return None
