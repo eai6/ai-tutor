@@ -1098,8 +1098,5 @@ async function addPlotToQuestion(qid) {
     } catch (e) { alert('Network error: ' + e.message); }
 }
 </script>
-{# Chart.js removed — figures now render server-side via figure_render.py.
-   The legacy plot_spec helpers above (togglePlotEditor / addPlotToQuestion /
-   etc.) are dead code; the Edit-figure button now opens
-   /dashboard/exit-tickets/<qid>/figure/. #}
+{% comment %}Chart.js removed — figures now render server-side via figure_render.py. The legacy plot_spec helpers above (togglePlotEditor / addPlotToQuestion / etc.) are dead code; the Edit-figure button now opens /dashboard/exit-tickets/<qid>/figure/.{% endcomment %}
 {% endblock %}

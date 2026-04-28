@@ -111,6 +111,32 @@ Rules:
 - pie / point_angles values must sum to 100 (or 360 for angles).
 - For charts (bar/line/scatter/histogram) include a `title`; bar/line
   also include `x_label`, `y_label`.
+- **NEVER REVEAL THE ANSWER in the figure or data_description**. If the
+  question asks the student to *calculate* X, the figure / table shown
+  to them MUST NOT include X. Examples:
+    - Q: "Calculate the area of each plot and find the largest."
+      Show only Length and Width columns. NEVER include an Area column.
+    - Q: "What is the average tuna price across the 6 weeks?"
+      Show the 6 weekly prices. NEVER show the average.
+    - Q: "Find the missing angle x in this triangle (other angles 48° and 67°)."
+      Label only 48° and 67° on the figure. NEVER label x.
+  If the data inherently contains the answer (e.g. "which student
+  scored highest?" with a score table), that's fine — but a calculate-
+  the-result question must hide the result.
+
+- **GEOMETRY ≠ BAR CHART**. Do NOT use bar/line charts to display
+  angles, side lengths, or other geometric measurements. Anti-patterns
+  (DO NOT generate these):
+    - "Bar chart of two angles per triangle" — use a table
+      (data_description) OR one `triangle` figure per question (with
+      angle labels), one question per triangle.
+    - "Bar chart of side lengths" — use a `triangle` / `rectangle` /
+      `polygon` figure with sides labelled.
+    - "Bar chart of angle measurements per shape" — useless visual,
+      doesn't communicate geometry. Use the geometry templates.
+  Bar/line/scatter are for *quantitative comparison data* (populations,
+  prices, scores). They are NOT for showing values that belong on a
+  geometric figure.
 
 CHART-TYPE GUIDE — pick the right shape, not just any shape:
 - pie: parts of a whole. Values sum to a meaningful total (100% of a budget,
@@ -242,6 +268,32 @@ Rules:
 - pie / point_angles values must sum to 100 (or 360 for angles).
 - For charts (bar/line/scatter/histogram) include a `title`; bar/line
   also include `x_label`, `y_label`.
+- **NEVER REVEAL THE ANSWER in the figure or data_description**. If the
+  question asks the student to *calculate* X, the figure / table shown
+  to them MUST NOT include X. Examples:
+    - Q: "Calculate the area of each plot and find the largest."
+      Show only Length and Width columns. NEVER include an Area column.
+    - Q: "What is the average tuna price across the 6 weeks?"
+      Show the 6 weekly prices. NEVER show the average.
+    - Q: "Find the missing angle x in this triangle (other angles 48° and 67°)."
+      Label only 48° and 67° on the figure. NEVER label x.
+  If the data inherently contains the answer (e.g. "which student
+  scored highest?" with a score table), that's fine — but a calculate-
+  the-result question must hide the result.
+
+- **GEOMETRY ≠ BAR CHART**. Do NOT use bar/line charts to display
+  angles, side lengths, or other geometric measurements. Anti-patterns
+  (DO NOT generate these):
+    - "Bar chart of two angles per triangle" — use a table
+      (data_description) OR one `triangle` figure per question (with
+      angle labels), one question per triangle.
+    - "Bar chart of side lengths" — use a `triangle` / `rectangle` /
+      `polygon` figure with sides labelled.
+    - "Bar chart of angle measurements per shape" — useless visual,
+      doesn't communicate geometry. Use the geometry templates.
+  Bar/line/scatter are for *quantitative comparison data* (populations,
+  prices, scores). They are NOT for showing values that belong on a
+  geometric figure.
 
 CHART-TYPE GUIDE — pick the right shape, not just any shape:
 - pie: parts of a whole. Values sum to a meaningful total (100% of a budget,

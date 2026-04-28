@@ -252,8 +252,7 @@
         <div class="bubble-wrapper left">
             <div class="bubble-role">Tutor</div>
             <div class="chat-bubble bubble-tutor">{{ turn.content }}</div>
-            {# Eval metadata + bare-answer flag (M4 / M9) — answers the
-               teacher's question "why was this answer marked correct?" #}
+            {% comment %}Eval metadata + bare-answer flag (M4 / M9) — answers the teacher's question "why was this answer marked correct?"{% endcomment %}
             {% if turn.metadata.eval_layer %}
             <div class="bubble-meta" style="font-size:0.7rem;color:#71717a;margin-top:0.25rem;display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
                 {% if turn.metadata.is_correct %}
