@@ -482,15 +482,51 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         except Exception as e:
             logger.warning(f"Failed to load Seychelles context: {e}")
 
-        # Calculate step budget from lesson duration.
-        # Target ~5 min per step; hard cap at 5 so a single live tutor
-        # session reliably fits a 20-30 min classroom slot.
-        # 10min → 3 (floor); 15min → 3; 20min → 4; 25min → 5; 30min+ → 5
+        # Calculate step budget from lesson duration. Target ~2.5 min per
+        # step. Teachers reported the previous 4-step 20-min lesson
+        # finishing in ~14 min — too thin. 8 steps × 2.5 min = 20 min
+        # gives the tutor enough rungs to actually drill one objective.
+        # 10min → 4; 15min → 6; 20min → 8; 25min → 10; 30min → 12.
         target_minutes = lesson.estimated_minutes or 20
-        max_steps = max(3, min(5, target_minutes // 5))
-        # Most lessons cover ONE enabling objective. Only the longest
-        # (5-step) variant gets a second EO.
-        max_eos = 2 if max_steps >= 5 else 1
+        max_steps = max(4, min(12, int(target_minutes * 2 // 5)))
+        # 1 teaching objective per lesson, regardless of step count.
+        max_eos = 1
+        is_math = bool(lesson.unit and lesson.unit.course and lesson.unit.course.is_math)
+
+        # Build step structures for math vs non-math. Each line names a
+        # step + its purpose; the prompt asks for EXACTLY max_steps lines
+        # in order. We always end with a quiz/evaluation step.
+        if is_math:
+            structure_lines = [
+                "Step 1 ENGAGE — real-world Seychelles hook + state today's question. 2 sentences.",
+                "Step 2 TEACH — direct instruction of the concept. 4-6 sentences.",
+                "Step 3 WORKED_EXAMPLE — solve a complete problem showing EVERY line of working.",
+                "Step 4 PRACTICE — DIFFERENT problem (not the same numbers); question + expected_answer + hints.",
+                "Step 5 PRACTICE — slightly harder DIFFERENT problem; question + expected_answer + hints.",
+                "Step 6 TEACH — call out one common mistake or misconception students make. 3-5 sentences.",
+                "Step 7 PRACTICE — applied / multi-step problem; question + expected_answer + hints.",
+                "Step 8 QUIZ — short evaluation that this objective is mastered.",
+                "Step 9 PRACTICE — extension: same skill, novel context; question + expected_answer + hints.",
+                "Step 10 PRACTICE — reverse / inverse problem; question + expected_answer + hints.",
+                "Step 11 SYNTHESIZE — student explains the rule in their own words.",
+                "Step 12 QUIZ — final evaluation of mastery.",
+            ]
+        else:
+            structure_lines = [
+                "Step 1 ENGAGE — real-world Seychelles hook + the lesson question. 2-3 sentences.",
+                "Step 2 TEACH — direct instruction. 4-6 sentences — minimum effective dose.",
+                "Step 3 EXPLORE — student answers a guided question that surfaces the key idea.",
+                "Step 4 PRACTICE — student applies the idea to a fresh case; question + expected_answer + hints.",
+                "Step 5 TEACH — extend or contextualise (link to prior learning). 4-6 sentences.",
+                "Step 6 PRACTICE — varied scenario, same objective; question + expected_answer + hints.",
+                "Step 7 SYNTHESIZE — student explains in their own words.",
+                "Step 8 QUIZ — short evaluation that this objective is met.",
+                "Step 9 PRACTICE — applied / cross-context problem; question + expected_answer + hints.",
+                "Step 10 PRACTICE — counter-example or compare-and-contrast.",
+                "Step 11 EXTEND — connect to a real Seychelles situation.",
+                "Step 12 QUIZ — final evaluation.",
+            ]
+        structure = "\n".join(structure_lines[:max_steps])
 
         # Prompt focuses on CONTENT, not FORMAT — instructor handles the schema
         prompt = f"""Create a complete tutoring session for this lesson.
@@ -505,23 +541,11 @@ LESSON DURATION: {target_minutes} minutes
 TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}
-Create EXACTLY {max_steps} steps. This is a focused {target_minutes}-minute lesson — students should finish the whole flow in that window.
-A 20-minute lesson drills ONE teaching objective intensely. The {max_steps} tutoring steps progress through DOK levels (recall → skill → strategic) all in service of that single objective. Do not introduce additional objectives.
+Create EXACTLY {max_steps} steps. The whole flow must fit a {target_minutes}-minute classroom slot (~2.5 min per step in conversation).
+A {target_minutes}-minute lesson drills ONE teaching objective intensely. Every step here progresses up the DOK levels (recall → skill → strategic) for that ONE objective. DO NOT introduce additional objectives — depth, not breadth.
 
-{"MATH LESSON STRUCTURE — exactly " + str(max_steps) + " steps:" if lesson.unit.course.is_math else "STRUCTURE — exactly " + str(max_steps) + " steps:"}
-{(
-    "Step 1 TEACH — explain the concept with a real-world Seychelles hook in the opening line (e.g., 'If tuna sells for SCR 45/kg and a fisherman catches 3.5kg...'). 4-6 sentences total.\n"
-    "Step 2 WORKED_EXAMPLE — solve a complete problem showing EVERY line of working.\n"
-    "Step 3 PRACTICE — DIFFERENT problem (not the same numbers); MUST have question + expected_answer (with full working steps) + hints.\n"
-    + ("Step 4 PRACTICE — second different problem.\n" if max_steps >= 5 else "")
-    + ("Step 5 QUIZ — short evaluation question." if max_steps >= 5 else "Step 4 QUIZ — short evaluation question.")
-) if lesson.unit.course.is_math else (
-    "Step 1 ENGAGE — real-world Seychelles hook + the lesson question. 2-3 sentences.\n"
-    "Step 2 TEACH — direct instruction. 4-6 sentences max — minimum effective dose.\n"
-    "Step 3 PRACTICE — student attempts a question; MUST have question + expected_answer + hints.\n"
-    + ("Step 4 TEACH — second EO concept (4-6 sentences).\n" if max_steps >= 5 else "")
-    + ("Step 5 QUIZ — short evaluation question." if max_steps >= 5 else "Step 4 QUIZ — short evaluation question.")
-)}
+{"MATH LESSON STRUCTURE — exactly " + str(max_steps) + " steps:" if is_math else "LESSON STRUCTURE — exactly " + str(max_steps) + " steps:"}
+{structure}
 
 {"MATH DEPTH: worked_example shows every step. Practice/quiz problems use DIFFERENT numbers from the worked example." if lesson.unit.course.is_math else "KEEP TEACH STEPS SHORT: 4-6 sentences max, never a lecture. The student must do most of the talking."}
 
@@ -646,7 +670,7 @@ CONTENT GUIDELINES:
         from apps.curriculum.models import LessonStep
 
         target_minutes = lesson.estimated_minutes or 20
-        MAX_STEPS = max(3, min(5, target_minutes // 5))
+        MAX_STEPS = max(4, min(12, int(target_minutes * 2 // 5)))
         if len(steps) > MAX_STEPS:
             logger.warning(
                 f"[ContentGen] [{lesson.title}] Trimming {len(steps)} steps to {MAX_STEPS}"
