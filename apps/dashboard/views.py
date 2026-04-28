@@ -4114,8 +4114,29 @@ def course_edit(request, course_id):
         upload.processing_log = ''
         upload.save()
 
-        # Delete existing units/lessons (they'll be recreated)
-        course.units.all().delete()
+        # IMPORTANT: do NOT delete units/lessons here.
+        #
+        # Previously this path called `course.units.all().delete()`, which
+        # cascaded into LessonStep, ExitTicket, ExitTicketAttempt,
+        # StudentLessonProgress, StudentSkillMastery, TutorSession, and
+        # SkillPracticeLog rows. A re-parse therefore wiped the whole pilot's
+        # competency history — exactly the data we are trying to preserve.
+        #
+        # `complete_curriculum_upload` (apps/curriculum/pipeline.py) already
+        # uses `update_or_create` keyed on (course, unit_title) and
+        # (unit, lesson_title). Re-parsing now upserts in place, so:
+        #   - existing Lesson rows keep their PK → student progress, sessions,
+        #     mastery, and exit-ticket history all survive
+        #   - new lessons in the re-parsed structure are created fresh
+        #   - lessons that no longer appear in the new parse are LEFT in the DB
+        #     (orphans) rather than deleted — teacher can prune manually if
+        #     wanted, but no data is silently destroyed
+        #
+        # Trade-off: a renamed lesson title creates a duplicate (the old row
+        # stays under its old title, a new row is created under the new
+        # title). This is the right default — losing student data to a
+        # cosmetic title change would be far worse than a one-time manual
+        # cleanup.
 
         # Re-plan lessons only (skip text extraction + vectorization — already done)
         # Auto-completes after replan: the user already explicitly chose to
