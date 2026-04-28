@@ -925,58 +925,92 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
             log(f"   ⛔ {lesson.title}: cancelled before media")
             return {'lesson': lesson.title, 'success': True, 'steps': steps_generated, 'media': 0, 'exit_questions': 0, 'skills': 0}
 
-        # Step 2: Generate media
-        media_generated = 0
-        log(f"   [2/4] Generating media assets...")
-        t0 = time.time()
-        try:
-            from apps.tutoring.image_service import ImageGenerationService
-            institution = _resolve_institution(institution_id=institution_id, lesson=lesson)
+        # Step 2: Generate media — per-image timeout, parallel, math skips
+        # raster images entirely (figure_templates handles the diagrams).
+        # Background: prior bug had a single Gemini call hang for 18+
+        # minutes blocking the whole lesson. Hard timeout per image,
+        # ThreadPoolExecutor for parallelism, cap total step-2 time.
+        from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeout
+        IMG_TIMEOUT_S = 45
+        STEP2_BUDGET_S = 240  # whole step caps at 4 minutes
 
-            steps_with_media = 0
-            for step in lesson.steps.all():
-                if not step.media:
-                    continue
-                images = step.media.get('images', [])
-                if not images:
-                    continue
-                steps_with_media += 1
-                media_updated = False
-                for i, img in enumerate(images):
-                    if img.get('url'):
-                        log(f"      Step {step.order_index}, img {i}: already has URL, skipping")
+        media_generated = 0
+        is_math = bool(lesson.unit and lesson.unit.course and lesson.unit.course.is_math)
+
+        log(f"   [2/4] Generating media assets...{' (skipping raster — math lesson, templates render diagrams)' if is_math else ''}")
+        t0 = time.time()
+        if is_math:
+            # Math lessons rely on figure_templates for shape/angle/coord
+            # diagrams. Raster image generation here is the wrong tool —
+            # it's slow, expensive, and inaccurate for geometry.
+            elapsed = time.time() - t0
+            log(f"   ✅ [2/4] skipped (math lesson uses templates) in {elapsed:.1f}s")
+        else:
+            try:
+                from apps.tutoring.image_service import ImageGenerationService
+                institution = _resolve_institution(institution_id=institution_id, lesson=lesson)
+
+                # Collect (step, img_index, description) tuples.
+                jobs = []
+                for step in lesson.steps.all():
+                    if not step.media:
                         continue
-                    description = img.get('description', '')
-                    if not description:
-                        log(f"      Step {step.order_index}, img {i}: no description, skipping")
+                    images = step.media.get('images', [])
+                    if not images:
                         continue
-                    log(f"      Step {step.order_index}, img {i}: generating '{description[:60]}...'")
-                    img_t0 = time.time()
-                    service = ImageGenerationService(lesson=lesson, institution=institution)
-                    img_result = service.get_or_generate_image(
-                        prompt=description,
-                        category=img.get('type', 'diagram'),
+                    for i, img in enumerate(images):
+                        if img.get('url'):
+                            continue
+                        desc = img.get('description', '')
+                        if not desc:
+                            continue
+                        jobs.append((step, i, img, desc))
+
+                def _do_one(step, idx, img, desc):
+                    svc = ImageGenerationService(lesson=lesson, institution=institution)
+                    return idx, svc.get_or_generate_image(
+                        prompt=desc, category=img.get('type', 'diagram'),
                         generate_only=True,
                     )
-                    img_elapsed = time.time() - img_t0
-                    if img_result and img_result.get('url'):
-                        img['url'] = img_result['url']
-                        img['source'] = 'generated' if img_result.get('generated') else 'library'
-                        media_updated = True
-                        media_generated += 1
-                        log(f"      Step {step.order_index}, img {i}: ✅ done in {img_elapsed:.1f}s")
-                    else:
-                        log(f"      Step {step.order_index}, img {i}: ⚠️ no result after {img_elapsed:.1f}s")
-                if media_updated:
+
+                steps_to_save = set()
+                if jobs:
+                    with ThreadPoolExecutor(max_workers=2) as pool:
+                        futures = {
+                            pool.submit(_do_one, s, i, img, desc): (s, i, img, desc)
+                            for (s, i, img, desc) in jobs
+                        }
+                        try:
+                            for fut in as_completed(futures, timeout=STEP2_BUDGET_S):
+                                step, i, img, desc = futures[fut]
+                                try:
+                                    _, result = fut.result(timeout=0)
+                                except Exception as e:
+                                    log(f"      Step {step.order_index}, img {i}: ⚠️ skipped — {e}")
+                                    continue
+                                if result and result.get('url'):
+                                    img['url'] = result['url']
+                                    img['source'] = 'generated' if result.get('generated') else 'library'
+                                    steps_to_save.add(step)
+                                    media_generated += 1
+                                    log(f"      Step {step.order_index}, img {i}: ✅")
+                                else:
+                                    log(f"      Step {step.order_index}, img {i}: ⚠️ no result")
+                        except FuturesTimeout:
+                            log(f"      ⏱  [2/4] step-2 budget ({STEP2_BUDGET_S}s) exceeded — moving on")
+                            for f in futures:
+                                f.cancel()
+
+                for step in steps_to_save:
                     step.save()
 
-            elapsed = time.time() - t0
-            log(f"   ✅ [2/4] {media_generated} media assets from {steps_with_media} steps in {elapsed:.1f}s")
-        except Exception as e:
-            elapsed = time.time() - t0
-            log(f"   ⚠️ [2/4] Media generation error after {elapsed:.1f}s: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+                elapsed = time.time() - t0
+                log(f"   ✅ [2/4] {media_generated} media assets in {elapsed:.1f}s")
+            except Exception as e:
+                elapsed = time.time() - t0
+                log(f"   ⚠️ [2/4] Media generation error after {elapsed:.1f}s: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
 
         # Check cancellation before exit tickets
         if _is_cancelled():

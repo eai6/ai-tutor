@@ -890,13 +890,21 @@ def course_detail(request, course_id):
         material_q |= Q(curriculum_upload_id=upload_id)
     materials = TeachingMaterialUpload.objects.filter(material_q).distinct()
 
-    # Check both: any lesson with 'generating' status, OR an active upload
-    # still processing. Stale uploads (no updates in 5+ min) are ignored —
-    # they're almost always orphaned threads from a worker recycle, and
-    # treating them as "active" pins the page in a permanent auto-refresh
-    # loop that interrupts file uploads.
+    # Auto-recover lessons stuck in `generating` after a worker recycle.
+    # Daemon background threads die with the gunicorn worker, so a deploy
+    # mid-generation leaves Lesson.content_status='generating' forever.
+    # Any lesson that hasn't bumped `updated_at` in 10+ min is orphaned —
+    # reset to 'empty' so the teacher can regenerate. Steps already
+    # written to the DB stay intact.
     from datetime import timedelta
     stale_cutoff = timezone.now() - timedelta(minutes=5)
+    lesson_stale_cutoff = timezone.now() - timedelta(minutes=10)
+    Lesson.objects.filter(
+        unit__course=course,
+        content_status='generating',
+        updated_at__lt=lesson_stale_cutoff,
+    ).update(content_status='empty')
+
     active_upload = CurriculumUpload.objects.filter(
         created_course=course, status='processing',
         updated_at__gte=stale_cutoff,
