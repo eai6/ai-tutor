@@ -64,6 +64,25 @@ class Course(models.Model):
         ),
     )
 
+    # Calibrates content generation across the whole course. Slow learners
+    # get more figures + more MCQ/TF mix; advanced gets richer free-response.
+    # See memory/course_regeneration_for_slow_learners.md.
+    class GenerationProfile(models.TextChoices):
+        STANDARD = 'standard', 'Standard'
+        SLOW_LEARNER = 'slow_learner', 'Slower / weaker learners (more figures, more MCQ/TF)'
+        ADVANCED = 'advanced', 'Advanced (richer free-response, fewer hints)'
+
+    generation_profile = models.CharField(
+        max_length=20,
+        choices=GenerationProfile.choices,
+        default=GenerationProfile.STANDARD,
+        help_text=(
+            "Calibrates content generation. Slow learners get more visual "
+            "scaffolding and a varied question-format mix; advanced gets "
+            "richer free-response and fewer hints."
+        ),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

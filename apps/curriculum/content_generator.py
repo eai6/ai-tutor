@@ -124,7 +124,17 @@ class LessonStepSchema(BaseModel):
         "If no media, do NOT reference images."
     ))
     question: Optional[str] = Field(default=None, description="Question for the student. Required for practice and quiz steps.")
-    answer_type: str = Field(default="none", description="Answer type: none, short_numeric, short_text, multiple_choice, or free_response")
+    answer_type: str = Field(
+        default="none",
+        description=(
+            "Answer type. MUST be one of: 'none', 'free_text', "
+            "'multiple_choice', 'short_numeric', 'true_false'. "
+            "For multiple_choice: choices field required, expected_answer is letter A/B/C/D. "
+            "For true_false: expected_answer is exactly 'True' or 'False'. "
+            "For short_numeric: expected_answer is a number (math may include unit). "
+            "For free_text: open-ended explanation."
+        ),
+    )
     expected_answer: Optional[str] = Field(default=None, description="Correct answer. For multiple_choice, the letter (A/B/C/D)")
     choices: Optional[List[str]] = Field(default=None, description="MCQ options: ['A) ...', 'B) ...', 'C) ...', 'D) ...']")
     terminal_objective: Optional[str] = Field(default="", description=(
@@ -559,6 +569,174 @@ code fence. Example shape:
             return 'tier_3'  # Syllabus Only
         return 'tier_4'  # Framework Only
 
+    def _profile_rules(self, profile: str, target_minutes: int, max_steps: int, is_math: bool) -> Dict:
+        """Concrete generation rules per Course.generation_profile.
+
+        Each profile drives:
+          - figure floor across the lesson
+          - which step types MUST include media
+          - minimum count of each answer_type across practice/quiz steps
+          - teach-step length cap and hint count
+
+        See memory/course_regeneration_for_slow_learners.md.
+        """
+        profile = (profile or 'standard').lower()
+
+        if profile == 'slow_learner':
+            # Visuals everywhere a concept is introduced. Practice
+            # leans on recognition formats (MCQ, T/F) so weaker
+            # learners can demonstrate understanding without being
+            # blocked by free-text production.
+            return {
+                'profile': 'slow_learner',
+                'description': (
+                    "Slower / weaker learners. Prioritise visual scaffolding, "
+                    "concrete examples, and recognition-format questions. "
+                    "Avoid open-ended writing. Short teach blocks."
+                ),
+                'min_figures': max(4, max_steps - 2),
+                'figure_required_step_types': ('engage', 'teach', 'worked_example'),
+                'min_multiple_choice': 2,
+                'min_short_numeric': 1 if is_math else 0,
+                'min_true_false': 1,
+                'max_free_text': 1,
+                'teach_sentence_max': 3,
+                'hint_count': 3,
+            }
+
+        if profile == 'advanced':
+            return {
+                'profile': 'advanced',
+                'description': (
+                    "Advanced learners. Lean toward free-response and "
+                    "synthesis. Fewer hints, deeper questions. Figures "
+                    "only where genuinely needed."
+                ),
+                'min_figures': 1,
+                'figure_required_step_types': (),
+                'min_multiple_choice': 0,
+                'min_short_numeric': 1 if is_math else 0,
+                'min_true_false': 0,
+                'max_free_text': max_steps,  # effectively unbounded
+                'teach_sentence_max': 6,
+                'hint_count': 1,
+            }
+
+        # standard
+        return {
+            'profile': 'standard',
+            'description': (
+                "Standard mixed-ability calibration. Balance figures "
+                "with text, mix question formats, scaffold with 2 hints."
+            ),
+            'min_figures': 2,
+            'figure_required_step_types': ('teach',),
+            'min_multiple_choice': 1,
+            'min_short_numeric': 1 if is_math else 0,
+            'min_true_false': 0,
+            'max_free_text': max(2, max_steps // 2),
+            'teach_sentence_max': 5,
+            'hint_count': 2,
+        }
+
+    def _validate_against_profile(self, steps: List[Dict], rules: Dict) -> List[str]:
+        """Check that generated steps meet the profile floors. Returns
+        a list of human-readable issues; empty list = valid.
+
+        Caller policy: 1 retry with these issues injected as a
+        correction prompt; accept-and-warn if the retry still fails.
+        """
+        issues: List[str] = []
+
+        # Count figures across steps. media may be None or {'images': [...]}.
+        figure_count = 0
+        steps_missing_required_figure: List[int] = []
+        for step in steps:
+            media = step.get('media') or {}
+            images = media.get('images') if isinstance(media, dict) else None
+            n = len(images or [])
+            figure_count += n
+            if step.get('step_type') in rules.get('figure_required_step_types', ()) and n == 0:
+                steps_missing_required_figure.append(step.get('order_index', -1))
+
+        if figure_count < rules['min_figures']:
+            issues.append(
+                f"Lesson has {figure_count} figures total; "
+                f"profile '{rules['profile']}' requires at least {rules['min_figures']}."
+            )
+        if steps_missing_required_figure:
+            issues.append(
+                f"Steps {steps_missing_required_figure} are required step "
+                f"types ({list(rules['figure_required_step_types'])}) but have no media. "
+                f"Add a figure to each."
+            )
+
+        # Count answer_type distribution across practice/quiz steps.
+        format_counts = {'multiple_choice': 0, 'short_numeric': 0, 'true_false': 0, 'free_text': 0}
+        for step in steps:
+            if step.get('step_type') in ('practice', 'quiz'):
+                at = (step.get('answer_type') or '').lower()
+                # Apply the same alias normalisation as _save_steps_to_db
+                # so validation matches what we'd persist.
+                aliases = {'short_text': 'free_text', 'free_response': 'free_text',
+                           'open_ended': 'free_text', 'mcq': 'multiple_choice',
+                           'tf': 'true_false', 'numeric': 'short_numeric'}
+                at = aliases.get(at, at)
+                if at in format_counts:
+                    format_counts[at] += 1
+
+        if format_counts['multiple_choice'] < rules['min_multiple_choice']:
+            issues.append(
+                f"Found {format_counts['multiple_choice']} multiple_choice questions; "
+                f"need at least {rules['min_multiple_choice']}. Convert at least one practice "
+                f"step to answer_type='multiple_choice' with a choices list of 4 options."
+            )
+        if format_counts['short_numeric'] < rules['min_short_numeric']:
+            issues.append(
+                f"Found {format_counts['short_numeric']} short_numeric questions; "
+                f"need at least {rules['min_short_numeric']}. Convert at least one calculation "
+                f"step to answer_type='short_numeric'."
+            )
+        if format_counts['true_false'] < rules['min_true_false']:
+            issues.append(
+                f"Found {format_counts['true_false']} true_false questions; "
+                f"need at least {rules['min_true_false']}. Convert at least one practice step "
+                f"to answer_type='true_false' (expected_answer must be exactly 'True' or 'False')."
+            )
+        if format_counts['free_text'] > rules['max_free_text']:
+            issues.append(
+                f"Found {format_counts['free_text']} free_text questions; "
+                f"profile '{rules['profile']}' allows at most {rules['max_free_text']}. "
+                f"Convert excess free_text questions to multiple_choice or true_false."
+            )
+
+        # Per-step structural checks for question formats.
+        for step in steps:
+            at = (step.get('answer_type') or '').lower()
+            idx = step.get('order_index')
+            if at == 'multiple_choice':
+                choices = step.get('choices') or []
+                if len(choices) < 2:
+                    issues.append(
+                        f"Step {idx} is multiple_choice but choices list is empty/too short. "
+                        f"Provide 4 distractors."
+                    )
+                expected = (step.get('expected_answer') or '').strip().upper()
+                if expected and expected not in ('A', 'B', 'C', 'D'):
+                    issues.append(
+                        f"Step {idx} is multiple_choice but expected_answer '{step.get('expected_answer')}' "
+                        f"is not a single letter A/B/C/D."
+                    )
+            elif at == 'true_false':
+                expected = (step.get('expected_answer') or '').strip().lower()
+                if expected and expected not in ('true', 'false'):
+                    issues.append(
+                        f"Step {idx} is true_false but expected_answer '{step.get('expected_answer')}' "
+                        f"is not exactly 'True' or 'False'."
+                    )
+
+        return issues
+
     def _generate_steps(self, lesson, curriculum_context: Dict) -> Dict:
         """Generate lesson steps using instructor for guaranteed structured output."""
 
@@ -670,6 +848,33 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         max_eos = 1
         is_math = bool(lesson.unit and lesson.unit.course and lesson.unit.course.is_math)
 
+        # Course-level generation profile drives figure density,
+        # question-format mix, and teach-block length. See
+        # memory/course_regeneration_for_slow_learners.md.
+        profile_name = getattr(lesson.unit.course, 'generation_profile', 'standard') or 'standard'
+        profile_rules = self._profile_rules(profile_name, target_minutes, max_steps, is_math)
+        profile_str = f"""
+LEARNER PROFILE: {profile_rules['profile']}
+{profile_rules['description']}
+
+VISUAL SCAFFOLDING RULES:
+- Generate at least {profile_rules['min_figures']} StepMedia images across the lesson.
+- Every step of type {list(profile_rules['figure_required_step_types'])} MUST include a media figure.
+- Figures must illustrate the concept directly (diagram, schematic, labelled example), not decorative.
+- Caption every figure with the key takeaway in 1 short sentence.
+
+QUESTION FORMAT MIX (across practice + quiz steps):
+- At least {profile_rules['min_multiple_choice']} multiple_choice question(s). choices is REQUIRED (4 options); expected_answer is exactly the LETTER A/B/C/D.
+- At least {profile_rules['min_short_numeric']} short_numeric question(s). expected_answer is the number{' (math: include unit)' if is_math else ''}.
+- At least {profile_rules['min_true_false']} true_false question(s). The question must be a single declarative statement; expected_answer is exactly 'True' or 'False'; choices is null.
+- At most {profile_rules['max_free_text']} free_text question(s). Use only when the concept genuinely requires explanation, not as a default.
+- Every practice or quiz step's answer_type MUST be one of: multiple_choice, short_numeric, true_false, free_text. Do not use 'short_text' or 'free_response' — those are not valid.
+
+TEACHING DEPTH RULES:
+- Each TEACH step: at most {profile_rules['teach_sentence_max']} sentences. One concrete example, one analogy.
+- Each practice or quiz step: provide exactly {profile_rules['hint_count']} hints, scaffolding general → specific.
+"""
+
         # Build step structures for math vs non-math. The last step is
         # ALWAYS a QUIZ — the rest fill the middle. Order:
         #   Math:     ENGAGE → TEACH → WORKED_EXAMPLE → PRACTICE…+ → QUIZ
@@ -726,7 +931,7 @@ LESSON DURATION: {target_minutes} minutes
 
 TEACHING STRATEGIES TO USE:
 {strategies_str}
-{kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}
+{kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}{profile_str}
 Create EXACTLY {max_steps} steps. The whole flow must fit a {target_minutes}-minute classroom slot (~2.5 min per step in conversation).
 A {target_minutes}-minute lesson drills ONE teaching objective intensely. Every step here progresses up the DOK levels (recall → skill → strategic) for that ONE objective. DO NOT introduce additional objectives — depth, not breadth.
 
@@ -802,40 +1007,32 @@ CONTENT GUIDELINES:
         # teaching step. See apps/curriculum/dok_framework.py.
         system_prompt = system_prompt + "\n\n" + dok_guidance_for("content")
 
-        print(f"[ContentGen] [{lesson.title}] Calling instructor ({self._model_config.provider}/{self._model_config.model_name})...", flush=True)
-        t0 = time.time()
+        print(f"[ContentGen] [{lesson.title}] Calling instructor ({self._model_config.provider}/{self._model_config.model_name}) profile={profile_rules['profile']}...", flush=True)
 
-        try:
-            # Build kwargs per provider
+        def _call_llm(user_prompt: str):
+            """Single instructor call returning (steps_list, summary_dict).
+            Raises on parse failure — caller decides whether to retry."""
             create_kwargs = dict(
                 response_model=GeneratedLessonContent,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
+                    {"role": "user", "content": user_prompt},
                 ],
                 max_retries=3,
             )
             if self._model_config.provider == 'google':
-                # Gemini genai SDK: token limits go inside generation_config dict
                 create_kwargs['generation_config'] = {'max_tokens': 16384}
             else:
                 create_kwargs['max_tokens'] = 16384
+            r = self.client.chat.completions.create(**create_kwargs)
+            return (
+                [s.model_dump() for s in r.steps],
+                r.lesson_summary.model_dump() if r.lesson_summary else {},
+            )
 
-            result = self.client.chat.completions.create(**create_kwargs)
-
-            elapsed = time.time() - t0
-            steps = [step.model_dump() for step in result.steps]
-            summary = result.lesson_summary.model_dump() if result.lesson_summary else {}
-
-            print(f"[ContentGen] [{lesson.title}] ✅ {len(steps)} steps generated in {elapsed:.1f}s", flush=True)
-            logger.info(f"[{lesson.title}] {len(steps)} steps generated in {elapsed:.1f}s")
-
-            return {
-                'success': True,
-                'steps': steps,
-                'lesson_summary': summary,
-            }
-
+        t0 = time.time()
+        try:
+            steps, summary = _call_llm(prompt)
         except Exception as e:
             elapsed = time.time() - t0
             print(f"[ContentGen] [{lesson.title}] ❌ Failed after {elapsed:.1f}s: {e}", flush=True)
@@ -843,6 +1040,44 @@ CONTENT GUIDELINES:
             import traceback
             traceback.print_exc()
             return {'success': False, 'error': str(e)}
+
+        # Profile validation — one retry if the lesson missed the
+        # figure floor or format mix. Accept-and-warn if the second
+        # pass still falls short (better than stuck 'generating').
+        issues = self._validate_against_profile(steps, profile_rules)
+        if issues:
+            print(f"[ContentGen] [{lesson.title}] profile retry — issues: {issues}", flush=True)
+            correction = (
+                "Your previous response did not meet the LEARNER PROFILE requirements.\n"
+                "Issues to fix:\n" + "\n".join(f"- {i}" for i in issues) +
+                "\n\nRegenerate the entire lesson, fixing every issue while keeping the "
+                "educational content and Seychelles context intact. Honour every rule in "
+                "the LEARNER PROFILE, VISUAL SCAFFOLDING RULES, and QUESTION FORMAT MIX "
+                "sections of the original brief. Original brief follows:\n\n" + prompt
+            )
+            try:
+                steps, summary = _call_llm(correction)
+                remaining = self._validate_against_profile(steps, profile_rules)
+                if remaining:
+                    logger.warning(
+                        f"[ContentGen] [{lesson.title}] profile retry still has issues: {remaining}"
+                    )
+                    print(f"[ContentGen] [{lesson.title}] ⚠️ accepting degraded content — issues remain: {remaining}", flush=True)
+                else:
+                    print(f"[ContentGen] [{lesson.title}] ✅ profile retry succeeded", flush=True)
+            except Exception as e:
+                logger.warning(f"[{lesson.title}] profile retry crashed: {e} — keeping original")
+                print(f"[ContentGen] [{lesson.title}] ⚠️ profile retry crashed: {e} — keeping original output", flush=True)
+
+        elapsed = time.time() - t0
+        print(f"[ContentGen] [{lesson.title}] ✅ {len(steps)} steps generated in {elapsed:.1f}s (profile={profile_rules['profile']})", flush=True)
+        logger.info(f"[{lesson.title}] {len(steps)} steps generated in {elapsed:.1f}s profile={profile_rules['profile']}")
+
+        return {
+            'success': True,
+            'steps': steps,
+            'lesson_summary': summary,
+        }
 
     def _save_steps_to_db(self, lesson, steps: List[Dict]):
         """Save generated steps to database.
@@ -863,6 +1098,30 @@ CONTENT GUIDELINES:
             )
             steps = steps[:MAX_STEPS]
 
+        valid_answer_types = set(LessonStep.AnswerType.values)
+        # Map common LLM mis-emissions to valid LessonStep.AnswerType
+        # values. The schema docstring lists these but providers
+        # occasionally drift; normalise instead of failing the save.
+        answer_type_aliases = {
+            'short_text': 'free_text',
+            'free_response': 'free_text',
+            'open_ended': 'free_text',
+            'mcq': 'multiple_choice',
+            'tf': 'true_false',
+            'numeric': 'short_numeric',
+        }
+
+        def _normalise_answer_type(raw):
+            value = (raw or 'none').strip().lower()
+            value = answer_type_aliases.get(value, value)
+            if value not in valid_answer_types:
+                logger.warning(
+                    f"[ContentGen] [{lesson.title}] Unknown answer_type '{raw}' "
+                    f"on step {step_data.get('order_index')} — coercing to 'free_text'"
+                )
+                return 'free_text'
+            return value
+
         for step_data in steps:
             step, created = LessonStep.objects.update_or_create(
                 lesson=lesson,
@@ -878,7 +1137,7 @@ CONTENT GUIDELINES:
                     },
                     'teacher_script': step_data.get('teacher_script', ''),
                     'question': step_data.get('question') or '',
-                    'answer_type': step_data.get('answer_type', 'none'),
+                    'answer_type': _normalise_answer_type(step_data.get('answer_type')),
                     'expected_answer': step_data.get('expected_answer') or '',
                     'choices': step_data.get('choices'),
                     'hint_1': (step_data.get('hints') or [''])[0] if step_data.get('hints') else '',
