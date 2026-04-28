@@ -533,12 +533,12 @@
     <span style="font-size: 1.25rem;">🔁</span>
     <div style="flex: 1;">
         <strong style="color: #5b21b6;">Regenerate all lessons</strong>
-        <div style="font-size: 0.8rem; color: #6d28d9;">Replaces lesson content + exit tickets across the whole course with the latest rich-content prompt. Mastery levels and the permanent competency transcript are preserved.</div>
+        <div style="font-size: 0.8rem; color: #6d28d9;">Replaces lesson content + exit tickets across the whole course with the latest rich-content prompt. Runs 3 lessons in parallel. Mastery levels and the permanent competency transcript are preserved.</div>
     </div>
     <form method="post" action="{% url 'dashboard:course_regenerate_all' course.id %}" style="display:inline;">
         {% csrf_token %}
         <button type="submit" class="btn btn-secondary btn-sm" style="border-color:#a78bfa; color:#5b21b6;"
-                onclick="return confirm('Regenerate ALL lessons in this course?\n\nWhat happens:\n• Lesson steps replaced\n• Exit tickets regenerated\n• Past exit-ticket attempts cleared\n• Mastery levels PRESERVED\n• Permanent competency transcript PRESERVED\n\nRuns serially in the background — refresh to watch progress.');">
+                onclick="return confirm('Regenerate ALL lessons in this course?\n\nWhat happens:\n• Lesson steps replaced\n• Exit tickets regenerated\n• Past exit-ticket attempts cleared\n• Mastery levels PRESERVED\n• Permanent competency transcript PRESERVED\n\nRuns 3 lessons in parallel in the background — refresh to watch progress.');">
             🔁 Regenerate all lessons
         </button>
     </form>

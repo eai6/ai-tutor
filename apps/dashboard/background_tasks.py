@@ -1093,14 +1093,21 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
         return {'lesson': lesson.title, 'success': False, 'error': str(e)}
 
 
-def generate_complete_course(course_id: int, institution_id: int, log_fn=None):
+def generate_complete_course(course_id: int, institution_id: int, log_fn=None, max_workers: int = 3):
     """
-    Regenerate every lesson in a course, serially.
+    Regenerate every lesson in a course in parallel batches.
 
-    Calls `generate_complete_lesson` per lesson — keeps its CAS guard,
-    cancellation hooks, and content_status flow intact. Serial because
-    concurrent generation has CAS-raced before (see comments in
-    generate_complete_lesson).
+    Calls `generate_complete_lesson` per lesson via a ThreadPoolExecutor.
+    `generate_complete_lesson` has its own CAS guard so two workers
+    cannot race on the same lesson — parallel on DIFFERENT lessons is
+    safe (and is the same pattern used by `generate_all_content_async`
+    for fresh-content generation).
+
+    max_workers default 3 — chosen to balance LLM API rate limits
+    (Anthropic / Google / OpenAI) against wall-clock time. The
+    existing 2-worker pool in `generate_all_content_async` has run
+    cleanly in production; 3 is a modest bump. If we start hitting
+    rate-limit 429s we should dial back to 2.
 
     Each lesson:
       - has its steps + exit ticket wiped (so the regen produces fresh
@@ -1113,6 +1120,8 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None):
     Returns a summary dict that the calling view can flash to the user.
     """
     import time
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from apps.curriculum.models import Course, Lesson
     from apps.tutoring.models import ExitTicket
 
@@ -1121,17 +1130,20 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None):
     course = Course.objects.get(id=course_id)
     pipeline_start = time.time()
 
+    log_lock = threading.Lock()
+
     def log(msg):
-        print(f"[CourseRegen] {msg}", flush=True)
-        if log_fn:
-            log_fn(msg)
-        else:
-            logger.info(msg)
+        with log_lock:
+            print(f"[CourseRegen] {msg}", flush=True)
+            if log_fn:
+                log_fn(msg)
+            else:
+                logger.info(msg)
 
     lessons = list(
         Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
     )
-    log(f"🚀 Starting course regen for '{course.title}' — {len(lessons)} lesson(s)")
+    log(f"🚀 Starting course regen for '{course.title}' — {len(lessons)} lesson(s) with {max_workers} parallel workers")
 
     summary = {
         'course': course.title,
@@ -1141,31 +1153,53 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None):
         'skipped': 0,
         'lessons': [],
     }
+    summary_lock = threading.Lock()
 
-    for i, lesson in enumerate(lessons, 1):
-        log(f"   [{i}/{len(lessons)}] {lesson.title}")
+    def _process(lesson_id: int) -> dict:
+        """Wipe + pipeline for one lesson. Runs in a worker thread."""
+        # Each thread needs its own DB connection (mirrors the pattern
+        # in generate_complete_lesson).
+        connection.close()
+        try:
+            lesson = Lesson.objects.get(id=lesson_id)
+        except Lesson.DoesNotExist:
+            return {'lesson_id': lesson_id, 'status': 'failed', 'error': 'lesson disappeared'}
+
         if lesson.content_status == 'generating':
-            log(f"      ⏭️ already generating — skipping")
-            summary['skipped'] += 1
-            summary['lessons'].append({'lesson': lesson.title, 'status': 'skipped'})
-            continue
+            log(f"   ⏭️ {lesson.title} (already generating — skipping)")
+            return {'lesson': lesson.title, 'status': 'skipped'}
+
         # Wipe partial state (mirrors lesson_regenerate view).
         lesson.steps.all().delete()
         ExitTicket.objects.filter(lesson=lesson).delete()
         lesson.content_status = 'empty'
         lesson.updated_at = timezone.now()
         lesson.save(update_fields=['content_status', 'updated_at'])
+
         try:
             result = generate_complete_lesson(lesson.id, institution_id, log_fn=log_fn)
-            if result.get('success'):
-                summary['success'] += 1
-            else:
-                summary['failed'] += 1
-            summary['lessons'].append({'lesson': lesson.title, 'status': 'ok' if result.get('success') else 'failed'})
+            ok = bool(result.get('success'))
+            return {'lesson': lesson.title, 'status': 'ok' if ok else 'failed',
+                    'error': None if ok else result.get('error')}
         except Exception as e:
-            log(f"      ❌ {lesson.title}: {e}")
-            summary['failed'] += 1
-            summary['lessons'].append({'lesson': lesson.title, 'status': 'failed', 'error': str(e)})
+            log(f"   ❌ {lesson.title}: {e}")
+            return {'lesson': lesson.title, 'status': 'failed', 'error': str(e)}
+
+    completed = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_process, l.id): l.id for l in lessons}
+        for future in as_completed(futures):
+            res = future.result()
+            with summary_lock:
+                completed += 1
+                if res['status'] == 'ok':
+                    summary['success'] += 1
+                elif res['status'] == 'skipped':
+                    summary['skipped'] += 1
+                else:
+                    summary['failed'] += 1
+                summary['lessons'].append(res)
+            log(f"   [{completed}/{len(lessons)}] {res.get('lesson', '?')} → {res['status']}")
 
     elapsed = time.time() - pipeline_start
     log(f"✅ Course regen done in {elapsed:.1f}s — "

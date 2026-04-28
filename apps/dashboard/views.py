@@ -3210,9 +3210,9 @@ def course_regenerate_all(request, course_id):
     messages.success(
         request,
         f"Regenerating all {lesson_count} lesson(s) in '{course.title}'. "
-        f"This runs serially in the background and usually takes a few "
-        f"minutes per lesson — refresh this page to watch the status badges. "
-        f"Student mastery levels and the permanent competency transcript are preserved.",
+        f"Running 3 in parallel in the background — refresh this page to "
+        f"watch the status badges light up. Student mastery levels and "
+        f"the permanent competency transcript are preserved.",
     )
     return redirect('dashboard:course_detail', course_id=course.id)
 
