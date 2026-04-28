@@ -3169,11 +3169,16 @@ def lesson_regenerate(request, lesson_id):
 
     # Wipe partial state then spawn. Status='empty' is the signal the
     # worker reads as "not running yet"; the worker sets 'generating'
-    # itself once it starts.
+    # itself once it starts. Bumping updated_at is critical — the
+    # course-detail auto-recovery uses it as a "is this lesson stale?"
+    # signal, and a save with update_fields=['content_status'] alone
+    # leaves updated_at untouched (Django doesn't auto-bump auto_now
+    # fields when update_fields is specified).
     lesson.steps.all().delete()
     ExitTicket.objects.filter(lesson=lesson).delete()
     lesson.content_status = 'empty'
-    lesson.save(update_fields=['content_status'])
+    lesson.updated_at = timezone.now()
+    lesson.save(update_fields=['content_status', 'updated_at'])
 
     inst = institution or lesson.unit.course.institution or Institution.get_global()
     run_async(generate_complete_lesson, lesson.id, inst.id)
@@ -3229,10 +3234,12 @@ def lesson_generate_content(request, lesson_id):
     # respawn so the worker rebuilds cleanly. (Without this,
     # generate_exit_ticket_for_lesson skips when an exit ticket
     # already exists, leaving the lesson with steps but 0 questions.)
+    # updated_at must bump too — see the matching note in lesson_regenerate.
     lesson.steps.all().delete()
     ExitTicket.objects.filter(lesson=lesson).delete()
     lesson.content_status = 'empty'
-    lesson.save(update_fields=['content_status'])
+    lesson.updated_at = timezone.now()
+    lesson.save(update_fields=['content_status', 'updated_at'])
 
     from apps.accounts.models import Institution
     inst = institution or lesson.unit.course.institution or Institution.get_global()
@@ -3880,7 +3887,8 @@ def cancel_lesson_generation(request, lesson_id):
         # 'pending' are normal-flow states and must NOT be read as
         # a cancel signal (that triggered the multi-spawn race).
         lesson.content_status = 'cancelled'
-        lesson.save(update_fields=['content_status'])
+        lesson.updated_at = timezone.now()
+        lesson.save(update_fields=['content_status', 'updated_at'])
         messages.success(request, f"Cancelled generation for '{lesson.title}'.")
     else:
         messages.info(request, f"'{lesson.title}' was not generating.")

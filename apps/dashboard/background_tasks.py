@@ -14,6 +14,7 @@ import threading
 import logging
 from functools import wraps
 from django.db import connection
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -894,9 +895,29 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
         log(f"   ⏭️ {lesson.title} (already generating, skipping)")
         return {'lesson': lesson.title, 'success': True, 'skipped': True, 'steps': 0, 'media': 0, 'exit_questions': 0, 'skills': 0}
 
-    # Mark as generating
-    lesson.content_status = 'generating'
-    lesson.save(update_fields=['content_status'])
+    # Atomic CAS: flip to 'generating' ONLY if status is still
+    # non-'generating'. If two workers race here, only one update
+    # succeeds — the other gets 0 rows and bails out. Without the
+    # atomic update, both workers' read-then-write would race and
+    # both proceed, producing the multi-spawn pattern we saw in logs
+    # (3 parallel pipelines, duplicate exit-ticket key violation,
+    # one worker reporting media=2 and another media=0).
+    #
+    # Bumping updated_at is also required: the course-detail page's
+    # auto-recovery resets 'generating' lessons whose updated_at is
+    # 10+ min old, and Django doesn't auto-bump updated_at when
+    # update_fields is specified.
+    from apps.curriculum.models import Lesson as _LessonModel
+    rows = _LessonModel.objects.filter(
+        id=lesson_id,
+    ).exclude(content_status='generating').update(
+        content_status='generating',
+        updated_at=timezone.now(),
+    )
+    if rows == 0:
+        log(f"   ⏭️ {lesson.title} (CAS lost — another worker is running)")
+        return {'lesson': lesson.title, 'success': True, 'skipped': True, 'steps': 0, 'media': 0, 'exit_questions': 0, 'skills': 0}
+    lesson.refresh_from_db()
 
     def _is_cancelled():
         """Return True only when the teacher explicitly cancelled.
@@ -920,7 +941,8 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
 
         if not result.get('success'):
             lesson.content_status = 'failed'
-            lesson.save(update_fields=['content_status'])
+            lesson.updated_at = timezone.now()
+            lesson.save(update_fields=['content_status', 'updated_at'])
             log(f"   ❌ [1/4] Step generation FAILED after {elapsed:.1f}s: {result.get('error', 'Unknown error')}")
             return {'lesson': lesson.title, 'success': False, 'error': result.get('error')}
 
@@ -1044,7 +1066,8 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
 
         # Mark as ready
         lesson.content_status = 'ready'
-        lesson.save(update_fields=['content_status'])
+        lesson.updated_at = timezone.now()
+        lesson.save(update_fields=['content_status', 'updated_at'])
 
         total_elapsed = time.time() - pipeline_start
         log(f"🎉 Pipeline COMPLETE for '{lesson.title}' in {total_elapsed:.1f}s "
@@ -1065,7 +1088,8 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
         import traceback
         logger.error(traceback.format_exc())
         lesson.content_status = 'failed'
-        lesson.save(update_fields=['content_status'])
+        lesson.updated_at = timezone.now()
+        lesson.save(update_fields=['content_status', 'updated_at'])
         return {'lesson': lesson.title, 'success': False, 'error': str(e)}
 
 
