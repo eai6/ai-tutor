@@ -482,51 +482,60 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         except Exception as e:
             logger.warning(f"Failed to load Seychelles context: {e}")
 
-        # Calculate step budget from lesson duration. Target ~2.5 min per
-        # step. Teachers reported the previous 4-step 20-min lesson
-        # finishing in ~14 min — too thin. 8 steps × 2.5 min = 20 min
-        # gives the tutor enough rungs to actually drill one objective.
-        # 10min → 4; 15min → 6; 20min → 8; 25min → 10; 30min → 12.
+        # Calculate step budget from lesson duration. Target ~3.3 min
+        # per step. 4-step lessons came in too thin (~14 min); 8-step
+        # came in too long. 6 steps × ~3.3 min = 20 min is the right
+        # rhythm for a single 20-min classroom slot.
+        # 10min → 4 (floor); 15min → 5; 20min → 6; 25min → 8; 30min → 10.
         target_minutes = lesson.estimated_minutes or 20
-        max_steps = max(4, min(12, int(target_minutes * 2 // 5)))
+        max_steps = max(4, min(10, target_minutes // 3))
         # 1 teaching objective per lesson, regardless of step count.
         max_eos = 1
         is_math = bool(lesson.unit and lesson.unit.course and lesson.unit.course.is_math)
 
-        # Build step structures for math vs non-math. Each line names a
-        # step + its purpose; the prompt asks for EXACTLY max_steps lines
-        # in order. We always end with a quiz/evaluation step.
+        # Build step structures for math vs non-math. The last step is
+        # ALWAYS a QUIZ — the rest fill the middle. Order:
+        #   Math:     ENGAGE → TEACH → WORKED_EXAMPLE → PRACTICE…+ → QUIZ
+        #   Non-math: ENGAGE → TEACH → EXPLORE → PRACTICE…+ → QUIZ
+        # For longer lessons we sprinkle a "common mistakes" or
+        # "extend" step in the middle.
         if is_math:
-            structure_lines = [
-                "Step 1 ENGAGE — real-world Seychelles hook + state today's question. 2 sentences.",
-                "Step 2 TEACH — direct instruction of the concept. 4-6 sentences.",
-                "Step 3 WORKED_EXAMPLE — solve a complete problem showing EVERY line of working.",
-                "Step 4 PRACTICE — DIFFERENT problem (not the same numbers); question + expected_answer + hints.",
-                "Step 5 PRACTICE — slightly harder DIFFERENT problem; question + expected_answer + hints.",
-                "Step 6 TEACH — call out one common mistake or misconception students make. 3-5 sentences.",
-                "Step 7 PRACTICE — applied / multi-step problem; question + expected_answer + hints.",
-                "Step 8 QUIZ — short evaluation that this objective is mastered.",
-                "Step 9 PRACTICE — extension: same skill, novel context; question + expected_answer + hints.",
-                "Step 10 PRACTICE — reverse / inverse problem; question + expected_answer + hints.",
-                "Step 11 SYNTHESIZE — student explains the rule in their own words.",
-                "Step 12 QUIZ — final evaluation of mastery.",
+            opening = [
+                "ENGAGE — real-world Seychelles hook + state today's question. 2 sentences.",
+                "TEACH — direct instruction of the concept. 4-6 sentences.",
+                "WORKED_EXAMPLE — solve a complete problem showing EVERY line of working.",
+            ]
+            middle_pool = [
+                "PRACTICE — DIFFERENT problem (not the same numbers); question + expected_answer + hints.",
+                "PRACTICE — slightly harder DIFFERENT problem; question + expected_answer + hints.",
+                "TEACH — call out one common mistake or misconception. 3-5 sentences.",
+                "PRACTICE — applied / multi-step problem; question + expected_answer + hints.",
+                "PRACTICE — reverse / inverse problem; question + expected_answer + hints.",
+                "SYNTHESIZE — student explains the rule in their own words.",
             ]
         else:
-            structure_lines = [
-                "Step 1 ENGAGE — real-world Seychelles hook + the lesson question. 2-3 sentences.",
-                "Step 2 TEACH — direct instruction. 4-6 sentences — minimum effective dose.",
-                "Step 3 EXPLORE — student answers a guided question that surfaces the key idea.",
-                "Step 4 PRACTICE — student applies the idea to a fresh case; question + expected_answer + hints.",
-                "Step 5 TEACH — extend or contextualise (link to prior learning). 4-6 sentences.",
-                "Step 6 PRACTICE — varied scenario, same objective; question + expected_answer + hints.",
-                "Step 7 SYNTHESIZE — student explains in their own words.",
-                "Step 8 QUIZ — short evaluation that this objective is met.",
-                "Step 9 PRACTICE — applied / cross-context problem; question + expected_answer + hints.",
-                "Step 10 PRACTICE — counter-example or compare-and-contrast.",
-                "Step 11 EXTEND — connect to a real Seychelles situation.",
-                "Step 12 QUIZ — final evaluation.",
+            opening = [
+                "ENGAGE — real-world Seychelles hook + the lesson question. 2-3 sentences.",
+                "TEACH — direct instruction. 4-6 sentences — minimum effective dose.",
+                "EXPLORE — student answers a guided question that surfaces the key idea.",
             ]
-        structure = "\n".join(structure_lines[:max_steps])
+            middle_pool = [
+                "PRACTICE — student applies the idea to a fresh case; question + expected_answer + hints.",
+                "TEACH — extend or contextualise (link to prior learning). 4-6 sentences.",
+                "PRACTICE — varied scenario, same objective; question + expected_answer + hints.",
+                "SYNTHESIZE — student explains in their own words.",
+                "PRACTICE — applied / cross-context problem; question + expected_answer + hints.",
+                "EXTEND — connect to a real Seychelles situation.",
+            ]
+        closer = "QUIZ — short evaluation that this objective is mastered."
+
+        # Total = opening (3) + middles + closer (1). The floor of
+        # max_steps=4 ensures chosen always has >= 4 items with the
+        # quiz at the end.
+        middle_count = max(0, max_steps - len(opening) - 1)
+        middle_count = min(middle_count, len(middle_pool))
+        chosen = opening + middle_pool[:middle_count] + [closer]
+        structure = "\n".join(f"Step {i+1} {line}" for i, line in enumerate(chosen))
 
         # Prompt focuses on CONTENT, not FORMAT — instructor handles the schema
         prompt = f"""Create a complete tutoring session for this lesson.
@@ -670,7 +679,7 @@ CONTENT GUIDELINES:
         from apps.curriculum.models import LessonStep
 
         target_minutes = lesson.estimated_minutes or 20
-        MAX_STEPS = max(4, min(12, int(target_minutes * 2 // 5)))
+        MAX_STEPS = max(4, min(10, target_minutes // 3))
         if len(steps) > MAX_STEPS:
             logger.warning(
                 f"[ContentGen] [{lesson.title}] Trimming {len(steps)} steps to {MAX_STEPS}"
