@@ -144,6 +144,11 @@
                                 <textarea name="image_description_{{ forloop.counter0 }}" class="form-control" rows="2" style="font-size: 0.85rem; min-height: 60px;">{{ img.description }}</textarea>
                             </div>
                             <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                <select id="model-choice-{{ forloop.counter0 }}" class="form-control" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.8rem;" title="Image model for regeneration">
+                                    <option value="">Default (config)</option>
+                                    <option value="openai">OpenAI gpt-image-2</option>
+                                    <option value="gemini">Gemini</option>
+                                </select>
                                 <button type="submit" form="regenerate-form-{{ forloop.counter0 }}" class="btn btn-secondary btn-sm">
                                     Regenerate
                                 </button>
@@ -154,6 +159,9 @@
                                 <button type="button" class="btn btn-sm" style="color: var(--danger); border-color: var(--danger);" onclick="confirmDeleteImage({{ forloop.counter0 }})">
                                     Delete
                                 </button>
+                                {% if img.model %}
+                                <span style="font-size: 0.7rem; color: var(--gray-500);">last: {{ img.model }}</span>
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}
@@ -185,6 +193,7 @@
     {% csrf_token %}
     <input type="hidden" name="action" value="regenerate_media">
     <input type="hidden" name="image_index" value="{{ forloop.counter0 }}">
+    <input type="hidden" name="model_choice" id="regenerate-model-{{ forloop.counter0 }}" value="">
 </form>
 {% endfor %}
 {% endif %}
@@ -211,7 +220,10 @@ document.querySelectorAll('.phase-option').forEach(option => {
     });
 });
 
-// When a regenerate form is submitted, copy textarea values into it
+// When a regenerate form is submitted, copy edited prompt textareas
+// into it AND copy the per-image model selector into the form's
+// model_choice hidden field, so the teacher can change both prompt
+// and provider in one click.
 document.querySelectorAll('form[id^="regenerate-form-"]').forEach(function(form) {
     form.addEventListener('submit', function() {
         document.querySelectorAll('textarea[name^="image_description_"]').forEach(function(ta) {
@@ -221,6 +233,10 @@ document.querySelectorAll('form[id^="regenerate-form-"]').forEach(function(form)
             hidden.value = ta.value;
             form.appendChild(hidden);
         });
+        var idx = form.id.replace('regenerate-form-', '');
+        var sel = document.getElementById('model-choice-' + idx);
+        var modelHidden = document.getElementById('regenerate-model-' + idx);
+        if (sel && modelHidden) modelHidden.value = sel.value;
     });
 });
 

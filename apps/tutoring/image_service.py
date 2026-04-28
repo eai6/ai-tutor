@@ -1,37 +1,49 @@
-"""
-Image Generation Service — Gemini native image generation.
+"""Image Generation Service — OpenAI gpt-image-2 (primary) + Gemini (fallback).
 
-Primary: gemini-3.1-flash-image-preview — latest model with search grounding
-for factual categories (maps, diagrams, charts, infographics, flowcharts).
-Fallback: gemini-3-pro-image-preview — used when primary is 503.
+Provider routing:
 
-Set DISABLE_IMAGE_GEN=1 in .env to disable.
+  - ModelConfig(purpose='image_generation') determines the configured
+    primary. provider='openai' → gpt-image-2; provider='google' →
+    gemini-3.1-flash-image-preview. The OTHER provider is used as a
+    cross-provider fallback if the primary 503s or returns no image.
+  - Callers can force a specific provider per-call via
+    `get_or_generate_image(..., model_override='openai'|'gemini')`.
+    The teacher's per-image Regenerate UI uses this so they can flip
+    providers when one model produces a bad result.
+
+Set DISABLE_IMAGE_GEN=1 in .env to disable both providers.
 """
 
 import os
 import logging
 import hashlib
 import mimetypes
+import base64
 from typing import Optional, Dict
 from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PRIMARY_MODEL = 'gemini-3.1-flash-image-preview'
-FALLBACK_MODEL = 'gemini-3-pro-image-preview'
+# OpenAI
+DEFAULT_OPENAI_MODEL = 'gpt-image-2'
+
+# Gemini
+DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-image-preview'
+GEMINI_FALLBACK_MODEL = 'gemini-3-pro-image-preview'
 
 FACTUAL_CATEGORIES = {'diagram', 'map', 'chart', 'infographic', 'flowchart'}
 
 
 class ImageGenerationService:
     """
-    Generate images with Gemini native image generation.
+    Generate images via OpenAI gpt-image-2 or Gemini.
 
     Usage:
         service = ImageGenerationService(lesson)
         result = service.get_or_generate_image(
             prompt="Diagram showing relief rainfall on a mountain",
-            category="diagram"
+            category="diagram",
+            model_override="openai",  # optional; force a provider
         )
         # Returns: {'url': '/media/...', 'title': '...', 'generated': True/False}
     """
@@ -53,29 +65,55 @@ class ImageGenerationService:
         except Exception:
             pass
 
-    def _get_primary_model(self) -> str:
-        """Get primary model name from config or default."""
+    def _configured_provider(self) -> str:
+        """Return 'openai' or 'gemini' from ModelConfig, defaulting to openai
+        when both keys are available, gemini otherwise."""
         if self._model_config:
-            return self._model_config.model_name
-        return DEFAULT_PRIMARY_MODEL
+            provider = (self._model_config.provider or '').lower()
+            if provider == 'openai':
+                return 'openai'
+            if provider in ('google', 'gemini'):
+                return 'gemini'
+        # No ModelConfig → prefer OpenAI when both keys are present.
+        if self._get_openai_key():
+            return 'openai'
+        return 'gemini'
 
-    def _get_api_key(self) -> Optional[str]:
-        """Get API key from ModelConfig (encrypted DB → env var fallback)."""
-        if self._model_config:
+    def _get_openai_key(self) -> Optional[str]:
+        """OpenAI API key from ModelConfig (when provider matches) or env."""
+        if self._model_config and (self._model_config.provider or '').lower() == 'openai':
+            key = self._model_config.get_api_key()
+            if key:
+                return key
+        return os.environ.get('OPENAI_API_KEY')
+
+    def _get_gemini_key(self) -> Optional[str]:
+        """Gemini API key from ModelConfig (when provider matches) or env."""
+        if self._model_config and (self._model_config.provider or '').lower() in ('google', 'gemini'):
             key = self._model_config.get_api_key()
             if key:
                 return key
         return os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
 
+    def _openai_model(self) -> str:
+        """OpenAI model name from ModelConfig (if provider matches) or default."""
+        if self._model_config and (self._model_config.provider or '').lower() == 'openai':
+            return self._model_config.model_name or DEFAULT_OPENAI_MODEL
+        return DEFAULT_OPENAI_MODEL
+
+    def _gemini_model(self) -> str:
+        """Gemini primary model from ModelConfig (if provider matches) or default."""
+        if self._model_config and (self._model_config.provider or '').lower() in ('google', 'gemini'):
+            return self._model_config.model_name or DEFAULT_GEMINI_MODEL
+        return DEFAULT_GEMINI_MODEL
+
     def _check_available(self) -> bool:
-        """Check if Gemini image generation is available."""
+        """Available if disabled flag isn't set AND at least one provider has a key."""
         if os.environ.get('DISABLE_IMAGE_GEN'):
             return False
-
-        if not self._get_api_key():
+        if not (self._get_openai_key() or self._get_gemini_key()):
             logger.info("Image generation not available: No API key configured")
             return False
-
         return True
 
     def get_or_generate_image(
@@ -84,42 +122,142 @@ class ImageGenerationService:
         category: str = "general",
         textbook_context: str = "",
         include_bytes: bool = False,
+        model_override: Optional[str] = None,
         **kwargs
     ) -> Optional[Dict]:
         """
-        Generate a new image with Gemini.
+        Generate a new image.
 
         Args:
             prompt: Description of the image needed
             category: Type of image (diagram, photo, illustration, etc.)
             textbook_context: Optional description of the textbook figure style
             include_bytes: If True, include '_raw_bytes' key with raw image data
+            model_override: 'openai' or 'gemini' — force a specific provider
+                            and skip cross-provider fallback. Used by the
+                            teacher Regenerate UI.
 
         Returns:
-            Dict with 'url', 'title', 'caption', 'generated' keys, or None
+            Dict with 'url', 'title', 'caption', 'generated', 'model' keys,
+            or None on failure.
         """
-        if self.available:
-            generated = self._generate_with_gemini(
-                prompt, category, textbook_context,
-                include_bytes=include_bytes,
-            )
-            if generated:
-                return generated
+        if not self.available:
+            logger.warning(f"Image generation unavailable for: {prompt[:50]}...")
+            return None
 
-        logger.warning(f"Image generation unavailable for: {prompt[:50]}...")
+        override = (model_override or '').lower().strip() or None
+
+        if override == 'openai':
+            return self._generate_with_openai(prompt, category, textbook_context, include_bytes)
+        if override in ('gemini', 'google'):
+            return self._generate_with_gemini(prompt, category, textbook_context, include_bytes)
+
+        # No override — primary by config, with cross-provider fallback.
+        primary = self._configured_provider()
+        order = (
+            (self._generate_with_openai, self._generate_with_gemini)
+            if primary == 'openai'
+            else (self._generate_with_gemini, self._generate_with_openai)
+        )
+        for fn in order:
+            result = fn(prompt, category, textbook_context, include_bytes)
+            if result:
+                return result
+
+        logger.warning("Both providers failed to generate image")
         return None
+
+    # ─── OpenAI gpt-image-2 ─────────────────────────────────────────
+
+    def _generate_with_openai(
+        self, prompt: str, category: str, textbook_context: str = "",
+        include_bytes: bool = False,
+    ) -> Optional[Dict]:
+        """Generate image via OpenAI Images API (gpt-image-2)."""
+        api_key = self._get_openai_key()
+        if not api_key:
+            return None
+
+        try:
+            from openai import OpenAI
+        except Exception as e:
+            logger.warning(f"openai SDK not installed: {e}")
+            return None
+
+        enhanced_prompt = self._enhance_prompt(prompt, category, textbook_context)
+        model = self._openai_model()
+        # Use landscape for factual/spatial categories, square for the rest.
+        size = "1536x1024" if category in FACTUAL_CATEGORIES else "1024x1024"
+
+        try:
+            logger.info(f"Generating image with {model}: {prompt[:80]}...")
+            client = OpenAI(api_key=api_key)
+            response = client.images.generate(
+                model=model,
+                prompt=enhanced_prompt,
+                size=size,
+                n=1,
+            )
+            data = response.data[0] if response.data else None
+            if not data:
+                logger.warning(f"{model}: empty response.data")
+                return None
+
+            image_bytes = None
+            if getattr(data, 'b64_json', None):
+                image_bytes = base64.b64decode(data.b64_json)
+            elif getattr(data, 'url', None):
+                # Fall back to fetching the URL if SDK returned a URL instead.
+                import urllib.request
+                with urllib.request.urlopen(data.url, timeout=30) as r:
+                    image_bytes = r.read()
+
+            if not image_bytes:
+                logger.warning(f"{model}: no image bytes in response")
+                return None
+
+            saved_url = self._save_generated_image_bytes(image_bytes, prompt, '.png')
+            if not saved_url:
+                return None
+
+            logger.info(f"Image generated successfully with {model}")
+            result = {
+                'url': saved_url,
+                'title': prompt[:100],
+                'caption': f"AI-generated: {prompt[:200]}",
+                'alt_text': prompt,
+                'generated': True,
+                'model': model,
+                'provider': 'openai',
+            }
+            if include_bytes:
+                result['_raw_bytes'] = image_bytes
+            return result
+
+        except Exception as e:
+            err = str(e)
+            logger.error(f"{model} failed: {err[:300]}")
+            return None
+
+    # ─── Gemini ─────────────────────────────────────────────────────
 
     def _generate_with_gemini(
         self, prompt: str, category: str, textbook_context: str = "",
         include_bytes: bool = False,
     ) -> Optional[Dict]:
-        """Generate image — tries configured model, falls back to FALLBACK_MODEL on 503."""
-        from google import genai
-        from google.genai import types
+        """Generate image — tries configured Gemini model, falls back to GEMINI_FALLBACK_MODEL on 503."""
+        api_key = self._get_gemini_key()
+        if not api_key:
+            return None
 
-        api_key = self._get_api_key()
+        try:
+            from google import genai
+            from google.genai import types
+        except Exception as e:
+            logger.warning(f"google-genai SDK not installed: {e}")
+            return None
+
         client = genai.Client(api_key=api_key)
-
         enhanced_prompt = self._enhance_prompt(prompt, category, textbook_context)
 
         contents = [
@@ -129,7 +267,6 @@ class ImageGenerationService:
             ),
         ]
 
-        # Use 16:9 for factual/spatial categories, 1:1 for others
         aspect = "16:9" if category in FACTUAL_CATEGORIES else "1:1"
 
         config = types.GenerateContentConfig(
@@ -140,7 +277,7 @@ class ImageGenerationService:
             response_modalities=["IMAGE", "TEXT"],
         )
 
-        # Always enable web + image search grounding for factual accuracy
+        # Always enable web + image search grounding for factual accuracy.
         tools = None
         try:
             tools = [types.Tool(google_search=types.GoogleSearch(
@@ -153,22 +290,22 @@ class ImageGenerationService:
         except Exception as e:
             logger.warning(f"Could not create search grounding tool: {e}")
 
-        for model in [self._get_primary_model(), FALLBACK_MODEL]:
-            result = self._call_model(
+        for model in [self._gemini_model(), GEMINI_FALLBACK_MODEL]:
+            result = self._call_gemini(
                 client, model, contents, config, prompt,
                 tools=tools, include_bytes=include_bytes,
             )
             if result is not None:
                 return result
 
-        logger.warning("Both primary and fallback image models failed")
+        logger.warning("Both primary and fallback Gemini models failed")
         return None
 
-    def _call_model(
+    def _call_gemini(
         self, client, model: str, contents, config, prompt: str,
         tools=None, include_bytes: bool = False,
     ) -> Optional[Dict]:
-        """Generate image from a single model (non-streaming). Returns result dict or None."""
+        """Generate image from a single Gemini model. Returns result dict or None."""
         try:
             logger.info(f"Generating image with {model}: {prompt[:80]}...")
 
@@ -218,6 +355,7 @@ class ImageGenerationService:
                 'alt_text': prompt,
                 'generated': True,
                 'model': model,
+                'provider': 'gemini',
             }
 
             if include_bytes:
@@ -233,8 +371,10 @@ class ImageGenerationService:
             logger.error(f"{model} failed: {err[:300]}")
             return None
 
+    # ─── Prompt enhancement ─────────────────────────────────────────
+
     def _enhance_prompt(self, prompt: str, category: str, textbook_context: str = "") -> str:
-        """Enhance prompt for better Gemini image results."""
+        """Enhance prompt for better image results (provider-agnostic)."""
         from apps.llm.prompts import get_prompt_or_default
         institution_id = self.institution.id if self.institution else None
         context = get_prompt_or_default(
@@ -242,7 +382,6 @@ class ImageGenerationService:
             "Educational visual for secondary school students. "
         )
 
-        # Build lesson context for grounding
         lesson_context = ""
         if self.lesson:
             try:
@@ -308,6 +447,8 @@ class ImageGenerationService:
         )
 
         return f"{style}{context}{lesson_context}{textbook_style}{prompt}{anti_hallucination}"
+
+    # ─── Save ───────────────────────────────────────────────────────
 
     def _save_generated_image_bytes(
         self, image_bytes: bytes, prompt: str, ext: str = '.png'

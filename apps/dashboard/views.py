@@ -2884,6 +2884,7 @@ def settings_page(request):
             'local_ollama': 'llama3',
         })
         img_provider_defaults_json = json.dumps({
+            'openai': 'gpt-image-2',
             'google': 'gemini-3.1-flash-image-preview',
         })
 
@@ -3560,6 +3561,9 @@ def step_edit(request, step_id):
         # Handle regenerate media action
         if action == 'regenerate_media':
             image_index = int(request.POST.get('image_index', 0))
+            # Teacher-selected provider: 'openai' (gpt-image-2), 'gemini',
+            # or '' (use ModelConfig default with cross-provider fallback).
+            model_choice = (request.POST.get('model_choice') or '').strip().lower()
             images = step.media.get('images', []) if step.media else []
             if 0 <= image_index < len(images):
                 img = images[image_index]
@@ -3574,13 +3578,18 @@ def step_edit(request, step_id):
                         result = service.get_or_generate_image(
                             prompt=description,
                             category=img.get('type', 'diagram'),
-                            generate_only=True,
+                            model_override=model_choice or None,
                         )
                         if result and result.get('url'):
                             img['url'] = result['url']
                             img['source'] = 'generated'
+                            if result.get('model'):
+                                img['model'] = result['model']
+                            if result.get('provider'):
+                                img['provider'] = result['provider']
                             step.save()
-                            messages.success(request, "Image regenerated successfully.")
+                            label = result.get('model') or 'image'
+                            messages.success(request, f"Regenerated with {label}.")
                         else:
                             messages.warning(request, "Image generation returned no result.")
                     except Exception as e:
