@@ -126,6 +126,14 @@ def _process_lesson(lesson_id: int, institution_id: int, k: int, seed_for_lesson
     # combined_objectives_for_lesson is the SINGLE SOURCE OF TRUTH —
     # it now falls back to lesson.objective and lesson.title internally,
     # so every summative + competency-map consumer sees the same tags.
+    #
+    # Design rule (2026-04-28): summative questions are tagged at
+    # LESSON-OBJECTIVE granularity, period. The fine-grained
+    # concept_tag on the source ExitTicketQuestion is kept for
+    # tutoring-engine scaffolding within a lesson, but never used for
+    # cross-attempt reporting. This is the join key the class +
+    # student competency map uses, so it has to match the matrix's
+    # canonical list (which comes from this same helper).
     objectives = combined_objectives_for_lesson(lesson)
     primary_objective = objectives[0] if objectives else lesson.title
 
@@ -140,9 +148,11 @@ def _process_lesson(lesson_id: int, institution_id: int, k: int, seed_for_lesson
             'correct_answer': q.correct_answer,
             'answer_data': q.answer_data,
             'explanation': q.explanation,
-            # Tag every summative question with the lesson's teaching
-            # objective so the stratified selector can guarantee coverage.
-            'concept_tag': (q.concept_tag or primary_objective)[:200],
+            # Always lesson-level: ignore the source question's
+            # fine-grained sub-skill tag. This is the only knob that
+            # makes the competency matrix match what students actually
+            # attempted. (See design note above.)
+            'concept_tag': primary_objective[:200],
             'difficulty': q.difficulty,
         })
 

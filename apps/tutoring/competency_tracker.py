@@ -88,21 +88,50 @@ def collect_objective_signals_for_course(course, students=None) -> dict:
     )
     if students is not None:
         attempts_qs = attempts_qs.filter(student__in=students)
-    attempts_qs = attempts_qs.select_related('exit_ticket', 'student').order_by(
-        'student_id', 'completed_at'
-    )
+    attempts_qs = attempts_qs.select_related(
+        'exit_ticket', 'exit_ticket__lesson',
+        'exit_ticket__lesson__unit', 'exit_ticket__lesson__unit__course',
+        'student',
+    ).order_by('student_id', 'completed_at')
+
+    # Per-lesson ET attempts: roll the per-question concept_tag up to
+    # the lesson's primary objective at read time. This is what makes
+    # the competency matrix actually reflect what students attempted —
+    # the per-question tag stays fine-grained on the source
+    # ExitTicketQuestion (useful for tutor scaffolding inside a
+    # lesson) but the cross-attempt aggregation always uses
+    # lesson-level. Summative attempts already carry lesson-level
+    # tags from summative_generator, so this is a no-op for them.
+    from apps.curriculum.content_generator import combined_objectives_for_lesson
+    _lesson_obj_cache: Dict[int, str] = {}
+    def _lesson_objective(lesson) -> str:
+        if not lesson:
+            return ''
+        cached = _lesson_obj_cache.get(lesson.id)
+        if cached is not None:
+            return cached
+        objs = combined_objectives_for_lesson(lesson)
+        primary = objs[0] if objs else (lesson.title or '')
+        _lesson_obj_cache[lesson.id] = primary
+        return primary
 
     out: Dict[tuple, dict] = {}
 
     for attempt in attempts_qs:
         sid = attempt.student_id
         purpose = attempt.purpose
+        et = attempt.exit_ticket
+        # For per-lesson exit tickets we override every per-question
+        # tag with the lesson's primary objective — the source of
+        # truth for cross-attempt reporting.
+        per_lesson_tag = _lesson_objective(et.lesson) if et.lesson_id else None
 
         # Walk per-question rows so a single attempt fans out per objective.
         per_obj_correct: Dict[str, int] = defaultdict(int)
         per_obj_total: Dict[str, int] = defaultdict(int)
         for row in _per_question_rows(attempt):
-            tag = _normalize_tag(row.get('concept_tag') or '')
+            tag = per_lesson_tag or _normalize_tag(row.get('concept_tag') or '')
+            tag = _normalize_tag(tag)
             if not tag:
                 continue
             per_obj_total[tag] += 1
