@@ -39,6 +39,7 @@ urlpatterns = [
     path('', views.lesson_catalog, name='catalog'),
     path('lesson/<int:lesson_id>/', views.chat_tutor_interface, name='tutor_interface'),
     path('chat/lesson/<int:lesson_id>/', views.chat_tutor_interface, name='chat_tutor_interface'),
+    path('lesson/<int:lesson_id>/pretest/', views.lesson_pretest, name='lesson_pretest'),
 
     # Course summative exam (student-facing)
     path('summative/<int:course_id>/', views.summative_take, name='summative_take'),

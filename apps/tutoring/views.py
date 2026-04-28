@@ -1875,3 +1875,216 @@ def summative_review(request, course_id, attempt_id):
         'per_q_by_id': per_q_by_id,
         'result': attempt.answers.get('result') or {},
     })
+
+
+# ============================================================================
+# Pre-test diagnostic — students take 10 questions BEFORE starting the lesson.
+# Pass → lesson marked mastered. Fail → tutor session starts with the per-EO
+# sub-skill map primed in engine_state. Pre-test and post-test sample disjoint
+# question sets so the post-test isn't biased.
+# ============================================================================
+
+@login_required
+def lesson_pretest(request, lesson_id):
+    """GET: render the pre-test form (10 random questions).
+    POST: grade, save attempt, route to catalog (pass) or tutor (fail)."""
+    from apps.tutoring.models import (
+        ExitTicket, ExitTicketQuestion, ExitTicketAttempt, StudentLessonProgress,
+    )
+    import random as _random
+
+    institution = get_user_institution(request.user)
+    lookup = {'id': lesson_id, 'is_published': True}
+    if institution and not request.user.is_staff:
+        lesson = get_object_or_404(
+            Lesson.objects.filter(
+                Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
+            ), **lookup,
+        )
+    else:
+        lesson = get_object_or_404(Lesson, **lookup)
+
+    exit_ticket = ExitTicket.objects.filter(lesson=lesson).first()
+    if not exit_ticket:
+        django_messages.warning(request, "This lesson doesn't have a question bank yet.")
+        return redirect('tutoring:catalog')
+
+    # Already mastered → no point pre-testing again.
+    progress = StudentLessonProgress.objects.filter(
+        student=request.user, lesson=lesson,
+    ).first()
+    if progress and progress.mastery_level == 'mastered':
+        django_messages.info(request, f"You've already mastered '{lesson.title}'.")
+        return redirect('tutoring:catalog')
+
+    PRETEST_SIZE = 10
+
+    if request.method == 'POST':
+        # Grade. Selected IDs come from a hidden field set on GET.
+        selected_ids = [
+            int(x) for x in (request.POST.get('selected_question_ids') or '').split(',')
+            if x.strip().isdigit()
+        ]
+        if not selected_ids:
+            django_messages.error(request, "Pre-test session expired. Please retry.")
+            return redirect('tutoring:lesson_pretest', lesson_id=lesson.id)
+
+        questions = list(ExitTicketQuestion.objects.filter(id__in=selected_ids))
+        q_by_id = {q.id: q for q in questions}
+        ordered = [q_by_id[qid] for qid in selected_ids if qid in q_by_id]
+
+        correct = 0
+        per_question = []
+        achieved_eos = set()
+        failed_eos = set()
+        for q in ordered:
+            student_answer = (request.POST.get(f'q_{q.id}') or '').strip()
+            is_correct = _grade_pretest_question(q, student_answer)
+            if is_correct:
+                correct += 1
+            tag = (q.concept_tag or '').strip()
+            if tag:
+                (achieved_eos if is_correct else failed_eos).add(tag)
+            per_question.append({
+                'question_id': q.id,
+                'concept_tag': tag,
+                'student_answer': student_answer,
+                'correct': is_correct,
+            })
+
+        passing = exit_ticket.passing_score or 8
+        # Scale the threshold to the pre-test size if the configured
+        # passing_score was set for a 10-question post-test.
+        if PRETEST_SIZE != 10 and passing > PRETEST_SIZE:
+            passing = max(1, int(round(passing * PRETEST_SIZE / 10)))
+        passed = correct >= passing
+
+        attempt = ExitTicketAttempt.objects.create(
+            exit_ticket=exit_ticket,
+            student=request.user,
+            session=None,  # diagnostic happens before any tutor session
+            purpose=ExitTicketAttempt.Purpose.DIAGNOSTIC,
+            score=correct,
+            passed=passed,
+            answers={
+                'selected_question_ids': selected_ids,
+                'per_question': per_question,
+                'achieved_eos': sorted(achieved_eos),
+                'failed_eos': sorted(failed_eos),
+                'total': len(ordered),
+                'passing_score': passing,
+            },
+            completed_at=timezone.now(),
+        )
+
+        if passed:
+            # Lesson considered mastered — pre-test demonstrated the
+            # competency. Mirrors _update_competency from the engine.
+            score_pct = correct / len(ordered) if ordered else 0.0
+            score_pct = max(0.0, min(1.0, round(score_pct, 4)))
+            sess_inst = lesson.unit.course.institution if lesson.unit else None
+            progress, _ = StudentLessonProgress.objects.get_or_create(
+                student=request.user,
+                lesson=lesson,
+                defaults={'institution': sess_inst, 'mastery_level': 'mastered'},
+            )
+            if progress.best_score is None or score_pct > progress.best_score:
+                progress.best_score = score_pct
+            progress.attempts_count = (progress.attempts_count or 0) + 1
+            progress.last_attempt_at = timezone.now()
+            progress.mastery_level = 'mastered'
+            progress.save()
+
+            # Refresh skills snapshot so the next lesson's tutor sees this.
+            try:
+                from apps.tutoring.competency_tracker import refresh_student_snapshot
+                if lesson.unit and lesson.unit.course:
+                    refresh_student_snapshot(request.user, lesson.unit.course)
+            except Exception:
+                pass
+
+            django_messages.success(
+                request,
+                f"🎯 Pre-test passed ({correct}/{len(ordered)}) — '{lesson.title}' marked complete!",
+            )
+            return redirect('tutoring:catalog')
+
+        # Failed: route to tutor with the diagnostic primed. The
+        # engine reads the most recent DIAGNOSTIC attempt on session
+        # init and surfaces it in a [PRE-TEST RESULT] prompt block.
+        django_messages.info(
+            request,
+            f"Got {correct}/{len(ordered)}. Let's work on the parts you missed.",
+        )
+        return redirect('tutoring:tutor_interface', lesson_id=lesson.id)
+
+    # GET — sample 10 questions and render. Sample anew each visit so a
+    # student abandoning + retrying doesn't see the same set.
+    pool = list(
+        ExitTicketQuestion.objects.filter(exit_ticket=exit_ticket)
+        .exclude(question_type='data_interpretation')
+    )
+    if len(pool) < PRETEST_SIZE:
+        django_messages.warning(
+            request,
+            f"This lesson's bank has {len(pool)} questions — too few for a pre-test. Start the lesson directly.",
+        )
+        return redirect('tutoring:tutor_interface', lesson_id=lesson.id)
+
+    sampled = _random.sample(pool, PRETEST_SIZE)
+    return render(request, 'tutoring/diagnostic.html', {
+        'lesson': lesson,
+        'questions': sampled,
+        'selected_question_ids': ','.join(str(q.id) for q in sampled),
+        'total': PRETEST_SIZE,
+    })
+
+
+def _grade_pretest_question(q, student_answer: str) -> bool:
+    """Deterministic per-question grading for the pre-test. Mirrors the
+    answer-matching logic the post-test exit-ticket flow uses but kept
+    standalone so the diagnostic doesn't depend on tutor session state."""
+    qtype = (q.question_type or 'mcq').lower()
+    sa = (student_answer or '').strip()
+    if not sa:
+        return False
+    if qtype == 'mcq':
+        return sa.upper() == (q.correct_answer or '').upper()
+    if qtype == 'fill_in_blank':
+        ad = q.answer_data or {}
+        blanks = [str(b).strip().lower() for b in (ad.get('blanks') or [])]
+        if not blanks:
+            return False
+        # Single-blank fill: accept if matches blank or any alternate.
+        student_norm = sa.lower().replace(' ', '').replace(',', '')
+        target_norm = blanks[0].replace(' ', '').replace(',', '')
+        if student_norm == target_norm:
+            return True
+        for alt_list in (ad.get('accept_alternatives') or []):
+            for alt in (alt_list if isinstance(alt_list, list) else [alt_list]):
+                if str(alt).strip().lower().replace(' ', '').replace(',', '') == student_norm:
+                    return True
+        return False
+    if qtype == 'short_answer':
+        ad = q.answer_data or {}
+        keywords = [str(k).strip().lower() for k in (ad.get('keywords') or []) if str(k).strip()]
+        min_kw = max(1, int(ad.get('min_keywords') or 1))
+        sa_lower = sa.lower()
+        hits = sum(1 for k in keywords if k in sa_lower)
+        return hits >= min_kw
+    if qtype == 'matching':
+        # Matching: a JSON dict {left: right}; serialize to compare.
+        ad = q.answer_data or {}
+        pairs = ad.get('pairs') or []
+        try:
+            import json as _json
+            student_map = _json.loads(sa) if sa.startswith('{') else {}
+        except Exception:
+            return False
+        for p in pairs:
+            left = str(p.get('left') or '')
+            right = str(p.get('right') or '').strip().lower()
+            if str(student_map.get(left, '')).strip().lower() != right:
+                return False
+        return True
+    return False

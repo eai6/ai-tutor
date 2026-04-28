@@ -542,12 +542,39 @@ class ConversationalTutor:
                 questions = sorted(questions, key=lambda q: id_order.get(q.id, 0))
             else:
                 # New session: select 10 from the full bank.
-                # Skip data_interpretation — disabled platform-wide
-                # (figures unreliable; new banks won't generate them
-                # but legacy banks may still have them).
-                all_questions = list(ExitTicketQuestion.objects.filter(
+                # Skip data_interpretation — disabled platform-wide.
+                # Also exclude question IDs already served as a
+                # DIAGNOSTIC pre-test for this student so the post-test
+                # is disjoint (the bank ships with 35 questions —
+                # plenty of room for 10 pre + 10 post).
+                from apps.tutoring.models import ExitTicketAttempt
+                served_diag_ids = set()
+                for prior in ExitTicketAttempt.objects.filter(
                     exit_ticket=exit_ticket,
-                ).exclude(question_type='data_interpretation').order_by('order_index'))
+                    student=self.student,
+                    purpose=ExitTicketAttempt.Purpose.DIAGNOSTIC,
+                ).only('answers'):
+                    for qid in (prior.answers or {}).get('selected_question_ids', []) or []:
+                        try:
+                            served_diag_ids.add(int(qid))
+                        except (TypeError, ValueError):
+                            continue
+
+                base_qs = ExitTicketQuestion.objects.filter(
+                    exit_ticket=exit_ticket,
+                ).exclude(question_type='data_interpretation')
+                if served_diag_ids:
+                    base_qs = base_qs.exclude(id__in=served_diag_ids)
+                all_questions = list(base_qs.order_by('order_index'))
+
+                # Fallback: if exclusion left fewer than 10, allow the
+                # diagnostic IDs back in so we don't ship a tiny test.
+                if len(all_questions) < 10 and served_diag_ids:
+                    all_questions = list(
+                        ExitTicketQuestion.objects.filter(exit_ticket=exit_ticket)
+                        .exclude(question_type='data_interpretation')
+                        .order_by('order_index')
+                    )
 
                 if len(all_questions) > 10:
                     questions = self._select_randomized_questions(all_questions, count=10)
@@ -661,6 +688,39 @@ class ConversationalTutor:
             pass
         return ""
 
+    def _load_recent_diagnostic(self) -> Optional[Dict]:
+        """If the student took a DIAGNOSTIC pre-test for this lesson
+        recently AND failed it, return the per-EO sub-skill map for
+        the tutor's [PRE-TEST RESULT] prompt block.
+
+        Skip if they passed (lesson is already mastered) or if no
+        pre-test was taken. Returns the most recent failed attempt's
+        digest, or None.
+        """
+        try:
+            from apps.tutoring.models import ExitTicket, ExitTicketAttempt
+            exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
+            if not exit_ticket:
+                return None
+            attempt = ExitTicketAttempt.objects.filter(
+                exit_ticket=exit_ticket,
+                student=self.student,
+                purpose=ExitTicketAttempt.Purpose.DIAGNOSTIC,
+                completed_at__isnull=False,
+            ).order_by('-completed_at').first()
+            if not attempt or attempt.passed:
+                return None
+            ad = attempt.answers or {}
+            return {
+                'achieved_eos': ad.get('achieved_eos', []),
+                'failed_eos': ad.get('failed_eos', []),
+                'score': attempt.score,
+                'total': ad.get('total', 0),
+                'completed_at': attempt.completed_at.isoformat() if attempt.completed_at else None,
+            }
+        except Exception:
+            return None
+
     def _derive_initial_difficulty(self) -> int:
         """Derive initial `difficulty_level` for a NEW session from the
         student's skills_snapshot for this lesson's course.
@@ -769,6 +829,20 @@ class ConversationalTutor:
         else:
             self.difficulty_level = self._derive_initial_difficulty()
 
+        # Pre-test diagnostic — if the student took the lesson's
+        # diagnostic and DIDN'T pass, the most recent attempt's per-EO
+        # results are surfaced as a [PRE-TEST RESULT] prompt block so
+        # the tutor focuses on weak sub-skills. Resume sessions keep
+        # whatever was already in state; new sessions seed it.
+        if 'pretest_diagnostic' in state:
+            self.pretest_diagnostic = state['pretest_diagnostic']
+        else:
+            self.pretest_diagnostic = self._load_recent_diagnostic()
+            if self.pretest_diagnostic:
+                # Cache on engine_state so this is stable across resumes.
+                state['pretest_diagnostic'] = self.pretest_diagnostic
+                self.session.engine_state = state
+
         # Correct-answer streak for in-conversation gamification
         self._correct_streak = state.get('correct_streak', 0)
 
@@ -843,6 +917,8 @@ class ConversationalTutor:
             ],
             # Difficulty signal (ZPD adjustment)
             'difficulty_level': getattr(self, 'difficulty_level', 0),
+            # Pre-test diagnostic — surfaced as [PRE-TEST RESULT] block
+            'pretest_diagnostic': getattr(self, 'pretest_diagnostic', None),
             # Correct-answer streak for in-conversation gamification
             'correct_streak': getattr(self, '_correct_streak', 0),
             # Cognitive load adaptation
@@ -2509,6 +2585,37 @@ SCAFFOLDING TONE ({intensity} application):
 
         return "\n".join(blocks)
 
+    def _build_pretest_diagnostic_block(self) -> str:
+        """If the student took a diagnostic pre-test before starting
+        this lesson and didn't pass, surface the per-EO sub-skill map
+        so the tutor focuses on the gaps and skips what they showed
+        they already know."""
+        diag = getattr(self, 'pretest_diagnostic', None)
+        if not diag:
+            return ""
+        achieved = [eo for eo in (diag.get('achieved_eos') or []) if eo]
+        failed = [eo for eo in (diag.get('failed_eos') or []) if eo]
+        if not achieved and not failed:
+            return ""
+        score = diag.get('score', 0)
+        total = diag.get('total', 0)
+        score_str = f"{score}/{total}" if total else "partial"
+        lines = [
+            f"[PRE-TEST RESULT — {score_str}]",
+            "The student took a diagnostic pre-test before starting this lesson. "
+            "Use the breakdown below to focus the tutoring:",
+        ]
+        if achieved:
+            lines.append("• Already demonstrated competency on these sub-skills (DON'T re-teach unless they ask):")
+            for eo in achieved[:8]:
+                lines.append(f"  - {eo}")
+        if failed:
+            lines.append("• Got these wrong on the pre-test — PRIORITIZE these in the lesson:")
+            for eo in failed[:8]:
+                lines.append(f"  - {eo}")
+        lines.append("[/PRE-TEST RESULT]")
+        return "\n".join(lines)
+
     def _build_worked_example_block(self) -> str:
         """Build [WORKED EXAMPLE] context block for teach/worked_example steps (R14).
 
@@ -2693,6 +2800,9 @@ SCAFFOLDING TONE ({intensity} application):
         next_concept = self._get_next_uncovered_concept() if not getattr(self, 'is_remediation', False) else ""
         student_profile = self._build_student_profile_block()
         difficulty_block = self._build_difficulty_signal_block()
+        pretest_block = self._build_pretest_diagnostic_block()
+        if pretest_block:
+            difficulty_block = (difficulty_block + "\n\n" + pretest_block).strip()
         worked_example_block = self._build_worked_example_block()
         interleaved_block = self._build_interleaved_practice_block()
         enabling_obj_block = self._build_enabling_objectives_block()

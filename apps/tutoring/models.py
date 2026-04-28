@@ -580,6 +580,7 @@ class ExitTicketAttempt(models.Model):
         BASELINE = 'baseline', 'Baseline (pre-course summative)'
         FINAL = 'final', 'Final (post-course summative)'
         RETAKE = 'retake', 'Retake'
+        DIAGNOSTIC = 'diagnostic', 'Diagnostic (pre-lesson assessment)'
 
     exit_ticket = models.ForeignKey(
         ExitTicket,

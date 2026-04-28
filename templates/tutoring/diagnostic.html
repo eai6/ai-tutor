@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}{{ lesson.title }} — Quick check{% endblock %}
+
+{% block content %}
+<style>
+    .dx-wrap { max-width: 760px; margin: 1rem auto 5rem; padding: 0 1rem; }
+    .dx-head {
+        background: #fef9c3; border: 1px solid #fde047;
+        border-radius: 14px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+    }
+    .dx-head h1 { font-size: 1.1rem; margin: 0 0 0.4rem; color: #78350f; }
+    .dx-head p { margin: 0; color: #92400e; font-size: 0.9rem; line-height: 1.5; }
+    .dx-q {
+        background: #fff; border: 1px solid #e5e7eb;
+        border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 0.75rem;
+    }
+    .dx-q-stem { color: #111; font-size: 0.98rem; line-height: 1.55; margin: 0 0 0.7rem; }
+    .dx-q-num { display:inline-block; background:#fef3c7; color:#92400e; padding:0.15rem 0.55rem; border-radius:999px; font-size:0.72rem; font-weight:700; margin-right:0.4rem; }
+    .opt {
+        display: flex; gap: 0.55rem; align-items: flex-start;
+        padding: 0.55rem 0.8rem; border: 1px solid #e5e7eb;
+        border-radius: 10px; margin-bottom: 0.4rem; cursor: pointer;
+        font-size: 0.92rem; color: #111;
+        transition: border-color 0.12s ease, background 0.12s ease;
+    }
+    .opt:hover { border-color: #fde047; }
+    .opt input[type=radio] { margin-top: 0.2rem; accent-color: #92400e; }
+    .opt.selected { border-color: #ca8a04; background: #fef9c3; }
+    .text-input, .textarea-input {
+        width: 100%; padding: 0.55rem 0.75rem;
+        border: 1px solid #d1d5db; border-radius: 8px;
+        font-family: inherit; font-size: 0.92rem; color: #111;
+        box-sizing: border-box;
+    }
+    .text-input:focus, .textarea-input:focus { outline: none; border-color: #ca8a04; box-shadow: 0 0 0 3px rgba(202,138,4,0.15); }
+    .textarea-input { min-height: 80px; resize: vertical; }
+    .blank-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; font-size: 0.9rem; color: #374151; }
+    .blank-row input { flex: 1; min-width: 180px; }
+    .match-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; }
+    .match-row .left { font-weight: 500; color: #111; min-width: 140px; }
+    .match-row select { flex: 1; min-width: 180px; padding: 0.4rem 0.6rem; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 0.88rem; }
+    .dx-submit {
+        position: sticky; bottom: 1rem;
+        display: flex; gap: 0.5rem; justify-content: center; margin: 1rem 0;
+    }
+    .dx-submit button {
+        background: #ca8a04; color: #fff; border: none;
+        padding: 0.85rem 2rem; border-radius: 999px;
+        font-size: 1rem; font-weight: 700; cursor: pointer;
+        box-shadow: 0 8px 24px rgba(202,138,4,0.3);
+    }
+    .dx-submit button[disabled] { opacity: 0.6; cursor: wait; }
+    .skip-link { display: block; text-align: center; margin-top: 0.6rem; font-size: 0.85rem; color: #6b7280; }
+</style>
+
+<form method="post" class="dx-wrap" id="dx-form">
+    {% csrf_token %}
+    <input type="hidden" name="selected_question_ids" value="{{ selected_question_ids }}">
+
+    <div class="dx-head">
+        <h1>🎯 Quick check — {{ lesson.title }}</h1>
+        <p>{{ total }} questions, ~5 minutes. If you get most of them right, the lesson is marked complete and you can move on. Otherwise the tutor will focus on what you missed.</p>
+    </div>
+
+    {% for q in questions %}
+    <div class="dx-q">
+        <p class="dx-q-stem"><span class="dx-q-num">{{ forloop.counter }}</span>{{ q.question_text }}</p>
+
+        {% if q.answer_data.figure_url %}
+        <div style="margin:0.5rem 0 0.6rem;">
+            <img src="{{ q.answer_data.figure_url }}" alt="Question figure" style="max-width:100%;border-radius:8px;border:1px solid #e5e7eb;">
+        </div>
+        {% elif q.answer_data.figure_svg %}
+        <div style="margin:0.5rem 0 0.6rem;">{{ q.answer_data.figure_svg|safe }}</div>
+        {% endif %}
+
+        {% if q.question_type == 'mcq' %}
+            <label class="opt"><input type="radio" name="q_{{ q.id }}" value="A"><span><strong>A.</strong> {{ q.option_a }}</span></label>
+            <label class="opt"><input type="radio" name="q_{{ q.id }}" value="B"><span><strong>B.</strong> {{ q.option_b }}</span></label>
+            <label class="opt"><input type="radio" name="q_{{ q.id }}" value="C"><span><strong>C.</strong> {{ q.option_c }}</span></label>
+            <label class="opt"><input type="radio" name="q_{{ q.id }}" value="D"><span><strong>D.</strong> {{ q.option_d }}</span></label>
+        {% elif q.question_type == 'fill_in_blank' %}
+            {% if q.answer_data.text_template %}
+            <p style="color:#374151;font-size:0.9rem;margin:0 0 0.5rem;font-style:italic;">{{ q.answer_data.text_template }}</p>
+            {% endif %}
+            <input type="text" class="text-input" name="q_{{ q.id }}" placeholder="Type your answer…" autocomplete="off">
+        {% elif q.question_type == 'short_answer' %}
+            <textarea class="textarea-input" name="q_{{ q.id }}" placeholder="Type your answer…"></textarea>
+        {% elif q.question_type == 'matching' %}
+            {% if q.answer_data.pairs %}
+            <input type="hidden" name="q_{{ q.id }}" id="match_{{ q.id }}_payload">
+            {% for p in q.answer_data.pairs %}
+            <div class="match-row">
+                <span class="left">{{ p.left }}</span>
+                <select data-mid="{{ q.id }}" data-left="{{ p.left }}" onchange="updateMatchPayload({{ q.id }})">
+                    <option value="">— pick —</option>
+                    {% for p2 in q.answer_data.pairs %}
+                    <option value="{{ p2.right }}">{{ p2.right }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endfor %}
+            {% endif %}
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="dx-submit">
+        <button type="submit" id="dx-submit-btn">Submit pre-test</button>
+    </div>
+    <a href="{% url 'tutoring:tutor_interface' lesson.id %}" class="skip-link">Skip pre-test — start the lesson directly →</a>
+</form>
+
+<script>
+// Highlight the selected MCQ option visually.
+document.querySelectorAll('.opt input[type=radio]').forEach(input => {
+    input.addEventListener('change', () => {
+        const stem = input.closest('.dx-q');
+        stem.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
+        input.closest('.opt').classList.add('selected');
+    });
+});
+
+// Build matching JSON payload from the per-row selects.
+function updateMatchPayload(qid) {
+    const selects = document.querySelectorAll(`select[data-mid='${qid}']`);
+    const payload = {};
+    selects.forEach(s => {
+        if (s.value) payload[s.dataset.left] = s.value;
+    });
+    document.getElementById(`match_${qid}_payload`).value = JSON.stringify(payload);
+}
+
+// Disable submit button on submit so a slow page doesn't double-post.
+document.getElementById('dx-form').addEventListener('submit', (e) => {
+    document.getElementById('dx-submit-btn').disabled = true;
+    document.getElementById('dx-submit-btn').textContent = 'Grading…';
+});
+</script>
+{% endblock %}

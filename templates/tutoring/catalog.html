@@ -271,6 +271,9 @@
                     </div>
                     <div class="lesson-meta">
                         <span class="time">⏱️ {{ lesson.estimated_minutes }} min</span>
+                        {% if lesson.status != 'completed' %}
+                        <a href="{% url 'tutoring:lesson_pretest' lesson.id %}" onclick="event.stopPropagation();" style="font-size:0.72rem;color:#92400e;background:#fef3c7;padding:0.15rem 0.55rem;border-radius:999px;text-decoration:none;font-weight:600;border:1px solid #fcd34d;" title="Take a 10-question pre-test instead — pass and the lesson is marked complete.">🎯 Quick check</a>
+                        {% endif %}
                         <span class="arrow">{% if lesson.status == 'completed' %}Review &rarr;{% else %}&rarr;{% endif %}</span>
                     </div>
                 </a>
