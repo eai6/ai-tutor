@@ -254,3 +254,30 @@ Phase A: implement `apps/common/soft_delete.py` with tests, no model
 adoption. Land that as a small, reviewable PR. Then Phase B — adopt
 on `Course` + the cascade-FK migrations — as a separate, more
 involved PR.
+
+## Pending teacher-facing requests (parked, 2026-04-28)
+
+Concrete user-facing actions the user has explicitly asked for that
+this plan needs to deliver. When work resumes, prioritise these:
+
+1. **Remove a unit from a course.** Soft-delete with the standard
+   30-day grace window, then hard-delete via cron. Confirmation
+   modal must spell out: lessons under the unit disappear from
+   teacher view but stay in the DB; student `StudentCompetencyRecord`
+   transcripts persist regardless. Button location:
+   `templates/dashboard/curriculum/course_detail.html` next to each
+   unit's "+ Add Lesson". (User asked 2026-04-28 — held pending the
+   broader soft-delete rollout.)
+
+2. **Remove a course.** Already exists (`course_delete` view at
+   `apps/dashboard/views.py:4194`) but currently hard-deletes. Wrap
+   in soft-delete + 30-day grace as part of Phase B.
+
+3. **Restore / trash UI.** Teacher needs a way to recover a
+   soft-deleted unit/course before the cron purges it. v1 can be
+   admin-only via Django admin's `all_objects` queryset; v2 adds a
+   "Trash" tab on the course detail page.
+
+These are stacked on Phase B (Course adoption); doing Unit first
+lets us validate the approach on a low-blast-radius model before
+touching Course.
