@@ -3591,7 +3591,11 @@ def step_edit(request, step_id):
                             label = result.get('model') or 'image'
                             messages.success(request, f"Regenerated with {label}.")
                         else:
-                            messages.warning(request, "Image generation returned no result.")
+                            err = getattr(service, 'last_error', None)
+                            if err:
+                                messages.warning(request, f"Image generation failed: {err}")
+                            else:
+                                messages.warning(request, "Image generation returned no result.")
                     except Exception as e:
                         logger.error(f"Image regeneration error: {e}")
                         messages.error(request, f"Image generation failed: {e}")

@@ -54,6 +54,9 @@ class ImageGenerationService:
         self._model_config = None
         self._load_model_config()
         self.available = self._check_available()
+        # Last error message — surfaced to the teacher Regenerate UI
+        # when get_or_generate_image returns None so they know WHY.
+        self.last_error: Optional[str] = None
 
     def _load_model_config(self):
         """Load image generation config from ModelConfig if available."""
@@ -141,8 +144,10 @@ class ImageGenerationService:
             Dict with 'url', 'title', 'caption', 'generated', 'model' keys,
             or None on failure.
         """
+        self.last_error = None  # reset between calls
         if not self.available:
             logger.warning(f"Image generation unavailable for: {prompt[:50]}...")
+            self.last_error = "Image generation is disabled or no API keys configured."
             return None
 
         override = (model_override or '').lower().strip() or None
@@ -197,7 +202,7 @@ class ImageGenerationService:
                 prompt=enhanced_prompt,
                 size=size,
                 n=1,
-            )
+            )  # noqa: B009
             data = response.data[0] if response.data else None
             if not data:
                 logger.warning(f"{model}: empty response.data")
@@ -237,6 +242,19 @@ class ImageGenerationService:
         except Exception as e:
             err = str(e)
             logger.error(f"{model} failed: {err[:300]}")
+            # Detect the verification gate so the UI can show a clear
+            # action ("verify your OpenAI org") instead of a generic
+            # "no result" message.
+            if 'verified' in err.lower() or 'must be verified' in err.lower():
+                self.last_error = (
+                    "OpenAI organization is not verified for gpt-image-2. "
+                    "Verify at platform.openai.com/settings/organization/general, "
+                    "wait ~15 min for propagation, then retry."
+                )
+            elif '403' in err or 'forbidden' in err.lower():
+                self.last_error = f"OpenAI {model}: 403 Forbidden — check API key permissions."
+            else:
+                self.last_error = f"OpenAI {model} error: {err[:200]}"
             return None
 
     # ─── Gemini ─────────────────────────────────────────────────────
@@ -367,8 +385,10 @@ class ImageGenerationService:
             err = str(e)
             if '503' in err or 'UNAVAILABLE' in err.upper() or 'overloaded' in err.lower():
                 logger.warning(f"{model} unavailable (503), trying fallback...")
+                self.last_error = f"{model} unavailable (503)"
                 return None
             logger.error(f"{model} failed: {err[:300]}")
+            self.last_error = f"Gemini {model} error: {err[:200]}"
             return None
 
     # ─── Prompt enhancement ─────────────────────────────────────────
@@ -456,12 +476,18 @@ class ImageGenerationService:
         """Save generated image bytes to media library."""
         try:
             from apps.media_library.models import MediaAsset
+            from apps.accounts.models import Institution
 
             prompt_hash = hashlib.md5(prompt.encode()).hexdigest()[:8]
             filename = f"generated_{prompt_hash}{ext}"
 
+            # MediaAsset.institution is NOT NULL. For platform-wide
+            # lessons (institution=None) fall back to the Global
+            # institution so the save doesn't violate the FK.
+            asset_institution = self.institution or Institution.get_global()
+
             asset = MediaAsset.objects.create(
-                institution=self.institution,
+                institution=asset_institution,
                 title=prompt[:100],
                 asset_type='image',
                 caption=f"AI-generated image for: {prompt[:200]}",
@@ -476,6 +502,7 @@ class ImageGenerationService:
 
         except Exception as e:
             logger.error(f"Failed to save generated image: {e}")
+            self.last_error = f"Saved image, but DB write failed: {str(e)[:200]}"
             return None
 
 
