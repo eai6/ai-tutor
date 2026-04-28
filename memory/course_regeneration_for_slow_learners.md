@@ -1,5 +1,29 @@
 # Course Regeneration for Slow / Weaker Learners — Plan (2026-04-28)
 
+## ⚠️ Design revision (2026-04-28)
+
+**Original assumption**: per-course `generation_profile` (standard /
+slow_learner / advanced) drives three different content streams.
+
+**Revised**: lesson content is generated ONCE — always rich enough to
+support the slowest learner (lots of figures, varied recognition +
+production formats, multiple hint levels). **Personalisation happens
+at the tutoring engine, not at content generation.**
+
+Rationale: a single content stream is simpler for teachers (no profile
+decision per course), gives every student access to the same rich
+material, and locates personalisation where it belongs — at runtime,
+informed by the student's actual signals. Adapting at content-time
+would have produced three separate cached lessons that drift apart.
+
+What this means for the work:
+- `Course.generation_profile` field has been **dropped** (commit X).
+- `_profile_rules()` collapsed to a single always-rich ruleset (the
+  numbers below match what the original `slow_learner` profile used).
+- `_validate_against_profile()` still runs on every generation.
+- Phase 2 (tutor engine adaptation) is now the load-bearing
+  personalisation work — see "Revised Phase 2" below.
+
 ## Problem
 
 The Seychelles pilot has students at a wide range of readiness levels. The
@@ -204,7 +228,12 @@ status.
 | `apps/curriculum/content_generator.py` (new method) | `_validate_against_profile(steps, rules)` |
 | `apps/curriculum/tests/test_content_generation_profile.py` | Unit tests for rule selection + validator |
 
-## Backend changes — Phase 2 (sketched)
+## Backend changes — Revised Phase 2 (the load-bearing personalisation)
+
+The single content stream means Phase 2 has to do all the work of
+adapting to learner level. Two layers:
+
+### Layer A — format-aware presentation (mechanical)
 
 `apps/tutoring/conversational_tutor.py`:
 
@@ -223,6 +252,50 @@ status.
   bare numeric answer in `free_text` mode (see
   `memory/feedback_math_tutoring.md`). Format-specific path only
   applies when `answer_type` is explicit.
+
+### Layer B — student-signal-aware adaptation (personalisation)
+
+The tutor reads the student's signals at session start and adapts
+per step. Sources of signal:
+
+- `student.skills_snapshot` (existing) — pretest sub-skill bitmap
+- `pretest_diagnostic` (existing) — first-lesson exit-ticket result
+- Per-session "Too Hard / Too Easy" buttons (existing in the engine
+  but underutilised)
+- Recent `StudentSkillMastery.mastery_level` for skills tagged on
+  the current lesson
+
+Derive a session-level `scaffolding_level ∈ {high, medium, low}`
+("high" = slow learner, "low" = advanced). Per step:
+
+- **scaffolding_level = high (slow learner signal)**:
+  - For a step with `answer_type=free_text`, present the prompt as
+    a T/F or MCQ if the LLM can synthesize plausible distractors
+    (extra LLM call gated to once per step, cached).
+  - Offer all 3 hints early, with shorter sentences.
+  - Slow pace: don't advance until 2 successful attempts.
+  - Use simpler language — invoke an existing
+    "simplify-explanation" prompt path.
+- **scaffolding_level = medium (default)**:
+  - Present each step in its source format. Offer hints on first
+    wrong attempt. Standard advancement criteria.
+- **scaffolding_level = low (advanced signal)**:
+  - For a step with a recognition-format question (MCQ, T/F),
+    convert the prompt to free-text form by stripping the choices
+    ("Explain why X is the answer..."). The LLM grades.
+  - Withhold hints until 2 wrong attempts.
+  - Skip practice steps that the student has already shown
+    mastery on (per `StudentSkillMastery` ≥ 0.8 for tagged skill).
+
+Implementation sketch:
+
+- New helper `_compute_scaffolding_level(student, lesson, session)` →
+  `'high' | 'medium' | 'low'`. Cached on `engine_state`.
+- New helper `_adapt_step_presentation(step, scaffolding_level)` →
+  returns a dict that drives the per-step LLM call.
+- Per-step LLM call in the existing flow gets the adaptation dict
+  injected; format-specific blocks from Layer A still apply.
+- Per-session difficulty buttons override the computed level.
 
 ## Frontend / dashboard — Phase 3 (sketched)
 

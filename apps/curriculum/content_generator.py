@@ -569,74 +569,34 @@ code fence. Example shape:
             return 'tier_3'  # Syllabus Only
         return 'tier_4'  # Framework Only
 
-    def _profile_rules(self, profile: str, target_minutes: int, max_steps: int, is_math: bool) -> Dict:
-        """Concrete generation rules per Course.generation_profile.
+    def _profile_rules(self, target_minutes: int, max_steps: int, is_math: bool) -> Dict:
+        """Always-rich generation rules.
 
-        Each profile drives:
-          - figure floor across the lesson
-          - which step types MUST include media
-          - minimum count of each answer_type across practice/quiz steps
-          - teach-step length cap and hint count
+        Per the 2026-04-28 design decision, lesson content is generated
+        ONCE — rich enough to support slower learners (lots of figures,
+        varied recognition + production formats, multiple hint levels).
+        Personalisation happens at the tutoring engine, not at content
+        generation. So no per-course profile dispatch — every lesson
+        gets the same scaffolding-heavy ruleset.
 
         See memory/course_regeneration_for_slow_learners.md.
         """
-        profile = (profile or 'standard').lower()
-
-        if profile == 'slow_learner':
-            # Visuals everywhere a concept is introduced. Practice
-            # leans on recognition formats (MCQ, T/F) so weaker
-            # learners can demonstrate understanding without being
-            # blocked by free-text production.
-            return {
-                'profile': 'slow_learner',
-                'description': (
-                    "Slower / weaker learners. Prioritise visual scaffolding, "
-                    "concrete examples, and recognition-format questions. "
-                    "Avoid open-ended writing. Short teach blocks."
-                ),
-                'min_figures': max(4, max_steps - 2),
-                'figure_required_step_types': ('engage', 'teach', 'worked_example'),
-                'min_multiple_choice': 2,
-                'min_short_numeric': 1 if is_math else 0,
-                'min_true_false': 1,
-                'max_free_text': 1,
-                'teach_sentence_max': 3,
-                'hint_count': 3,
-            }
-
-        if profile == 'advanced':
-            return {
-                'profile': 'advanced',
-                'description': (
-                    "Advanced learners. Lean toward free-response and "
-                    "synthesis. Fewer hints, deeper questions. Figures "
-                    "only where genuinely needed."
-                ),
-                'min_figures': 1,
-                'figure_required_step_types': (),
-                'min_multiple_choice': 0,
-                'min_short_numeric': 1 if is_math else 0,
-                'min_true_false': 0,
-                'max_free_text': max_steps,  # effectively unbounded
-                'teach_sentence_max': 6,
-                'hint_count': 1,
-            }
-
-        # standard
         return {
-            'profile': 'standard',
             'description': (
-                "Standard mixed-ability calibration. Balance figures "
-                "with text, mix question formats, scaffold with 2 hints."
+                "Generate rich, scaffolding-heavy content suitable for the "
+                "slowest learner in a mixed-ability class. The tutoring "
+                "engine decides at runtime which format / hint depth / pace "
+                "to use per student — content must offer enough variety for "
+                "that adaptation to be possible."
             ),
-            'min_figures': 2,
-            'figure_required_step_types': ('teach',),
-            'min_multiple_choice': 1,
+            'min_figures': max(4, max_steps - 2),
+            'figure_required_step_types': ('engage', 'teach', 'worked_example'),
+            'min_multiple_choice': 2,
             'min_short_numeric': 1 if is_math else 0,
-            'min_true_false': 0,
-            'max_free_text': max(2, max_steps // 2),
-            'teach_sentence_max': 5,
-            'hint_count': 2,
+            'min_true_false': 1,
+            'max_free_text': 1,
+            'teach_sentence_max': 3,
+            'hint_count': 3,
         }
 
     def _validate_against_profile(self, steps: List[Dict], rules: Dict) -> List[str]:
@@ -662,7 +622,7 @@ code fence. Example shape:
         if figure_count < rules['min_figures']:
             issues.append(
                 f"Lesson has {figure_count} figures total; "
-                f"profile '{rules['profile']}' requires at least {rules['min_figures']}."
+                f"need at least {rules['min_figures']} for scaffolding-heavy content."
             )
         if steps_missing_required_figure:
             issues.append(
@@ -706,8 +666,10 @@ code fence. Example shape:
         if format_counts['free_text'] > rules['max_free_text']:
             issues.append(
                 f"Found {format_counts['free_text']} free_text questions; "
-                f"profile '{rules['profile']}' allows at most {rules['max_free_text']}. "
-                f"Convert excess free_text questions to multiple_choice or true_false."
+                f"at most {rules['max_free_text']} allowed (the tutor engine "
+                f"will offer free-text variants of recognition questions to "
+                f"advanced students at runtime). Convert excess free_text "
+                f"questions to multiple_choice or true_false."
             )
 
         # Per-step structural checks for question formats.
@@ -848,13 +810,13 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         max_eos = 1
         is_math = bool(lesson.unit and lesson.unit.course and lesson.unit.course.is_math)
 
-        # Course-level generation profile drives figure density,
-        # question-format mix, and teach-block length. See
-        # memory/course_regeneration_for_slow_learners.md.
-        profile_name = getattr(lesson.unit.course, 'generation_profile', 'standard') or 'standard'
-        profile_rules = self._profile_rules(profile_name, target_minutes, max_steps, is_math)
+        # Always-rich content rules. See
+        # memory/course_regeneration_for_slow_learners.md — generation
+        # is one-size-fits-the-slowest-learner; the tutoring engine
+        # adapts presentation per student at runtime.
+        profile_rules = self._profile_rules(target_minutes, max_steps, is_math)
         profile_str = f"""
-LEARNER PROFILE: {profile_rules['profile']}
+CONTENT SCAFFOLDING — generate rich content that supports the slowest learner.
 {profile_rules['description']}
 
 VISUAL SCAFFOLDING RULES:
@@ -867,7 +829,7 @@ QUESTION FORMAT MIX (across practice + quiz steps):
 - At least {profile_rules['min_multiple_choice']} multiple_choice question(s). choices is REQUIRED (4 options); expected_answer is exactly the LETTER A/B/C/D.
 - At least {profile_rules['min_short_numeric']} short_numeric question(s). expected_answer is the number{' (math: include unit)' if is_math else ''}.
 - At least {profile_rules['min_true_false']} true_false question(s). The question must be a single declarative statement; expected_answer is exactly 'True' or 'False'; choices is null.
-- At most {profile_rules['max_free_text']} free_text question(s). Use only when the concept genuinely requires explanation, not as a default.
+- At most {profile_rules['max_free_text']} free_text question(s). The tutor engine will offer free-text variants to advanced students at runtime, so don't default to free_text in the source content.
 - Every practice or quiz step's answer_type MUST be one of: multiple_choice, short_numeric, true_false, free_text. Do not use 'short_text' or 'free_response' — those are not valid.
 
 TEACHING DEPTH RULES:
@@ -1007,7 +969,7 @@ CONTENT GUIDELINES:
         # teaching step. See apps/curriculum/dok_framework.py.
         system_prompt = system_prompt + "\n\n" + dok_guidance_for("content")
 
-        print(f"[ContentGen] [{lesson.title}] Calling instructor ({self._model_config.provider}/{self._model_config.model_name}) profile={profile_rules['profile']}...", flush=True)
+        print(f"[ContentGen] [{lesson.title}] Calling instructor ({self._model_config.provider}/{self._model_config.model_name})...", flush=True)
 
         def _call_llm(user_prompt: str):
             """Single instructor call returning (steps_list, summary_dict).
@@ -1070,8 +1032,8 @@ CONTENT GUIDELINES:
                 print(f"[ContentGen] [{lesson.title}] ⚠️ profile retry crashed: {e} — keeping original output", flush=True)
 
         elapsed = time.time() - t0
-        print(f"[ContentGen] [{lesson.title}] ✅ {len(steps)} steps generated in {elapsed:.1f}s (profile={profile_rules['profile']})", flush=True)
-        logger.info(f"[{lesson.title}] {len(steps)} steps generated in {elapsed:.1f}s profile={profile_rules['profile']}")
+        print(f"[ContentGen] [{lesson.title}] ✅ {len(steps)} steps generated in {elapsed:.1f}s", flush=True)
+        logger.info(f"[{lesson.title}] {len(steps)} steps generated in {elapsed:.1f}s")
 
         return {
             'success': True,
