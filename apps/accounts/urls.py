@@ -58,6 +58,10 @@ urlpatterns = [
     # Self-service account deletion (linked from settings page)
     path('delete-account/', views.delete_account, name='delete_account'),
 
+    # Email verification (soft gate — banner only)
+    path('verify-email/<str:token>/', views.verify_email, name='verify_email'),
+    path('resend-verification/', views.resend_verification, name='resend_verification'),
+
     # Legacy routes (redirect)
     path('register/', views.register_view, name='register'),
     path('login/', views.login_view, name='login'),

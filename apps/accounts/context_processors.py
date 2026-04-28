@@ -46,3 +46,19 @@ def _build_theme_dict():
 def institution_theme(request):
     """Return platform-wide theme variables for every template."""
     return _build_theme_dict()
+
+
+def email_verification_status(request):
+    """Expose `user_email_verified` to every template so the soft-gate
+    banner can decide whether to show. Defensive — handles users who
+    pre-date the UserEmailStatus migration."""
+    if not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return {'user_email_verified': True}  # treat unauthenticated as no banner
+    if not request.user.email:
+        return {'user_email_verified': True}  # nothing to verify
+    try:
+        from apps.accounts.models import UserEmailStatus
+        status = UserEmailStatus.objects.filter(user=request.user).first()
+        return {'user_email_verified': bool(status and status.verified_at)}
+    except Exception:
+        return {'user_email_verified': True}  # fail-open: don't show banner on error

@@ -470,3 +470,106 @@ class PlatformTerms(models.Model):
     def active_version(cls) -> int:
         active = cls.active()
         return active.version if active else 0
+
+
+# ============================================================================
+# Email verification (role-agnostic — works for students and staff)
+# ============================================================================
+
+class UserEmailStatus(models.Model):
+    """Tracks email verification + digest opt-out for any user (student
+    or staff). One row per User, auto-created on demand via the
+    `for_user` classmethod.
+
+    Soft gate: an unverified user can still log in and use the site;
+    they just see a banner asking them to verify and won't receive
+    the weekly digest.
+    """
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='email_status',
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    # Weekly digest opt-out (CAN-SPAM / GDPR). Default opted-IN.
+    opt_out = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "User email status"
+        verbose_name_plural = "User email statuses"
+
+    def __str__(self):
+        suffix = 'verified' if self.verified_at else 'unverified'
+        return f"{self.user.username} — {suffix}"
+
+    @property
+    def is_verified(self) -> bool:
+        return self.verified_at is not None
+
+    @classmethod
+    def for_user(cls, user):
+        """Idempotent get-or-create. Use everywhere instead of direct .get()."""
+        obj, _ = cls.objects.get_or_create(user=user)
+        return obj
+
+
+class EmailVerificationToken(models.Model):
+    """One-time token sent to verify a user's email at sign-up (or on
+    resend). Tokens expire after 7 days; consumed tokens have
+    `used_at` set so they can't be replayed.
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='email_verification_tokens',
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        state = 'used' if self.used_at else ('expired' if self.is_expired else 'live')
+        return f"{self.user.username} ({state})"
+
+    @property
+    def is_expired(self) -> bool:
+        from django.utils import timezone as _tz
+        return self.expires_at < _tz.now()
+
+    @property
+    def is_valid(self) -> bool:
+        return self.used_at is None and not self.is_expired
+
+    @classmethod
+    def issue(cls, user, ttl_days: int = 7):
+        """Mint a fresh token for `user`. Invalidates any prior live
+        tokens (so resend always supersedes). Returns the new token row.
+        """
+        import secrets
+        from datetime import timedelta
+        from django.utils import timezone as _tz
+        cls.objects.filter(user=user, used_at__isnull=True).update(used_at=_tz.now())
+        return cls.objects.create(
+            user=user,
+            token=secrets.token_urlsafe(32),
+            expires_at=_tz.now() + timedelta(days=ttl_days),
+        )
+
+    def consume(self):
+        """Mark this token as used + flip the user's email_status to
+        verified. Idempotent — re-consuming is a no-op."""
+        from django.utils import timezone as _tz
+        if self.used_at is not None:
+            return
+        self.used_at = _tz.now()
+        self.save(update_fields=['used_at'])
+        status = UserEmailStatus.for_user(self.user)
+        if status.verified_at is None:
+            status.verified_at = _tz.now()
+            status.save(update_fields=['verified_at'])

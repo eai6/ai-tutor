@@ -185,9 +185,21 @@ def student_register(request):
                 role=Membership.Role.STUDENT,
                 is_active=True,
             )
-        
+
+        # Send verification email (soft gate — failure is non-fatal,
+        # student can still log in; banner will nag until verified).
+        if email:
+            from apps.accounts.email_verification import send_verification_email
+            send_verification_email(request, user)
+
         login(request, user)
-        messages.success(request, f"Welcome, {first_name}! 🎉 Let's start learning!")
+        if email:
+            messages.success(
+                request,
+                f"Welcome, {first_name}! 🎉 We sent a verification link to {email} — check your inbox.",
+            )
+        else:
+            messages.success(request, f"Welcome, {first_name}! 🎉 Let's start learning!")
         return redirect('tutoring:catalog')
     
     return render(request, 'accounts/student_register.html', {
@@ -348,6 +360,13 @@ def staff_self_register(request):
                     'terms_accepted_at': _tz.now(),
                 },
             )
+
+        # Send verification email. Staff email is required (validated
+        # above) so this should always have a recipient. Verification
+        # status is independent of admin approval — a teacher can
+        # verify their email before the admin activates the account.
+        from apps.accounts.email_verification import send_verification_email
+        send_verification_email(request, user)
 
         return render(request, 'accounts/staff_pending.html')
 
@@ -856,3 +875,88 @@ def terms_accept(request):
         'terms': active,
         'next_url': next_url,
     })
+
+
+# ============================================================================
+# Email verification (soft gate)
+# ============================================================================
+
+def verify_email(request, token):
+    """Consume an email-verification token and flip the user's
+    UserEmailStatus.verified_at. Idempotent — re-clicking is a no-op
+    success."""
+    from apps.accounts.models import EmailVerificationToken, UserEmailStatus
+
+    row = EmailVerificationToken.objects.filter(token=token).first()
+    if row is None:
+        messages.error(request, "That verification link is invalid or expired. Request a new one.")
+        return redirect('accounts:landing')
+
+    if row.used_at is not None:
+        # Already used — but still report success so re-clicks don't confuse.
+        status = UserEmailStatus.for_user(row.user)
+        if status.is_verified:
+            messages.success(request, "Email already verified — you're all set! ✅")
+        else:
+            messages.error(request, "That verification link was already used.")
+        return redirect('accounts:landing')
+
+    if row.is_expired:
+        messages.error(request, "That verification link has expired. Request a new one.")
+        return redirect('accounts:landing')
+
+    row.consume()
+    messages.success(request, "Email verified! ✅ You'll now receive weekly lesson reminders.")
+
+    # If the user is logged in, drop them on their dashboard. Otherwise,
+    # send them to login so they can pick up where they left off.
+    if request.user.is_authenticated and request.user.id == row.user_id:
+        return redirect_by_role(request.user)
+    return redirect('accounts:landing')
+
+
+@login_required
+def resend_verification(request):
+    """Re-mint and send a verification token for the current user.
+    Always rate-limit-safe at the app level (1 token/2 minutes per
+    user) — earlier tokens get invalidated on the model side."""
+    from apps.accounts.models import EmailVerificationToken, UserEmailStatus
+    from apps.accounts.email_verification import send_verification_email
+
+    # If already verified, no-op.
+    status = UserEmailStatus.for_user(request.user)
+    if status.is_verified:
+        messages.info(request, "Your email is already verified.")
+        return redirect_by_role(request.user)
+
+    if not request.user.email:
+        messages.error(
+            request,
+            "You don't have an email address on file. Add one in Settings first.",
+        )
+        return redirect('accounts:settings')
+
+    # Rate-limit: don't issue a fresh token if one was issued in the
+    # last 2 minutes. Saves the user from spamming the button.
+    from django.utils import timezone as _tz
+    from datetime import timedelta
+    recent = EmailVerificationToken.objects.filter(
+        user=request.user,
+        created_at__gte=_tz.now() - timedelta(minutes=2),
+    ).first()
+    if recent is not None:
+        messages.info(
+            request,
+            f"A verification link was just sent to {request.user.email}. Check your inbox (and spam folder).",
+        )
+        return redirect_by_role(request.user)
+
+    sent = send_verification_email(request, request.user)
+    if sent:
+        messages.success(request, f"Verification link sent to {request.user.email}. ✉️")
+    else:
+        messages.error(
+            request,
+            "Couldn't send the verification email right now. Try again in a few minutes.",
+        )
+    return redirect_by_role(request.user)
