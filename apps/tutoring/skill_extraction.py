@@ -444,9 +444,17 @@ Return JSON:
         Terminal objectives (assessment targets) and enabling objectives (teaching
         steps) both become Skills with SM-2 tracking. Each is tagged with
         objective_type='terminal' or 'enabling' for separate competency reporting.
+
+        Routed through `combined_objectives_for_lesson` so a lesson
+        with empty `enabling_objectives` still yields a Skill from
+        its `lesson.objective` (or title) fallback — every lesson
+        gets at least one trackable competency.
         """
-        # Terminal objectives = what we assess (stored in lesson.enabling_objectives)
-        terminal_objectives = lesson.enabling_objectives or []
+        from apps.curriculum.content_generator import combined_objectives_for_lesson
+
+        # Terminal objectives = lesson-level competencies (the unit of
+        # competency-map reporting). Pulled via the canonical helper.
+        terminal_objectives = combined_objectives_for_lesson(lesson)
         # Enabling objectives = teaching steps (stored in lesson.metadata)
         teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
 

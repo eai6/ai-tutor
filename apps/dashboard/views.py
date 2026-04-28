@@ -1932,9 +1932,11 @@ def lesson_session_report(request, lesson_id):
             if eo and eo not in seen:
                 seen.add(eo)
                 teaching_steps.append(eo)
-    # Fallback to lesson.enabling_objectives (TO chunks)
+    # Fallback to the canonical helper (TOs + EOs + lesson.objective + title) —
+    # same source of truth used by summative tagging and the competency matrix.
     if not teaching_steps:
-        teaching_steps = lesson.enabling_objectives or []
+        from apps.curriculum.content_generator import combined_objectives_for_lesson
+        teaching_steps = combined_objectives_for_lesson(lesson)
 
     total_objectives = len(teaching_steps)
 

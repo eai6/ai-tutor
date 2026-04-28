@@ -659,17 +659,23 @@ class ConversationalTutor:
     def _load_enabling_objectives(self) -> List[Dict]:
         """Load enabling objectives for systematic coverage tracking (P1.2).
 
-        Collects objectives from the lesson model and from individual step fields.
-        Returns empty list for old lessons without objectives (graceful fallback).
+        Routes through `combined_objectives_for_lesson` (the single
+        source of truth — same helper the summative + competency map
+        use) so the tutor never sees a different objective list than
+        the matrix that reports on it.
         """
+        from apps.curriculum.content_generator import combined_objectives_for_lesson
         all_objectives = set()
 
-        # From lesson-level enabling_objectives
-        for obj in (self.lesson.enabling_objectives or []):
+        # Lesson-level objectives via the canonical helper (TOs + EOs
+        # + lesson.objective fallback chain).
+        for obj in combined_objectives_for_lesson(self.lesson):
             if obj and obj.strip():
                 all_objectives.add(obj.strip())
 
-        # From step-level enabling_objective fields
+        # From step-level enabling_objective fields (per-step
+        # granularity used inside this engine for scaffolding —
+        # never propagated to cross-attempt reporting).
         for step in self.steps:
             eo = getattr(step, 'enabling_objective', '')
             if eo and eo.strip():
