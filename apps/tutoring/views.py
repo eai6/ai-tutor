@@ -380,6 +380,29 @@ def lesson_catalog(request):
                         lesson['recommended_reason'] = recommended_reason
                         break
 
+        # Summative status for the catalog "📝 Course exam" link.
+        # Shown once baseline_required is False (i.e. student has at
+        # least the baseline attempt) so retakes are discoverable.
+        summative_attempts_count = 0
+        summative_published = False
+        if request.user.is_authenticated:
+            try:
+                from apps.tutoring.models import ExitTicket as _ET, ExitTicketAttempt as _ETA
+                _sum = _ET.objects.filter(
+                    course=course,
+                    assessment_type=_ET.AssessmentType.SUMMATIVE,
+                    is_published=True,
+                ).first()
+                summative_published = bool(_sum)
+                if _sum:
+                    summative_attempts_count = _ETA.objects.filter(
+                        exit_ticket=_sum,
+                        student=request.user,
+                        completed_at__isnull=False,
+                    ).count()
+            except Exception:
+                pass
+
         subject_data = {
             'id': course.id,
             'title': course.title,
@@ -392,6 +415,9 @@ def lesson_catalog(request):
             'grade_display': grade_display,
             'baseline_required': bool(baseline_summative),
             'baseline_url': f"/tutor/summative/{course.id}/" if baseline_summative else None,
+            'summative_published': summative_published,
+            'summative_attempts_count': summative_attempts_count,
+            'summative_url': f"/tutor/summative/{course.id}/" if summative_published else None,
             'recommended_lesson_id': recommended_lesson_id,
             'recommended_reason': recommended_reason,
         }
@@ -1867,6 +1893,19 @@ def summative_review(request, course_id, attempt_id):
     per_q = (attempt.answers.get('result') or {}).get('per_question') or []
     per_q_by_id = {row['question_id']: row for row in per_q}
 
+    # Show all the student's completed attempts on this summative so they
+    # can track growth across baseline → final → any retakes.
+    prior_attempts = list(
+        ExitTicketAttempt.objects.filter(
+            exit_ticket=summative,
+            student=request.user,
+            completed_at__isnull=False,
+        ).order_by('completed_at')
+    )
+    for p in prior_attempts:
+        # Stamp questions_per_attempt for the template (no FK trip).
+        p.questions_per_attempt = summative.questions_per_attempt
+
     return render(request, 'tutoring/summative/review.html', {
         'course': course,
         'summative': summative,
@@ -1874,6 +1913,7 @@ def summative_review(request, course_id, attempt_id):
         'questions': questions,
         'per_q_by_id': per_q_by_id,
         'result': attempt.answers.get('result') or {},
+        'prior_attempts': prior_attempts,
     })
 
 
