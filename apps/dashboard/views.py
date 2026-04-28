@@ -3155,10 +3155,21 @@ def lesson_regenerate(request, lesson_id):
         lookup['unit__course__institution'] = institution
     lesson = get_object_or_404(Lesson, **lookup)
 
-    # Don't pre-set content_status='generating' here — the worker
-    # (`generate_complete_lesson`) skips when it sees that status, to
-    # prevent two threads racing. Set the lesson back to 'empty' first
-    # so the worker can take it.
+    # Guard: skip if a generation is already in flight. This is THE
+    # bug that produced "cancelled before media" + multi-spawn loops:
+    # each rapid click was wiping in-progress state and spawning a
+    # new task that pre-empted the previous.
+    if lesson.content_status == 'generating':
+        messages.info(
+            request,
+            f"'{lesson.title}' is already generating. Wait a minute "
+            f"and refresh — clicking again won't make it faster.",
+        )
+        return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
+    # Wipe partial state then spawn. Status='empty' is the signal the
+    # worker reads as "not running yet"; the worker sets 'generating'
+    # itself once it starts.
     lesson.steps.all().delete()
     ExitTicket.objects.filter(lesson=lesson).delete()
     lesson.content_status = 'empty'
@@ -3864,7 +3875,11 @@ def cancel_lesson_generation(request, lesson_id):
     lesson = get_object_or_404(Lesson, **lookup)
 
     if lesson.content_status == 'generating':
-        lesson.content_status = 'empty'
+        # Set the explicit 'cancelled' sentinel — that's the ONE state
+        # the worker's _is_cancelled() listens for. Status 'empty' /
+        # 'pending' are normal-flow states and must NOT be read as
+        # a cancel signal (that triggered the multi-spawn race).
+        lesson.content_status = 'cancelled'
         lesson.save(update_fields=['content_status'])
         messages.success(request, f"Cancelled generation for '{lesson.title}'.")
     else:

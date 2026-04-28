@@ -899,9 +899,16 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
     lesson.save(update_fields=['content_status'])
 
     def _is_cancelled():
-        """Check if lesson generation was cancelled (status changed externally)."""
+        """Return True only when the teacher explicitly cancelled.
+
+        Before: any non-'generating' status counted as a cancel
+        signal — but races between view-side resets ('empty') and
+        worker-side status writes ('generating') triggered spurious
+        cancellations mid-pipeline. Now we only honour the explicit
+        'cancelled' sentinel set by `cancel_lesson_generation`.
+        """
         lesson.refresh_from_db()
-        return lesson.content_status != 'generating'
+        return lesson.content_status == 'cancelled'
 
     try:
         # Step 1: Generate lesson steps
