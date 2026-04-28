@@ -21,19 +21,31 @@ logger = logging.getLogger(__name__)
 
 
 def combined_objectives_for_lesson(lesson) -> List[str]:
-    """Return the lesson's teaching objectives.
+    """Return the lesson's teaching objectives — the SINGLE SOURCE OF
+    TRUTH for what objectives a lesson teaches.
 
-    Each lesson now owns ONE teaching objective (parser-enforced). This
-    helper still combines the lesson's `enabling_objectives` with the
-    parent unit's `terminal_objectives` for backwards compatibility with
-    legacy multi-objective lessons in the database — so a lesson that
-    pre-dates the 1:1 rule still pulls every relevant objective into
-    content + assessment generation.
+    Read order (first non-empty wins, deduped):
+      1. parent unit's `terminal_objectives` (broader outcomes)
+      2. lesson's `enabling_objectives` (granular skills, expanded via
+         `_expand_to_granular_subskills` during content generation)
+      3. lesson's `objective` field (the singular CharField populated
+         by curriculum parsing — always present)
+      4. lesson's `title` (last-ditch fallback so the helper never
+         returns an empty list when the lesson exists)
 
-    Order: parent-unit TOs first, then the lesson's own EOs. Deduped
-    case-insensitively on whitespace-normalized text.
+    The fallback chain matters because every downstream consumer —
+    content generation, exit ticket tagging, summative tagging, the
+    teacher competency map — calls this helper. If they each had
+    their own fallback policy (or none), the same lesson could end up
+    tagged differently in each system, breaking the join between
+    "what students attempted" and "what objectives we report on".
 
-    See `~/.claude/projects/.../memory/feedback_teaching_steps_unification.md`.
+    Each lesson nominally owns ONE teaching objective (parser-enforced
+    1:1 contract); the multi-element return supports legacy
+    pre-1:1 lessons and unit-level rollups.
+
+    See `~/.claude/projects/.../memory/feedback_teaching_steps_unification.md`
+    and `memory/course_regeneration_for_slow_learners.md`.
     """
     eos = list(lesson.enabling_objectives or [])
     tos: List[str] = []
@@ -53,7 +65,18 @@ def combined_objectives_for_lesson(lesson) -> List[str]:
             continue
         seen.add(key)
         merged.append(str(obj).strip())
-    return merged
+
+    if merged:
+        return merged
+
+    # Fallback chain — lesson is real, must produce something.
+    fallback = (getattr(lesson, 'objective', '') or '').strip()
+    if fallback:
+        return [fallback]
+    title = (getattr(lesson, 'title', '') or '').strip()
+    if title:
+        return [title]
+    return []
 
 
 # ============================================================================

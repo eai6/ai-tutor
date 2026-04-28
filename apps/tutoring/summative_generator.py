@@ -123,7 +123,10 @@ def _process_lesson(lesson_id: int, institution_id: int, k: int, seed_for_lesson
 
     rng = random.Random(seed_for_lesson)
     picks = _sample_questions(et, k, rng)
-    objectives = combined_objectives_for_lesson(lesson) or [lesson.title]
+    # combined_objectives_for_lesson is the SINGLE SOURCE OF TRUTH —
+    # it now falls back to lesson.objective and lesson.title internally,
+    # so every summative + competency-map consumer sees the same tags.
+    objectives = combined_objectives_for_lesson(lesson)
     primary_objective = objectives[0] if objectives else lesson.title
 
     # Snapshot fields so we can recreate as new summative questions in the parent thread.
