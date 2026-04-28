@@ -937,6 +937,8 @@ def chat_respond(request, session_id):
             "milestone": result.milestone,
             # Rich HTML artifact (rendered in sandboxed iframe)
             "artifact_html": getattr(result, 'artifact_html', None),
+            # Easy-mode interactive probe (MCQ / fill-in-blank widget).
+            "probe": getattr(result, 'probe', None),
         })
     except Exception as e:
         logger.error(f"[respond] Failed: {e}", exc_info=True)

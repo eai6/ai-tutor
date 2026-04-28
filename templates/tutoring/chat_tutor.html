@@ -445,6 +445,138 @@ body {
     font-style: italic;
 }
 
+/* ── Easy-mode interactive probe widget ──
+   Inline radio (MCQ) / input (fill-in-blank) below the tutor bubble
+   for low-difficulty practice questions. Sparkle on correct, hint
+   on wrong. */
+.probe-widget {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    font-size: 0.9rem;
+}
+.probe-widget .probe-stem {
+    font-weight: 500;
+    color: #111;
+    margin-bottom: 0.5rem;
+    font-size: 0.92rem;
+}
+.probe-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+.probe-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    background: #fff;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    font-size: 0.92rem;
+    color: #111;
+}
+.probe-option:hover {
+    border-color: #a78bfa;
+    background: #f5f3ff;
+}
+.probe-option.selected {
+    border-color: #7c3aed;
+    background: #f5f3ff;
+}
+.probe-option .opt-letter {
+    font-weight: 700;
+    color: #7c3aed;
+    width: 1.5em;
+    flex-shrink: 0;
+}
+.probe-option.correct {
+    border-color: #16a34a;
+    background: #dcfce7;
+    color: #14532d;
+}
+.probe-option.wrong {
+    border-color: #ef4444;
+    background: #fee2e2;
+    color: #7f1d1d;
+}
+.probe-fill-input {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    margin-bottom: 0.5rem;
+}
+.probe-fill-input:focus {
+    outline: none;
+    border-color: #7c3aed;
+}
+.probe-fill-input.correct { border-color: #16a34a; background: #dcfce7; color: #14532d; }
+.probe-fill-input.wrong { border-color: #ef4444; background: #fee2e2; color: #7f1d1d; }
+.probe-actions {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+.probe-submit {
+    padding: 0.5rem 1rem;
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+.probe-submit:hover { background: #6d28d9; }
+.probe-submit:disabled { background: #d1d5db; cursor: not-allowed; }
+.probe-feedback {
+    margin-top: 0.55rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+.probe-feedback.correct {
+    background: #dcfce7;
+    color: #14532d;
+    border: 1px solid #86efac;
+}
+.probe-feedback.wrong {
+    background: #fef3c7;
+    color: #78350f;
+    border: 1px solid #fcd34d;
+}
+.probe-feedback .feedback-icon {
+    font-size: 1.15rem;
+    margin-right: 0.3rem;
+}
+@keyframes probe-sparkle {
+    0%   { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+    40%  { transform: scale(1.2) rotate(8deg);  opacity: 1; }
+    70%  { transform: scale(0.95) rotate(-4deg); opacity: 1; }
+    100% { transform: scale(1)    rotate(0);    opacity: 1; }
+}
+.probe-celebrate {
+    display: inline-block;
+    animation: probe-sparkle 0.6s ease-out;
+}
+@keyframes probe-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+.probe-shake { animation: probe-shake 0.35s ease-in-out; }
+
 /* Desktop: small inline thumbnail that opens artifact panel */
 .media-panel-trigger {
     cursor: pointer;
@@ -1365,6 +1497,7 @@ function sanitizeContent(text) {
         .replace(/\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|/g, '')
         .replace(/\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|/g, '')
         .replace(/\|\|\|ARTIFACT:html\|\|\|[\s\S]*?\|\|\|\/ARTIFACT\|\|\|/g, '')
+        .replace(/\|\|\|PROBE\s*:\s*\{[\s\S]*?\}\s*\|\|\|/g, '')
         .replace(/ {2,}/g, ' ')
         .trim();
 }
@@ -1661,7 +1794,7 @@ function handleResponse(data) {
     updateStepProgress(data);
 
     // Add tutor message
-    addMessage('tutor', data.message, data.media, data.artifact_html);
+    addMessage('tutor', data.message, data.media, data.artifact_html, data.probe || null);
 
     // Handle exit ticket
     if (data.show_exit_ticket && data.exit_ticket) {
@@ -1680,7 +1813,7 @@ function handleResponse(data) {
     userInput.focus();
 }
 
-function addMessage(role, content, media = [], artifactHtml = null) {
+function addMessage(role, content, media = [], artifactHtml = null, probe = null) {
     const div = document.createElement('div');
     div.className = `message ${role}`;
 
@@ -1757,9 +1890,174 @@ function addMessage(role, content, media = [], artifactHtml = null) {
         });
     });
 
+    // Easy-mode interactive probe widget (MCQ / fill-in-blank).
+    // The tutor LLM emits a |||PROBE:{...}||| signal when in easy mode;
+    // server parses it and surfaces it as data.probe. We render
+    // radio/input below the bubble and evaluate locally on submit.
+    if (probe && role === 'tutor') {
+        const widget = renderProbeWidget(probe);
+        if (widget) {
+            div.querySelector('.bubble-wrapper').appendChild(widget);
+        }
+    }
+
     chatMessages.insertBefore(div, typing);
     scrollToBottom();
     return div;
+}
+
+// Render the inline interactive probe (MCQ or fill). Evaluation is
+// client-side; on correct, the picked answer is auto-submitted to the
+// tutor as a chat message so the conversation advances.
+function renderProbeWidget(probe) {
+    if (!probe || !probe.type) return null;
+    const wrap = document.createElement('div');
+    wrap.className = 'probe-widget';
+
+    const stemEl = document.createElement('div');
+    stemEl.className = 'probe-stem';
+    stemEl.textContent = probe.stem || '';
+    wrap.appendChild(stemEl);
+
+    const PRAISE = ['Yes! ✨', 'Nice work! 🌟', 'Got it! 🎉', 'Exactly! 💫', 'Perfect! ⭐'];
+    const ENCOURAGE = [
+        'Not quite — give it another try! 💪',
+        'Close! Have another go. 🔍',
+        'Almost — read the hint and try again. 🌱',
+        "You're learning — try once more. 🌟",
+    ];
+
+    let attempts = 0;
+    let locked = false;
+    let selected = null;
+
+    const feedback = document.createElement('div');
+    feedback.style.display = 'none';
+
+    function showCorrect(picked) {
+        const sparkle = PRAISE[Math.floor(Math.random() * PRAISE.length)];
+        feedback.className = 'probe-feedback correct';
+        feedback.innerHTML = `<span class="feedback-icon probe-celebrate">${sparkle.split(' ').slice(-1)[0]}</span> <strong>${sparkle.split(' ').slice(0, -1).join(' ')}</strong>`;
+        feedback.style.display = 'block';
+        locked = true;
+        // Auto-send the picked answer to the tutor so the conversation advances.
+        // performSend is the existing chat send fn; passing the answer
+        // triggers the normal eval/advance flow on the server.
+        setTimeout(() => {
+            const answerText = probe.type === 'mcq' ? picked : picked;
+            try { performSend(answerText); } catch (e) { console.warn('probe auto-send failed', e); }
+        }, 800);
+    }
+
+    function showWrong() {
+        wrap.classList.add('probe-shake');
+        setTimeout(() => wrap.classList.remove('probe-shake'), 400);
+        const enc = ENCOURAGE[Math.floor(Math.random() * ENCOURAGE.length)];
+        const hint = (probe.hints && probe.hints[Math.min(attempts - 1, probe.hints.length - 1)]) || '';
+        feedback.className = 'probe-feedback wrong';
+        feedback.innerHTML = `<strong>${enc}</strong>` + (hint ? `<br><span style="opacity:0.85;">💡 ${hint}</span>` : '');
+        feedback.style.display = 'block';
+        // After 2 wrong attempts, reveal answer and unlock so they can move on.
+        if (attempts >= 2) {
+            const correctVal = probe.type === 'mcq'
+                ? `<strong>${probe.answer}</strong>`
+                : `<strong>${probe.answer}</strong>`;
+            feedback.innerHTML += `<br><span style="opacity:0.85;">The answer is ${correctVal}. That's okay — keep going!</span>`;
+            locked = true;
+            // Auto-advance after revealing answer so the student isn't stuck.
+            setTimeout(() => {
+                try { performSend(probe.answer); } catch (e) { console.warn('probe reveal-send failed', e); }
+            }, 1800);
+        }
+    }
+
+    function evalAnswer(picked) {
+        if (locked) return;
+        attempts += 1;
+        const correctRaw = (probe.answer || '').trim();
+        const pickedRaw = (picked || '').trim();
+        let isCorrect = false;
+        if (probe.type === 'mcq') {
+            isCorrect = pickedRaw.toUpperCase() === correctRaw.toUpperCase();
+        } else {
+            const norm = (s) => s.toString().toLowerCase().replace(/\s+/g, '').replace(/,/g, '');
+            isCorrect = norm(pickedRaw) === norm(correctRaw)
+                || (probe.alternates || []).some((a) => norm(a) === norm(pickedRaw));
+        }
+        if (isCorrect) showCorrect(picked);
+        else showWrong();
+    }
+
+    if (probe.type === 'mcq') {
+        const opts = document.createElement('div');
+        opts.className = 'probe-options';
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        (probe.options || []).slice(0, 6).forEach((text, i) => {
+            const letter = letters[i];
+            const opt = document.createElement('label');
+            opt.className = 'probe-option';
+            opt.dataset.letter = letter;
+            opt.innerHTML = `<span class="opt-letter">${letter}.</span><span>${text}</span>`;
+            opt.addEventListener('click', () => {
+                if (locked) return;
+                opts.querySelectorAll('.probe-option').forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                selected = letter;
+            });
+            opts.appendChild(opt);
+        });
+        wrap.appendChild(opts);
+    } else {
+        // fill-in-blank
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'probe-fill-input';
+        input.placeholder = 'Type your answer…';
+        input.autocomplete = 'off';
+        input.addEventListener('input', () => { selected = input.value; });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !locked) {
+                e.preventDefault();
+                submit.click();
+            }
+        });
+        wrap.appendChild(input);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'probe-actions';
+    const submit = document.createElement('button');
+    submit.type = 'button';
+    submit.className = 'probe-submit';
+    submit.textContent = 'Check answer';
+    submit.addEventListener('click', () => {
+        if (locked) return;
+        if (probe.type === 'mcq') {
+            if (!selected) return;  // need to pick one
+            evalAnswer(selected);
+            // Highlight the picked option green/red after eval
+            wrap.querySelectorAll('.probe-option').forEach(o => {
+                if (o.dataset.letter === selected) {
+                    o.classList.remove('selected');
+                    const correct = selected.toUpperCase() === (probe.answer || '').toUpperCase();
+                    o.classList.add(correct ? 'correct' : 'wrong');
+                }
+            });
+        } else {
+            const input = wrap.querySelector('.probe-fill-input');
+            const val = (input.value || '').trim();
+            if (!val) return;
+            evalAnswer(val);
+            const norm = (s) => s.toString().toLowerCase().replace(/\s+/g, '').replace(/,/g, '');
+            const ok = norm(val) === norm(probe.answer || '')
+                || (probe.alternates || []).some((a) => norm(a) === norm(val));
+            input.classList.add(ok ? 'correct' : 'wrong');
+        }
+    });
+    actions.appendChild(submit);
+    wrap.appendChild(actions);
+    wrap.appendChild(feedback);
+    return wrap;
 }
 
 let isSending = false;
@@ -1839,7 +2137,7 @@ function applyTutorResponse(data) {
         return;
     }
     stopCurrentAudio();
-    addMessage('tutor', data.message, data.media || [], data.artifact_html);
+    addMessage('tutor', data.message, data.media || [], data.artifact_html, data.probe || null);
     if (data.is_correct) showCorrectFeedback(data.streak_count);
     if (data.milestone) showMilestone(data.milestone, data.step_number, data.total_steps);
     if (data.phase) phaseBadge.textContent = phaseLabel(data.phase);

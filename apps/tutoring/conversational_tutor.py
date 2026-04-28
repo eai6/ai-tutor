@@ -440,6 +440,11 @@ class TutorMessage:
     # Rich HTML artifact (rendered in sandboxed iframe)
     artifact_html: Optional[str] = None
 
+    # Easy-mode interactive probe (MCQ / fill-in-blank widget). When
+    # set, the frontend renders an inline widget below the tutor's
+    # text. Set by _parse_probe_signal from a |||PROBE:{json}||| tag.
+    probe: Optional[Dict] = None
+
     # Metadata
     skills_covered: List[str] = field(default_factory=list)
     tokens_used: int = 0
@@ -867,8 +872,8 @@ class ConversationalTutor:
         ).order_by('created_at')
 
         _tag_re = re.compile(
-            r'\[SHOW_MEDIA\s*:[^\]]*\]|\|\|\|MEDIA\s*:\s*\d+\s*\|\|\||\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|',
-            re.IGNORECASE,
+            r'\[SHOW_MEDIA\s*:[^\]]*\]|\|\|\|MEDIA\s*:\s*\d+\s*\|\|\||\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\||\|\|\|PROBE\s*:\s*\{.+?\}\s*\|\|\|',
+            re.IGNORECASE | re.DOTALL,
         )
 
         conversation = []
@@ -1355,6 +1360,8 @@ Keep it to 2-3 sentences."""
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media, gen_request = self._parse_media_signal(response)
         clean_response, artifact_html = self._parse_artifact_signal(clean_response)
+        # Parse |||PROBE:{json}||| for easy-mode interactive widget.
+        clean_response, parsed_probe = self._parse_probe_signal(clean_response)
 
         # Verify calculations in math responses
         if self.lesson.unit.course.is_math:
@@ -1531,7 +1538,9 @@ Keep it to 2-3 sentences."""
         self._save_turn("tutor", clean_response, metadata=turn_metadata)
         self.conversation.append({"role": "assistant", "content": clean_response})
 
-        return self._create_message(clean_response, media=media, artifact_html=artifact_html)
+        return self._create_message(
+            clean_response, media=media, artifact_html=artifact_html, probe=parsed_probe,
+        )
 
     def _prepare_response(self, student_input: str) -> Optional[Dict]:
         """
@@ -2440,11 +2449,27 @@ formats with visual anchors, NOT open-text working-required questions.
 
 QUESTION FORMAT (this is the important change):
 - Pose practice questions as MCQ or fill-in-blank, NOT open-ended.
-- MCQ template: "Which of these is correct? (A) ... (B) ... (C) ... (D) ..."
-  → Accept the LETTER (A/B/C/D) as a complete answer. Do NOT ask
-  for working when they pick a letter.
-- Fill-in-blank template: "Fill in the blank: 12 + ___ = 20"
-  → Accept the filled value as a complete answer.
+- ALSO emit a |||PROBE:{{json}}||| signal at the END of your message
+  whenever you ask a practice question. The frontend renders an
+  interactive widget (radio buttons / input) below your message
+  and gives the student instant feedback (sparkle on correct, hint
+  on wrong). Without the signal the question is plain text only.
+
+PROBE TAG SCHEMA — emit AFTER your prose, on its own line, EXACTLY:
+  |||PROBE:{{"type":"mcq","stem":"<question>","options":["A text","B text","C text","D text"],"answer":"B","hints":["hint if they pick wrong","second-try hint"]}}|||
+or for fill-in-blank:
+  |||PROBE:{{"type":"fill","stem":"<question>","answer":"42","alternates":["forty-two"],"hints":["..."]}}|||
+
+Rules for the JSON:
+- Use double-quoted JSON. No trailing commas. No comments.
+- For mcq: exactly 4 options. `answer` is a single letter A/B/C/D.
+- For fill: `answer` is the canonical correct value. `alternates`
+  is optional and lists equivalent accepted forms (e.g. "42" and
+  "forty-two", or "0.5" and "1/2").
+- `hints`: 1-3 short, encouraging nudges. Don't reveal the answer.
+- The `stem` should match (or summarize) the question text in your
+  prose so the widget makes sense even without scrolling.
+
 - For math: STILL show worked examples first (math memory rules),
   but the student's PRACTICE response is a letter or single number.
 - Always include or reference a visual/diagram when one helps anchor
@@ -5182,6 +5207,49 @@ Do NOT just ask a quiz question — actually RE-TEACH the concept first, then ch
             metadata=metadata or {},
         )
     
+    def _parse_probe_signal(self, text: str) -> Tuple[str, Optional[Dict]]:
+        """Parse |||PROBE:{json}||| from LLM output for the easy-mode
+        interactive question widget (MCQ / fill-in-blank).
+
+        Expected JSON shape:
+          {
+            "type": "mcq" | "fill",
+            "stem": "<question text — usually duplicated above>",
+            "options": ["...", "...", "...", "..."],   // mcq only
+            "answer": "B" | "42" | "8.5",               // canonical
+            "alternates": ["forty-two", ...],           // optional, fill
+            "hints": ["...", "..."]                     // shown on wrong
+          }
+
+        Returns (clean_text, probe_dict_or_None). The signal is always
+        stripped from the response so it never reaches the DB or the
+        student's chat bubble.
+        """
+        import json as _json
+        match = re.search(r'\|\|\|PROBE\s*:\s*(\{.+?\})\s*\|\|\|', text, re.DOTALL)
+        if not match:
+            return text, None
+        clean_text = (text[:match.start()] + text[match.end():]).strip()
+        try:
+            probe = _json.loads(match.group(1))
+        except Exception:
+            return clean_text, None
+        if not isinstance(probe, dict):
+            return clean_text, None
+        ptype = (probe.get('type') or '').lower()
+        if ptype not in ('mcq', 'fill'):
+            return clean_text, None
+        # Normalize fields the frontend depends on.
+        normalized = {
+            'type': ptype,
+            'stem': str(probe.get('stem') or ''),
+            'options': list(probe.get('options') or []) if ptype == 'mcq' else [],
+            'answer': str(probe.get('answer') or '').strip(),
+            'alternates': [str(a).strip() for a in (probe.get('alternates') or []) if str(a).strip()],
+            'hints': [str(h).strip() for h in (probe.get('hints') or []) if str(h).strip()],
+        }
+        return clean_text, normalized
+
     def _parse_media_signal(self, text: str) -> Tuple[str, Optional[Dict], Optional[Dict]]:
         """Parse |||MEDIA:N||| or |||GENERATE:category:description||| from LLM output.
 
@@ -5276,13 +5344,17 @@ Do NOT just ask a quiz question — actually RE-TEACH the concept first, then ch
         html = re.sub(r'href\s*=\s*["\']javascript:[^"\']*["\']', '', html, flags=re.IGNORECASE)
         return html.strip()
 
-    def _create_message(self, content: str, media: List[Dict] = None, artifact_html: str = None) -> TutorMessage:
+    def _create_message(
+        self, content: str, media: List[Dict] = None, artifact_html: str = None,
+        probe: Optional[Dict] = None,
+    ) -> TutorMessage:
         """Create a TutorMessage from content."""
-        # Defense-in-depth: strip legacy, MEDIA, GENERATE, and ARTIFACT signal tags
+        # Defense-in-depth: strip legacy, MEDIA, GENERATE, ARTIFACT, and PROBE signal tags
         content = re.sub(r'\[SHOW_MEDIA\s*:[^\]]*\]', '', content, flags=re.IGNORECASE)
         content = re.sub(r'\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|', '', content)
         content = re.sub(r'\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|', '', content)
         content = re.sub(r'\|\|\|ARTIFACT:html\|\|\|.*?\|\|\|/ARTIFACT\|\|\|', '', content, flags=re.DOTALL)
+        content = re.sub(r'\|\|\|PROBE\s*:\s*\{.+?\}\s*\|\|\|', '', content, flags=re.DOTALL)
         content = re.sub(r' {2,}', ' ', content)
         content = re.sub(r'\n{3,}', '\n\n', content)
         content = content.strip()
@@ -5293,6 +5365,7 @@ Do NOT just ask a quiz question — actually RE-TEACH the concept first, then ch
             phase=self._get_display_phase(),
             media=media or [],
             artifact_html=artifact_html,
+            probe=probe,
             expects_response=self.session_state != SessionState.COMPLETED,
             step_number=step_num,
             total_steps=total,
