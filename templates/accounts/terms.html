@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load dashboard_extras %}
 
 {% block title %}{% if terms %}{{ terms.title }}{% else %}Terms{% endif %} — AI Tutor{% endblock %}
 
@@ -17,7 +18,7 @@
     {% if terms %}
         <h1>{{ terms.title }}</h1>
         <div class="terms-meta">Version {{ terms.version }}{% if terms.effective_date %} · effective {{ terms.effective_date|date:"M j, Y" }}{% endif %}</div>
-        <div class="terms-body">{{ terms.body|linebreaks }}</div>
+        <div class="terms-body">{{ terms.body|render_markdown }}</div>
     {% else %}
         <h1>Terms not published</h1>
         <p>No platform terms are currently published.</p>

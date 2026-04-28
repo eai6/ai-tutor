@@ -289,7 +289,7 @@ class LessonContentGenerator:
                     topic=f"{lesson.title} {lesson.objective or ''}",
                     subject=subject,
                     n_results=5,
-                    grade_level=curriculum_context.get('grade_level', ''),
+                    grade_level=(course.grade_level if course else ''),
                 )
                 for fig in figures:
                     figure_descriptions.append({

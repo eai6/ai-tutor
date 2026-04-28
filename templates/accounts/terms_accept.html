@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load dashboard_extras %}
 
 {% block title %}Updated terms — AI Tutor{% endblock %}
 
@@ -29,7 +30,7 @@
 
         {% if error %}<div class="ta-error">{{ error }}</div>{% endif %}
 
-        <div class="ta-body">{{ terms.body|linebreaks }}</div>
+        <div class="ta-body">{{ terms.body|render_markdown }}</div>
 
         <form method="post" action="">
             {% csrf_token %}

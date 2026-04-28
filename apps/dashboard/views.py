@@ -1998,7 +1998,23 @@ def lesson_session_report(request, lesson_id):
 
         session = sessions.filter(student_id=sid).order_by('-started_at').first()
 
-        pct = round(achieved_count / total_objectives * 100) if total_objectives else 0
+        # Competency percentage:
+        # - When the student has taken the exit ticket, use the actual
+        #   score / served-question-count. That's the real signal.
+        # - Fall back to the objective-coverage ratio only when no exit
+        #   attempt exists (and even then, no `pct` should imply BE —
+        #   we treat that as Unassessed).
+        # The earlier behaviour bucketed an 80% exit ticket as BE because
+        # `total_objectives` was 0 → pct=0 → BE category. Fixed.
+        if exit_attempt:
+            served = (
+                exit_attempt.exit_ticket.questions_per_attempt
+                if exit_attempt.exit_ticket and exit_attempt.exit_ticket.questions_per_attempt
+                else 10
+            )
+            pct = round(((exit_attempt.score or 0) / served) * 100) if served else 0
+        else:
+            pct = round(achieved_count / total_objectives * 100) if total_objectives else 0
 
         # Calculate exit ticket completion time
         exit_time_minutes = None
@@ -2029,7 +2045,10 @@ def lesson_session_report(request, lesson_id):
             'total': total_objectives,
             'pct': pct,
             'category': category,
-            'exit_score': f"{exit_attempt.score}/10" if exit_attempt else '—',
+            'exit_score': (
+                f"{exit_attempt.score}/{(exit_attempt.exit_ticket.questions_per_attempt or 10) if exit_attempt.exit_ticket else 10}"
+                if exit_attempt else '—'
+            ),
             'exit_passed': exit_attempt.passed if exit_attempt else None,
             'exit_time': f"{exit_time_minutes:.0f} min" if exit_time_minutes else '—',
             'session_status': session.status if session else 'not_started',
@@ -3133,11 +3152,13 @@ def lesson_regenerate(request, lesson_id):
         lookup['unit__course__institution'] = institution
     lesson = get_object_or_404(Lesson, **lookup)
 
-    # Reset existing content + flag as generating, all synchronously so
-    # the user lands on a clean state. Heavy lifting is async.
+    # Don't pre-set content_status='generating' here — the worker
+    # (`generate_complete_lesson`) skips when it sees that status, to
+    # prevent two threads racing. Set the lesson back to 'empty' first
+    # so the worker can take it.
     lesson.steps.all().delete()
     ExitTicket.objects.filter(lesson=lesson).delete()
-    lesson.content_status = 'generating'
+    lesson.content_status = 'empty'
     lesson.save(update_fields=['content_status'])
 
     inst = institution or lesson.unit.course.institution or Institution.get_global()
