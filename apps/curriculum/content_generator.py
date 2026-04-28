@@ -238,6 +238,15 @@ class LessonContentGenerator:
         lesson.content_quality = content_quality
         lesson.save(update_fields=['content_quality'])
 
+        # Expand the lesson's enabling_objectives into 5-8 atomic
+        # sub-skills BEFORE generating steps. This makes the pre-test
+        # diagnostic (sub-skill map) actually useful — without it, an
+        # EO like "Understand maps" gives a coarse 1-bit signal; with
+        # it, "Read a legend / Estimate distance / Find a coordinate"
+        # gives the tutor a real targeting map.
+        if save_to_db:
+            self._expand_to_granular_subskills(lesson, curriculum_context)
+
         # Generate steps
         steps_data = self._generate_steps(lesson, curriculum_context)
 
@@ -263,6 +272,174 @@ class LessonContentGenerator:
             'lesson_summary': steps_data.get('lesson_summary', {}),
             'exit_ticket_generated': exit_ticket_result.get('success', False) if save_to_db else False,
         }
+
+    def _expand_to_granular_subskills(self, lesson, curriculum_context: Dict) -> None:
+        """Replace the lesson's enabling_objectives with 5-8 atomic
+        sub-skills the pre-test diagnostic and exit-ticket
+        questions will tag.
+
+        Idempotent contract: if the existing EOs already look granular
+        (every entry starts with an action verb AND there are >= 4 of
+        them), this is a no-op. Otherwise we call the LLM, parse a
+        list, and save back to lesson.enabling_objectives.
+
+        Failure is non-fatal — bad LLM output → keep existing EOs.
+        """
+        existing = list(lesson.enabling_objectives or [])
+        if self._already_granular(existing):
+            print(f"[ContentGen] [{lesson.title}] EOs already granular ({len(existing)})", flush=True)
+            return
+
+        if not self.client or not self._model_config:
+            return  # LLM unavailable; skip silently
+
+        unit = lesson.unit
+        course = unit.course if unit else None
+        subject = course.title if course else ''
+        grade = course.grade_level if course else ''
+        terminal_objs = list(unit.terminal_objectives or []) if unit else []
+
+        kb_str = ''
+        if curriculum_context.get('related_content'):
+            snippets = curriculum_context['related_content'][:3]
+            kb_str = "\n".join(f"  - {s.get('text', '')[:200]}" for s in snippets)
+
+        existing_str = "\n".join(f"  - {eo}" for eo in existing) if existing else "  (none)"
+        terminal_str = "\n".join(f"  - {to}" for to in terminal_objs) if terminal_objs else "  (none)"
+
+        prompt = f"""Break this lesson into 5-8 ATOMIC sub-skills (granular enabling objectives).
+
+LESSON: {lesson.title}
+OBJECTIVE: {lesson.objective or 'Master the concepts in this lesson'}
+SUBJECT: {subject}
+GRADE: {grade}
+DURATION: {lesson.estimated_minutes or 20} minutes
+
+EXISTING ENABLING OBJECTIVES (often coarse — refine these):
+{existing_str}
+
+PARENT TERMINAL OBJECTIVES (broader outcomes):
+{terminal_str}
+
+CURRICULUM CONTEXT:
+{kb_str or '(none)'}
+
+REQUIREMENTS — every sub-skill must:
+1. Start with a SPECIFIC action verb (Calculate, Identify, Convert, Apply,
+   Compare, Solve, Construct, Read, Label, Sketch, etc.) — NEVER
+   "Understand", "Know", "Be aware of", "Appreciate".
+2. Test ONE concrete thing — a student should be able to FAIL one but
+   PASS another. If two sub-skills always go together, merge them.
+3. Be testable with a single MCQ or short-answer question.
+4. Be specific to THIS lesson's content — not a generic learning
+   skill like "think critically".
+5. Together cover the full scope of the lesson objective.
+
+GOOD example for "Understand fractions":
+- Convert a proper fraction to a decimal
+- Add two fractions with the same denominator
+- Reduce a fraction to its simplest form
+- Compare the size of two fractions with different denominators
+- Solve a word problem involving a fraction of a quantity
+
+BAD examples (do NOT generate these):
+- Understand fractions          [vague — refine]
+- Know what fractions are       [not testable]
+- Work with fractions           [meaningless verb]
+
+Output a JSON array of 5-8 strings — nothing else, no prose, no
+code fence. Example shape:
+["Calculate the area of a rectangle given length and width", "Calculate the area of a triangle from its base and height", ...]"""
+
+        sys_prompt = (
+            "You are a curriculum analyst who breaks lesson objectives into "
+            "atomic, testable sub-skills. Output ONLY a JSON array of strings."
+        )
+
+        try:
+            print(f"[ContentGen] [{lesson.title}] Expanding to granular sub-skills...", flush=True)
+            create_kwargs = dict(
+                response_model=None,  # raw response — we'll parse JSON ourselves
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            if self._model_config.provider == 'google':
+                create_kwargs['generation_config'] = {'max_tokens': 1500}
+            else:
+                create_kwargs['max_tokens'] = 1500
+
+            # Use a direct LLM call (not via instructor) so we avoid the
+            # response_model schema cost for this small free-form list.
+            from apps.llm.client import get_llm_client_for_purpose
+            llm = get_llm_client_for_purpose('generation', self.institution_id)
+            response = llm.generate(
+                [{'role': 'user', 'content': prompt}],
+                system_prompt=sys_prompt,
+                max_tokens=1500,
+            )
+            raw = (response.content or '').strip()
+        except Exception as e:
+            print(f"[ContentGen] [{lesson.title}] sub-skill expansion failed: {e}", flush=True)
+            return
+
+        # Parse JSON array. Tolerate code fences, single quotes, etc.
+        from apps.llm.json_utils import parse_llm_json
+        try:
+            parsed = parse_llm_json(raw)
+        except Exception as e:
+            print(f"[ContentGen] [{lesson.title}] sub-skill JSON parse failed: {e}", flush=True)
+            return
+
+        if not isinstance(parsed, list):
+            print(f"[ContentGen] [{lesson.title}] sub-skill output not a list: {type(parsed)}", flush=True)
+            return
+
+        cleaned = []
+        seen = set()
+        for item in parsed:
+            text = str(item).strip().rstrip('.')
+            if not text or len(text) < 8:
+                continue
+            key = text.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(text)
+
+        # Defense against LLM ignoring the rules — drop anything starting
+        # with weak verbs.
+        WEAK_OPENERS = ('understand', 'know', 'be aware', 'appreciate', 'learn about', 'study')
+        cleaned = [c for c in cleaned if not c.lower().startswith(WEAK_OPENERS)]
+
+        if len(cleaned) < 4:
+            print(f"[ContentGen] [{lesson.title}] sub-skill expansion produced too few ({len(cleaned)}) — keeping existing EOs", flush=True)
+            return
+
+        # Cap at 10 to keep questions/sub-skill ratio reasonable.
+        lesson.enabling_objectives = cleaned[:10]
+        lesson.save(update_fields=['enabling_objectives'])
+        print(f"[ContentGen] [{lesson.title}] Expanded to {len(lesson.enabling_objectives)} granular sub-skills", flush=True)
+
+    @staticmethod
+    def _already_granular(eos: List[str]) -> bool:
+        """Heuristic: at least 4 EOs and every one starts with a
+        concrete action verb (not 'understand', 'know', etc.)."""
+        if len(eos) < 4:
+            return False
+        WEAK_OPENERS = ('understand', 'know', 'be aware', 'appreciate', 'learn about', 'study', 'familiar')
+        for eo in eos:
+            text = (eo or '').strip().lower()
+            if not text:
+                return False
+            first_word = text.split()[0] if text.split() else ''
+            if any(text.startswith(w) for w in WEAK_OPENERS):
+                return False
+            # Should look like an action verb — at least 2 words.
+            if len(text.split()) < 3:
+                return False
+        return True
 
     def _get_curriculum_context(self, lesson) -> Dict:
         """Get curriculum context from knowledge base."""
