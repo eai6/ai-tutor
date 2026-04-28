@@ -1036,43 +1036,17 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 else:
                     ad = q.get('answer_data', {}) or {}
                     ad.update(objective_data)
-                    # Render figure from spec — single dispatcher handles
-                    # the full template catalog (charts, geometry, angles,
-                    # coords, stats, geography). The LLM may emit either
-                    # a `figure` key (new) with `kind`+fields, or the
-                    # legacy `figure_spec` (charts only). Both go through
-                    # the same renderer.
-                    if 'plot_spec' in ad and 'figure_spec' not in ad and 'figure' not in ad:
-                        ad['figure_spec'] = ad.pop('plot_spec')
-                    elif 'plot_spec' in ad:
-                        ad.pop('plot_spec', None)
-
-                    figure_payload = ad.get('figure') or ad.get('figure_spec')
-                    if figure_payload:
-                        from apps.curriculum.figure_templates import render_template
-                        svg = render_template(figure_payload)
-                        if svg:
-                            ad['figure_svg'] = svg
-                            ad.setdefault('figure_spec', figure_payload)
-                        else:
-                            logger.warning(
-                                f"[ExitTicket] dropping unrenderable figure on Q{i} "
-                                f"(kind={figure_payload.get('kind') if isinstance(figure_payload, dict) else '?'})"
-                            )
-                            ad.pop('figure_spec', None)
-                            ad.pop('figure', None)
+                    # Drop legacy figure-spec / figure-svg / plot-spec
+                    # fields. Per the unified image-gen decision
+                    # (memory/feedback_image_gen_unified.md), all
+                    # question figures go through gpt-image-2 on-demand
+                    # via the exit_ticket_figure_edit view — not the
+                    # SVG-template path. Auto-generating figures here
+                    # would block the bulk pipeline (~50s × N questions).
+                    for legacy in ('figure_spec', 'figure', 'plot_spec', 'figure_svg'):
+                        ad.pop(legacy, None)
                     kwargs['answer_data'] = ad
                 ExitTicketQuestion.objects.create(**kwargs)
-
-        # Post-processing: generate images for questions that need figures
-        try:
-            figures_generated = _generate_exit_ticket_figures(
-                exit_ticket, lesson, institution_id
-            )
-            if figures_generated:
-                logger.info(f"Generated {figures_generated} figures for exit ticket of {lesson.title}")
-        except Exception as e:
-            logger.warning(f"Exit ticket figure generation failed (non-blocking): {e}")
 
         return {'success': True, 'questions_created': len(questions)}
 

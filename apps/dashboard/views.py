@@ -3080,16 +3080,26 @@ def exit_question_edit(request, question_id):
             ad['plot_spec'] = cleaned
         question.answer_data = ad
 
-    # Free-form answer_data fields a teacher might tweak
-    if 'data_description' in data or 'model_answer' in data or 'keywords' in data:
+    # Free-form answer_data fields a teacher might tweak.
+    # Includes fill-in-blank (text_template + blanks) so the inline
+    # edit on lesson_detail / summative review saves correctly.
+    ad_fields_present = any(
+        k in data for k in (
+            'data_description', 'model_answer', 'keywords',
+            'text_template', 'blanks',
+        )
+    )
+    if ad_fields_present:
         ad = question.answer_data or {}
         if not isinstance(ad, dict):
             ad = {}
-        for k in ('data_description', 'model_answer'):
+        for k in ('data_description', 'model_answer', 'text_template'):
             if k in data:
                 ad[k] = data[k]
         if 'keywords' in data and isinstance(data['keywords'], list):
             ad['keywords'] = [str(k) for k in data['keywords']]
+        if 'blanks' in data and isinstance(data['blanks'], list):
+            ad['blanks'] = [str(b).strip() for b in data['blanks'] if str(b).strip()]
         question.answer_data = ad
 
     question.save()
@@ -4950,23 +4960,24 @@ def session_exit_review_override(request, attempt_id):
 
 
 # ============================================================================
-# EXIT-TICKET FIGURE EDIT (Stage 2 of figure_spec rework)
+# EXIT-TICKET FIGURE EDIT — gpt-image-2 prompt → raster URL
 # ============================================================================
+#
+# Per the unified image-gen decision (memory/feedback_image_gen_unified.md),
+# the SVG-template path is dead. The teacher provides a free-text prompt;
+# we generate via OpenAI gpt-image-2 (with Gemini fallback) through
+# ImageGenerationService and persist the URL as `answer_data.figure_url`.
+# Any legacy figure_spec / figure_svg fields are stripped on first save.
 
 @teacher_required
 def exit_ticket_figure_edit(request, question_id):
-    """Edit an exit-ticket question's figure_spec.
+    """Generate or replace a question figure via gpt-image-2.
 
-    GET: render the edit form (preview + raw JSON spec textarea).
-    POST: validate the new spec, render to SVG, persist both.
-
-    Routes through the unified template renderer so any of the catalog
-    kinds (charts, geometry, angles, coords, stats, geography) can be
-    edited.
+    GET: render form (current figure preview + prompt textarea).
+    POST: read prompt, generate via gpt-image-2 (model_override or default),
+    persist URL as answer_data.figure_url.
     """
-    import json
-    from apps.tutoring.models import ExitTicketQuestion
-    from apps.curriculum.figure_templates import render_template
+    from apps.tutoring.image_service import ImageGenerationService
 
     question = _question_for_staff(request, question_id)
     if question is None:
@@ -4976,45 +4987,66 @@ def exit_ticket_figure_edit(request, question_id):
     if not isinstance(answer_data, dict):
         answer_data = {}
 
+    # Seed prompt from existing figure_prompt OR an old description if any.
+    figure_prompt = answer_data.get('figure_prompt') or answer_data.get('figure_description') or ''
+
     error = None
     success = None
-    current_spec = answer_data.get('figure') or answer_data.get('figure_spec') or {}
-    spec_text = json.dumps(current_spec, indent=2) if current_spec else ''
 
     if request.method == 'POST':
-        raw = (request.POST.get('figure_spec') or '').strip()
-        if not raw:
-            error = 'Spec is empty.'
+        if request.POST.get('action') == 'remove':
+            for k in ('figure_prompt', 'figure_url', 'figure_svg', 'figure_spec',
+                      'figure', 'figure_source', 'figure_description'):
+                answer_data.pop(k, None)
+            question.answer_data = answer_data
+            question.save(update_fields=['answer_data'])
+            success = 'Figure removed.'
+            figure_prompt = ''
         else:
-            try:
-                spec = json.loads(raw)
-            except json.JSONDecodeError as e:
-                error = f'Invalid JSON: {e.msg} (line {e.lineno})'
-                spec = None
-            if spec is not None and isinstance(spec, dict):
-                svg = render_template(spec)
-                if not svg:
-                    kind = spec.get('kind') or spec.get('type') or '(unset)'
-                    error = (
-                        f'Could not render figure (kind="{kind}"). '
-                        f'Check that the kind is in the catalog and the spec is valid.'
-                    )
-                else:
-                    answer_data['figure_spec'] = spec
-                    answer_data['figure_svg'] = svg
-                    # Strip any stale raster fields so the SVG wins.
-                    for legacy in ('figure_url', 'figure_source', 'figure_description'):
+            new_prompt = (request.POST.get('figure_prompt') or '').strip()
+            model_choice = (request.POST.get('model_choice') or '').strip().lower()
+            if not new_prompt:
+                error = 'Prompt is empty.'
+            else:
+                # Resolve lesson + institution for the image service.
+                lesson = (
+                    question.exit_ticket.lesson if question.exit_ticket else None
+                )
+                inst = (
+                    lesson.unit.course.institution
+                    if lesson and lesson.unit and lesson.unit.course
+                    else None
+                )
+                svc = ImageGenerationService(lesson=lesson, institution=inst)
+                result = svc.get_or_generate_image(
+                    prompt=new_prompt,
+                    category='diagram',
+                    model_override=model_choice or None,
+                )
+                if result and result.get('url'):
+                    # Strip ALL legacy figure fields so figure_url is the
+                    # single source of truth.
+                    for legacy in ('figure_svg', 'figure_spec', 'figure',
+                                   'figure_source', 'figure_description'):
                         answer_data.pop(legacy, None)
+                    answer_data['figure_prompt'] = new_prompt
+                    answer_data['figure_url'] = result['url']
+                    if result.get('model'):
+                        answer_data['figure_model'] = result['model']
                     question.answer_data = answer_data
                     question.save(update_fields=['answer_data'])
-                    success = 'Figure rendered.'
-                    spec_text = json.dumps(spec, indent=2)
+                    success = f"Figure generated with {result.get('model') or 'image gen'}."
+                    figure_prompt = new_prompt
+                else:
+                    err = getattr(svc, 'last_error', None)
+                    error = f"Image generation failed: {err}" if err else "Image generation returned no result."
 
     return render(request, 'dashboard/exit_ticket_figure_edit.html', {
         'question': question,
-        'spec_text': spec_text,
-        'figure_svg': answer_data.get('figure_svg', ''),
-        'figure_url': '',  # raster figures retired
+        'figure_prompt': figure_prompt,
+        'figure_url': answer_data.get('figure_url', ''),
+        'figure_svg': answer_data.get('figure_svg', ''),  # legacy display only
+        'figure_model': answer_data.get('figure_model', ''),
         'error': error,
         'success': success,
     })
@@ -5022,102 +5054,16 @@ def exit_ticket_figure_edit(request, question_id):
 
 @teacher_required
 def exit_ticket_figure_regenerate(request, question_id):
-    """Regenerate the figure_spec via LLM from a teacher's prompt.
+    """Deprecated. The SVG-template path was retired in favour of
+    gpt-image-2 raster generation. Use exit_ticket_figure_edit, which
+    now takes a free-text prompt and runs ImageGenerationService.
 
-    POST: read `prompt` from form, send the current spec + the
-    teacher's correction prompt to the LLM, parse a new spec, render
-    it, return the result for preview (does not save until the
-    teacher submits the main form).
+    Kept as a 410 Gone so any cached front-end requests fail loudly.
     """
-    import json
-    from apps.tutoring.models import ExitTicketQuestion
-    from apps.curriculum.figure_templates import render_template, list_kinds
-    from apps.llm.prompts import get_prompt_or_default
-
-    if request.method != 'POST':
-        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
-
-    question = _question_for_staff(request, question_id)
-    if question is None:
-        return JsonResponse({'ok': False, 'error': 'not found'}, status=404)
-
-    teacher_prompt = (request.POST.get('prompt') or '').strip()
-    if not teacher_prompt:
-        return JsonResponse({'ok': False, 'error': 'prompt required'}, status=400)
-
-    answer_data = question.answer_data or {}
-    if not isinstance(answer_data, dict):
-        answer_data = {}
-    current_spec = answer_data.get('figure_spec', {})
-
-    institution_id = (
-        question.exit_ticket.lesson.unit.course.institution_id
-        if question.exit_ticket and question.exit_ticket.lesson else None
-    )
-
-    from apps.llm.client import get_llm_client_for_purpose
-    from apps.llm.json_utils import parse_llm_json
-
-    try:
-        llm_client = get_llm_client_for_purpose('exit_ticket_generation', institution_id)
-    except Exception as e:
-        return JsonResponse({'ok': False, 'error': f'LLM client unavailable: {e}'}, status=500)
-
-    sys_prompt = (
-        "You are an assistant that produces structured chart specs in JSON. "
-        "Output ONLY a JSON object — no prose, no code fence."
-    )
-    valid_kinds = ', '.join(list_kinds())
-    user_prompt = (
-        "Update this figure_spec based on the teacher's instruction.\n\n"
-        f"QUESTION: {question.question_text}\n"
-        f"CURRENT SPEC:\n{json.dumps(current_spec, indent=2) if current_spec else '(none)'}\n\n"
-        f"TEACHER INSTRUCTION:\n{teacher_prompt}\n\n"
-        "Output a JSON object with a `kind` field set to ONE of these "
-        f"catalog kinds: {valid_kinds}.\n"
-        "Each kind has its own fields — set what makes sense for the question.\n"
-        "Examples:\n"
-        "  {\"kind\":\"bar\", \"title\":\"...\", \"labels\":[...], \"datasets\":[{\"data\":[...]}]}\n"
-        "  {\"kind\":\"pie\", \"title\":\"...\", \"labels\":[...], \"datasets\":[{\"data\":[...]}]}\n"
-        "  {\"kind\":\"triangle\", \"type\":\"right\", \"sides\":[3,4,5], \"units\":\"cm\"}\n"
-        "  {\"kind\":\"angle\", \"degrees\":48}\n"
-        "  {\"kind\":\"point_angles\", \"angles\":[80,100,90,90], \"labels\":[...]}\n"
-        "Numbers must be plain numbers (no commas, no units). "
-        "Do NOT wrap your output in markdown code fences."
-    )
-
-    try:
-        response = llm_client.generate(
-            [{'role': 'user', 'content': user_prompt}],
-            system_prompt=sys_prompt,
-            max_tokens=2000,
-        )
-    except Exception as e:
-        return JsonResponse({'ok': False, 'error': f'LLM call failed: {e}'}, status=500)
-
-    try:
-        new_spec = parse_llm_json(response.content)
-    except Exception as e:
-        return JsonResponse({'ok': False, 'error': f'Could not parse LLM JSON: {e}'}, status=500)
-
-    if not isinstance(new_spec, dict):
-        return JsonResponse({'ok': False, 'error': 'LLM produced non-object spec'}, status=500)
-
-    from apps.curriculum.figure_templates import render_template
-    svg = render_template(new_spec)
-    if not svg:
-        kind = new_spec.get('kind') or new_spec.get('type') or '(unset)'
-        return JsonResponse({
-            'ok': False,
-            'error': f'Could not render figure (kind="{kind}"). Spec must use a catalog kind.',
-        }, status=500)
-
     return JsonResponse({
-        'ok': True,
-        'spec': new_spec,
-        'spec_text': json.dumps(new_spec, indent=2),
-        'svg': svg,
-    })
+        'ok': False,
+        'error': "Figure spec/SVG editing was retired. Use the prompt-based image edit on this question's figure page.",
+    }, status=410)
 
 
 @teacher_required

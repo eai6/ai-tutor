@@ -109,28 +109,105 @@
     </div>
     <div class="card-body" style="padding:0.75rem 1rem;">
         {% for q in questions %}
-        <div class="qrow">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;flex-wrap:wrap;">
-                <div style="flex:1;min-width:240px;">
-                    <span class="sm-pill {{ q.question_type }}">{{ q.get_question_type_display }}</span>
-                    <span class="sm-pill {{ q.difficulty }}">{{ q.get_difficulty_display }}</span>
-                    {% if q.concept_tag %}<span class="sm-pill tag" title="{{ q.concept_tag }}">{{ q.concept_tag|truncatechars:60 }}</span>{% endif %}
-                    <div style="margin-top:0.5rem;color:#111;font-size:0.92rem;">{{ q.question_text }}</div>
-                    {% if q.question_type == 'mcq' %}
-                    <ol type="A" style="margin:0.5rem 0 0 1.25rem;padding:0;font-size:0.88rem;color:#374151;">
-                        <li>{{ q.option_a }}{% if q.correct_answer == 'A' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
-                        <li>{{ q.option_b }}{% if q.correct_answer == 'B' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
-                        <li>{{ q.option_c }}{% if q.correct_answer == 'C' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
-                        <li>{{ q.option_d }}{% if q.correct_answer == 'D' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
-                    </ol>
-                    {% endif %}
-                    {% if q.answer_data.figure_svg %}
-                    <div style="margin-top:0.5rem;max-width:480px;">{{ q.answer_data.figure_svg|safe }}</div>
-                    {% endif %}
-                    {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:#374151;"><strong>Answer:</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
-                    {% if q.explanation %}<div class="qmeta">{{ q.explanation }}</div>{% endif %}
+        <div class="sum-q-card qrow" data-question-id="{{ q.id }}">
+            <!-- View mode -->
+            <div class="q-view">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:240px;">
+                        <span class="sm-pill {{ q.question_type }}">{{ q.get_question_type_display }}</span>
+                        <span class="sm-pill {{ q.difficulty }}">{{ q.get_difficulty_display }}</span>
+                        {% if q.concept_tag %}<span class="sm-pill tag" title="{{ q.concept_tag }}">{{ q.concept_tag|truncatechars:60 }}</span>{% endif %}
+                        <div style="margin-top:0.5rem;color:#111;font-size:0.92rem;">{{ q.question_text }}</div>
+                        {% if q.question_type == 'mcq' %}
+                        <ol type="A" style="margin:0.5rem 0 0 1.25rem;padding:0;font-size:0.88rem;color:#374151;">
+                            <li>{{ q.option_a }}{% if q.correct_answer == 'A' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
+                            <li>{{ q.option_b }}{% if q.correct_answer == 'B' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
+                            <li>{{ q.option_c }}{% if q.correct_answer == 'C' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
+                            <li>{{ q.option_d }}{% if q.correct_answer == 'D' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
+                        </ol>
+                        {% elif q.question_type == 'fill_in_blank' %}
+                        {% if q.answer_data.text_template %}
+                        <div style="margin-top:0.5rem;padding:0.5rem;background:#fff;border:1px solid #e5e7eb;border-radius:6px;font-style:italic;font-size:0.88rem;">{{ q.answer_data.text_template }}</div>
+                        {% endif %}
+                        <div style="margin-top:0.4rem;color:#166534;font-size:0.85rem;">✓ Answer: {% for blank in q.answer_data.blanks %}{{ blank }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                        {% endif %}
+                        {% if q.answer_data.figure_svg %}
+                        <div style="margin-top:0.5rem;max-width:480px;">{{ q.answer_data.figure_svg|safe }}</div>
+                        {% endif %}
+                        {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:#374151;"><strong>Answer:</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
+                        {% if q.explanation %}<div class="qmeta">{{ q.explanation }}</div>{% endif %}
+                        <div style="margin-top:0.5rem;display:flex;gap:0.4rem;">
+                            <button type="button" onclick="editSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">Edit</button>
+                            <button type="button" onclick="deleteSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;color:var(--danger);">Delete</button>
+                        </div>
+                    </div>
+                    <div style="font-size:0.7rem;color:var(--gray-400);">#{{ q.order_index|add:1 }}</div>
                 </div>
-                <div style="font-size:0.7rem;color:var(--gray-400);">#{{ q.order_index|add:1 }}</div>
+            </div>
+
+            <!-- Edit mode (hidden by default) -->
+            <div class="q-edit" style="display:none;">
+                <div style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.72rem;font-weight:600;">Question</label>
+                    <textarea class="eq-question_text" rows="2" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.question_text }}</textarea>
+                </div>
+                {% if q.question_type == 'mcq' %}
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
+                    <div><label style="font-size:0.72rem;">A)</label><input class="eq-option_a" value="{{ q.option_a }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;"></div>
+                    <div><label style="font-size:0.72rem;">B)</label><input class="eq-option_b" value="{{ q.option_b }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;"></div>
+                    <div><label style="font-size:0.72rem;">C)</label><input class="eq-option_c" value="{{ q.option_c }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;"></div>
+                    <div><label style="font-size:0.72rem;">D)</label><input class="eq-option_d" value="{{ q.option_d }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;"></div>
+                </div>
+                <div style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.72rem;">Correct</label>
+                    <select class="eq-correct_answer" style="padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                        <option value="A" {% if q.correct_answer == 'A' %}selected{% endif %}>A</option>
+                        <option value="B" {% if q.correct_answer == 'B' %}selected{% endif %}>B</option>
+                        <option value="C" {% if q.correct_answer == 'C' %}selected{% endif %}>C</option>
+                        <option value="D" {% if q.correct_answer == 'D' %}selected{% endif %}>D</option>
+                    </select>
+                </div>
+                {% elif q.question_type == 'fill_in_blank' %}
+                <div style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.72rem;">Sentence template (use ___ for blanks)</label>
+                    <input class="eq-fill_template" value="{{ q.answer_data.text_template }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                </div>
+                <div style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.72rem;">Answers (comma-separated)</label>
+                    <input class="eq-fill_answers" value="{% for b in q.answer_data.blanks %}{{ b }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                </div>
+                {% else %}
+                <div style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.72rem;">Model answer</label>
+                    <textarea class="eq-model_answer" rows="3" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.answer_data.model_answer }}</textarea>
+                </div>
+                <div style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.72rem;">Keywords (comma-separated)</label>
+                    <input class="eq-keywords" value="{% for kw in q.answer_data.keywords %}{{ kw }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                </div>
+                {% endif %}
+                <div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem;margin-bottom:0.5rem;">
+                    <div>
+                        <label style="font-size:0.72rem;">Difficulty</label>
+                        <select class="eq-difficulty" style="padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                            <option value="easy" {% if q.difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                            <option value="medium" {% if q.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="hard" {% if q.difficulty == 'hard' %}selected{% endif %}>Hard</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.72rem;">Concept tag</label>
+                        <input class="eq-concept_tag" value="{{ q.concept_tag }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                    </div>
+                </div>
+                <div style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.72rem;">Explanation</label>
+                    <textarea class="eq-explanation" rows="2" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.explanation }}</textarea>
+                </div>
+                <div style="display:flex;gap:0.4rem;">
+                    <button type="button" onclick="saveSumQ(this)" class="btn btn-primary btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">Save</button>
+                    <button type="button" onclick="cancelSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">Cancel</button>
+                </div>
             </div>
         </div>
         {% empty %}
@@ -138,5 +215,66 @@
         {% endfor %}
     </div>
 </div>
+
+{# CSRF token so the inline-edit fetches can read it from the cookie or token. #}
+<form style="display:none;">{% csrf_token %}</form>
+
+<script>
+// Inline edit/delete for summative questions. Backend endpoint is the
+// same one that handles exit-ticket questions because both kinds of
+// questions live in the ExitTicketQuestion model — only the parent
+// ExitTicket.assessment_type differs.
+function editSumQ(btn) {
+    const card = btn.closest('.sum-q-card');
+    card.querySelector('.q-view').style.display = 'none';
+    card.querySelector('.q-edit').style.display = 'block';
+}
+function cancelSumQ(btn) {
+    const card = btn.closest('.sum-q-card');
+    card.querySelector('.q-view').style.display = 'block';
+    card.querySelector('.q-edit').style.display = 'none';
+}
+function _csrfTok() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+}
+function saveSumQ(btn) {
+    const card = btn.closest('.sum-q-card');
+    const qid = card.dataset.questionId;
+    const data = {};
+    ['question_text','option_a','option_b','option_c','option_d',
+     'correct_answer','explanation','difficulty','concept_tag'].forEach(f => {
+        const el = card.querySelector('.eq-' + f);
+        if (el) data[f] = el.value;
+    });
+    const ma = card.querySelector('.eq-model_answer');
+    if (ma) data.model_answer = ma.value;
+    const kw = card.querySelector('.eq-keywords');
+    if (kw) data.keywords = kw.value.split(',').map(s => s.trim()).filter(Boolean);
+    const ft = card.querySelector('.eq-fill_template');
+    if (ft) data.text_template = ft.value;
+    const fa = card.querySelector('.eq-fill_answers');
+    if (fa) data.blanks = fa.value.split(',').map(s => s.trim()).filter(Boolean);
+    btn.disabled = true; btn.textContent = 'Saving...';
+    fetch(`/dashboard/curriculum/exit-question/${qid}/edit/`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':_csrfTok()},
+        body: JSON.stringify(data),
+    }).then(r => r.json()).then(resp => {
+        if (resp.success) location.reload();
+        else { alert('Save failed: ' + (resp.error || 'Unknown')); btn.disabled=false; btn.textContent='Save'; }
+    }).catch(() => { alert('Network error'); btn.disabled=false; btn.textContent='Save'; });
+}
+function deleteSumQ(btn) {
+    if (!confirm('Delete this question from the summative bank?')) return;
+    const card = btn.closest('.sum-q-card');
+    const qid = card.dataset.questionId;
+    fetch(`/dashboard/curriculum/exit-question/${qid}/edit/`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':_csrfTok()},
+        body: JSON.stringify({action:'delete'}),
+    }).then(r => r.json()).then(resp => { if (resp.success) card.remove(); });
+}
+</script>
 {% endif %}
 {% endblock %}

@@ -131,8 +131,12 @@ class TestDifficultyPromptBlock(BaseTutoringTestCase):
     def test_difficulty_block_too_hard_content(self):
         tutor = self._make_tutor(-1)
         block = tutor._build_difficulty_signal_block()
-        self.assertIn("TOO HARD", block)
-        self.assertIn("cognitive_load", block)
+        # Easy mode block emitted at level<=-1 — wording rewritten
+        # 2026-04-28 to instruct MCQ / fill-in-blank format per pilot
+        # feedback. "TOO HARD" → "easy mode" naming.
+        self.assertIn("EASY MODE", block)
+        self.assertIn("MCQ", block)
+        self.assertIn("DIFFICULTY ADJUSTMENT", block)
 
     def test_difficulty_block_too_hard_level_2(self):
         tutor = self._make_tutor(-2)

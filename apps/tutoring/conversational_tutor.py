@@ -656,6 +656,49 @@ class ConversationalTutor:
             pass
         return ""
 
+    def _derive_initial_difficulty(self) -> int:
+        """Derive initial `difficulty_level` for a NEW session from the
+        student's skills_snapshot for this lesson's course.
+
+        Returns:
+            -1 (easy mode — MCQ + fill-in-blank, accept short answers)
+                when mean mastery < 40% or no signal at all (treat
+                first-time students as low-performers per the pilot
+                feedback that lower performers struggled with the
+                open-text default).
+             0 (balanced — current default behavior) when 40–69%.
+            +1 (hard mode — open-text, working required) when ≥ 70%.
+
+        Per memory/feedback_adaptive_difficulty.md. Buttons still
+        override this within the session.
+        """
+        try:
+            from apps.accounts.models import StudentProfile
+            profile = StudentProfile.objects.filter(user=self.student).first()
+            if not profile:
+                return -1  # no profile → assume new student → easy
+            snap = profile.skills_snapshot or {}
+            course = self.lesson.unit.course if self.lesson and self.lesson.unit else None
+            if not course:
+                return -1
+            slice_for_course = snap.get(str(course.id)) or {}
+            if not isinstance(slice_for_course, dict) or not slice_for_course:
+                return -1  # no signal yet → easy
+            pcts = [
+                v.get('pct', 0) for v in slice_for_course.values()
+                if isinstance(v, dict) and v.get('pct') is not None
+            ]
+            if not pcts:
+                return -1
+            mean_pct = sum(pcts) / len(pcts)
+            if mean_pct >= 70:
+                return 1
+            if mean_pct >= 40:
+                return 0
+            return -1
+        except Exception:
+            return -1  # fail safe → easy mode
+
     def _load_state(self):
         """Load session state (backward compatible with old phase-based state)."""
         state = self.session.engine_state or {}
@@ -709,8 +752,17 @@ class ConversationalTutor:
         # Worked example deduplication (Issue 1)
         self.shown_worked_example_indices = set(state.get('shown_worked_example_indices', []))
 
-        # Difficulty signal (ZPD adjustment)
-        self.difficulty_level = state.get('difficulty_level', 0)
+        # Difficulty signal (ZPD adjustment).
+        # New sessions seed `difficulty_level` from the student's
+        # skills_snapshot for this course (low mastery → -1 = easy mode
+        # with MCQ + fill-in-blank scaffolding; high mastery → +1 = hard
+        # mode with open-text working). Per the adaptive-difficulty
+        # decision (memory/feedback_adaptive_difficulty.md). Returning
+        # students keep whatever the buttons set last time.
+        if 'difficulty_level' in state:
+            self.difficulty_level = state['difficulty_level']
+        else:
+            self.difficulty_level = self._derive_initial_difficulty()
 
         # Correct-answer streak for in-conversation gamification
         self._correct_streak = state.get('correct_streak', 0)
@@ -2381,9 +2433,25 @@ CRITICAL: When the student answers correctly, do NOT revert to asking them to ex
 [/DIFFICULTY ADJUSTMENT]""")
         elif level <= -1:
             intensity = "moderately" if level == -1 else "significantly"
-            blocks.append(f"""[DIFFICULTY ADJUSTMENT]
-The student has signaled this material is TOO HARD for them (struggle level: {abs(level)}/2).
-Apply the cognitive_load and targeted_remediation principles {intensity}:
+            blocks.append(f"""[DIFFICULTY ADJUSTMENT — EASY MODE]
+Student is in easy mode (struggle level: {abs(level)}/2). The pilot
+feedback was clear: lower-performing students need MCQ / fill-in-blank
+formats with visual anchors, NOT open-text working-required questions.
+
+QUESTION FORMAT (this is the important change):
+- Pose practice questions as MCQ or fill-in-blank, NOT open-ended.
+- MCQ template: "Which of these is correct? (A) ... (B) ... (C) ... (D) ..."
+  → Accept the LETTER (A/B/C/D) as a complete answer. Do NOT ask
+  for working when they pick a letter.
+- Fill-in-blank template: "Fill in the blank: 12 + ___ = 20"
+  → Accept the filled value as a complete answer.
+- For math: STILL show worked examples first (math memory rules),
+  but the student's PRACTICE response is a letter or single number.
+- Always include or reference a visual/diagram when one helps anchor
+  the question (use the lesson's step media, or describe a diagram in
+  the question).
+
+SCAFFOLDING TONE ({intensity} application):
 - Break the current concept into SMALLER sub-steps than the directive specifies.
 - Use a fully worked example BEFORE asking the student to try independently.
 - Use simpler numbers, shorter problems, and more concrete/real-world examples.

@@ -517,8 +517,14 @@
     <span style="font-size: 1.25rem;">⚠️</span>
     <div style="flex: 1;">
         <strong style="color: #92400E;">{{ lessons_without_content }} lesson{{ lessons_without_content|pluralize }} need{{ lessons_without_content|pluralize:"s," }} content</strong>
-        <div style="font-size: 0.8rem; color: #A16207;">Use ⚡ on individual lessons to generate content one at a time</div>
+        <div style="font-size: 0.8rem; color: #A16207;">Generate everything in parallel (2 workers, ~2 min/lesson) or use ⚡ on individual lessons.</div>
     </div>
+    <form method="post" action="{% url 'dashboard:course_generate_all' course.id %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Generate content for all {{ lessons_without_content }} lesson{{ lessons_without_content|pluralize }}? This runs in the background and will take a while.');">
+            ⚡ Generate All Content
+        </button>
+    </form>
 </div>
 {% endif %}
 

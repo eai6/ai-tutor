@@ -780,8 +780,20 @@ function saveQuestion(btn) {
     ['question_text', 'option_a', 'option_b', 'option_c', 'option_d',
      'correct_answer', 'explanation', 'difficulty', 'concept_tag'].forEach(f => {
         const el = card.querySelector('.eq-' + f);
-        data[f] = el.value;
+        if (el) data[f] = el.value;
     });
+    // Type-specific answer_data fields. Until now these inputs
+    // existed in the markup but were never sent → silent failures.
+    const ma = card.querySelector('.eq-model_answer');
+    if (ma) data.model_answer = ma.value;
+    const kw = card.querySelector('.eq-keywords');
+    if (kw) data.keywords = kw.value.split(',').map(s => s.trim()).filter(Boolean);
+    const ft = card.querySelector('.eq-fill_template');
+    if (ft) data.text_template = ft.value;
+    const fa = card.querySelector('.eq-fill_answers');
+    if (fa) data.blanks = fa.value.split(',').map(s => s.trim()).filter(Boolean);
+    const dd = card.querySelector('.eq-data_description');
+    if (dd) data.data_description = dd.value;
 
     btn.disabled = true;
     btn.textContent = 'Saving...';
