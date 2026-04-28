@@ -103,6 +103,32 @@
     <!-- Achievement Toast Container -->
     <div id="achievement-toasts" style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;display:flex;flex-direction:column-reverse;gap:0.5rem;"></div>
 
+    {% if weekly_assignments %}
+    <div class="continue-section animate-in" style="animation-delay: 0.03s; background:#fef9c3; border:1px solid #fde047; border-radius:14px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
+        <h2 style="font-size:1.05rem; margin:0 0 0.5rem; color:#78350f;">📅 This week's lessons</h2>
+        {% for wa in weekly_assignments %}
+        <div style="margin-top:0.6rem;">
+            <div style="font-size:0.85rem; color:#92400e; font-weight:600;">{{ wa.course.title }} · due Sunday {{ wa.week_end|date:"M j" }}</div>
+            {% if wa.notes %}
+            <div style="font-size:0.82rem; color:#78350f; font-style:italic; margin-top:0.2rem;">"{{ wa.notes }}"</div>
+            {% endif %}
+            <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.4rem;">
+                {% for lesson in wa.lessons %}
+                <a href="{% url 'tutoring:tutor_interface' lesson.id %}"
+                   style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.4rem 0.75rem; background:#fff; border:1px solid #fde047; border-radius:999px; font-size:0.82rem; color:#78350f; text-decoration:none; font-weight:500;">
+                    {% if lesson.mastery_level == 'mastered' %}✅
+                    {% elif lesson.mastery_level == 'in_progress' %}⏳
+                    {% else %}📖
+                    {% endif %}
+                    {{ lesson.title|truncatechars:40 }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     {% if active_sessions %}
     <!-- Continue Learning Section -->
     <div class="continue-section animate-in" style="animation-delay: 0.05s">

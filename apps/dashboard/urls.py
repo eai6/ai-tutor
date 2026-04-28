@@ -68,6 +68,9 @@ urlpatterns = [
     path('curriculum/exit-question/<int:question_id>/edit/', views.exit_question_edit, name='exit_question_edit'),
     path('curriculum/lesson/<int:lesson_id>/prerequisites/', views.lesson_prerequisite_edit, name='lesson_prerequisite_edit'),
     
+    # Weekly assignments — teacher creates/edits per (course, week)
+    path('curriculum/course/<int:course_id>/weekly-assignment/', views.weekly_assignment_save, name='weekly_assignment_save'),
+
     # Bulk Generation
     path('curriculum/course/<int:course_id>/generate-all/', views.course_generate_all, name='course_generate_all'),
     path('curriculum/course/<int:course_id>/generate-media/', views.course_generate_media, name='course_generate_media'),

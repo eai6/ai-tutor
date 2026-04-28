@@ -943,6 +943,31 @@ def course_detail(request, course_id):
         course_tier, ('Tier 3', '#92400e', '#fef3c7')
     )
 
+    # Weekly assignments — current + next 4 weeks (so the teacher can
+    # plan ahead). Each row shows lessons + a quick edit button.
+    from apps.dashboard.models import WeeklyAssignment
+    from datetime import timedelta
+    this_monday = WeeklyAssignment.current_week_start()
+    week_starts = [this_monday + timedelta(weeks=i) for i in range(0, 5)]
+    existing = {
+        wa.week_start: wa for wa in
+        WeeklyAssignment.objects.filter(
+            course=course, week_start__in=week_starts,
+        ).prefetch_related('lessons')
+    }
+    weekly_assignments = [
+        {
+            'week_start': ws,
+            'week_end': ws + timedelta(days=6),
+            'assignment': existing.get(ws),
+            'is_current': ws == this_monday,
+        }
+        for ws in week_starts
+    ]
+    course_lessons = list(
+        Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
+    )
+
     context = {
         **request.staff_ctx,
         'course': course,
@@ -965,6 +990,9 @@ def course_detail(request, course_id):
         'course_tier_label': course_tier_label,
         'course_tier_color': course_tier_color,
         'course_tier_bg': course_tier_bg,
+        # Weekly assignment block
+        'weekly_assignments': weekly_assignments,
+        'course_lessons': course_lessons,
     }
 
     return render(request, 'dashboard/curriculum/course_detail.html', context)
@@ -5522,3 +5550,74 @@ def student_competency(request, course_id, student_id):
         'has_final': has_final,
         'mastered_latest': mastered_latest,
     })
+
+
+# ============================================================================
+# Weekly assignment (Phase 2)
+# ============================================================================
+
+@teacher_required
+@require_POST
+def weekly_assignment_save(request, course_id):
+    """Create or update a WeeklyAssignment for (course, week_start).
+    Form fields:
+      - week_start: ISO date string (YYYY-MM-DD), normalized to Monday on save
+      - lesson_ids: comma-separated lesson IDs, OR multiple `lesson_ids` POSTs
+      - notes: optional teacher message
+    """
+    from datetime import date as _date
+    from apps.dashboard.models import WeeklyAssignment
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        course = get_object_or_404(
+            Course, Q(institution=institution) | Q(institution__isnull=True), id=course_id,
+        )
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    raw_date = (request.POST.get('week_start') or '').strip()
+    try:
+        ws = _date.fromisoformat(raw_date)
+    except ValueError:
+        messages.error(request, "Invalid week date.")
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    monday = WeeklyAssignment.normalize_to_monday(ws)
+    notes = (request.POST.get('notes') or '').strip()
+
+    # Pull lesson IDs — accept either a comma-separated single field or
+    # repeated `lesson_ids` form values.
+    raw_ids = request.POST.getlist('lesson_ids')
+    if len(raw_ids) == 1 and ',' in raw_ids[0]:
+        raw_ids = [x.strip() for x in raw_ids[0].split(',') if x.strip()]
+    lesson_ids = [int(x) for x in raw_ids if x.isdigit()]
+
+    # Whitelist to lessons in this course (defense against ID-tampering).
+    allowed_ids = set(
+        Lesson.objects.filter(unit__course=course, id__in=lesson_ids).values_list('id', flat=True)
+    )
+    final_ids = [i for i in lesson_ids if i in allowed_ids]
+
+    if request.POST.get('action') == 'delete':
+        WeeklyAssignment.objects.filter(course=course, week_start=monday).delete()
+        messages.success(request, f"Cleared assignment for week of {monday.isoformat()}.")
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    wa, created = WeeklyAssignment.objects.get_or_create(
+        course=course,
+        week_start=monday,
+        defaults={'assigned_by': request.user, 'notes': notes},
+    )
+    if not created:
+        wa.notes = notes
+        wa.assigned_by = request.user
+        wa.save(update_fields=['notes', 'assigned_by', 'updated_at'])
+    wa.lessons.set(final_ids)
+
+    verb = "created" if created else "updated"
+    messages.success(
+        request,
+        f"Weekly assignment {verb} — {len(final_ids)} lesson{'s' if len(final_ids) != 1 else ''} for week of {monday.isoformat()}.",
+    )
+    return redirect('dashboard:course_detail', course_id=course.id)

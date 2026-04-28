@@ -528,6 +528,60 @@
 </div>
 {% endif %}
 
+{% if can_edit_content %}
+<details class="card" style="margin-top: 1rem; padding: 0; overflow: hidden;">
+    <summary style="cursor:pointer; padding:1rem 1.25rem; font-weight:600; color:#374151; font-size:0.95rem; background:#f9fafb; list-style:none; display:flex; justify-content:space-between; align-items:center;">
+        <span>📅 Weekly assignments <span style="font-size:0.78rem;color:#6b7280;font-weight:500;margin-left:0.5rem;">— students see these in their weekly panel + Monday email</span></span>
+        <span style="font-size:0.78rem;color:#6b7280;">{{ weekly_assignments|length }} weeks visible</span>
+    </summary>
+    <div style="padding: 0.5rem 1.25rem 1.25rem;">
+        {% for w in weekly_assignments %}
+        <div style="border:1px solid #e5e7eb; border-radius:10px; padding:0.85rem 1rem; margin-top:0.75rem; {% if w.is_current %}background:#fef9c3;border-color:#fde047;{% endif %}">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; flex-wrap:wrap;">
+                <div>
+                    <strong style="color:#111;">Week of {{ w.week_start|date:"M j" }} – {{ w.week_end|date:"M j, Y" }}</strong>
+                    {% if w.is_current %}<span style="background:#92400e;color:#fff;padding:1px 8px;border-radius:999px;font-size:0.7rem;margin-left:0.4rem;">This week</span>{% endif %}
+                    {% if w.assignment %}
+                    <div style="font-size:0.8rem; color:#6b7280; margin-top:0.2rem;">
+                        {{ w.assignment.lessons.count }} lesson{{ w.assignment.lessons.count|pluralize }} assigned
+                        {% if w.assignment.notes %} · note: "{{ w.assignment.notes|truncatechars:80 }}"{% endif %}
+                    </div>
+                    {% else %}
+                    <div style="font-size:0.8rem; color:#9ca3af; margin-top:0.2rem;">No lessons assigned for this week.</div>
+                    {% endif %}
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('wa-form-{{ forloop.counter0 }}').style.display='block'; this.style.display='none';">
+                    {% if w.assignment %}Edit{% else %}Assign{% endif %}
+                </button>
+            </div>
+            <form id="wa-form-{{ forloop.counter0 }}" method="post" action="{% url 'dashboard:weekly_assignment_save' course.id %}" style="display:none; margin-top:0.85rem;">
+                {% csrf_token %}
+                <input type="hidden" name="week_start" value="{{ w.week_start|date:'Y-m-d' }}">
+                <div style="display:grid; grid-template-columns:1fr; gap:0.6rem; max-height:280px; overflow-y:auto; border:1px solid #e5e7eb; border-radius:8px; padding:0.6rem; background:#fff;">
+                    {% for lesson in course_lessons %}
+                    <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.86rem; cursor:pointer;">
+                        <input type="checkbox" name="lesson_ids" value="{{ lesson.id }}"
+                               {% if w.assignment and lesson in w.assignment.lessons.all %}checked{% endif %}>
+                        <span>{{ lesson.unit.title|truncatechars:30 }} → {{ lesson.title }}</span>
+                    </label>
+                    {% empty %}
+                    <em style="color:#9ca3af; font-size:0.82rem;">No lessons in this course yet.</em>
+                    {% endfor %}
+                </div>
+                <textarea name="notes" rows="2" placeholder="Optional message to students for this week..." style="width:100%; margin-top:0.5rem; padding:0.45rem; border:1px solid #e5e7eb; border-radius:8px; font-size:0.86rem; font-family:inherit;">{% if w.assignment %}{{ w.assignment.notes }}{% endif %}</textarea>
+                <div style="display:flex; gap:0.4rem; margin-top:0.5rem; flex-wrap:wrap;">
+                    <button type="submit" class="btn btn-primary btn-sm">Save assignment</button>
+                    {% if w.assignment %}
+                    <button type="submit" name="action" value="delete" class="btn btn-sm" style="color:#b91c1c; border:1px solid #fecaca;" onclick="return confirm('Clear this week\'s assignment?');">Clear week</button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}
+
 <!-- Units and Lessons -->
 {% for unit in units %}
 {% ifchanged unit.grade_level %}

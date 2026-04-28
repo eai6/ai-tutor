@@ -407,11 +407,46 @@ def lesson_catalog(request):
     if not selected_subject and subjects:
         selected_subject = subjects[0]
 
+    # This week's assignments — surfaces teacher-assigned lessons at the
+    # top of the catalog so students see exactly what they need to do.
+    weekly_assignments_this_week = []
+    try:
+        from apps.dashboard.models import WeeklyAssignment
+        from apps.tutoring.models import StudentLessonProgress
+        wa_qs = WeeklyAssignment.for_student_this_week(request.user)
+        # Pre-compute completion state per lesson for the badge display.
+        lesson_ids = [l.id for wa in wa_qs for l in wa.lessons.all()]
+        progress_map = {
+            p.lesson_id: p.mastery_level
+            for p in StudentLessonProgress.objects.filter(
+                student=request.user, lesson_id__in=lesson_ids,
+            )
+        }
+        for wa in wa_qs:
+            lessons_payload = []
+            for lesson in wa.lessons.all():
+                lessons_payload.append({
+                    'id': lesson.id,
+                    'title': lesson.title,
+                    'mastery_level': progress_map.get(lesson.id, 'not_started'),
+                })
+            weekly_assignments_this_week.append({
+                'course': wa.course,
+                'week_start': wa.week_start,
+                'week_end': wa.week_end,
+                'notes': wa.notes,
+                'lessons': lessons_payload,
+            })
+    except Exception:
+        # Never fail the catalog render on assignment lookup error.
+        pass
+
     context = {
         "subjects": subjects,
         "selected_subject": selected_subject,
         "active_sessions": active_sessions_data,
         "student_grade": student_grade,
+        "weekly_assignments": weekly_assignments_this_week,
     }
     # Staff school switcher
     if is_staff:

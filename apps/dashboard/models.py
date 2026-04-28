@@ -269,3 +269,112 @@ class FeedbackReport(models.Model):
     def __str__(self):
         who = self.user.username if self.user else '(anon)'
         return f"[{self.kind}] {who}: {self.message[:60]}"
+
+
+# ============================================================================
+# Weekly lesson assignment (Phase 2 of email/assignment work)
+# ============================================================================
+#
+# A teacher assigns one or more lessons in a course to "this week" and
+# students see them in a "This week's lessons" panel + receive them in
+# the Monday digest email. Per pilot decision a Course = a class
+# (e.g. S3 Math), so the assignment is keyed (course, week_start)
+# and applies to every student in that course's institution+grade.
+
+class WeeklyAssignment(models.Model):
+    """One row per (course, week). Teachers attach lessons + an
+    optional note; students see this in their weekly panel and
+    Monday digest."""
+
+    course = models.ForeignKey(
+        'curriculum.Course',
+        on_delete=models.CASCADE,
+        related_name='weekly_assignments',
+    )
+    # Monday of the assignment week (date, no time). Always normalize
+    # to ISO week's Monday on save so duplicate weeks can't be
+    # created via off-by-one dates.
+    week_start = models.DateField(
+        help_text="Monday of the week this assignment covers.",
+    )
+    lessons = models.ManyToManyField(
+        'curriculum.Lesson',
+        related_name='weekly_assignments',
+        blank=True,
+        help_text="Lessons due this week.",
+    )
+    notes = models.TextField(
+        blank=True, default='',
+        help_text="Optional teacher message — shown to students with the assignment.",
+    )
+    assigned_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='weekly_assignments_made',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-week_start']
+        unique_together = [['course', 'week_start']]
+        verbose_name = "Weekly assignment"
+        verbose_name_plural = "Weekly assignments"
+
+    def __str__(self):
+        return f"{self.course.title} — week of {self.week_start.isoformat()}"
+
+    @staticmethod
+    def normalize_to_monday(d):
+        """Snap any date to the Monday of its ISO week."""
+        from datetime import timedelta
+        return d - timedelta(days=d.weekday())
+
+    def save(self, *args, **kwargs):
+        # Normalize week_start so two teachers can't accidentally
+        # create overlapping assignments by picking different days.
+        if self.week_start:
+            self.week_start = self.normalize_to_monday(self.week_start)
+        super().save(*args, **kwargs)
+
+    @property
+    def week_end(self):
+        """Sunday of the same week (inclusive)."""
+        from datetime import timedelta
+        return self.week_start + timedelta(days=6)
+
+    @classmethod
+    def current_week_start(cls):
+        """Monday of THIS week (in server-local date — Seychelles UTC+4
+        is close enough that the date boundary lines up)."""
+        from django.utils import timezone as _tz
+        return cls.normalize_to_monday(_tz.localdate())
+
+    @classmethod
+    def for_student_this_week(cls, student):
+        """Return WeeklyAssignment rows assigned to courses the student
+        has access to, where week_start == this week's Monday.
+
+        Course-access rule mirrors the existing tutoring/views catalog:
+        institution match (with platform-wide fallback) + grade match.
+        """
+        from apps.accounts.models import Membership, StudentProfile
+        from django.db.models import Q
+
+        membership = Membership.objects.filter(
+            user=student, is_active=True
+        ).first()
+        if not membership:
+            return cls.objects.none()
+        institution = membership.institution
+        profile = StudentProfile.objects.filter(user=student).first()
+        grade = profile.grade_level if profile else ''
+
+        course_filter = Q(course__institution=institution) | Q(course__institution__isnull=True)
+        if grade:
+            course_filter &= Q(course__grade_level=grade) | Q(course__grade_level='')
+        return cls.objects.filter(
+            course_filter,
+            week_start=cls.current_week_start(),
+        ).select_related('course').prefetch_related('lessons')
