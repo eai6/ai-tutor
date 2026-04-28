@@ -3507,9 +3507,69 @@ Follow the current step; this concept will be covered in sequence."""
                 parts.append(f"\nQUESTION (ask verbatim): {step.question}")
             if step.expected_answer:
                 parts.append(f"EXPECTED ANSWER: {step.expected_answer}")
-            if step.answer_type and step.answer_type != 'none':
+
+            # Format-aware presentation. Lesson content is generated
+            # rich (mixed answer_types); the tutor is responsible for
+            # presenting each format correctly. See
+            # memory/course_regeneration_for_slow_learners.md
+            # "Revised Phase 2 Layer A".
+            atype = (step.answer_type or 'none').lower()
+            if atype == 'multiple_choice':
+                choices = step.choices or []
+                # Render choices verbatim; if they aren't already
+                # prefixed A) / B) / ..., add the letter labels.
+                rendered = []
+                for i, c in enumerate(choices[:4]):
+                    label = chr(ord('A') + i)
+                    if isinstance(c, str) and c.strip().upper().startswith(f"{label})"):
+                        rendered.append(c)
+                    else:
+                        rendered.append(f"{label}) {c}")
+                parts.append(
+                    "\nFORMAT — multiple choice:\n"
+                    "Present the question, then list ALL the choices below. End with: "
+                    "'Which letter is your answer — A, B, C, or D?'\n"
+                    f"CHOICES (read all to the student):\n" + "\n".join(rendered)
+                )
+                parts.append(
+                    "GRADING: The student's answer is correct only if it matches the expected_answer letter. "
+                    "Accept the letter alone (e.g. 'B') or letter + value ('B, 12 cm'). "
+                    "If they answer with the value only, infer the letter from the choices."
+                )
+            elif atype == 'true_false':
+                parts.append(
+                    "\nFORMAT — true/false:\n"
+                    "Frame the question as: 'True or False: <statement>'. "
+                    "Ask the student to answer with the word True or False."
+                )
+                parts.append(
+                    "GRADING: Correct only if the student says exactly True or False matching the expected_answer. "
+                    "Accept 'T' / 'F' as well. If they explain their reasoning instead of choosing, "
+                    "ask them to commit to True or False before grading."
+                )
+            elif atype == 'short_numeric':
+                parts.append(
+                    "\nFORMAT — short numeric:\n"
+                    "Ask for a number. If the expected_answer includes a unit (e.g. '12 cm'), "
+                    "ask the student to include the unit too."
+                )
+                parts.append(
+                    "GRADING: Strip units and whitespace, then compare numerically. "
+                    "Accept ±5% tolerance for non-trivial calculations. "
+                    "If the answer is right but the unit is missing, accept it and gently remind them about the unit."
+                )
+            elif atype == 'free_text':
+                parts.append(
+                    "\nFORMAT — free response:\n"
+                    "Open-ended question. Encourage the student to explain in their own words."
+                )
+                parts.append(
+                    "GRADING: Compare conceptually against the expected_answer; accept paraphrases that capture "
+                    "the same key points. Don't penalize spelling or minor word differences."
+                )
+            elif atype != 'none':
                 parts.append(f"ANSWER TYPE: {step.answer_type}")
-            if step.choices:
+            if step.choices and atype != 'multiple_choice':
                 parts.append(f"CHOICES: {step.choices}")
         elif step.step_type == 'summary':
             parts.append("YOUR TASK: Summarize the key takeaways, then confirm the student understands.")
@@ -3521,10 +3581,47 @@ Follow the current step; this concept will be covered in sequence."""
             if teacher_script:
                 parts.append(f"\nCONTENT:\n{teacher_script}")
 
-        # Hint ladder (for practice/quiz steps, or any step with hints)
+        # Hint ladder (for practice/quiz steps, or any step with hints).
+        # Hint POLICY adapts to the session's difficulty_level — the
+        # existing -1/0/+1 signal already tracks whether this student is
+        # a slower or stronger learner (per skills_snapshot, see
+        # _derive_initial_difficulty). Per memory/course_regeneration_for_slow_learners.md
+        # "Revised Phase 2 Layer B".
         hints = [h for h in [step.hint_1, step.hint_2, step.hint_3] if h]
         if hints:
-            parts.append("\nHINT LADDER (use progressively if student is stuck):")
+            difficulty = getattr(self, 'difficulty_level', 0) or 0
+            if difficulty <= -1:
+                # High scaffolding (slow learner / no signal yet).
+                # Offer hints proactively on the first wrong answer; if
+                # the student has been silent on this step for >1
+                # exchange, surface Hint 1 unprompted.
+                policy = (
+                    "HINT POLICY (this student needs more scaffolding):\n"
+                    "  • On the FIRST wrong answer, give Hint 1 + a fresh attempt.\n"
+                    "  • On the SECOND wrong answer, give Hint 2 + a fresh attempt.\n"
+                    "  • On the THIRD wrong answer, give Hint 3 along with the worked-out answer.\n"
+                    "  • If the student stalls (no answer for 2 exchanges), volunteer Hint 1 unprompted."
+                )
+            elif difficulty >= 1:
+                # Low scaffolding (advanced student). Withhold hints
+                # until they've genuinely tried twice.
+                policy = (
+                    "HINT POLICY (this student is performing strongly — challenge them):\n"
+                    "  • Do NOT volunteer hints. Wait for the student to ask or attempt.\n"
+                    "  • Give Hint 1 only after TWO wrong attempts.\n"
+                    "  • Give Hint 2 only after THREE wrong attempts.\n"
+                    "  • Reserve Hint 3 + worked answer for genuine surrender."
+                )
+            else:
+                # Standard.
+                policy = (
+                    "HINT POLICY (use progressively if student is stuck):\n"
+                    "  • Give a hint after one wrong attempt or if the student asks.\n"
+                    "  • Walk up the ladder Hint 1 → Hint 2 → Hint 3 across attempts.\n"
+                    "  • Don't reveal the answer outright; scaffold them to it."
+                )
+            parts.append("\n" + policy)
+            parts.append("HINT LADDER:")
             for j, hint in enumerate(hints, 1):
                 parts.append(f"  Hint {j}: {hint}")
 
@@ -3836,6 +3933,26 @@ Follow the current step; this concept will be covered in sequence."""
             step_context_parts.append(f"Question: {step.question}")
         if step.expected_answer:
             step_context_parts.append(f"Expected answer: {step.expected_answer}")
+        # Format-aware grading hints — the evaluator should apply
+        # answer-type-specific rules (e.g. true_false → exact match,
+        # short_numeric → ±5% tolerance, mcq → letter match).
+        atype = (step.answer_type or '').lower()
+        if atype == 'multiple_choice':
+            step_context_parts.append(
+                "Answer format: multiple_choice. Correct iff student's letter matches expected_answer (A/B/C/D)."
+            )
+        elif atype == 'true_false':
+            step_context_parts.append(
+                "Answer format: true_false. Correct iff student's response (True/False) matches expected_answer exactly."
+            )
+        elif atype == 'short_numeric':
+            step_context_parts.append(
+                "Answer format: short_numeric. Strip units, compare numerically with ±5% tolerance."
+            )
+        elif atype == 'free_text':
+            step_context_parts.append(
+                "Answer format: free_text. Compare conceptually; accept paraphrases that match expected_answer's key points."
+            )
         step_context_parts.append(f"Exchanges on this step: {self.step_exchange_count}")
 
         # Step-type-specific completion criteria
