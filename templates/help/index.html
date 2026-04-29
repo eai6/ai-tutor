@@ -138,12 +138,41 @@
     <details class="help-section">
         <summary><span class="help-tag">All</span> Exit tickets &amp; mastery</summary>
         <div class="body">
-            <p>At the end of every lesson there's a short <strong>exit ticket</strong> — typically 10 questions. Pass it and you've mastered the lesson.</p>
+            <p>At the end of every lesson there's a short <strong>exit ticket</strong> — 10 questions drawn from a 35-question bank, mixed across five formats so you're not just clicking A/B/C/D the whole time:</p>
             <ul>
-                <li>You need to get most questions right to pass — the threshold is shown at the top.</li>
+                <li><strong>Multiple choice</strong> — 4 options, pick a letter.</li>
+                <li><strong>Fill in the blank</strong> — type the missing word or number.</li>
+                <li><strong>True or false</strong> — single statement, two answers.</li>
+                <li><strong>Short answer</strong> — one or two sentences in your own words.</li>
+                <li><strong>Data interpretation</strong> — read a chart or diagram and answer.</li>
+            </ul>
+            <p>Pass and you've mastered the lesson. The pass threshold is shown at the top of the ticket.</p>
+            <ul>
                 <li>If you don't pass, the tutor walks you through what you missed and you can retry.</li>
+                <li>Mastery is permanent — once you've earned it, it stays on your record even if your teacher reworks the lesson later.</li>
                 <li>You can review your finished exit tickets on the lesson page.</li>
             </ul>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag">All</span> Course exam (baseline + retake)</summary>
+        <div class="body">
+            <p>Each course has a <strong>summative exam</strong> — a 30-question check across the whole course. You take it twice (or more):</p>
+            <ol>
+                <li><strong>Baseline</strong> — before you start any lessons. Don't worry about scoring high; we use it to figure out which lessons to prioritise for you. Lessons unlock after you submit it.</li>
+                <li><strong>Final</strong> — after you've worked through the course. The "Δ (final − baseline)" column on the class report tracks your growth.</li>
+                <li><strong>Retakes</strong> — once you have at least one attempt, a <strong>📝 Retake course exam</strong> pill appears on your subject card. Take it as often as you want; every attempt updates the dashboard's "latest" score.</li>
+            </ol>
+            <p>Your full attempt history (baseline → final → retakes) is on the summative review page so you can see growth over time.</p>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag">All</span> This week's lessons</summary>
+        <div class="body">
+            <p>Your home page shows a yellow <strong>"This week's lessons"</strong> panel listing the lessons your teacher has assigned for the current week. The panel also flags which ones you've already completed and which are still pending.</p>
+            <p>You'll receive a Monday email reminder summarising the week's plan. If your email isn't verified yet, the verification banner at the top has a <strong>Resend link</strong> button — verify so reminders reach you. You can dismiss the banner with the × button if it's distracting; it's a soft prompt, not a hard requirement.</p>
         </div>
     </details>
 
@@ -159,8 +188,47 @@
                 <li>Optionally attach teaching materials (textbooks, worksheets, past exam papers). Each material gets its own type — that drives where it shows up in the AI tutoring.</li>
                 <li>Submit. The vision-extraction parser reads the PDF and produces one lesson per teaching objective. You'll be redirected to the course page; refresh after a minute or two.</li>
             </ol>
-            <p>To re-parse with different lesson durations: open the course, expand <strong>Re-parse &amp; Re-plan Lessons</strong>, pick a duration, click <strong>Re-parse</strong>. This deletes existing lessons and rebuilds from the source PDF.</p>
+            <h4>Re-parsing later</h4>
+            <p>To re-parse with different lesson durations: open the course, expand <strong>Re-parse &amp; Re-plan Lessons</strong>, pick a duration, click <strong>Re-parse</strong>.</p>
+            <p><strong>Re-parsing is non-destructive.</strong> Existing units and lessons with the same titles are updated in place; new ones are added. Student data — mastery levels, session transcripts, exit-ticket attempt history, the permanent competency transcript — all survive. If a lesson title changes between parses you may end up with a duplicate (the old row is left intact rather than silently destroyed); clean those up manually if needed.</p>
             <div class="video-slot">📹 <strong>Video coming soon:</strong> 3-minute curriculum upload walkthrough.</div>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag staff">Teachers</span> Generating &amp; regenerating lesson content</summary>
+        <div class="body">
+            <p>Lesson content (the 5E steps, figures, hints, exit ticket) is generated by the LLM from the parsed curriculum. There are three buttons that trigger generation, each with a different scope:</p>
+            <ul>
+                <li><strong>⚡ on a single lesson row</strong> (course detail page) — wipes that lesson's steps + exit ticket and regenerates only that one. Confirmation prompt explains what's preserved.</li>
+                <li><strong>⚡ Generate All Content</strong> (yellow banner on course detail) — only appears when one or more lessons have no content yet. Generates them in parallel.</li>
+                <li><strong>🔁 Regenerate all lessons</strong> (purple banner on course detail) — replaces every lesson's content + exit tickets across the whole course, runs 3 lessons in parallel, takes ~30–40 minutes for a 50-lesson course. Use this after curriculum updates or when you want to roll out new prompt changes.</li>
+            </ul>
+            <h4>What's preserved on regen</h4>
+            <p>Lesson row IDs are stable, so:</p>
+            <ul>
+                <li><strong>Mastery levels</strong> on <code>StudentLessonProgress</code> — preserved.</li>
+                <li><strong>Skill mastery (SM-2 spaced repetition)</strong> — preserved.</li>
+                <li><strong>Session transcripts</strong> — preserved.</li>
+                <li><strong>Permanent competency transcript</strong> (each student's earned-mastery record) — preserved regardless of regen.</li>
+                <li><strong>Exit-ticket attempt history</strong> — currently cleared on regen (we're working on durability so attempts survive future regens).</li>
+            </ul>
+            <h4>Content style</h4>
+            <p>Lessons generate with rich scaffolding by default — multiple figures, varied question formats (MCQ + short numeric + true/false + free text), 3 hints per practice step. The tutoring engine adapts presentation per student at runtime based on their skill profile and the Too Hard / Too Easy buttons, so one rich content stream serves every learner.</p>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag staff">Teachers</span> Summative exam (course-level)</summary>
+        <div class="body">
+            <h4>Generating the bank</h4>
+            <p>Open <strong>Course → Summative</strong> and click <strong>Generate</strong>. The system samples questions from each lesson's exit-ticket bank (~1–2 per lesson) into a 90-question summative bank. Students see 30 of those 90 per attempt, randomised.</p>
+            <h4>Publishing</h4>
+            <p>Newly generated summatives default to <strong>unpublished</strong>. Click <strong>Publish</strong> on the summative page to make it active. Until you publish, students see no baseline gate and lessons are open. Publishing the summative triggers the baseline gate: students must take the baseline before any lesson unlocks.</p>
+            <h4>Regenerating</h4>
+            <p>The <strong>Regenerate</strong> button rebuilds the summative bank by re-sampling. Existing student attempts on the previous bank are cleared (working on it). Use this after a curriculum update so the bank reflects current lessons.</p>
+            <h4>Coverage</h4>
+            <p>The summative bank shows "<em>N teaching objectives covered</em>" — every question in the bank is tagged with the lesson-level objective it came from, so the class competency map joins cleanly to the bank. If you see the matrix showing 0/49 across all rows after a fresh regen, that's expected: students need to take the new baseline first.</p>
         </div>
     </details>
 
@@ -193,19 +261,35 @@
             <h4>Session report</h4>
             <p>Open <strong>Reports → Lesson session report</strong>. Shows who passed/failed/didn't take the exit ticket, broken down by student. Click a row to read the full chat transcript.</p>
 
-            <h4>Class readiness</h4>
-            <p>From a course page, <strong>Class Competency &amp; Readiness</strong> shows the class-wide competency map: each row is a teaching objective, columns track baseline → latest → final scores, plus class readiness % and the students with the most gaps.</p>
+            <h4>Class competency map</h4>
+            <p>From a course page, <strong>Classes → Competency Map</strong> shows the class-wide view. Each row is one atomic teaching objective (one per lesson) — the same objective string used everywhere on the platform: lesson generation, exit-ticket question tags, summative bank tags, and the SM-2 skill records all share this canonical string, so the join is exact rather than fuzzy. Columns: <strong>Baseline</strong> (pre-course summative) → <strong>Latest</strong> (most recent attempt) → <strong>Final</strong> (post-course summative) → <strong>Δ</strong> growth → <strong>Mastered ≥70%</strong>. Plus class readiness %, struggling objectives, and the students with the most gaps.</p>
+            <p>Click any student row to drill into their per-objective breakdown.</p>
+
+            <h4>Permanent competency transcript</h4>
+            <p>Every time a student transitions to mastered (on a lesson or skill) we write a permanent record on their account. These records survive course re-parses, lesson regenerations, and even course deletion — they're the durable evidence of what a student has earned, regardless of whether the source course still exists in its original form. The teacher dashboard can surface these as a transcript per student in upcoming UI work.</p>
         </div>
     </details>
 
     <details class="help-section">
-        <summary><span class="help-tag staff">Teachers</span> Generating &amp; reviewing exit tickets</summary>
+        <summary><span class="help-tag staff">Teachers</span> Editing exit-ticket questions</summary>
         <div class="body">
             <ol>
-                <li>Open a lesson. The Generate Content button creates the tutoring steps + exit ticket question bank.</li>
-                <li>Click an exit-ticket question to edit the wording, options, or the embedded chart (data-interpretation questions render server-side from a structured spec).</li>
-                <li>Mark a question as a "data interpretation" question to get an automatically rendered chart.</li>
+                <li>Open a lesson — the lesson detail page lists the 35 exit-ticket questions across the five formats (MCQ, fill-in-blank, matching, short-answer, data-interpretation).</li>
+                <li>Click any question to edit wording, options, accepted alternatives, embedded charts, or figures. Data-interpretation questions render server-side from a structured spec, so you edit the spec rather than the rendered image.</li>
+                <li>Each question is tagged with <code>concept_tag</code> (the fine-grained sub-skill it tests). The summative sampling rolls these up to lesson-objective level for cross-attempt reporting.</li>
             </ol>
+        </div>
+    </details>
+
+    <details class="help-section">
+        <summary><span class="help-tag staff">Teachers</span> Weekly assignments &amp; student communication</summary>
+        <div class="body">
+            <h4>Setting weekly lessons</h4>
+            <p>From the course detail page, expand the <strong>📅 Weekly assignments</strong> card. For each upcoming week, tick the lessons you want students to work on and add an optional note. Students see these in their home-page panel and receive a Monday email reminder.</p>
+            <h4>Email verification</h4>
+            <p>Students who haven't verified their email see a soft-prompt banner with a Resend button. They can dismiss it, but reminders won't reach unverified addresses. The banner stays hidden once dismissed (per browser).</p>
+            <h4>In-app feedback</h4>
+            <p>The <strong>Help / Feedback</strong> button (bottom-right of every page) routes student bug reports + feedback to the Feedback &amp; Bugs view in your dashboard. Reports include the page URL and user agent.</p>
         </div>
     </details>
     {% endif %}
@@ -222,11 +306,17 @@
             <h4>Tutor said something wrong / inappropriate</h4>
             <p>Click the flag icon under the message. Teachers see flagged chats under <strong>Safety → Flagged Chats</strong>.</p>
 
+            <h4>The verify-email banner won't go away</h4>
+            <p>Click the <strong>×</strong> on the right edge of the banner to dismiss it. It stays hidden in that browser unless you sign in elsewhere or clear storage. Verifying your email is still recommended so weekly reminders reach you.</p>
+
             <h4>Voice / audio doesn't play</h4>
             <p>Some browsers block autoplay audio. Tap the speaker icon to start it manually. On mobile, make sure your silent switch is off.</p>
 
             <h4>Images aren't loading</h4>
             <p>Slow internet — give it a few seconds. The platform caches images so a second visit is faster.</p>
+
+            <h4>The "Retake course exam" button isn't showing</h4>
+            <p>It only appears once you have at least one completed attempt on the published summative. If your teacher hasn't published the summative yet, or you haven't taken the baseline, the button is hidden. Take the baseline first; the retake pill appears after you submit it.</p>
 
             <h4>Still stuck?</h4>
             <p>Click <strong>Help / Feedback</strong> bottom-right. Tell us:</p>
@@ -244,6 +334,15 @@
         <div class="body">
             <p>This is a Seychelles pilot of the AI Tutor platform, running through 2026. Some features are still being added — if you spot a rough edge, that's why. Click <strong>Help / Feedback</strong> and tell us; the things you flag get fixed.</p>
             <p>Thanks for being part of it 🙏</p>
+            <h4>What's new (April 2026)</h4>
+            <ul>
+                <li><strong>Rich-content lessons</strong> — every lesson now generates with multiple figures, varied question formats, and 3 hint levels. The tutor adapts presentation per student at runtime (slow learners get more recognition formats + earlier hints; advanced students get free-response + delayed hints).</li>
+                <li><strong>Permanent competency transcript</strong> — every mastery transition writes a durable record on your account, independent of course rewrites or deletions.</li>
+                <li><strong>Course-wide regenerate</strong> (teachers) — one click rebuilds every lesson in a course in parallel, ~30–40 min for a 50-lesson course.</li>
+                <li><strong>Non-destructive re-parse</strong> — re-parsing a curriculum file no longer wipes student data; lessons upsert by title.</li>
+                <li><strong>Single source of truth for objectives</strong> — lesson content, exit-ticket tags, summative tags, and the competency map all use the same canonical lesson-objective string, so the matrix joins exactly to what students attempted.</li>
+                <li><strong>Retake course exam</strong> — once you have any baseline/final attempt, you can retake the course summative as often as you want; every attempt updates the dashboard's "latest" score.</li>
+            </ul>
         </div>
     </details>
 </div>
