@@ -1,14 +1,42 @@
 {% comment %}
 Soft email-verification banner. Shows only for authenticated users
 with an email on file who haven't verified yet. Click "Resend" to
-re-mint and resend the verification link.
+re-mint and resend the verification link. Dismissible per-browser
+via localStorage (the user can hide it; it stays hidden until they
+clear storage or sign in elsewhere).
 {% endcomment %}
 {% if user.is_authenticated and user.email and not user_email_verified %}
-<div style="background:#fef3c7;border-bottom:1px solid #fcd34d;padding:0.6rem 1rem;font-size:0.88rem;color:#78350f;display:flex;justify-content:center;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+<div id="email-verify-banner"
+     data-storage-key="email_verify_banner_dismissed_for_{{ user.id }}"
+     style="background:#fef3c7;border-bottom:1px solid #fcd34d;padding:0.6rem 1rem;font-size:0.88rem;color:#78350f;display:flex;justify-content:center;align-items:center;gap:0.75rem;flex-wrap:wrap;position:relative;">
     <span>📬 Please verify your email <strong>{{ user.email }}</strong> so you can receive weekly lesson reminders.</span>
     <form method="post" action="{% url 'accounts:resend_verification' %}" style="margin:0;">
         {% csrf_token %}
         <button type="submit" style="background:#92400e;color:#fff;border:none;border-radius:6px;padding:0.3rem 0.75rem;font-size:0.8rem;font-weight:600;cursor:pointer;">Resend link</button>
     </form>
+    <button type="button" id="email-verify-banner-close"
+            aria-label="Dismiss this notice"
+            title="Dismiss"
+            style="background:transparent;border:none;color:#78350f;font-size:1.1rem;line-height:1;cursor:pointer;padding:0 0.25rem;font-weight:600;">×</button>
 </div>
+<script>
+(function() {
+    var banner = document.getElementById('email-verify-banner');
+    if (!banner) return;
+    var key = banner.getAttribute('data-storage-key');
+    try {
+        if (localStorage.getItem(key) === '1') {
+            banner.style.display = 'none';
+            return;
+        }
+    } catch (e) { /* localStorage unavailable — show banner */ }
+    var btn = document.getElementById('email-verify-banner-close');
+    if (btn) {
+        btn.addEventListener('click', function() {
+            try { localStorage.setItem(key, '1'); } catch (e) {}
+            banner.style.display = 'none';
+        });
+    }
+})();
+</script>
 {% endif %}
