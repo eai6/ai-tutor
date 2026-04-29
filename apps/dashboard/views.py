@@ -3207,11 +3207,26 @@ def course_set_default_duration(request, course_id):
     updated = Lesson.objects.filter(unit__course=course).update(
         estimated_minutes=new_duration,
     )
+
+    # Course-level policy toggle — ships in the same form so the
+    # teacher sets duration + access in one action. The checkbox is
+    # only present in POST when ticked; absence = lockdown.
+    new_allow = bool(request.POST.get('allow_student_override'))
+    policy_msg = ''
+    if new_allow != course.allow_student_duration_override:
+        course.allow_student_duration_override = new_allow
+        course.save(update_fields=['allow_student_duration_override'])
+        policy_msg = (
+            ' Students CAN now pick their session duration.'
+            if new_allow else
+            ' Students can NO LONGER change duration; everyone uses the default.'
+        )
+
     messages.success(
         request,
         f"Default lesson duration set to {new_duration} min for {updated} lesson(s) "
-        f"in '{course.title}'. Active sessions keep their existing pacing; new "
-        f"sessions will use the new duration. No regeneration triggered.",
+        f"in '{course.title}'.{policy_msg} Active sessions keep their existing pacing; "
+        f"new sessions will use the new duration. No regeneration triggered.",
     )
     return redirect('dashboard:course_detail', course_id=course.id)
 

@@ -534,6 +534,9 @@
     <div style="flex: 1; min-width: 240px;">
         <strong style="color: #047857;">Default lesson duration</strong>
         <div style="font-size: 0.8rem; color: #047857;">Sets <code>estimated_minutes</code> on every lesson in this course. The tutoring engine adapts depth at runtime — no regeneration needed. Active student sessions keep their existing pacing.</div>
+        <div style="font-size: 0.78rem; color: #065f46; margin-top: 0.4rem;">
+            Current policy: students {% if course.allow_student_duration_override %}<strong>CAN</strong> pick their own session duration{% else %}<strong>CANNOT</strong> change duration — everyone uses the default{% endif %}.
+        </div>
     </div>
     <form method="post" action="{% url 'dashboard:course_set_default_duration' course.id %}" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
         {% csrf_token %}
@@ -546,6 +549,10 @@
             <option value="40">40 min · 8 steps</option>
             <option value="50">50 min · 10 steps</option>
         </select>
+        <label style="font-size:0.78rem; color:#065f46; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="When unchecked, the chat-page picker is hidden and every session uses the default duration.">
+            <input type="checkbox" name="allow_student_override" value="1" {% if course.allow_student_duration_override %}checked{% endif %} style="accent-color:#059669;">
+            Allow students to change
+        </label>
         <button type="submit" class="btn btn-secondary btn-sm" style="border-color:#34d399; color:#047857;">
             Apply
         </button>

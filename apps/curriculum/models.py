@@ -64,6 +64,22 @@ class Course(models.Model):
         ),
     )
 
+    # Teacher policy: if False, students cannot pick their session
+    # duration. The chat-page picker is hidden and any
+    # `target_minutes` sent from the client is ignored — sessions
+    # always use the teacher-configured `lesson.estimated_minutes`.
+    # Default True preserves the agency that the picker shipped with;
+    # teachers opt INTO control rather than out. See
+    # memory/max_depth_lesson_steps_plan.md.
+    allow_student_duration_override = models.BooleanField(
+        default=True,
+        help_text=(
+            "Whether students may pick their session duration via the "
+            "chat-page picker. When False, sessions always use the "
+            "teacher-configured lesson.estimated_minutes."
+        ),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

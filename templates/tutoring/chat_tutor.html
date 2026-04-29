@@ -64,7 +64,9 @@
     <!-- Chat body: flex row with chat column + artifact panel -->
     <div class="chat-body">
         <div class="chat-column">
-            <!-- Pre-session duration picker. JS auto-defaults after 6s -->
+            {% if allow_duration_picker %}
+            <!-- Pre-session duration picker. JS auto-defaults after 6s.
+                 Hidden when Course.allow_student_duration_override is False. -->
             <div id="duration-picker"
                  style="margin: 1rem; padding: 1rem 1.2rem; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 12px; box-shadow: 0 4px 12px rgba(91,33,182,0.08);">
                 <div style="font-weight: 600; color: #5b21b6; margin-bottom: 0.4rem;">⏱️ How long do you have today?</div>
@@ -78,6 +80,7 @@
                     <button type="button" data-duration="" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: transparent; border: 1px solid transparent; color: #6d28d9; cursor: pointer; font-size: 0.85rem; text-decoration: underline;">Use the lesson default</button>
                 </div>
             </div>
+            {% endif %}
 
             <!-- Chat Messages -->
             <main class="chat-messages" id="chat-messages">

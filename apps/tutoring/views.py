@@ -598,9 +598,19 @@ def chat_tutor_interface(request, lesson_id):
     # Detect math lessons for KaTeX rendering
     is_math_lesson = lesson.unit.course.is_math
 
+    # Whether to render the duration picker — controlled by the
+    # teacher via Course.allow_student_duration_override. When False,
+    # the chat page hides the picker entirely and the session uses the
+    # teacher-configured lesson.estimated_minutes.
+    allow_duration_picker = (
+        lesson.unit.course.allow_student_duration_override
+        if lesson.unit and lesson.unit.course else True
+    )
+
     return render(request, 'tutoring/chat_tutor.html', {
         "lesson": lesson,
         "is_math_lesson": is_math_lesson,
+        "allow_duration_picker": allow_duration_picker,
     })
 
 
@@ -751,19 +761,29 @@ def chat_start_session(request, lesson_id):
         # engine reads engine_state['target_minutes_override'] in
         # _target_minutes_for_session and uses it to select the right
         # subset of the max-depth step bundle. No LLM regen needed.
-        try:
-            _body = json.loads(request.body or "{}")
-        except (ValueError, TypeError):
-            _body = {}
-        try:
-            _override = int(_body.get('target_minutes') or 0)
-        except (TypeError, ValueError):
-            _override = 0
-        if 5 <= _override <= 120:
-            engine_state = session.engine_state or {}
-            engine_state['target_minutes_override'] = _override
-            session.engine_state = engine_state
-            session.save(update_fields=['engine_state'])
+        #
+        # Course-level policy: if Course.allow_student_duration_override
+        # is False, the picker is hidden client-side AND we ignore any
+        # `target_minutes` sent on the request (defense in depth — a
+        # crafted POST shouldn't bypass the teacher's lockdown).
+        course_allows_pick = (
+            lesson.unit.course.allow_student_duration_override
+            if lesson.unit and lesson.unit.course else True
+        )
+        if course_allows_pick:
+            try:
+                _body = json.loads(request.body or "{}")
+            except (ValueError, TypeError):
+                _body = {}
+            try:
+                _override = int(_body.get('target_minutes') or 0)
+            except (TypeError, ValueError):
+                _override = 0
+            if 5 <= _override <= 120:
+                engine_state = session.engine_state or {}
+                engine_state['target_minutes_override'] = _override
+                session.engine_state = engine_state
+                session.save(update_fields=['engine_state'])
 
         # Record the primary participant (G1). Every session has at least
         # one SessionParticipant — the owner.
