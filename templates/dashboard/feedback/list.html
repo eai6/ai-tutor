@@ -63,6 +63,12 @@
             <span class="fb-tag {{ r.severity }}">{{ r.get_severity_display }}</span>
             {% if r.is_resolved %}<span class="fb-tag" style="background:#dcfce7;color:#166534;">Resolved</span>{% endif %}
             <div class="fb-msg" style="margin-top:0.4rem;">{{ r.message }}</div>
+            {% if r.screenshot %}
+            <a href="{{ r.screenshot.url }}" target="_blank" rel="noopener" title="Open full-size in a new tab" style="display:inline-block;margin-top:0.5rem;">
+                <img src="{{ r.screenshot.url }}" alt="Screenshot from user" style="max-width:240px;max-height:160px;border-radius:6px;border:1px solid #e5e7eb;background:#f9fafb;display:block;">
+                <span style="font-size:0.7rem;color:#6b7280;">📷 Screenshot — click to enlarge</span>
+            </a>
+            {% endif %}
             <div class="fb-meta">
                 {% if r.user %}{{ r.user.first_name }} {{ r.user.last_name }} (@{{ r.user.username }}){% else %}(anonymous){% endif %}
                 {% if r.institution %} · {{ r.institution.name }}{% endif %}

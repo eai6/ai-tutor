@@ -250,6 +250,15 @@ class FeedbackReport(models.Model):
     message = models.TextField(help_text="What happened / what's wrong / what would help.")
     page_url = models.CharField(max_length=500, blank=True, default='')
     user_agent = models.CharField(max_length=500, blank=True, default='')
+    # Optional screen capture attached at submit time. The picker on
+    # the feedback widget defaults to checked but the student can opt
+    # out — we never capture without the explicit click that triggers
+    # browser permission. See _includes/feedback_button.html.
+    screenshot = models.ImageField(
+        upload_to='feedback_screenshots/',
+        null=True, blank=True,
+        help_text="Optional real-pixel screenshot attached by the user when submitting.",
+    )
 
     is_resolved = models.BooleanField(default=False)
     resolved_at = models.DateTimeField(null=True, blank=True)

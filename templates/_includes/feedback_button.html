@@ -141,6 +141,11 @@
 
         <textarea class="fb-textarea" id="fb-message" placeholder="Describe what happened, what you expected, or any feedback…"></textarea>
 
+        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:#374151;margin-top:0.5rem;cursor:pointer;">
+            <input type="checkbox" id="fb-include-screenshot" checked style="accent-color:#5b21b6;">
+            <span>Include a screenshot of my current screen <span style="color:#6b7280;font-size:0.78rem;">(your browser will ask which screen / window to share)</span></span>
+        </label>
+
         <div class="fb-actions">
             <button type="button" class="fb-cancel" id="fb-cancel">Cancel</button>
             <button type="button" class="fb-submit" id="fb-submit">Send</button>
@@ -201,6 +206,56 @@
         if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
     });
 
+    // Real-pixel screen capture via getDisplayMedia. The browser
+    // shows a native window/tab/screen picker and the user must
+    // explicitly approve — we never capture without an explicit
+    // click that ALSO triggered this flow. Returns a PNG Blob, or
+    // null if the user declined / the API isn't supported (older
+    // Safari, mobile WebViews). Failures are non-fatal; the
+    // feedback still submits without an attachment.
+    async function captureScreenshot() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            return null;
+        }
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getDisplayMedia({
+                video: { displaySurface: 'browser' },
+                audio: false,
+                preferCurrentTab: true,
+            });
+        } catch (e) {
+            // User declined or permission denied — submit without screenshot.
+            return null;
+        }
+        try {
+            const track = stream.getVideoTracks()[0];
+            // Some browsers (Chrome) expose ImageCapture; fall back to
+            // <video> + <canvas> for everyone else.
+            const video = document.createElement('video');
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            video.srcObject = stream;
+            await new Promise((resolve, reject) => {
+                video.addEventListener('loadedmetadata', resolve, { once: true });
+                setTimeout(reject, 5000);
+            });
+            await video.play().catch(() => {});
+            // Give the frame a moment to render before grabbing.
+            await new Promise(r => setTimeout(r, 150));
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 1280;
+            canvas.height = video.videoHeight || 720;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            return blob;
+        } finally {
+            stream.getTracks().forEach(t => t.stop());
+        }
+    }
+
     submitBtn.addEventListener('click', async () => {
         const message = messageEl.value.trim();
         if (!message) {
@@ -208,24 +263,33 @@
             errorEl.style.display = 'block';
             return;
         }
+        const wantScreenshot = document.getElementById('fb-include-screenshot').checked;
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Sending…';
+        submitBtn.textContent = wantScreenshot ? 'Pick a window…' : 'Sending…';
         errorEl.style.display = 'none';
 
+        let screenshotBlob = null;
+        if (wantScreenshot) {
+            screenshotBlob = await captureScreenshot();
+            // If capture failed/declined, just submit without it —
+            // don't block the feedback flow on an attachment.
+        }
+        submitBtn.textContent = 'Sending…';
+
         try {
+            const fd = new FormData();
+            fd.append('message', message);
+            fd.append('kind', kindRow.dataset.value);
+            fd.append('severity', severityRow.dataset.value);
+            fd.append('page_url', window.location.href);
+            if (screenshotBlob) {
+                fd.append('screenshot', screenshotBlob, 'screenshot.png');
+            }
             const r = await fetch('{% url "dashboard:feedback_submit" %}', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
                 credentials: 'same-origin',
-                body: JSON.stringify({
-                    message,
-                    kind: kindRow.dataset.value,
-                    severity: severityRow.dataset.value,
-                    page_url: window.location.href,
-                }),
+                body: fd,
             });
             const data = await r.json().catch(() => ({}));
             if (!r.ok) {

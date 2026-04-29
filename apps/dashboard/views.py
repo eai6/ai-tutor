@@ -5300,23 +5300,40 @@ def _question_for_staff(request, question_id):
 @login_required
 @require_POST
 def feedback_submit(request):
-    """Receive a bug report or feedback from any authenticated page."""
+    """Receive a bug report or feedback from any authenticated page.
+
+    Accepts BOTH application/json (legacy clients without
+    screenshots) AND multipart/form-data (new — when the user opts
+    to attach a real-pixel screenshot via getDisplayMedia()). The
+    multipart form looks like:
+
+        message=<text>&kind=bug&severity=medium&page_url=...
+        + screenshot=<PNG file>  (optional, only when user opted in)
+    """
     from apps.dashboard.models import FeedbackReport
 
-    try:
-        body = json.loads(request.body or "{}")
-    except (ValueError, TypeError):
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    # Multipart path — screenshot may be attached.
+    if request.content_type and request.content_type.startswith('multipart/form-data'):
+        message = (request.POST.get('message') or '').strip()
+        kind = (request.POST.get('kind') or 'bug').strip()
+        severity = (request.POST.get('severity') or 'medium').strip()
+        page_url = (request.POST.get('page_url') or '')[:500]
+        screenshot = request.FILES.get('screenshot')
+    else:
+        try:
+            body = json.loads(request.body or "{}")
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+        message = (body.get('message') or '').strip()
+        kind = (body.get('kind') or 'bug').strip()
+        severity = (body.get('severity') or 'medium').strip()
+        page_url = (body.get('page_url') or '')[:500]
+        screenshot = None
 
-    message = (body.get("message") or "").strip()
     if not message:
         return JsonResponse({"error": "Message is required"}, status=400)
-
-    kind = (body.get("kind") or "bug").strip()
     if kind not in {c[0] for c in FeedbackReport.Kind.choices}:
         kind = FeedbackReport.Kind.BUG
-
-    severity = (body.get("severity") or "medium").strip()
     if severity not in {c[0] for c in FeedbackReport.Severity.choices}:
         severity = FeedbackReport.Severity.MEDIUM
 
@@ -5335,8 +5352,9 @@ def feedback_submit(request):
         kind=kind,
         severity=severity,
         message=message[:4000],
-        page_url=(body.get("page_url") or "")[:500],
-        user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:500],
+        page_url=page_url,
+        user_agent=(request.META.get('HTTP_USER_AGENT') or '')[:500],
+        screenshot=screenshot,
     )
     return JsonResponse({"ok": True})
 
