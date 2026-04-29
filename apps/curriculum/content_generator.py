@@ -1167,14 +1167,15 @@ CONTENT GUIDELINES:
     def _generate_exit_ticket(self, lesson) -> Dict:
         """Generate a mixed-format exit ticket for a lesson after content generation.
 
-        Always force_regenerate=True — when this runs as part of the
-        full content pipeline (incl. regen), we want fresh questions.
-        The helper replaces questions in place rather than deleting +
-        recreating the ExitTicket row so ExitTicketAttempt rows
-        FK'd to the ticket survive (preserves the competency map).
+        Skip-if-exists by default — exit-ticket questions are stable
+        assessment items, regenerating lesson STEPS doesn't require new
+        questions. This keeps the ExitTicket row + its
+        ExitTicketAttempt history alive across lesson regenerations.
+        Teachers can trigger an explicit exit-ticket regeneration via
+        a separate action if they ever want fresh questions.
         """
         try:
-            result = generate_exit_ticket_for_lesson(lesson, self.institution_id, force_regenerate=True)
+            result = generate_exit_ticket_for_lesson(lesson, self.institution_id)
             if result.get('success'):
                 print(f"[ContentGen] [{lesson.title}] Exit ticket: {result['questions_created']} questions", flush=True)
             else:

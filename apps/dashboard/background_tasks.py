@@ -1169,9 +1169,13 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
             log(f"   ⏭️ {lesson.title} (already generating — skipping)")
             return {'lesson': lesson.title, 'status': 'skipped'}
 
-        # Wipe partial state (mirrors lesson_regenerate view).
+        # Wipe lesson STEPS only — preserve the ExitTicket row so
+        # ExitTicketAttempt history (CASCADE child) survives the
+        # regen. Exit-ticket questions are stable assessment items;
+        # regenerating lesson content doesn't require new questions.
+        # The pipeline's _generate_exit_ticket skips when an existing
+        # ticket has questions, so this is naturally idempotent.
         lesson.steps.all().delete()
-        ExitTicket.objects.filter(lesson=lesson).delete()
         lesson.content_status = 'empty'
         lesson.updated_at = timezone.now()
         lesson.save(update_fields=['content_status', 'updated_at'])

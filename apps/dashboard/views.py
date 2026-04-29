@@ -3276,8 +3276,16 @@ def lesson_regenerate(request, lesson_id):
     # signal, and a save with update_fields=['content_status'] alone
     # leaves updated_at untouched (Django doesn't auto-bump auto_now
     # fields when update_fields is specified).
+    #
+    # We DO NOT delete the ExitTicket here. Exit-ticket questions are
+    # stable assessment items — regenerating lesson steps doesn't
+    # require new questions. Keeping the ExitTicket row preserves all
+    # ExitTicketAttempt history (which CASCADEs from ExitTicket).
+    # The pipeline's `_generate_exit_ticket` skips when an existing
+    # ticket has questions, so this is naturally idempotent. If a
+    # teacher genuinely wants new exit-ticket questions, that becomes
+    # a separate explicit action.
     lesson.steps.all().delete()
-    ExitTicket.objects.filter(lesson=lesson).delete()
     lesson.content_status = 'empty'
     lesson.updated_at = timezone.now()
     lesson.save(update_fields=['content_status', 'updated_at'])

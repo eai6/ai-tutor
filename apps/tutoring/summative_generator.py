@@ -28,8 +28,19 @@ from typing import Dict, List
 logger = logging.getLogger(__name__)
 
 
-SUMMATIVE_TARGET_COUNT = 90
+# Summative bank size policy (revised 2026-04-29):
+# Sample at least N questions per teaching objective so every
+# objective has variety in the bank. Total bank size scales with
+# the course (>= MIN_PER_LESSON × number_of_lessons), rather than
+# being capped at a fixed total. The previous fixed-90 cap meant a
+# course with 50+ lessons got 1-2 questions per objective, which
+# made the per-attempt sampler hit the same questions repeatedly.
+SUMMATIVE_MIN_PER_LESSON = 5
 SUMMATIVE_PER_ATTEMPT = 30
+
+# Kept for backward compatibility with callers passing target_count.
+# Not used as a hard cap any more — see comment above.
+SUMMATIVE_TARGET_COUNT = 90
 
 
 def _ensure_exit_ticket_for(lesson, institution_id: int) -> int:
@@ -167,10 +178,21 @@ def _process_lesson(lesson_id: int, institution_id: int, k: int, seed_for_lesson
 def generate_summative_for_course(
     course,
     *,
-    target_count: int = SUMMATIVE_TARGET_COUNT,
+    min_per_lesson: int = SUMMATIVE_MIN_PER_LESSON,
     max_workers: int = 3,
+    target_count: int = None,  # deprecated; kept for callsite compatibility
 ) -> Dict:
     """Build the summative bank by sampling each lesson's exit ticket.
+
+    Sampling policy (revised 2026-04-29): each lesson contributes
+    AT LEAST `min_per_lesson` questions to the bank — every teaching
+    objective therefore gets variety in the bank rather than landing
+    on a single representative question. Total bank size scales with
+    the course (>= min_per_lesson × N_lessons).
+
+    The legacy `target_count` parameter is accepted but no longer
+    enforced as a hard cap; if the produced bank exceeds it, we don't
+    trim. Callers should migrate to passing `min_per_lesson` directly.
 
     Returns {success, questions_created, lessons_processed, error}.
     """
@@ -189,15 +211,16 @@ def generate_summative_for_course(
     if not lessons:
         return {'success': False, 'error': 'No lessons in this course.'}
 
-    # Distribute the target evenly across lessons; floor at 1, top up the
-    # remainder so the total lands at `target_count`.
-    base = target_count // len(lessons)
-    remainder = target_count - base * len(lessons)
-    per_lesson_k = [max(1, base) + (1 if i < remainder else 0) for i in range(len(lessons))]
+    # ≥ min_per_lesson questions per lesson, period. The bank's total
+    # size is min_per_lesson × N — no global cap. Lessons whose exit
+    # ticket has fewer than min_per_lesson questions contribute what
+    # they have (sampler clamps to available).
+    per_lesson_k = [min_per_lesson] * len(lessons)
+    target_total = min_per_lesson * len(lessons)
 
     print(
-        f"[Summative] {course.title}: {len(lessons)} lessons, "
-        f"~{per_lesson_k[0]}–{per_lesson_k[-1]} qs/lesson → target {target_count}",
+        f"[Summative] {course.title}: {len(lessons)} lessons × "
+        f"{min_per_lesson} qs/lesson → bank target {target_total}",
         flush=True,
     )
 
@@ -237,12 +260,21 @@ def generate_summative_for_course(
             'error': f'No questions could be sampled (failed lessons: {len(lessons_with_zero)} / {len(lessons)}).',
         }
 
-    # Trim to target if we collected slightly more.
-    if len(aggregated_payload) > target_count:
-        rng_master.shuffle(aggregated_payload)
-        aggregated_payload = aggregated_payload[:target_count]
+    # No global trim — the bank scales with the course. Shuffle the
+    # aggregated payload so per-lesson questions don't all land
+    # adjacent to each other in the bank (the sampler does its own
+    # shuffle per attempt, but a shuffled bank is friendlier for
+    # teacher review).
+    rng_master.shuffle(aggregated_payload)
 
     with transaction.atomic():
+        # Replace the SUMMATIVE ExitTicket. Note this still
+        # CASCADE-deletes any existing ExitTicketAttempt rows on the
+        # OLD summative — we revisit this trade-off if we add a
+        # "regenerate summative without losing attempt history" flow.
+        # For now, regenerating the summative bank is a deliberate
+        # "I want a fresh exam" action, so wiping past attempts is
+        # acceptable. Lesson regen no longer touches summative at all.
         ExitTicket.objects.filter(
             course=course,
             assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
