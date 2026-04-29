@@ -1162,9 +1162,16 @@ CONTENT GUIDELINES:
             logger.warning(f"EO skill extraction failed for {lesson.title}: {e}")
 
     def _generate_exit_ticket(self, lesson) -> Dict:
-        """Generate a mixed-format exit ticket for a lesson after content generation."""
+        """Generate a mixed-format exit ticket for a lesson after content generation.
+
+        Always force_regenerate=True — when this runs as part of the
+        full content pipeline (incl. regen), we want fresh questions.
+        The helper replaces questions in place rather than deleting +
+        recreating the ExitTicket row so ExitTicketAttempt rows
+        FK'd to the ticket survive (preserves the competency map).
+        """
         try:
-            result = generate_exit_ticket_for_lesson(lesson, self.institution_id)
+            result = generate_exit_ticket_for_lesson(lesson, self.institution_id, force_regenerate=True)
             if result.get('success'):
                 print(f"[ContentGen] [{lesson.title}] Exit ticket: {result['questions_created']} questions", flush=True)
             else:
@@ -1175,13 +1182,21 @@ CONTENT GUIDELINES:
             return {'success': False, 'error': str(e)}
 
 
-def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
+def generate_exit_ticket_for_lesson(lesson, institution_id: int = None, force_regenerate: bool = False) -> Dict:
     """
     Generate a mixed-format exit ticket question bank for a lesson.
 
     Standalone function usable from both the content pipeline and management commands.
     Generates 35 questions (20 MCQ + 5 fill-in-blank + 4 matching + 3 short-answer +
     3 data-interpretation) and saves them to the database.
+
+    Args:
+        force_regenerate: When True, REPLACE the existing ExitTicket's
+            questions in place rather than deleting + recreating the
+            ExitTicket row. This preserves any ExitTicketAttempt rows
+            (and therefore the competency map / matrix data) across
+            regenerations. Default False keeps the legacy
+            "skip-if-exists" semantics for non-regen callers.
     """
     from apps.tutoring.models import ExitTicket, ExitTicketQuestion
     from apps.llm.models import ModelConfig
@@ -1192,9 +1207,11 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None) -> Dict:
         from apps.accounts.models import Institution
         institution_id = lesson.unit.course.institution_id or Institution.get_global().id
 
-    # Skip if already has exit ticket with any questions
+    # Skip if already has exit ticket with any questions — unless the
+    # caller explicitly asked for a regen, in which case we replace
+    # the questions but KEEP the ExitTicket row (so attempts survive).
     existing = ExitTicket.objects.filter(lesson=lesson).first()
-    if existing and existing.questions.exists():
+    if existing and existing.questions.exists() and not force_regenerate:
         return {'success': True, 'skipped': True, 'questions_created': 0}
 
     # Get LLM client
