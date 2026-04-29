@@ -46,6 +46,7 @@ urlpatterns = [
     path('', include('apps.accounts.urls')),  # Landing page at root
     path('tutor/', include('apps.tutoring.urls')),
     path('dashboard/', include('apps.dashboard.urls')),
+    path('support/', include('apps.support.urls')),
 ]
 
 # Always serve media (Azure Files mount in production)

@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'apps.safety',
     'apps.dashboard',
     'apps.api',
+    'apps.support',
 ]
 
 MIDDLEWARE = [

@@ -123,33 +123,53 @@
 
 <div class="fb-overlay" id="fb-overlay" role="dialog" aria-modal="true" aria-labelledby="fb-title">
     <div class="fb-modal" onclick="event.stopPropagation();">
-        <h3 id="fb-title">Report a bug or send feedback</h3>
-        <p class="fb-help">Tell us what happened or what would help. We read every one.</p>
-        <div class="fb-success" id="fb-success">✅ Thanks — your message was sent. We'll review it soon.</div>
-        <div class="fb-error" id="fb-error"></div>
+        <h3 id="fb-title">Help & Support</h3>
 
-        <div class="fb-row" id="fb-kind-row" data-value="bug">
-            <button type="button" class="fb-pill active" data-kind="bug">🐞 Bug</button>
-            <button type="button" class="fb-pill" data-kind="feedback">💬 Feedback</button>
-            <button type="button" class="fb-pill" data-kind="idea">💡 Idea</button>
-        </div>
-        <div class="fb-row" id="fb-severity-row" data-value="medium">
-            <button type="button" class="fb-pill" data-severity="low">Low</button>
-            <button type="button" class="fb-pill active" data-severity="medium">Medium</button>
-            <button type="button" class="fb-pill" data-severity="high">High — pilot blocker</button>
+        <!-- Tab bar -->
+        <div style="display:flex;gap:0.4rem;margin:0.4rem 0 0.9rem;border-bottom:1px solid #e5e7eb;">
+            <button type="button" id="fb-tab-ai" class="fb-tab fb-tab-active" style="background:none;border:none;border-bottom:2px solid #5b21b6;padding:0.5rem 0.9rem;font-weight:600;color:#5b21b6;cursor:pointer;">💬 Ask the AI</button>
+            <button type="button" id="fb-tab-support" class="fb-tab" style="background:none;border:none;border-bottom:2px solid transparent;padding:0.5rem 0.9rem;font-weight:600;color:#6b7280;cursor:pointer;">📩 Send to support</button>
         </div>
 
-        <textarea class="fb-textarea" id="fb-message" placeholder="Describe what happened, what you expected, or any feedback…"></textarea>
+        <!-- TAB 1: AI chat -->
+        <section id="fb-pane-ai" style="display:flex;flex-direction:column;gap:0.5rem;min-height:340px;">
+            <div id="fb-ai-thread" style="display:flex;flex-direction:column;gap:0.6rem;max-height:46vh;overflow-y:auto;padding:0.4rem 0.1rem;"></div>
+            <div style="display:flex;gap:0.4rem;align-items:flex-end;">
+                <textarea id="fb-ai-input" rows="2" placeholder="Ask anything about the platform — how do I…, where is…" style="flex:1;padding:0.55rem 0.7rem;border:1px solid #d1d5db;border-radius:8px;font-size:0.92rem;font-family:inherit;resize:vertical;min-height:38px;"></textarea>
+                <button type="button" id="fb-ai-send" style="background:#5b21b6;color:#fff;border:none;border-radius:8px;padding:0.55rem 0.95rem;font-weight:600;cursor:pointer;font-size:0.88rem;">Send</button>
+            </div>
+            <div id="fb-ai-error" class="fb-error" style="margin-top:0.4rem;"></div>
+        </section>
 
-        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:#374151;margin-top:0.5rem;cursor:pointer;">
-            <input type="checkbox" id="fb-include-screenshot" checked style="accent-color:#5b21b6;">
-            <span>Include a screenshot of my current screen <span style="color:#6b7280;font-size:0.78rem;">(your browser will ask which screen / window to share)</span></span>
-        </label>
+        <!-- TAB 2: human-support form (existing) -->
+        <section id="fb-pane-support" style="display:none;">
+            <p class="fb-help">Tell us what happened or what would help. We read every one.</p>
+            <div class="fb-success" id="fb-success">✅ Thanks — your message was sent. We'll review it soon.</div>
+            <div class="fb-error" id="fb-error"></div>
 
-        <div class="fb-actions">
-            <button type="button" class="fb-cancel" id="fb-cancel">Cancel</button>
-            <button type="button" class="fb-submit" id="fb-submit">Send</button>
-        </div>
+            <div class="fb-row" id="fb-kind-row" data-value="bug">
+                <button type="button" class="fb-pill active" data-kind="bug">🐞 Bug</button>
+                <button type="button" class="fb-pill" data-kind="feedback">💬 Feedback</button>
+                <button type="button" class="fb-pill" data-kind="idea">💡 Idea</button>
+            </div>
+            <div class="fb-row" id="fb-severity-row" data-value="medium">
+                <button type="button" class="fb-pill" data-severity="low">Low</button>
+                <button type="button" class="fb-pill active" data-severity="medium">Medium</button>
+                <button type="button" class="fb-pill" data-severity="high">High — pilot blocker</button>
+            </div>
+
+            <textarea class="fb-textarea" id="fb-message" placeholder="Describe what happened, what you expected, or any feedback…"></textarea>
+
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:#374151;margin-top:0.5rem;cursor:pointer;">
+                <input type="checkbox" id="fb-include-screenshot" checked style="accent-color:#5b21b6;">
+                <span>Include a screenshot of my current screen <span style="color:#6b7280;font-size:0.78rem;">(your browser will ask which screen / window to share)</span></span>
+            </label>
+
+            <div class="fb-actions">
+                <button type="button" class="fb-cancel" id="fb-cancel">Cancel</button>
+                <button type="button" class="fb-submit" id="fb-submit">Send</button>
+            </div>
+        </section>
     </div>
 </div>
 
@@ -198,6 +218,214 @@
         setActive(kindRow, 'kind', 'bug');
         setActive(severityRow, 'severity', 'medium');
     }
+
+    // ---- Tab switching ----------------------------------------------------
+    const tabAi = document.getElementById('fb-tab-ai');
+    const tabSupport = document.getElementById('fb-tab-support');
+    const paneAi = document.getElementById('fb-pane-ai');
+    const paneSupport = document.getElementById('fb-pane-support');
+    function activateTab(which) {
+        const isAi = which === 'ai';
+        paneAi.style.display = isAi ? 'flex' : 'none';
+        paneSupport.style.display = isAi ? 'none' : 'block';
+        tabAi.style.borderBottom = isAi ? '2px solid #5b21b6' : '2px solid transparent';
+        tabAi.style.color = isAi ? '#5b21b6' : '#6b7280';
+        tabSupport.style.borderBottom = isAi ? '2px solid transparent' : '2px solid #5b21b6';
+        tabSupport.style.color = isAi ? '#6b7280' : '#5b21b6';
+    }
+    tabAi.addEventListener('click', () => activateTab('ai'));
+    tabSupport.addEventListener('click', () => activateTab('support'));
+
+    // ---- AI chat client ---------------------------------------------------
+    let aiConversationId = null;
+    const aiThread = document.getElementById('fb-ai-thread');
+    const aiInput = document.getElementById('fb-ai-input');
+    const aiSend = document.getElementById('fb-ai-send');
+    const aiError = document.getElementById('fb-ai-error');
+
+    function aiAppendBubble(role, text) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = role === 'user'
+            ? 'align-self:flex-end;max-width:85%;background:#ede9fe;color:#3b0764;padding:0.55rem 0.8rem;border-radius:14px 14px 4px 14px;font-size:0.9rem;line-height:1.5;white-space:pre-wrap;'
+            : 'align-self:flex-start;max-width:90%;background:#f9fafb;color:#111827;padding:0.55rem 0.8rem;border:1px solid #e5e7eb;border-radius:14px 14px 14px 4px;font-size:0.9rem;line-height:1.5;white-space:pre-wrap;';
+        wrap.textContent = text;
+        aiThread.appendChild(wrap);
+        aiThread.scrollTop = aiThread.scrollHeight;
+        return wrap;
+    }
+
+    function aiAppendCitations(citations) {
+        if (!citations || !citations.length) return;
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.3rem;margin:-0.2rem 0 0.4rem 0.5rem;';
+        const seen = new Set();
+        citations.forEach(c => {
+            const key = `${c.source}|${c.section_title}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            const chip = document.createElement('a');
+            const anchor = c.anchor ? '#' + c.anchor : '';
+            chip.href = '/dashboard/help/' + anchor;
+            chip.target = '_blank';
+            chip.style.cssText = 'font-size:0.7rem;background:#f3f4f6;color:#4b5563;padding:0.1rem 0.5rem;border-radius:999px;text-decoration:none;border:1px solid #e5e7eb;';
+            chip.textContent = '📖 ' + (c.section_title || c.source);
+            row.appendChild(chip);
+        });
+        aiThread.appendChild(row);
+    }
+
+    function aiAppendToolCard(prop, msgIndex) {
+        const card = document.createElement('div');
+        card.style.cssText = 'align-self:flex-start;max-width:90%;background:#fef3c7;border:1px solid #fde68a;color:#78350f;padding:0.6rem 0.8rem;border-radius:10px;font-size:0.86rem;';
+        const summary = document.createElement('div');
+        summary.style.fontWeight = '600';
+        summary.style.marginBottom = '0.3rem';
+        summary.textContent = '⚡ Proposed action: ' + prop.name;
+        const inputs = document.createElement('pre');
+        inputs.style.cssText = 'font-size:0.78rem;background:#fff;padding:0.4rem;border-radius:6px;overflow-x:auto;margin:0.25rem 0;color:#374151;';
+        inputs.textContent = JSON.stringify(prop.inputs, null, 2);
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;gap:0.4rem;margin-top:0.4rem;';
+        const confirmBtn = document.createElement('button');
+        confirmBtn.type = 'button';
+        confirmBtn.style.cssText = 'background:#16a34a;color:#fff;border:none;border-radius:6px;padding:0.3rem 0.7rem;font-size:0.8rem;font-weight:600;cursor:pointer;';
+        confirmBtn.textContent = 'Confirm';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.style.cssText = 'background:#f9fafb;color:#374151;border:1px solid #d1d5db;border-radius:6px;padding:0.3rem 0.7rem;font-size:0.8rem;cursor:pointer;';
+        cancelBtn.textContent = 'Cancel';
+        confirmBtn.addEventListener('click', () => aiResolveTool(prop.tool_use_id, true, card));
+        cancelBtn.addEventListener('click', () => aiResolveTool(prop.tool_use_id, false, card));
+        actions.append(confirmBtn, cancelBtn);
+        card.append(summary, inputs, actions);
+        aiThread.appendChild(card);
+        aiThread.scrollTop = aiThread.scrollHeight;
+    }
+
+    function aiAppendNavLink(content) {
+        // The LLM's text often includes a tool result with a URL.
+        // We surface it as a "Take me there" button if the latest
+        // assistant message ends with a recognisable url.
+        const m = (content || '').match(/https?:\/\/\S+|\/dashboard\/\S+|\/tutor\/\S+/);
+        if (!m) return;
+        const link = document.createElement('a');
+        link.href = m[0];
+        link.style.cssText = 'align-self:flex-start;background:#5b21b6;color:#fff;padding:0.35rem 0.85rem;border-radius:999px;text-decoration:none;font-size:0.82rem;margin-top:-0.2rem;';
+        link.textContent = '🔗 Take me there →';
+        aiThread.appendChild(link);
+    }
+
+    function aiAppendEscalateCta(messageId) {
+        const row = document.createElement('div');
+        row.style.cssText = 'align-self:flex-start;margin-top:-0.1rem;';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style.cssText = 'background:transparent;color:#6b7280;border:none;text-decoration:underline;font-size:0.78rem;cursor:pointer;padding:0;';
+        btn.textContent = 'Send this to support →';
+        btn.addEventListener('click', () => {
+            // Switch to support tab and pre-fill the message field
+            // with a snippet of the conversation.
+            activateTab('support');
+            const last = aiThread.querySelector('div:nth-last-of-type(2)');
+            const snippet = last ? last.textContent.slice(0, 400) : '';
+            document.getElementById('fb-message').value =
+                '(From AI chat #' + aiConversationId + ')\n' + snippet;
+        });
+        row.appendChild(btn);
+        aiThread.appendChild(row);
+    }
+
+    async function aiEnsureConversation() {
+        if (aiConversationId) return aiConversationId;
+        const r = await fetch('/support/chat/start/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+            credentials: 'same-origin',
+            body: JSON.stringify({page_url: window.location.href}),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.ok) throw new Error(data.human_msg || 'Could not start chat.');
+        aiConversationId = data.conversation_id;
+        if (data.greeting) aiAppendBubble('assistant', data.greeting);
+        return aiConversationId;
+    }
+
+    async function aiSendMessage(text) {
+        try {
+            const cid = await aiEnsureConversation();
+            const r = await fetch(`/support/chat/${cid}/message/`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+                credentials: 'same-origin',
+                body: JSON.stringify({message: text}),
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok || !data.ok) throw new Error(data.human_msg || 'Assistant failed.');
+            if (data.content) {
+                aiAppendBubble('assistant', data.content);
+                aiAppendCitations(data.citations);
+                aiAppendNavLink(data.content);
+                aiAppendEscalateCta(data.message_id);
+            }
+            (data.pending_tool_proposals || []).forEach(prop => aiAppendToolCard(prop));
+        } catch (e) {
+            aiError.textContent = e.message;
+            aiError.style.display = 'block';
+        }
+    }
+
+    async function aiResolveTool(toolUseId, accept, cardEl) {
+        try {
+            const r = await fetch(`/support/chat/${aiConversationId}/confirm/`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+                credentials: 'same-origin',
+                body: JSON.stringify({tool_use_id: toolUseId, accept: !!accept}),
+            });
+            const data = await r.json().catch(() => ({}));
+            if (cardEl) cardEl.style.opacity = '0.5';
+            if (!r.ok || !data.ok) {
+                aiError.textContent = data.human_msg || 'Could not run that action.';
+                aiError.style.display = 'block';
+                return;
+            }
+            if (accept && data.tool_result) {
+                if (data.tool_result.url) {
+                    aiAppendBubble('assistant', '✅ Done. ' + (data.tool_result.human_msg || ''));
+                    aiAppendNavLink(data.tool_result.url);
+                } else {
+                    aiAppendBubble('assistant', data.tool_result.human_msg || '✅ Done.');
+                }
+            } else {
+                aiAppendBubble('assistant', '↩️ Cancelled.');
+            }
+            // The followup turn's content (if any) was already
+            // returned in data.follow_up — render it.
+            if (data.follow_up && data.follow_up.content) {
+                aiAppendBubble('assistant', data.follow_up.content);
+                aiAppendCitations(data.follow_up.citations);
+                aiAppendEscalateCta(data.follow_up.message_id);
+            }
+        } catch (e) {
+            aiError.textContent = e.message;
+            aiError.style.display = 'block';
+        }
+    }
+
+    aiSend.addEventListener('click', () => {
+        const text = aiInput.value.trim();
+        if (!text) return;
+        aiInput.value = '';
+        aiError.style.display = 'none';
+        aiAppendBubble('user', text);
+        aiSendMessage(text);
+    });
+    aiInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            aiSend.click();
+        }
+    });
 
     openBtn.addEventListener('click', openModal);
     cancelBtn.addEventListener('click', closeModal);
