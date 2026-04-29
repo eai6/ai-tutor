@@ -257,6 +257,11 @@ class LessonStep(models.Model):
         SHORT_NUMERIC = 'short_numeric', 'Numeric Answer'
         TRUE_FALSE = 'true_false', 'True/False'
 
+    class Priority(models.IntegerChoices):
+        REQUIRED = 1, 'Required'      # Always included regardless of duration
+        CORE = 2, 'Core'              # Included by default; first to drop on tight time
+        ENRICHMENT = 3, 'Enrichment'  # Extra depth; dropped on short sessions
+
     lesson = models.ForeignKey(
         Lesson,
         on_delete=models.CASCADE,
@@ -267,6 +272,22 @@ class LessonStep(models.Model):
         max_length=20,
         choices=StepType.choices,
         default=StepType.TEACH
+    )
+    # Priority drives runtime step selection by the tutor engine.
+    # Lessons are generated at max depth (10 steps); the engine picks
+    # a subset based on the session's target duration without needing
+    # any LLM regeneration. Required steps stay; core drop first on
+    # tight time; enrichment drops earliest. See
+    # memory/max_depth_lesson_steps_plan.md.
+    priority = models.PositiveSmallIntegerField(
+        choices=Priority.choices,
+        default=Priority.REQUIRED,
+        help_text=(
+            "Step priority for runtime step selection. 1=required (always "
+            "included), 2=core (included by default), 3=enrichment "
+            "(dropped on short sessions). Legacy steps default to 1 so "
+            "existing lessons render unchanged."
+        ),
     )
 
     # Content

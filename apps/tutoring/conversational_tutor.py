@@ -479,11 +479,22 @@ class ConversationalTutor:
         self.session = session
         self.lesson = session.lesson
         self.student = session.student
-        
-        # Load lesson context
-        self.steps = list(
+
+        # Load all lesson steps from the DB.
+        all_steps = list(
             LessonStep.objects.filter(lesson=self.lesson)
             .order_by('order_index')
+        )
+
+        # MAX-DEPTH STEP SELECTION (2026-04-29):
+        # Lessons are generated at full depth (10 steps); the engine
+        # picks a subset based on the session's target duration. The
+        # full step set is kept on `self.all_steps` for reference
+        # (debug, teacher review); `self.steps` is the filtered
+        # session-active set.
+        self.all_steps = all_steps
+        self.steps = self._select_steps_for_duration(
+            all_steps, self._target_minutes_for_session()
         )
         
         # Load exit ticket concepts (CRITICAL for ensuring coverage)
@@ -666,6 +677,70 @@ class ConversationalTutor:
         random.shuffle(selected)
         return selected[:count]
     
+    def _target_minutes_for_session(self) -> int:
+        """Return the target session duration in minutes.
+
+        Resolution order:
+          1. session.engine_state['target_minutes_override'] — set
+             when a student picks "I have X minutes" or a teacher
+             configures the session explicitly.
+          2. lesson.estimated_minutes — the course-level default.
+          3. 20 — sensible fallback.
+        """
+        try:
+            override = (self.session.engine_state or {}).get('target_minutes_override')
+            if override:
+                return int(override)
+        except Exception:
+            pass
+        return self.lesson.estimated_minutes or 20
+
+    def _select_steps_for_duration(self, all_steps: List, target_minutes: int) -> List:
+        """Pick the subset of steps that fits the target duration.
+
+        Algorithm:
+          - Compute target_count = max(3, min(10, target_minutes // 5)).
+            (~5 min per step in conversation including back-and-forth.)
+          - If we have fewer steps than the target, return everything.
+          - Otherwise:
+            * Always include the FIRST step (the engage hook).
+            * Always include the LAST step (the quiz / evaluate).
+            * Fill the remaining slots from the middle by ascending
+              (priority, order_index) — required steps come in first,
+              then core, then enrichment. Ties broken by natural
+              lesson order so the 5E flow stays coherent.
+          - Re-sort the picked set by order_index so the lesson
+            progression is preserved.
+
+        See memory/max_depth_lesson_steps_plan.md.
+        """
+        if not all_steps:
+            return []
+
+        target_count = max(3, min(10, target_minutes // 5))
+        if len(all_steps) <= target_count:
+            return list(all_steps)
+
+        first_idx = 0
+        last_idx = len(all_steps) - 1
+        must_include = {first_idx, last_idx}
+
+        # Sort middle steps by (priority asc, order_index asc) so
+        # priority-1 steps come first; ties broken by lesson order.
+        middle = [
+            (i, s) for i, s in enumerate(all_steps) if i not in must_include
+        ]
+        middle.sort(key=lambda pair: (
+            getattr(pair[1], 'priority', 1),
+            pair[1].order_index,
+        ))
+
+        slots_to_fill = max(0, target_count - len(must_include))
+        chosen_indices = set(must_include) | {
+            i for i, _ in middle[:slots_to_fill]
+        }
+        return [all_steps[i] for i in sorted(chosen_indices)]
+
     def _load_enabling_objectives(self) -> List[Dict]:
         """Load enabling objectives for systematic coverage tracking (P1.2).
 

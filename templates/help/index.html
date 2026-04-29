@@ -204,16 +204,18 @@
                 <li><strong>⚡ Generate All Content</strong> (yellow banner on course detail) — only appears when one or more lessons have no content yet. Generates them in parallel.</li>
                 <li><strong>🔁 Regenerate all lessons</strong> (purple banner on course detail) — replaces every lesson's content + exit tickets across the whole course, runs 3 lessons in parallel, takes ~30–40 minutes for a 50-lesson course. Use this after curriculum updates or when you want to roll out new prompt changes.</li>
             </ul>
-            <h4>Lesson duration (without re-parsing)</h4>
-            <p>The 🔁 Regenerate all form has a <strong>Duration</strong> dropdown. Pick a value and every lesson in the course gets its <code>estimated_minutes</code> reset before regen. The generator targets ~5 min per step in conversation:</p>
+            <h4>Lesson duration — adapts at runtime, no regen needed</h4>
+            <p>Lessons are generated at <strong>full depth (10 steps)</strong> and tagged with priority — the tutoring engine selects a subset at session start based on the student's available time. Changing duration does NOT require regenerating any content.</p>
             <ul>
-                <li>15 min → 3 steps (warm-up + teach + practice/quiz)</li>
+                <li>15 min → 3 steps (engage + teach + quiz; priority-1 only)</li>
                 <li>20 min → 4 steps</li>
-                <li>25 min → 5 steps</li>
-                <li>30 min → 6 steps</li>
-                <li>40 min → 8 steps</li>
+                <li>25 min → 5 steps (adds worked example)</li>
+                <li>30 min → 6 steps (adds priority-2 core steps)</li>
+                <li>40 min → 8 steps (adds priority-3 enrichment)</li>
+                <li>50 min → all 10 steps</li>
             </ul>
-            <p>One teaching objective per lesson always — duration only controls depth, never breadth. Leave the dropdown on "— keep existing —" to use whatever each lesson already has.</p>
+            <p>The duration the engine targets comes from each lesson's <code>estimated_minutes</code> (settable via the regen-all Duration dropdown or per-lesson edit). Future work: a student-facing "I have N minutes today" picker that overrides per-session.</p>
+            <p>One teaching objective per lesson always — duration only controls how deep the engine goes, never which objectives the student sees.</p>
             <h4>What's preserved on regen</h4>
             <p>Lesson row IDs are stable, so:</p>
             <ul>

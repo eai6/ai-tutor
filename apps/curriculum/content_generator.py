@@ -171,6 +171,19 @@ class LessonStepSchema(BaseModel):
     hints: Optional[List[str]] = Field(default=None, description="2-3 hints scaffolded from general to specific")
     media: Optional[StepMedia] = Field(default=None, description="Media for this step, only if teacher_script references it")
     educational_content: Optional[EducationalContent] = None
+    priority: int = Field(
+        default=1,
+        ge=1, le=3,
+        description=(
+            "Step priority for runtime selection by the tutor engine. "
+            "1 = REQUIRED (must appear in every session — first engage, "
+            "primary teach, primary practice, final quiz/evaluate). "
+            "2 = CORE (included by default — worked example, second "
+            "practice, synthesise). 3 = ENRICHMENT (dropped on short "
+            "sessions — third+ practice, common-mistakes drill, extends). "
+            "Aim for ~4 priority-1, ~3 priority-2, ~3 priority-3 across the lesson."
+        ),
+    )
 
 
 class SummaryVocab(BaseModel):
@@ -822,16 +835,19 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         except Exception as e:
             logger.warning(f"Failed to load Seychelles context: {e}")
 
-        # Calculate step budget from lesson duration. Target ~5 min
-        # per step in conversation — pilot testing (2026-04-29) showed
-        # the previous 3.3 min/step formula produced 6-step lessons
-        # that ran ~30 min in practice, not the intended 20.
-        # Recalibrated: 15min → 3 (floor); 20min → 4; 25min → 5;
-        # 30min → 6; 40min → 8; 50min+ → 10 (ceiling).
-        # Each lesson still owns ONE teaching objective regardless of
-        # step count, so duration only controls depth — never breadth.
+        # MAX-DEPTH GENERATION (2026-04-29):
+        # Always generate at the deepest depth (10 steps). The tutor
+        # engine selects the right subset at session start based on
+        # target duration, using the per-step `priority` field, with
+        # zero LLM regeneration cost when a teacher or student
+        # changes the target duration. See
+        # memory/max_depth_lesson_steps_plan.md.
+        #
+        # `target_minutes` is still passed into the prompt so the LLM
+        # has a sense of pacing per step, but it no longer drives the
+        # step count.
         target_minutes = lesson.estimated_minutes or 20
-        max_steps = max(3, min(10, target_minutes // 5))
+        max_steps = 10
         # 1 teaching objective per lesson, regardless of step count.
         max_eos = 1
         is_math = bool(lesson.unit and lesson.unit.course and lesson.unit.course.is_math)
@@ -920,8 +936,20 @@ LESSON DURATION: {target_minutes} minutes
 TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}{profile_str}
-Create EXACTLY {max_steps} steps. The whole flow must fit a {target_minutes}-minute classroom slot (~5 min per step in conversation, including the back-and-forth turns).
-A {target_minutes}-minute lesson drills ONE teaching objective intensely. Every step here progresses up the DOK levels (recall → skill → strategic) for that ONE objective. DO NOT introduce additional objectives — depth, not breadth.
+Create EXACTLY {max_steps} steps — the FULL DEPTH version of this lesson (~50 minutes if every step were used).
+The tutoring engine will SELECT a subset of these steps at session start based on the student's available time, using the per-step `priority` field — so:
+  • A 15-minute session uses 3 steps (priority 1 only).
+  • A 20-minute session uses 4 steps.
+  • A 30-minute session uses 6 steps (priority 1 + 2).
+  • A 50-minute session uses all 10 steps.
+This means you should produce a coherent FULL lesson, but tag each step's priority so the engine can drop enrichment steps gracefully.
+
+PRIORITY ASSIGNMENT (mandatory per step):
+- priority 1 (REQUIRED) — must always run. Reserve for: the FIRST engage step, ONE primary teach step, ONE primary practice step, the FINAL quiz/evaluate step. Aim for ~4 priority-1 steps total.
+- priority 2 (CORE) — included by default; first to drop on tight time. Worked example, second practice, synthesise step. Aim for ~3 priority-2 steps total.
+- priority 3 (ENRICHMENT) — third+ practice variants, common-mistakes drill, "extend" / Seychelles-context bonus. Aim for ~3 priority-3 steps total.
+
+Drilling ONE teaching objective intensely. Every step progresses up the DOK levels (recall → skill → strategic) for that ONE objective. DO NOT introduce additional objectives — depth, not breadth.
 
 {"MATH LESSON STRUCTURE — exactly " + str(max_steps) + " steps:" if is_math else "LESSON STRUCTURE — exactly " + str(max_steps) + " steps:"}
 {structure}
@@ -1078,8 +1106,10 @@ CONTENT GUIDELINES:
         """
         from apps.curriculum.models import LessonStep
 
-        target_minutes = lesson.estimated_minutes or 20
-        MAX_STEPS = max(3, min(10, target_minutes // 5))
+        # Always-10 max-depth ceiling. The tutor engine selects the
+        # right subset at session start; storing all 10 keeps duration
+        # changes free of LLM regeneration.
+        MAX_STEPS = 10
         if len(steps) > MAX_STEPS:
             logger.warning(
                 f"[ContentGen] [{lesson.title}] Trimming {len(steps)} steps to {MAX_STEPS}"
@@ -1110,6 +1140,19 @@ CONTENT GUIDELINES:
                 return 'free_text'
             return value
 
+        def _clamp_priority(raw):
+            """Clamp LLM-emitted priority to {1, 2, 3}. Default to 1
+            (REQUIRED) on missing / garbage so a misformed step still
+            shows up in every session rather than silently disappearing.
+            """
+            try:
+                value = int(raw)
+            except (TypeError, ValueError):
+                return 1
+            if value < 1 or value > 3:
+                return 1
+            return value
+
         for step_data in steps:
             step, created = LessonStep.objects.update_or_create(
                 lesson=lesson,
@@ -1134,6 +1177,10 @@ CONTENT GUIDELINES:
                     'media': step_data.get('media'),
                     'educational_content': step_data.get('educational_content'),
                     'curriculum_context': step_data.get('curriculum_context'),
+                    # Clamp to {1,2,3}; default to 1 (REQUIRED) if the
+                    # LLM omits or sends garbage so the step still
+                    # makes it into every session.
+                    'priority': _clamp_priority(step_data.get('priority')),
                 }
             )
 
