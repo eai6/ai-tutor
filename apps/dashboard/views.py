@@ -5585,12 +5585,25 @@ def class_competency(request, course_id):
     else:
         course = get_object_or_404(Course, id=course_id)
 
-    # Roster — students at this institution.
-    if course.institution_id:
+    # Roster resolution priority:
+    #   1. The school picker (request.staff_ctx['institution']) — if a
+    #      super admin picks "Belonie Secondary", scope every metric to
+    #      that school's roster, even on platform-wide courses.
+    #   2. The course's own institution if it's school-scoped.
+    #   3. All active students (only when picker = "All Schools" AND
+    #      the course is platform-wide).
+    if institution is not None:
+        roster_institution_id = institution.id
+    elif course.institution_id:
+        roster_institution_id = course.institution_id
+    else:
+        roster_institution_id = None
+
+    if roster_institution_id is not None:
         roster_ids = list(
             Membership.objects.filter(
                 role='student', is_active=True,
-                institution_id=course.institution_id,
+                institution_id=roster_institution_id,
             ).values_list('user_id', flat=True)
         )
     else:
