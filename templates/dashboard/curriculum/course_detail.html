@@ -721,17 +721,22 @@
                                     ⛔
                                 </button>
                             </form>
-                        {% elif is_generating %}
-                            <button class="btn btn-secondary btn-sm" disabled title="Course generation in progress">
-                                ⚡
-                            </button>
-                        {% elif lstats.content_status != 'ready' %}
-                        <form method="post" action="{% url 'dashboard:lesson_generate_content' lesson.id %}" style="display: inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-primary btn-sm" title="Generate tutoring content" onclick="this.disabled=true; this.innerHTML='⏳'; this.form.submit();">
-                                ⚡
-                            </button>
-                        </form>
+                        {% else %}
+                            {# Always wire ⚡ to regenerate. Works for both empty
+                               lessons (wipes zero rows, then runs the pipeline)
+                               and lessons that already have content (wipe + rebuild).
+                               Per-lesson CAS guard inside generate_complete_lesson
+                               protects against double-fire — no need to globally
+                               disable the button just because some other lesson
+                               in the course is generating. #}
+                            <form method="post" action="{% url 'dashboard:lesson_regenerate' lesson.id %}" style="display: inline;"
+                                  onsubmit="return confirm('Regenerate this lesson?\n\nReplaces lesson steps and exit ticket. Mastery levels and the permanent competency transcript are preserved.');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary btn-sm"
+                                        title="{% if lstats.content_status == 'ready' %}Regenerate this lesson{% else %}Generate this lesson{% endif %}">
+                                    ⚡
+                                </button>
+                            </form>
                         {% endif %}
                     {% endwith %}
                     <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">Review</a>
