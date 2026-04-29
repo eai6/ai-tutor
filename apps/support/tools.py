@@ -468,6 +468,72 @@ def student_summary(user, *, student_query: str) -> Dict:
     }
 
 
+def list_lessons_in_unit(user, *, unit_query: str) -> Dict:
+    """List all lessons in a unit. Read-only.
+
+    Resolves a fuzzy unit title across the courses the caller can
+    see (super admin = all; teacher = their institution(s) +
+    platform-wide). Returns up to one disambiguation step if the
+    query matches multiple units.
+    """
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    from apps.curriculum.models import Unit
+    from django.db.models import Q
+    qs = Unit.objects.filter(title__icontains=unit_query)
+    if not user.is_superuser:
+        from apps.accounts.models import Membership
+        inst_ids = list(Membership.objects.filter(
+            user=user, role__in=['teacher', 'admin'], is_active=True,
+        ).values_list('institution_id', flat=True))
+        qs = qs.filter(
+            Q(course__institution_id__in=inst_ids)
+            | Q(course__institution__isnull=True),
+        )
+    candidates = list(qs.select_related('course').order_by('title')[:5])
+    if not candidates:
+        return {'ok': False, 'human_msg': f'No unit matching "{unit_query}".'}
+    if len(candidates) > 1:
+        return {
+            'ok': False,
+            'candidates': [
+                {'id': u.id, 'title': u.title, 'course': u.course.title}
+                for u in candidates
+            ],
+            'human_msg': 'Which unit?',
+        }
+
+    unit = candidates[0]
+    lessons = list(
+        unit.lessons.order_by('order_index')
+        .values('id', 'title', 'objective', 'estimated_minutes',
+                'is_published', 'content_status')
+    )
+    return {
+        'ok': True,
+        'unit_title': unit.title,
+        'course_title': unit.course.title,
+        'lesson_count': len(lessons),
+        'url': f'/dashboard/curriculum/course/{unit.course_id}/',
+        'label': f"Open {unit.course.title}",
+        'lessons': [
+            {
+                'id': l['id'],
+                'title': l['title'],
+                'objective': (l['objective'] or '')[:120],
+                'estimated_minutes': l['estimated_minutes'],
+                'is_published': l['is_published'],
+                'content_status': l['content_status'],
+            }
+            for l in lessons
+        ],
+        'human_msg': (
+            f"{unit.title} (in {unit.course.title}) has "
+            f"{len(lessons)} lesson(s)."
+        ),
+    }
+
+
 def flagged_chats_count(user) -> Dict:
     """How many flagged chat sessions are currently open for the
     caller's institution(s)."""
@@ -724,6 +790,20 @@ _CATALOG = [
         'audience': 'staff',
         'requires_confirmation': False,
         'handler': student_summary,
+    },
+    {
+        'name': 'list_lessons_in_unit',
+        'description': 'List all lessons in a unit, with their title, objective, duration, and content status. Useful when a teacher asks "what lessons are in <unit>".',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'unit_query': {'type': 'string', 'description': 'Unit title or fragment.'},
+            },
+            'required': ['unit_query'],
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': list_lessons_in_unit,
     },
     {
         'name': 'flagged_chats_count',
