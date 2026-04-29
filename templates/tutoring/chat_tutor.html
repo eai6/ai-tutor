@@ -1582,9 +1582,11 @@ userInput.addEventListener('input', () => {
 });
 
 // Initialize — show duration picker first, then start the session.
-// The picker is a soft prompt: it auto-defaults after 6s if the
-// student doesn't pick. For resumed sessions the engine already has
-// its step selection cached, so the override is harmless either way.
+// The picker BLOCKS the chat until the student explicitly clicks one
+// of the buttons (15/20/30/Use lesson default). No auto-default —
+// the previous 6-second timer dismissed the picker before students
+// finished reading the prompt. Better to wait indefinitely than to
+// silently make the choice for them.
 document.addEventListener('DOMContentLoaded', () => {
     const picker = document.getElementById('duration-picker');
     if (!picker) {
@@ -1608,8 +1610,6 @@ document.addEventListener('DOMContentLoaded', () => {
             launch(v ? parseInt(v, 10) : null);
         });
     });
-    // Auto-default after 6 seconds so distracted students aren't blocked.
-    setTimeout(() => launch(null), 6000);
 });
 userInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) {
