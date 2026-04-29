@@ -1,0 +1,47 @@
+{% comment %}
+Soft baseline-assessment banner. Shows when the student is enrolled
+in a course with a published summative but hasn't completed the
+baseline yet. Replaces the old hard gate (baseline_required_for
+that short-circuited lesson access). Per the 2026-04-29 pilot
+decision: students can start lessons immediately; this banner
+keeps nudging until they take the baseline.
+
+Dismissable per-browser via localStorage (mirrors the
+verify-email banner pattern). Re-shown on next visit if the
+student hasn't taken it.
+{% endcomment %}
+{% if user.is_authenticated and baseline_recommended_courses %}
+{% for c in baseline_recommended_courses %}
+<div id="baseline-recommend-banner-{{ c.id }}"
+     data-storage-key="baseline_recommend_dismissed_for_{{ user.id }}_{{ c.id }}"
+     style="background:#ede9fe;border-bottom:1px solid #c4b5fd;padding:0.6rem 1rem;font-size:0.88rem;color:#4c1d95;display:flex;justify-content:center;align-items:center;gap:0.75rem;flex-wrap:wrap;position:relative;">
+    <span>🎯 Take the <strong>{{ c.title }}</strong> baseline whenever you're ready — it helps the tutor focus on what you actually need.</span>
+    <a href="{{ c.url }}" style="background:#5b21b6;color:#fff;border:none;border-radius:6px;padding:0.3rem 0.75rem;font-size:0.8rem;font-weight:600;text-decoration:none;">Take baseline</a>
+    <button type="button" class="baseline-banner-close"
+            data-banner-id="baseline-recommend-banner-{{ c.id }}"
+            aria-label="Dismiss this notice"
+            title="Dismiss"
+            style="background:transparent;border:none;color:#4c1d95;font-size:1.1rem;line-height:1;cursor:pointer;padding:0 0.25rem;font-weight:600;">×</button>
+</div>
+{% endfor %}
+<script>
+(function() {
+    document.querySelectorAll('[id^="baseline-recommend-banner-"]').forEach(function(banner) {
+        var key = banner.getAttribute('data-storage-key');
+        try {
+            if (localStorage.getItem(key) === '1') {
+                banner.style.display = 'none';
+                return;
+            }
+        } catch (e) {}
+        var btn = banner.querySelector('.baseline-banner-close');
+        if (btn) {
+            btn.addEventListener('click', function() {
+                try { localStorage.setItem(key, '1'); } catch (e) {}
+                banner.style.display = 'none';
+            });
+        }
+    });
+})();
+</script>
+{% endif %}

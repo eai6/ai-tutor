@@ -563,22 +563,12 @@ def chat_tutor_interface(request, lesson_id):
         # Super admin — can access any published lesson
         lesson = get_object_or_404(Lesson, id=lesson_id, is_published=True)
 
-    # Baseline gate: students must complete the course's baseline summative
-    # before starting any lesson — gives us the pre-pilot competency map
-    # and enables targeted recommendations. See competency_tracker.py.
-    from apps.tutoring.competency_tracker import baseline_required_for
-    course = lesson.unit.course if lesson.unit else None
-    if course is not None:
-        baseline_summative = baseline_required_for(request.user, course)
-        if baseline_summative:
-            django_messages.info(
-                request,
-                f"Take the {course.title} baseline first — it unlocks the lessons "
-                f"and helps the tutor focus on what you actually need.",
-            )
-            return redirect(
-                f"/tutor/summative/{course.id}/?next=/tutor/chat/lesson/{lesson.id}/"
-            )
+    # Baseline is now a SOFT recommendation, not a gate. Students can
+    # start any lesson immediately so teachers can demo without forcing
+    # the pilot through the summative first. The persistent
+    # baseline-recommend banner (templates/_includes/_baseline_recommend_banner.html,
+    # included from base.html) keeps nudging the student to take it.
+    # See memory/feedback_dev_collaboration.md for the pilot decision.
 
     # Prerequisite check — only block if no existing session
     has_session = TutorSession.objects.filter(
@@ -690,22 +680,9 @@ def chat_start_session(request, lesson_id):
                 "unmet_prerequisites": unmet_prereqs,
             }, status=400)
 
-    # Baseline gate (defense-in-depth — chat_tutor_interface enforces it
-    # at GET time; this guards against direct POSTs that bypass the page.)
-    if not existing and not completed_session:
-        from apps.tutoring.competency_tracker import baseline_required_for
-        course = lesson.unit.course if lesson.unit else None
-        if course is not None:
-            baseline_summative = baseline_required_for(request.user, course)
-            if baseline_summative:
-                return JsonResponse({
-                    "error": "baseline_required",
-                    "message": (
-                        f"Take the {course.title} baseline summative first — "
-                        f"it unlocks the lessons."
-                    ),
-                    "baseline_url": f"/tutor/summative/{course.id}/?next=/tutor/chat/lesson/{lesson.id}/",
-                }, status=400)
+    # Baseline is a SOFT recommendation, not a gate. Lesson sessions
+    # start immediately; the persistent banner keeps nudging the
+    # student to take their baseline. See chat_tutor_interface.
 
     # Resolve institution for session creation (super admins use Global)
     session_institution = institution or lesson.unit.course.institution or Institution.get_global()

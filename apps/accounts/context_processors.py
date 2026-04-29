@@ -62,3 +62,62 @@ def email_verification_status(request):
         return {'user_email_verified': bool(status and status.verified_at)}
     except Exception:
         return {'user_email_verified': True}  # fail-open: don't show banner on error
+
+
+def baseline_recommendations(request):
+    """Expose `baseline_recommended_courses` (list of {id, title, url})
+    to every template so the soft baseline-recommend banner can render.
+
+    Returns courses where:
+      - the course has a published summative
+      - the student has NO completed baseline attempt on it
+    Skips staff and superusers. Empty for unauthenticated users.
+
+    Replaces the old hard gate (baseline_required_for that
+    short-circuited lesson access). Per the 2026-04-29 pilot decision:
+    students can start lessons immediately; the banner keeps nudging.
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated or user.is_staff or user.is_superuser:
+        return {'baseline_recommended_courses': []}
+    try:
+        from apps.tutoring.models import ExitTicket, ExitTicketAttempt
+        from apps.accounts.models import Membership
+
+        # Limit to courses the student is actually enrolled in via institution.
+        memberships = Membership.objects.filter(
+            user=user, role='student', is_active=True,
+        ).select_related('institution')
+        if not memberships:
+            return {'baseline_recommended_courses': []}
+
+        institutions = [m.institution for m in memberships if m.institution]
+        if not institutions:
+            return {'baseline_recommended_courses': []}
+
+        # Published summatives in the student's institution(s) OR platform-wide.
+        from django.db.models import Q
+        summatives = ExitTicket.objects.filter(
+            assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
+            is_published=True,
+        ).filter(
+            Q(course__institution__in=institutions) | Q(course__institution__isnull=True),
+        ).select_related('course')
+
+        recommended = []
+        for sm in summatives:
+            has_baseline = ExitTicketAttempt.objects.filter(
+                exit_ticket=sm,
+                student=user,
+                purpose=ExitTicketAttempt.Purpose.BASELINE,
+                completed_at__isnull=False,
+            ).exists()
+            if not has_baseline and sm.course:
+                recommended.append({
+                    'id': sm.course.id,
+                    'title': sm.course.title,
+                    'url': f"/tutor/summative/{sm.course.id}/",
+                })
+        return {'baseline_recommended_courses': recommended}
+    except Exception:
+        return {'baseline_recommended_courses': []}  # fail-open
