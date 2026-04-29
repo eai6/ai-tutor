@@ -35,8 +35,11 @@
         background: #fff;
         border-radius: 14px;
         padding: 1.4rem 1.6rem;
-        max-width: 480px;
+        max-width: 720px;
         width: 92%;
+        max-height: 88vh;
+        display: flex;
+        flex-direction: column;
         box-shadow: 0 16px 40px rgba(0,0,0,0.22);
         font-family: inherit;
     }
@@ -132,11 +135,11 @@
         </div>
 
         <!-- TAB 1: AI chat -->
-        <section id="fb-pane-ai" style="display:flex;flex-direction:column;gap:0.5rem;min-height:340px;">
-            <div id="fb-ai-thread" style="display:flex;flex-direction:column;gap:0.6rem;max-height:46vh;overflow-y:auto;padding:0.4rem 0.1rem;"></div>
+        <section id="fb-pane-ai" style="display:flex;flex-direction:column;gap:0.6rem;flex:1;min-height:0;">
+            <div id="fb-ai-thread" style="display:flex;flex-direction:column;gap:0.7rem;flex:1;min-height:280px;max-height:60vh;overflow-y:auto;padding:0.6rem 0.4rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;"></div>
             <div style="display:flex;gap:0.4rem;align-items:flex-end;">
-                <textarea id="fb-ai-input" rows="2" placeholder="Ask anything about the platform — how do I…, where is…" style="flex:1;padding:0.55rem 0.7rem;border:1px solid #d1d5db;border-radius:8px;font-size:0.92rem;font-family:inherit;resize:vertical;min-height:38px;"></textarea>
-                <button type="button" id="fb-ai-send" style="background:#5b21b6;color:#fff;border:none;border-radius:8px;padding:0.55rem 0.95rem;font-weight:600;cursor:pointer;font-size:0.88rem;">Send</button>
+                <textarea id="fb-ai-input" rows="2" placeholder="Ask anything about the platform — how do I…, where is…" style="flex:1;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:10px;font-size:0.92rem;font-family:inherit;resize:vertical;min-height:46px;max-height:140px;"></textarea>
+                <button type="button" id="fb-ai-send" style="background:#5b21b6;color:#fff;border:none;border-radius:10px;padding:0.6rem 1.05rem;font-weight:600;cursor:pointer;font-size:0.9rem;">Send</button>
             </div>
             <div id="fb-ai-error" class="fb-error" style="margin-top:0.4rem;"></div>
         </section>
@@ -243,36 +246,84 @@
     const aiSend = document.getElementById('fb-ai-send');
     const aiError = document.getElementById('fb-ai-error');
 
+    // Tiny markdown renderer: bold / italic / code / inline code,
+    // numbered + bulleted lists, links, paragraph + line breaks.
+    // Escapes HTML first so the assistant can't inject markup.
+    function aiRenderMarkdown(text) {
+        const escape = (s) => s
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        let s = escape(text || '');
+        // Code blocks (```...```)
+        s = s.replace(/```([\s\S]*?)```/g, (_, code) =>
+            `<pre style="background:#f1f5f9;padding:0.5rem 0.7rem;border-radius:6px;overflow-x:auto;font-size:0.82rem;margin:0.4rem 0;"><code>${code}</code></pre>`
+        );
+        // Inline code
+        s = s.replace(/`([^`\n]+)`/g, '<code style="background:#f1f5f9;padding:0.05rem 0.3rem;border-radius:4px;font-size:0.85em;">$1</code>');
+        // Bold (**) — must come before italic
+        s = s.replace(/\*\*([^*\n][^*]*[^*\n])\*\*/g, '<strong>$1</strong>');
+        s = s.replace(/\*\*([^*\s][^*]*?)\*\*/g, '<strong>$1</strong>');
+        // Italic (*)
+        s = s.replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s).,!?]|$)/g, '$1<em>$2</em>');
+        // Links [text](url)
+        s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g,
+            '<a href="$2" target="_blank" rel="noopener" style="color:#5b21b6;text-decoration:underline;">$1</a>');
+
+        // Lists: split into lines, group consecutive list items
+        const lines = s.split('\n');
+        const out = [];
+        let inOl = false, inUl = false;
+        const closeLists = () => {
+            if (inOl) { out.push('</ol>'); inOl = false; }
+            if (inUl) { out.push('</ul>'); inUl = false; }
+        };
+        for (const raw of lines) {
+            const lineNum = raw.match(/^(\s*)(\d+)\.\s+(.*)$/);
+            const lineBul = raw.match(/^(\s*)[-*]\s+(.*)$/);
+            if (lineNum) {
+                if (!inOl) { closeLists(); out.push('<ol style="margin:0.3rem 0 0.3rem 1.4rem;padding:0;">'); inOl = true; }
+                out.push(`<li style="margin:0.1rem 0;">${lineNum[3]}</li>`);
+            } else if (lineBul) {
+                if (!inUl) { closeLists(); out.push('<ul style="margin:0.3rem 0 0.3rem 1.4rem;padding:0;">'); inUl = true; }
+                out.push(`<li style="margin:0.1rem 0;">${lineBul[2]}</li>`);
+            } else if (raw.trim() === '') {
+                closeLists();
+                out.push('');
+            } else {
+                closeLists();
+                out.push(raw);
+            }
+        }
+        closeLists();
+        // Join, collapse blank-line runs into paragraph breaks
+        return out.join('\n')
+            .replace(/\n{2,}/g, '</p><p style="margin:0.4rem 0;">')
+            .replace(/^/, '<p style="margin:0.4rem 0;">')
+            .replace(/$/, '</p>')
+            .replace(/<p[^>]*>(\s*)<\/p>/g, '')
+            .replace(/\n/g, '<br>');
+    }
+
     function aiAppendBubble(role, text) {
         const wrap = document.createElement('div');
         wrap.style.cssText = role === 'user'
-            ? 'align-self:flex-end;max-width:85%;background:#ede9fe;color:#3b0764;padding:0.55rem 0.8rem;border-radius:14px 14px 4px 14px;font-size:0.9rem;line-height:1.5;white-space:pre-wrap;'
-            : 'align-self:flex-start;max-width:90%;background:#f9fafb;color:#111827;padding:0.55rem 0.8rem;border:1px solid #e5e7eb;border-radius:14px 14px 14px 4px;font-size:0.9rem;line-height:1.5;white-space:pre-wrap;';
-        wrap.textContent = text;
+            ? 'align-self:flex-end;max-width:80%;background:#ede9fe;color:#3b0764;padding:0.6rem 0.9rem;border-radius:14px 14px 4px 14px;font-size:0.92rem;line-height:1.55;'
+            : 'align-self:flex-start;max-width:90%;background:#fff;color:#111827;padding:0.7rem 0.95rem;border:1px solid #e5e7eb;border-radius:14px 14px 14px 4px;font-size:0.92rem;line-height:1.6;box-shadow:0 1px 2px rgba(0,0,0,0.03);';
+        if (role === 'assistant') {
+            wrap.innerHTML = aiRenderMarkdown(text);
+        } else {
+            wrap.textContent = text;  // user messages stay literal
+        }
         aiThread.appendChild(wrap);
         aiThread.scrollTop = aiThread.scrollHeight;
         return wrap;
     }
 
-    function aiAppendCitations(citations) {
-        if (!citations || !citations.length) return;
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.3rem;margin:-0.2rem 0 0.4rem 0.5rem;';
-        const seen = new Set();
-        citations.forEach(c => {
-            const key = `${c.source}|${c.section_title}`;
-            if (seen.has(key)) return;
-            seen.add(key);
-            const chip = document.createElement('a');
-            const anchor = c.anchor ? '#' + c.anchor : '';
-            chip.href = '/dashboard/help/' + anchor;
-            chip.target = '_blank';
-            chip.style.cssText = 'font-size:0.7rem;background:#f3f4f6;color:#4b5563;padding:0.1rem 0.5rem;border-radius:999px;text-decoration:none;border:1px solid #e5e7eb;';
-            chip.textContent = '📖 ' + (c.section_title || c.source);
-            row.appendChild(chip);
-        });
-        aiThread.appendChild(row);
-    }
+    // Citation chips removed — they were noisy and the anchors
+    // weren't always real. The assistant cites inline in its text
+    // ("from Help → Exit tickets") which is enough.
+    function aiAppendCitations(_citations) { /* no-op */ }
 
     function aiAppendToolCard(prop, msgIndex) {
         const card = document.createElement('div');
@@ -302,16 +353,17 @@
         aiThread.scrollTop = aiThread.scrollHeight;
     }
 
-    function aiAppendNavLink(content) {
-        // The LLM's text often includes a tool result with a URL.
-        // We surface it as a "Take me there" button if the latest
-        // assistant message ends with a recognisable url.
-        const m = (content || '').match(/https?:\/\/\S+|\/dashboard\/\S+|\/tutor\/\S+/);
-        if (!m) return;
+    // Render a "Take me there" button ONLY when we have a verified
+    // URL that came from a real tool result (not regex-scraped from
+    // the LLM's text — those URLs were often hallucinated).
+    function aiAppendNavLink(url, label) {
+        if (!url || typeof url !== 'string') return;
+        // Extra guard: must be a relative app URL or our domain.
+        if (!url.startsWith('/') && !url.match(/^https?:\/\/(ai-tutor\.|localhost)/)) return;
         const link = document.createElement('a');
-        link.href = m[0];
-        link.style.cssText = 'align-self:flex-start;background:#5b21b6;color:#fff;padding:0.35rem 0.85rem;border-radius:999px;text-decoration:none;font-size:0.82rem;margin-top:-0.2rem;';
-        link.textContent = '🔗 Take me there →';
+        link.href = url;
+        link.style.cssText = 'align-self:flex-start;background:#5b21b6;color:#fff;padding:0.4rem 0.95rem;border-radius:999px;text-decoration:none;font-size:0.85rem;font-weight:600;';
+        link.textContent = '🔗 ' + (label || 'Take me there →');
         aiThread.appendChild(link);
     }
 
@@ -363,8 +415,12 @@
             if (!r.ok || !data.ok) throw new Error(data.human_msg || 'Assistant failed.');
             if (data.content) {
                 aiAppendBubble('assistant', data.content);
-                aiAppendCitations(data.citations);
-                aiAppendNavLink(data.content);
+                // Render a verified "Take me there" button only when
+                // a tool result attached one. Never regex-scrape the
+                // LLM's text for URLs — those are unreliable.
+                if (data.last_tool_url) {
+                    aiAppendNavLink(data.last_tool_url, data.last_tool_label);
+                }
                 aiAppendEscalateCta(data.message_id);
             }
             (data.pending_tool_proposals || []).forEach(prop => aiAppendToolCard(prop));
@@ -389,22 +445,29 @@
                 aiError.style.display = 'block';
                 return;
             }
-            if (accept && data.tool_result) {
-                if (data.tool_result.url) {
-                    aiAppendBubble('assistant', '✅ Done. ' + (data.tool_result.human_msg || ''));
-                    aiAppendNavLink(data.tool_result.url);
-                } else {
-                    aiAppendBubble('assistant', data.tool_result.human_msg || '✅ Done.');
-                }
-            } else {
+            // Render exactly ONE assistant bubble per confirm round.
+            // The follow-up turn's text (if present) already
+            // summarises what happened with the tool result, so we
+            // prefer it over a generic "Done." line. If there's no
+            // follow-up, fall back to the tool's human_msg.
+            if (!accept) {
                 aiAppendBubble('assistant', '↩️ Cancelled.');
-            }
-            // The followup turn's content (if any) was already
-            // returned in data.follow_up — render it.
-            if (data.follow_up && data.follow_up.content) {
-                aiAppendBubble('assistant', data.follow_up.content);
-                aiAppendCitations(data.follow_up.citations);
-                aiAppendEscalateCta(data.follow_up.message_id);
+            } else {
+                const followText = (data.follow_up && data.follow_up.content) || '';
+                const fallbackText = (data.tool_result && data.tool_result.human_msg) || '✅ Done.';
+                aiAppendBubble('assistant', followText || fallbackText);
+
+                // Verified URL — prefer the follow-up's tool URL,
+                // else the just-confirmed tool's URL.
+                const navUrl = (data.follow_up && data.follow_up.last_tool_url)
+                    || (data.tool_result && data.tool_result.url) || '';
+                const navLabel = (data.follow_up && data.follow_up.last_tool_label)
+                    || (data.tool_result && data.tool_result.label) || '';
+                if (navUrl) aiAppendNavLink(navUrl, navLabel);
+
+                if (data.follow_up && data.follow_up.message_id) {
+                    aiAppendEscalateCta(data.follow_up.message_id);
+                }
             }
         } catch (e) {
             aiError.textContent = e.message;

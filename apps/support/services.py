@@ -175,6 +175,12 @@ def answer(*, conversation: HelpAssistantConversation,
 
     assistant_text_parts: List[str] = []
     pending_proposals: List[Dict] = []  # write tools awaiting user confirm
+    # Most recent successful read-only tool result that returned a
+    # URL — surfaced to the client so the UI can render a verified
+    # "Take me there" button. Only set from genuine handler output,
+    # never scraped from text.
+    last_tool_url: Optional[str] = None
+    last_tool_label: Optional[str] = None
 
     # Hard cap on tool iterations to avoid runaway loops.
     for _iter in range(6):
@@ -273,6 +279,11 @@ def answer(*, conversation: HelpAssistantConversation,
                     result=result,
                     error=str(result.get('error', ''))[:1000],
                 )
+                # If the handler returned a verified URL, remember it
+                # so the client can render a "Take me there" button.
+                if result.get('ok') and result.get('url'):
+                    last_tool_url = result['url']
+                    last_tool_label = result.get('label') or ''
 
                 # Feed result back into history and loop.
                 history.append({'role': 'assistant', 'content': new_history_assistant_blocks})
@@ -306,7 +317,9 @@ def answer(*, conversation: HelpAssistantConversation,
         if pending_proposals and not any_tool_use:
             break
 
-    final_text = '\n'.join(assistant_text_parts).strip()
+    # Join multiple text blocks with a paragraph break so the chat
+    # reads as one coherent message, not run-on lines.
+    final_text = '\n\n'.join(t for t in assistant_text_parts if t).strip()
 
     # 5. Persist the assistant message.
     citations = [
@@ -350,6 +363,8 @@ def answer(*, conversation: HelpAssistantConversation,
         'content': final_text,
         'citations': citations,
         'pending_tool_proposals': pending_proposals,
+        'last_tool_url': last_tool_url,
+        'last_tool_label': last_tool_label,
     }
 
 

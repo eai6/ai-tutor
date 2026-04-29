@@ -339,6 +339,163 @@ def open_student_chat_history(user, *, student_query: str) -> Dict:
     }
 
 
+# ----- Teacher analytics (read-only, no confirmation) ---------------------
+
+
+def count_students(user, *, scope: str = 'mine') -> Dict:
+    """How many active students. Default scope='mine' (caller's
+    institution(s)); super admins can pass scope='all'."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    from apps.accounts.models import Membership
+    if scope == 'all' and user.is_superuser:
+        n = Membership.objects.filter(role='student', is_active=True).count()
+        return {'ok': True, 'count': n,
+                'human_msg': f"{n} active student(s) across all schools."}
+    inst_ids = list(Membership.objects.filter(
+        user=user, role__in=['teacher', 'admin'], is_active=True,
+    ).values_list('institution_id', flat=True))
+    if not inst_ids:
+        return {'ok': True, 'count': 0,
+                'human_msg': "You aren't a teacher at any institution yet."}
+    n = Membership.objects.filter(
+        role='student', is_active=True, institution_id__in=inst_ids,
+    ).count()
+    return {'ok': True, 'count': n,
+            'human_msg': f"{n} active student(s) at your school(s)."}
+
+
+def count_courses(user, *, scope: str = 'mine') -> Dict:
+    """Count courses visible to the caller."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    from apps.curriculum.models import Course
+    from django.db.models import Q
+    qs = Course.objects.all()
+    if scope == 'all' and user.is_superuser:
+        n = qs.count()
+        return {'ok': True, 'count': n,
+                'human_msg': f"{n} course(s) across all institutions."}
+    if not user.is_superuser:
+        from apps.accounts.models import Membership
+        inst_ids = list(Membership.objects.filter(
+            user=user, role__in=['teacher', 'admin'], is_active=True,
+        ).values_list('institution_id', flat=True))
+        qs = qs.filter(Q(institution_id__in=inst_ids) | Q(institution__isnull=True))
+    n = qs.count()
+    return {'ok': True, 'count': n,
+            'human_msg': f"{n} course(s) you can see."}
+
+
+def course_attempt_summary(user, *, course_query: str) -> Dict:
+    """Summary stats for a single course: lessons, students engaged,
+    mastery counts. Read-only."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    candidates = _fuzzy_course_lookup(course_query, user)
+    if not candidates:
+        return {'ok': False, 'human_msg': f'No course matching "{course_query}".'}
+    if len(candidates) > 1:
+        return {'ok': False, 'candidates': [
+            {'id': c.id, 'title': c.title} for c in candidates
+        ], 'human_msg': 'Which course?'}
+    course = candidates[0]
+    from apps.curriculum.models import Lesson
+    from apps.tutoring.models import StudentLessonProgress, TutorSession
+
+    total_lessons = Lesson.objects.filter(unit__course=course).count()
+    progress_qs = StudentLessonProgress.objects.filter(lesson__unit__course=course)
+    students_engaged = progress_qs.values('student_id').distinct().count()
+    total_progress_rows = progress_qs.count()
+    mastered_rows = progress_qs.filter(mastery_level='mastered').count()
+    sessions_total = TutorSession.objects.filter(lesson__unit__course=course).count()
+    summary = (
+        f"{course.title}: {total_lessons} lesson(s), "
+        f"{students_engaged} student(s) have started at least one lesson, "
+        f"{mastered_rows} lesson-level mastery records, "
+        f"{sessions_total} tutoring session(s) total."
+    )
+    return {
+        'ok': True,
+        'course_title': course.title,
+        'total_lessons': total_lessons,
+        'students_engaged': students_engaged,
+        'lesson_progress_rows': total_progress_rows,
+        'mastery_rows': mastered_rows,
+        'sessions_total': sessions_total,
+        'human_msg': summary,
+    }
+
+
+def student_summary(user, *, student_query: str) -> Dict:
+    """Per-student progress overview. Read-only.
+    Teachers can only see students in their own institution(s).
+    """
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    candidates = _fuzzy_student_lookup(student_query, user)
+    if not candidates:
+        return {'ok': False, 'human_msg': f'No student matching "{student_query}".'}
+    if len(candidates) > 1:
+        return {'ok': False, 'candidates': [
+            {'id': s.id, 'username': s.username, 'name': s.get_full_name()}
+            for s in candidates
+        ], 'human_msg': 'Which student?'}
+    student = candidates[0]
+    from apps.tutoring.models import StudentLessonProgress, TutorSession
+
+    progress = StudentLessonProgress.objects.filter(student=student)
+    total = progress.count()
+    mastered = progress.filter(mastery_level='mastered').count()
+    sessions = TutorSession.objects.filter(student=student)
+    sessions_total = sessions.count()
+    sessions_completed = sessions.filter(status='completed').count()
+
+    return {
+        'ok': True,
+        'student': student.username,
+        'name': student.get_full_name() or student.username,
+        'lessons_attempted': total,
+        'lessons_mastered': mastered,
+        'sessions_total': sessions_total,
+        'sessions_completed': sessions_completed,
+        'url': f'/dashboard/students/{student.id}/',
+        'label': f"@{student.username} — Student Detail",
+        'human_msg': (
+            f"@{student.username}: {mastered}/{total} lesson(s) mastered, "
+            f"{sessions_completed}/{sessions_total} session(s) completed."
+        ),
+    }
+
+
+def flagged_chats_count(user) -> Dict:
+    """How many flagged chat sessions are currently open for the
+    caller's institution(s)."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    try:
+        from apps.tutoring.models import TutorSession
+    except ImportError:
+        return {'ok': False, 'human_msg': 'Sessions not available.'}
+    from apps.accounts.models import Membership
+    qs = TutorSession.objects.filter(is_flagged=True)
+    if not user.is_superuser:
+        inst_ids = list(Membership.objects.filter(
+            user=user, role__in=['teacher', 'admin'], is_active=True,
+        ).values_list('institution_id', flat=True))
+        qs = qs.filter(institution_id__in=inst_ids)
+    open_n = qs.filter(flag_reviewed=False).count()
+    total_n = qs.count()
+    return {
+        'ok': True,
+        'open': open_n,
+        'total': total_n,
+        'url': '/dashboard/flagged/',
+        'label': 'Flagged Chats',
+        'human_msg': f"{open_n} open flagged chat(s); {total_n} total ever flagged.",
+    }
+
+
 # ----- Teacher write tools (require_confirmation=True) ----------------------
 
 
@@ -521,6 +678,60 @@ _CATALOG = [
         'audience': 'staff',
         'requires_confirmation': False,
         'handler': open_student_chat_history,
+    },
+    {
+        'name': 'count_students',
+        'description': "Count active students. Pass scope='all' for the whole platform (super admins only); default 'mine' is your own institution(s).",
+        'input_schema': {
+            'type': 'object',
+            'properties': {'scope': {'type': 'string', 'enum': ['mine', 'all']}},
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': count_students,
+    },
+    {
+        'name': 'count_courses',
+        'description': "Count courses visible to you. scope='all' for super admins.",
+        'input_schema': {
+            'type': 'object',
+            'properties': {'scope': {'type': 'string', 'enum': ['mine', 'all']}},
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': count_courses,
+    },
+    {
+        'name': 'course_attempt_summary',
+        'description': 'Get summary stats for a course: lessons, students engaged, mastery counts, sessions total.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {'course_query': {'type': 'string'}},
+            'required': ['course_query'],
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': course_attempt_summary,
+    },
+    {
+        'name': 'student_summary',
+        'description': 'Per-student progress overview: lessons attempted, lessons mastered, sessions total. Teachers see only their own institution students.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {'student_query': {'type': 'string', 'description': 'Username, first name, or last name fragment.'}},
+            'required': ['student_query'],
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': student_summary,
+    },
+    {
+        'name': 'flagged_chats_count',
+        'description': 'Count open vs total flagged chats in your institution(s).',
+        'input_schema': {'type': 'object', 'properties': {}},
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': flagged_chats_count,
     },
     {
         'name': 'assign_lesson_for_week',
