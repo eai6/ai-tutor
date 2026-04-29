@@ -3175,6 +3175,49 @@ def lesson_prerequisite_edit(request, lesson_id):
 
 @teacher_required
 @require_POST
+def course_set_default_duration(request, course_id):
+    """Bulk-update lesson.estimated_minutes for every lesson in a course
+    WITHOUT regenerating any content.
+
+    Lessons are generated at max depth (10 steps) — duration only
+    drives runtime step selection by the tutor engine. Recalibrating
+    the course duration is therefore a metadata change, not an LLM
+    regeneration. This view exists so teachers can recalibrate
+    immediately without triggering the parallel regen pipeline.
+    See memory/max_depth_lesson_steps_plan.md.
+    """
+    from apps.curriculum.models import Course, Lesson
+
+    institution = request.staff_ctx['institution']
+    lookup = {'id': course_id}
+    if institution is not None:
+        lookup['institution'] = institution
+    course = get_object_or_404(Course, **lookup)
+
+    raw = (request.POST.get('lesson_duration') or '').strip()
+    try:
+        new_duration = int(raw)
+    except ValueError:
+        messages.error(request, "Pick a duration first.")
+        return redirect('dashboard:course_detail', course_id=course.id)
+    if not (5 <= new_duration <= 120):
+        messages.error(request, f"Duration must be between 5 and 120 minutes (got {new_duration}).")
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    updated = Lesson.objects.filter(unit__course=course).update(
+        estimated_minutes=new_duration,
+    )
+    messages.success(
+        request,
+        f"Default lesson duration set to {new_duration} min for {updated} lesson(s) "
+        f"in '{course.title}'. Active sessions keep their existing pacing; new "
+        f"sessions will use the new duration. No regeneration triggered.",
+    )
+    return redirect('dashboard:course_detail', course_id=course.id)
+
+
+@teacher_required
+@require_POST
 def course_regenerate_all(request, course_id):
     """Regenerate every lesson in a course, serially, in a background
     thread. Used to roll out the rich-content prompt across an entire

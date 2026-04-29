@@ -64,6 +64,21 @@
     <!-- Chat body: flex row with chat column + artifact panel -->
     <div class="chat-body">
         <div class="chat-column">
+            <!-- Pre-session duration picker. JS auto-defaults after 6s -->
+            <div id="duration-picker"
+                 style="margin: 1rem; padding: 1rem 1.2rem; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 12px; box-shadow: 0 4px 12px rgba(91,33,182,0.08);">
+                <div style="font-weight: 600; color: #5b21b6; margin-bottom: 0.4rem;">⏱️ How long do you have today?</div>
+                <div style="font-size: 0.85rem; color: #6d28d9; margin-bottom: 0.7rem;">
+                    The tutor adapts the lesson depth to fit your time. You can answer the same number of questions either way — fewer steps just means less reinforcement.
+                </div>
+                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                    <button type="button" data-duration="15" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">15 min</button>
+                    <button type="button" data-duration="20" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">20 min</button>
+                    <button type="button" data-duration="30" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">30 min</button>
+                    <button type="button" data-duration="" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: transparent; border: 1px solid transparent; color: #6d28d9; cursor: pointer; font-size: 0.85rem; text-decoration: underline;">Use the lesson default</button>
+                </div>
+            </div>
+
             <!-- Chat Messages -->
             <main class="chat-messages" id="chat-messages">
                 <!-- Messages will be inserted here -->
@@ -1563,8 +1578,36 @@ userInput.addEventListener('input', () => {
     userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
 });
 
-// Initialize
-document.addEventListener('DOMContentLoaded', startSession);
+// Initialize — show duration picker first, then start the session.
+// The picker is a soft prompt: it auto-defaults after 6s if the
+// student doesn't pick. For resumed sessions the engine already has
+// its step selection cached, so the override is harmless either way.
+document.addEventListener('DOMContentLoaded', () => {
+    const picker = document.getElementById('duration-picker');
+    if (!picker) {
+        startSession();
+        return;
+    }
+    let started = false;
+    const launch = (mins) => {
+        if (started) return;
+        started = true;
+        picker.style.display = 'none';
+        // Pass the chosen duration to startSession via a closure on
+        // window-level variable so the existing function signature stays
+        // small. startSession reads window.__targetMinutes if set.
+        window.__targetMinutes = mins || null;
+        startSession();
+    };
+    picker.querySelectorAll('[data-duration]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const v = btn.getAttribute('data-duration');
+            launch(v ? parseInt(v, 10) : null);
+        });
+    });
+    // Auto-default after 6 seconds so distracted students aren't blocked.
+    setTimeout(() => launch(null), 6000);
+});
 userInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -1735,12 +1778,17 @@ async function startSession() {
     showTyping(true);
 
     try {
+        const body = {};
+        if (window.__targetMinutes) {
+            body.target_minutes = window.__targetMinutes;
+        }
         const response = await fetch(`/tutor/api/chat/start/${lessonId}/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
             },
+            body: JSON.stringify(body),
         });
 
         const data = await response.json();

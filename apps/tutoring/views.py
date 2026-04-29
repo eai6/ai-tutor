@@ -746,6 +746,25 @@ def chat_start_session(request, lesson_id):
             status=TutorSession.Status.ACTIVE,
         )
 
+        # Optional per-session duration override — student-picked
+        # "I have N minutes today" from the chat-page picker. The tutor
+        # engine reads engine_state['target_minutes_override'] in
+        # _target_minutes_for_session and uses it to select the right
+        # subset of the max-depth step bundle. No LLM regen needed.
+        try:
+            _body = json.loads(request.body or "{}")
+        except (ValueError, TypeError):
+            _body = {}
+        try:
+            _override = int(_body.get('target_minutes') or 0)
+        except (TypeError, ValueError):
+            _override = 0
+        if 5 <= _override <= 120:
+            engine_state = session.engine_state or {}
+            engine_state['target_minutes_override'] = _override
+            session.engine_state = engine_state
+            session.save(update_fields=['engine_state'])
+
         # Record the primary participant (G1). Every session has at least
         # one SessionParticipant — the owner.
         from apps.tutoring.models import SessionParticipant
