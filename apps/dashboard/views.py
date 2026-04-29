@@ -3193,7 +3193,7 @@ def course_regenerate_all(request, course_id):
 
     See memory/course_regeneration_for_slow_learners.md (Phase 3).
     """
-    from apps.curriculum.models import Course
+    from apps.curriculum.models import Course, Lesson
     from apps.dashboard.background_tasks import run_async, generate_complete_course
     from apps.accounts.models import Institution
 
@@ -3203,13 +3203,30 @@ def course_regenerate_all(request, course_id):
         lookup['institution'] = institution
     course = get_object_or_404(Course, **lookup)
 
+    # Optional duration knob — lets the teacher recalibrate every
+    # lesson's `estimated_minutes` BEFORE regen, without going through
+    # the destructive curriculum re-parse path. Only writes if the
+    # form sent a value; absent = keep each lesson's existing duration.
+    new_duration_raw = (request.POST.get('lesson_duration') or '').strip()
+    duration_msg = ''
+    if new_duration_raw:
+        try:
+            new_duration = int(new_duration_raw)
+            if 5 <= new_duration <= 60:
+                Lesson.objects.filter(unit__course=course).update(
+                    estimated_minutes=new_duration,
+                )
+                duration_msg = f" Lesson duration set to {new_duration} min."
+        except ValueError:
+            pass
+
     inst = institution or course.institution or Institution.get_global()
     run_async(generate_complete_course, course.id, inst.id)
 
     lesson_count = course.units.aggregate(n=Count('lessons'))['n'] or 0
     messages.success(
         request,
-        f"Regenerating all {lesson_count} lesson(s) in '{course.title}'. "
+        f"Regenerating all {lesson_count} lesson(s) in '{course.title}'.{duration_msg} "
         f"Running 3 in parallel in the background — refresh this page to "
         f"watch the status badges light up. Student mastery levels and "
         f"the permanent competency transcript are preserved.",

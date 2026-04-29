@@ -260,7 +260,7 @@
                         <label style="font-size: 0.8125rem; font-weight: 500; color: var(--gray-600);">Lesson Duration</label>
                         <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
                             <label style="display:flex;align-items:center;gap:0.25rem;padding:0.375rem 0.75rem;border:2px solid var(--gray-200);border-radius:6px;cursor:pointer;font-size:0.8125rem;">
-                                <input type="radio" name="lesson_duration" value="10" style="accent-color:var(--primary);"> 10m
+                                <input type="radio" name="lesson_duration" value="15" style="accent-color:var(--primary);"> 15m
                             </label>
                             <label style="display:flex;align-items:center;gap:0.25rem;padding:0.375rem 0.75rem;border:2px solid var(--primary);border-radius:6px;cursor:pointer;font-size:0.8125rem;background:var(--primary-light);">
                                 <input type="radio" name="lesson_duration" value="20" checked style="accent-color:var(--primary);"> 20m
@@ -529,14 +529,25 @@
 {% endif %}
 
 {% if can_edit_content %}
-<div class="bulk-actions" style="background: #f5f3ff; border: 1px solid #ddd6fe; margin-top: 0.75rem;">
+<div class="bulk-actions" style="background: #f5f3ff; border: 1px solid #ddd6fe; margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">🔁</span>
-    <div style="flex: 1;">
+    <div style="flex: 1; min-width: 240px;">
         <strong style="color: #5b21b6;">Regenerate all lessons</strong>
-        <div style="font-size: 0.8rem; color: #6d28d9;">Replaces lesson content + exit tickets across the whole course with the latest rich-content prompt. Runs 3 lessons in parallel. Mastery levels and the permanent competency transcript are preserved.</div>
+        <div style="font-size: 0.8rem; color: #6d28d9;">Replaces lesson content + exit tickets across the whole course with the latest rich-content prompt. Runs 3 lessons in parallel. Mastery levels and the permanent competency transcript are preserved. Set duration to recalibrate without re-parsing.</div>
     </div>
-    <form method="post" action="{% url 'dashboard:course_regenerate_all' course.id %}" style="display:inline;">
+    <form method="post" action="{% url 'dashboard:course_regenerate_all' course.id %}" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
         {% csrf_token %}
+        <label style="font-size:0.78rem; color:#5b21b6; display:flex; align-items:center; gap:0.4rem;">
+            Duration:
+            <select name="lesson_duration" style="font-size:0.78rem; padding:0.25rem 0.4rem; border:1px solid #ddd6fe; border-radius:6px; color:#5b21b6; background:#fff;">
+                <option value="">— keep existing —</option>
+                <option value="15">15 min · 3 steps</option>
+                <option value="20">20 min · 4 steps</option>
+                <option value="25">25 min · 5 steps</option>
+                <option value="30">30 min · 6 steps</option>
+                <option value="40">40 min · 8 steps</option>
+            </select>
+        </label>
         <button type="submit" class="btn btn-secondary btn-sm" style="border-color:#a78bfa; color:#5b21b6;"
                 onclick="return confirm('Regenerate ALL lessons in this course?\n\nWhat happens:\n• Lesson steps replaced\n• Exit tickets regenerated\n• Past exit-ticket attempts cleared\n• Mastery levels PRESERVED\n• Permanent competency transcript PRESERVED\n\nRuns 3 lessons in parallel in the background — refresh to watch progress.');">
             🔁 Regenerate all lessons

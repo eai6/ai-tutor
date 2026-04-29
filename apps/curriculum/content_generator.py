@@ -822,13 +822,16 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         except Exception as e:
             logger.warning(f"Failed to load Seychelles context: {e}")
 
-        # Calculate step budget from lesson duration. Target ~3.3 min
-        # per step. 4-step lessons came in too thin (~14 min); 8-step
-        # came in too long. 6 steps × ~3.3 min = 20 min is the right
-        # rhythm for a single 20-min classroom slot.
-        # 10min → 4 (floor); 15min → 5; 20min → 6; 25min → 8; 30min → 10.
+        # Calculate step budget from lesson duration. Target ~5 min
+        # per step in conversation — pilot testing (2026-04-29) showed
+        # the previous 3.3 min/step formula produced 6-step lessons
+        # that ran ~30 min in practice, not the intended 20.
+        # Recalibrated: 15min → 3 (floor); 20min → 4; 25min → 5;
+        # 30min → 6; 40min → 8; 50min+ → 10 (ceiling).
+        # Each lesson still owns ONE teaching objective regardless of
+        # step count, so duration only controls depth — never breadth.
         target_minutes = lesson.estimated_minutes or 20
-        max_steps = max(4, min(10, target_minutes // 3))
+        max_steps = max(3, min(10, target_minutes // 5))
         # 1 teaching objective per lesson, regardless of step count.
         max_eos = 1
         is_math = bool(lesson.unit and lesson.unit.course and lesson.unit.course.is_math)
@@ -917,7 +920,7 @@ LESSON DURATION: {target_minutes} minutes
 TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}{profile_str}
-Create EXACTLY {max_steps} steps. The whole flow must fit a {target_minutes}-minute classroom slot (~2.5 min per step in conversation).
+Create EXACTLY {max_steps} steps. The whole flow must fit a {target_minutes}-minute classroom slot (~5 min per step in conversation, including the back-and-forth turns).
 A {target_minutes}-minute lesson drills ONE teaching objective intensely. Every step here progresses up the DOK levels (recall → skill → strategic) for that ONE objective. DO NOT introduce additional objectives — depth, not breadth.
 
 {"MATH LESSON STRUCTURE — exactly " + str(max_steps) + " steps:" if is_math else "LESSON STRUCTURE — exactly " + str(max_steps) + " steps:"}
@@ -1076,7 +1079,7 @@ CONTENT GUIDELINES:
         from apps.curriculum.models import LessonStep
 
         target_minutes = lesson.estimated_minutes or 20
-        MAX_STEPS = max(4, min(10, target_minutes // 3))
+        MAX_STEPS = max(3, min(10, target_minutes // 5))
         if len(steps) > MAX_STEPS:
             logger.warning(
                 f"[ContentGen] [{lesson.title}] Trimming {len(steps)} steps to {MAX_STEPS}"
