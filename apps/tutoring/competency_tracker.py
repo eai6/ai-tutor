@@ -74,16 +74,22 @@ def collect_objective_signals_for_course(course, students=None) -> dict:
     """
     from apps.tutoring.models import ExitTicket, ExitTicketAttempt
 
-    summative_q = ExitTicket.objects.filter(
-        course=course, assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
-    )
+    # PER-LESSON EXIT TICKETS ONLY (decided 2026-04-29):
+    # The summative bank samples ~5 questions per teaching objective —
+    # too sparse to be a fair per-objective signal alongside 10-question
+    # exit tickets. Comparing 1-question summative coverage to 10-question
+    # exit-ticket coverage created false zeros on the matrix. Summative
+    # remains the source of truth for COURSE-LEVEL score (X / 30) and
+    # still feeds the SM-2 skills map for personalised tutoring; it
+    # just doesn't contribute to the per-objective competency map any
+    # more.
     lesson_q = ExitTicket.objects.filter(
         lesson__unit__course=course,
         assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
     )
 
     attempts_qs = ExitTicketAttempt.objects.filter(
-        exit_ticket__in=list(summative_q) + list(lesson_q),
+        exit_ticket__in=list(lesson_q),
         completed_at__isnull=False,
     )
     if students is not None:
@@ -153,14 +159,27 @@ def collect_objective_signals_for_course(course, students=None) -> dict:
                 'is_summative': bool(attempt.exit_ticket.course_id),
                 'purpose': purpose,
             }
-            # Always update 'latest' since attempts come in chronological order.
+            # Exit-ticket-only semantics (2026-04-29):
+            #   baseline = the student's FIRST attempt on this objective
+            #              (their starting point on this lesson)
+            #   latest   = most recent attempt (always updated as we
+            #              walk chronologically)
+            #   final    = best attempt — the highest correct/total
+            #              ratio so far. Tracks "best they've ever
+            #              done" rather than "the post-course exam".
+            #   practice = every attempt for that objective (audit trail)
             bucket['latest'] = row
-            if purpose == 'baseline' and bucket['baseline'] is None:
+            if bucket['baseline'] is None:
                 bucket['baseline'] = row
-            elif purpose == 'final':
+            current_final = bucket.get('final')
+            row_pct = (row['correct'] / row['total']) if row['total'] else 0.0
+            current_final_pct = (
+                (current_final['correct'] / current_final['total'])
+                if current_final and current_final.get('total') else -1.0
+            )
+            if row_pct >= current_final_pct:
                 bucket['final'] = row
-            elif purpose == 'practice':
-                bucket['practice'].append(row)
+            bucket['practice'].append(row)
 
     return out
 

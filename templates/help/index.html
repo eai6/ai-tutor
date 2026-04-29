@@ -293,7 +293,8 @@
             <p>Open <strong>Reports → Lesson session report</strong>. Shows who passed/failed/didn't take the exit ticket, broken down by student. Click a row to read the full chat transcript.</p>
 
             <h4>Class competency map</h4>
-            <p>From a course page, <strong>Classes → Competency Map</strong> shows the class-wide view. Each row is one atomic teaching objective (one per lesson) — the same objective string used everywhere on the platform: lesson generation, exit-ticket question tags, summative bank tags, and the SM-2 skill records all share this canonical string, so the join is exact rather than fuzzy. Columns: <strong>Baseline</strong> (pre-course summative) → <strong>Latest</strong> (most recent attempt) → <strong>Final</strong> (post-course summative) → <strong>Δ</strong> growth → <strong>Mastered ≥70%</strong>. Plus class readiness %, struggling objectives, and the students with the most gaps.</p>
+            <p>From a course page, <strong>Classes → Competency Map</strong> shows the class-wide view. Each row is one atomic teaching objective (one per lesson). Data source: <strong>per-lesson exit tickets only</strong> — 10 questions per lesson is a much richer signal than the summative's ~5 sampled per objective, so we don't mix them. Columns: <strong>Baseline</strong> (first exit-ticket attempt on the lesson) → <strong>Latest</strong> (most recent) → <strong>Final</strong> (best score so far) → <strong>Δ</strong> growth → <strong>Mastered ≥70%</strong>. Plus class readiness %, struggling objectives, and the students with the most gaps.</p>
+            <p>The course summative is reported separately as an X/30 overall score and still feeds the SM-2 skills map for personalised tutoring — it just doesn't drive this per-objective matrix.</p>
             <p>Click any student row to drill into their per-objective breakdown.</p>
 
             <h4>Permanent competency transcript</h4>
