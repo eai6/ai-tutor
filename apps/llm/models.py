@@ -123,6 +123,7 @@ class ModelConfig(models.Model):
         EXIT_TICKETS = 'exit_tickets', 'Exit Ticket Generation'
         SKILL_EXTRACTION = 'skill_extraction', 'Skill Extraction'
         IMAGE_GENERATION = 'image_generation', 'Image Generation'
+        HELP_ASSISTANT = 'help_assistant', 'In-app Help Assistant'
 
     institution = models.ForeignKey(
         Institution,
