@@ -18,6 +18,47 @@ def _norm(s) -> str:
     return ' '.join(str(s or '').split()).strip().lower()
 
 
+# Math-symbol normalisation. Students typing on phone / laptop
+# keyboards rarely produce degree symbols, true Unicode squareds,
+# pi glyphs, etc. — they write "38" instead of "38°", "x^2" instead
+# of "x²", "pi" or "3.14" instead of "π". Without normalisation,
+# substring keyword matching gives false negatives for
+# mathematically correct answers. See the 2026-04-29 exit-ticket
+# false-negative bug (student wrote "38, 142, 38, 142", keywords
+# were "38°, 142°, 38°, 142°").
+_MATH_REPLACEMENTS = (
+    ('°', ''),       # degree
+    ('º', ''),       # masculine ordinal sometimes used as degree
+    ('²', '^2'),
+    ('³', '^3'),
+    ('√', 'sqrt'),
+    ('π', 'pi'),
+    ('×', '*'),
+    ('÷', '/'),
+    ('−', '-'),      # Unicode minus → ASCII hyphen
+    ('–', '-'),      # en dash
+    ('—', '-'),      # em dash
+    ('≤', '<='),
+    ('≥', '>='),
+    ('≠', '!='),
+    ('±', '+-'),
+    ('½', '1/2'),
+    ('¼', '1/4'),
+    ('¾', '3/4'),
+)
+
+
+def _math_norm(s) -> str:
+    """Normalise math notation so '38°' and '38' are equivalent for
+    keyword matching. Lowercase + whitespace-collapsed first, then
+    swap symbol variants for ASCII equivalents.
+    """
+    text = _norm(s)
+    for src, dst in _MATH_REPLACEMENTS:
+        text = text.replace(src, dst)
+    return text
+
+
 def grade_one(question, student_answer) -> Tuple[bool, str]:
     """Return (is_correct, reason). `reason` is a short tag for logging."""
     q_type = (question.question_type or 'mcq').lower()
@@ -66,10 +107,13 @@ def grade_one(question, student_answer) -> Tuple[bool, str]:
         return ok, f'matching.{correct}/{len(pairs)}'
 
     if q_type in ('short_answer', 'data_interpretation'):
-        text = _norm(student_answer if isinstance(student_answer, str) else '')
+        # Apply math-symbol normalisation to BOTH sides so e.g. "38°"
+        # and "38" are equivalent. The numeric-keyword path then
+        # extracts pure numbers separately for tolerance comparison.
+        text = _math_norm(student_answer if isinstance(student_answer, str) else '')
         if not text:
             return False, 'short.empty'
-        keywords = [_norm(k) for k in (data.get('keywords') or []) if k]
+        keywords = [_math_norm(k) for k in (data.get('keywords') or []) if k]
         if not keywords:
             # No rubric — accept any non-empty response (lenient default).
             return True, 'short.no_rubric'
@@ -80,6 +124,8 @@ def grade_one(question, student_answer) -> Tuple[bool, str]:
             if not kw:
                 continue
             # Numeric keywords: extract numbers and compare with tolerance.
+            # After _math_norm the degree symbol is gone, so "38°" → "38"
+            # which matches as a numeric keyword.
             num_match = re.fullmatch(r'-?\d+(?:\.\d+)?', kw)
             if num_match:
                 student_numbers = re.findall(r'-?\d+(?:\.\d+)?', text)

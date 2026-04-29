@@ -5033,11 +5033,30 @@ Which concept numbers were meaningfully covered?"""
             )
             return correct_count >= max(1, len(correct_map) // 2 + 1) if correct_map else False
 
-        # short_answer / data_interpretation fallback
-        keywords = data.get('keywords', [])
+        # short_answer / data_interpretation fallback. Math-symbol
+        # normalise BOTH sides so "38°" and "38" are equivalent —
+        # students rarely type Unicode glyphs from a phone keyboard.
+        # See apps/tutoring/summative_grading.py::_math_norm for the
+        # canonical implementation.
+        from apps.tutoring.summative_grading import _math_norm
+        keywords = [_math_norm(kw) for kw in (data.get('keywords') or [])]
         min_kw = data.get('min_keywords', 2)
-        text = (student_answer if isinstance(student_answer, str) else '').lower()
-        matched = sum(1 for kw in keywords if kw.lower() in text)
+        text = _math_norm(student_answer if isinstance(student_answer, str) else '')
+        # Numeric-aware match: pure numbers extracted from the student
+        # answer are compared with tolerance against numeric keywords;
+        # text keywords use substring match.
+        import re as _re
+        student_numbers = _re.findall(r'-?\d+(?:\.\d+)?', text)
+        matched = 0
+        for kw in keywords:
+            if not kw:
+                continue
+            if _re.fullmatch(r'-?\d+(?:\.\d+)?', kw):
+                target = float(kw)
+                if any(abs(float(sn) - target) < 0.01 for sn in student_numbers):
+                    matched += 1
+            elif kw in text:
+                matched += 1
         return matched >= min_kw
 
     def submit_exit_ticket(self, answers) -> TutorMessage:

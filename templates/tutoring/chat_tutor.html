@@ -2575,7 +2575,18 @@ function showExitTicket() {
                     // description so the question is still answerable.
                     dataDesc = `<div class="data-description" style="font-style:italic;color:#52525b;">${escapeHtml(ad.figure_description)}</div>`;
                 }
-                bodyHTML = `${dataDesc}
+                // Math-symbol picker. Students rarely produce °/π/√/etc.
+                // from a phone keyboard; the grader normalises symbols
+                // (apps/tutoring/summative_grading.py::_math_norm) but the
+                // picker is still helpful when a teacher's expected
+                // working uses them. Click inserts at cursor position.
+                const mathBar = `
+                    <div class="math-toolbar" data-q="${origIdx}" style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-bottom:0.4rem;">
+                        ${['°','π','√','²','³','±','≤','≥','≠','×','÷','½','¼','¾'].map(sym =>
+                            `<button type="button" class="math-sym-btn" onclick="insertMathSymbol(${origIdx}, '${sym}')" style="font-size:0.95rem;padding:0.18rem 0.5rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">${sym}</button>`
+                        ).join('')}
+                    </div>`;
+                bodyHTML = `${dataDesc}${mathBar}
                 <textarea class="exit-textarea" data-q="${origIdx}" rows="3" placeholder="Type your answer..." oninput="collectTextAnswer(${origIdx}, this)"></textarea>`;
             }
 
@@ -2653,6 +2664,26 @@ function collectTextAnswer(qIndex, el) {
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
     checkExitSubmitReady();
+}
+
+// Insert a math symbol at the cursor position of the answer textarea
+// for question qIndex. The grader normalises math symbols on the
+// server side too, so typing "38°" and "38" are equivalent — but the
+// picker is still useful when a teacher's expected working uses
+// symbols and students want to mirror the format.
+function insertMathSymbol(qIndex, sym) {
+    const ta = document.querySelector(`textarea.exit-textarea[data-q="${qIndex}"]`);
+    if (!ta) return;
+    const start = ta.selectionStart || 0;
+    const end = ta.selectionEnd || 0;
+    const before = ta.value.slice(0, start);
+    const after = ta.value.slice(end);
+    ta.value = before + sym + after;
+    const caret = start + sym.length;
+    ta.focus();
+    ta.setSelectionRange(caret, caret);
+    // Re-fire collection + auto-grow
+    collectTextAnswer(qIndex, ta);
 }
 
 function checkExitSubmitReady() {
