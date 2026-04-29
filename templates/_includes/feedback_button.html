@@ -213,7 +213,15 @@
         successEl.style.display = 'none';
         errorEl.style.display = 'none';
         overlay.classList.add('open');
-        setTimeout(() => messageEl.focus(), 50);
+        // Kick off the AI conversation eagerly so the greeting
+        // appears BEFORE the user's first message. Without this,
+        // aiSendMessage would fetch /chat/start/ on the first send,
+        // and the greeting would race in after the user's bubble.
+        aiEnsureConversation().catch(() => {/* error already shown */});
+        setTimeout(() => {
+            const aiInput = document.getElementById('fb-ai-input');
+            if (aiInput) aiInput.focus();
+        }, 50);
     }
     function closeModal() {
         overlay.classList.remove('open');
