@@ -97,6 +97,25 @@
 
             <!-- Input Area -->
             <footer class="chat-input-area" id="input-area">
+                {% if is_math_lesson %}
+                <div id="chat-math-toolbar" style="display:flex;flex-wrap:wrap;gap:0.2rem;padding:0.4rem 0.75rem 0;">
+                    <button type="button" onclick="insertChatSymbol('°')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">°</button>
+                    <button type="button" onclick="insertChatSymbol('π')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">π</button>
+                    <button type="button" onclick="insertChatSymbol('√')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">√</button>
+                    <button type="button" onclick="insertChatSymbol('²')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">²</button>
+                    <button type="button" onclick="insertChatSymbol('³')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">³</button>
+                    <button type="button" onclick="insertChatSymbol('±')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">±</button>
+                    <button type="button" onclick="insertChatSymbol('≤')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">≤</button>
+                    <button type="button" onclick="insertChatSymbol('≥')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">≥</button>
+                    <button type="button" onclick="insertChatSymbol('≠')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">≠</button>
+                    <button type="button" onclick="insertChatSymbol('×')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">×</button>
+                    <button type="button" onclick="insertChatSymbol('÷')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">÷</button>
+                    <button type="button" onclick="insertChatSymbol('½')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">½</button>
+                    <button type="button" onclick="insertChatSymbol('¼')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">¼</button>
+                    <button type="button" onclick="insertChatSymbol('¾')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">¾</button>
+                    <button type="button" onclick="insertChatSymbol('θ')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">θ</button>
+                </div>
+                {% endif %}
                 <div class="input-wrapper">
                     <textarea
                         id="user-input"
@@ -2664,6 +2683,27 @@ function collectTextAnswer(qIndex, el) {
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
     checkExitSubmitReady();
+}
+
+// Insert a math symbol at the cursor position of the MAIN chat input
+// (#user-input). Mirrors insertMathSymbol's behaviour for the
+// per-question textareas, but targets the conversation textarea so
+// students typing answers DURING the lesson can also drop math
+// symbols without fighting their phone keyboard.
+function insertChatSymbol(sym) {
+    const ta = document.getElementById('user-input');
+    if (!ta) return;
+    const start = ta.selectionStart || 0;
+    const end = ta.selectionEnd || 0;
+    const before = ta.value.slice(0, start);
+    const after = ta.value.slice(end);
+    ta.value = before + sym + after;
+    const caret = start + sym.length;
+    ta.focus();
+    ta.setSelectionRange(caret, caret);
+    // Auto-resize logic mirrors the textarea's input listener.
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
 }
 
 // Insert a math symbol at the cursor position of the answer textarea
