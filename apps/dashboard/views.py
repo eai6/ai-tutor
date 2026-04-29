@@ -4222,7 +4222,6 @@ def course_edit(request, course_id):
 
     # Check if re-parse was requested
     if request.POST.get('action') == 'reparse':
-        new_duration = int(request.POST.get('lesson_duration', 20))
         from apps.dashboard.models import CurriculumUpload
         from apps.dashboard.background_tasks import run_async
 
@@ -4237,8 +4236,13 @@ def course_edit(request, course_id):
             messages.error(request, "No curriculum file found to re-parse. Please upload a new curriculum.")
             return redirect('dashboard:course_detail', course_id=course.id)
 
-        # Update the upload's duration setting
-        upload.lesson_duration_minutes = new_duration
+        # Re-parse no longer carries a duration knob. Lessons are
+        # generated at max depth and the engine adapts duration at
+        # runtime — see memory/max_depth_lesson_steps_plan.md.
+        # Existing upload.lesson_duration_minutes (set at original
+        # upload time) carries through as the default for any newly
+        # created lessons; teachers change it later via the green
+        # "Default lesson duration" form on the course page.
         upload.status = 'processing'
         upload.processing_log = ''
         upload.save()
@@ -4271,7 +4275,7 @@ def course_edit(request, course_id):
         # Auto-completes after replan: the user already explicitly chose to
         # re-parse, so we don't ask them to "approve" the result on a separate
         # page. They'd just see an empty course in between and think it failed.
-        def _replan(upload_id, course_id, duration):
+        def _replan(upload_id, course_id):
             import django.db
             django.db.connections.close_all()
             try:
@@ -4284,7 +4288,6 @@ def course_edit(request, course_id):
 
                 up.current_step = 3
                 up.add_log("📚 Re-planning lesson structure (skipping text extraction — already in KB)...")
-                up.add_log(f"   Target duration: {duration} minutes per lesson")
                 up.save()
 
                 print(f"[Reparse] Step 3: Vision extraction + lesson planning for {up.subject_name}", flush=True)
@@ -4331,8 +4334,13 @@ def course_edit(request, course_id):
                 except Exception:
                     pass
 
-        run_async(_replan, upload.id, course.id, new_duration)
-        messages.success(request, f"Re-planning lessons with {new_duration}-minute target. Vision extraction will analyze the PDF pages — refresh in ~1 minute to see the new units.")
+        run_async(_replan, upload.id, course.id)
+        messages.success(
+            request,
+            "Re-parsing the curriculum document. Existing lessons upsert "
+            "by title (mastery + transcripts preserved). Refresh in ~1 "
+            "minute to see the result.",
+        )
         return redirect('dashboard:course_detail', course_id=course.id)
 
     messages.success(request, f"Course updated.")

@@ -359,7 +359,6 @@ LESSON: {lesson.title}
 OBJECTIVE: {lesson.objective or 'Master the concepts in this lesson'}
 SUBJECT: {subject}
 GRADE: {grade}
-DURATION: {lesson.estimated_minutes or 20} minutes
 
 EXISTING ENABLING OBJECTIVES (often coarse — refine these):
 {existing_str}
@@ -605,7 +604,7 @@ code fence. Example shape:
             return 'tier_3'  # Syllabus Only
         return 'tier_4'  # Framework Only
 
-    def _profile_rules(self, target_minutes: int, max_steps: int, is_math: bool) -> Dict:
+    def _profile_rules(self, max_steps: int, is_math: bool) -> Dict:
         """Always-rich generation rules.
 
         Per the 2026-04-28 design decision, lesson content is generated
@@ -835,18 +834,12 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         except Exception as e:
             logger.warning(f"Failed to load Seychelles context: {e}")
 
-        # MAX-DEPTH GENERATION (2026-04-29):
-        # Always generate at the deepest depth (10 steps). The tutor
+        # MAX-DEPTH GENERATION (2026-04-29): always generate the
+        # deepest version of the lesson (10 steps). The tutoring
         # engine selects the right subset at session start based on
-        # target duration, using the per-step `priority` field, with
-        # zero LLM regeneration cost when a teacher or student
-        # changes the target duration. See
+        # the target duration, using the per-step `priority` field —
+        # so generation is duration-agnostic. See
         # memory/max_depth_lesson_steps_plan.md.
-        #
-        # `target_minutes` is still passed into the prompt so the LLM
-        # has a sense of pacing per step, but it no longer drives the
-        # step count.
-        target_minutes = lesson.estimated_minutes or 20
         max_steps = 10
         # 1 teaching objective per lesson, regardless of step count.
         max_eos = 1
@@ -856,7 +849,7 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
         # memory/course_regeneration_for_slow_learners.md — generation
         # is one-size-fits-the-slowest-learner; the tutoring engine
         # adapts presentation per student at runtime.
-        profile_rules = self._profile_rules(target_minutes, max_steps, is_math)
+        profile_rules = self._profile_rules(max_steps, is_math)
         profile_str = f"""
 CONTENT SCAFFOLDING — generate rich content that supports the slowest learner.
 {profile_rules['description']}
@@ -931,7 +924,6 @@ OBJECTIVE: {lesson.objective or 'Master the concepts in this lesson'}
 UNIT: {unit.title}
 SUBJECT: {subject}
 GRADE: {grade} (Seychelles secondary school)
-LESSON DURATION: {target_minutes} minutes
 
 TEACHING STRATEGIES TO USE:
 {strategies_str}
