@@ -116,6 +116,61 @@ class TestStripPraiseIfWrong(unittest.TestCase):
         # The rest of the sentence (content) should survive
         self.assertIn("divided", result)
 
+    def test_checkmark_treated_as_praise(self):
+        """A bare ✓ inline is the LLM affirming an answer; strip it so a
+        wrong-arithmetic line like '60 + 80 + 75 + 70 + 75 = 220 ✓'
+        loses the misleading checkmark."""
+        text = "60 + 80 + 75 + 70 + 75 = 220 ✓"
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        self.assertNotIn("✓", result)
+
+    def test_great_work_treated_as_praise(self):
+        """'Great work' is praise-equivalent to 'great job' and was
+        slipping past the original patterns."""
+        text = "Great work, that's the right approach!"
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        self.assertNotIn("Great work", result)
+
+    def test_bare_correct_uses_echo_opener(self):
+        """When the student gave a bare-but-correct answer, the heavy-
+        praise replacement should echo their answer back rather than
+        use the generic 'walk me through' opener that contradicted the
+        '✓ correct' that came later in the same response."""
+        text = "Perfect! 275 is right!"
+        result, modified = strip_praise_if_wrong(
+            text,
+            is_correct=False,
+            context="bare_correct",
+            student_input="275",
+        )
+        self.assertTrue(modified)
+        self.assertNotIn("Let's check this one together", result)
+        self.assertIn("275", result)
+
+    def test_bare_unknown_uses_neutral_opener(self):
+        """Bare answer with no canonical correctness signal — should
+        ask for working without echoing or implying correctness."""
+        text = "Excellent! Now let's check that."
+        result, modified = strip_praise_if_wrong(
+            text,
+            is_correct=False,
+            context="bare_unknown",
+        )
+        self.assertTrue(modified)
+        self.assertNotIn("Excellent", result)
+        self.assertIn("show me your working", result.lower())
+
+    def test_default_context_is_backward_compatible(self):
+        """Callers that don't pass context still get the original
+        'Let's check this together' opener — preserving existing
+        behaviour for the wrong-answer code path."""
+        text = "Brilliant, perfect, excellent!"
+        result, modified = strip_praise_if_wrong(text, is_correct=False)
+        self.assertTrue(modified)
+        self.assertIn("Let's check this one together", result)
+
 
 if __name__ == "__main__":
     unittest.main()

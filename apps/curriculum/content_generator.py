@@ -301,7 +301,12 @@ class LessonContentGenerator:
 
         # Save to database if requested
         if save_to_db:
-            self._save_steps_to_db(lesson, steps_data['steps'])
+            self._save_steps_to_db(
+                lesson,
+                steps_data['steps'],
+                arith_retry_count=steps_data.get('arithmetic_retry_count', 0),
+                arith_unresolved=steps_data.get('arithmetic_unresolved', False),
+            )
 
             # Auto-generate exit ticket after content generation
             exit_ticket_result = self._generate_exit_ticket(lesson)
@@ -1077,6 +1082,66 @@ CONTENT GUIDELINES:
                 logger.warning(f"[{lesson.title}] profile retry crashed: {e} — keeping original")
                 print(f"[ContentGen] [{lesson.title}] ⚠️ profile retry crashed: {e} — keeping original output", flush=True)
 
+        # Layer 3 — arithmetic verify-then-retry. Math lessons only.
+        # Run Layer 1 over the (possibly profile-retried) steps. If
+        # unresolved detect-only entries remain, retry the LLM call
+        # once with a constraint block listing the wrong claims and
+        # their correct values. Cap at one retry (latency + cost).
+        arith_audit: List[Dict] = []
+        arith_retry_count = 0
+        arith_unresolved = False
+        if is_math:
+            from apps.curriculum.content_verifier import (
+                build_arithmetic_constraint_block,
+                has_unresolved_corrections,
+                verify_lesson_step,
+            )
+            for step in steps:
+                verify_lesson_step(step, audit=arith_audit)
+            if has_unresolved_corrections(arith_audit):
+                print(
+                    f"[ContentGen] [{lesson.title}] Layer 3 arithmetic "
+                    f"retry — {len(arith_audit)} corrections "
+                    f"(detect-only present)",
+                    flush=True,
+                )
+                constraint = build_arithmetic_constraint_block(
+                    step_audit=arith_audit,
+                )
+                try:
+                    steps, summary = _call_llm(constraint + "\n\n" + prompt)
+                    arith_retry_count = 1
+                    # Re-verify with a fresh audit list so we report
+                    # only the post-retry state.
+                    arith_audit = []
+                    for step in steps:
+                        verify_lesson_step(step, audit=arith_audit)
+                    arith_unresolved = has_unresolved_corrections(arith_audit)
+                    if arith_unresolved:
+                        print(
+                            f"[ContentGen] [{lesson.title}] ⚠️ Layer 3 "
+                            f"retry still has unresolved arithmetic — "
+                            f"will mark READY_WITH_WARNINGS",
+                            flush=True,
+                        )
+                    else:
+                        print(
+                            f"[ContentGen] [{lesson.title}] ✅ Layer 3 "
+                            f"retry resolved all arithmetic issues",
+                            flush=True,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"[{lesson.title}] arithmetic retry crashed: "
+                        f"{e} — keeping original"
+                    )
+                    print(
+                        f"[ContentGen] [{lesson.title}] ⚠️ arithmetic "
+                        f"retry crashed: {e} — keeping original output",
+                        flush=True,
+                    )
+                    arith_unresolved = True
+
         elapsed = time.time() - t0
         print(f"[ContentGen] [{lesson.title}] ✅ {len(steps)} steps generated in {elapsed:.1f}s", flush=True)
         logger.info(f"[{lesson.title}] {len(steps)} steps generated in {elapsed:.1f}s")
@@ -1085,9 +1150,19 @@ CONTENT GUIDELINES:
             'success': True,
             'steps': steps,
             'lesson_summary': summary,
+            'arithmetic_audit': arith_audit,
+            'arithmetic_retry_count': arith_retry_count,
+            'arithmetic_unresolved': arith_unresolved,
         }
 
-    def _save_steps_to_db(self, lesson, steps: List[Dict]):
+    def _save_steps_to_db(
+        self,
+        lesson,
+        steps: List[Dict],
+        *,
+        arith_retry_count: int = 0,
+        arith_unresolved: bool = False,
+    ):
         """Save generated steps to database.
 
         Mirrors the budget in _generate_steps so the LLM's output is
@@ -1095,8 +1170,22 @@ CONTENT GUIDELINES:
         deletes any leftover LessonStep rows with order_index >=
         len(steps) — without this, regenerating a lesson with FEWER
         steps would leave the old tail behind in the DB.
+
+        Layer 1 hook (defensive — idempotent with the same check
+        that runs inside `_generate_steps`): when the course is_math,
+        every step's verifiable text fields run through
+        `verify_calculations` before persistence. Post-Layer-3 the
+        audit is usually empty here (retry already fixed things);
+        we still record what we see so the metadata is the source
+        of truth even if upstream skipped.
+
+        Layer 3 hook: caller passes `arith_retry_count` and
+        `arith_unresolved` from `_generate_steps`. We persist the
+        retry count to metadata and set
+        `content_status=READY_WITH_WARNINGS` when issues remain.
         """
         from apps.curriculum.models import LessonStep
+        from apps.curriculum.content_verifier import verify_lesson_step
 
         # Always-10 max-depth ceiling. The tutor engine selects the
         # right subset at session start; storing all 10 keeps duration
@@ -1107,6 +1196,29 @@ CONTENT GUIDELINES:
                 f"[ContentGen] [{lesson.title}] Trimming {len(steps)} steps to {MAX_STEPS}"
             )
             steps = steps[:MAX_STEPS]
+
+        # Layer 1 — math arithmetic verification on generated content.
+        # Math-only gate to avoid false-positive matches on geography
+        # prose like "Seychelles has 115 islands".
+        try:
+            is_math = lesson.unit.course.is_math
+        except Exception:
+            is_math = False
+        step_audit: List[Dict] = []
+        if is_math:
+            for step_data in steps:
+                verify_lesson_step(step_data, audit=step_audit)
+            if step_audit:
+                fixed = sum(
+                    1 for e in step_audit if e.get("auto_corrected")
+                )
+                detected = len(step_audit) - fixed
+                print(
+                    f"[ContentGen] [{lesson.title}] Layer 1: {fixed} "
+                    f"auto-corrected, {detected} detect-only "
+                    f"(answer-key-bound)",
+                    flush=True,
+                )
 
         valid_answer_types = set(LessonStep.AnswerType.values)
         # Map common LLM mis-emissions to valid LessonStep.AnswerType
@@ -1191,6 +1303,35 @@ CONTENT GUIDELINES:
                 f"[ContentGen] [{lesson.title}] Removing {orphan_count} orphan steps from prior generation"
             )
             orphan_qs.delete()
+
+        # Layers 1 + 3 — persist the per-lesson verification audit
+        # to lesson.metadata. Subsequent layers (A2 exit-ticket
+        # verifier, Layer 2 cross-check) extend the same blob with
+        # sibling keys.
+        if is_math:
+            from django.utils import timezone
+            from apps.curriculum.models import Lesson
+            existing = lesson.metadata or {}
+            audit_blob = existing.get('verification_audit') or {}
+            audit_blob['generated_at'] = timezone.now().isoformat()
+            audit_blob['math_check_run'] = True
+            audit_blob['step_corrections'] = step_audit
+            audit_blob['retry_count'] = arith_retry_count
+            existing['verification_audit'] = audit_blob
+            lesson.metadata = existing
+            update_fields = ['metadata']
+            if arith_unresolved:
+                lesson.content_status = (
+                    Lesson.ContentStatus.READY_WITH_WARNINGS
+                )
+                update_fields.append('content_status')
+                print(
+                    f"[ContentGen] [{lesson.title}] content_status → "
+                    f"READY_WITH_WARNINGS (Layer 3 retry could not "
+                    f"resolve all arithmetic issues)",
+                    flush=True,
+                )
+            lesson.save(update_fields=update_fields)
 
     def _extract_eo_skills(self, lesson):
         """Create Skill records from enabling objectives for SM-2 mastery tracking."""
@@ -1448,6 +1589,61 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
 
         questions = questions[:35]
 
+        # Layer 4 — render any parametric templates the LLM emitted.
+        # Templated questions get their prose fields filled in by
+        # `render_template`, with answers computed deterministically
+        # in code. Failed renders (unsatisfiable constraints, bad
+        # formula) fall back to the LLM's raw question.
+        try:
+            is_math_lesson_l4 = lesson.unit.course.is_math
+        except Exception:
+            is_math_lesson_l4 = False
+        templated_count = 0
+        if is_math_lesson_l4:
+            from apps.curriculum.parametric_renderer import (
+                ParametricQuestionTemplate,
+                render_template,
+            )
+            for i, q in enumerate(questions):
+                tmpl_data = q.get('template')
+                if not tmpl_data:
+                    continue
+                try:
+                    tmpl = ParametricQuestionTemplate.model_validate(tmpl_data)
+                except Exception as e:
+                    logger.warning(
+                        f"[ExitTicket] [{lesson.title}] Q{i} template "
+                        f"failed validation: {e} — falling back to raw"
+                    )
+                    continue
+                rendered = render_template(tmpl, seed=lesson.id * 1000 + i)
+                if rendered is None:
+                    logger.warning(
+                        f"[ExitTicket] [{lesson.title}] Q{i} template "
+                        f"failed to render — falling back to raw"
+                    )
+                    continue
+                # Merge: rendered wins on the prose fields, but the
+                # LLM-supplied concept_tag / objectives / question_type
+                # (when not the renderer's default) survive.
+                preserve_keys = (
+                    'concept_tag', 'terminal_objective',
+                    'enabling_objective', 'difficulty', 'source',
+                )
+                preserved = {k: q[k] for k in preserve_keys if q.get(k)}
+                if q.get('question_type') and q['question_type'] != 'short_numeric':
+                    preserved['question_type'] = q['question_type']
+                q.clear()
+                q.update(rendered)
+                q.update(preserved)
+                templated_count += 1
+        if templated_count:
+            print(
+                f"[ContentGen] [{lesson.title}] Layer 4: "
+                f"{templated_count} parametric question(s) rendered",
+                flush=True,
+            )
+
         # Save to database
         from django.db import transaction
         with transaction.atomic():
@@ -1461,12 +1657,32 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 instructions=f"Answer 10 questions about {lesson.title}. You need 8 correct to pass.",
             )
 
-            # Drop questions the deterministic validator flags as broken
-            # (rationalization patterns in explanation, math mismatch on
-            # fill-in-blank, MCQ option vs computed value mismatch).
-            from apps.tutoring.question_validator import is_broken
+            # Drop questions the deterministic validator flags as broken:
+            #   - rationalization patterns in explanation
+            #   - sum-with-blank math mismatch (Pattern A)
+            #   - MCQ option vs computed value mismatch (Pattern A)
+            #   - LAYER 2 cross-check (Patterns B/C/D — pure sum, mult
+            #     chain, simple linear equation)
+            #
+            # Cross-check audit entries are recorded BEFORE drop so the
+            # teacher sees what got caught + Layer 3 retry can use the
+            # list to reconstruct the constraint prompt.
+            from apps.tutoring.question_validator import (
+                cross_check_question,
+                is_broken,
+            )
+            answer_key_mismatches: List[Dict] = []
             valid_questions = []
-            for q in questions:
+            for i, q in enumerate(questions):
+                # Layer 2 — capture cross-check audit before is_broken
+                # decides whether to drop. cross_check_question only
+                # fires when the stem matches a recognised pattern AND
+                # the stored answer disagrees with what the math
+                # produces — so a non-None entry is a real mismatch.
+                ck = cross_check_question(q, question_index=i)
+                if ck is not None:
+                    answer_key_mismatches.append(ck)
+
                 reason = is_broken(q)
                 if reason:
                     logger.warning(
@@ -1477,22 +1693,64 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                     valid_questions.append(q)
             print(
                 f"[ContentGen] [{lesson.title}] validator kept "
-                f"{len(valid_questions)}/{len(questions)} questions",
+                f"{len(valid_questions)}/{len(questions)} questions"
+                + (
+                    f" ({len(answer_key_mismatches)} answer-key mismatch"
+                    f"{'es' if len(answer_key_mismatches) != 1 else ''})"
+                    if answer_key_mismatches else ""
+                ),
                 flush=True,
             )
             questions = valid_questions
+
+            # Layer 1 — arithmetic verification on the surviving
+            # questions. Auto-correct prose fields (explanation),
+            # detect-only on stem + options + answer_key.
+            try:
+                is_math_lesson = lesson.unit.course.is_math
+            except Exception:
+                is_math_lesson = False
+            question_audit: List[Dict] = []
+            if is_math_lesson:
+                from apps.curriculum.content_verifier import (
+                    verify_exit_ticket_question,
+                )
+                for i, q in enumerate(questions):
+                    # Mirror the question_text → question key the
+                    # verifier expects (some upstream paths use one,
+                    # some use the other).
+                    if "question_text" not in q and "question" in q:
+                        q["question_text"] = q["question"]
+                    verify_exit_ticket_question(
+                        q, question_index=i, audit=question_audit,
+                    )
+                if question_audit:
+                    fixed = sum(
+                        1 for e in question_audit if e.get("auto_corrected")
+                    )
+                    detected = len(question_audit) - fixed
+                    print(
+                        f"[ContentGen] [{lesson.title}] Layer 1 "
+                        f"(exit ticket): {fixed} auto-corrected, "
+                        f"{detected} detect-only",
+                        flush=True,
+                    )
 
             for i, q in enumerate(questions):
                 q_type = q.get('question_type', 'mcq')
                 kwargs = {
                     'exit_ticket': exit_ticket,
                     'question_type': q_type,
-                    'question_text': q.get('question', ''),
+                    'question_text': q.get('question_text') or q.get('question', ''),
                     'explanation': q.get('explanation', ''),
                     'concept_tag': q.get('concept_tag', ''),
                     'difficulty': q.get('difficulty', 'medium'),
                     'order_index': i,
                 }
+                # Layer 4 — preserve template source for retake
+                # re-rendering + teacher visibility.
+                if q.get('template_data'):
+                    kwargs['template_data'] = q['template_data']
                 # Store objective linkage on all question types
                 objective_data = {}
                 if q.get('terminal_objective'):
@@ -1528,6 +1786,26 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                         ad.pop(legacy, None)
                     kwargs['answer_data'] = ad
                 ExitTicketQuestion.objects.create(**kwargs)
+
+        # Layers 1 + 2 — append exit-ticket audit to lesson.metadata.
+        # Mirrors the step-audit write in _save_steps_to_db. We
+        # extend (not replace) verification_audit so the step
+        # corrections persisted earlier survive.
+        if is_math_lesson and (question_audit or answer_key_mismatches):
+            from django.utils import timezone
+            existing = lesson.metadata or {}
+            audit_blob = existing.get('verification_audit') or {}
+            if question_audit:
+                audit_blob['exit_ticket_corrections'] = question_audit
+            if answer_key_mismatches:
+                audit_blob['answer_key_mismatches'] = answer_key_mismatches
+            audit_blob.setdefault('math_check_run', True)
+            audit_blob.setdefault(
+                'generated_at', timezone.now().isoformat(),
+            )
+            existing['verification_audit'] = audit_blob
+            lesson.metadata = existing
+            lesson.save(update_fields=['metadata'])
 
         return {'success': True, 'questions_created': len(questions)}
 

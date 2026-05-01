@@ -263,9 +263,11 @@ class MathTutoringIntegrationTest(TestCase):
         self.course.title = "Grade 8 Math"
         self.course.save(update_fields=["title"])
 
-    def test_no_signal_when_expected_answer_is_free_text(self):
-        """If expected_answer isn't numeric, layer 1 returns None → fall
-        through to normal LLM evaluator, no signal injected."""
+    def test_no_numeric_verdict_when_expected_answer_is_free_text(self):
+        """If expected_answer isn't numeric, layer 1 returns None — so no
+        CORRECT/INCORRECT verdict is injected. But on a bare numeric reply
+        the bare-answer-only block still fires (Rule 1 applies regardless
+        of whether there's a canonical answer to check against)."""
         # Repurpose the step with a free-text expected answer.
         self.step_mixed_number.expected_answer = "any answer showing understanding"
         self.step_mixed_number.save(update_fields=["expected_answer"])
@@ -275,9 +277,31 @@ class MathTutoringIntegrationTest(TestCase):
 
         call_kwargs = fake_llm.generate.call_args.kwargs
         sys_prompt = call_kwargs.get("system_prompt", "")
-        self.assertNotIn("<evaluation_signal>", sys_prompt)
+        # No deterministic numeric verdict (no expected to compare against).
+        self.assertNotIn("Verdict: CORRECT", sys_prompt)
+        self.assertNotIn("Verdict: INCORRECT", sys_prompt)
+        # But the bare-answer-only signal IS injected so the LLM doesn't
+        # praise a bare reply on its own judgement.
+        self.assertIn("Verdict: BARE", sys_prompt)
+        self.assertIn("<evaluation_signal>", sys_prompt)
 
         # Restore for other tests.
+        self.step_mixed_number.expected_answer = "5 1/4"
+        self.step_mixed_number.save(update_fields=["expected_answer"])
+
+    def test_no_signal_when_non_numeric_input_and_free_text_expected(self):
+        """Free-text expected_answer + free-text student input → no signal
+        block at all (the bare-answer detector requires a numeric reply)."""
+        self.step_mixed_number.expected_answer = "any answer showing understanding"
+        self.step_mixed_number.save(update_fields=["expected_answer"])
+
+        tutor, session, fake_llm = self._make_tutor("Thanks, let's continue.")
+        tutor.respond("I think we should multiply the fractions")
+
+        call_kwargs = fake_llm.generate.call_args.kwargs
+        sys_prompt = call_kwargs.get("system_prompt", "")
+        self.assertNotIn("<evaluation_signal>", sys_prompt)
+
         self.step_mixed_number.expected_answer = "5 1/4"
         self.step_mixed_number.save(update_fields=["expected_answer"])
 
@@ -354,3 +378,110 @@ class MathTutoringIntegrationTest(TestCase):
         md = tutor_turn.metadata or {}
         self.assertTrue(md.get("bare_answer_flagged"))
         self.assertGreaterEqual(md.get("bare_answer_count_for_step", 0), 3)
+
+    # ------------------------------------------------------------------
+    # Layer S — student working analyzer (S3 wiring tests)
+    # ------------------------------------------------------------------
+
+    def _set_numeric_step(self, expected: str):
+        """Reconfigure the practice step to take a pure-numeric expected
+        answer so Layer S has something concrete to compare against."""
+        self.step_mixed_number.question = "Three angles around a point are 95°, 70°, 110°. Find x."
+        self.step_mixed_number.expected_answer = expected
+        self.step_mixed_number.save(
+            update_fields=["question", "expected_answer"]
+        )
+
+    def test_layer_s_partial_correct_block_in_system_prompt(self):
+        """Student stopped partway through. The prompt must include a
+        PARTIAL_CORRECT analysis block telling the LLM not to finish."""
+        self._set_numeric_step("85")
+        try:
+            tutor, _session, fake_llm = self._make_tutor(
+                "Good, 95 + 70 + 110 = 275. What's the next step?"
+            )
+            tutor.respond("95 + 70 + 110 = 275")
+            sys_prompt = fake_llm.generate.call_args.kwargs.get("system_prompt", "")
+            self.assertIn("<student_working_analysis>", sys_prompt)
+            self.assertIn("PARTIAL_CORRECT", sys_prompt)
+            self.assertIn("DO NOT compute the remaining step", sys_prompt)
+            self.assertIn("DO NOT state the final answer", sys_prompt)
+        finally:
+            self.step_mixed_number.expected_answer = "5 1/4"
+            self.step_mixed_number.save(update_fields=["expected_answer"])
+
+    def test_layer_s_complete_correct_block_in_system_prompt(self):
+        """Student finished correctly. Block must require articulation,
+        not blind praise."""
+        self._set_numeric_step("85")
+        try:
+            tutor, _session, fake_llm = self._make_tutor(
+                "Yes — well done. Can you explain why?"
+            )
+            tutor.respond("95 + 70 + 110 = 275\n360 - 275 = 85")
+            sys_prompt = fake_llm.generate.call_args.kwargs.get("system_prompt", "")
+            self.assertIn("COMPLETE_CORRECT", sys_prompt)
+            self.assertIn("DO NOT just say", sys_prompt)
+            self.assertIn("articulate", sys_prompt)
+        finally:
+            self.step_mixed_number.expected_answer = "5 1/4"
+            self.step_mixed_number.save(update_fields=["expected_answer"])
+
+    def test_layer_s_partial_wrong_block_points_to_first_error(self):
+        """Wrong arithmetic in step 1 — the analysis block must
+        identify FIRST_ERROR: Step 1 and forbid stating the correct
+        value."""
+        self._set_numeric_step("85")
+        try:
+            tutor, _session, fake_llm = self._make_tutor(
+                "Let me check that addition."
+            )
+            tutor.respond("95 + 70 + 110 = 285")
+            sys_prompt = fake_llm.generate.call_args.kwargs.get("system_prompt", "")
+            self.assertIn("PARTIAL_WRONG", sys_prompt)
+            self.assertIn("FIRST ERROR: Step 1", sys_prompt)
+            self.assertIn("(correct: 275)", sys_prompt)
+            self.assertIn("Do NOT state the correct value yet", sys_prompt)
+        finally:
+            self.step_mixed_number.expected_answer = "5 1/4"
+            self.step_mixed_number.save(update_fields=["expected_answer"])
+
+    def test_layer_s_metadata_persisted_to_session_turn(self):
+        """Layer S state is on SessionTurn.metadata for the teacher
+        monitor — chip rendering depends on these fields."""
+        self._set_numeric_step("85")
+        try:
+            tutor, session, _fake_llm = self._make_tutor("Good, what's next?")
+            tutor.respond("95 + 70 + 110 = 275")
+            tutor_turn = (
+                SessionTurn.objects.filter(session=session, role="tutor")
+                .order_by("-created_at")
+                .first()
+            )
+            md = tutor_turn.metadata or {}
+            self.assertEqual(md.get("working_state"), "partial_correct")
+            self.assertEqual(md.get("working_steps_count"), 1)
+            self.assertIsNone(md.get("working_first_error_idx"))
+            self.assertEqual(md.get("working_final_claim"), 275.0)
+            self.assertEqual(md.get("working_expected"), 85.0)
+        finally:
+            self.step_mixed_number.expected_answer = "5 1/4"
+            self.step_mixed_number.save(update_fields=["expected_answer"])
+
+    def test_layer_s_skips_when_no_steps_extracted(self):
+        """Bare answer / pure prose → no Layer S block in system prompt
+        (the existing bare-answer signal handles those cases).
+
+        NB: the closing tag `</student_working_analysis>` is unique to
+        the actual block — `<student_working_analysis>` (without slash)
+        appears in Rule 1.5's text as a reference, so we check the
+        closing tag and a body-only phrase instead.
+        """
+        tutor, _session, fake_llm = self._make_tutor("Show me your working.")
+        tutor.respond("5 1/4")  # bare numeric answer
+        sys_prompt = fake_llm.generate.call_args.kwargs.get("system_prompt", "")
+        # Existing bare-answer signal still fires
+        self.assertIn("<evaluation_signal>", sys_prompt)
+        # Layer S block does NOT fire when no steps extracted
+        self.assertNotIn("</student_working_analysis>", sys_prompt)
+        self.assertNotIn("Steps extracted:", sys_prompt)

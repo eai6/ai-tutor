@@ -68,11 +68,22 @@ class TestEnablingObjectivesCoverage(BaseTutoringTestCase):
         self.assertIn("Step-level objective", objectives)
 
     def test_empty_objectives_graceful_fallback(self):
-        """Old lessons with no objectives should return empty list."""
+        """Old lessons with no enabling_objectives still produce a usable
+        list — the canonical helper falls back to lesson.objective then
+        lesson.title (see apps/curriculum/content_generator.py::
+        combined_objectives_for_lesson). The contract is "never empty",
+        not "empty when EOs are unset" — the matrix and summative
+        tagging both depend on this guarantee."""
         self.lesson.enabling_objectives = []
         self.lesson.save()
+        # Also clear step-level EOs so the only signal left is the
+        # lesson's own objective/title fallback.
+        LessonStep.objects.filter(lesson=self.lesson).update(enabling_objective='')
         tutor = self._make_tutor()
-        self.assertEqual(tutor.enabling_objectives, [])
+        # The objective fallback must surface — non-empty list, single entry.
+        self.assertGreaterEqual(len(tutor.enabling_objectives), 1)
+        objs = [o['objective'] for o in tutor.enabling_objectives]
+        self.assertIn(self.lesson.objective, objs)
 
     def test_objective_coverage_state_persistence(self):
         """Covered objectives should persist in engine_state."""
@@ -95,8 +106,15 @@ class TestEnablingObjectivesCoverage(BaseTutoringTestCase):
         self.assertIn("Define GNP", block)
 
     def test_enabling_objectives_block_empty_when_no_objectives(self):
+        """Block is empty only when every fallback (lesson EOs, lesson
+        objective, lesson title, every step's enabling_objective) is
+        also blank. With the canonical-helper contract there's no other
+        way to get an empty block."""
         self.lesson.enabling_objectives = []
+        self.lesson.objective = ''
+        self.lesson.title = ''
         self.lesson.save()
+        LessonStep.objects.filter(lesson=self.lesson).update(enabling_objective='')
         tutor = self._make_tutor()
         block = tutor._build_enabling_objectives_block()
         self.assertEqual(block, "")

@@ -15,7 +15,7 @@ preserved. Praise almost always lands in the opening.
 """
 
 import re
-from typing import Tuple
+from typing import Optional, Tuple
 
 
 # Praise patterns limited to "affirmation" uses. Avoid words like plain
@@ -33,10 +33,14 @@ _PRAISE_PATTERNS = [
     r"\bgreat job\b",
     r"\bnice job\b",
     r"\bgood job\b",
+    r"\bgreat work\b",
+    r"\bnice work\b",
+    r"\bgood work\b",
     r"\bwell done\b",
     r"\bnicely done\b",
     r"\byou(?:'?ve| have)?\s+got\s+it\b",
     r"\byou got it\b",
+    r"\byou(?:'?ve| have)?\s+nailed\s+it\b",
     r"\byou(?:'?re| are)\s+right\b",
     r"\bthat(?:'?s| is)\s+right\b",
     r"\bthat(?:'?s| is)\s+correct\b",
@@ -44,6 +48,12 @@ _PRAISE_PATTERNS = [
     r"\bspot on\b",
     r"\bbravo\b",
     r"\bwoo+hoo+\b",
+    # Affirmative checkmarks. Catch both the literal U+2713/U+2717 and
+    # common ASCII renderings like " ✓" / " ✗" the LLM uses to signal
+    # "this is correct" inline. Strip them too — they leak past the
+    # text-only patterns and otherwise mark wrong arithmetic as right.
+    r"✓",
+    r"✗",
     # Sentence-starters followed by exclamation/comma
     r"^\s*correct[!,.]",
     r"^\s*right[!,.]",
@@ -53,9 +63,60 @@ _PRAISE_PATTERNS = [
 
 _PRAISE_RE = re.compile("|".join(_PRAISE_PATTERNS), re.IGNORECASE | re.MULTILINE)
 
+# Default fallback: matches the original phrasing for the "answer is
+# wrong" case. Kept stable for tests and any caller that doesn't pass a
+# context.
 _NEUTRAL_OPENER = (
     "Let's check this one together — can you walk me through your steps?"
 )
+
+
+def _opener_for_context(
+    context: Optional[str],
+    student_input: Optional[str] = None,
+) -> str:
+    """Pick the right neutral opener for the situation.
+
+    The single hardcoded opener was producing the contradictory pattern
+    visible in production transcripts: praise filter strips "Perfect!",
+    swaps in "Let's check this together — can you walk me through your
+    steps?", and the rest of the response then says "✓ correct, now do
+    the next step". The student sees a tutor that asked for working
+    *after* it already affirmed the answer.
+
+    Three contexts:
+      - "wrong"          — student's answer is wrong. Keep the original
+                           opener — asking to walk through the steps is
+                           exactly what we want.
+      - "bare_correct"   — student gave a bare numeric answer that
+                           happens to match. Per math_teaching Rule 1
+                           we still must not praise; ask for working
+                           but echo the answer so the tutor doesn't
+                           sound like it ignored what they said.
+      - "bare_unknown"   — student gave a bare numeric answer with no
+                           expected-answer to check against. Ask for
+                           working without implying anything about
+                           correctness.
+    """
+    if context == "bare_correct":
+        echo = (student_input or "").strip()
+        if echo:
+            # Truncate to keep the opener tight — long pasted answers
+            # (e.g. "1/2 + 1/3 = 5/6") fit, full essays do not.
+            echo = echo if len(echo) <= 60 else echo[:60].rstrip() + "…"
+            return (
+                f"I see you wrote {echo}. Walk me through how you got "
+                "there before I check it with you."
+            )
+        return (
+            "Show me your working step by step before I check the answer."
+        )
+    if context == "bare_unknown":
+        return (
+            "Before I check that — show me your working, step by step."
+        )
+    # Default / "wrong"
+    return _NEUTRAL_OPENER
 
 
 def _split_first_sentence(text: str) -> Tuple[str, str]:
@@ -78,11 +139,26 @@ def _split_first_sentence(text: str) -> Tuple[str, str]:
 def strip_praise_if_wrong(
     response_text: str,
     is_correct: bool,
+    context: Optional[str] = None,
+    student_input: Optional[str] = None,
 ) -> Tuple[str, bool]:
     """Return (possibly-rewritten text, was_modified).
 
     Only acts when is_correct is explicitly False. When is_correct is True
     or None (unknown), returns the input unchanged.
+
+    Args:
+      response_text: the LLM response (post media-signal parsing).
+      is_correct: kept for backward compatibility — when False, the
+        filter runs. Callers that want to strip on bare-answer-correct
+        should pass `is_correct=False, context="bare_correct"` so the
+        opener fits the situation.
+      context: one of "wrong" (default), "bare_correct", "bare_unknown".
+        Picks the neutral opener used when heavy praise must be replaced.
+        See `_opener_for_context` for the rationale.
+      student_input: the student's literal reply. Used only when
+        context="bare_correct" so the opener can echo back what they
+        wrote ("I see you wrote 275. Walk me through...").
 
     Strategy:
       1. Strip praise patterns across the ENTIRE response text. Praise is
@@ -90,8 +166,8 @@ def strip_praise_if_wrong(
          sometimes sprinkles it across multiple sentences ("Brilliant!
          You've got it — ...").
       2. If the first sentence was heavy in praise (> 2 hits) or nearly
-         entirely praise, replace it with a neutral opener so the output
-         doesn't read as a mangled fragment.
+         entirely praise, replace it with a context-appropriate opener so
+         the output doesn't read as a mangled fragment.
       3. Tidy whitespace and punctuation artifacts from the stripping.
     """
     if is_correct is True or is_correct is None:
@@ -111,10 +187,12 @@ def strip_praise_if_wrong(
     )
 
     if heavy_praise:
-        # Replace the mangled opening with a neutral opener and strip any
-        # stray praise from the rest (preserves original rest content).
+        # Replace the mangled opening with a context-appropriate opener
+        # and strip any stray praise from the rest (preserves original
+        # rest content).
         rest_stripped = _tidy(_PRAISE_RE.sub("", rest_orig)) if rest_orig else ""
-        cleaned = _NEUTRAL_OPENER + (" " + rest_stripped if rest_stripped else "")
+        opener = _opener_for_context(context, student_input)
+        cleaned = opener + (" " + rest_stripped if rest_stripped else "")
     else:
         # Light strip across the entire text.
         cleaned = _tidy(_PRAISE_RE.sub("", response_text))

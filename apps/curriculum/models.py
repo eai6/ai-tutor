@@ -152,6 +152,10 @@ class Lesson(models.Model):
         EMPTY = 'empty', 'Empty'
         GENERATING = 'generating', 'Generating'
         READY = 'ready', 'Ready'
+        # Layer 3 — content generated but with unresolved arithmetic
+        # warnings. Lesson is still usable; teacher should review the
+        # 🧮 Arithmetic Verification panel on the lesson detail page.
+        READY_WITH_WARNINGS = 'ready_with_warnings', 'Ready with warnings'
         FAILED = 'failed', 'Failed'
 
     class ContentQuality(models.TextChoices):

@@ -63,6 +63,31 @@ NO FIGURES — questions are TEXT-ONLY. Do NOT emit `figure_spec`,
 <svg>. The teacher can attach a generated image (gpt-image-2)
 to any question after the fact via the question editor.
 
+PARAMETRIC TEMPLATES (preferred for arithmetic-heavy questions) —
+Instead of writing literal numbers in your question and computing
+the answer yourself, you MAY emit a `template` object. The
+backend samples concrete parameter values and computes the answer
+in code — arithmetic errors become impossible. Use this for
+question patterns where the same form with different numbers
+would be a valid alternate question.
+
+PARAMETRIC FORMAT example (replaces SHORT_ANSWER for arithmetic):
+{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "easy", "template": {{"template_text": "Three angles around a point are {{a}}°, {{b}}°, and x°. Find x.", "parameters": {{"a": {{"type": "int", "min": 30, "max": 150, "step": 5}}, "b": {{"type": "int", "min": 30, "max": 150, "step": 5}}}}, "answer_formula": "360 - a - b", "answer_unit": "°", "explanation_template": "Angles around a point sum to 360°. x = 360 - {{a}} - {{b}} = {{answer}}.", "constraints": ["a + b < 350"]}}}}
+
+Template rules:
+- Parameter names in {{braces}} must match exactly between
+  template_text, answer_formula, and explanation_template.
+- answer_formula uses ONLY + - * / ** ( ) and the parameter
+  names. No function calls, no external variables.
+- The slot {{answer}} in explanation_template gets the computed
+  answer.
+- constraints are simple boolean comparisons over parameters
+  (e.g. "a + b < 350"); the renderer re-samples until they
+  hold.
+- DO NOT use templates for word problems whose phrasing depends
+  on the actual numbers, or for questions requiring qualitative
+  reasoning. Use them for clean arithmetic patterns.
+
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (straightforward calculations, single step)
 - Questions 13-25: medium (multi-step, word problems with Seychelles context)

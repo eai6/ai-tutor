@@ -113,6 +113,10 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
         mock_result.practice_score = ""
         mock_result.milestone = None
         mock_result.artifact_html = None
+        # The view reads `probe` via getattr default-None; on a bare
+        # MagicMock that returns a MagicMock (auto-spec) which JSON
+        # can't serialize. Pin every JSON-encoded field explicitly.
+        mock_result.probe = None
         mock_respond.return_value = mock_result
 
         session = self._create_session()

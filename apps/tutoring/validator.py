@@ -109,6 +109,7 @@ def validate_tutor_response(
     lesson=None,
     llm_client=None,
     fact_check: bool = True,
+    student_input: Optional[str] = None,
 ) -> ValidationResult:
     """Run V1+V2 validator layers over a tutor response.
 
@@ -153,7 +154,18 @@ def validate_tutor_response(
         should_strip = True
 
     if should_strip and _PRAISE_RE.search(content):
-        new_content, stripped = strip_praise_if_wrong(content, is_correct=False)
+        # By the time the validator runs, the engine's deterministic
+        # math-check pass has already stripped praise on bare-correct
+        # turns. Anything reaching this layer with `is_correct=False`
+        # is genuinely wrong; bare answers without any canonical
+        # correctness signal use the "bare_unknown" opener.
+        praise_context = "wrong" if is_correct is False else "bare_unknown"
+        new_content, stripped = strip_praise_if_wrong(
+            content,
+            is_correct=False,
+            context=praise_context,
+            student_input=student_input,
+        )
         if stripped:
             content = new_content
             issues.append(ISSUE_UNFOUNDED_PRAISE_STRIPPED)

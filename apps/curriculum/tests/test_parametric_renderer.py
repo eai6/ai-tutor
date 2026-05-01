@@ -1,0 +1,247 @@
+"""Tests for Layer 4 — parametric question template renderer.
+
+Coverage:
+  - ParameterSpec validation (max >= min, step grids)
+  - Sampling with and without constraints
+  - Constraint resampling + give-up
+  - Answer-formula evaluation with substitution
+  - Full render_template round trip
+  - Bad templates handled gracefully (None return)
+"""
+
+from __future__ import annotations
+
+import unittest
+
+from apps.curriculum.parametric_renderer import (
+    ParameterSpec,
+    ParametricQuestionTemplate,
+    _check_constraint,
+    _compute_answer,
+    _sample_parameters,
+    render_template,
+)
+
+
+# Reusable: the canonical "sum to 360°" template.
+SUM_TO_360_TEMPLATE = ParametricQuestionTemplate(
+    template_text=(
+        "Three angles around a point are {a}°, {b}°, and x°. Find x."
+    ),
+    parameters={
+        "a": ParameterSpec(type="int", min=30, max=150, step=5),
+        "b": ParameterSpec(type="int", min=30, max=150, step=5),
+    },
+    answer_formula="360 - a - b",
+    answer_unit="°",
+    explanation_template=(
+        "Angles around a point sum to 360°. So x = 360 - {a} - {b} "
+        "= {answer}."
+    ),
+    constraints=["a + b < 350"],
+)
+
+
+# ============================================================================
+# ParameterSpec validation
+# ============================================================================
+
+
+class TestParameterSpec(unittest.TestCase):
+    def test_max_below_min_raises(self):
+        with self.assertRaises(Exception):  # pydantic ValidationError
+            ParameterSpec(type="int", min=10, max=5)
+
+    def test_int_no_step(self):
+        spec = ParameterSpec(type="int", min=1, max=10)
+        self.assertEqual(spec.type, "int")
+        self.assertIsNone(spec.step)
+
+    def test_int_with_step(self):
+        spec = ParameterSpec(type="int", min=30, max=150, step=5)
+        self.assertEqual(spec.step, 5)
+
+
+# ============================================================================
+# Sampling
+# ============================================================================
+
+
+class TestSampling(unittest.TestCase):
+    def test_int_step_sampling_lands_on_grid(self):
+        spec = ParameterSpec(type="int", min=30, max=150, step=5)
+        # Sample many; every value should be on the grid.
+        import random
+        rng = random.Random(42)
+        from apps.curriculum.parametric_renderer import _sample_one
+        for _ in range(50):
+            v = _sample_one(spec, rng)
+            self.assertGreaterEqual(v, 30)
+            self.assertLessEqual(v, 150)
+            # On grid: (v - 30) divisible by 5
+            self.assertEqual((v - 30) % 5, 0)
+
+    def test_constraint_holds(self):
+        params = _sample_parameters(SUM_TO_360_TEMPLATE, __import__("random").Random(0))
+        self.assertIsNotNone(params)
+        self.assertLess(params["a"] + params["b"], 350)
+
+    def test_constraint_unsatisfiable_returns_none(self):
+        # Force a contradiction: parameters can never satisfy.
+        impossible = ParametricQuestionTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            answer_formula="a",
+            explanation_template="x = {answer}",
+            constraints=["a > 100"],  # impossible given range 1-10
+        )
+        result = _sample_parameters(impossible, __import__("random").Random(0))
+        self.assertIsNone(result)
+
+
+# ============================================================================
+# Constraint evaluation
+# ============================================================================
+
+
+class TestCheckConstraint(unittest.TestCase):
+    def test_simple_lt(self):
+        self.assertTrue(_check_constraint("a + b < 350", {"a": 100, "b": 200}))
+        self.assertFalse(_check_constraint("a + b < 100", {"a": 100, "b": 200}))
+
+    def test_le(self):
+        self.assertTrue(_check_constraint("a <= 5", {"a": 5}))
+
+    def test_eq(self):
+        self.assertTrue(_check_constraint("a == 5", {"a": 5}))
+        self.assertFalse(_check_constraint("a == 5", {"a": 6}))
+
+    def test_no_comparator_fails_closed(self):
+        # Malformed constraint — treat as not satisfied.
+        self.assertFalse(_check_constraint("a + b", {"a": 1, "b": 2}))
+
+
+# ============================================================================
+# Answer computation
+# ============================================================================
+
+
+class TestComputeAnswer(unittest.TestCase):
+    def test_sum_subtract(self):
+        result = _compute_answer("360 - a - b", {"a": 95, "b": 70})
+        self.assertEqual(result, 195.0)
+
+    def test_multiplication(self):
+        result = _compute_answer("a * b", {"a": 8, "b": 7})
+        self.assertEqual(result, 56.0)
+
+    def test_division(self):
+        result = _compute_answer("a / b", {"a": 100, "b": 4})
+        self.assertEqual(result, 25.0)
+
+    def test_parens_precedence(self):
+        result = _compute_answer("(a + b) * 2", {"a": 5, "b": 10})
+        self.assertEqual(result, 30.0)
+
+    def test_undefined_var_returns_none(self):
+        result = _compute_answer("a + missing", {"a": 1})
+        self.assertIsNone(result)
+
+
+# ============================================================================
+# Full render
+# ============================================================================
+
+
+class TestRenderTemplate(unittest.TestCase):
+    def test_sum_to_360_renders_correctly(self):
+        # Fixed seed → reproducible parameters.
+        result = render_template(SUM_TO_360_TEMPLATE, seed=1)
+        self.assertIsNotNone(result)
+
+        a = result["answer_data"]["parameters"]["a"]
+        b = result["answer_data"]["parameters"]["b"]
+
+        # Question stem has params filled in.
+        self.assertIn(f"{a}°", result["question_text"])
+        self.assertIn(f"{b}°", result["question_text"])
+
+        # Answer is computed correctly: 360 - a - b.
+        expected = 360 - a - b
+        self.assertEqual(result["answer_data"]["computed"], float(expected))
+        self.assertEqual(result["correct_answer"], f"{expected}°")
+
+        # Explanation includes the answer (with unit suffix).
+        self.assertIn(f"= {expected}°.", result["explanation"])
+
+        # template_data is preserved for retake re-rendering.
+        self.assertEqual(
+            result["template_data"]["template_text"],
+            SUM_TO_360_TEMPLATE.template_text,
+        )
+
+    def test_seeds_produce_reproducible_output(self):
+        r1 = render_template(SUM_TO_360_TEMPLATE, seed=42)
+        r2 = render_template(SUM_TO_360_TEMPLATE, seed=42)
+        self.assertEqual(r1["correct_answer"], r2["correct_answer"])
+        self.assertEqual(r1["question_text"], r2["question_text"])
+
+    def test_different_seeds_produce_different_output(self):
+        # Statistically — with a step=5 grid this should hold.
+        r1 = render_template(SUM_TO_360_TEMPLATE, seed=1)
+        r2 = render_template(SUM_TO_360_TEMPLATE, seed=2)
+        # Either the question or the answer should differ.
+        self.assertTrue(
+            r1["question_text"] != r2["question_text"]
+            or r1["correct_answer"] != r2["correct_answer"]
+        )
+
+    def test_unsatisfiable_template_returns_none(self):
+        template = ParametricQuestionTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            answer_formula="a",
+            explanation_template="x = {answer}",
+            constraints=["a > 100"],
+        )
+        self.assertIsNone(render_template(template, seed=0))
+
+    def test_template_with_unknown_slot_returns_none(self):
+        template = ParametricQuestionTemplate(
+            template_text="x = {a} + {missing}",  # 'missing' not in parameters
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            answer_formula="a",
+            explanation_template="x = {answer}",
+        )
+        self.assertIsNone(render_template(template, seed=0))
+
+    def test_no_unit_omits_suffix(self):
+        template = ParametricQuestionTemplate(
+            template_text="What is {a} + {b}?",
+            parameters={
+                "a": ParameterSpec(type="int", min=1, max=10),
+                "b": ParameterSpec(type="int", min=1, max=10),
+            },
+            answer_formula="a + b",
+            explanation_template="The sum is {answer}.",
+        )
+        result = render_template(template, seed=5)
+        self.assertIsNotNone(result)
+        # No unit on the answer string.
+        self.assertNotIn("°", result["correct_answer"])
+        # Just the integer.
+        self.assertTrue(result["correct_answer"].isdigit())
+
+    def test_answer_data_includes_parameters(self):
+        result = render_template(SUM_TO_360_TEMPLATE, seed=99)
+        self.assertIn("parameters", result["answer_data"])
+        self.assertIn("a", result["answer_data"]["parameters"])
+        self.assertIn("b", result["answer_data"]["parameters"])
+
+    def test_question_type_default_is_short_numeric(self):
+        result = render_template(SUM_TO_360_TEMPLATE, seed=7)
+        self.assertEqual(result["question_type"], "short_numeric")
+
+
+if __name__ == "__main__":
+    unittest.main()

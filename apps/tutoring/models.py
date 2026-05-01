@@ -538,6 +538,21 @@ class ExitTicketQuestion(models.Model):
         help_text="Optional image for the question"
     )
 
+    # Layer 4 — parametric template source (when non-null, this row
+    # was rendered from a ParametricQuestionTemplate at content-gen
+    # time). Kept for retake re-rendering and teacher-review
+    # visibility. See apps/curriculum/parametric_renderer.py.
+    template_data = models.JSONField(
+        null=True, blank=True,
+        help_text=(
+            "If set, this question was generated from a parametric "
+            "template. The dict has the shape of "
+            "ParametricQuestionTemplate (template_text, parameters, "
+            "answer_formula, etc.) and is used to re-render "
+            "alternative versions on retake."
+        ),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

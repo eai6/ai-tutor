@@ -1891,9 +1891,8 @@ def lesson_session_report(request, lesson_id):
     - Clear recommendation: move to next lesson or revisit with focus areas
     """
     from apps.curriculum.models import Lesson
-    from apps.tutoring.skills_models import Skill, StudentSkillMastery
     from apps.tutoring.models import TutorSession, ExitTicketAttempt
-    from django.db.models import Avg, Q
+    from django.db.models import Q
     from django.contrib.auth.models import User
 
     from apps.accounts.models import PlatformConfig
@@ -1920,34 +1919,37 @@ def lesson_session_report(request, lesson_id):
     completed_sessions = sessions.filter(status='completed').values_list('student_id', flat=True).distinct()
     completed_count = len(set(completed_sessions))
 
-    # ── Enabling Objectives: read directly from lesson steps (curriculum-aligned) ──
-    # The enabling objectives ARE the competencies — no separate skill model needed
-    from apps.curriculum.models import LessonStep
-    teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
-    if not teaching_steps:
-        # Collect from step enabling_objective fields
-        seen = set()
-        for step in LessonStep.objects.filter(lesson=lesson).order_by('order_index'):
-            eo = step.enabling_objective or ''
-            if eo and eo not in seen:
-                seen.add(eo)
-                teaching_steps.append(eo)
-    # Fallback to the canonical helper (TOs + EOs + lesson.objective + title) —
-    # same source of truth used by summative tagging and the competency matrix.
-    if not teaching_steps:
-        from apps.curriculum.content_generator import combined_objectives_for_lesson
-        teaching_steps = combined_objectives_for_lesson(lesson)
-
+    # ── Enabling Objectives: canonical source of truth ──
+    # Use `combined_objectives_for_lesson` — the same helper used by
+    # summative tagging and the cross-lesson competency matrix. Reading
+    # from `lesson.metadata.teaching_steps` or `LessonStep.enabling_objective`
+    # produces strings that don't always textually match the per-question
+    # `concept_tag` stored on attempts (granular sub-skills, rephrased
+    # during content gen, whitespace/case drift) — which silently zeroed
+    # every objective even when students passed the exit ticket.
+    from apps.curriculum.content_generator import combined_objectives_for_lesson
+    teaching_steps = combined_objectives_for_lesson(lesson)
     total_objectives = len(teaching_steps)
 
+    def _norm_tag(s: str) -> str:
+        return ' '.join((s or '').split()).strip().lower()
+
+    primary_obj_norm = _norm_tag(teaching_steps[0]) if teaching_steps else ''
+
     # ── Per-objective competency (C4: exit-ticket only, single source of truth) ──
-    # For each EO, count students whose BEST exit ticket attempt answered
-    # at least one question tagged with this EO's concept_tag correctly.
-    # Legacy fallbacks to engine_state.covered_enabling_objectives and
-    # StudentSkillMastery have been removed per memory/lesson_competency_plan.md.
+    # Match concept_tag → eo_text using normalized comparison. For the
+    # lesson's PRIMARY canonical objective, also apply the lesson-level
+    # rollup that competency_tracker._lesson_objective uses: every correct
+    # answer in a per-lesson exit ticket attempt counts toward the
+    # lesson's primary objective, regardless of the per-question tag
+    # (which is intentionally fine-grained for tutor scaffolding but
+    # never the cross-attempt aggregation key — see
+    # apps/tutoring/competency_tracker.py:103-110).
     from apps.tutoring.competency import best_attempt
     objectives_data = []
     for eo_text in teaching_steps:
+        eo_norm = _norm_tag(eo_text)
+        is_primary = bool(eo_norm) and eo_norm == primary_obj_norm
         achieved = 0
         for sid in student_ids:
             student = User.objects.filter(id=sid).first()
@@ -1959,7 +1961,10 @@ def lesson_session_report(request, lesson_id):
             for ans in (attempt.answers if isinstance(attempt.answers, list) else []):
                 if not isinstance(ans, dict):
                     continue
-                if ans.get('concept_tag', '') == eo_text and ans.get('correct'):
+                if not ans.get('correct'):
+                    continue
+                ans_tag_norm = _norm_tag(ans.get('concept_tag', ''))
+                if ans_tag_norm == eo_norm or is_primary:
                     achieved += 1
                     break
         not_achieved = total_students - achieved
@@ -1982,41 +1987,34 @@ def lesson_session_report(request, lesson_id):
         if not student:
             continue
 
-        # Count how many EOs this student achieved
-        achieved_count = sum(1 for o in objectives_data if any(
-            True for s2 in [sid] if o['achieved'] > 0
-            # This is per-objective, need per-student check
-        ))
-        # Recalculate per student properly
+        # Per-student EO achievement — mirrors the per-objective block
+        # above: normalized concept_tag matching + primary-objective
+        # rollup (every correct answer counts toward the lesson's
+        # primary canonical objective). Single source of truth = the
+        # exit ticket attempt; legacy fallbacks (covered_enabling_objectives
+        # in engine_state, StudentSkillMastery) were removed per
+        # memory/lesson_competency_plan.md.
         achieved_count = 0
         weak_objectives = []
+        student_attempt = best_attempt(student, lesson)
+        student_rows = (
+            student_attempt.answers
+            if student_attempt and isinstance(student_attempt.answers, list)
+            else []
+        )
         for eo_text in teaching_steps:
+            eo_norm = _norm_tag(eo_text)
+            is_primary = bool(eo_norm) and eo_norm == primary_obj_norm
             eo_achieved = False
-            # Same logic as above for this specific student
-            attempt = ExitTicketAttempt.objects.filter(
-                exit_ticket__lesson=lesson, student_id=sid
-            ).order_by('-completed_at').first()
-            if attempt and attempt.answers:
-                for ans in (attempt.answers if isinstance(attempt.answers, list) else []):
-                    if isinstance(ans, dict) and ans.get('concept_tag', '') == eo_text and ans.get('correct'):
-                        eo_achieved = True
-                        break
-            if not eo_achieved:
-                student_session = sessions.filter(student_id=sid, status='completed').first()
-                if student_session:
-                    state = student_session.engine_state or {}
-                    covered_eos = state.get('covered_enabling_objectives', [])
-                    if eo_text in covered_eos:
-                        eo_achieved = True
-            if not eo_achieved:
-                mastery = StudentSkillMastery.objects.filter(
-                    skill__enabling_objective_text__icontains=eo_text[:50],
-                    skill__is_enabling_objective=True,
-                    student_id=sid,
-                    mastery_level__gte=mastery_threshold,
-                ).first()
-                if mastery:
+            for ans in student_rows:
+                if not isinstance(ans, dict):
+                    continue
+                if not ans.get('correct'):
+                    continue
+                ans_tag_norm = _norm_tag(ans.get('concept_tag', ''))
+                if ans_tag_norm == eo_norm or is_primary:
                     eo_achieved = True
+                    break
 
             if eo_achieved:
                 achieved_count += 1

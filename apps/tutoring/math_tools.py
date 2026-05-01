@@ -92,12 +92,70 @@ def verify_calculations(text: str) -> tuple[str, list[dict]]:
 
     text = re.sub(double_eq_pattern, replace_double_eq, text)
 
+    # 1.5: pure additive N-term sums with N >= 4. Catches the worked-
+    # example "Step 5: Check" lines like
+    #   "60 + 80 + 75 + 70 + 75 = 220 ✓"
+    # which the 3-term chain pattern below misses (it only allows two
+    # operators). Restricted to + and − so we don't have to model
+    # operator precedence — those are left-associative.
+    nterm_pattern = re.compile(
+        r'(\d+(?:\.\d+)?)'
+        r'((?:\s*[+\-−]\s*\d+(?:\.\d+)?){3,})'
+        r'\s*=\s*(\d+(?:\.\d+)?)'
+    )
+
+    def replace_nterm(match):
+        first_str, rest_str, claimed_str = match.groups()
+        # Tokenise the trailing "(op num)+" sequence.
+        tokens = re.findall(r'([+\-−])\s*(\d+(?:\.\d+)?)', rest_str)
+        try:
+            total = float(first_str)
+            for op, n in tokens:
+                v = float(n)
+                if op == '+':
+                    total += v
+                else:  # '-' or '−'
+                    total -= v
+            claimed = float(claimed_str)
+        except ValueError:
+            return match.group(0)
+        if abs(total - claimed) < 0.01:
+            return match.group(0)
+        correct_str = f"{total:g}"
+        corrections.append({
+            'expression': f"{first_str}{rest_str}",
+            'claimed': claimed_str,
+            'correct': correct_str,
+        })
+        logger.warning(
+            "[MathCheck] Fixed N-term sum: %s%s = %s → %s",
+            first_str, rest_str, claimed_str, correct_str,
+        )
+        return f"{first_str}{rest_str} = {correct_str}"
+
+    text = nterm_pattern.sub(replace_nterm, text)
+
+    # Track N-term spans in the corrected text so the chain and
+    # simple-binary passes don't re-match a subsequence of an already-
+    # handled long sum. Without this guard, a fixed `60 + 80 + 75 + 70
+    # + 75 = 360` becomes a target for the simple-binary pass to
+    # mis-flag `70 + 75 = 360` as wrong arithmetic.
+    nterm_spans = [m.span() for m in nterm_pattern.finditer(text)]
+
+    def _inside(start: int, end: int, spans) -> bool:
+        for s, e in spans:
+            if start >= s and end <= e:
+                return True
+        return False
+
     # SECOND: handle chained expressions: a op b op c = result
     # e.g., "8 × 2.5 + 15 = 35" or "20 - 3 + 5 = 22"
     # Must run BEFORE simple pattern to avoid partial matches
     chain_pattern = r'(\d+(?:\.\d+)?)\s*([×x*÷/+\-−])\s*(\d+(?:\.\d+)?)\s*([+\-−])\s*(\d+(?:\.\d+)?)\s*=\s*(\d+(?:\.\d+)?)'
 
     def replace_chain(match):
+        if _inside(match.start(), match.end(), nterm_spans):
+            return match.group(0)
         a_str, op1, b_str, op2, c_str, claimed_str = match.groups()
 
         # Calculate step by step following BIDMAS
@@ -137,6 +195,10 @@ def verify_calculations(text: str) -> tuple[str, list[dict]]:
 
     corrected = re.sub(chain_pattern, replace_chain, text)
 
+    # Recompute spans in the corrected text — substitution shifts
+    # offsets, and downstream passes need accurate ranges to skip.
+    nterm_spans_corrected = [m.span() for m in nterm_pattern.finditer(corrected)]
+
     # Pattern: number op number = result (with Unicode math operators)
     # Matches: 8 × 2.5 = 20, 3 + 4 = 7, 45 ÷ 5 = 9, 20 - 3 = 17
     # Skip matches that overlap with already-handled chain expressions.
@@ -150,7 +212,9 @@ def verify_calculations(text: str) -> tuple[str, list[dict]]:
         chain_pattern_corrected_spans.append((m.start(), m.end()))
 
     def replace_match(match):
-        # Skip if this match is a sub-expression of a chain match
+        # Skip if this match is a sub-expression of a chain or N-term match
+        if _inside(match.start(), match.end(), nterm_spans_corrected):
+            return match.group(0)
         for cs, ce in chain_pattern_corrected_spans:
             if match.start() >= cs and match.end() <= ce:
                 return match.group(0)

@@ -1477,23 +1477,56 @@ Keep it to 2-3 sentences."""
         self._pending_math_check = self._deterministic_math_check(student_input)
         # Bare-answer detection (M9 / Layer 4). Tracked even when the
         # deterministic check didn't produce a verdict so metadata is
-        # consistent for teacher review.
+        # consistent for teacher review. Bare-answer detection runs
+        # whether or not the deterministic check produced a result —
+        # interim arithmetic the tutor invents on the fly ("what's
+        # 95 + 70 + 110?") has no expected_answer, so the math-check
+        # path returns None, but Rule 1 still applies: a bare numeric
+        # reply on a math practice/quiz step must be met with a
+        # request for working, not affirmation.
         self._pending_bare_answer = False
+        try:
+            is_math_step = self.lesson.unit.course.is_math
+        except Exception:
+            is_math_step = False
+        step_type = ''
+        if self.current_topic_index < len(self.steps):
+            step_type = self.steps[self.current_topic_index].step_type or ''
+        if is_math_step and step_type in ('practice', 'quiz'):
+            self._pending_bare_answer = self._is_bare_math_answer(student_input)
+            if self._pending_bare_answer:
+                self.bare_answer_counts_by_step[self.current_topic_index] = (
+                    self.bare_answer_counts_by_step.get(self.current_topic_index, 0) + 1
+                )
+        self._pending_math_student_input = student_input
+
+        # Layer S — student working analyzer. Runs alongside the
+        # existing bare-answer + math-check pipeline. Produces a
+        # rich state signal (NO_WORKING / PARTIAL_CORRECT / etc.)
+        # plus a `<student_working_analysis>` block that gets
+        # injected into the system prompt below.
+        self._pending_working_analysis = None
+        if is_math_step and step_type in ('practice', 'quiz', 'worked_example'):
+            from apps.tutoring.student_working_analyzer import analyze_working
+            current_step = (
+                self.steps[self.current_topic_index]
+                if self.current_topic_index < len(self.steps)
+                else None
+            )
+            expected = current_step.expected_answer if current_step else None
+            self._pending_working_analysis = analyze_working(
+                student_input, expected_answer=expected,
+            )
+            logger.info(
+                "[LayerS] session=%s step=%s state=%s steps=%d first_error=%s",
+                self.session.id,
+                self.current_topic_index,
+                self._pending_working_analysis.state.value,
+                len(self._pending_working_analysis.steps),
+                self._pending_working_analysis.first_error_idx,
+            )
+
         if self._pending_math_check is not None:
-            try:
-                is_math_step = self.lesson.unit.course.is_math
-            except Exception:
-                is_math_step = False
-            step_type = ''
-            if self.current_topic_index < len(self.steps):
-                step_type = self.steps[self.current_topic_index].step_type or ''
-            if is_math_step and step_type in ('practice', 'quiz'):
-                self._pending_bare_answer = self._is_bare_math_answer(student_input)
-                if self._pending_bare_answer:
-                    self.bare_answer_counts_by_step[self.current_topic_index] = (
-                        self.bare_answer_counts_by_step.get(self.current_topic_index, 0) + 1
-                    )
-            self._pending_math_student_input = student_input
             logger.info(
                 "[MathCheck] session=%s step=%s is_correct=%s bare=%s student=%s expected=%s",
                 self.session.id,
@@ -1503,8 +1536,13 @@ Keep it to 2-3 sentences."""
                 self._pending_math_check.student_parsed,
                 self._pending_math_check.expected_parsed,
             )
-        else:
-            self._pending_math_student_input = None
+        elif self._pending_bare_answer:
+            logger.info(
+                "[MathCheck] session=%s step=%s no-expected-answer; bare=True student=%r",
+                self.session.id,
+                self.current_topic_index,
+                (student_input or '')[:40],
+            )
 
         # Generate response — LLM picks media via |||MEDIA:N||| tail-line signal
         response = self._generate_contextual_response(
@@ -1548,13 +1586,28 @@ Keep it to 2-3 sentences."""
             or turn_bare_answer
         )
         if should_strip:
+            # Pick the right opener for the situation. The previous
+            # single-opener behaviour produced "Let's check this together"
+            # even on a bare-but-correct answer, then the rest of the
+            # response said "✓ correct" — a contradiction. Bare-correct
+            # gets an echo-back opener; deterministic-wrong keeps the
+            # original "walk me through" opener.
+            if turn_bare_answer and turn_math_check is not None and turn_math_check.is_correct:
+                praise_context = "bare_correct"
+            elif turn_bare_answer:
+                praise_context = "bare_unknown"
+            else:
+                praise_context = "wrong"
             clean_response, praise_stripped = strip_praise_if_wrong(
-                clean_response, is_correct=False,
+                clean_response,
+                is_correct=False,
+                context=praise_context,
+                student_input=student_input,
             )
             if praise_stripped:
                 logger.info(
-                    "[MathCheck] Praise filter triggered session=%s step=%s bare=%s",
-                    self.session.id, self.current_topic_index, turn_bare_answer,
+                    "[MathCheck] Praise filter triggered session=%s step=%s bare=%s context=%s",
+                    self.session.id, self.current_topic_index, turn_bare_answer, praise_context,
                 )
 
         media = [parsed_media] if parsed_media else []
@@ -1604,6 +1657,7 @@ Keep it to 2-3 sentences."""
             step_type=(current_step.step_type if current_step else None),
             lesson=self.lesson,
             llm_client=self.llm_client,
+            student_input=student_input,
         )
         if validation.content != clean_response:
             clean_response = validation.content
@@ -1651,6 +1705,7 @@ Keep it to 2-3 sentences."""
                 lesson=self.lesson,
                 llm_client=self.llm_client,
                 fact_check=False,  # avoid second fact-check (latency cap)
+                student_input=student_input,
             )
             clean_response = revalidation.content
             turn_metadata['regenerated'] = True
@@ -1740,22 +1795,35 @@ Keep it to 2-3 sentences."""
         # Deterministic math check BEFORE response generation (mirrors
         # respond()). Keeps streaming path consistent if it is re-enabled.
         self._pending_math_check = self._deterministic_math_check(student_input)
-        self._pending_math_student_input = student_input if self._pending_math_check else None
+        self._pending_math_student_input = student_input
         self._pending_bare_answer = False
-        if self._pending_math_check is not None:
-            try:
-                is_math_step = self.lesson.unit.course.is_math
-            except Exception:
-                is_math_step = False
-            step_type = ''
-            if self.current_topic_index < len(self.steps):
-                step_type = self.steps[self.current_topic_index].step_type or ''
-            if is_math_step and step_type in ('practice', 'quiz'):
-                self._pending_bare_answer = self._is_bare_math_answer(student_input)
-                if self._pending_bare_answer:
-                    self.bare_answer_counts_by_step[self.current_topic_index] = (
-                        self.bare_answer_counts_by_step.get(self.current_topic_index, 0) + 1
-                    )
+        try:
+            is_math_step = self.lesson.unit.course.is_math
+        except Exception:
+            is_math_step = False
+        step_type = ''
+        if self.current_topic_index < len(self.steps):
+            step_type = self.steps[self.current_topic_index].step_type or ''
+        if is_math_step and step_type in ('practice', 'quiz'):
+            self._pending_bare_answer = self._is_bare_math_answer(student_input)
+            if self._pending_bare_answer:
+                self.bare_answer_counts_by_step[self.current_topic_index] = (
+                    self.bare_answer_counts_by_step.get(self.current_topic_index, 0) + 1
+                )
+
+        # Layer S — student working analyzer (streaming parity).
+        self._pending_working_analysis = None
+        if is_math_step and step_type in ('practice', 'quiz', 'worked_example'):
+            from apps.tutoring.student_working_analyzer import analyze_working
+            current_step = (
+                self.steps[self.current_topic_index]
+                if self.current_topic_index < len(self.steps)
+                else None
+            )
+            expected = current_step.expected_answer if current_step else None
+            self._pending_working_analysis = analyze_working(
+                student_input, expected_answer=expected,
+            )
 
         # Exit ticket is handled separately (non-streamable)
         if self.session_state == SessionState.EXIT_TICKET:
@@ -1804,13 +1872,22 @@ Keep it to 2-3 sentences."""
             or turn_bare_answer
         )
         if should_strip:
+            if turn_bare_answer and turn_math_check is not None and turn_math_check.is_correct:
+                praise_context = "bare_correct"
+            elif turn_bare_answer:
+                praise_context = "bare_unknown"
+            else:
+                praise_context = "wrong"
             clean_content, praise_stripped = strip_praise_if_wrong(
-                clean_content, is_correct=False,
+                clean_content,
+                is_correct=False,
+                context=praise_context,
+                student_input=student_input,
             )
             if praise_stripped:
                 logger.info(
-                    "[MathCheck] Praise filter triggered (stream) session=%s step=%s bare=%s",
-                    self.session.id, self.current_topic_index, turn_bare_answer,
+                    "[MathCheck] Praise filter triggered (stream) session=%s step=%s bare=%s context=%s",
+                    self.session.id, self.current_topic_index, turn_bare_answer, praise_context,
                 )
 
         # Media from LLM signal, with fallback for phantom references
@@ -1865,6 +1942,7 @@ Keep it to 2-3 sentences."""
             step_type=(current_step.step_type if current_step else None),
             lesson=self.lesson,
             llm_client=self.llm_client,
+            student_input=student_input,
         )
         if validation.content != clean_content:
             clean_content = validation.content
@@ -3222,6 +3300,19 @@ Follow the current step; this concept will be covered in sequence."""
                 "\nThe ONLY exception: a one-step mental-math drill the tutor explicitly"
                 "\nframed as 'just the answer' (e.g. flash-card warmup). Otherwise, working first."
                 "\n"
+                "\n=== RULE 1.5: NEVER FINISH THE STUDENT'S PROBLEM ==="
+                "\nWhen the student has shown partial working and stopped at an"
+                "\nintermediate value, your job is to ASK WHAT COMES NEXT — not to"
+                "\ncompute the remaining steps for them."
+                "\n- DO NOT write out 'so the answer is X' when X requires a step they"
+                "\n  haven't shown."
+                "\n- DO NOT compute the next subtraction, multiplication, etc., even if"
+                "\n  it's 'obvious' to you."
+                "\n- DO acknowledge what they got right, then prompt: 'what do you do"
+                "\n  with that to find x?'"
+                "\nIf <student_working_analysis> reports PARTIAL_CORRECT, this rule is"
+                "\nbinding regardless of how short the remaining work looks."
+                "\n"
                 "\n=== RULE 2: NAME THE SUBSKILLS ==="
                 "\nFor every problem, explicitly identify the subskills involved before"
                 "\nthe student attempts it. Format:"
@@ -3307,6 +3398,36 @@ Follow the current step; this concept will be covered in sequence."""
                 student_input,
                 bare_answer=bare,
                 bare_answer_count_for_step=bare_count,
+            )
+        elif getattr(self, '_pending_bare_answer', False):
+            # Bare numeric answer on a math practice/quiz step but no
+            # expected_answer to check against (i.e. the tutor invented
+            # an interim arithmetic question on the fly). Without this
+            # block the LLM falls back to its own judgement and praises
+            # what it independently knows is right — violating Rule 1.
+            student_input = getattr(self, '_pending_math_student_input', '') or ''
+            bare_count = self.bare_answer_counts_by_step.get(
+                self.current_topic_index, 0,
+            )
+            system_prompt += self._build_bare_answer_only_block(
+                student_input,
+                bare_answer_count_for_step=bare_count,
+            )
+
+        # Layer S — student-working analysis block. Appended AFTER
+        # the math eval signal so it's the very last thing the LLM
+        # reads before generating. The two blocks are complementary:
+        # eval-signal verdicts the FINAL answer; working-analysis
+        # diagnoses each STEP and tells the LLM whether the student
+        # is partway through (PARTIAL_CORRECT) or wrong on a
+        # specific step (PARTIAL_WRONG, with FIRST_ERROR pointer).
+        working_analysis = getattr(self, '_pending_working_analysis', None)
+        if working_analysis is not None and working_analysis.steps:
+            from apps.tutoring.student_working_analyzer import (
+                build_working_analysis_block,
+            )
+            system_prompt += "\n\n" + build_working_analysis_block(
+                working_analysis,
             )
 
         # Mobile clients pass X-Client-Form-Factor: mobile so we can keep
@@ -3998,6 +4119,52 @@ Follow the current step; this concept will be covered in sequence."""
         )
         return block
 
+    def _build_bare_answer_only_block(
+        self,
+        student_input: str,
+        bare_answer_count_for_step: int = 0,
+    ) -> str:
+        """Render a slim guidance block when the student gave a bare
+        numeric answer on a math practice/quiz step but the deterministic
+        check produced no result (no expected_answer recorded — the case
+        when the tutor invents interim arithmetic mid-conversation).
+
+        Without this block the LLM, lacking the full <evaluation_signal>
+        guidance, falls back to its own judgement and praises bare
+        correct answers — violating math_teaching Rule 1 and triggering
+        the praise filter's awkward "Let's check this together" rewrite.
+        """
+        echo = (student_input or "").strip()[:80]
+        guidance = (
+            "The student replied with a BARE numeric answer with no"
+            " working shown, on a math practice/quiz step. There is no"
+            " pre-recorded expected answer for this turn (you asked an"
+            " interim arithmetic question on the fly), so DO NOT decide"
+            " correctness on your own.\n"
+            "Per math_teaching Rule 1, you MUST NOT say 'correct',"
+            " 'right', 'brilliant', 'perfect', 'exactly', 'spot on',"
+            " 'great work', 'you got it', '✓', or any equivalent praise"
+            " — even if their answer looks right to you.\n"
+            f"Echo the student's answer back verbatim ('You said {echo}'),"
+            " then ask them to walk you through how they got it. Only"
+            " after seeing the working may you affirm or correct."
+        )
+        if bare_answer_count_for_step >= 2:
+            guidance += (
+                "\nNOTE: This is the third+ bare answer on this step. Be"
+                " patient — gently model what 'showing working' looks"
+                " like by writing one example step yourself, then invite"
+                " them to try the next step that way."
+            )
+        return (
+            "\n\n<evaluation_signal>"
+            f"\nStudent's answer: {echo}"
+            "\nVerdict: BARE — no expected answer to check against"
+            "\nBare answer (no working shown): True"
+            f"\n{guidance}"
+            "\n</evaluation_signal>"
+        )
+
     def _evaluate_step(self, student_input: str, tutor_response: str) -> Optional[StepEvaluationResult]:
         """Merged LLM evaluator: answer correctness + step completion in one call.
 
@@ -4524,6 +4691,22 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         if math_check is not None:
             metadata['student_answer_parsed'] = math_check.student_parsed
             metadata['expected_answer_parsed'] = math_check.expected_parsed
+
+        # Layer S — persist working-analysis state to metadata so the
+        # teacher monitor can render chips (state, step count,
+        # first-error pointer, propagation set). Independent of
+        # whether the math_check fired — Layer S runs on every math
+        # practice/quiz/worked_example turn.
+        wa = getattr(self, '_pending_working_analysis', None)
+        if wa is not None:
+            metadata['working_state'] = wa.state.value
+            metadata['working_steps_count'] = len(wa.steps)
+            metadata['working_first_error_idx'] = wa.first_error_idx
+            metadata['working_propagated_idxs'] = sorted(wa.propagated_idxs)
+            if wa.final_claim is not None:
+                metadata['working_final_claim'] = wa.final_claim
+            if wa.expected_answer is not None:
+                metadata['working_expected'] = wa.expected_answer
         return metadata
 
     def _get_eo_skill(self, eo_text: str):
