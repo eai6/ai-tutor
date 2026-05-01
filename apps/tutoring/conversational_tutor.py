@@ -460,6 +460,23 @@ class TutorMessage:
     tokens_used: int = 0
 
 
+# Strip "thinking leakage" — opening sentences where the LLM narrates
+# its own plan instead of just executing it. Triggered by phrases like
+# "I need to address...", "Let me first clarify...", "First, I'll...".
+# Only fires on the FIRST sentence, only on the start of the response,
+# and only on this small known-bad pattern set so we don't accidentally
+# strip legitimate teacher voice.
+_THINKING_LEAK_RE = re.compile(
+    r"^\s*(?:"
+    r"I (?:need to|will|should|'?ll|am going to|must|have to|want to)"
+    r"|Let me (?:first|start by|address|clarify|think|plan|tackle|handle)"
+    r"|First[,]?\s+(?:I|let me|let's address|I'?ll)"
+    r"|My (?:plan|approach|response|first step) (?:is|will|here)"
+    r")\b[^.\n]*[.\n]\s*",
+    re.IGNORECASE,
+)
+
+
 # =============================================================================
 # CONVERSATIONAL TUTOR ENGINE
 # =============================================================================
@@ -1492,7 +1509,11 @@ Keep it to 2-3 sentences."""
         step_type = ''
         if self.current_topic_index < len(self.steps):
             step_type = self.steps[self.current_topic_index].step_type or ''
-        if is_math_step and step_type in ('practice', 'quiz'):
+        # Bare-answer detection — fires on EVERY math step type, not just
+        # practice/quiz. Warmup steps in math lessons routinely see bare
+        # arithmetic answers ("False it is 360-90=20") that need the same
+        # Rule 1 treatment. Per user guidance: validators run at all steps.
+        if is_math_step:
             self._pending_bare_answer = self._is_bare_math_answer(student_input)
             if self._pending_bare_answer:
                 self.bare_answer_counts_by_step[self.current_topic_index] = (
@@ -1504,9 +1525,10 @@ Keep it to 2-3 sentences."""
         # existing bare-answer + math-check pipeline. Produces a
         # rich state signal (NO_WORKING / PARTIAL_CORRECT / etc.)
         # plus a `<student_working_analysis>` block that gets
-        # injected into the system prompt below.
+        # injected into the system prompt below. Fires on EVERY math
+        # step type — warmups need this just as much as practice.
         self._pending_working_analysis = None
-        if is_math_step and step_type in ('practice', 'quiz', 'worked_example'):
+        if is_math_step:
             from apps.tutoring.student_working_analyzer import analyze_working
             current_step = (
                 self.steps[self.current_topic_index]
@@ -1819,7 +1841,9 @@ Keep it to 2-3 sentences."""
         step_type = ''
         if self.current_topic_index < len(self.steps):
             step_type = self.steps[self.current_topic_index].step_type or ''
-        if is_math_step and step_type in ('practice', 'quiz'):
+        # Bare-answer detection on EVERY math step (streaming parity
+        # with respond()). Per user guidance: validators run at all steps.
+        if is_math_step:
             self._pending_bare_answer = self._is_bare_math_answer(student_input)
             if self._pending_bare_answer:
                 self.bare_answer_counts_by_step[self.current_topic_index] = (
@@ -1827,8 +1851,9 @@ Keep it to 2-3 sentences."""
                 )
 
         # Layer S — student working analyzer (streaming parity).
+        # Fires on EVERY math step type, not just practice.
         self._pending_working_analysis = None
-        if is_math_step and step_type in ('practice', 'quiz', 'worked_example'):
+        if is_math_step:
             from apps.tutoring.student_working_analyzer import analyze_working
             current_step = (
                 self.steps[self.current_topic_index]
@@ -3301,6 +3326,11 @@ Follow the current step; this concept will be covered in sequence."""
             "\n   number, comparison, or named fact, only do so when it's grounded"
             "\n   in the curriculum context provided to you below. If you're not"
             "\n   sure, say so and ask the student to look it up — never invent."
+            "\n"
+            "\n5. NEVER NARRATE WHAT YOU ARE ABOUT TO DO. Do not start a"
+            "\n   response with 'I need to…', 'Let me first…', 'First, I'll…',"
+            "\n   'My plan is…', 'I'm going to…'. Just write the response."
+            "\n   The student does not need a preamble — they need the answer."
             "\n</socratic_rules>"
         )
 
@@ -6111,6 +6141,11 @@ Do NOT just ask a quiz question — actually RE-TEACH the concept first, then ch
         content = re.sub(r'\|\|\|ARTIFACT:html\|\|\|.*?\|\|\|/ARTIFACT\|\|\|', '', content, flags=re.DOTALL)
         content = re.sub(r'\|\|\|PROBE\s*:\s*\{.+?\}\s*\|\|\|', '', content, flags=re.DOTALL)
         content = re.sub(r'\|\|\|QUESTION\s*:\s*\d+\s*\|\|\|', '', content)
+        # Strip leaked planning narration. The LLM sometimes verbalises
+        # its own plan as the first sentence ("I need to address the
+        # student's incorrect warmup answer first..."). That's internal
+        # monologue — the student should never see it.
+        content = _THINKING_LEAK_RE.sub('', content, count=1)
         content = re.sub(r' {2,}', ' ', content)
         content = re.sub(r'\n{3,}', '\n\n', content)
         content = content.strip()
