@@ -70,6 +70,13 @@ class Command(BaseCommand):
             "--force", action="store_true", default=True,
             help="Always regenerate (ignored — bulk regen is force=True by definition).",
         )
+        parser.add_argument(
+            "--no-confirm", action="store_true",
+            help=(
+                "Skip the YES prompt. Required when running unattended "
+                "(GitHub Actions / cron / az containerapp exec)."
+            ),
+        )
 
     def handle(self, *args, **opts):
         from apps.curriculum.content_generator import (
@@ -141,7 +148,8 @@ class Command(BaseCommand):
 
         # Confirm before launching real generation. The check below
         # is paranoid by design: bulk regen is a high-cost, hard-to-
-        # reverse operation.
+        # reverse operation. Bypassed when --no-confirm is set —
+        # required for unattended runs from GitHub Actions, etc.
         self.stdout.write(self.style.WARNING(
             "About to regenerate every math lesson in every listed course."
         ))
@@ -150,10 +158,15 @@ class Command(BaseCommand):
             "drop ExitTicketAttempt history. Student progress / mastery "
             "/ competency-transcript records are preserved."
         ))
-        confirm = input("Type YES to proceed (anything else aborts): ")
-        if confirm.strip() != "YES":
-            self.stdout.write(self.style.WARNING("Aborted."))
-            return
+        if opts["no_confirm"]:
+            self.stdout.write(self.style.WARNING(
+                "--no-confirm set; proceeding without prompt."
+            ))
+        else:
+            confirm = input("Type YES to proceed (anything else aborts): ")
+            if confirm.strip() != "YES":
+                self.stdout.write(self.style.WARNING("Aborted."))
+                return
 
         # Run generation, course by course. Lessons within a course
         # run serially (per generate_content_for_course). For

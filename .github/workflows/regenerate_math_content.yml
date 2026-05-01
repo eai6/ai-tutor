@@ -1,0 +1,145 @@
+name: Regenerate math content
+
+# Manually-triggered bulk regeneration of every lesson in every math
+# course. Runs the management command INSIDE the deployed Container
+# App via `az containerapp exec` — so the prod LLM keys + DATABASE_URL
+# come from the container env automatically and we don't need to
+# expose anything on the developer machine.
+#
+# Trigger from the GitHub UI:
+#   Actions → "Regenerate math content" → "Run workflow"
+# Or from the CLI:
+#   gh workflow run regenerate_math_content.yml -f dry_run=true
+#
+# Safety:
+#   - Requires the deployed image to have the regenerate_math_content
+#     management command (shipped in commit 519bb74).
+#   - Default `dry_run=true` — confirm scope before flipping to false.
+#   - `course_id` lets you pilot one course before a wider run.
+#   - `max_courses` caps the run for staged rollouts.
+#   - The job has a 6-hour timeout; ~150 lessons fit comfortably
+#     (estimated ~50 min serial within a course, parallel across).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (list scope, no LLM calls, no writes)"
+        type: boolean
+        required: true
+        default: true
+      course_id:
+        description: "Limit to one course id (blank = all math courses)"
+        type: string
+        required: false
+        default: ""
+      max_courses:
+        description: "Cap to first N math courses (blank = no cap)"
+        type: string
+        required: false
+        default: ""
+
+env:
+  RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  APP: ${{ secrets.CONTAINER_APP_NAME }}
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360   # generous; full Math S3 + others should fit
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Show resolved inputs
+        run: |
+          echo "dry_run=${{ inputs.dry_run }}"
+          echo "course_id=${{ inputs.course_id }}"
+          echo "max_courses=${{ inputs.max_courses }}"
+
+      - name: Build management-command argv
+        id: build
+        run: |
+          ARGS="regenerate_math_content"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          else
+            ARGS="$ARGS --no-confirm"
+          fi
+          if [ -n "${{ inputs.course_id }}" ]; then
+            ARGS="$ARGS --course-id ${{ inputs.course_id }}"
+          fi
+          if [ -n "${{ inputs.max_courses }}" ]; then
+            ARGS="$ARGS --max-courses ${{ inputs.max_courses }}"
+          fi
+          echo "argv: python manage.py $ARGS"
+          echo "argv=$ARGS" >> "$GITHUB_OUTPUT"
+
+      - name: Exec regen command in prod Container App (dry run)
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          # Dry run is instantaneous — just exec and stream.
+          az containerapp exec \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --command "python manage.py ${{ steps.build.outputs.argv }}"
+
+      - name: Launch regen in background + stream log (real run)
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          # Real bulk regen can take ~50min for the full math
+          # catalog. Running it directly under `az containerapp
+          # exec` ties its lifetime to the websocket — any blip
+          # kills the regen. Detach with nohup, then poll the
+          # log file from a fresh exec each iteration. The regen
+          # process survives WebSocket drops; we only lose log
+          # visibility (which we recover on the next poll).
+          set -e
+
+          # Start regen, capture PID into the container.
+          az containerapp exec \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --command "bash -c 'nohup python manage.py ${{ steps.build.outputs.argv }} > /tmp/regen.log 2>&1 & echo \$! > /tmp/regen.pid; echo started PID=\$(cat /tmp/regen.pid)'"
+
+          # Tail the log every 30s until the PID is gone.
+          # Output is appended each iteration so the GHA log
+          # builds up monotonically — easy to scrub later.
+          last_size=0
+          while true; do
+            # Poll: get log size + PID-alive status in one round-trip.
+            poll=$(az containerapp exec \
+              --resource-group "$RG" \
+              --name "$APP" \
+              --command "bash -c 'pid=\$(cat /tmp/regen.pid 2>/dev/null); if [ -n \"\$pid\" ] && kill -0 \$pid 2>/dev/null; then alive=yes; else alive=no; fi; size=\$(wc -c < /tmp/regen.log 2>/dev/null || echo 0); echo \"alive=\$alive size=\$size\"'" \
+              | tr -d '\r')
+            echo "[poll] $poll"
+            alive=$(echo "$poll" | grep -oE 'alive=[a-z]+' | cut -d= -f2 || echo no)
+            size=$(echo "$poll"  | grep -oE 'size=[0-9]+'  | cut -d= -f2 || echo 0)
+
+            # Stream new log content if any.
+            if [ "$size" -gt "$last_size" ]; then
+              new_bytes=$((size - last_size))
+              echo "----- new log ($new_bytes bytes) -----"
+              az containerapp exec \
+                --resource-group "$RG" \
+                --name "$APP" \
+                --command "bash -c 'tail -c +$((last_size + 1)) /tmp/regen.log'" \
+                || echo "(log fetch failed; will retry)"
+              last_size=$size
+            fi
+
+            if [ "$alive" = "no" ]; then
+              echo "----- regen process exited -----"
+              break
+            fi
+            sleep 30
+          done
+
+          # Final flush of any tail bytes.
+          az containerapp exec \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --command "bash -c 'tail -c +$((last_size + 1)) /tmp/regen.log; echo; echo === regen exit summary ===; tail -20 /tmp/regen.log'"
