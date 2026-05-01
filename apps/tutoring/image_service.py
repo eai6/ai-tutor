@@ -464,6 +464,12 @@ class ImageGenerationService:
             "If unsure of spelling, omit the label.\n"
             "2. Do NOT fabricate geographic features, place names, or scientific data.\n"
             "3. Keep text labels minimal — prefer arrows and colour-coding.\n"
+            "4. If the figure depicts a problem with an unknown "
+            "(a 'find x' style question), mark the unknown with '?' or "
+            "'x = ?'. NEVER write the computed answer in place of the "
+            "unknown. The figure helps the student SEE the problem; "
+            "the answer must come from the student's working, not "
+            "from reading the image.\n"
         )
 
         return f"{style}{context}{lesson_context}{textbook_style}{prompt}{anti_hallucination}"

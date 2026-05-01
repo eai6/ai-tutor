@@ -89,7 +89,15 @@ class MediaImage(BaseModel):
     description: str = Field(description=(
         "Specific description for image generation. "
         "For maps: use 'schematic map'. For diagrams: specify labels. "
-        "Never request photos of real places."
+        "Never request photos of real places. "
+        "PRACTICE/QUIZ STEPS: depict the question SETUP only — show the "
+        "given values labelled clearly, mark the unknown as a question "
+        "mark or 'x = ?'. NEVER label the unknown with its computed "
+        "value. The figure helps the student visualise the problem; "
+        "the answer must come from the student's working, not from "
+        "reading the image. (For TEACH / WORKED_EXAMPLE / SUMMARY "
+        "steps the figure can show fully-solved values — those steps "
+        "are explanatory, not assessable.)"
     ))
     alt_text: str = Field(description="Accessibility text describing the image")
     caption: str = Field(default="", description="Figure caption")
