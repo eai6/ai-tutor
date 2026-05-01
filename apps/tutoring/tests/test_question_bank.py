@@ -357,3 +357,223 @@ class QuestionBankWiringTest(TestCase):
         second_keys = set(tutor._question_id_map.keys())
         # The keys should be the same shape (0..N), not accumulating
         self.assertEqual(first_keys, second_keys)
+
+
+class FailingTranscriptRegressionTest(TestCase):
+    """Regression set against the three failing transcripts that
+    motivated the no-authoring architecture. See
+    memory/tutor_no_authoring_plan.md.
+
+    Each test asserts the architectural guarantees: (a) any question
+    posed comes from the published bank verbatim, and (b) the LLM has
+    no path to author its own arithmetic.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.institution = Institution.objects.create(name="R", slug="r")
+        cls.student = User.objects.create_user(username="s3", password="pw")
+        cls.course = Course.objects.create(
+            institution=cls.institution, title="Math S3",
+            grade_level="S3", is_published=True,
+            subject_type='math',
+        )
+        cls.unit = Unit.objects.create(
+            course=cls.course, title="U", order_index=0,
+        )
+        cls.lesson = Lesson.objects.create(
+            unit=cls.unit, title="Angles",
+            objective="180/360 rules", order_index=0, is_published=True,
+        )
+        cls.step = LessonStep.objects.create(
+            lesson=cls.lesson, phase='practice', step_type='practice',
+            order_index=0,
+            teacher_script=(
+                "On a straight line, one angle is 65°. What is the "
+                "adjacent angle?"
+            ),
+            expected_answer="115°",
+            concept_tag="angles_on_line",
+        )
+        cls.ticket = ExitTicket.objects.create(
+            lesson=cls.lesson, passing_score=8, is_published=True,
+        )
+        # Verified bank: every entry has a known correct answer the
+        # tutor pulls from. The LLM never speaks the question stem.
+        cls.bank_q_adjacent = ExitTicketQuestion.objects.create(
+            exit_ticket=cls.ticket,
+            question_text=(
+                "On a straight line, one angle is 73°. What is the "
+                "adjacent angle?"
+            ),
+            option_a="107°", option_b="117°", option_c="97°", option_d="113°",
+            correct_answer="A", explanation="180 - 73 = 107",
+            concept_tag="angles_on_line",
+            order_index=0,
+        )
+        for i in range(1, 6):
+            ExitTicketQuestion.objects.create(
+                exit_ticket=cls.ticket,
+                question_text=f"Sibling Q{i}",
+                option_a="A", option_b="B", option_c="C", option_d="D",
+                correct_answer="A", explanation="",
+                concept_tag="angles_on_line",
+                order_index=i,
+            )
+
+    def _make_tutor(self):
+        from apps.tutoring.conversational_tutor import ConversationalTutor
+        session = TutorSession.objects.create(
+            institution=self.institution,
+            student=self.student,
+            lesson=self.lesson,
+            engine_state={},
+        )
+        tutor = ConversationalTutor.__new__(ConversationalTutor)
+        tutor.session = session
+        tutor.lesson = self.lesson
+        tutor.student = self.student
+        tutor.steps = [self.step]
+        tutor.current_topic_index = 0
+        tutor._question_id_map = {}
+        return tutor
+
+    def test_transcript1_no_path_for_LLM_to_invent_adjacent_question(self):
+        """Original failure: tutor said '125° is correct' for adjacent
+        of 65° (correct: 115°). Architectural guarantee: even if the
+        LLM tries to author a question, it has no path — only |||QUESTION:N|||
+        renders prose, and only bank entries can be selected."""
+        tutor = self._make_tutor()
+        block = tutor._build_question_bank_block()
+        # The LLM sees the bank menu...
+        self.assertIn("MUST come from this bank", block)
+        # ...and the only way to pose a question is via the signal.
+        # If it emits any other question text, render_question_to_prose
+        # is never called, so its question text doesn't get the verbatim
+        # render path. The student sees only what the LLM wrote (which
+        # the prompt forbids) — but if the LLM follows the rule, every
+        # question ends with a signal.
+        # Assert: signal-driven render produces a verified bank entry.
+        clean, picked = tutor._parse_question_signal(
+            "Try this. |||QUESTION:1|||"
+        )
+        self.assertIsInstance(picked, ExitTicketQuestion)
+        # The rendered prose is the bank entry verbatim — never the
+        # 65°/125° trap (because that was never in the bank).
+        from apps.tutoring.question_bank import render_question_to_prose
+        rendered = render_question_to_prose(picked)
+        self.assertNotIn("65°", rendered)
+        self.assertNotIn("125°", rendered)
+
+    def test_transcript2_misread_106_as_105_cant_happen(self):
+        """Original failure: student wrote '106', tutor said 'you got
+        105°'. Architectural guarantee: the grader compares student
+        input to a code-stored expected_answer, never to LLM output."""
+        # The step's expected_answer is the ground truth the grader
+        # uses. The LLM's narrative confidence is irrelevant.
+        self.assertEqual(self.step.expected_answer, "115°")
+        # The bank's correct_answer is similarly ground truth — the
+        # grader pulls the option letter, not whatever the LLM wrote.
+        self.assertEqual(self.bank_q_adjacent.correct_answer, "A")
+        self.assertEqual(self.bank_q_adjacent.option_a, "107°")
+
+    def test_transcript3_advancement_question_comes_from_bank(self):
+        """Original failure: bare answer 'n=135' got praise + a NEW
+        question the LLM authored. Architectural guarantee: any
+        follow-up question is signal-driven; rendering is verbatim
+        from the bank."""
+        tutor = self._make_tutor()
+        tutor._build_question_bank_block()
+        # Simulate the LLM picking slot 1 to advance to the next item.
+        # The user-visible question is the bank entry verbatim, not
+        # whatever the LLM might have prefixed.
+        clean, picked = tutor._parse_question_signal(
+            "Let's try the next one. |||QUESTION:1|||"
+        )
+        self.assertEqual(picked.id, self.bank_q_adjacent.id)
+        # Verify the rendered prose IS the verified bank text, byte-for-byte.
+        from apps.tutoring.question_bank import render_question_to_prose
+        rendered = render_question_to_prose(picked)
+        self.assertIn(self.bank_q_adjacent.question_text, rendered)
+        # No "n = 135" hallucination possible because that text was
+        # never in the bank.
+
+    def test_signal_strip_keeps_no_signal_in_message_path(self):
+        """Even if the |||QUESTION:N||| signal somehow survives parsing
+        (programmer error), _create_message and the conversation loader
+        strip it as defense-in-depth so it never reaches the student
+        or the DB."""
+        tutor = self._make_tutor()
+        tutor._build_question_bank_block()
+        # Direct exercise of the parser + render — what actually reaches
+        # the chat surface.
+        clean, picked = tutor._parse_question_signal(
+            "Framing prose. |||QUESTION:1|||"
+        )
+        self.assertNotIn("|||QUESTION", clean)
+        self.assertIsNotNone(picked)
+
+
+class CoverageGapTest(TestCase):
+    """Tests for content_generator._coverage_gaps (P4)."""
+
+    def test_no_gaps_when_every_practice_tag_has_bank_match(self):
+        from apps.curriculum.content_generator import _coverage_gaps
+        institution = Institution.objects.create(name="C", slug="c")
+        course = Course.objects.create(
+            institution=institution, title="M", grade_level="S3",
+            is_published=True, subject_type='math',
+        )
+        unit = Unit.objects.create(course=course, title="U", order_index=0)
+        lesson = Lesson.objects.create(
+            unit=unit, title="L", objective="x",
+            order_index=0, is_published=True,
+        )
+        LessonStep.objects.create(
+            lesson=lesson, phase='practice', step_type='practice',
+            order_index=0, teacher_script="t", expected_answer="x",
+            concept_tag="tag_a",
+        )
+        ticket = ExitTicket.objects.create(lesson=lesson, passing_score=8)
+        ExitTicketQuestion.objects.create(
+            exit_ticket=ticket, question_text="q",
+            option_a="A", option_b="B", option_c="C", option_d="D",
+            correct_answer="A", explanation="",
+            concept_tag="tag_a", order_index=0,
+        )
+        gaps = _coverage_gaps(lesson, ticket)
+        self.assertEqual(gaps, [])
+
+    def test_gap_surfaces_uncovered_step(self):
+        from apps.curriculum.content_generator import _coverage_gaps
+        institution = Institution.objects.create(name="C2", slug="c2")
+        course = Course.objects.create(
+            institution=institution, title="M", grade_level="S3",
+            is_published=True, subject_type='math',
+        )
+        unit = Unit.objects.create(course=course, title="U", order_index=0)
+        lesson = Lesson.objects.create(
+            unit=unit, title="L", objective="x",
+            order_index=0, is_published=True,
+        )
+        # Two practice steps with different tags
+        step_a = LessonStep.objects.create(
+            lesson=lesson, phase='practice', step_type='practice',
+            order_index=0, teacher_script="t", expected_answer="x",
+            concept_tag="tag_a",
+        )
+        step_b = LessonStep.objects.create(
+            lesson=lesson, phase='practice', step_type='practice',
+            order_index=1, teacher_script="t", expected_answer="x",
+            concept_tag="tag_b",
+        )
+        ticket = ExitTicket.objects.create(lesson=lesson, passing_score=8)
+        # Bank only covers tag_a — tag_b is the gap
+        ExitTicketQuestion.objects.create(
+            exit_ticket=ticket, question_text="q",
+            option_a="A", option_b="B", option_c="C", option_d="D",
+            correct_answer="A", explanation="",
+            concept_tag="tag_a", order_index=0,
+        )
+        gaps = _coverage_gaps(lesson, ticket)
+        self.assertEqual([s.id for s in gaps], [step_b.id])

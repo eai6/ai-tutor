@@ -20,6 +20,30 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
+def _coverage_gaps(lesson, exit_ticket) -> list:
+    """Return practice steps whose concept_tag has no matching bank
+    question on the just-generated exit_ticket.
+
+    Used by the post-generation coverage warning (P4 of
+    memory/tutor_no_authoring_plan.md). Non-blocking — runtime can
+    always fall back to any same-lesson bank question. The warning
+    just surfaces gaps so the teacher review can target them.
+    """
+    if exit_ticket is None:
+        return []
+    bank_tags = set(
+        (t or '').strip()
+        for t in exit_ticket.questions.values_list('concept_tag', flat=True)
+        if (t or '').strip()
+    )
+    gaps = []
+    for step in lesson.steps.filter(step_type='practice'):
+        tag = (step.concept_tag or '').strip()
+        if tag and tag not in bank_tags:
+            gaps.append(step)
+    return gaps
+
+
 def combined_objectives_for_lesson(lesson) -> List[str]:
     """Return the lesson's teaching objectives — the SINGLE SOURCE OF
     TRUTH for what objectives a lesson teaches.
@@ -2040,6 +2064,26 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 )
                 update_fields.append('content_status')
             lesson.save(update_fields=update_fields)
+
+        # Coverage check (P4 of memory/tutor_no_authoring_plan.md):
+        # warn if any practice step's concept_tag has no matching bank
+        # question. Non-blocking — runtime falls back to any same-lesson
+        # bank question. Logged so the teacher review surface can flag
+        # gaps before publish.
+        try:
+            uncovered = _coverage_gaps(lesson, exit_ticket)
+            if uncovered:
+                print(
+                    f"[ContentGen] [{lesson.title}] ⚠️ bank coverage gaps: "
+                    f"{len(uncovered)} practice step(s) lack a matching "
+                    f"concept_tag in the bank → "
+                    f"{[(s.order_index, s.concept_tag) for s in uncovered]}",
+                    flush=True,
+                )
+        except Exception as cov_err:
+            logger.warning(
+                f"[{lesson.title}] coverage check failed (non-fatal): {cov_err}"
+            )
 
         return {
             'success': True,

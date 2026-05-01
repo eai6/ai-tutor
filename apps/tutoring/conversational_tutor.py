@@ -5815,11 +5815,61 @@ Which concept numbers were meaningfully covered?"""
         total: int,
         failed_questions: List[Dict]
     ) -> str:
-        """Generate EO-focused remediation opening."""
+        """Generate EO-focused remediation opening.
+
+        For math lessons, the check-understanding question is pulled
+        from the published bank (no LLM authoring) and appended to the
+        opening. The LLM writes only the re-teaching prose. See
+        memory/tutor_no_authoring_plan.md.
+        """
         failed_eos = getattr(self, '_failed_eos', [])
 
-        eo_list = "\n".join(f"  - {eo}" for eo in failed_eos[:4]) if failed_eos else "  - (general review needed)"
+        eo_list = (
+            "\n".join(f"  - {eo}" for eo in failed_eos[:4])
+            if failed_eos else "  - (general review needed)"
+        )
 
+        # For math lessons, pull a published bank question for the first
+        # failed EO and instruct the LLM NOT to author its own check.
+        try:
+            is_math_lesson = self.lesson.unit.course.is_math
+        except Exception:
+            is_math_lesson = False
+        bank_question = None
+        if is_math_lesson and failed_eos:
+            from apps.tutoring.question_bank import pick_published_for_concept_tag
+            picks = pick_published_for_concept_tag(
+                self.lesson, failed_eos[0], max_candidates=1,
+            )
+            if picks:
+                bank_question = picks[0]
+
+        if bank_question is not None:
+            prompt = f"""The student just completed the exit ticket but didn't pass.
+Score: {score}/{total} (needed 8 to pass)
+Attempt number: {self.remediation_attempt}
+
+ENABLING OBJECTIVES they need to work on:
+{eo_list}
+
+Generate an encouraging RE-TEACHING message that:
+1. Acknowledges their effort positively (no shame!)
+2. Names the specific enabling objectives they'll review (use the EO text above)
+3. Reassures them this is normal — learning takes practice
+4. RE-TEACHES the FIRST enabling objective above. Walk through the rule, give a worked example using ONLY numbers that appear in the lesson's teacher_script — do NOT invent new numerical examples.
+
+DO NOT pose a check-understanding question yourself. A verified question
+will be appended after your response. Just stop after the re-teaching.
+
+Keep it warm, supportive, and focused. 3-4 sentences total."""
+            opening_prose = self._generate_response(prompt)
+            from apps.tutoring.question_bank import render_question_to_prose
+            rendered = render_question_to_prose(bank_question)
+            if rendered:
+                return (opening_prose.rstrip() + "\n\n" + rendered).strip()
+            return opening_prose
+
+        # Non-math (or no bank match) — preserve current behaviour.
         prompt = f"""The student just completed the exit ticket but didn't pass.
 Score: {score}/{total} (needed 8 to pass)
 Attempt number: {self.remediation_attempt}

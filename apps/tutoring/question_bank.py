@@ -94,6 +94,32 @@ def pick_candidates_for_step(
     return pool[:max_candidates]
 
 
+def pick_published_for_concept_tag(
+    lesson,
+    concept_tag: str,
+    max_candidates: int = 1,
+):
+    """Query the published bank directly for matches by concept_tag.
+
+    Used by the remediation flow, which doesn't go through the per-
+    session pool — the failed EOs may not be in the sampled subset,
+    so we hit the full published bank instead. Falls back to any
+    published bank question for the lesson when no exact tag matches.
+    """
+    from apps.tutoring.models import ExitTicketQuestion
+    base = ExitTicketQuestion.objects.filter(
+        exit_ticket__lesson=lesson,
+        exit_ticket__is_published=True,
+    )
+    tag = (concept_tag or '').strip()
+    if tag:
+        matches = list(base.filter(concept_tag=tag).order_by('order_index')[:max_candidates])
+        if matches:
+            return matches
+    # Fallback — any published bank question for this lesson
+    return list(base.order_by('order_index')[:max_candidates])
+
+
 def render_bank_block(
     step,
     candidates: List,
