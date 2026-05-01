@@ -20,6 +20,68 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
+def _normalize_enabling_objective(
+    question_eo: str,
+    canonical_eos: List[str],
+) -> tuple[str, str]:
+    """Snap an LLM-emitted enabling_objective to one of the lesson's
+    canonical enabling_objectives.
+
+    The LLM is told to copy lesson EOs verbatim, but it drifts —
+    paraphrasing, capitalisation changes, trailing punctuation,
+    occasional invention. This pass enforces the constraint
+    deterministically:
+
+      1. Exact match → keep verbatim.
+      2. Fuzzy match (case + whitespace + punctuation normalised, or
+         high overlap with exactly one canonical EO) → snap to the
+         canonical text.
+      3. No match → drop the tag (return ''). The question itself is
+         kept; only the bad tag is cleared so it can't pollute
+         remediation targeting.
+
+    Returns (normalised_eo, status), where status is one of:
+      - 'exact'   — already matched verbatim
+      - 'snapped' — fuzzy-matched and rewritten to canonical
+      - 'dropped' — no match, tag cleared
+      - 'empty'   — input was empty to begin with
+    """
+    raw = (question_eo or '').strip()
+    if not raw:
+        return '', 'empty'
+    canonical = [(eo or '').strip() for eo in canonical_eos if (eo or '').strip()]
+    if not canonical:
+        return '', 'dropped'
+    # 1. Exact match
+    if raw in canonical:
+        return raw, 'exact'
+
+    def _norm(s: str) -> str:
+        # Lowercase, collapse whitespace, strip trailing punctuation.
+        import re as _re
+        out = _re.sub(r'\s+', ' ', s.lower().strip())
+        return _re.sub(r'[\s.,;:!?]+$', '', out)
+
+    raw_n = _norm(raw)
+    by_norm = {_norm(eo): eo for eo in canonical}
+
+    # 2a. Normalised exact match (case / punctuation / whitespace drift)
+    if raw_n in by_norm:
+        return by_norm[raw_n], 'snapped'
+
+    # 2b. Substring match — if the LLM truncated or extended the EO
+    # text, accept when there's exactly ONE canonical EO that's a
+    # substring of the input or vice versa. Ambiguous → drop.
+    contains_matches = [
+        eo for eo_n, eo in by_norm.items()
+        if eo_n and (eo_n in raw_n or raw_n in eo_n)
+    ]
+    if len(contains_matches) == 1:
+        return contains_matches[0], 'snapped'
+
+    return '', 'dropped'
+
+
 def _coverage_gaps(lesson, exit_ticket) -> list:
     """Return practice steps whose concept_tag has no matching bank
     question on the just-generated exit_ticket.
@@ -1308,6 +1370,35 @@ CONTENT GUIDELINES:
                 return 1
             return value
 
+        # Snap each step's enabling_objective to one of the lesson's
+        # canonical EOs. Same drift problem as exit-ticket questions —
+        # the LLM is told to copy lesson EOs verbatim but paraphrases.
+        # Mismatches drop the tag (clearing it), keeping the step.
+        canonical_eos_for_steps = list(lesson.enabling_objectives or [])
+        step_eo_stats = {'exact': 0, 'snapped': 0, 'dropped': 0, 'empty': 0}
+        step_eo_dropped_examples: List[Dict] = []
+        for step_data in steps:
+            raw_eo = step_data.get('enabling_objective', '') or ''
+            normalised, status = _normalize_enabling_objective(
+                raw_eo, canonical_eos_for_steps,
+            )
+            step_eo_stats[status] = step_eo_stats.get(status, 0) + 1
+            step_data['enabling_objective'] = normalised
+            if status == 'dropped' and len(step_eo_dropped_examples) < 5:
+                step_eo_dropped_examples.append({
+                    'order_index': step_data.get('order_index', 0),
+                    'step_type': step_data.get('step_type', ''),
+                    'rejected_eo': raw_eo[:160],
+                })
+        print(
+            f"[ContentGen] [{lesson.title}] step enabling_objective "
+            f"validation: exact={step_eo_stats['exact']}, "
+            f"snapped={step_eo_stats['snapped']}, "
+            f"dropped={step_eo_stats['dropped']}, "
+            f"empty={step_eo_stats['empty']}",
+            flush=True,
+        )
+
         for step_data in steps:
             step, created = LessonStep.objects.update_or_create(
                 lesson=lesson,
@@ -1368,6 +1459,10 @@ CONTENT GUIDELINES:
             audit_blob['math_check_run'] = True
             audit_blob['step_corrections'] = step_audit
             audit_blob['retry_count'] = arith_retry_count
+            audit_blob['step_enabling_objective_validation'] = {
+                **step_eo_stats,
+                'dropped_examples': step_eo_dropped_examples,
+            }
             existing['verification_audit'] = audit_blob
             lesson.metadata = existing
             update_fields = ['metadata']
@@ -1383,6 +1478,18 @@ CONTENT GUIDELINES:
                     flush=True,
                 )
             lesson.save(update_fields=update_fields)
+        else:
+            # Non-math lessons still record EO validation
+            from apps.curriculum.models import Lesson  # noqa: F401
+            existing = lesson.metadata or {}
+            audit_blob = existing.get('verification_audit') or {}
+            audit_blob['step_enabling_objective_validation'] = {
+                **step_eo_stats,
+                'dropped_examples': step_eo_dropped_examples,
+            }
+            existing['verification_audit'] = audit_blob
+            lesson.metadata = existing
+            lesson.save(update_fields=['metadata'])
 
     def _extract_eo_skills(self, lesson):
         """Create Skill records from enabling objectives for SM-2 mastery tracking."""
@@ -1997,6 +2104,37 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                         flush=True,
                     )
 
+            # Snap each question's enabling_objective to one of the
+            # lesson's canonical EOs. The LLM is told to copy verbatim
+            # but drifts; this validation makes it deterministic.
+            # Mismatches drop the TAG (clearing it), keeping the
+            # question itself.
+            canonical_eos = list(lesson.enabling_objectives or [])
+            eo_validation_stats = {
+                'exact': 0, 'snapped': 0, 'dropped': 0, 'empty': 0,
+            }
+            eo_dropped_examples: List[Dict] = []
+            for q in questions:
+                raw_eo = q.get('enabling_objective', '') or ''
+                normalised, status = _normalize_enabling_objective(
+                    raw_eo, canonical_eos,
+                )
+                eo_validation_stats[status] = eo_validation_stats.get(status, 0) + 1
+                q['enabling_objective'] = normalised
+                if status == 'dropped' and len(eo_dropped_examples) < 5:
+                    eo_dropped_examples.append({
+                        'question': (q.get('question_text') or q.get('question', ''))[:100],
+                        'rejected_eo': raw_eo[:160],
+                    })
+            print(
+                f"[ContentGen] [{lesson.title}] enabling_objective "
+                f"validation: exact={eo_validation_stats['exact']}, "
+                f"snapped={eo_validation_stats['snapped']}, "
+                f"dropped={eo_validation_stats['dropped']}, "
+                f"empty={eo_validation_stats['empty']}",
+                flush=True,
+            )
+
             for i, q in enumerate(questions):
                 q_type = q.get('question_type', 'mcq')
                 kwargs = {
@@ -2005,10 +2143,9 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                     'question_text': q.get('question_text') or q.get('question', ''),
                     'explanation': q.get('explanation', ''),
                     'concept_tag': q.get('concept_tag', ''),
-                    # Sub-objective (specific EO) — promoted from
-                    # answer_data JSON to a first-class field
-                    # 2026-05-01 so remediation can target the failing
-                    # sub-skill, not just the broad learning objective.
+                    # Sub-objective (specific EO) — already snapped to
+                    # one of the lesson's canonical enabling_objectives
+                    # by _normalize_enabling_objective above.
                     'enabling_objective': (q.get('enabling_objective') or '')[:500],
                     'difficulty': q.get('difficulty', 'medium'),
                     'order_index': i,
@@ -2074,6 +2211,12 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
             audit_blob['layer4_retry_count'] = layer4_retry_count
             audit_blob['layer4_unresolved'] = layer4_unresolved
             audit_blob['exit_ticket_questions_created'] = len(questions)
+            # Sub-objective tag validation always recorded so the
+            # teacher dashboard can surface drift.
+            audit_blob['exit_ticket_enabling_objective_validation'] = {
+                **eo_validation_stats,
+                'dropped_examples': eo_dropped_examples,
+            }
             audit_blob.setdefault('math_check_run', True)
             audit_blob.setdefault(
                 'generated_at', timezone.now().isoformat(),
@@ -2087,6 +2230,20 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 )
                 update_fields.append('content_status')
             lesson.save(update_fields=update_fields)
+        else:
+            # Non-math (or no math-layer issues): still record the EO
+            # validation result so teachers see exit-ticket tag drift
+            # in the audit even when no math layer fired.
+            existing = lesson.metadata or {}
+            audit_blob = existing.get('verification_audit') or {}
+            audit_blob['exit_ticket_enabling_objective_validation'] = {
+                **eo_validation_stats,
+                'dropped_examples': eo_dropped_examples,
+            }
+            audit_blob['exit_ticket_questions_created'] = len(questions)
+            existing['verification_audit'] = audit_blob
+            lesson.metadata = existing
+            lesson.save(update_fields=['metadata'])
 
         # Coverage check (P4 of memory/tutor_no_authoring_plan.md):
         # warn if any practice step's concept_tag has no matching bank
