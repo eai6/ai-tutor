@@ -504,6 +504,35 @@ class ImageGenerationService:
             asset.save()
 
             logger.info(f"Saved generated image: {asset.file.url}")
+
+            # Best-effort: extract figure_facts so the runtime tutor can
+            # anchor scaffolding in real labelled features instead of
+            # asking the student to imagine. Non-fatal — if extraction
+            # fails, the figure still serves; the runtime falls through
+            # to text-only behaviour. See memory/figure_facts_plan.md.
+            try:
+                from apps.curriculum.figure_facts_extractor import (
+                    extract_figure_facts,
+                )
+                facts, err = extract_figure_facts(image_bytes)
+                if err is None and facts is not None:
+                    asset.figure_facts = facts.model_dump(mode="json")
+                    asset.save(update_fields=["figure_facts", "updated_at"])
+                    logger.info(
+                        f"[FigureFacts] extracted for asset #{asset.id} "
+                        f"(type={facts.type}, "
+                        f"features={len(facts.labelled_features)})"
+                    )
+                else:
+                    logger.info(
+                        f"[FigureFacts] skip asset #{asset.id}: {err}"
+                    )
+            except Exception as ff_err:
+                logger.warning(
+                    f"[FigureFacts] extraction crashed for asset "
+                    f"#{asset.id}: {ff_err}"
+                )
+
             return asset.file.url
 
         except Exception as e:

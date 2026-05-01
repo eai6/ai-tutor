@@ -3432,6 +3432,11 @@ Follow the current step; this concept will be covered in sequence."""
         # Append media catalog so the LLM knows what figures are available
         system_prompt += self._build_media_catalog()
 
+        # Append figure_facts — structured visual ground truth for any
+        # figure attached to the current step. Replaces "imagine" with
+        # "look at the figure". See memory/figure_facts_plan.md.
+        system_prompt += self._build_figure_facts_block()
+
         # Append question bank — math-only. Forces the tutor to pose
         # only verified questions, never author its own. See
         # memory/tutor_no_authoring_plan.md.
@@ -3689,6 +3694,143 @@ Follow the current step; this concept will be covered in sequence."""
         catalog += "\n|||GENERATE:category:description||| (as the LAST line)"
         catalog += "\n</media_catalog>"
         return catalog
+
+    def _build_figure_facts_block(self) -> str:
+        """Build the <figure_facts> block for the current step.
+
+        For each figure attached to the current step that carries
+        structured `figure_facts` metadata, render the scene
+        description, labelled features, verified relationships, and
+        anchor prompts. Followed by usage rules forbidding "imagine X"
+        when the figure is visible. See memory/figure_facts_plan.md.
+
+        Math-only — gated on Course.is_math. Empty string when there
+        is no current step, no attached figure, or no figure_facts on
+        the attached MediaAsset.
+        """
+        try:
+            if not self.lesson.unit.course.is_math:
+                return ''
+        except Exception:
+            return ''
+        if self.current_topic_index >= len(self.steps):
+            return ''
+        current_step = self.steps[self.current_topic_index]
+
+        # Collect MediaAssets referenced by the current step. A step's
+        # `media` JSONField may reference assets by URL; we pull
+        # MediaAsset rows whose file URL matches.
+        from apps.media_library.models import MediaAsset
+
+        urls = set()
+        if current_step.media:
+            for img in (current_step.media.get('images') or []):
+                u = img.get('url')
+                if u:
+                    urls.add(u)
+        if not urls:
+            return ''
+
+        # Match by file URL — Django's FileField.url is a string we can
+        # compare. We only iterate institution-scoped assets to keep
+        # the query bounded.
+        institution = self.session.institution
+        candidate_qs = MediaAsset.objects.filter(
+            asset_type=MediaAsset.AssetType.IMAGE,
+            figure_facts__isnull=False,
+        )
+        if institution is not None:
+            candidate_qs = candidate_qs.filter(institution=institution)
+
+        matched = []
+        for asset in candidate_qs.iterator():
+            try:
+                if asset.file and asset.file.url in urls:
+                    matched.append(asset)
+            except Exception:
+                continue
+
+        if not matched:
+            return ''
+
+        parts: List[str] = []
+        for asset in matched:
+            facts = asset.figure_facts or {}
+            if not isinstance(facts, dict):
+                continue
+            block = [f"\n<figure_facts source=\"{asset.title[:80]}\">"]
+            scene = (facts.get('scene_description') or '').strip()
+            if scene:
+                block.append(f"  Scene: {scene}")
+            features = facts.get('labelled_features') or []
+            if features:
+                block.append("  Labelled features:")
+                for f in features[:20]:
+                    label = f.get('label', '?')
+                    location = f.get('location', '?')
+                    color = f.get('color')
+                    suffix = f" ({color})" if color else ""
+                    block.append(f"    - \"{label}\" — {location}{suffix}")
+            relationships = facts.get('angle_relationships') or []
+            if relationships:
+                block.append("  Verified relationships:")
+                for r in relationships[:20]:
+                    pair = r.get('pair') or [None, None]
+                    rel = (r.get('relationship') or '').upper().replace('_', ' ')
+                    if r.get('equal') is True:
+                        block.append(
+                            f"    - Angles {pair[0]} and {pair[1]} are {rel} (equal)"
+                        )
+                    elif r.get('sum') is not None:
+                        block.append(
+                            f"    - Angles {pair[0]} and {pair[1]} are {rel} "
+                            f"(sum to {r.get('sum')}°)"
+                        )
+                    else:
+                        block.append(
+                            f"    - Angles {pair[0]} and {pair[1]} are {rel}"
+                        )
+            extra = facts.get('extra_facts') or []
+            if extra:
+                block.append("  Other facts:")
+                for fact in extra[:10]:
+                    block.append(f"    - {fact}")
+            anchors = facts.get('anchor_prompts') or []
+            if anchors:
+                block.append("  Anchor prompts you may use VERBATIM to direct attention:")
+                for a in anchors[:6]:
+                    block.append(f"    - \"{a}\"")
+            block.append("</figure_facts>")
+            parts.append("\n".join(block))
+
+        if not parts:
+            return ''
+
+        rules = (
+            "\n\nRULES FOR USING FIGURES:"
+            "\n1. PROMPT VISUALISATION, NOT IMAGINATION. The figure"
+            " above is ALREADY VISIBLE to the student. Say \"look at"
+            " the figure\" / \"find angle 5 on the diagram\" — NEVER"
+            " \"imagine two parallel lines\" or \"picture this\". The"
+            " student sees the figure; you must reference it as a"
+            " present, visible object."
+            "\n2. ANCHOR YOUR SCAFFOLDING. Reference labelled features"
+            " by their actual labels and positions (\"the blue angle"
+            " at the top-left of the upper intersection\"), not vague"
+            " gestures (\"an angle up here\")."
+            "\n3. VERIFY CLAIMS AGAINST <figure_facts>. When the"
+            " student names a relationship (\"are 1 and 5"
+            " corresponding?\"), consult the verified relationships"
+            " list before answering. Do not interpret the geometry"
+            " yourself — the data above is authoritative."
+            "\n4. PREFER ANCHOR PROMPTS. The anchor prompts above are"
+            " pre-verified scaffolds you can use verbatim — no"
+            " authoring required."
+            "\n5. HONEST UNCERTAINTY. If the student asks about"
+            " something not in <figure_facts>, say so. Do not guess"
+            " about visual features that aren't enumerated above."
+        )
+        return "\n" + "\n".join(parts) + rules + "\n"
 
     def _build_question_bank_block(self) -> str:
         """Build the <question_bank> block for math sessions.

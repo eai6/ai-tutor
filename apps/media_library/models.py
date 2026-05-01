@@ -46,6 +46,22 @@ class MediaAsset(models.Model):
         blank=True,
         help_text="Comma-separated tags for search"
     )
+    # Structured visual facts extracted from the figure at content-gen
+    # (or backfilled). Used by the tutor at runtime to anchor scaffolding
+    # in real labelled features instead of asking the student to imagine.
+    # Schema: apps.curriculum.figure_facts_schema.FigureFacts. Lesson
+    # is_published gates approval — no separate verified flag.
+    # See memory/figure_facts_plan.md.
+    figure_facts = models.JSONField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Structured visual facts extracted from this figure: "
+            "scene_description, labelled_features, angle_relationships, "
+            "extra_facts, anchor_prompts. See "
+            "apps.curriculum.figure_facts_schema.FigureFacts."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
