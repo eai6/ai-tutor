@@ -27,14 +27,14 @@ from apps.tutoring.models import (
 def compute_passing_threshold_pct(exit_ticket: Optional[ExitTicket]) -> float:
     """Return the passing threshold as a 0.0-1.0 fraction.
 
-    Assumes a 10-question exit ticket when exact total is unknown (matches
-    the system default elsewhere in the codebase).
+    The denominator is questions_per_attempt (what the student sees in one
+    sitting — default 10), NOT the bank size. Using bank size produces
+    misleading thresholds like 8/35 ≈ 23% instead of the real 8/10 = 80%.
     """
     if not exit_ticket:
         return 0.8
-    # passing_score is a count; divide by total question count.
-    total_questions = exit_ticket.questions.count() or 10
-    return round((exit_ticket.passing_score or 8) / total_questions, 4)
+    per_attempt = exit_ticket.questions_per_attempt or 10
+    return round((exit_ticket.passing_score or 8) / per_attempt, 4)
 
 
 def best_attempt(student: User, lesson: Lesson) -> Optional[ExitTicketAttempt]:
