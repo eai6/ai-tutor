@@ -1093,10 +1093,34 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
         return {'lesson': lesson.title, 'success': False, 'error': str(e)}
 
 
-def generate_complete_course(course_id: int, institution_id: int, log_fn=None, max_workers: int = 3):
+def generate_complete_course(
+    course_id: int,
+    institution_id: int,
+    log_fn=None,
+    max_workers: int = 3,
+    *,
+    regen_steps: bool = True,
+    regen_exit_tickets: bool = True,
+    regen_summative: bool = True,
+):
     """
-    Regenerate every lesson in a course in parallel batches AND
-    every exit ticket AND the course's summative bank.
+    Regenerate course content. Three independent toggles select
+    which phases to run — matches the checkboxes on the "Regenerate
+    content" form on the course detail page.
+
+      regen_steps          — Phase 1 (LessonStep wipe + regen)
+      regen_exit_tickets   — Phase 2 (ExitTicketQuestion bank
+                             force-replace; drops attempt history
+                             on affected lessons)
+      regen_summative      — Phase 3 (re-sample summative bank
+                             from the current lesson exit tickets;
+                             math courses only; drops summative
+                             attempt rows)
+
+    All-three is the typical "regenerate everything" flow. Steps-
+    off + tickets-on is the "fix exit tickets without paying for
+    step regen" flow. Summative-only requires the lesson exit
+    tickets to already be the correct version (no LLM call).
 
     Three phases:
       1. Steps — wipes LessonStep rows per lesson, regenerates via
@@ -1150,6 +1174,24 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
     course = Course.objects.get(id=course_id)
     pipeline_start = time.time()
 
+    # Resolve the three flags. If the caller passed all-False
+    # (shouldn't happen — view validates) we'd silently no-op;
+    # log a warning so it's visible.
+    do_steps = bool(regen_steps)
+    do_exit_tickets = bool(regen_exit_tickets)
+    do_summative = bool(regen_summative)
+    if not (do_steps or do_exit_tickets or do_summative):
+        logger.warning(
+            "[CourseRegen] %s: no phases selected — nothing to do",
+            course.title,
+        )
+        return {
+            'course': course.title, 'total': 0, 'success': 0,
+            'failed': 0, 'skipped': 0, 'lessons': [],
+            'exit_tickets_ok': 0, 'exit_tickets_failed': 0,
+            'summative_questions': 0, 'summative_error': None,
+        }
+
     log_lock = threading.Lock()
 
     def log(msg):
@@ -1163,7 +1205,8 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
     lessons = list(
         Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
     )
-    log(f"🚀 Starting course regen for '{course.title}' — {len(lessons)} lesson(s) with {max_workers} parallel workers")
+    scope_label = "steps + exit tickets + summative" if do_steps else "exit tickets + summative (steps preserved)"
+    log(f"🚀 Starting course regen for '{course.title}' — {len(lessons)} lesson(s), scope: {scope_label}, {max_workers} parallel workers")
 
     summary = {
         'course': course.title,
@@ -1199,41 +1242,46 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
         # The pipeline's _generate_exit_ticket has skip-if-exists
         # semantics, which is fine here — we replace the questions
         # explicitly in phase 2 below with force_regenerate=True.
-        lesson.steps.all().delete()
-        lesson.content_status = 'empty'
-        lesson.updated_at = timezone.now()
-        lesson.save(update_fields=['content_status', 'updated_at'])
+        # Skipped when scope='exit_tickets' — steps stay as-is.
+        if do_steps:
+            lesson.steps.all().delete()
+            lesson.content_status = 'empty'
+            lesson.updated_at = timezone.now()
+            lesson.save(update_fields=['content_status', 'updated_at'])
 
-        try:
-            result = generate_complete_lesson(lesson.id, institution_id, log_fn=log_fn)
-            ok = bool(result.get('success'))
-        except Exception as e:
-            log(f"   ❌ {lesson.title}: {e}")
-            return {'lesson': lesson.title, 'status': 'failed', 'error': str(e)}
+            try:
+                result = generate_complete_lesson(lesson.id, institution_id, log_fn=log_fn)
+                ok = bool(result.get('success'))
+            except Exception as e:
+                log(f"   ❌ {lesson.title}: {e}")
+                return {'lesson': lesson.title, 'status': 'failed', 'error': str(e)}
 
-        if not ok:
-            return {'lesson': lesson.title, 'status': 'failed',
-                    'error': result.get('error')}
+            if not ok:
+                return {'lesson': lesson.title, 'status': 'failed',
+                        'error': result.get('error')}
 
         # Phase 2 — force-regenerate the exit ticket so Layers 1+2+4
         # apply to the question bank. Failures here don't fail the
         # whole lesson — steps are already regenerated and saved;
-        # the exit ticket can be retried independently.
-        et_status = 'ok'
+        # the exit ticket can be retried independently. Skipped
+        # when do_exit_tickets is False.
+        et_status = None
         et_error = None
-        try:
-            lesson.refresh_from_db()
-            et_result = generate_exit_ticket_for_lesson(
-                lesson, institution_id, force_regenerate=True,
-            )
-            if not et_result.get('success'):
+        if do_exit_tickets:
+            et_status = 'ok'
+            try:
+                lesson.refresh_from_db()
+                et_result = generate_exit_ticket_for_lesson(
+                    lesson, institution_id, force_regenerate=True,
+                )
+                if not et_result.get('success'):
+                    et_status = 'failed'
+                    et_error = et_result.get('error')
+                    log(f"   ⚠️ {lesson.title}: exit-ticket regen failed — {et_error}")
+            except Exception as e:
                 et_status = 'failed'
-                et_error = et_result.get('error')
-                log(f"   ⚠️ {lesson.title}: exit-ticket regen failed — {et_error}")
-        except Exception as e:
-            et_status = 'failed'
-            et_error = str(e)
-            log(f"   ⚠️ {lesson.title}: exit-ticket regen crashed — {e}")
+                et_error = str(e)
+                log(f"   ⚠️ {lesson.title}: exit-ticket regen crashed — {e}")
 
         return {
             'lesson': lesson.title,
@@ -1268,8 +1316,9 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
             log(f"   [{completed}/{len(lessons)}] {res.get('lesson', '?')} → {res['status']}{et_msg}")
 
     # Phase 3 — rebuild the summative bank by sampling from the
-    # (now-fresh) lesson exit tickets. Free, no LLM call. Math-only.
-    if course.is_math:
+    # (now-fresh) lesson exit tickets. Free, no LLM call. Math-only,
+    # and only when the caller asked for it.
+    if course.is_math and do_summative:
         try:
             from apps.tutoring.summative_generator import (
                 generate_summative_for_course,

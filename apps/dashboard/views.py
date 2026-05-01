@@ -3287,22 +3287,49 @@ def course_regenerate_all(request, course_id):
         except ValueError:
             pass
 
+    # Read scope checkboxes from the form (default: all on).
+    regen_steps = bool(request.POST.get('regen_steps'))
+    regen_et = bool(request.POST.get('regen_exit_tickets'))
+    regen_sum = bool(request.POST.get('regen_summative'))
+    if not (regen_steps or regen_et or regen_sum):
+        messages.warning(
+            request,
+            "Pick at least one thing to regenerate "
+            "(steps, exit tickets, or summative).",
+        )
+        return redirect('dashboard:course_detail', course_id=course.id)
+
     inst = institution or course.institution or Institution.get_global()
-    run_async(generate_complete_course, course.id, inst.id)
+    run_async(
+        generate_complete_course,
+        course.id, inst.id,
+        regen_steps=regen_steps,
+        regen_exit_tickets=regen_et,
+        regen_summative=regen_sum,
+    )
 
     lesson_count = course.units.aggregate(n=Count('lessons'))['n'] or 0
-    summative_msg = (
-        " The summative bank will be rebuilt from the new exit tickets at the end."
-        if course.is_math else ""
-    )
+    parts = []
+    if regen_steps:
+        parts.append("lesson steps")
+    if regen_et:
+        parts.append("exit tickets")
+    if regen_sum and course.is_math:
+        parts.append("summative bank")
+    if len(parts) > 1:
+        scope_human = ", ".join(parts[:-1]) + " + " + parts[-1]
+    else:
+        scope_human = parts[0] if parts else "(nothing)"
     messages.success(
         request,
-        f"Regenerating all {lesson_count} lesson(s) in '{course.title}'.{duration_msg} "
-        f"Running 3 in parallel — steps first, then exit tickets per lesson."
-        f"{summative_msg} "
-        f"Refresh this page to watch the status badges light up. "
-        f"Student mastery levels + permanent competency transcript are preserved; "
-        f"per-lesson exit-ticket attempts on regenerated lessons will be reset.",
+        f"Regenerating {scope_human} in '{course.title}' "
+        f"({lesson_count} lesson(s)).{duration_msg} "
+        f"Running 3 in parallel — refresh this page to watch progress. "
+        f"Student mastery + permanent competency transcript are preserved"
+        + (
+            "; per-lesson exit-ticket attempts on regenerated lessons reset."
+            if regen_et else "."
+        ),
     )
     return redirect('dashboard:course_detail', course_id=course.id)
 

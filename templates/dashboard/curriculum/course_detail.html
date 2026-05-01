@@ -543,14 +543,28 @@
 <div class="bulk-actions" style="background: #f5f3ff; border: 1px solid #ddd6fe; margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">🔁</span>
     <div style="flex: 1; min-width: 240px;">
-        <strong style="color: #5b21b6;">Regenerate all content</strong>
-        <div style="font-size: 0.8rem; color: #6d28d9;">Replaces lesson steps <strong>and</strong> exit-ticket questions across the whole course{% if course.is_math %}, then rebuilds the summative bank{% endif %}. Runs 3 lessons in parallel. Mastery levels and the permanent competency transcript are preserved; exit-ticket attempt history on regenerated lessons is reset. Use the green "Default lesson duration" form above for duration-only changes — those don't need a regen.</div>
+        <strong style="color: #5b21b6;">Regenerate content</strong>
+        <div style="font-size: 0.8rem; color: #6d28d9;">Pick what to refresh. Lesson steps regenerate the teaching script + worked examples. Exit tickets replace the question bank{% if course.is_math %} and rebuild the summative{% endif %}. Mastery levels and the permanent competency transcript are always preserved; per-lesson exit-ticket attempts on regenerated lessons reset.</div>
     </div>
     <form method="post" action="{% url 'dashboard:course_regenerate_all' course.id %}" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
         {% csrf_token %}
+        <label style="font-size:0.78rem; color:#5b21b6; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Wipe + regenerate LessonStep rows. ~2 min/lesson.">
+            <input type="checkbox" name="regen_steps" value="1" checked style="accent-color:#7c3aed;">
+            Lesson steps
+        </label>
+        <label style="font-size:0.78rem; color:#5b21b6; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Replace ExitTicketQuestion rows. Drops attempt history on affected lessons. ~30s/lesson.">
+            <input type="checkbox" name="regen_exit_tickets" value="1" checked style="accent-color:#7c3aed;">
+            Exit tickets
+        </label>
+        {% if course.is_math %}
+        <label style="font-size:0.78rem; color:#5b21b6; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Re-sample the summative bank from current exit tickets. No LLM call. Drops summative attempts.">
+            <input type="checkbox" name="regen_summative" value="1" checked style="accent-color:#7c3aed;">
+            Summative bank
+        </label>
+        {% endif %}
         <button type="submit" class="btn btn-secondary btn-sm" style="border-color:#a78bfa; color:#5b21b6;"
-                onclick="return confirm('Regenerate ALL content in this course?\n\nWhat happens:\n• Lesson steps replaced (max-depth, 10 steps each)\n• Exit-ticket question banks REGENERATED (Layer 1+2+4 defenses applied)\n{% if course.is_math %}• Summative bank REBUILT from new exit tickets\n{% endif %}• Mastery levels PRESERVED\n• Permanent competency transcript PRESERVED\n• Exit-ticket attempt history on regenerated lessons RESET\n\nRuns 3 lessons in parallel in the background — refresh to watch progress.');">
-            🔁 Regenerate all content
+                onclick="return confirm('Regenerate the selected content?\n\nMastery levels + permanent competency transcript are preserved.\nExit-ticket attempt history on affected lessons resets.\nRuns 3 lessons in parallel in the background — refresh to watch progress.');">
+            🔁 Regenerate
         </button>
     </form>
 </div>
