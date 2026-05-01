@@ -4717,17 +4717,22 @@ def lesson_live_monitor(request, lesson_id):
         # Active engagement: sum gaps between consecutive turns, clipping any
         # gap > 5 min so a student who left the tab open for days doesn't rack
         # up wall-clock minutes. Gives "time actually tutoring" not "wall clock".
+        # Gaps are also floored at 0: started_lesson_at can be set retroactively
+        # (or by a later code path), so it may post-date the first turn — in
+        # which case the first gap would be negative and corrupt the total.
         duration = None
         turn_times = sorted(t.created_at for t in session.turns.all())
         if turn_times:
             active_seconds = 0.0
             prev = session.started_lesson_at or turn_times[0]
             for t in turn_times:
-                active_seconds += min((t - prev).total_seconds(), IDLE_THRESHOLD_SECONDS)
+                gap = (t - prev).total_seconds()
+                active_seconds += max(0, min(gap, IDLE_THRESHOLD_SECONDS))
                 prev = t
             # Include time since last turn if still active
             if session.status == 'active' and not session.ended_at:
-                active_seconds += min((now - prev).total_seconds(), IDLE_THRESHOLD_SECONDS)
+                tail = (now - prev).total_seconds()
+                active_seconds += max(0, min(tail, IDLE_THRESHOLD_SECONDS))
             duration = round(active_seconds / 60, 1)
 
         is_idle = False
@@ -4928,7 +4933,8 @@ def session_chat_history(request, session_id):
     state = session.engine_state or {}
 
     # Active engagement (same calc as live monitor — clip turn-to-turn gaps > 5 min
-    # so multi-day sessions don't show 4-digit minute totals).
+    # so multi-day sessions don't show 4-digit minute totals). Floor at 0 because
+    # started_lesson_at can post-date the first turn.
     IDLE_CAP_SECONDS = 5 * 60
     duration_minutes = None
     turn_times = list(turns.values_list('created_at', flat=True))
@@ -4936,10 +4942,12 @@ def session_chat_history(request, session_id):
         active_seconds = 0.0
         prev = session.started_lesson_at or turn_times[0]
         for t in turn_times:
-            active_seconds += min((t - prev).total_seconds(), IDLE_CAP_SECONDS)
+            gap = (t - prev).total_seconds()
+            active_seconds += max(0, min(gap, IDLE_CAP_SECONDS))
             prev = t
         if session.status == 'active' and not session.ended_at:
-            active_seconds += min((timezone.now() - prev).total_seconds(), IDLE_CAP_SECONDS)
+            tail = (timezone.now() - prev).total_seconds()
+            active_seconds += max(0, min(tail, IDLE_CAP_SECONDS))
         duration_minutes = round(active_seconds / 60, 1)
 
     context = {
