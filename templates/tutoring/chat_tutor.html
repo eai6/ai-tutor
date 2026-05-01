@@ -1535,6 +1535,7 @@ function sanitizeContent(text) {
         .replace(/\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|/g, '')
         .replace(/\|\|\|ARTIFACT:html\|\|\|[\s\S]*?\|\|\|\/ARTIFACT\|\|\|/g, '')
         .replace(/\|\|\|PROBE\s*:\s*\{[\s\S]*?\}\s*\|\|\|/g, '')
+        .replace(/\|\|\|QUESTION\s*:\s*\d+\s*\|\|\|/g, '')
         .replace(/ {2,}/g, ' ')
         .trim();
 }

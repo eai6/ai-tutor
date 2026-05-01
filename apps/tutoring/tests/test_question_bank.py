@@ -1,13 +1,19 @@
-"""Tests for the no-authoring question-bank helpers (P1).
+"""Tests for the no-authoring question-bank helpers (P1) and the
+ConversationalTutor wiring that consumes them (P2).
 
 See memory/tutor_no_authoring_plan.md.
 """
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 
 from apps.accounts.models import Institution
 from apps.curriculum.models import Course, Unit, Lesson, LessonStep
-from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+from apps.tutoring.models import (
+    ExitTicket,
+    ExitTicketQuestion,
+    TutorSession,
+)
 from apps.tutoring.question_bank import (
     CANDIDATES_PER_STEP,
     POOL_SIZE_PER_LESSON,
@@ -192,3 +198,162 @@ class QuestionBankHelpersTest(TestCase):
 
     def test_render_to_prose_none_returns_empty(self):
         self.assertEqual(render_question_to_prose(None), '')
+
+
+class QuestionBankWiringTest(TestCase):
+    """End-to-end tests for ConversationalTutor.{_build_question_bank_block,
+    _parse_question_signal} — exercises the wiring without an LLM call."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.institution = Institution.objects.create(name="W", slug="w")
+        cls.student = User.objects.create_user(username="s2", password="pw")
+        cls.math_course = Course.objects.create(
+            institution=cls.institution, title="Math S3",
+            grade_level="S3", is_published=True,
+            subject_type='math',
+        )
+        cls.non_math_course = Course.objects.create(
+            institution=cls.institution, title="Geo S3",
+            grade_level="S3", is_published=True,
+            subject_type='humanities',
+        )
+        cls.unit = Unit.objects.create(
+            course=cls.math_course, title="U", order_index=0,
+        )
+        cls.geo_unit = Unit.objects.create(
+            course=cls.non_math_course, title="U", order_index=0,
+        )
+        cls.lesson = Lesson.objects.create(
+            unit=cls.unit, title="Angles around a point",
+            objective="360°", order_index=0, is_published=True,
+        )
+        cls.geo_lesson = Lesson.objects.create(
+            unit=cls.geo_unit, title="Capitals", objective="x",
+            order_index=0, is_published=True,
+        )
+        cls.practice_step = LessonStep.objects.create(
+            lesson=cls.lesson,
+            phase='practice', step_type='practice', order_index=0,
+            teacher_script="Three angles around a point are 95°, 70°, and x°. Find x.",
+            expected_answer="195°",
+            concept_tag="angles_around_point",
+        )
+        cls.geo_step = LessonStep.objects.create(
+            lesson=cls.geo_lesson,
+            phase='practice', step_type='practice', order_index=0,
+            teacher_script="What is the capital of Seychelles?",
+            expected_answer="Victoria",
+            concept_tag="seychelles_geography",
+        )
+        cls.published_ticket = ExitTicket.objects.create(
+            lesson=cls.lesson, passing_score=8, is_published=True,
+        )
+        for i in range(15):
+            ExitTicketQuestion.objects.create(
+                exit_ticket=cls.published_ticket,
+                question_text=f"Bank Q{i}",
+                option_a="A", option_b="B", option_c="C", option_d="D",
+                correct_answer="A", explanation="",
+                concept_tag="angles_around_point",
+                order_index=i,
+            )
+
+    def _make_tutor(self, session, steps, current_topic_index=0):
+        from apps.tutoring.conversational_tutor import ConversationalTutor
+        tutor = ConversationalTutor.__new__(ConversationalTutor)
+        tutor.session = session
+        tutor.lesson = session.lesson
+        tutor.student = self.student
+        tutor.steps = steps
+        tutor.current_topic_index = current_topic_index
+        tutor._question_id_map = {}
+        return tutor
+
+    def _make_session(self, lesson, engine_state=None):
+        return TutorSession.objects.create(
+            institution=self.institution,
+            student=self.student,
+            lesson=lesson,
+            engine_state=engine_state or {},
+        )
+
+    def test_bank_block_empty_for_non_math_course(self):
+        session = self._make_session(self.geo_lesson)
+        tutor = self._make_tutor(session, [self.geo_step])
+        block = tutor._build_question_bank_block()
+        self.assertEqual(block, '')
+        self.assertEqual(tutor._question_id_map, {})
+
+    def test_bank_block_populated_for_math_course(self):
+        session = self._make_session(self.lesson)
+        tutor = self._make_tutor(session, [self.practice_step])
+        block = tutor._build_question_bank_block()
+        self.assertIn("<question_bank>", block)
+        self.assertIn("Three angles around a point", block)
+        # Slot 0 is the LessonStep
+        self.assertIs(tutor._question_id_map[SENTINEL_NO_QUESTION], self.practice_step)
+        # At least one bank candidate at a 1-indexed slot
+        self.assertIn(1, tutor._question_id_map)
+
+    def test_pool_persisted_to_engine_state_on_first_call(self):
+        session = self._make_session(self.lesson)
+        tutor = self._make_tutor(session, [self.practice_step])
+        tutor._build_question_bank_block()
+        session.refresh_from_db()
+        self.assertIn('question_pool_ids', session.engine_state)
+        self.assertGreater(len(session.engine_state['question_pool_ids']), 0)
+
+    def test_pool_reloads_from_engine_state_on_subsequent_calls(self):
+        # Pre-seed the pool
+        bank_ids = list(self.published_ticket.questions.values_list('id', flat=True))
+        # Hand-pick a 5-question pool (subset of what's in the bank)
+        seeded_pool = bank_ids[:5]
+        session = self._make_session(
+            self.lesson, engine_state={'question_pool_ids': seeded_pool},
+        )
+        tutor = self._make_tutor(session, [self.practice_step])
+        tutor._build_question_bank_block()
+        # Pool must come back as the EXACT seeded list, not re-sampled
+        session.refresh_from_db()
+        self.assertEqual(session.engine_state['question_pool_ids'], seeded_pool)
+
+    def test_parse_signal_resolves_to_correct_entry(self):
+        session = self._make_session(self.lesson)
+        tutor = self._make_tutor(session, [self.practice_step])
+        tutor._build_question_bank_block()
+        # Pose slot 0 → returns the step
+        clean, entry = tutor._parse_question_signal("Try this. |||QUESTION:0|||")
+        self.assertNotIn("|||QUESTION", clean)
+        self.assertIs(entry, self.practice_step)
+        # Pose slot 1 → returns an ExitTicketQuestion
+        clean, entry = tutor._parse_question_signal("Next one. |||QUESTION:1|||")
+        self.assertIsInstance(entry, ExitTicketQuestion)
+
+    def test_parse_signal_unknown_slot_returns_none_entry(self):
+        session = self._make_session(self.lesson)
+        tutor = self._make_tutor(session, [self.practice_step])
+        tutor._build_question_bank_block()
+        clean, entry = tutor._parse_question_signal("Bad |||QUESTION:9999|||")
+        self.assertIsNone(entry)
+        self.assertNotIn("|||QUESTION", clean)
+
+    def test_parse_signal_no_signal_returns_text_unchanged(self):
+        session = self._make_session(self.lesson)
+        tutor = self._make_tutor(session, [self.practice_step])
+        tutor._build_question_bank_block()
+        clean, entry = tutor._parse_question_signal("No signal in this one.")
+        self.assertIsNone(entry)
+        self.assertEqual(clean, "No signal in this one.")
+
+    def test_bank_block_id_map_resets_each_call(self):
+        # Ensures stale entries from a prior turn can't be referenced
+        # by a new turn's signal.
+        session = self._make_session(self.lesson)
+        tutor = self._make_tutor(session, [self.practice_step])
+        tutor._build_question_bank_block()
+        first_keys = set(tutor._question_id_map.keys())
+        tutor._build_question_bank_block()
+        second_keys = set(tutor._question_id_map.keys())
+        # The keys should be the same shape (0..N), not accumulating
+        self.assertEqual(first_keys, second_keys)

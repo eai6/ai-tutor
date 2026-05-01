@@ -1039,7 +1039,7 @@ class ConversationalTutor:
         ).order_by('created_at')
 
         _tag_re = re.compile(
-            r'\[SHOW_MEDIA\s*:[^\]]*\]|\|\|\|MEDIA\s*:\s*\d+\s*\|\|\||\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\||\|\|\|PROBE\s*:\s*\{.+?\}\s*\|\|\|',
+            r'\[SHOW_MEDIA\s*:[^\]]*\]|\|\|\|MEDIA\s*:\s*\d+\s*\|\|\||\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\||\|\|\|PROBE\s*:\s*\{.+?\}\s*\|\|\||\|\|\|QUESTION\s*:\s*\d+\s*\|\|\|',
             re.IGNORECASE | re.DOTALL,
         )
 
@@ -1567,6 +1567,16 @@ Keep it to 2-3 sentences."""
         clean_response, artifact_html = self._parse_artifact_signal(clean_response)
         # Parse |||PROBE:{json}||| for easy-mode interactive widget.
         clean_response, parsed_probe = self._parse_probe_signal(clean_response)
+        # Parse |||QUESTION:N||| (no-authoring tutor). When the LLM
+        # picks a bank entry we render it verbatim and append, so any
+        # question text the LLM might have written in prose is
+        # superseded by the canonical bank stem.
+        clean_response, picked_question = self._parse_question_signal(clean_response)
+        if picked_question is not None:
+            from apps.tutoring.question_bank import render_question_to_prose
+            rendered = render_question_to_prose(picked_question)
+            if rendered:
+                clean_response = (clean_response.rstrip() + "\n\n" + rendered).strip()
 
         # Verify calculations in math responses
         if self.lesson.unit.course.is_math:
@@ -1857,6 +1867,13 @@ Keep it to 2-3 sentences."""
 
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_content, parsed_media, gen_request = self._parse_media_signal(full_response)
+        # Parse |||QUESTION:N||| — render bank entry verbatim and append.
+        clean_content, picked_question = self._parse_question_signal(clean_content)
+        if picked_question is not None:
+            from apps.tutoring.question_bank import render_question_to_prose
+            rendered = render_question_to_prose(picked_question)
+            if rendered:
+                clean_content = (clean_content.rstrip() + "\n\n" + rendered).strip()
 
         # Verify calculations in math responses
         if self.lesson.unit.course.is_math:
@@ -3377,6 +3394,11 @@ Follow the current step; this concept will be covered in sequence."""
         # Append media catalog so the LLM knows what figures are available
         system_prompt += self._build_media_catalog()
 
+        # Append question bank — math-only. Forces the tutor to pose
+        # only verified questions, never author its own. See
+        # memory/tutor_no_authoring_plan.md.
+        system_prompt += self._build_question_bank_block()
+
         # Regeneration constraint (V3) — appended when retrying after a
         # validator hard-fail. Highest-priority block.
         regen = getattr(self, '_pending_regen_constraint', None)
@@ -3629,6 +3651,90 @@ Follow the current step; this concept will be covered in sequence."""
         catalog += "\n|||GENERATE:category:description||| (as the LAST line)"
         catalog += "\n</media_catalog>"
         return catalog
+
+    def _build_question_bank_block(self) -> str:
+        """Build the <question_bank> block for math sessions.
+
+        The tutor MUST NOT author its own arithmetic questions. Every
+        question posed during a math session comes from this bank:
+        either the current step's `teacher_script` (slot 0) or one of
+        the published `ExitTicketQuestion` rows for the same lesson.
+
+        See memory/tutor_no_authoring_plan.md.
+
+        Side effect: populates self._question_id_map = {N: entry} for
+        O(1) lookup when parsing |||QUESTION:N||| signals.
+        """
+        # Reset every turn so a stale map can't bleed across responses.
+        self._question_id_map = {}
+
+        try:
+            if not self.lesson.unit.course.is_math:
+                return ''
+        except Exception:
+            return ''
+        if self.current_topic_index >= len(self.steps):
+            return ''
+        current_step = self.steps[self.current_topic_index]
+
+        # Per-session pool — sample once at first need, cache the IDs
+        # in engine_state so reloads reconstruct the same pool. Same
+        # pattern the exit-ticket randomisation already uses.
+        from apps.tutoring.question_bank import (
+            pick_candidates_for_step,
+            render_bank_block,
+            sample_session_pool,
+        )
+        from apps.tutoring.models import ExitTicketQuestion
+
+        pool_ids = (self.session.engine_state or {}).get('question_pool_ids')
+        if pool_ids is None:
+            pool = sample_session_pool(self.lesson, seed=self.session.id)
+            pool_ids = [q.id for q in pool]
+            state = self.session.engine_state or {}
+            state['question_pool_ids'] = pool_ids
+            self.session.engine_state = state
+            self.session.save(update_fields=['engine_state'])
+        else:
+            # Preserve the sampled order so the bank block is stable
+            # turn-to-turn (otherwise Django's PK-ordered reload would
+            # change the candidate ranking each request).
+            qs = ExitTicketQuestion.objects.filter(id__in=pool_ids)
+            by_id = {q.id: q for q in qs}
+            pool = [by_id[i] for i in pool_ids if i in by_id]
+
+        if not pool:
+            return ''
+
+        candidates = pick_candidates_for_step(
+            pool, current_step.concept_tag or '',
+        )
+        block, id_map = render_bank_block(current_step, candidates)
+        self._question_id_map = id_map
+        return block
+
+    def _parse_question_signal(
+        self, text: str,
+    ) -> Tuple[str, Optional[object]]:
+        """Parse |||QUESTION:N||| from the LLM response.
+
+        Returns (clean_text, chosen_entry_or_None). chosen_entry is the
+        LessonStep (slot 0) or ExitTicketQuestion (slots 1..N) the LLM
+        picked. Caller renders it verbatim and appends to the response.
+        """
+        from apps.tutoring.question_bank import parse_question_signal
+        clean_text, n = parse_question_signal(text)
+        if n is None:
+            return clean_text, None
+        id_map = getattr(self, '_question_id_map', {}) or {}
+        entry = id_map.get(n)
+        if entry is None:
+            logger.warning(
+                "[QuestionBank] LLM emitted |||QUESTION:%d||| "
+                "but no entry exists at that slot (id_map keys: %s)",
+                n, sorted(id_map.keys()),
+            )
+        return clean_text, entry
 
     # =========================================================================
     # CONTEXT HELPERS
@@ -5901,6 +6007,7 @@ Do NOT just ask a quiz question — actually RE-TEACH the concept first, then ch
         content = re.sub(r'\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|', '', content)
         content = re.sub(r'\|\|\|ARTIFACT:html\|\|\|.*?\|\|\|/ARTIFACT\|\|\|', '', content, flags=re.DOTALL)
         content = re.sub(r'\|\|\|PROBE\s*:\s*\{.+?\}\s*\|\|\|', '', content, flags=re.DOTALL)
+        content = re.sub(r'\|\|\|QUESTION\s*:\s*\d+\s*\|\|\|', '', content)
         content = re.sub(r' {2,}', ' ', content)
         content = re.sub(r'\n{3,}', '\n\n', content)
         content = content.strip()
