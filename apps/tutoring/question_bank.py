@@ -99,12 +99,17 @@ def pick_published_for_concept_tag(
     concept_tag: str,
     max_candidates: int = 1,
 ):
-    """Query the published bank directly for matches by concept_tag.
+    """Query the published bank directly for matches by tag.
 
     Used by the remediation flow, which doesn't go through the per-
     session pool — the failed EOs may not be in the sampled subset,
-    so we hit the full published bank instead. Falls back to any
-    published bank question for the lesson when no exact tag matches.
+    so we hit the full published bank instead.
+
+    Match precedence (specific → general):
+      1. enabling_objective exact match — narrow sub-objective targeting
+      2. concept_tag exact match — broad learning-objective grouping
+      3. any published bank question for this lesson — fallback so the
+         tutor always has something verified to pose
     """
     from apps.tutoring.models import ExitTicketQuestion
     base = ExitTicketQuestion.objects.filter(
@@ -113,6 +118,11 @@ def pick_published_for_concept_tag(
     )
     tag = (concept_tag or '').strip()
     if tag:
+        # Sub-objective match first — most specific
+        matches = list(base.filter(enabling_objective=tag).order_by('order_index')[:max_candidates])
+        if matches:
+            return matches
+        # Then broader concept_tag
         matches = list(base.filter(concept_tag=tag).order_by('order_index')[:max_candidates])
         if matches:
             return matches

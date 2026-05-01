@@ -586,7 +586,10 @@
                         <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}#d1fae5{% elif question.difficulty == 'hard' %}#fee2e2{% else %}#fef3c7{% endif %};">{{ question.difficulty }}</span>
                         {% endif %}
                         {% if question.concept_tag %}
-                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe;">{{ question.concept_tag }}</span>
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe;" title="Learning objective (broad)">{{ question.concept_tag }}</span>
+                        {% endif %}
+                        {% if question.enabling_objective %}
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dcfce7; color: #166534; font-weight: 500;" title="Enabling objective (sub-skill — used for remediation targeting)">EO: {{ question.enabling_objective|truncatewords:8 }}</span>
                         {% endif %}
                     </div>
                 </div>

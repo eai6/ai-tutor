@@ -5647,8 +5647,12 @@ Which concept numbers were meaningfully covered?"""
             except Exception:
                 pass
 
-            # Track EO (concept_tag) for competency reporting
+            # Track tags for competency reporting + remediation
+            # targeting. concept_tag is the BROAD learning-objective
+            # grouping; enabling_objective is the NARROW sub-objective
+            # remediation actually targets.
             eo_tag = getattr(q, 'concept_tag', '') or ''
+            sub_eo = getattr(q, 'enabling_objective', '') or ''
 
             if is_correct:
                 correct += 1
@@ -5659,6 +5663,7 @@ Which concept numbers were meaningfully covered?"""
                     'index': i,
                     'question': q.question_text,
                     'concept_tag': eo_tag,
+                    'enabling_objective': sub_eo,
                     'student_answer': student_answer,
                     'correct_answer': q.correct_answer if q_type == 'mcq' else str(q.answer_data or {}),
                     'correct_text': getattr(q, f'option_{(q.correct_answer or "a").lower()}', '') if q_type == 'mcq' else '',
@@ -5670,6 +5675,7 @@ Which concept numbers were meaningfully covered?"""
                 'question': q.question_text,
                 'question_type': getattr(q, 'question_type', 'mcq') or 'mcq',
                 'concept_tag': eo_tag,
+                'enabling_objective': sub_eo,
                 'selected': student_answer,
                 'correct_answer': q.correct_answer if (getattr(q, 'question_type', 'mcq') or 'mcq') == 'mcq' else q.answer_data,
                 'is_correct': is_correct,
@@ -5976,25 +5982,34 @@ Which concept numbers were meaningfully covered?"""
         except Exception as e:
             logger.warning(f"Failed to save ExitTicketAttempt: {e}")
 
-        # Extract failed enabling objectives from exit ticket concept_tags
-        # First try concept_tag from the failed_questions dict (added in grading)
+        # Extract failed enabling objectives. Prefer the question's
+        # specific `enabling_objective` (sub-objective) — that's what
+        # remediation should target. Fall back to `concept_tag` for
+        # older questions where the field hasn't been backfilled, then
+        # to the question text as a last resort.
         failed_eos = set()
+        from apps.tutoring.models import ExitTicketQuestion
         for fq in failed_questions:
-            tag = fq.get('concept_tag', '')
+            eo = (fq.get('enabling_objective') or '').strip()
+            if eo:
+                failed_eos.add(eo)
+                continue
+            # Re-fetch from DB if the dict didn't carry it
+            q = ExitTicketQuestion.objects.filter(id=fq.get('id')).first() if fq.get('id') else None
+            if q and (q.enabling_objective or '').strip():
+                failed_eos.add(q.enabling_objective.strip())
+                continue
+            # Fallback to concept_tag
+            tag = (fq.get('concept_tag') or '').strip()
             if tag:
                 failed_eos.add(tag)
-
-        # Fallback: query DB for concept_tags
-        if not failed_eos:
-            from apps.tutoring.models import ExitTicketQuestion
-            for fq in failed_questions:
-                q = ExitTicketQuestion.objects.filter(id=fq['id']).first()
-                if q and q.concept_tag:
-                    failed_eos.add(q.concept_tag)
+                continue
+            if q and q.concept_tag:
+                failed_eos.add(q.concept_tag.strip())
 
         # Last resort: use question text
         if not failed_eos:
-            failed_eos = {fq['question'][:100] for fq in failed_questions[:5]}
+            failed_eos = {fq.get('question', '')[:100] for fq in failed_questions[:5]}
 
         self.failed_exit_questions = failed_questions
         self._failed_eos = list(failed_eos)

@@ -73,7 +73,7 @@ WORKED EXAMPLES (5 patterns covering different shapes)
 ═══════════════════════════════════════════════════════════════════════
 
 1) PURE SUM — angles around a point:
-{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "easy",
+{{"question_type": "short_numeric", "concept_tag": "broad learning objective", "enabling_objective": "EXACT EO TEXT", "difficulty": "easy",
   "template": {{
     "template_text": "Three angles around a point are {{a}}°, {{b}}°, and x°. Find x.",
     "parameters": {{
@@ -87,7 +87,7 @@ WORKED EXAMPLES (5 patterns covering different shapes)
   }}}}
 
 2) PRODUCT — area of a rectangle:
-{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "easy",
+{{"question_type": "short_numeric", "concept_tag": "broad learning objective", "enabling_objective": "EXACT EO TEXT", "difficulty": "easy",
   "template": {{
     "template_text": "A rectangular plot is {{l}} m long and {{w}} m wide. Find its area.",
     "parameters": {{
@@ -101,7 +101,7 @@ WORKED EXAMPLES (5 patterns covering different shapes)
   }}}}
 
 3) LINEAR EQUATION — solve ax + b = c:
-{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "medium",
+{{"question_type": "short_numeric", "concept_tag": "broad learning objective", "enabling_objective": "EXACT EO TEXT", "difficulty": "medium",
   "template": {{
     "template_text": "Solve for x: {{a}}x + {{b}} = {{c}}.",
     "parameters": {{
@@ -115,7 +115,7 @@ WORKED EXAMPLES (5 patterns covering different shapes)
   }}}}
 
 4) PERCENT — percent of a Seychelles-context value:
-{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "medium",
+{{"question_type": "short_numeric", "concept_tag": "broad learning objective", "enabling_objective": "EXACT EO TEXT", "difficulty": "medium",
   "template": {{
     "template_text": "A fisherman sells {{kg}} kg of tuna. He gives {{p}}% to the cooperative. How many kg does he keep?",
     "parameters": {{
@@ -129,7 +129,7 @@ WORKED EXAMPLES (5 patterns covering different shapes)
   }}}}
 
 5) PYTHAGORAS — hypotenuse via sqrt:
-{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "medium",
+{{"question_type": "short_numeric", "concept_tag": "broad learning objective", "enabling_objective": "EXACT EO TEXT", "difficulty": "medium",
   "template": {{
     "template_text": "A right triangle has legs of {{a}} and {{b}}. Find the hypotenuse.",
     "parameters": {{
@@ -159,7 +159,11 @@ questions than free-form math the system can't verify.
 REQUIREMENTS
 ═══════════════════════════════════════════════════════════════════════
 1. Generate up to 35 questions, ALL templated. Bank floor is 25.
-2. Each question MUST have concept_tag = EXACT TEXT of an enabling objective from below
+2. Each question MUST have BOTH:
+   - concept_tag: broad learning objective (the lesson's main objective)
+   - enabling_objective: EXACT TEXT of one ENABLING OBJECTIVE from below
+     (the specific sub-skill — copy verbatim). This is the field
+     remediation uses to target the failing sub-skill.
 3. EVERY enabling objective must be assessed by at least 1 question
 4. Use Seychelles context in word problems (SCR prices, fish catches, island areas)
 5. Vary difficulty: easy calculations → harder numbers → word problems → multi-step
@@ -193,27 +197,37 @@ MUST NOT be MCQ.
 REQUIREMENTS:
 1. Generate EXACTLY 35 questions in the format mix above
 2. Each question MUST have:
-   - concept_tag: MUST be the EXACT TEXT of one of the ENABLING OBJECTIVES listed below (not a short label — use the full objective text so questions link directly to teaching steps)
-   - terminal_objective: the exact terminal objective this question assesses (from the lesson objectives)
-   - enabling_objective: same as concept_tag — the specific enabling objective this question tests
-3. EVERY terminal objective must be assessed by at least 2 questions
-4. EVERY enabling objective must be assessed by at least 1 question
+   - concept_tag: the BROAD learning objective the question is grouped
+     under. Use the exact text of the lesson's main learning objective.
+   - enabling_objective: the SPECIFIC enabling objective (sub-objective)
+     this question tests. MUST be the EXACT TEXT of one of the ENABLING
+     OBJECTIVES listed below — copy verbatim, including capitalisation
+     and punctuation. This is the field remediation uses to target the
+     failing sub-skill, so getting it right matters.
+   - terminal_objective: the terminal objective this question assesses
+     (from the lesson objectives, optional).
+3. EVERY enabling objective must be assessed by at least 1 question
+   — distribute coverage across all of them.
+4. enabling_objective and concept_tag are DIFFERENT fields:
+     - concept_tag is the BROAD grouping (the learning objective)
+     - enabling_objective is the NARROW sub-objective (one of EO1..EON)
+   Do not put the same value in both.
 4. Use context relevant to Seychelles secondary school students
 5. Vary question phrasing — avoid repetitive stems
 
 OUTPUT FORMAT (JSON array — each question has a "question_type" field):
 
 MCQ format:
-{{"question_type": "mcq", "question": "What is...?", "option_a": "...", "option_b": "...", "option_c": "...", "option_d": "...", "correct": "B", "explanation": "...", "difficulty": "easy", "concept_tag": "Define the terms Development, Globalization, MEDC, NIC, LEDC"}}
+{{"question_type": "mcq", "question": "What is...?", "option_a": "...", "option_b": "...", "option_c": "...", "option_d": "...", "correct": "B", "explanation": "...", "difficulty": "easy", "concept_tag": "Understand development indicators", "enabling_objective": "Define the terms Development, Globalization, MEDC, NIC, LEDC"}}
 
 FILL_IN_BLANK format:
-{{"question_type": "fill_in_blank", "question": "Complete the sentence:", "answer_data": {{"text_template": "The ___ of a country is measured using ___ per capita figures.", "blanks": ["GNP", "US dollar"], "accept_alternatives": [["gross national product", "Gross National Product"], ["USD", "American dollar"]]}}, "explanation": "...", "difficulty": "easy", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
+{{"question_type": "fill_in_blank", "question": "Complete the sentence:", "answer_data": {{"text_template": "The ___ of a country is measured using ___ per capita figures.", "blanks": ["GNP", "US dollar"], "accept_alternatives": [["gross national product", "Gross National Product"], ["USD", "American dollar"]]}}, "explanation": "...", "difficulty": "easy", "concept_tag": "broad learning objective text", "enabling_objective": "EXACT TEXT OF ONE EO FROM THE LIST ABOVE"}}
 
 MATCHING format:
-{{"question_type": "matching", "question": "Match each term to its definition:", "answer_data": {{"pairs": [{{"left": "GNP", "right": "Total value of goods and services"}}, {{"left": "HDI", "right": "Measure combining health, education, income"}}], "distractor_rights": ["Population growth rate"]}}, "explanation": "...", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
+{{"question_type": "matching", "question": "Match each term to its definition:", "answer_data": {{"pairs": [{{"left": "GNP", "right": "Total value of goods and services"}}, {{"left": "HDI", "right": "Measure combining health, education, income"}}], "distractor_rights": ["Population growth rate"]}}, "explanation": "...", "difficulty": "medium", "concept_tag": "broad learning objective text", "enabling_objective": "EXACT TEXT OF ONE EO FROM THE LIST ABOVE"}}
 
 SHORT_ANSWER format:
-{{"question_type": "short_answer", "question": "Explain why HDI is considered a better measure of development than GNP.", "answer_data": {{"model_answer": "HDI is better because it measures health, education and income, not just economic output.", "keywords": ["health", "education", "income", "not just economic"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE FROM THE LIST ABOVE"}}
+{{"question_type": "short_answer", "question": "Explain why HDI is considered a better measure of development than GNP.", "answer_data": {{"model_answer": "HDI is better because it measures health, education and income, not just economic output.", "keywords": ["health", "education", "income", "not just economic"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "broad learning objective text", "enabling_objective": "EXACT TEXT OF ONE EO FROM THE LIST ABOVE"}}
 
 DATA_INTERPRETATION is DISABLED. Do not generate questions of that type.
 

@@ -517,7 +517,23 @@ class ExitTicketQuestion(models.Model):
     concept_tag = models.CharField(
         max_length=200,
         blank=True,
-        help_text="The concept/objective this question assesses"
+        help_text=(
+            "Broader learning-objective tag (or short concept slug) the "
+            "question is grouped under. Often the lesson's main learning "
+            "objective text. Shown in the dashboard as the broad pill."
+        ),
+    )
+    enabling_objective = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text=(
+            "Specific enabling objective (sub-objective) this question "
+            "tests — must match one of the parent lesson's enabling "
+            "objectives. Promoted to a first-class field 2026-05-01 so "
+            "remediation can target the failing sub-skill instead of "
+            "the whole learning objective."
+        ),
     )
 
     difficulty = models.CharField(

@@ -2005,6 +2005,11 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                     'question_text': q.get('question_text') or q.get('question', ''),
                     'explanation': q.get('explanation', ''),
                     'concept_tag': q.get('concept_tag', ''),
+                    # Sub-objective (specific EO) — promoted from
+                    # answer_data JSON to a first-class field
+                    # 2026-05-01 so remediation can target the failing
+                    # sub-skill, not just the broad learning objective.
+                    'enabling_objective': (q.get('enabling_objective') or '')[:500],
                     'difficulty': q.get('difficulty', 'medium'),
                     'order_index': i,
                 }
@@ -2012,12 +2017,11 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 # re-rendering + teacher visibility.
                 if q.get('template_data'):
                     kwargs['template_data'] = q['template_data']
-                # Store objective linkage on all question types
+                # terminal_objective stays in answer_data JSON for now —
+                # not used by remediation, kept for forensics.
                 objective_data = {}
                 if q.get('terminal_objective'):
                     objective_data['terminal_objective'] = q['terminal_objective']
-                if q.get('enabling_objective'):
-                    objective_data['enabling_objective'] = q['enabling_objective']
 
                 if q_type == 'mcq':
                     kwargs.update({
