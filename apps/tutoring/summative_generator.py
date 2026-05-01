@@ -268,32 +268,46 @@ def generate_summative_for_course(
     rng_master.shuffle(aggregated_payload)
 
     with transaction.atomic():
-        # Replace the SUMMATIVE ExitTicket. Note this still
-        # CASCADE-deletes any existing ExitTicketAttempt rows on the
-        # OLD summative — we revisit this trade-off if we add a
-        # "regenerate summative without losing attempt history" flow.
-        # For now, regenerating the summative bank is a deliberate
-        # "I want a fresh exam" action, so wiping past attempts is
-        # acceptable. Lesson regen no longer touches summative at all.
-        ExitTicket.objects.filter(
+        # Replace the SUMMATIVE bank IN-PLACE so we don't cascade-wipe
+        # ExitTicketAttempt rows (baseline / final / retake purposes
+        # all live on the summative ticket). Pattern mirrors the
+        # lesson exit-ticket regen fix in commit 25c62a2: drop the
+        # OLD questions only, keep the ExitTicket row, recreate
+        # questions on the same row. ExitTicketAttempt's FK is to
+        # ExitTicket (not ExitTicketQuestion), so attempts survive.
+        existing = ExitTicket.objects.filter(
             course=course,
             assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
-        ).delete()
-
-        summative = ExitTicket.objects.create(
-            course=course,
-            assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
-            question_bank_size=len(aggregated_payload),
-            questions_per_attempt=SUMMATIVE_PER_ATTEMPT,
-            passing_score=int(SUMMATIVE_PER_ATTEMPT * 0.7),
-            time_limit_minutes=60,
-            is_published=False,
-            instructions=(
-                f"Course summative exam covering all teaching objectives in {course.title}. "
-                f"You'll see {SUMMATIVE_PER_ATTEMPT} questions out of "
-                f"{len(aggregated_payload)} — stratified so every objective is represented."
-            ),
+        ).first()
+        new_instructions = (
+            f"Course summative exam covering all teaching objectives in {course.title}. "
+            f"You'll see {SUMMATIVE_PER_ATTEMPT} questions out of "
+            f"{len(aggregated_payload)} — stratified so every objective is represented."
         )
+        if existing is not None:
+            existing.questions.all().delete()
+            summative = existing
+            summative.question_bank_size = len(aggregated_payload)
+            summative.questions_per_attempt = SUMMATIVE_PER_ATTEMPT
+            summative.passing_score = int(SUMMATIVE_PER_ATTEMPT * 0.7)
+            summative.time_limit_minutes = 60
+            summative.instructions = new_instructions
+            summative.save(update_fields=[
+                'question_bank_size', 'questions_per_attempt',
+                'passing_score', 'time_limit_minutes', 'instructions',
+                'updated_at',
+            ])
+        else:
+            summative = ExitTicket.objects.create(
+                course=course,
+                assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
+                question_bank_size=len(aggregated_payload),
+                questions_per_attempt=SUMMATIVE_PER_ATTEMPT,
+                passing_score=int(SUMMATIVE_PER_ATTEMPT * 0.7),
+                time_limit_minutes=60,
+                is_published=False,
+                instructions=new_instructions,
+            )
         for i, q in enumerate(aggregated_payload):
             try:
                 ExitTicketQuestion.objects.create(

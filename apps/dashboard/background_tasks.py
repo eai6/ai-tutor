@@ -1097,7 +1097,7 @@ def generate_complete_course(
     course_id: int,
     institution_id: int,
     log_fn=None,
-    max_workers: int = 3,
+    max_workers: int = 10,
     *,
     regen_steps: bool = True,
     regen_exit_tickets: bool = True,
@@ -1129,34 +1129,36 @@ def generate_complete_course(
          on the new step content.
       2. Exit tickets — for each lesson that has steps regenerated,
          force-regenerate its ExitTicketQuestion bank with
-         force_regenerate=True (in-place replace; ExitTicket row
-         survives so existing per-lesson state stays linked).
-         Activates Layers 1 + 2 + 4 on the new questions. NB: this
-         drops ExitTicketAttempt history for the regenerated
-         lessons — the in-place replace replaces the questions but
-         the cascade-delete on ExitTicketQuestion drops attempt rows
-         that referenced them.
+         force_regenerate=True. This is an in-place replace: the
+         OLD questions are deleted but the ExitTicket row is kept,
+         and ExitTicketAttempt has its FK to ExitTicket (not to
+         ExitTicketQuestion) — so attempt rows SURVIVE the regen.
+         Fixed in commit 25c62a2 after a regression that wiped
+         attempts. Activates Layers 1 + 2 + 4 on the new questions.
       3. Summative bank — for math courses, re-sample the summative
          bank from the (now-fresh) lesson exit tickets via
          generate_summative_for_course. No LLM call — it's
          deterministic sampling.
 
     What's PRESERVED across all three phases:
+      - Lesson row (PK stable; FK targets survive)
+      - ExitTicket row (lesson + summative; in-place question
+        replacement keeps attempt history attached)
+      - ExitTicketAttempt rows (every purpose — practice, baseline,
+        final, retake, diagnostic — survives the regen)
       - StudentLessonProgress, StudentSkillMastery, TutorSession
       - StudentCompetencyRecord (permanent mastery transcript)
-      - Lesson row (PK stable; FK targets survive)
 
     What's WIPED:
       - LessonStep rows (replaced with regen)
-      - ExitTicketQuestion rows (replaced with regen)
-      - ExitTicketAttempt rows for the regenerated questions
-      - Summative ExitTicketQuestion rows (rebuilt from samples)
+      - ExitTicketQuestion rows (replaced; attempts hang off
+        ExitTicket so they survive)
 
-    max_workers default 3 — chosen to balance LLM API rate limits
-    (Anthropic / Google / OpenAI) against wall-clock time. The
-    existing 2-worker pool in `generate_all_content_async` has run
-    cleanly in production; 3 is a modest bump. If we start hitting
-    rate-limit 429s we should dial back to 2.
+    max_workers default 10 — bumped from 3 (2026-05-01) per pilot
+    feedback that 3 was bottlenecking course-wide regen. Anthropic
+    rate limits comfortably handle 10 parallel content_generation
+    calls; the AnthropicClient retry-with-backoff loop catches the
+    occasional 429. Dial back if we see sustained rate-limit pressure.
 
     Returns a summary dict that the calling view can flash to the user.
     """
