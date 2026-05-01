@@ -1095,27 +1095,44 @@ def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
 
 def generate_complete_course(course_id: int, institution_id: int, log_fn=None, max_workers: int = 3):
     """
-    Regenerate every lesson in a course in parallel batches.
+    Regenerate every lesson in a course in parallel batches AND
+    every exit ticket AND the course's summative bank.
 
-    Calls `generate_complete_lesson` per lesson via a ThreadPoolExecutor.
-    `generate_complete_lesson` has its own CAS guard so two workers
-    cannot race on the same lesson — parallel on DIFFERENT lessons is
-    safe (and is the same pattern used by `generate_all_content_async`
-    for fresh-content generation).
+    Three phases:
+      1. Steps — wipes LessonStep rows per lesson, regenerates via
+         the standard pipeline (parallel across lessons via
+         ThreadPoolExecutor). Activates Layer 1 + Layer 3 defenses
+         on the new step content.
+      2. Exit tickets — for each lesson that has steps regenerated,
+         force-regenerate its ExitTicketQuestion bank with
+         force_regenerate=True (in-place replace; ExitTicket row
+         survives so existing per-lesson state stays linked).
+         Activates Layers 1 + 2 + 4 on the new questions. NB: this
+         drops ExitTicketAttempt history for the regenerated
+         lessons — the in-place replace replaces the questions but
+         the cascade-delete on ExitTicketQuestion drops attempt rows
+         that referenced them.
+      3. Summative bank — for math courses, re-sample the summative
+         bank from the (now-fresh) lesson exit tickets via
+         generate_summative_for_course. No LLM call — it's
+         deterministic sampling.
+
+    What's PRESERVED across all three phases:
+      - StudentLessonProgress, StudentSkillMastery, TutorSession
+      - StudentCompetencyRecord (permanent mastery transcript)
+      - Lesson row (PK stable; FK targets survive)
+
+    What's WIPED:
+      - LessonStep rows (replaced with regen)
+      - ExitTicketQuestion rows (replaced with regen)
+      - ExitTicketAttempt rows for the regenerated questions
+      - Summative ExitTicketQuestion rows (rebuilt from samples)
 
     max_workers default 3 — chosen to balance LLM API rate limits
     (Anthropic / Google / OpenAI) against wall-clock time. The
     existing 2-worker pool in `generate_all_content_async` has run
     cleanly in production; 3 is a modest bump. If we start hitting
     rate-limit 429s we should dial back to 2.
-
-    Each lesson:
-      - has its steps + exit ticket wiped (so the regen produces fresh
-        content); StudentLessonProgress / StudentSkillMastery are NOT
-        touched (FKs preserve them via lesson_id stability) and the
-        permanent StudentCompetencyRecord transcript stands as the
-        durable history.
-      - then runs through the standard pipeline.
 
     Returns a summary dict that the calling view can flash to the user.
     """
@@ -1124,6 +1141,9 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from apps.curriculum.models import Course, Lesson
     from apps.tutoring.models import ExitTicket
+    from apps.curriculum.content_generator import (
+        generate_exit_ticket_for_lesson,
+    )
 
     connection.close()
 
@@ -1151,12 +1171,18 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
         'success': 0,
         'failed': 0,
         'skipped': 0,
+        # Phase 2 + 3 counters (populated below).
+        'exit_tickets_ok': 0,
+        'exit_tickets_failed': 0,
+        'summative_questions': 0,
+        'summative_error': None,
         'lessons': [],
     }
     summary_lock = threading.Lock()
 
     def _process(lesson_id: int) -> dict:
-        """Wipe + pipeline for one lesson. Runs in a worker thread."""
+        """Wipe + pipeline + exit-ticket regen for one lesson.
+        Runs in a worker thread."""
         # Each thread needs its own DB connection (mirrors the pattern
         # in generate_complete_lesson).
         connection.close()
@@ -1169,12 +1195,10 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
             log(f"   ⏭️ {lesson.title} (already generating — skipping)")
             return {'lesson': lesson.title, 'status': 'skipped'}
 
-        # Wipe lesson STEPS only — preserve the ExitTicket row so
-        # ExitTicketAttempt history (CASCADE child) survives the
-        # regen. Exit-ticket questions are stable assessment items;
-        # regenerating lesson content doesn't require new questions.
-        # The pipeline's _generate_exit_ticket skips when an existing
-        # ticket has questions, so this is naturally idempotent.
+        # Phase 1 — wipe lesson STEPS, run the standard pipeline.
+        # The pipeline's _generate_exit_ticket has skip-if-exists
+        # semantics, which is fine here — we replace the questions
+        # explicitly in phase 2 below with force_regenerate=True.
         lesson.steps.all().delete()
         lesson.content_status = 'empty'
         lesson.updated_at = timezone.now()
@@ -1183,11 +1207,40 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
         try:
             result = generate_complete_lesson(lesson.id, institution_id, log_fn=log_fn)
             ok = bool(result.get('success'))
-            return {'lesson': lesson.title, 'status': 'ok' if ok else 'failed',
-                    'error': None if ok else result.get('error')}
         except Exception as e:
             log(f"   ❌ {lesson.title}: {e}")
             return {'lesson': lesson.title, 'status': 'failed', 'error': str(e)}
+
+        if not ok:
+            return {'lesson': lesson.title, 'status': 'failed',
+                    'error': result.get('error')}
+
+        # Phase 2 — force-regenerate the exit ticket so Layers 1+2+4
+        # apply to the question bank. Failures here don't fail the
+        # whole lesson — steps are already regenerated and saved;
+        # the exit ticket can be retried independently.
+        et_status = 'ok'
+        et_error = None
+        try:
+            lesson.refresh_from_db()
+            et_result = generate_exit_ticket_for_lesson(
+                lesson, institution_id, force_regenerate=True,
+            )
+            if not et_result.get('success'):
+                et_status = 'failed'
+                et_error = et_result.get('error')
+                log(f"   ⚠️ {lesson.title}: exit-ticket regen failed — {et_error}")
+        except Exception as e:
+            et_status = 'failed'
+            et_error = str(e)
+            log(f"   ⚠️ {lesson.title}: exit-ticket regen crashed — {e}")
+
+        return {
+            'lesson': lesson.title,
+            'status': 'ok',
+            'exit_ticket_status': et_status,
+            'exit_ticket_error': et_error,
+        }
 
     completed = 0
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -1198,16 +1251,55 @@ def generate_complete_course(course_id: int, institution_id: int, log_fn=None, m
                 completed += 1
                 if res['status'] == 'ok':
                     summary['success'] += 1
+                    if res.get('exit_ticket_status') == 'ok':
+                        summary['exit_tickets_ok'] += 1
+                    elif res.get('exit_ticket_status') == 'failed':
+                        summary['exit_tickets_failed'] += 1
                 elif res['status'] == 'skipped':
                     summary['skipped'] += 1
                 else:
                     summary['failed'] += 1
                 summary['lessons'].append(res)
-            log(f"   [{completed}/{len(lessons)}] {res.get('lesson', '?')} → {res['status']}")
+            et_msg = ''
+            if res.get('exit_ticket_status') == 'ok':
+                et_msg = ' + ET ok'
+            elif res.get('exit_ticket_status') == 'failed':
+                et_msg = ' + ET failed'
+            log(f"   [{completed}/{len(lessons)}] {res.get('lesson', '?')} → {res['status']}{et_msg}")
+
+    # Phase 3 — rebuild the summative bank by sampling from the
+    # (now-fresh) lesson exit tickets. Free, no LLM call. Math-only.
+    if course.is_math:
+        try:
+            from apps.tutoring.summative_generator import (
+                generate_summative_for_course,
+            )
+            log(f"📚 Rebuilding summative bank for '{course.title}'…")
+            sum_result = generate_summative_for_course(course)
+            if sum_result.get('success'):
+                summary['summative_questions'] = sum_result.get(
+                    'questions_created', 0,
+                )
+                log(
+                    f"   ✓ summative: "
+                    f"{summary['summative_questions']} questions "
+                    f"sampled across "
+                    f"{sum_result.get('lessons_processed', 0)} lessons"
+                )
+            else:
+                summary['summative_error'] = sum_result.get('error')
+                log(f"   ⚠️ summative rebuild failed: {summary['summative_error']}")
+        except Exception as e:
+            summary['summative_error'] = str(e)
+            log(f"   ⚠️ summative rebuild crashed: {e}")
 
     elapsed = time.time() - pipeline_start
-    log(f"✅ Course regen done in {elapsed:.1f}s — "
-        f"{summary['success']} ok, {summary['failed']} failed, {summary['skipped']} skipped")
+    log(
+        f"✅ Course regen done in {elapsed:.1f}s — "
+        f"steps {summary['success']}/{len(lessons)} ok · "
+        f"exit-tickets {summary['exit_tickets_ok']}/{len(lessons)} ok · "
+        f"summative {summary['summative_questions']} questions"
+    )
     return summary
 
 

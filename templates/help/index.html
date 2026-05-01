@@ -220,7 +220,7 @@
             <ul>
                 <li><strong>⚡ on a single lesson row</strong> (course detail page) — wipes that lesson's steps and regenerates only that one. The exit ticket is left in place.</li>
                 <li><strong>⚡ Generate All Content</strong> (yellow banner on course detail) — only appears when one or more lessons have no content yet. Generates them in parallel.</li>
-                <li><strong>🔁 Regenerate all lessons</strong> (purple banner on course detail) — replaces every lesson's content across the whole course, runs 3 lessons in parallel, takes ~30–40 minutes for a 50-lesson course. Use this after curriculum updates or when you want to roll out new prompt changes. Exit ticket questions and attempts are preserved.</li>
+                <li><strong>🔁 Regenerate all content</strong> (purple banner on course detail) — replaces every lesson's steps AND exit-ticket questions across the whole course (and rebuilds the summative bank for math courses). Runs 3 lessons in parallel; ~30–40 minutes for a 50-lesson course. Use this after curriculum updates or to apply new prompt changes / arithmetic-defense layers. Mastery levels + permanent competency transcript are preserved; exit-ticket attempt history on regenerated lessons is reset.</li>
             </ul>
             <h4>Default lesson duration (no regen)</h4>
             <p>The green <strong>"⏱️ Default lesson duration"</strong> form on the course page sets <code>estimated_minutes</code> on every lesson, instantly. Lessons are generated at <strong>full depth (10 steps)</strong> and tagged with priority; the tutoring engine selects a subset at session start, so changing duration is a metadata flip, not a regeneration.</p>

@@ -3232,22 +3232,33 @@ def course_set_default_duration(request, course_id):
 @teacher_required
 @require_POST
 def course_regenerate_all(request, course_id):
-    """Regenerate every lesson in a course, serially, in a background
-    thread. Used to roll out the rich-content prompt across an entire
-    course in one click.
+    """Regenerate ALL generated content in a course in one click:
+    lesson steps, exit-ticket question banks, and (for math
+    courses) the summative-exam bank. Runs lessons 3 in parallel
+    in a background thread.
 
-    Student data is preserved:
-      - StudentLessonProgress, StudentSkillMastery, TutorSession all
-        keep their FK targets (lesson_id is stable across
-        regeneration).
-      - StudentCompetencyRecord (the permanent transcript) is the
-        durable record of mastery regardless of regen / re-parse.
-      - What does get wiped per-lesson: LessonStep, ExitTicket
-        (questions), and ExitTicketAttempt history (cascade from
-        ExitTicket delete). Best-score and mastery_level survive on
-        StudentLessonProgress because we don't touch the lesson row.
+    Phase 1 — steps (~2 min/lesson, parallel): triggers Layer 1+3
+      arithmetic verification on the new step content.
+    Phase 2 — exit tickets (~30s/lesson, parallel): triggers
+      Layers 1+2+4 on the new question banks. Drops
+      ExitTicketAttempt history for affected lessons.
+    Phase 3 — summative bank (sampling, no LLM): rebuilds the
+      per-course bank from the freshly generated lesson exit
+      tickets. Math courses only.
 
-    See memory/course_regeneration_for_slow_learners.md (Phase 3).
+    Student data preserved across all phases:
+      - StudentLessonProgress, StudentSkillMastery, TutorSession
+      - StudentCompetencyRecord (permanent mastery transcript)
+      - Lesson row (PK stable; FKs survive)
+
+    What gets wiped:
+      - LessonStep rows (replaced)
+      - ExitTicketQuestion rows (replaced)
+      - ExitTicketAttempt rows for the regenerated lessons
+      - Summative ExitTicketQuestion rows (rebuilt)
+
+    See memory/course_regeneration_for_slow_learners.md (Phase 3)
+    and memory/llm_arithmetic_defense_plan.md.
     """
     from apps.curriculum.models import Course, Lesson
     from apps.dashboard.background_tasks import run_async, generate_complete_course
@@ -3280,12 +3291,18 @@ def course_regenerate_all(request, course_id):
     run_async(generate_complete_course, course.id, inst.id)
 
     lesson_count = course.units.aggregate(n=Count('lessons'))['n'] or 0
+    summative_msg = (
+        " The summative bank will be rebuilt from the new exit tickets at the end."
+        if course.is_math else ""
+    )
     messages.success(
         request,
         f"Regenerating all {lesson_count} lesson(s) in '{course.title}'.{duration_msg} "
-        f"Running 3 in parallel in the background — refresh this page to "
-        f"watch the status badges light up. Student mastery levels and "
-        f"the permanent competency transcript are preserved.",
+        f"Running 3 in parallel — steps first, then exit tickets per lesson."
+        f"{summative_msg} "
+        f"Refresh this page to watch the status badges light up. "
+        f"Student mastery levels + permanent competency transcript are preserved; "
+        f"per-lesson exit-ticket attempts on regenerated lessons will be reset.",
     )
     return redirect('dashboard:course_detail', course_id=course.id)
 
