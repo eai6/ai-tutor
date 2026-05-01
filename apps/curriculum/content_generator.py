@@ -175,7 +175,13 @@ class LessonStepSchema(BaseModel):
     ))
     teacher_script: str = Field(description=(
         "The tutor's dialogue/instruction text. "
-        "If media is included, MUST reference it (e.g. 'Look at this diagram...'). "
+        "When media is attached, anchor the script in the figure: "
+        "'Look at the diagram — you can see…', 'Find angle 5 on the figure…'. "
+        "Treat the figure as already visible; never ask the student to "
+        "imagine or picture the geometry. NEVER use phrasings like "
+        "'imagine two parallel lines', 'picture this', 'envision X', "
+        "'in your head, draw…'. For visual concepts without an attached "
+        "figure, reconsider — a figure should probably be attached. "
         "If no media, do NOT reference images."
     ))
     question: Optional[str] = Field(default=None, description="Question for the student. Required for practice and quiz steps.")
@@ -1027,18 +1033,31 @@ CONTENT GUIDELINES:
    - Example BAD: "Image of Earth's layers"
 3. Hints should scaffold from general to specific
 4. For MCQ, make distractors plausible but clearly wrong
-5. When a step has media, the teacher_script MUST explicitly reference it
-   with phrases like "Let's look at this diagram...", "As you can see in the figure..."
-6. Steps with NO media should NOT have media references in the script
-7. Questions must be CLEAR and UNAMBIGUOUS — the student should know exactly what is
+5. PROACTIVELY ATTACH AND USE FIGURES. For any step teaching a VISUAL
+   concept — geometric shapes, angle relationships, maps, charts,
+   diagrams, cross-sections, processes with multiple parts — attach a
+   figure via the `media` field. Then anchor the teacher_script in
+   that figure: "Look at the diagram below — you can see two
+   parallel lines, l and m, cut by a transversal t." The figure is
+   the working surface; the script should treat it as already visible.
+6. NEVER ASK THE STUDENT TO IMAGINE OR PICTURE GEOMETRY. Banned
+   phrasings: "imagine two parallel lines", "picture this", "envision
+   a triangle", "think of a diagram where...", "in your head, draw...".
+   If the concept requires visualisation, attach a figure (rule 5)
+   and reference it. If a figure cannot be attached, describe the
+   geometry concretely with named labels — never with imagination prompts.
+7. Steps with NO media should NOT have media references in the script.
+   But for visual concepts, the absence of media is itself a bug —
+   reconsider whether a figure should be attached.
+8. Questions must be CLEAR and UNAMBIGUOUS — the student should know exactly what is
    being asked and what form the answer should take
-8. Practice/quiz questions should require APPLICATION or CONCEPTUAL understanding,
+9. Practice/quiz questions should require APPLICATION or CONCEPTUAL understanding,
    not just recall or looking through text. Ask "why", "how", "what would happen if",
    "compare", "explain" rather than "what is" or "which one"
 10. NEVER write teacher_script that says "which of these", "which of the following",
    or references a list of options without actually listing them. Either list the
    options explicitly or phrase the question as open-ended
-9. The expected_answer MUST directly and completely answer the question as phrased.
+11. The expected_answer MUST directly and completely answer the question as phrased.
    If the question asks "which is smallest", the expected_answer must name the smallest
    item, not just explain a comparison method"""
 

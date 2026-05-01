@@ -3859,6 +3859,16 @@ def step_edit(request, step_id):
                     alt_text=request.POST.get('image_alt', ''),
                     caption=request.POST.get('image_caption', ''),
                 )
+                # Best-effort figure_facts extraction so teacher uploads
+                # also feed the runtime tutor with verified visual
+                # ground truth. Non-fatal.
+                try:
+                    from apps.curriculum.figure_facts_extractor import (
+                        extract_and_save_for_asset,
+                    )
+                    extract_and_save_for_asset(asset)
+                except Exception:
+                    pass
                 if not step.media:
                     step.media = {'images': []}
                 if 'images' not in step.media:
@@ -3900,6 +3910,15 @@ def step_edit(request, step_id):
                     alt_text=images[image_index].get('alt', ''),
                     caption=images[image_index].get('caption', ''),
                 )
+                # Replacement image — re-extract facts since the visual
+                # has changed. force=True overrides any stale facts.
+                try:
+                    from apps.curriculum.figure_facts_extractor import (
+                        extract_and_save_for_asset,
+                    )
+                    extract_and_save_for_asset(asset, force=True)
+                except Exception:
+                    pass
                 images[image_index]['url'] = asset.file.url
                 images[image_index]['source'] = 'uploaded'
                 step.save()

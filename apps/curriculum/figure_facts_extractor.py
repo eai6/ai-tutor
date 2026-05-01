@@ -212,3 +212,54 @@ def extract_figure_facts(
         return None, f"schema validation failed: {err}"
 
     return facts, None
+
+
+def extract_and_save_for_asset(asset, *, force: bool = False) -> Tuple[bool, Optional[str]]:
+    """Extract `figure_facts` for a saved MediaAsset and persist it.
+
+    Best-effort. Used by every code path that creates a new image
+    (auto-generated images, teacher uploads, content regen) so that
+    every figure entering the system arrives with facts attached.
+
+    Skips when:
+      - asset is not an image
+      - asset has no file
+      - asset.figure_facts is already non-null and force=False
+
+    Returns (saved_facts, error_message). Never raises.
+    """
+    if asset is None or asset.asset_type != "image":
+        return False, "asset_not_image"
+    if not asset.file or not asset.file.name:
+        return False, "asset_has_no_file"
+    if asset.figure_facts and not force:
+        return False, "already_has_facts"
+
+    # Read bytes from the asset's file. Local storage exposes .path;
+    # remote storages need .read() instead.
+    try:
+        try:
+            image_arg = asset.file.path  # local FS
+        except (NotImplementedError, ValueError):
+            asset.file.open("rb")
+            try:
+                image_arg = asset.file.read()
+            finally:
+                try:
+                    asset.file.close()
+                except Exception:
+                    pass
+    except Exception as e:
+        return False, f"could not read asset file: {e}"
+
+    facts, err = extract_figure_facts(image_arg)
+    if err is not None or facts is None:
+        return False, err or "unknown_extractor_error"
+
+    asset.figure_facts = facts.model_dump(mode="json")
+    asset.save(update_fields=["figure_facts", "updated_at"])
+    logger.info(
+        f"[FigureFacts] saved facts for asset #{asset.id} "
+        f"(type={facts.type}, features={len(facts.labelled_features)})"
+    )
+    return True, None

@@ -181,6 +181,56 @@ class FigureFactsExtractorTest(TestCase):
         self.assertIn("LLM call failed", err)
 
 
+class ExtractAndSaveHelperTest(TestCase):
+    """Tests for extract_and_save_for_asset — the helper called from
+    every image-creation site (image_service, dashboard upload, KB
+    ingestion) so every figure entering the system gets facts."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.institution = Institution.objects.create(name="ES", slug="es")
+
+    def test_skips_non_image_asset(self):
+        from apps.curriculum.figure_facts_extractor import extract_and_save_for_asset
+        asset = MediaAsset(
+            institution=self.institution,
+            title="not an image",
+            asset_type="audio",
+        )
+        asset.file.name = "audio.mp3"
+        asset.save()
+        saved, err = extract_and_save_for_asset(asset)
+        self.assertFalse(saved)
+        self.assertEqual(err, "asset_not_image")
+
+    def test_skips_when_facts_already_present(self):
+        from apps.curriculum.figure_facts_extractor import extract_and_save_for_asset
+        asset = MediaAsset(
+            institution=self.institution,
+            title="x",
+            asset_type=MediaAsset.AssetType.IMAGE,
+            figure_facts={"type": "x", "scene_description": "a"},
+        )
+        asset.file.name = "x.png"
+        asset.save()
+        saved, err = extract_and_save_for_asset(asset)
+        self.assertFalse(saved)
+        self.assertEqual(err, "already_has_facts")
+
+    def test_skips_when_no_file(self):
+        from apps.curriculum.figure_facts_extractor import extract_and_save_for_asset
+        asset = MediaAsset(
+            institution=self.institution,
+            title="y",
+            asset_type=MediaAsset.AssetType.IMAGE,
+        )
+        # No .file.name assigned — empty file field
+        asset.save()
+        saved, err = extract_and_save_for_asset(asset)
+        self.assertFalse(saved)
+        self.assertEqual(err, "asset_has_no_file")
+
+
 # ============================================================================
 # Runtime injection
 # ============================================================================

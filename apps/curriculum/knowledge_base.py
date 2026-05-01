@@ -757,6 +757,19 @@ class CurriculumKnowledgeBase:
                         asset.save()
                         figure_image_url = asset.file.url
                         media_assets_created += 1
+                        # Best-effort figure_facts extraction so textbook
+                        # figures arrive with the rich metadata the
+                        # tutor uses to anchor scaffolding. Non-fatal.
+                        try:
+                            from apps.curriculum.figure_facts_extractor import (
+                                extract_and_save_for_asset,
+                            )
+                            extract_and_save_for_asset(asset)
+                        except Exception as ff_err:
+                            logger.warning(
+                                f"[FigureFacts] textbook ingest "
+                                f"asset #{asset.id} failed: {ff_err}"
+                            )
                 except Exception as e:
                     logger.warning(f"Failed to save figure MediaAsset: {e}")
 
