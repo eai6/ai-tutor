@@ -3537,8 +3537,62 @@ Follow the current step; this concept will be covered in sequence."""
         # From step.media JSONField images
         # Track which catalog IDs belong to which step
         step_media_positions = {}  # {step_index: [catalog_id, ...]}
+        # ── Practice/quiz answer-reveal guard ──────────────────────
+        # When the student is currently ON a practice/quiz step AND
+        # the CURRENT submission isn't a confirmed-correct answer,
+        # withhold THAT step's images from the catalog. Many
+        # practice figures contain the answer (a labeled angle
+        # diagram, a marked-up worked example) and showing them
+        # up-front violates math_teaching Rule 1 ("hint, not
+        # answer"). Lesson-level + KB-derived figures stay
+        # available — they're general scaffolding.
+        #
+        # We use the CURRENT-TURN signals (`_pending_math_check`,
+        # `_pending_working_analysis`) rather than `last_answer_correct`
+        # because the latter is sticky across step boundaries —
+        # it stays True from the prior step until a new evaluation
+        # fires, which would leak the *next* step's image on its
+        # first turn.
+        #
+        # Reveal happens on the LLM turn that responds to the
+        # student's correct submission: the deterministic math
+        # check fires pre-LLM-call, so by the time we build the
+        # catalog, we already know they're right and can include
+        # the image as confirmation ("here's the diagram that
+        # matches what you computed").
+        current_idx = self.current_topic_index
+        current_step = (
+            self.steps[current_idx]
+            if 0 <= current_idx < len(self.steps) else None
+        )
+        # Is the current student submission confirmed-correct?
+        # Two sources:
+        #   1. Layer 1 deterministic math check (numeric answers)
+        #   2. Layer S working analyzer state COMPLETE_CORRECT
+        # Either is sufficient. Both fire BEFORE the LLM call, so
+        # the catalog at LLM-time reflects this turn's evaluation.
+        _check = getattr(self, '_pending_math_check', None)
+        math_check_correct = bool(_check and _check.is_correct)
+        try:
+            from apps.tutoring.student_working_analyzer import WorkingState
+            _analysis = getattr(self, '_pending_working_analysis', None)
+            working_complete = bool(
+                _analysis and _analysis.state == WorkingState.COMPLETE_CORRECT
+            )
+        except Exception:
+            working_complete = False
+        withhold_current_step_media = (
+            current_step is not None
+            and (current_step.step_type or '') in ('practice', 'quiz')
+            and not (math_check_correct or working_complete)
+        )
         for step_idx, step in enumerate(self.steps):
             if not step.media or 'images' not in step.media:
+                continue
+            if withhold_current_step_media and step_idx == current_idx:
+                # Skip this step's images entirely — neither catalog
+                # nor _step_media_ids should include them while the
+                # answer is still unsubmitted / wrong.
                 continue
             for img in step.media['images']:
                 url = img.get('url')
