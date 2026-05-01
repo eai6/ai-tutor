@@ -336,8 +336,8 @@
 
 {% with audit=lesson.metadata.verification_audit %}
 {% if audit and audit.math_check_run %}
-{% with step_corrs=audit.step_corrections|default_if_none:'' et_corrs=audit.exit_ticket_corrections|default_if_none:'' answer_key_mismatches=audit.answer_key_mismatches|default_if_none:'' %}
-{% if step_corrs or et_corrs or answer_key_mismatches %}
+{% with step_corrs=audit.step_corrections|default_if_none:'' et_corrs=audit.exit_ticket_corrections|default_if_none:'' answer_key_mismatches=audit.answer_key_mismatches|default_if_none:'' layer4_rejections=audit.layer4_rejections|default_if_none:'' %}
+{% if step_corrs or et_corrs or answer_key_mismatches or layer4_rejections %}
 <!-- Layers 1 + 2 — content arithmetic verification audit -->
 <div class="card" style="border-left:4px solid #8b5cf6;">
     <div class="card-header">
@@ -355,6 +355,14 @@
             {% if answer_key_mismatches %}
             <span>·</span>
             <span style="color:#b91c1c;"><strong>{{ answer_key_mismatches|length }}</strong> answer-key mismatch{{ answer_key_mismatches|length|pluralize:"es" }}</span>
+            {% endif %}
+            {% if layer4_rejections %}
+            <span>·</span>
+            <span style="color:#b91c1c;"><strong>{{ layer4_rejections|length }}</strong> Layer 4 rejection{{ layer4_rejections|length|pluralize }}{% if audit.layer4_retry_count %} (retry: {{ audit.layer4_retry_count }}){% endif %}</span>
+            {% endif %}
+            {% if audit.exit_ticket_questions_created %}
+            <span>·</span>
+            <span style="color:#1e40af;"><strong>{{ audit.exit_ticket_questions_created }}</strong> question{{ audit.exit_ticket_questions_created|pluralize }} in bank</span>
             {% endif %}
         </div>
         <details style="font-size:0.8rem;">
@@ -402,6 +410,18 @@
                             stem computes <code>{{ c.computed }}</code>, stored answer was <code>{{ c.claimed }}</code>
                         </div>
                         <div style="margin:0.1rem 0 0.2rem 1rem;color:#9ca3af;font-size:0.75rem;">{{ c.reason }}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% if layer4_rejections %}
+                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:#b91c1c;">Layer 4 — parametric template rejections{% if audit.layer4_unresolved %} (bank below floor; lesson marked READY_WITH_WARNINGS){% endif %}</h4>
+                <ul style="margin:0;padding-left:1.2rem;list-style:disc;">
+                    {% for r in layer4_rejections %}
+                    <li style="margin-bottom:0.4rem;">
+                        Q{{ r.question_index|add:1 }} — <code style="background:#f4f4f5;padding:0.1rem 0.35rem;border-radius:3px;">{{ r.reason }}</code>
+                        <div style="margin:0.2rem 0 0.2rem 1rem;color:#71717a;">{{ r.message }}</div>
+                        {% if r.question_text %}<div style="margin:0.1rem 0 0.2rem 1rem;color:#9ca3af;font-size:0.75rem;font-style:italic;">"{{ r.question_text }}"</div>{% endif %}
                     </li>
                     {% endfor %}
                 </ul>

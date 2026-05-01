@@ -1601,39 +1601,89 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
         # Templated questions get their prose fields filled in by
         # `render_template`, with answers computed deterministically
         # in code. Failed renders (unsatisfiable constraints, bad
-        # formula) fall back to the LLM's raw question.
+        # formula) fail validation and get dropped — the LLM is
+        # given another chance via Layer 3 retry below.
         try:
             is_math_lesson_l4 = lesson.unit.course.is_math
         except Exception:
             is_math_lesson_l4 = False
+        # Track per-question rejection reasons so Layer 3 retry can
+        # tell the LLM exactly why each question was dropped.
+        layer4_rejections: List[Dict] = []
         templated_count = 0
         if is_math_lesson_l4:
             from apps.curriculum.parametric_renderer import (
                 ParametricQuestionTemplate,
                 render_template,
+                validate_template,
             )
+            kept = []
             for i, q in enumerate(questions):
                 tmpl_data = q.get('template')
+                # MANDATORY in math: a question without a template
+                # is rejected outright (per the prompt). Free-form
+                # math has no escape hatch.
                 if not tmpl_data:
+                    layer4_rejections.append({
+                        'question_index': i,
+                        'reason': 'no_template',
+                        'message': (
+                            'Math question emitted without a `template` '
+                            'object — every math question must be '
+                            'parametric.'
+                        ),
+                        'question_text': (q.get('question') or q.get('question_text') or '')[:120],
+                    })
                     continue
+
+                # Schema validation (pydantic). Catches malformed
+                # template_text, bad parameter specs, etc.
                 try:
                     tmpl = ParametricQuestionTemplate.model_validate(tmpl_data)
                 except Exception as e:
-                    logger.warning(
-                        f"[ExitTicket] [{lesson.title}] Q{i} template "
-                        f"failed validation: {e} — falling back to raw"
-                    )
+                    layer4_rejections.append({
+                        'question_index': i,
+                        'reason': 'schema_invalid',
+                        'message': f'Template schema invalid: {e}',
+                        'question_text': (q.get('question') or '')[:120],
+                    })
                     continue
+
+                # Behavior validation: sample N parameter sets, run
+                # the formula, confirm slots fill cleanly. Catches
+                # constraint contradictions, broken formulas, NaN
+                # answers, missing slots.
+                err = validate_template(tmpl, n_samples=10)
+                if err is not None:
+                    layer4_rejections.append({
+                        'question_index': i,
+                        'reason': err.kind,
+                        'message': err.message,
+                        'sample_params': err.sample_params,
+                        'question_text': (q.get('question') or tmpl.template_text)[:120],
+                    })
+                    continue
+
+                # Render a concrete instance (deterministic seed
+                # based on lesson + position so retake re-renders
+                # use a different seed).
                 rendered = render_template(tmpl, seed=lesson.id * 1000 + i)
                 if rendered is None:
-                    logger.warning(
-                        f"[ExitTicket] [{lesson.title}] Q{i} template "
-                        f"failed to render — falling back to raw"
-                    )
+                    layer4_rejections.append({
+                        'question_index': i,
+                        'reason': 'render_failed',
+                        'message': (
+                            'render_template returned None despite '
+                            'passing validate_template — sampling or '
+                            'formula edge case'
+                        ),
+                        'question_text': (q.get('question') or '')[:120],
+                    })
                     continue
-                # Merge: rendered wins on the prose fields, but the
-                # LLM-supplied concept_tag / objectives / question_type
-                # (when not the renderer's default) survive.
+
+                # Preserve the LLM-supplied bookkeeping fields
+                # (concept_tag, objectives, difficulty) — only the
+                # prose / answer fields come from the renderer.
                 preserve_keys = (
                     'concept_tag', 'terminal_objective',
                     'enabling_objective', 'difficulty', 'source',
@@ -1645,12 +1695,151 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                 q.update(rendered)
                 q.update(preserved)
                 templated_count += 1
-        if templated_count:
+                kept.append(q)
+            questions = kept
+
+        if templated_count or layer4_rejections:
             print(
                 f"[ContentGen] [{lesson.title}] Layer 4: "
-                f"{templated_count} parametric question(s) rendered",
+                f"{templated_count} templated OK, "
+                f"{len(layer4_rejections)} rejected",
                 flush=True,
             )
+
+        # Layer 4 retry — top up the bank if drops brought us below
+        # the target. Cap at 1 retry (latency + cost). After retry,
+        # if we're still under the FLOOR (25), save with
+        # READY_WITH_WARNINGS via the lesson.metadata.verification_audit.
+        BANK_TARGET = 35
+        BANK_FLOOR = 25
+        layer4_retry_count = 0
+        layer4_unresolved = False
+        if (
+            is_math_lesson_l4
+            and len(questions) < BANK_TARGET
+            and layer4_rejections
+        ):
+            from apps.curriculum.parametric_renderer import (
+                ParametricQuestionTemplate,
+                render_template,
+                validate_template,
+            )
+            shortfall = BANK_TARGET - len(questions)
+            print(
+                f"[ContentGen] [{lesson.title}] Layer 4 retry — "
+                f"{shortfall} short of target ({len(questions)}/{BANK_TARGET}); "
+                f"requesting replacements",
+                flush=True,
+            )
+            # Build the constraint block listing each rejection.
+            rejection_lines = []
+            for r in layer4_rejections[:10]:  # first 10 to keep prompt sane
+                rejection_lines.append(
+                    f"  - Q{r['question_index']+1} ({r['reason']}): "
+                    f"{r['message']}"
+                )
+            constraint = (
+                "=" * 72 + "\n"
+                "PARAMETRIC TEMPLATE VALIDATION FAILURES IN PREVIOUS RESPONSE\n"
+                + "=" * 72 + "\n\n"
+                f"{len(layer4_rejections)} of your previous "
+                f"questions were rejected because their `template` "
+                f"field was missing, schema-invalid, or failed "
+                f"backend validation. Examples:\n\n"
+                + "\n".join(rejection_lines) + "\n\n"
+                f"Generate {shortfall} REPLACEMENT questions, all "
+                f"properly templated. Re-read the worked examples "
+                f"above. EVERY answer_formula must be a closed-form "
+                f"arithmetic expression in the parameter names; the "
+                f"backend computes it deterministically. Do not "
+                f"emit free-form math — there is no escape hatch.\n\n"
+                "Original brief follows:\n\n"
+            )
+
+            try:
+                retry_prompt = constraint + prompt
+                retry_response = llm_client.generate(
+                    [{"role": "user", "content": retry_prompt}],
+                    system_prompt=exit_sys_prompt,
+                    max_tokens=16000,
+                )
+                from apps.llm.json_utils import parse_llm_json
+                retry_questions = parse_llm_json(
+                    retry_response.content, expect_array=True,
+                ) or []
+                # Process retry questions through the same Layer 4
+                # validator. Anything that passes gets appended to
+                # `questions`; failures are logged but not re-retried.
+                retry_kept = 0
+                for j, rq in enumerate(retry_questions[:shortfall * 2]):
+                    tmpl_data = rq.get('template')
+                    if not tmpl_data:
+                        layer4_rejections.append({
+                            'question_index': len(questions) + j,
+                            'reason': 'no_template_after_retry',
+                            'message': 'retry question still lacked template',
+                            'question_text': (rq.get('question') or '')[:120],
+                        })
+                        continue
+                    try:
+                        tmpl = ParametricQuestionTemplate.model_validate(tmpl_data)
+                    except Exception as e:
+                        layer4_rejections.append({
+                            'question_index': len(questions) + j,
+                            'reason': 'schema_invalid_after_retry',
+                            'message': f'{e}',
+                            'question_text': (rq.get('question') or '')[:120],
+                        })
+                        continue
+                    err = validate_template(tmpl, n_samples=10)
+                    if err is not None:
+                        layer4_rejections.append({
+                            'question_index': len(questions) + j,
+                            'reason': f'{err.kind}_after_retry',
+                            'message': err.message,
+                            'question_text': (rq.get('question') or tmpl.template_text)[:120],
+                        })
+                        continue
+                    rendered = render_template(
+                        tmpl, seed=lesson.id * 1000 + len(questions) + j,
+                    )
+                    if rendered is None:
+                        continue
+                    preserve_keys = (
+                        'concept_tag', 'terminal_objective',
+                        'enabling_objective', 'difficulty', 'source',
+                    )
+                    preserved = {k: rq[k] for k in preserve_keys if rq.get(k)}
+                    if rq.get('question_type') and rq['question_type'] != 'short_numeric':
+                        preserved['question_type'] = rq['question_type']
+                    rq.clear()
+                    rq.update(rendered)
+                    rq.update(preserved)
+                    questions.append(rq)
+                    retry_kept += 1
+                    if len(questions) >= BANK_TARGET:
+                        break
+                layer4_retry_count = 1
+                print(
+                    f"[ContentGen] [{lesson.title}] Layer 4 retry "
+                    f"recovered {retry_kept} questions "
+                    f"(bank now {len(questions)}/{BANK_TARGET})",
+                    flush=True,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"[{lesson.title}] Layer 4 retry crashed: {e}"
+                )
+
+            # Final floor check.
+            if len(questions) < BANK_FLOOR:
+                layer4_unresolved = True
+                print(
+                    f"[ContentGen] [{lesson.title}] ⚠️ Layer 4 retry "
+                    f"left bank at {len(questions)} (below floor "
+                    f"{BANK_FLOOR}) — will mark READY_WITH_WARNINGS",
+                    flush=True,
+                )
 
         # Save to database
         from django.db import transaction
@@ -1795,27 +1984,49 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                     kwargs['answer_data'] = ad
                 ExitTicketQuestion.objects.create(**kwargs)
 
-        # Layers 1 + 2 — append exit-ticket audit to lesson.metadata.
+        # Layers 1 + 2 + 4 — append exit-ticket audit to lesson.metadata.
         # Mirrors the step-audit write in _save_steps_to_db. We
         # extend (not replace) verification_audit so the step
         # corrections persisted earlier survive.
-        if is_math_lesson and (question_audit or answer_key_mismatches):
+        any_layer_audit = (
+            question_audit or answer_key_mismatches
+            or layer4_rejections
+        )
+        if is_math_lesson and any_layer_audit:
             from django.utils import timezone
+            from apps.curriculum.models import Lesson
             existing = lesson.metadata or {}
             audit_blob = existing.get('verification_audit') or {}
             if question_audit:
                 audit_blob['exit_ticket_corrections'] = question_audit
             if answer_key_mismatches:
                 audit_blob['answer_key_mismatches'] = answer_key_mismatches
+            if layer4_rejections:
+                audit_blob['layer4_rejections'] = layer4_rejections
+            audit_blob['layer4_retry_count'] = layer4_retry_count
+            audit_blob['layer4_unresolved'] = layer4_unresolved
+            audit_blob['exit_ticket_questions_created'] = len(questions)
             audit_blob.setdefault('math_check_run', True)
             audit_blob.setdefault(
                 'generated_at', timezone.now().isoformat(),
             )
             existing['verification_audit'] = audit_blob
             lesson.metadata = existing
-            lesson.save(update_fields=['metadata'])
+            update_fields = ['metadata']
+            if layer4_unresolved:
+                lesson.content_status = (
+                    Lesson.ContentStatus.READY_WITH_WARNINGS
+                )
+                update_fields.append('content_status')
+            lesson.save(update_fields=update_fields)
 
-        return {'success': True, 'questions_created': len(questions)}
+        return {
+            'success': True,
+            'questions_created': len(questions),
+            'layer4_rejections': len(layer4_rejections),
+            'layer4_retry_count': layer4_retry_count,
+            'layer4_unresolved': layer4_unresolved,
+        }
 
     except Exception as e:
         logger.error(f"Exit ticket generation failed for {lesson.title}: {e}")

@@ -173,29 +173,211 @@ _ALLOWED_UNARYOPS = {
 }
 
 
-def safe_eval_arithmetic(expr: str) -> Optional[float]:
-    """Evaluate a pure-arithmetic expression. Return None on failure
-    or on disallowed content (variables, function calls, etc.)."""
+# ─── Function whitelist ─────────────────────────────────────────────
+#
+# When a template's answer_formula calls a function (e.g.
+# `sqrt(a*a + b*b)`), the AST walker resolves the name against this
+# whitelist. Anything not in the whitelist returns None — that
+# includes builtins, dunder access, attribute lookups, etc.
+#
+# The whitelist intentionally covers the union of `math` + `statistics`
+# that secondary curricula realistically use: powers/roots/trig for
+# geometry, gcd/lcm/factorial for number theory, mean/median/stdev
+# for statistics, etc. Don't artificially trim — the curriculum
+# decides what shapes of math show up, and we want the LLM able to
+# express any of them.
+
+import math as _math
+import statistics as _stats
+
+
+def _safe_log(x, base=None):
+    """math.log(x [, base]). Default base = e (natural log)."""
+    if base is None:
+        return _math.log(x)
+    return _math.log(x, base)
+
+
+def _safe_round(x, ndigits=0):
+    return round(x, int(ndigits))
+
+
+def _safe_clamp(x, lo, hi):
+    """Clamp x to [lo, hi]. Useful for templates that compute a
+    value but want it bounded for display."""
+    return max(lo, min(hi, x))
+
+
+def _int_args(*args):
+    """Coerce args to int. _walk always yields floats, so int-only
+    functions (gcd, lcm, factorial) need this coercion. Raises
+    ValueError if a float can't be losslessly cast — caller's
+    except clause turns that into None."""
+    out = []
+    for a in args:
+        if isinstance(a, float) and not a.is_integer():
+            raise ValueError(f"non-integer arg: {a}")
+        out.append(int(a))
+    return out
+
+
+def _safe_gcd(*args):
+    return _math.gcd(*_int_args(*args))
+
+
+def _safe_lcm(*args):
+    ints = _int_args(*args)
+    if hasattr(_math, 'lcm'):
+        return _math.lcm(*ints)
+    # Python <3.9 fallback
+    if not ints:
+        return 0
+    result = ints[0]
+    for x in ints[1:]:
+        result = abs(result * x) // _math.gcd(result, x) if x else 0
+    return result
+
+
+def _safe_factorial(x):
+    return _math.factorial(_int_args(x)[0])
+
+
+_ALLOWED_FUNCS = {
+    # Powers / roots / exp / log
+    'sqrt':       _math.sqrt,
+    'pow':        _math.pow,
+    'exp':        _math.exp,
+    'log':        _safe_log,        # log(x) = ln(x); log(x, b) = log base b
+    'ln':         _math.log,        # alias for natural log
+    'log10':      _math.log10,
+    'log2':       _math.log2,
+    # Trig
+    'sin':        _math.sin,
+    'cos':        _math.cos,
+    'tan':        _math.tan,
+    'asin':       _math.asin,
+    'acos':       _math.acos,
+    'atan':       _math.atan,
+    'atan2':      _math.atan2,
+    'sinh':       _math.sinh,
+    'cosh':       _math.cosh,
+    'tanh':       _math.tanh,
+    'radians':    _math.radians,
+    'degrees':    _math.degrees,
+    # Min / max / abs / clamp
+    'min':        min,
+    'max':        max,
+    'abs':        abs,
+    'clamp':      _safe_clamp,
+    # Rounding
+    'round':      _safe_round,
+    'floor':      _math.floor,
+    'ceil':       _math.ceil,
+    'trunc':      _math.trunc,
+    # Number theory — these require integer args; coerce + reject
+    # non-integer floats inside the wrappers.
+    'gcd':        _safe_gcd,
+    'lcm':        _safe_lcm,
+    'factorial':  _safe_factorial,
+    # Aggregate (used with explicit lists / List nodes)
+    'sum':        sum,
+    'len':        len,
+    'mean':       _stats.mean,
+    'median':     _stats.median,
+    'mode':       _stats.mode,
+    'stdev':      _stats.stdev,
+    'variance':   _stats.variance,
+}
+
+_ALLOWED_CONSTS = {
+    'pi':   _math.pi,
+    'e':    _math.e,
+    'tau':  _math.tau,
+    'inf':  _math.inf,
+}
+
+
+def safe_eval_arithmetic(
+    expr: str, vars: Optional[dict] = None,
+) -> Optional[float]:
+    """Evaluate a pure-arithmetic expression with optional named
+    variables. Return None on failure or on disallowed content
+    (variables not in `vars`, non-whitelisted function calls,
+    attribute access, comprehensions, etc.).
+
+    `vars` is consulted before `_ALLOWED_CONSTS` — so a parameter
+    named `pi` would shadow the constant. Templates should avoid
+    that.
+    """
     if not expr or not expr.strip():
         return None
     try:
         tree = ast.parse(expr, mode="eval")
     except (SyntaxError, ValueError):
         return None
-    return _walk(tree.body)
+    return _walk(tree.body, vars or {})
 
 
-def _walk(node) -> Optional[float]:
+def _walk(node, vars: dict) -> Optional[float]:
+    # Numeric literals
     if isinstance(node, ast.Constant):
         if isinstance(node.value, (int, float)):
             return float(node.value)
         return None
+    # Variable / constant lookup
+    if isinstance(node, ast.Name):
+        if node.id in vars:
+            try:
+                return float(vars[node.id])
+            except (TypeError, ValueError):
+                return None
+        if node.id in _ALLOWED_CONSTS:
+            return float(_ALLOWED_CONSTS[node.id])
+        return None
+    # List literal — for `mean([a, b, c])`, `sum([1, 2, 3])`, etc.
+    if isinstance(node, ast.List) or isinstance(node, ast.Tuple):
+        out = []
+        for elt in node.elts:
+            v = _walk(elt, vars)
+            if v is None:
+                return None
+            out.append(v)
+        return out  # NB: not a float — the caller (a Call) reduces it
+    # Function call — restricted to the whitelist. The call's args
+    # are recursively walked. NB: a Call returning a list (e.g.,
+    # mean(sum_list)) is handled because _walk returns floats and
+    # lists; we coerce to float at the top via the float(...) below.
+    if isinstance(node, ast.Call):
+        if not isinstance(node.func, ast.Name):
+            return None
+        fn = _ALLOWED_FUNCS.get(node.func.id)
+        if fn is None:
+            return None
+        args = []
+        for arg in node.args:
+            v = _walk(arg, vars)
+            if v is None and not isinstance(arg, (ast.List, ast.Tuple)):
+                return None
+            args.append(v)
+        # Disallow keyword args — keeps the surface area tight.
+        if node.keywords:
+            return None
+        try:
+            result = fn(*args)
+            if isinstance(result, (int, float)):
+                return float(result)
+            return None
+        except (
+            TypeError, ValueError, ZeroDivisionError,
+            OverflowError, _stats.StatisticsError,
+        ):
+            return None
     if isinstance(node, ast.BinOp):
         op_fn = _ALLOWED_BINOPS.get(type(node.op))
         if op_fn is None:
             return None
-        left = _walk(node.left)
-        right = _walk(node.right)
+        left = _walk(node.left, vars)
+        right = _walk(node.right, vars)
         if left is None or right is None:
             return None
         try:
@@ -206,14 +388,15 @@ def _walk(node) -> Optional[float]:
         op_fn = _ALLOWED_UNARYOPS.get(type(node.op))
         if op_fn is None:
             return None
-        operand = _walk(node.operand)
+        operand = _walk(node.operand, vars)
         if operand is None:
             return None
         try:
             return float(op_fn(operand))
         except (OverflowError, ValueError):
             return None
-    # Anything else (Name, Call, Attribute, Subscript, ...) is rejected.
+    # Anything else (Attribute, Subscript, comprehensions, lambdas,
+    # Starred, etc.) is rejected by default.
     return None
 
 

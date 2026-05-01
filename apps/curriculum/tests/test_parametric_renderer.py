@@ -16,10 +16,12 @@ import unittest
 from apps.curriculum.parametric_renderer import (
     ParameterSpec,
     ParametricQuestionTemplate,
+    TemplateValidationError,
     _check_constraint,
     _compute_answer,
     _sample_parameters,
     render_template,
+    validate_template,
 )
 
 
@@ -241,6 +243,103 @@ class TestRenderTemplate(unittest.TestCase):
     def test_question_type_default_is_short_numeric(self):
         result = render_template(SUM_TO_360_TEMPLATE, seed=7)
         self.assertEqual(result["question_type"], "short_numeric")
+
+
+# ============================================================================
+# validate_template (F2)
+# ============================================================================
+
+
+class TestValidateTemplate(unittest.TestCase):
+    def test_valid_template_returns_none(self):
+        self.assertIsNone(validate_template(SUM_TO_360_TEMPLATE))
+
+    def test_constraint_unsatisfiable_caught(self):
+        bad = ParametricQuestionTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            answer_formula="a",
+            explanation_template="x = {answer}",
+            constraints=["a > 100"],  # impossible given range 1..10
+        )
+        err = validate_template(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "constraint_unsatisfiable")
+
+    def test_formula_error_caught(self):
+        bad = ParametricQuestionTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            answer_formula="a + missing_var",  # references undefined var
+            explanation_template="x = {answer}",
+        )
+        err = validate_template(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "formula_error")
+
+    def test_division_by_zero_caught(self):
+        bad = ParametricQuestionTemplate(
+            template_text="x = {a}/{b}",
+            parameters={
+                "a": ParameterSpec(type="int", min=1, max=10),
+                "b": ParameterSpec(type="int", min=0, max=0),  # always 0
+            },
+            answer_formula="a / b",
+            explanation_template="x = {answer}",
+        )
+        err = validate_template(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "formula_error")
+
+    def test_missing_template_slot_caught(self):
+        bad = ParametricQuestionTemplate(
+            template_text="x = {a} + {missing}",  # `missing` not declared
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            answer_formula="a",
+            explanation_template="x = {answer}",
+        )
+        err = validate_template(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "missing_template_slot")
+
+    def test_missing_explanation_slot_caught(self):
+        bad = ParametricQuestionTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            answer_formula="a",
+            # `b` not declared, and not the special `{answer}` slot
+            explanation_template="x = {answer} ({b})",
+        )
+        err = validate_template(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "missing_explanation_slot")
+
+    def test_unreasonable_magnitude_caught(self):
+        # 10^10 + ... blows past the 1e9 bound on every sample
+        bad = ParametricQuestionTemplate(
+            template_text="x = {a} ** {b}",
+            parameters={
+                "a": ParameterSpec(type="int", min=10, max=10),
+                "b": ParameterSpec(type="int", min=15, max=15),
+            },
+            answer_formula="a ** b",  # 10^15 = 1e15
+            explanation_template="x = {answer}",
+        )
+        err = validate_template(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "unreasonable_magnitude")
+
+    def test_validation_error_to_audit_entry(self):
+        err = TemplateValidationError(
+            kind="formula_error",
+            message="…",
+            sample_params={"a": 5},
+            sample_index=2,
+        )
+        d = err.to_audit_entry()
+        self.assertEqual(d["kind"], "formula_error")
+        self.assertEqual(d["sample_index"], 2)
+        self.assertEqual(d["sample_params"], {"a": 5})
 
 
 if __name__ == "__main__":

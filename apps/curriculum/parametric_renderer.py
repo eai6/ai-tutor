@@ -259,6 +259,141 @@ def _format_answer(value: float, unit: Optional[str]) -> str:
 
 
 # ============================================================================
+# Sanity-check / validator
+# ============================================================================
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class TemplateValidationError:
+    """Structured failure reason from `validate_template`. Surfaced
+    in lesson.metadata.verification_audit and embedded in the Layer
+    3 retry constraint block so the LLM gets a precise error
+    message."""
+    kind: str       # see TemplateValidationError.KINDS
+    message: str
+    sample_params: Optional[Dict[str, float]] = None
+    sample_index: Optional[int] = None  # which of the N samples failed
+
+    KINDS = (
+        'constraint_unsatisfiable',  # _sample_parameters returned None
+        'formula_error',              # answer_formula didn't evaluate
+        'missing_template_slot',      # template_text.format raised KeyError
+        'missing_explanation_slot',   # explanation_template.format raised KeyError
+        'non_finite_answer',          # NaN / inf
+        'unreasonable_magnitude',     # |answer| > 1e9
+        'parameter_spec_invalid',     # ParameterSpec validation failed
+    )
+
+    def to_audit_entry(self) -> Dict:
+        return {
+            'kind': self.kind,
+            'message': self.message,
+            'sample_params': self.sample_params,
+            'sample_index': self.sample_index,
+        }
+
+
+_MAX_REASONABLE_MAGNITUDE = 1e9
+
+
+def validate_template(
+    template: ParametricQuestionTemplate,
+    *,
+    n_samples: int = 10,
+) -> Optional[TemplateValidationError]:
+    """Sample `n_samples` parameter sets, render each, verify the
+    formula evaluates cleanly and the rendered text has no unfilled
+    slots. Returns None on success or a TemplateValidationError
+    describing the FIRST failure (so the caller can attach a
+    specific reason to the retry constraint).
+
+    All N samples must succeed — a partial pass is treated as a
+    failure because it implies the parameter range admits values
+    that break the formula.
+    """
+    rng = random.Random(0)  # deterministic so tests are stable
+    for i in range(n_samples):
+        params = _sample_parameters(template, rng)
+        if params is None:
+            return TemplateValidationError(
+                kind='constraint_unsatisfiable',
+                message=(
+                    f"Couldn't satisfy constraints {template.constraints!r} "
+                    f"in {_MAX_RESAMPLE_ATTEMPTS} attempts"
+                ),
+                sample_index=i,
+            )
+
+        # Compute answer
+        answer = _compute_answer(template.answer_formula, params)
+        if answer is None:
+            return TemplateValidationError(
+                kind='formula_error',
+                message=(
+                    f"answer_formula {template.answer_formula!r} "
+                    f"failed to evaluate with params {params!r}"
+                ),
+                sample_params=params, sample_index=i,
+            )
+        # Reject NaN / inf
+        if not math.isfinite(answer):
+            return TemplateValidationError(
+                kind='non_finite_answer',
+                message=(
+                    f"answer_formula produced non-finite value {answer!r} "
+                    f"for params {params!r}"
+                ),
+                sample_params=params, sample_index=i,
+            )
+        if abs(answer) > _MAX_REASONABLE_MAGNITUDE:
+            return TemplateValidationError(
+                kind='unreasonable_magnitude',
+                message=(
+                    f"answer {answer:g} exceeds magnitude bound "
+                    f"{_MAX_REASONABLE_MAGNITUDE:g} for params {params!r}"
+                ),
+                sample_params=params, sample_index=i,
+            )
+
+        # Try to fill the template_text slots
+        try:
+            template.template_text.format(**params)
+        except (KeyError, IndexError, ValueError) as e:
+            return TemplateValidationError(
+                kind='missing_template_slot',
+                message=(
+                    f"template_text references a slot not in "
+                    f"parameters: {e}"
+                ),
+                sample_params=params, sample_index=i,
+            )
+
+        # Try to fill the explanation_template slots
+        try:
+            answer_str = _format_answer(answer, template.answer_unit)
+            template.explanation_template.format(**params, answer=answer_str)
+        except (KeyError, IndexError, ValueError) as e:
+            return TemplateValidationError(
+                kind='missing_explanation_slot',
+                message=(
+                    f"explanation_template references a slot not in "
+                    f"parameters or {{answer}}: {e}"
+                ),
+                sample_params=params, sample_index=i,
+            )
+
+    return None
+
+
+# Need math.isfinite — pull at module level so we don't import inside the
+# hot path.
+import math
+
+
+# ============================================================================
 # Top-level rendering
 # ============================================================================
 

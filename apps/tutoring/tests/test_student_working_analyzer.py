@@ -65,8 +65,45 @@ class TestSafeEvalArithmetic(unittest.TestCase):
         # 'x' is a Name node — not allowed
         self.assertIsNone(safe_eval_arithmetic("x + 1"))
 
-    def test_rejects_function_call(self):
-        self.assertIsNone(safe_eval_arithmetic("max(1, 2)"))
+    def test_rejects_non_whitelisted_function(self):
+        # Layer 4 expanded the whitelist to include math + statistics
+        # functions; verify that a name NOT in the whitelist is still
+        # rejected (no implicit access to builtins).
+        self.assertIsNone(safe_eval_arithmetic("eval('1+1')"))
+        self.assertIsNone(safe_eval_arithmetic("__import__('os')"))
+        self.assertIsNone(safe_eval_arithmetic("getattr(1, 'real')"))
+
+    def test_whitelisted_functions_evaluate(self):
+        # Whitelisted math + stats functions work.
+        self.assertEqual(safe_eval_arithmetic("max(1, 2, 3)"), 3.0)
+        self.assertEqual(safe_eval_arithmetic("min(5, 2)"), 2.0)
+        self.assertEqual(safe_eval_arithmetic("abs(-7)"), 7.0)
+        self.assertEqual(safe_eval_arithmetic("sqrt(16)"), 4.0)
+        self.assertEqual(safe_eval_arithmetic("ceil(3.2)"), 4.0)
+        self.assertEqual(safe_eval_arithmetic("floor(3.8)"), 3.0)
+        self.assertEqual(safe_eval_arithmetic("gcd(12, 18)"), 6.0)
+        self.assertEqual(safe_eval_arithmetic("mean([1, 2, 3, 4])"), 2.5)
+        self.assertEqual(safe_eval_arithmetic("median([1, 5, 2, 8, 3])"), 3.0)
+
+    def test_constants_resolve(self):
+        import math
+        self.assertAlmostEqual(safe_eval_arithmetic("pi"), math.pi)
+        self.assertAlmostEqual(safe_eval_arithmetic("e"), math.e)
+        # Compound expressions using constants
+        self.assertAlmostEqual(safe_eval_arithmetic("2 * pi * 5"), 2 * math.pi * 5)
+
+    def test_vars_substitute(self):
+        # New vars= kwarg lets the caller bind names without textual
+        # substitution. Layer 4 uses this — params are passed as
+        # vars instead of being string-substituted into the formula.
+        self.assertEqual(safe_eval_arithmetic("a + b", vars={"a": 3, "b": 4}), 7.0)
+        self.assertEqual(safe_eval_arithmetic("sqrt(a*a + b*b)", vars={"a": 3, "b": 4}), 5.0)
+        # Undefined name returns None
+        self.assertIsNone(safe_eval_arithmetic("a + missing", vars={"a": 1}))
+
+    def test_rejects_keyword_args(self):
+        # Whitelist allows positional only — keeps the surface tight.
+        self.assertIsNone(safe_eval_arithmetic("round(3.14, ndigits=1)"))
 
     def test_rejects_attribute_access(self):
         self.assertIsNone(safe_eval_arithmetic("__import__('os').system('rm')"))

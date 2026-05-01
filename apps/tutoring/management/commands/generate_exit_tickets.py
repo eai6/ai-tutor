@@ -19,81 +19,160 @@ LESSON: {lesson_title}
 OBJECTIVE: {lesson_objective}
 SUBJECT: {subject}
 {exam_context}{seychelles_context}
-QUESTION FORMAT MIX — generate in THIS EXACT ORDER:
-Questions 1-5: FILL_IN_BLANK (calculation with blank for the answer)
-Questions 6-9: MATCHING (match expressions to their solutions/simplified forms)
-Questions 10-13: SHORT_ANSWER (multi-step calculation requiring working out)
-Questions 14-35: MCQ (multiple choice with numerical/algebraic options)
 
-YOU MUST generate ALL 4 types. DO NOT generate any data_interpretation
-questions — that type is disabled platform-wide. The first 13 questions
-MUST NOT be MCQ.
+═══════════════════════════════════════════════════════════════════════
+MANDATORY: every math question MUST emit a `template` object.
+═══════════════════════════════════════════════════════════════════════
 
-MATHEMATICS RULES — EVERY question must:
-- Require CALCULATION, not description or explanation
-- Have NUMERICAL or ALGEBRAIC answers, not paragraphs of text
-- Use command words: "Work out", "Calculate", "Simplify", "Solve", "Find", "Evaluate"
-- NOT use: "Explain why", "Describe", "Discuss" (these are for geography/humanities)
+You DO NOT compute numeric answers yourself. You define HOW to compute
+them as a `template` (parameter ranges + formula). The backend
+samples parameter values from the ranges and runs the formula in code.
+This means arithmetic errors are impossible — the answer is whatever
+the formula evaluates to with the chosen parameters, by construction.
 
-REQUIREMENTS:
-1. Generate EXACTLY 35 questions
+A question without a `template` is REJECTED. There is no "free-form"
+math escape hatch.
+
+For each question you emit:
+  • Pick a question pattern that fits the lesson objective.
+  • Write the `template_text` with named slots in {{single braces}}.
+  • Declare the `parameters` (name → type / min / max / step).
+  • Write `answer_formula` — a pure arithmetic expression in those
+    parameter names that the backend computes deterministically.
+  • Write `explanation_template` — same slot syntax, plus the
+    special slot {{answer}} which gets filled with the computed
+    answer at render time.
+  • Optionally declare `constraints` — boolean expressions that
+    must hold over the parameters; the backend re-samples until
+    they do.
+
+═══════════════════════════════════════════════════════════════════════
+ALLOWED FORMULA SYNTAX
+═══════════════════════════════════════════════════════════════════════
+
+Operators:  +  -  *  /  //  %  **  ( )
+
+Functions (positional args only — no kwargs):
+  Powers / roots:  sqrt, pow, exp, log, ln, log10, log2
+  Trig:            sin, cos, tan, asin, acos, atan, atan2,
+                   sinh, cosh, tanh, radians, degrees
+  Comparison:      min, max, abs, clamp(x, lo, hi)
+  Rounding:        round, floor, ceil, trunc
+  Number theory:   gcd, lcm, factorial
+  Aggregates:      sum, len, mean, median, mode, stdev, variance
+                   (use with [list, of, params] notation)
+
+Constants: pi, e, tau
+
+Anything outside this whitelist (attribute access, list comprehensions,
+custom functions, lambda, builtins like `eval`, etc.) is rejected by
+the formula sandbox and will fail validation.
+
+═══════════════════════════════════════════════════════════════════════
+WORKED EXAMPLES (5 patterns covering different shapes)
+═══════════════════════════════════════════════════════════════════════
+
+1) PURE SUM — angles around a point:
+{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "easy",
+  "template": {{
+    "template_text": "Three angles around a point are {{a}}°, {{b}}°, and x°. Find x.",
+    "parameters": {{
+      "a": {{"type": "int", "min": 30, "max": 150, "step": 5}},
+      "b": {{"type": "int", "min": 30, "max": 150, "step": 5}}
+    }},
+    "answer_formula": "360 - a - b",
+    "answer_unit": "°",
+    "explanation_template": "Angles around a point sum to 360°. x = 360 - {{a}} - {{b}} = {{answer}}.",
+    "constraints": ["a + b < 350"]
+  }}}}
+
+2) PRODUCT — area of a rectangle:
+{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "easy",
+  "template": {{
+    "template_text": "A rectangular plot is {{l}} m long and {{w}} m wide. Find its area.",
+    "parameters": {{
+      "l": {{"type": "int", "min": 4, "max": 30}},
+      "w": {{"type": "int", "min": 4, "max": 30}}
+    }},
+    "answer_formula": "l * w",
+    "answer_unit": " m²",
+    "explanation_template": "Area = length × width = {{l}} × {{w}} = {{answer}}.",
+    "constraints": ["l != w"]
+  }}}}
+
+3) LINEAR EQUATION — solve ax + b = c:
+{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "medium",
+  "template": {{
+    "template_text": "Solve for x: {{a}}x + {{b}} = {{c}}.",
+    "parameters": {{
+      "a": {{"type": "int", "min": 2, "max": 9}},
+      "b": {{"type": "int", "min": 1, "max": 20}},
+      "c": {{"type": "int", "min": 10, "max": 80}}
+    }},
+    "answer_formula": "(c - b) / a",
+    "explanation_template": "Rearrange: x = (c - b) / a = ({{c}} - {{b}}) / {{a}} = {{answer}}.",
+    "constraints": ["(c - b) % a == 0", "c > b"]
+  }}}}
+
+4) PERCENT — percent of a Seychelles-context value:
+{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "medium",
+  "template": {{
+    "template_text": "A fisherman sells {{kg}} kg of tuna. He gives {{p}}% to the cooperative. How many kg does he keep?",
+    "parameters": {{
+      "kg": {{"type": "int", "min": 20, "max": 200, "step": 10}},
+      "p": {{"type": "int", "min": 5, "max": 40, "step": 5}}
+    }},
+    "answer_formula": "kg * (100 - p) / 100",
+    "answer_unit": " kg",
+    "explanation_template": "He keeps (100 - {{p}})% = {{kg}} × (100 - {{p}}) / 100 = {{answer}}.",
+    "constraints": ["(kg * (100 - p)) % 100 == 0"]
+  }}}}
+
+5) PYTHAGORAS — hypotenuse via sqrt:
+{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "medium",
+  "template": {{
+    "template_text": "A right triangle has legs of {{a}} and {{b}}. Find the hypotenuse.",
+    "parameters": {{
+      "a": {{"type": "int", "min": 3, "max": 15}},
+      "b": {{"type": "int", "min": 3, "max": 15}}
+    }},
+    "answer_formula": "sqrt(a*a + b*b)",
+    "explanation_template": "By Pythagoras: c = √({{a}}² + {{b}}²) = √({{a}}² + {{b}}²) ≈ {{answer}}.",
+    "constraints": ["a != b"]
+  }}}}
+
+═══════════════════════════════════════════════════════════════════════
+QUESTION TYPE FIELD
+═══════════════════════════════════════════════════════════════════════
+
+Templated math questions use `question_type: "short_numeric"`. The
+backend renders them as fill-in-blank-style at runtime: the student
+types the numeric answer, the grader compares to the computed value.
+
+If a question genuinely cannot be templated (e.g., qualitative
+reasoning, proof, multi-step word problem with branching), it is
+NOT appropriate for a math exit ticket. SKIP it. The bank target
+is 35; the floor is 25 — better fewer high-quality templated
+questions than free-form math the system can't verify.
+
+═══════════════════════════════════════════════════════════════════════
+REQUIREMENTS
+═══════════════════════════════════════════════════════════════════════
+1. Generate up to 35 questions, ALL templated. Bank floor is 25.
 2. Each question MUST have concept_tag = EXACT TEXT of an enabling objective from below
 3. EVERY enabling objective must be assessed by at least 1 question
 4. Use Seychelles context in word problems (SCR prices, fish catches, island areas)
 5. Vary difficulty: easy calculations → harder numbers → word problems → multi-step
-
-OUTPUT FORMAT (JSON array):
-
-MCQ format (numerical/algebraic options):
-{{"question_type": "mcq", "question": "Simplify 3(x + 4) - 2x", "option_a": "x + 12", "option_b": "5x + 4", "option_c": "x + 4", "option_d": "3x + 12", "correct": "A", "explanation": "3(x+4) - 2x = 3x + 12 - 2x = x + 12", "difficulty": "easy", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
-
-FILL_IN_BLANK format (calculation result):
-{{"question_type": "fill_in_blank", "question": "Work out the following:", "answer_data": {{"text_template": "20 + 5 × 3 = ___", "blanks": ["35"], "accept_alternatives": [["35.0"]]}}, "explanation": "Using BIDMAS: multiply first (5×3=15), then add (20+15=35)", "difficulty": "easy", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
-
-MATCHING format (expressions to solutions):
-{{"question_type": "matching", "question": "Match each expression to its simplified form:", "answer_data": {{"pairs": [{{"left": "3x + 2x", "right": "5x"}}, {{"left": "4y - y", "right": "3y"}}, {{"left": "2(x + 3)", "right": "2x + 6"}}], "distractor_rights": ["6x", "5y"]}}, "explanation": "Combine like terms or expand brackets", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
-
-SHORT_ANSWER format (show working):
-{{"question_type": "short_answer", "question": "A fisherman in Seychelles sells tuna at SCR 45 per kg. He catches 3 fish weighing 2.5kg, 4.2kg, and 3.8kg. Calculate the total revenue. Show your working.", "answer_data": {{"model_answer": "Total weight = 2.5 + 4.2 + 3.8 = 10.5 kg. Revenue = 10.5 × 45 = SCR 472.50", "keywords": ["10.5", "472.50", "45"], "min_keywords": 2}}, "explanation": "Add the weights first, then multiply by price per kg", "difficulty": "medium", "concept_tag": "EXACT TEXT OF AN ENABLING OBJECTIVE"}}
-
-DATA_INTERPRETATION is DISABLED. Do not generate questions of that type.
-
-NO FIGURES — questions are TEXT-ONLY. Do NOT emit `figure_spec`,
-`figure`, `plot_spec`, `figure_svg`, `figure_url`, or any inline
-<svg>. The teacher can attach a generated image (gpt-image-2)
-to any question after the fact via the question editor.
-
-PARAMETRIC TEMPLATES (preferred for arithmetic-heavy questions) —
-Instead of writing literal numbers in your question and computing
-the answer yourself, you MAY emit a `template` object. The
-backend samples concrete parameter values and computes the answer
-in code — arithmetic errors become impossible. Use this for
-question patterns where the same form with different numbers
-would be a valid alternate question.
-
-PARAMETRIC FORMAT example (replaces SHORT_ANSWER for arithmetic):
-{{"question_type": "short_numeric", "concept_tag": "EXACT EO TEXT", "difficulty": "easy", "template": {{"template_text": "Three angles around a point are {{a}}°, {{b}}°, and x°. Find x.", "parameters": {{"a": {{"type": "int", "min": 30, "max": 150, "step": 5}}, "b": {{"type": "int", "min": 30, "max": 150, "step": 5}}}}, "answer_formula": "360 - a - b", "answer_unit": "°", "explanation_template": "Angles around a point sum to 360°. x = 360 - {{a}} - {{b}} = {{answer}}.", "constraints": ["a + b < 350"]}}}}
-
-Template rules:
-- Parameter names in {{braces}} must match exactly between
-  template_text, answer_formula, and explanation_template.
-- answer_formula uses ONLY + - * / ** ( ) and the parameter
-  names. No function calls, no external variables.
-- The slot {{answer}} in explanation_template gets the computed
-  answer.
-- constraints are simple boolean comparisons over parameters
-  (e.g. "a + b < 350"); the renderer re-samples until they
-  hold.
-- DO NOT use templates for word problems whose phrasing depends
-  on the actual numbers, or for questions requiring qualitative
-  reasoning. Use them for clean arithmetic patterns.
+6. NO data_interpretation. NO figures (text-only).
+7. Diversify the templates — don't emit 35 sum-to-360 questions.
+   Use the full range of patterns the lesson objective covers.
 
 DIFFICULTY DISTRIBUTION (out of 35):
-- Questions 1-12: easy (straightforward calculations, single step)
-- Questions 13-25: medium (multi-step, word problems with Seychelles context)
-- Questions 26-35: hard (complex problems, reverse/inverse, problem solving)
+- Questions 1-12: easy (single-step formula, small integers)
+- Questions 13-25: medium (multi-step formula, Seychelles context)
+- Questions 26-35: hard (compound formulas, reverse/inverse, sqrt/percent)
 
-Generate the 35 questions now:"""
+Generate the question bank now (JSON array of templated questions):"""
 
 EXIT_TICKET_PROMPT = """Generate a mixed-format question bank (35 questions) for a summative assessment (exit ticket) on this lesson.
 
