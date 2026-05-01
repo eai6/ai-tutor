@@ -15,6 +15,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Free runner disk before the Docker build. The hosted Ubuntu
+      # image ships with the Android SDK pre-installed at
+      # /usr/local/lib/android (~14 GB). We don't use it; building
+      # our image (sentence-transformers + ChromaDB layers) was
+      # running out of space in run #25202140993 with the SDK still
+      # in place. Removing only this directory; everything else on
+      # the runner stays as-is.
+      - name: Free Android-SDK disk space (runner only)
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          df -h /
+
       - name: Azure Login
         uses: azure/login@v2
         with:
