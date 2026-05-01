@@ -1841,18 +1841,39 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                     flush=True,
                 )
 
-        # Save to database
+        # Save to database — IN-PLACE replacement when an ExitTicket
+        # already exists. Honoring the docstring promise: drop the
+        # QUESTIONS only (cascade chain doesn't reach back up), keep
+        # the ExitTicket row so its `attempts` related set survives.
+        # ExitTicketAttempt.exit_ticket is a CASCADE FK to ExitTicket
+        # (apps/tutoring/models.py:600-603) — deleting the row would
+        # wipe every per-student attempt + score, which we
+        # explicitly DO NOT WANT on regen.
         from django.db import transaction
         with transaction.atomic():
             if existing:
-                existing.delete()
-
-            exit_ticket = ExitTicket.objects.create(
-                lesson=lesson,
-                passing_score=8,
-                time_limit_minutes=15,
-                instructions=f"Answer 10 questions about {lesson.title}. You need 8 correct to pass.",
-            )
+                # Drop the OLD questions only. ExitTicketQuestion has
+                # no children FKs (attempts hang off ExitTicket, not
+                # off individual questions), so this is safe.
+                existing.questions.all().delete()
+                exit_ticket = existing
+                # Refresh top-level metadata in case it changed.
+                exit_ticket.passing_score = 8
+                exit_ticket.time_limit_minutes = 15
+                exit_ticket.instructions = (
+                    f"Answer 10 questions about {lesson.title}. "
+                    f"You need 8 correct to pass."
+                )
+                exit_ticket.save(update_fields=[
+                    'passing_score', 'time_limit_minutes', 'instructions',
+                ])
+            else:
+                exit_ticket = ExitTicket.objects.create(
+                    lesson=lesson,
+                    passing_score=8,
+                    time_limit_minutes=15,
+                    instructions=f"Answer 10 questions about {lesson.title}. You need 8 correct to pass.",
+                )
 
             # Drop questions the deterministic validator flags as broken:
             #   - rationalization patterns in explanation
