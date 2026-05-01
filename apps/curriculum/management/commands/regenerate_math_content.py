@@ -1,40 +1,56 @@
-"""Bulk-regenerate every lesson in every math course.
+"""Bulk-regenerate generated math content.
 
-Triggers the defense layers (1, 2, 3, 4) on every math lesson at
-content-generation time. New errors get auto-corrected (Layer 1),
-answer-key mismatches get caught (Layer 2), Layer 3 retries once
-on unresolved arithmetic, and templated questions (Layer 4) come
-out of code rather than the LLM.
+Three independent scopes — pick what you want to refresh based on
+how aggressive a refresh you can afford:
 
-What gets preserved across regen:
+  --scope=steps          (default — non-destructive to attempts)
+      Regenerates LessonStep rows ONLY. Triggers Layer 1+3 defenses
+      on step content (teacher_script, hints, educational_content,
+      worked examples). Exit-ticket questions and summative bank
+      are LEFT AS-IS — so existing ExitTicketAttempt history
+      survives.
+
+  --scope=exit-tickets   (drops attempts)
+      Regenerates ExitTicketQuestion rows ONLY (no step regen).
+      Triggers Layer 1+2+4 on questions. Existing
+      ExitTicketAttempt history is wiped (cascade-delete from
+      ExitTicket replacement).
+
+  --scope=summative      (drops summative attempts only)
+      Rebuilds the per-course summative bank from each lesson's
+      CURRENT exit ticket — no LLM call for sampling, but old
+      summative attempts are dropped.
+
+  --scope=all            (everything)
+      Steps + exit tickets + summative. Maximum coverage,
+      maximum disruption to history.
+
+What's preserved REGARDLESS of scope:
   - StudentLessonProgress, StudentSkillMastery, TutorSession
   - StudentCompetencyRecord (permanent mastery transcript)
-  - Lesson row (PK is stable; FKs survive)
+  - Lesson, Unit, Course rows (PKs stable, FKs survive)
 
-What gets wiped per lesson:
-  - LessonStep rows (replaced with new generation)
-  - ExitTicket + its ExitTicketQuestion rows (replaced)
-  - ExitTicketAttempt history (cascade-deletes with ExitTicket)
-    NOTE: the existing course_regenerate_all view has the same
-    behaviour. If you need to preserve attempt history, regenerate
-    on a per-lesson basis instead.
+Cost guides:
+  - Steps: ~$0.10–0.40 per lesson + ~2 min each
+  - Exit tickets: ~$0.05–0.20 per lesson + ~30s each
+  - Summative: free (sampling from existing exit tickets)
 
-Cost: ~$0.10–0.40 per lesson + ~2 min each. For ~150 math
-lessons that's ~$15–60 and ~50 min serial (or faster if parallel
-processing is enabled in your environment).
-
-Usage:
-    # Dry run — list what WOULD be regenerated, no LLM calls
+Examples:
+    # Dry run — list scope, no LLM calls
     python manage.py regenerate_math_content --dry-run
 
-    # Regenerate all math courses
+    # Steps only (default, preserves attempts)
     python manage.py regenerate_math_content
 
-    # Regenerate one specific course
-    python manage.py regenerate_math_content --course-id 5
+    # Exit tickets only (drops attempts; required to fix
+    # Layer 1+2 errors in already-generated questions)
+    python manage.py regenerate_math_content --scope=exit-tickets
 
-    # Regenerate first 2 math courses (smoke test before wider run)
-    python manage.py regenerate_math_content --max-courses 2
+    # Full refresh of everything math
+    python manage.py regenerate_math_content --scope=all
+
+    # Pilot one course before wider run
+    python manage.py regenerate_math_content --scope=all --course-id 5
 
 Run against production:
     DATABASE_URL='<prod_pg_url>' \
@@ -77,6 +93,17 @@ class Command(BaseCommand):
                 "(GitHub Actions / cron / az containerapp exec)."
             ),
         )
+        parser.add_argument(
+            "--scope",
+            choices=["steps", "exit-tickets", "summative", "all"],
+            default="steps",
+            help=(
+                "Which content to regenerate. 'steps' (default) is "
+                "non-destructive to attempt history. 'exit-tickets' "
+                "and 'all' drop ExitTicketAttempt rows. See module "
+                "docstring for details."
+            ),
+        )
 
     def handle(self, *args, **opts):
         from apps.curriculum.content_generator import (
@@ -104,6 +131,11 @@ class Command(BaseCommand):
         if opts["max_courses"]:
             courses = courses[: opts["max_courses"]]
 
+        scope = opts["scope"]
+        regen_steps = scope in ("steps", "all")
+        regen_et = scope in ("exit-tickets", "all")
+        regen_summative = scope in ("summative", "all")
+
         # Pre-flight summary.
         total_lessons = sum(
             Lesson.objects.filter(unit__course=c).count() for c in courses
@@ -112,7 +144,7 @@ class Command(BaseCommand):
             f"\n{'=' * 70}"
         ))
         self.stdout.write(self.style.MIGRATE_HEADING(
-            f"BULK MATH CONTENT REGENERATION"
+            f"BULK MATH CONTENT REGENERATION  scope={scope}"
         ))
         self.stdout.write(self.style.MIGRATE_HEADING(
             f"{'=' * 70}\n"
@@ -123,13 +155,39 @@ class Command(BaseCommand):
         self.stdout.write(
             f"  Lessons (across all):    {total_lessons}"
         )
+        self.stdout.write(f"  Will regenerate:")
         self.stdout.write(
-            f"  Estimated time:          {total_lessons * 2 // 60}m+ "
-            f"(~2 min/lesson, serial within a course)"
+            f"    • Lesson steps:          {'YES' if regen_steps else 'no'}"
+        )
+        self.stdout.write(
+            f"    • Exit tickets:          "
+            f"{'YES (drops attempts)' if regen_et else 'no (preserved)'}"
+        )
+        self.stdout.write(
+            f"    • Summative bank:        "
+            f"{'YES (drops summative attempts)' if regen_summative else 'no'}"
+        )
+
+        # Cost / time estimates per scope. Steps dominate; exit-
+        # ticket regen is one LLM call per lesson (~30s); summative
+        # is sampling-only, no LLM.
+        est_min = 0
+        est_dollar_low = 0.0
+        est_dollar_high = 0.0
+        if regen_steps:
+            est_min += total_lessons * 2
+            est_dollar_low += total_lessons * 0.10
+            est_dollar_high += total_lessons * 0.40
+        if regen_et:
+            est_min += int(total_lessons * 0.5)
+            est_dollar_low += total_lessons * 0.05
+            est_dollar_high += total_lessons * 0.20
+        self.stdout.write(
+            f"  Estimated time:          {est_min}m+ (serial within a course)"
         )
         self.stdout.write(
             f"  Estimated cost:          "
-            f"${total_lessons * 0.10:.2f} – ${total_lessons * 0.40:.2f}"
+            f"${est_dollar_low:.2f} – ${est_dollar_high:.2f}"
         )
         self.stdout.write("")
 
@@ -151,13 +209,19 @@ class Command(BaseCommand):
         # reverse operation. Bypassed when --no-confirm is set —
         # required for unattended runs from GitHub Actions, etc.
         self.stdout.write(self.style.WARNING(
-            "About to regenerate every math lesson in every listed course."
+            "About to regenerate math content in every listed course."
         ))
-        self.stdout.write(self.style.WARNING(
-            "This will overwrite LessonStep + ExitTicketQuestion rows + "
-            "drop ExitTicketAttempt history. Student progress / mastery "
-            "/ competency-transcript records are preserved."
-        ))
+        if regen_et:
+            self.stdout.write(self.style.WARNING(
+                "Exit-ticket regeneration WILL drop ExitTicketAttempt "
+                "history. Student mastery / competency-transcript "
+                "records are preserved."
+            ))
+        if regen_summative:
+            self.stdout.write(self.style.WARNING(
+                "Summative-bank rebuild drops summative-attempt rows "
+                "for these courses."
+            ))
         if opts["no_confirm"]:
             self.stdout.write(self.style.WARNING(
                 "--no-confirm set; proceeding without prompt."
@@ -173,6 +237,16 @@ class Command(BaseCommand):
         # parallelism across courses, the dashboard's UI button
         # spawns a thread per course — but a management command
         # runs cleaner serially with deterministic progress.
+        # Lazy imports for the scope-specific generators so an
+        # 'exit-tickets' or 'summative' run doesn't pay for the
+        # instructor client unless it needs it.
+        from apps.curriculum.content_generator import (
+            generate_exit_ticket_for_lesson,
+        )
+        from apps.tutoring.summative_generator import (
+            generate_summative_for_course,
+        )
+
         results = []
         t_start = time.time()
         for i, c in enumerate(courses, 1):
@@ -180,37 +254,122 @@ class Command(BaseCommand):
             self.stdout.write(self.style.MIGRATE_HEADING(
                 f"\n[{i}/{len(courses)}] {c.title} (id={c.id})"
             ))
-            try:
-                result = generate_content_for_course(c.id, force=True)
-                elapsed = time.time() - t0
+            course_result = {"course": c.title}
+
+            # 1. Steps regen (uses _generate_exit_ticket internally
+            # but with skip-if-exists semantics; exit tickets are
+            # NOT replaced here — that happens in step 2 if requested).
+            if regen_steps:
+                try:
+                    r = generate_content_for_course(c.id, force=True)
+                    self.stdout.write(self.style.SUCCESS(
+                        f"  ✓ steps: {r.get('total_success', 0)} OK, "
+                        f"{r.get('total_failed', 0)} failed, "
+                        f"{r.get('total_skipped', 0)} skipped"
+                    ))
+                    course_result.update({
+                        "steps_success": r.get("total_success", 0),
+                        "steps_failed": r.get("total_failed", 0),
+                        "steps_skipped": r.get("total_skipped", 0),
+                    })
+                except Exception as e:
+                    self.stderr.write(self.style.ERROR(
+                        f"  ✗ steps regen failed: {e}"
+                    ))
+                    course_result["steps_error"] = str(e)
+
+            # 2. Exit-ticket regen (force_regenerate=True replaces
+            # the ExitTicketQuestion rows + drops ExitTicketAttempt
+            # history via cascade).
+            if regen_et:
+                lessons = Lesson.objects.filter(unit__course=c).order_by(
+                    "unit__order_index", "order_index",
+                )
+                et_ok = 0
+                et_fail = 0
+                for lesson in lessons:
+                    try:
+                        r = generate_exit_ticket_for_lesson(
+                            lesson, c.institution_id,
+                            force_regenerate=True,
+                        )
+                        if r.get("success"):
+                            et_ok += 1
+                        else:
+                            et_fail += 1
+                            self.stderr.write(self.style.WARNING(
+                                f"    ! [{lesson.title[:40]}] "
+                                f"exit ticket: {r.get('error')}"
+                            ))
+                    except Exception as e:
+                        et_fail += 1
+                        self.stderr.write(self.style.ERROR(
+                            f"    ✗ [{lesson.title[:40]}] "
+                            f"exit ticket crashed: {e}"
+                        ))
                 self.stdout.write(self.style.SUCCESS(
-                    f"  ✓ {result.get('total_success', 0)} lessons "
-                    f"OK, {result.get('total_failed', 0)} failed, "
-                    f"{result.get('total_skipped', 0)} skipped "
-                    f"in {elapsed:.0f}s"
+                    f"  ✓ exit tickets: {et_ok} OK, {et_fail} failed"
                 ))
-                results.append(result)
-            except Exception as e:
-                elapsed = time.time() - t0
-                self.stderr.write(self.style.ERROR(
-                    f"  ✗ Course {c.title} failed after {elapsed:.0f}s: {e}"
-                ))
-                results.append({"course": c.title, "error": str(e)})
+                course_result["et_success"] = et_ok
+                course_result["et_failed"] = et_fail
+
+            # 3. Summative bank rebuild (no LLM call — samples from
+            # current lesson exit tickets).
+            if regen_summative:
+                try:
+                    r = generate_summative_for_course(c)
+                    self.stdout.write(self.style.SUCCESS(
+                        f"  ✓ summative: "
+                        f"{r.get('questions_created', 0)} questions, "
+                        f"{r.get('lessons_processed', 0)} lessons sampled"
+                    ))
+                    course_result.update({
+                        "sum_questions": r.get("questions_created", 0),
+                        "sum_lessons": r.get("lessons_processed", 0),
+                    })
+                except Exception as e:
+                    self.stderr.write(self.style.ERROR(
+                        f"  ✗ summative rebuild failed: {e}"
+                    ))
+                    course_result["summative_error"] = str(e)
+
+            elapsed = time.time() - t0
+            self.stdout.write(
+                f"  course total: {elapsed:.0f}s"
+            )
+            results.append(course_result)
 
         total_elapsed = time.time() - t_start
-        ok = sum(r.get("total_success", 0) for r in results)
-        failed = sum(r.get("total_failed", 0) for r in results)
-        skipped = sum(r.get("total_skipped", 0) for r in results)
+        ok = sum(r.get("steps_success", 0) for r in results)
+        failed = sum(r.get("steps_failed", 0) for r in results)
+        skipped = sum(r.get("steps_skipped", 0) for r in results)
+        et_ok_total = sum(r.get("et_success", 0) for r in results)
+        et_fail_total = sum(r.get("et_failed", 0) for r in results)
+        sum_q_total = sum(r.get("sum_questions", 0) for r in results)
         self.stdout.write(self.style.MIGRATE_HEADING(
             f"\n{'=' * 70}"
         ))
         self.stdout.write(self.style.MIGRATE_HEADING(
-            f"COMPLETE — {ok} OK, {failed} failed, {skipped} skipped "
-            f"in {total_elapsed / 60:.1f}m"
+            f"COMPLETE in {total_elapsed / 60:.1f}m  scope={scope}"
         ))
         self.stdout.write(self.style.MIGRATE_HEADING(
             f"{'=' * 70}"
         ))
+        if regen_steps:
+            self.stdout.write(
+                f"  Steps:           {ok} OK, {failed} failed, "
+                f"{skipped} skipped"
+            )
+        if regen_et:
+            self.stdout.write(
+                f"  Exit tickets:    {et_ok_total} OK, "
+                f"{et_fail_total} failed (across all courses)"
+            )
+        if regen_summative:
+            self.stdout.write(
+                f"  Summative bank:  {sum_q_total} questions sampled "
+                f"across {len(courses)} course(s)"
+            )
         self.stdout.write(
             "\nNext: open each course's lesson_detail to inspect "
             "the 🧮 Arithmetic Verification panel for unresolved "

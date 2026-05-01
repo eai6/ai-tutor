@@ -28,6 +28,16 @@ on:
         type: boolean
         required: true
         default: true
+      scope:
+        description: "What to regenerate"
+        type: choice
+        required: true
+        default: "steps"
+        options:
+          - steps           # default — non-destructive to attempts
+          - exit-tickets    # drops ExitTicketAttempt history
+          - summative       # rebuilds summative bank from existing tickets
+          - all             # everything (steps + tickets + summative)
       course_id:
         description: "Limit to one course id (blank = all math courses)"
         type: string
@@ -62,7 +72,7 @@ jobs:
       - name: Build management-command argv
         id: build
         run: |
-          ARGS="regenerate_math_content"
+          ARGS="regenerate_math_content --scope=${{ inputs.scope }}"
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             ARGS="$ARGS --dry-run"
           else
