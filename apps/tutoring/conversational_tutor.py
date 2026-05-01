@@ -1668,18 +1668,21 @@ Keep it to 2-3 sentences."""
             lesson=self.lesson,
             llm_client=self.llm_client,
             student_input=student_input,
+            bank_stems=self._current_bank_stems(),
         )
         if validation.content != clean_response:
             clean_response = validation.content
         if validation.issues:
             turn_metadata['validator_issues'] = list(validation.issues)
             turn_metadata['validator_passed'] = validation.passed
-        # Always attach fact-check metadata (counts + unverified claims)
-        # so the teacher dashboard can show it even on clean turns.
+        # Always attach fact-check + rule-check metadata so the teacher
+        # dashboard can show it even on clean turns.
         for k in (
             'factual_claims_checked', 'factual_claims_unverified',
             'factual_claims_contradicted', 'fact_check_skipped',
             'fact_check_skip_reason',
+            'rule_check_skipped', 'rule_check_skip_reason',
+            'rule_violations',
         ):
             if k in validation.metadata:
                 turn_metadata[k] = validation.metadata[k]
@@ -1715,7 +1718,9 @@ Keep it to 2-3 sentences."""
                 lesson=self.lesson,
                 llm_client=self.llm_client,
                 fact_check=False,  # avoid second fact-check (latency cap)
+                rule_check=False,  # avoid second rule-check (latency cap)
                 student_input=student_input,
+                bank_stems=self._current_bank_stems(),
             )
             clean_response = revalidation.content
             turn_metadata['regenerated'] = True
@@ -1960,6 +1965,7 @@ Keep it to 2-3 sentences."""
             lesson=self.lesson,
             llm_client=self.llm_client,
             student_input=student_input,
+            bank_stems=self._current_bank_stems(),
         )
         if validation.content != clean_content:
             clean_content = validation.content
@@ -1970,6 +1976,8 @@ Keep it to 2-3 sentences."""
             'factual_claims_checked', 'factual_claims_unverified',
             'factual_claims_contradicted', 'fact_check_skipped',
             'fact_check_skip_reason',
+            'rule_check_skipped', 'rule_check_skip_reason',
+            'rule_violations',
         ):
             if k in validation.metadata:
                 turn_metadata[k] = validation.metadata[k]
@@ -3736,6 +3744,25 @@ Follow the current step; this concept will be covered in sequence."""
             )
         return clean_text, entry
 
+    def _current_bank_stems(self) -> List[str]:
+        """Flatten the active question_id_map to a list of stem strings.
+
+        Used by the rule-compliance validator (P5) so the judge knows
+        which question stems are bank-approved (anything else from the
+        tutor is an authoring violation).
+        """
+        id_map = getattr(self, '_question_id_map', {}) or {}
+        stems: List[str] = []
+        for entry in id_map.values():
+            ts = getattr(entry, 'teacher_script', None)
+            if ts:
+                stems.append(ts.strip())
+                continue
+            qt = getattr(entry, 'question_text', '') or ''
+            if qt:
+                stems.append(qt.strip())
+        return stems
+
     # =========================================================================
     # CONTEXT HELPERS
     # =========================================================================
@@ -4066,19 +4093,20 @@ Follow the current step; this concept will be covered in sequence."""
         """Build a system-prompt block injected on regeneration (V3).
 
         Tells the LLM what was wrong with the previous response so it
-        can produce a better one. Only fires when validation reported
-        contradicted factual claims — i.e., curriculum-grounded evidence
-        contradicts something the tutor said.
+        can produce a better one. Triggers on contradicted curriculum
+        claims OR rule-compliance violations (P5 — NO_AUTHORING /
+        ARITHMETIC / RULE_1).
         """
-        contradicted = (validation.metadata or {}).get(
-            'factual_claims_contradicted', []) or []
-        unverified = (validation.metadata or {}).get(
-            'factual_claims_unverified', []) or []
+        meta = validation.metadata or {}
+        contradicted = meta.get('factual_claims_contradicted', []) or []
+        unverified = meta.get('factual_claims_unverified', []) or []
+        rule_violations = meta.get('rule_violations', []) or []
         parts = ["\n\n<regeneration_required>"]
         parts.append(
-            "Your PREVIOUS attempt at this turn made claims the curriculum"
-            " contradicts. Rewrite the response. Do NOT repeat the same"
-            " incorrect claims.")
+            "Your PREVIOUS attempt at this turn was rejected by the"
+            " response validator. Rewrite the response. Do NOT repeat"
+            " the same mistakes."
+        )
         if contradicted:
             parts.append(
                 "Curriculum CONTRADICTS these claims (do not restate them):"
@@ -4093,6 +4121,31 @@ Follow the current step; this concept will be covered in sequence."""
             )
             for c in unverified[:5]:
                 parts.append(f"  - {c}")
+        if rule_violations:
+            parts.append("Rule violations the reviewer flagged:")
+            for v in rule_violations[:5]:
+                rule = v.get('rule', '?')
+                evidence = (v.get('evidence') or '').strip()
+                fix = (v.get('suggested_fix') or '').strip()
+                line = f"  - [{rule}]"
+                if evidence:
+                    line += f" evidence: \"{evidence[:120]}\""
+                if fix:
+                    line += f" → fix: {fix[:160]}"
+                parts.append(line)
+            parts.append(
+                "If NO_AUTHORING was flagged: do NOT pose a new question in"
+                " your prose. To pose a question, end with |||QUESTION:N|||"
+                " selecting an entry from <question_bank>."
+            )
+            parts.append(
+                "If ARITHMETIC was flagged: redo any number-claim using the"
+                " corrected value, or omit the calculation."
+            )
+            parts.append(
+                "If RULE_1 was flagged: remove ALL praise and ask the student"
+                " to walk through their working before any confirmation."
+            )
         parts.append(
             "Be honest about uncertainty. End with a question. Keep it"
             " concise (one new idea at a time)."

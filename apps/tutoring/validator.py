@@ -34,6 +34,11 @@ ISSUE_UNFOUNDED_PRAISE_STRIPPED = "unfounded_praise_stripped"
 ISSUE_INFO_DUMP = "info_dump_warning"
 ISSUE_NUMERIC_CLAIM_UNVERIFIED = "numeric_claim_unverified"
 ISSUE_NUMERIC_CLAIM_CONTRADICTED = "numeric_claim_contradicted"
+# P5 — rule-compliance violations (LLM-as-judge). See
+# memory/tutor_no_authoring_plan.md.
+ISSUE_AUTHORING_VIOLATION = "authoring_violation"
+ISSUE_ARITHMETIC_VIOLATION = "arithmetic_violation"
+ISSUE_RULE1_VIOLATION = "rule1_violation"
 
 
 @dataclass
@@ -57,6 +62,9 @@ class ValidationResult:
     # the tutor is wrong, can't be patched in place.
     _REGEN_ISSUES = frozenset({
         ISSUE_NUMERIC_CLAIM_CONTRADICTED,
+        ISSUE_AUTHORING_VIOLATION,
+        ISSUE_ARITHMETIC_VIOLATION,
+        ISSUE_RULE1_VIOLATION,
     })
 
     @property
@@ -110,6 +118,8 @@ def validate_tutor_response(
     llm_client=None,
     fact_check: bool = True,
     student_input: Optional[str] = None,
+    rule_check: bool = True,
+    bank_stems: Optional[List[str]] = None,
 ) -> ValidationResult:
     """Run V1+V2 validator layers over a tutor response.
 
@@ -185,6 +195,46 @@ def validate_tutor_response(
         unverified = [c for c in fc.claims if c.status == "unverified"]
         if unverified:
             issues.append(ISSUE_NUMERIC_CLAIM_UNVERIFIED)
+
+    # L5 — rule-compliance check (P5 of memory/tutor_no_authoring_plan.md).
+    # LLM-as-judge for: NO_AUTHORING (questions outside the bank),
+    # ARITHMETIC (prose-form arithmetic that verify_calculations regex
+    # missed), RULE_1 (praise synonyms when bare/wrong). Math-only —
+    # gated on lesson.unit.course.is_math because non-math sessions
+    # have no bank and no math claims to check.
+    if (
+        rule_check
+        and lesson is not None
+        and llm_client is not None
+    ):
+        try:
+            is_math_lesson = lesson.unit.course.is_math
+        except Exception:
+            is_math_lesson = False
+        if is_math_lesson:
+            layers_run.append("rule_check")
+            from apps.tutoring.rule_compliance import (
+                RULE_ARITHMETIC,
+                RULE_NO_AUTHORING,
+                RULE_RULE_1,
+                check_rule_compliance,
+            )
+            rc = check_rule_compliance(
+                content,
+                llm_client=llm_client,
+                bank_stems=bank_stems or [],
+                student_input=student_input or "",
+                answer_was_bare=bool(bare_answer),
+                answer_was_wrong=(is_correct is False),
+            )
+            extra_meta.update(rc.to_metadata())
+            if rc.has_violations:
+                if RULE_NO_AUTHORING in rc.violated_rules:
+                    issues.append(ISSUE_AUTHORING_VIOLATION)
+                if RULE_ARITHMETIC in rc.violated_rules:
+                    issues.append(ISSUE_ARITHMETIC_VIOLATION)
+                if RULE_RULE_1 in rc.violated_rules:
+                    issues.append(ISSUE_RULE1_VIOLATION)
 
     return ValidationResult(
         content=content,

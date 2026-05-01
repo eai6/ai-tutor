@@ -401,7 +401,11 @@ class MathTutoringIntegrationTest(TestCase):
                 "Good, 95 + 70 + 110 = 275. What's the next step?"
             )
             tutor.respond("95 + 70 + 110 = 275")
-            sys_prompt = fake_llm.generate.call_args.kwargs.get("system_prompt", "")
+            # call_args_list[0] is the tutor call; call_args (last) may
+            # be the rule-compliance judge if it ran.
+            sys_prompt = fake_llm.generate.call_args_list[0].kwargs.get(
+                "system_prompt", ""
+            )
             self.assertIn("<student_working_analysis>", sys_prompt)
             self.assertIn("PARTIAL_CORRECT", sys_prompt)
             self.assertIn("DO NOT compute the remaining step", sys_prompt)
@@ -419,7 +423,9 @@ class MathTutoringIntegrationTest(TestCase):
                 "Yes — well done. Can you explain why?"
             )
             tutor.respond("95 + 70 + 110 = 275\n360 - 275 = 85")
-            sys_prompt = fake_llm.generate.call_args.kwargs.get("system_prompt", "")
+            sys_prompt = fake_llm.generate.call_args_list[0].kwargs.get(
+                "system_prompt", ""
+            )
             self.assertIn("COMPLETE_CORRECT", sys_prompt)
             self.assertIn("DO NOT just say", sys_prompt)
             self.assertIn("articulate", sys_prompt)
