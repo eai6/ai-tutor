@@ -161,3 +161,33 @@ class SummativeRegenPreservesAttemptsTest(TransactionTestCase):
         # No overlap — old questions deleted, new ones created
         self.assertEqual(old_question_ids & new_question_ids, set())
         self.assertGreater(len(new_question_ids), 0)
+
+    def test_summative_carries_enabling_objective_forward(self):
+        """Sub-objective on the source lesson question must end up
+        on the summative copy — preserves sub-skill granularity for
+        post-summative remediation, while concept_tag stays at the
+        lesson-objective level for the competency matrix."""
+        # Tag every source lesson question with a distinctive sub-EO
+        # so we can verify it survives the sample → snapshot → create
+        # round-trip into the summative bank.
+        ExitTicketQuestion.objects.filter(
+            exit_ticket__lesson=self.lesson,
+            exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
+        ).update(
+            enabling_objective="Calculate sum given two addends",
+        )
+        from apps.tutoring.summative_generator import (
+            generate_summative_for_course,
+        )
+        result = generate_summative_for_course(self.course, min_per_lesson=3)
+        self.assertTrue(result.get('success'))
+        # Every freshly-created summative question should carry the
+        # source EO forward.
+        new_qs = ExitTicketQuestion.objects.filter(exit_ticket=self.old_summative)
+        self.assertGreater(new_qs.count(), 0)
+        for q in new_qs:
+            self.assertEqual(
+                q.enabling_objective,
+                "Calculate sum given two addends",
+                "summative question dropped the source enabling_objective",
+            )

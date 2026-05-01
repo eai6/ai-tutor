@@ -159,11 +159,18 @@ def _process_lesson(lesson_id: int, institution_id: int, k: int, seed_for_lesson
             'correct_answer': q.correct_answer,
             'answer_data': q.answer_data,
             'explanation': q.explanation,
-            # Always lesson-level: ignore the source question's
-            # fine-grained sub-skill tag. This is the only knob that
-            # makes the competency matrix match what students actually
-            # attempted. (See design note above.)
+            # concept_tag = lesson-level objective. This is what the
+            # competency matrix joins on, so summative questions are
+            # tagged at lesson granularity regardless of the source
+            # question's tag.
             'concept_tag': primary_objective[:200],
+            # enabling_objective = the sub-skill the source question
+            # tested. Carried forward so post-summative remediation
+            # can target the failing sub-skill (e.g. "you missed
+            # 'reverse calculation' on lesson 7"), not just the
+            # whole lesson. Empty when the source question pre-dates
+            # the field (older content, not yet regenerated).
+            'enabling_objective': (q.enabling_objective or '')[:500],
             'difficulty': q.difficulty,
         })
 
@@ -322,6 +329,7 @@ def generate_summative_for_course(
                     answer_data=q.get('answer_data') or {},
                     explanation=(q.get('explanation') or '')[:8000],
                     concept_tag=(q.get('concept_tag') or '')[:200],
+                    enabling_objective=(q.get('enabling_objective') or '')[:500],
                     difficulty=(q.get('difficulty') or 'medium').lower(),
                     order_index=i,
                 )
