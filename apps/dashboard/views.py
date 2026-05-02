@@ -3063,16 +3063,31 @@ def lesson_detail(request, lesson_id):
         unit__course=course, is_published=True
     ).exclude(id=lesson.id).order_by('unit__order_index', 'order_index')
 
-    # Enabling objectives: try metadata first, then collect from steps
-    teaching_steps = (lesson.metadata or {}).get('teaching_steps', [])
-    if not teaching_steps:
-        # Collect unique EOs from step enabling_objective fields
+    # Enabling objectives: lesson.enabling_objectives is the canonical
+    # granular list (populated by _expand_to_granular_subskills during
+    # generation). Fall back to lesson.metadata['teaching_steps'] then
+    # to step-level enabling_objective fields for legacy lessons.
+    enabling_objectives = list(lesson.enabling_objectives or [])
+    if not enabling_objectives:
+        enabling_objectives = list(
+            (lesson.metadata or {}).get('teaching_steps', []) or []
+        )
+    if not enabling_objectives:
         seen = set()
         for step in steps:
             eo = getattr(step, 'enabling_objective', '') or ''
             if eo and eo not in seen:
                 seen.add(eo)
-                teaching_steps.append(eo)
+                enabling_objectives.append(eo)
+    # Real terminal objectives live on the parent UNIT — distinct from
+    # the lesson's granular EOs. Without this the template was
+    # mislabelling lesson.enabling_objectives as "Terminal Objectives".
+    unit_terminal_objectives = list(
+        (lesson.unit.terminal_objectives or []) if lesson.unit else []
+    )
+    # Keep teaching_steps in context for backward compat with any
+    # downstream JS that still reads it.
+    teaching_steps = enabling_objectives
 
     # Auto-recover orphaned 'generating' state. Daemon background threads
     # die with the gunicorn worker, so a deploy mid-regen leaves the
@@ -3111,6 +3126,8 @@ def lesson_detail(request, lesson_id):
         'prerequisites': prerequisites,
         'available_lessons': available_lessons,
         'teaching_steps': teaching_steps,
+        'enabling_objectives': enabling_objectives,
+        'unit_terminal_objectives': unit_terminal_objectives,
         'is_generating': is_generating,
     }
 
