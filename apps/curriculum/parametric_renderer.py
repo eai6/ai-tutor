@@ -474,6 +474,11 @@ class TemplateValidationError:
         'non_finite_answer',          # NaN / inf
         'unreasonable_magnitude',     # |answer| > 1e9
         'parameter_spec_invalid',     # ParameterSpec validation failed
+        # P2c — new kinds for the typed templates
+        'distractor_collision',       # MCQ distractor == correct or another distractor
+        'blank_count_mismatch',       # fill stem ___ count != blank_formulas length
+        'matching_pair_collision',    # matching can't produce N distinct pairs across samples
+        'render_failed',              # render returned None (catch-all for typed renders)
     )
 
     def to_audit_entry(self) -> Dict:
@@ -580,6 +585,263 @@ def validate_template(
 # Need math.isfinite — pull at module level so we don't import inside the
 # hot path.
 import math
+
+
+def validate_template_typed(
+    template,
+    *,
+    n_samples: int = 10,
+) -> Optional[TemplateValidationError]:
+    """Validate a typed template (MCQ / fill_in_blank / matching /
+    short_answer) by sampling N times and checking type-specific
+    invariants.
+
+    For ParametricQuestionTemplate (the original short_numeric type),
+    this is a passthrough to validate_template.
+
+    Returns None on success or the FIRST TemplateValidationError.
+    """
+    if isinstance(template, ParametricQuestionTemplate):
+        return validate_template(template, n_samples=n_samples)
+    if isinstance(template, ParametricMCQTemplate):
+        return _validate_mcq_template(template, n_samples=n_samples)
+    if isinstance(template, ParametricFillBlankTemplate):
+        return _validate_fill_blank_template(template, n_samples=n_samples)
+    if isinstance(template, ParametricMatchingTemplate):
+        return _validate_matching_template(template, n_samples=n_samples)
+    if isinstance(template, ParametricShortAnswerTemplate):
+        return _validate_short_answer_template(template, n_samples=n_samples)
+    return TemplateValidationError(
+        kind='render_failed',
+        message=f"Unknown template type: {type(template).__name__}",
+    )
+
+
+def _validate_mcq_template(
+    template: ParametricMCQTemplate, *, n_samples: int,
+) -> Optional[TemplateValidationError]:
+    rng = random.Random(0)
+    for i in range(n_samples):
+        params = _sample_with_constraints_for_typed(template, rng)
+        if params is None:
+            return TemplateValidationError(
+                kind='constraint_unsatisfiable',
+                message=(
+                    f"Couldn't satisfy constraints {template.constraints!r} "
+                    f"in {_MAX_RESAMPLE_ATTEMPTS} attempts"
+                ),
+                sample_index=i,
+            )
+
+        # Correct
+        correct = _compute_answer(template.correct_formula, params)
+        err = _check_answer_value(correct, template.correct_formula, params, i)
+        if err: return err
+
+        # Distractors
+        distractor_values = []
+        for j, f in enumerate(template.distractor_formulas):
+            v = _compute_answer(f, params)
+            err = _check_answer_value(v, f, params, i, label=f"distractor {j}")
+            if err: return err
+            distractor_values.append(v)
+
+        EPS = 1e-6
+        # Distractor must not collide with correct
+        for j, v in enumerate(distractor_values):
+            if abs(v - correct) < EPS:
+                return TemplateValidationError(
+                    kind='distractor_collision',
+                    message=(
+                        f"distractor {j} ({template.distractor_formulas[j]!r}) "
+                        f"equals correct answer {correct!r} for params {params!r}"
+                    ),
+                    sample_params=params, sample_index=i,
+                )
+        # Distractors must not collide with each other
+        rounded = [round(v, 6) for v in distractor_values]
+        if len(set(rounded)) != len(rounded):
+            return TemplateValidationError(
+                kind='distractor_collision',
+                message=(
+                    f"two distractors yielded the same value "
+                    f"({distractor_values!r}) for params {params!r}"
+                ),
+                sample_params=params, sample_index=i,
+            )
+
+        # Slot fills
+        try:
+            template.template_text.format(**params)
+        except (KeyError, IndexError, ValueError) as e:
+            return TemplateValidationError(
+                kind='missing_template_slot',
+                message=f"template_text slot error: {e}",
+                sample_params=params, sample_index=i,
+            )
+        try:
+            template.explanation_template.format(
+                **params, answer=_format_answer(correct, template.answer_unit),
+            )
+        except (KeyError, IndexError, ValueError) as e:
+            return TemplateValidationError(
+                kind='missing_explanation_slot',
+                message=f"explanation_template slot error: {e}",
+                sample_params=params, sample_index=i,
+            )
+    return None
+
+
+def _validate_fill_blank_template(
+    template: ParametricFillBlankTemplate, *, n_samples: int,
+) -> Optional[TemplateValidationError]:
+    rng = random.Random(0)
+    for i in range(n_samples):
+        params = _sample_with_constraints_for_typed(template, rng)
+        if params is None:
+            return TemplateValidationError(
+                kind='constraint_unsatisfiable',
+                message=f"Couldn't satisfy constraints {template.constraints!r}",
+                sample_index=i,
+            )
+        # Slot fill
+        try:
+            stem_filled = template.template_text.format(**params)
+        except (KeyError, IndexError, ValueError) as e:
+            return TemplateValidationError(
+                kind='missing_template_slot',
+                message=f"template_text slot error: {e}",
+                sample_params=params, sample_index=i,
+            )
+        # Blank count match
+        slot_count = stem_filled.count("___")
+        if slot_count != len(template.blank_formulas):
+            return TemplateValidationError(
+                kind='blank_count_mismatch',
+                message=(
+                    f"stem has {slot_count} `___` slots but "
+                    f"{len(template.blank_formulas)} blank_formulas"
+                ),
+                sample_params=params, sample_index=i,
+            )
+        # Each blank evaluates
+        for j, f in enumerate(template.blank_formulas):
+            v = _compute_answer(f, params)
+            err = _check_answer_value(v, f, params, i, label=f"blank {j}")
+            if err: return err
+    return None
+
+
+def _validate_matching_template(
+    template: ParametricMatchingTemplate, *, n_samples: int,
+) -> Optional[TemplateValidationError]:
+    # Sample once to verify pair production succeeds at the requested
+    # pair_count + distractor_count. We don't run N iterations because
+    # render_matching itself does N internal samples.
+    rng = random.Random(0)
+    for i in range(n_samples):
+        # Quick sample check to surface formula/slot issues
+        params = _sample_with_constraints_for_typed(template, rng)
+        if params is None:
+            return TemplateValidationError(
+                kind='constraint_unsatisfiable',
+                message=f"Couldn't satisfy constraints {template.constraints!r}",
+                sample_index=i,
+            )
+        # right_formula must evaluate
+        v = _compute_answer(template.right_formula, params)
+        err = _check_answer_value(v, template.right_formula, params, i, label="right_formula")
+        if err: return err
+        # left_formula slot fill
+        try:
+            template.left_formula.format(**params)
+        except (KeyError, IndexError, ValueError) as e:
+            return TemplateValidationError(
+                kind='missing_template_slot',
+                message=f"left_formula slot error: {e}",
+                sample_params=params, sample_index=i,
+            )
+
+    # End-to-end render check — ensures pair_count + distractor_count
+    # are achievable given the parameter space.
+    rendered = render_matching(template, seed=12345)
+    if rendered is None:
+        return TemplateValidationError(
+            kind='matching_pair_collision',
+            message=(
+                f"render_matching produced fewer than {template.pair_count} "
+                "distinct pairs — parameter space too narrow"
+            ),
+        )
+    return None
+
+
+def _validate_short_answer_template(
+    template: ParametricShortAnswerTemplate, *, n_samples: int,
+) -> Optional[TemplateValidationError]:
+    rng = random.Random(0)
+    for i in range(n_samples):
+        params = _sample_with_constraints_for_typed(template, rng)
+        if params is None:
+            return TemplateValidationError(
+                kind='constraint_unsatisfiable',
+                message=f"Couldn't satisfy constraints {template.constraints!r}",
+                sample_index=i,
+            )
+        v = _compute_answer(template.final_answer_formula, params)
+        err = _check_answer_value(v, template.final_answer_formula, params, i)
+        if err: return err
+        try:
+            template.template_text.format(**params)
+        except (KeyError, IndexError, ValueError) as e:
+            return TemplateValidationError(
+                kind='missing_template_slot',
+                message=f"template_text slot error: {e}",
+                sample_params=params, sample_index=i,
+            )
+        try:
+            template.canonical_working.format(
+                **params, answer=_format_answer(v, template.answer_unit),
+            )
+        except (KeyError, IndexError, ValueError) as e:
+            return TemplateValidationError(
+                kind='missing_explanation_slot',
+                message=f"canonical_working slot error: {e}",
+                sample_params=params, sample_index=i,
+            )
+    return None
+
+
+def _check_answer_value(
+    value, formula: str, params: Dict, sample_index: int,
+    label: str = "answer",
+) -> Optional[TemplateValidationError]:
+    """Shared sanity check on a computed value: must be finite,
+    must be within reasonable magnitude bounds. Returns a
+    TemplateValidationError on failure or None on success.
+    """
+    if value is None:
+        return TemplateValidationError(
+            kind='formula_error',
+            message=f"{label} formula {formula!r} failed to evaluate with params {params!r}",
+            sample_params=params, sample_index=sample_index,
+        )
+    if not math.isfinite(value):
+        return TemplateValidationError(
+            kind='non_finite_answer',
+            message=f"{label} formula {formula!r} produced non-finite {value!r} for params {params!r}",
+            sample_params=params, sample_index=sample_index,
+        )
+    if abs(value) > _MAX_REASONABLE_MAGNITUDE:
+        return TemplateValidationError(
+            kind='unreasonable_magnitude',
+            message=(
+                f"{label} {value:g} exceeds magnitude bound "
+                f"{_MAX_REASONABLE_MAGNITUDE:g} for params {params!r}"
+            ),
+            sample_params=params, sample_index=sample_index,
+        )
+    return None
 
 
 # ============================================================================

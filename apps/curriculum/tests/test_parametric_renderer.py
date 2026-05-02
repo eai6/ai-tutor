@@ -377,6 +377,173 @@ class TestRenderTypedDispatch(unittest.TestCase):
         self.assertEqual(out["question_type"], "short_numeric")
 
 
+# ============================================================================
+# P2c — validate_template_typed
+# ============================================================================
+
+
+class TestValidateTypedMCQ(unittest.TestCase):
+    def test_valid_mcq_passes(self):
+        # Distractors deliberately distant from correct so no
+        # collisions across samples.
+        t = ParametricMCQTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            correct_formula="a",
+            distractor_formulas=["a + 100", "a * 2 + 50", "a + 200"],
+            explanation_template="x = {answer}",
+        )
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        self.assertIsNone(validate_template_typed(t))
+
+    def test_distractor_collides_with_correct(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        bad = ParametricMCQTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            correct_formula="a",
+            distractor_formulas=["a", "a + 1", "a + 2"],  # 1st collides
+            explanation_template="x = {answer}",
+        )
+        err = validate_template_typed(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "distractor_collision")
+
+    def test_distractors_collide_with_each_other(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        bad = ParametricMCQTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            correct_formula="a + 100",
+            distractor_formulas=["a + 1", "a + 1", "a + 2"],  # two are identical
+            explanation_template="x = {answer}",
+        )
+        err = validate_template_typed(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "distractor_collision")
+
+
+class TestValidateTypedFillBlank(unittest.TestCase):
+    def test_valid_fill_passes(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        t = ParametricFillBlankTemplate(
+            template_text="A: ___ and B: ___",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            blank_formulas=["a", "a + 1"],
+            explanation_template="x = {answer}",
+        )
+        self.assertIsNone(validate_template_typed(t))
+
+    def test_blank_count_mismatch(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        bad = ParametricFillBlankTemplate(
+            template_text="One blank: ___",  # only 1 ___
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            blank_formulas=["a", "a + 1"],   # but 2 formulas
+            explanation_template="x = {answer}",
+        )
+        err = validate_template_typed(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "blank_count_mismatch")
+
+    def test_blank_formula_error(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        bad = ParametricFillBlankTemplate(
+            template_text="A: ___",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            blank_formulas=["a + missing_var"],
+            explanation_template="x = {answer}",
+        )
+        err = validate_template_typed(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "formula_error")
+
+
+class TestValidateTypedMatching(unittest.TestCase):
+    def test_valid_matching_passes(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        t = ParametricMatchingTemplate(
+            framing_text="Match each pair to its sum.",
+            parameters={
+                "a": ParameterSpec(type="int", min=10, max=80, step=5),
+                "b": ParameterSpec(type="int", min=10, max=80, step=5),
+            },
+            pair_count=4,
+            left_formula="{a}° + {b}°",
+            right_formula="a + b",
+            answer_unit="°",
+            explanation_template="x",
+        )
+        self.assertIsNone(validate_template_typed(t))
+
+    def test_left_formula_slot_missing(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        bad = ParametricMatchingTemplate(
+            framing_text="x",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            pair_count=4,
+            left_formula="{nonexistent}",  # references undeclared param
+            right_formula="a",
+            explanation_template="x",
+        )
+        err = validate_template_typed(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "missing_template_slot")
+
+    def test_pair_count_too_high_for_param_space(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        # Parameter space has only 1*1=1 unique value but pair_count=4
+        bad = ParametricMatchingTemplate(
+            framing_text="x",
+            parameters={"a": ParameterSpec(type="int", min=1, max=1)},
+            pair_count=4,
+            left_formula="{a}",
+            right_formula="a",
+            explanation_template="x",
+        )
+        err = validate_template_typed(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "matching_pair_collision")
+
+
+class TestValidateTypedShortAnswer(unittest.TestCase):
+    def test_valid_short_answer_passes(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        t = ParametricShortAnswerTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            final_answer_formula="a",
+            canonical_working="x = {a} = {answer}",
+        )
+        self.assertIsNone(validate_template_typed(t))
+
+    def test_canonical_working_slot_missing(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        bad = ParametricShortAnswerTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            final_answer_formula="a",
+            canonical_working="bad: {missing_var}",
+        )
+        err = validate_template_typed(bad)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.kind, "missing_explanation_slot")
+
+
+class TestValidateTypedDispatch(unittest.TestCase):
+    def test_passthrough_to_existing_short_numeric(self):
+        from apps.curriculum.parametric_renderer import validate_template_typed
+        t = ParametricQuestionTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            answer_formula="a",
+            explanation_template="x = {answer}",
+        )
+        # validate_template_typed routes to validate_template, which
+        # this template passes.
+        self.assertIsNone(validate_template_typed(t))
+
+
 # Reusable: the canonical "sum to 360°" template.
 SUM_TO_360_TEMPLATE = ParametricQuestionTemplate(
     template_text=(
