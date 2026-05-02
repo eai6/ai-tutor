@@ -571,6 +571,11 @@
         <h3 class="card-title" style="margin: 0;">📝 Exit Ticket Question Bank ({{ exit_questions|length }} questions)</h3>
         <span style="font-size: 0.8rem; color: var(--gray-500);">10 randomly selected per tutoring session</span>
     </div>
+    {% if untagged_eo_count %}
+    <div style="margin: 0 1rem; padding: 0.6rem 0.85rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px; font-size: 0.85rem; color: #92400e;">
+        ⚠️ <strong>{{ untagged_eo_count }} of {{ exit_questions|length }}</strong> questions are missing their enabling-objective (sub-skill) tag. Remediation can't target sub-skills on these. Regenerate the exit ticket to populate, or edit individual questions to set the EO manually.
+    </div>
+    {% endif %}
     <div class="card-body">
         {% for question in exit_questions %}
         <div class="exit-q-card" data-question-id="{{ question.id }}" style="padding: 1rem; background: var(--gray-50); border-radius: 8px; margin-bottom: 1rem; position: relative;">
@@ -585,12 +590,24 @@
                         {% if question.difficulty %}
                         <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}#d1fae5{% elif question.difficulty == 'hard' %}#fee2e2{% else %}#fef3c7{% endif %};">{{ question.difficulty }}</span>
                         {% endif %}
-                        {% if question.concept_tag %}
-                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe;" title="Learning objective (broad)">{{ question.concept_tag }}</span>
-                        {% endif %}
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe;" title="Learning objective (broad)">{% if question.concept_tag %}{{ question.concept_tag }}{% else %}<span style="color:#a16207;">no learning objective</span>{% endif %}</span>
                         {% if question.enabling_objective %}
-                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dcfce7; color: #166534; font-weight: 500;" title="Enabling objective (sub-skill — used for remediation targeting)">EO: {{ question.enabling_objective|truncatewords:8 }}</span>
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dcfce7; color: #166534; font-weight: 500;" title="Enabling objective / sub-skill — used for remediation targeting">EO: {{ question.enabling_objective }}</span>
+                        {% else %}
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fef3c7; color: #92400e; font-weight: 500;" title="No enabling objective tagged — regenerate the lesson's exit ticket to populate, or edit this question to set it manually">⚠️ no enabling objective</span>
                         {% endif %}
+                    </div>
+                </div>
+
+                <!-- Full objective references shown below the stem so
+                     teachers can see the complete teaching + enabling
+                     objective text without truncation. -->
+                <div style="margin: 0.4rem 0 0.6rem 1rem; padding: 0.45rem 0.6rem; background: #f9fafb; border-left: 3px solid #c7d2fe; border-radius: 4px; font-size: 0.78rem; color: #4b5563; line-height: 1.5;">
+                    <div><strong style="color:#1e3a8a;">Teaching objective:</strong>
+                        {% if question.concept_tag %}{{ question.concept_tag }}{% else %}<em style="color:#a16207;">untagged</em>{% endif %}
+                    </div>
+                    <div><strong style="color:#166534;">Enabling objective:</strong>
+                        {% if question.enabling_objective %}{{ question.enabling_objective }}{% else %}<em style="color:#a16207;">untagged — regenerate this lesson's exit ticket to populate</em>{% endif %}
                     </div>
                 </div>
 

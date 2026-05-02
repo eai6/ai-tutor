@@ -3032,6 +3032,7 @@ def lesson_detail(request, lesson_id):
     exit_ticket = ExitTicket.objects.filter(lesson=lesson).first()
     exit_ticket_count = 0
     exit_questions = []
+    untagged_eo_count = 0
     if exit_ticket:
         exit_questions = list(exit_ticket.questions.all().order_by('order_index'))
         exit_ticket_count = len(exit_questions)
@@ -3042,6 +3043,8 @@ def lesson_detail(request, lesson_id):
                 spec = q.answer_data.get('plot_spec')
                 if spec:
                     q.plot_spec_json = json.dumps(spec, indent=2, ensure_ascii=False)
+            if not (q.enabling_objective or '').strip():
+                untagged_eo_count += 1
     
     # Students who completed
     students_completed = TutorSession.objects.filter(
@@ -3080,6 +3083,7 @@ def lesson_detail(request, lesson_id):
         'exit_ticket': exit_ticket,
         'exit_questions': exit_questions,
         'exit_ticket_count': exit_ticket_count,
+        'untagged_eo_count': untagged_eo_count,
         'students_completed': students_completed,
         'prerequisites': prerequisites,
         'available_lessons': available_lessons,
