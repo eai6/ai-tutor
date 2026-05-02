@@ -10,6 +10,13 @@
             <a href="{% url 'tutoring:catalog' %}" class="back-link" title="Back to Lessons">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </a>
+            {% if user.is_staff %}
+            <a href="{% url 'dashboard:home' %}"
+               style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.3rem 0.7rem; background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.78rem; margin-right:0.4rem;"
+               title="Return to teacher dashboard">
+                ← Dashboard
+            </a>
+            {% endif %}
             <div class="header-center">
                 <div class="header-title-row">
                     <h1 class="lesson-name">{{ lesson.title }}</h1>

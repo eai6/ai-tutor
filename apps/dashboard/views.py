@@ -14,6 +14,7 @@ import os
 import zoneinfo
 from datetime import timedelta
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
@@ -3073,6 +3074,28 @@ def lesson_detail(request, lesson_id):
                 seen.add(eo)
                 teaching_steps.append(eo)
 
+    # Auto-recover orphaned 'generating' state. Daemon background threads
+    # die with the gunicorn worker, so a deploy mid-regen leaves the
+    # lesson stuck. Mirror the course_detail recovery: any lesson that
+    # hasn't bumped updated_at in 10 min is reset to 'empty'.
+    from datetime import timedelta
+    if (
+        lesson.content_status == 'generating'
+        and lesson.updated_at
+        and lesson.updated_at < timezone.now() - timedelta(minutes=10)
+    ):
+        lesson.content_status = 'empty'
+        lesson.save(update_fields=['content_status'])
+
+    # ?regen=1 is set by the regenerate redirect so the polling banner
+    # shows immediately even if we land before the worker has had time
+    # to flip content_status from 'empty' to 'generating'. Closes a
+    # ~100ms race where the user sees a blank page with no feedback.
+    just_kicked_regen = request.GET.get('regen') == '1'
+    is_generating = (
+        lesson.content_status == 'generating' or just_kicked_regen
+    )
+
     context = {
         **request.staff_ctx,
         'lesson': lesson,
@@ -3088,8 +3111,9 @@ def lesson_detail(request, lesson_id):
         'prerequisites': prerequisites,
         'available_lessons': available_lessons,
         'teaching_steps': teaching_steps,
+        'is_generating': is_generating,
     }
-    
+
     return render(request, 'dashboard/curriculum/lesson_detail.html', context)
 
 
@@ -3437,7 +3461,12 @@ def lesson_regenerate(request, lesson_id):
             f"Usually ~30s — the lesson page will update automatically. "
             f"Lesson steps and attempt history are preserved.",
         )
-        return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+        # ?regen=1 lets the lesson_detail template force the polling
+        # banner on, even if the page renders before the worker has
+        # had a chance to flip content_status to 'generating'.
+        return redirect(
+            f"{reverse('dashboard:lesson_detail', args=[lesson.id])}?regen=1"
+        )
 
     # Steps regen (with or without exit-ticket replace) — full pipeline.
     # Wipe steps + bump updated_at so the course-detail auto-recovery
@@ -3472,7 +3501,9 @@ def lesson_regenerate(request, lesson_id):
         f"This usually takes 1–3 minutes — the lesson page will update "
         f"automatically.",
     )
-    return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+    return redirect(
+        f"{reverse('dashboard:lesson_detail', args=[lesson.id])}?regen=1"
+    )
 
 
 @teacher_required
