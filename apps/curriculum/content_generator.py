@@ -1584,6 +1584,23 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None, force_re
                 f"expanded {eos_before} → {eos_after} enabling objectives",
                 flush=True,
             )
+            if eos_after == 0:
+                # Expansion ran but produced nothing usable — the LLM
+                # returned <4 items, parse failed, or all were stripped
+                # by the weak-verb filter. Without this warning the
+                # bank silently generates with concept_tag only and
+                # remediation can't target sub-skills.
+                logger.warning(
+                    f"[{lesson.title}] EO expansion ran but yielded 0 "
+                    f"enabling objectives — exit-ticket questions will "
+                    f"fall back to broad concepts for tagging."
+                )
+                print(
+                    f"[ContentGen] [{lesson.title}] ⚠️ EO expansion "
+                    f"yielded 0 sub-skills — falling back to broad "
+                    f"concepts for question tagging",
+                    flush=True,
+                )
         except Exception as e:
             logger.warning(
                 f"[{lesson.title}] EO expansion before exit-ticket regen "
@@ -1719,17 +1736,75 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None, force_re
                 seen.add(eo)
                 eo_list.append(eo)
 
-    if eo_list:
-        eo_lines = "\n".join(f"  TS{i+1}: {eo}" for i, eo in enumerate(eo_list))
+    # Two distinct lists for the LLM:
+    #   - concept_tag list   = the BROAD learning objective(s) for the lesson.
+    #   - enabling_objective list = GRANULAR sub-skills (one per question).
+    # Without this separation the LLM was conflating the two and the
+    # post-hoc normaliser was dropping every emission. See P1 of
+    # memory/curriculum_tutor_v2_plan.md.
+    granular_eos: List[str] = list(lesson.enabling_objectives or [])
+
+    # Granular fallbacks when expansion produced nothing — keep the
+    # legacy fallback chain so step-tagged EOs and teaching_steps
+    # metadata still surface. Same chain that used to feed `eo_list`.
+    if not granular_eos and teaching_steps_meta:
+        granular_eos = list(teaching_steps_meta)
+    if not granular_eos:
+        from apps.curriculum.models import LessonStep as _LessonStep
+        seen_steps = set()
+        for step in _LessonStep.objects.filter(lesson=lesson).order_by('order_index'):
+            eo = step.enabling_objective or ''
+            if eo and eo not in seen_steps:
+                seen_steps.add(eo)
+                granular_eos.append(eo)
+
+    broad_concepts: List[str] = []
+    if lesson.unit and getattr(lesson.unit, 'terminal_objectives', None):
+        broad_concepts.extend(list(lesson.unit.terminal_objectives or []))
+    if (lesson.objective or '').strip():
+        broad_concepts.append(lesson.objective.strip())
+    # Dedup broad list (preserve order)
+    seen_b = set()
+    broad_concepts = [
+        c for c in broad_concepts
+        if c and c.strip() and not (c.lower() in seen_b or seen_b.add(c.lower()))
+    ]
+    # If still nothing, fall back to lesson title so the field always
+    # has SOMETHING to copy.
+    if not broad_concepts:
+        title = (lesson.title or '').strip()
+        if title:
+            broad_concepts = [title]
+
+    # Final canonical EO list the validator will snap against. Prefer
+    # granular sub-skills; if expansion failed and we only have broad
+    # concepts, fall back to those so the validator doesn't drop every
+    # tag.
+    canonical_eos_for_prompt: List[str] = (
+        granular_eos if granular_eos else list(broad_concepts)
+    )
+
+    if broad_concepts or canonical_eos_for_prompt:
+        broad_lines = "\n".join(f"  • {c}" for c in broad_concepts) or "  (none)"
+        eo_lines = "\n".join(
+            f"  EO{i+1}: {eo}" for i, eo in enumerate(canonical_eos_for_prompt)
+        ) or "  (none)"
         objectives_context += f"""
-TEACHING OBJECTIVES (the concept_tag for EVERY question MUST be one of
-these, and EACH objective must be assessed by at least 2 questions):
+LEARNING OBJECTIVE — use as the `concept_tag` field on EVERY question
+(broad lesson-level outcome, copy verbatim — do NOT invent short labels):
+{broad_lines}
+
+ENABLING OBJECTIVES — use as the `enabling_objective` field on EVERY
+question (specific sub-skill, copy verbatim from EXACTLY ONE of these):
 {eo_lines}
 
-CRITICAL: The concept_tag field must be the EXACT text of one of the teaching objectives above.
-Example: "Define the terms Development, Globalization, MEDC, NIC, LEDC"
-Do NOT invent short labels like "industry_definition" — use the FULL enabling objective text.
-Every enabling objective must be assessed by at least 1 question. Distribute questions across all EOs.
+RULES:
+1. `concept_tag` MUST exactly match one of the LEARNING OBJECTIVE lines.
+2. `enabling_objective` MUST exactly match one of the EOn lines above —
+   this is what remediation uses to target the failing sub-skill, so
+   tagging accuracy matters.
+3. Distribute questions across ALL enabling objectives so every sub-skill
+   gets at least 1 question. Do NOT repeat the same EO for every question.
 """
 
     # Use math-specific or general exit ticket prompt
@@ -2159,7 +2234,21 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
             # but drifts; this validation makes it deterministic.
             # Mismatches drop the TAG (clearing it), keeping the
             # question itself.
-            canonical_eos = list(lesson.enabling_objectives or [])
+            #
+            # Use the SAME list we showed the LLM
+            # (canonical_eos_for_prompt) so what the LLM was told to copy
+            # is what we accept. Falling back to lesson.enabling_objectives
+            # alone caused every tag to drop when expansion failed and
+            # the prompt fell back to broad concepts. See P1 of
+            # memory/curriculum_tutor_v2_plan.md.
+            canonical_eos = list(canonical_eos_for_prompt)
+            if not canonical_eos:
+                logger.warning(
+                    f"[{lesson.title}] no canonical EOs available for "
+                    f"validation — every question's enabling_objective "
+                    f"will be dropped. Set lesson.enabling_objectives "
+                    f"or unit.terminal_objectives and regenerate."
+                )
             eo_validation_stats = {
                 'exact': 0, 'snapped': 0, 'dropped': 0, 'empty': 0,
             }
