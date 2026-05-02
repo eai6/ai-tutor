@@ -1779,6 +1779,18 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None, force_re
         granular_eos if granular_eos else list(broad_concepts)
     )
 
+    # Loud trace — leave a breadcrumb so the next "questions are tagged
+    # with the broad concept again" mystery has data to debug from.
+    print(
+        f"[ContentGen] [{lesson.title}] EO sources at exit-ticket time → "
+        f"lesson.enabling_objectives={len(lesson.enabling_objectives or [])} "
+        f"unit.terminal_objectives={len(getattr(lesson.unit, 'terminal_objectives', []) or []) if lesson.unit else 0} "
+        f"granular_eos={len(granular_eos)} "
+        f"broad_concepts={len(broad_concepts)} "
+        f"canonical={canonical_eos_for_prompt[:3]!r}{'…' if len(canonical_eos_for_prompt) > 3 else ''}",
+        flush=True,
+    )
+
     if broad_concepts or canonical_eos_for_prompt:
         broad_lines = "\n".join(f"  • {c}" for c in broad_concepts) or "  (none)"
         eo_lines = "\n".join(
