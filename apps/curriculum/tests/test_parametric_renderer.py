@@ -25,7 +25,12 @@ from apps.curriculum.parametric_renderer import (
     _compute_answer,
     _sample_parameters,
     parse_template,
+    render_fill_blank,
+    render_matching,
+    render_mcq,
+    render_short_answer,
     render_template,
+    render_typed,
     validate_template,
 )
 
@@ -169,6 +174,207 @@ class TestParseTemplateDispatch(unittest.TestCase):
     def test_unknown_question_type_raises(self):
         with self.assertRaises(ValueError):
             parse_template("totally_made_up", {})
+
+
+# ============================================================================
+# P2b — render functions for each new template type
+# ============================================================================
+
+
+_MCQ_TEMPLATE = ParametricMCQTemplate(
+    template_text="Three angles around a point are {a}°, {b}°, x°. Find x.",
+    parameters={
+        "a": ParameterSpec(type="int", min=30, max=150, step=5),
+        "b": ParameterSpec(type="int", min=30, max=150, step=5),
+    },
+    correct_formula="360 - a - b",
+    distractor_formulas=["a + b", "180 - a - b", "360 - a"],
+    answer_unit="°",
+    explanation_template="x = 360 - {a} - {b} = {answer}.",
+    constraints=["a + b < 350"],
+)
+
+
+class TestRenderMCQ(unittest.TestCase):
+    def test_renders_full_payload(self):
+        out = render_mcq(_MCQ_TEMPLATE, seed=42)
+        self.assertIsNotNone(out)
+        self.assertEqual(out["question_type"], "mcq")
+        # All four options populated
+        self.assertTrue(out["option_a"])
+        self.assertTrue(out["option_b"])
+        self.assertTrue(out["option_c"])
+        self.assertTrue(out["option_d"])
+        self.assertIn(out["correct_answer"], ("A", "B", "C", "D"))
+
+    def test_correct_letter_corresponds_to_correct_value(self):
+        out = render_mcq(_MCQ_TEMPLATE, seed=42)
+        a, b = out["answer_data"]["parameters"]["a"], out["answer_data"]["parameters"]["b"]
+        expected = f"{360 - a - b}°"
+        # The option at the correct letter should equal expected
+        opt = out[f"option_{out['correct_answer'].lower()}"]
+        self.assertEqual(opt, expected)
+
+    def test_seed_determinism(self):
+        a = render_mcq(_MCQ_TEMPLATE, seed=99)
+        b = render_mcq(_MCQ_TEMPLATE, seed=99)
+        self.assertEqual(a, b)
+
+    def test_different_seeds_produce_different_output(self):
+        a = render_mcq(_MCQ_TEMPLATE, seed=1)
+        b = render_mcq(_MCQ_TEMPLATE, seed=2)
+        self.assertNotEqual(a["answer_data"]["parameters"], b["answer_data"]["parameters"])
+
+    def test_returns_none_when_distractor_collides_with_correct(self):
+        # Force correct == distractor for every sample → render returns None
+        bad = ParametricMCQTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            correct_formula="a",
+            distractor_formulas=["a", "a + 1", "a + 2"],  # 1st distractor == correct
+            explanation_template="x = {answer}",
+        )
+        self.assertIsNone(render_mcq(bad, seed=0))
+
+
+_FILL_TEMPLATE = ParametricFillBlankTemplate(
+    template_text="Two angles are {a}° and {b}°. Third is ___° and sum is ___°.",
+    parameters={
+        "a": ParameterSpec(type="int", min=30, max=150),
+        "b": ParameterSpec(type="int", min=30, max=150),
+    },
+    blank_formulas=["360 - a - b", "360"],
+    answer_unit="°",
+    explanation_template="Third = {answer}.",
+    constraints=["a + b < 350"],
+)
+
+
+class TestRenderFillBlank(unittest.TestCase):
+    def test_renders_blanks(self):
+        out = render_fill_blank(_FILL_TEMPLATE, seed=42)
+        self.assertIsNotNone(out)
+        self.assertEqual(out["question_type"], "fill_in_blank")
+        self.assertEqual(len(out["answer_data"]["blanks"]), 2)
+        # Stem keeps `___` slots intact for the UI
+        self.assertEqual(out["question_text"].count("___"), 2)
+
+    def test_blank_values_match_formulas(self):
+        out = render_fill_blank(_FILL_TEMPLATE, seed=42)
+        a = out["answer_data"]["parameters"]["a"]
+        b = out["answer_data"]["parameters"]["b"]
+        self.assertEqual(out["answer_data"]["blanks"][0], f"{360 - a - b}°")
+        self.assertEqual(out["answer_data"]["blanks"][1], "360°")
+
+    def test_mismatch_blank_count_returns_none(self):
+        # Stem has 1 `___` but formula list has 2 → render rejects
+        bad = ParametricFillBlankTemplate(
+            template_text="One blank: ___",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            blank_formulas=["a", "a + 1"],
+            explanation_template="x = {answer}",
+        )
+        self.assertIsNone(render_fill_blank(bad, seed=0))
+
+
+_MATCH_TEMPLATE = ParametricMatchingTemplate(
+    framing_text="Match each angle pair to its sum.",
+    parameters={
+        "a": ParameterSpec(type="int", min=10, max=80, step=5),
+        "b": ParameterSpec(type="int", min=10, max=80, step=5),
+    },
+    pair_count=4,
+    left_formula="{a}° + {b}°",
+    right_formula="a + b",
+    answer_unit="°",
+    distractor_count=2,
+    explanation_template="x",
+)
+
+
+class TestRenderMatching(unittest.TestCase):
+    def test_renders_pair_count(self):
+        out = render_matching(_MATCH_TEMPLATE, seed=42)
+        self.assertIsNotNone(out)
+        self.assertEqual(out["question_type"], "matching")
+        self.assertEqual(len(out["answer_data"]["pairs"]), 4)
+
+    def test_pairs_have_distinct_lefts_and_rights(self):
+        out = render_matching(_MATCH_TEMPLATE, seed=42)
+        lefts = [p["left"] for p in out["answer_data"]["pairs"]]
+        rights = [p["right"] for p in out["answer_data"]["pairs"]]
+        self.assertEqual(len(set(lefts)), len(lefts))
+        self.assertEqual(len(set(rights)), len(rights))
+
+    def test_distractors_dont_collide_with_correct_rights(self):
+        out = render_matching(_MATCH_TEMPLATE, seed=42)
+        rights = {p["right"] for p in out["answer_data"]["pairs"]}
+        for d in out["answer_data"]["distractor_rights"]:
+            self.assertNotIn(d, rights)
+
+    def test_unit_appended_to_right_values(self):
+        out = render_matching(_MATCH_TEMPLATE, seed=42)
+        for p in out["answer_data"]["pairs"]:
+            self.assertTrue(p["right"].endswith("°"))
+
+
+_SHORTANS_TEMPLATE = ParametricShortAnswerTemplate(
+    template_text="Three angles are {a}°, {b}°, x°. Find x and show working.",
+    parameters={
+        "a": ParameterSpec(type="int", min=30, max=150),
+        "b": ParameterSpec(type="int", min=30, max=150),
+    },
+    final_answer_formula="360 - a - b",
+    canonical_working="Step 1: Sum to 360. Step 2: x = 360 - {a} - {b} = {answer}.",
+    answer_unit="°",
+    constraints=["a + b < 350"],
+)
+
+
+class TestRenderShortAnswer(unittest.TestCase):
+    def test_renders_two_field_payload(self):
+        out = render_short_answer(_SHORTANS_TEMPLATE, seed=42)
+        self.assertIsNotNone(out)
+        self.assertEqual(out["question_type"], "short_answer")
+        # Final answer (deterministic grade target)
+        self.assertIn("model_answer", out["answer_data"])
+        # Canonical working (LLM compares student working to this)
+        self.assertIn("canonical_working", out["answer_data"])
+        self.assertIn("Step 1", out["answer_data"]["canonical_working"])
+
+    def test_model_answer_matches_formula(self):
+        out = render_short_answer(_SHORTANS_TEMPLATE, seed=42)
+        a = out["answer_data"]["parameters"]["a"]
+        b = out["answer_data"]["parameters"]["b"]
+        self.assertEqual(out["answer_data"]["model_answer"], f"{360 - a - b}°")
+
+
+class TestRenderTypedDispatch(unittest.TestCase):
+    def test_routes_to_mcq(self):
+        out = render_typed("mcq", _MCQ_TEMPLATE, seed=42)
+        self.assertEqual(out["question_type"], "mcq")
+
+    def test_routes_to_fill(self):
+        out = render_typed("fill_in_blank", _FILL_TEMPLATE, seed=42)
+        self.assertEqual(out["question_type"], "fill_in_blank")
+
+    def test_routes_to_matching(self):
+        out = render_typed("matching", _MATCH_TEMPLATE, seed=42)
+        self.assertEqual(out["question_type"], "matching")
+
+    def test_routes_to_short_answer(self):
+        out = render_typed("short_answer", _SHORTANS_TEMPLATE, seed=42)
+        self.assertEqual(out["question_type"], "short_answer")
+
+    def test_routes_to_existing_short_numeric(self):
+        snt = ParametricQuestionTemplate(
+            template_text="x = {a}",
+            parameters={"a": ParameterSpec(type="int", min=1, max=10)},
+            answer_formula="a",
+            explanation_template="x = {answer}",
+        )
+        out = render_typed("short_numeric", snt, seed=42)
+        self.assertEqual(out["question_type"], "short_numeric")
 
 
 # Reusable: the canonical "sum to 360°" template.

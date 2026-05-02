@@ -259,6 +259,11 @@ class ParametricMatchingTemplate(BaseModel):
         description="Arithmetic for the right side. Example: 'a + b'."
     )
     distractor_count: int = Field(default=2, ge=0, le=3)
+    answer_unit: Optional[str] = Field(
+        default=None,
+        description="Unit suffix for the right-side rendered values "
+                    "(e.g. '°' for angle sums).",
+    )
     explanation_template: str
     constraints: Optional[List[str]] = Field(default=None)
 
@@ -646,6 +651,382 @@ def render_template(
         # caller can override.
         "question_type": "short_numeric",
     }
+
+
+def _sample_with_constraints_for_typed(
+    template,
+    rng: random.Random,
+):
+    """Generic sampler for any template with `parameters` and optional
+    `constraints` fields. Returns a dict of param_name -> value, or
+    None if constraints can't be satisfied within the resample limit.
+    Identical behaviour to _sample_parameters but accepts the new
+    template subclasses without inheriting from
+    ParametricQuestionTemplate.
+    """
+    constraints = getattr(template, "constraints", None) or []
+    parameters = template.parameters
+    for _ in range(_MAX_RESAMPLE_ATTEMPTS):
+        params = {name: _sample_one(spec, rng) for name, spec in parameters.items()}
+        if all(_check_constraint(c, params) for c in constraints):
+            return params
+    logger.warning(
+        "[Layer4] couldn't satisfy constraints %r after %d attempts",
+        constraints, _MAX_RESAMPLE_ATTEMPTS,
+    )
+    return None
+
+
+def render_mcq(
+    template: ParametricMCQTemplate,
+    *,
+    seed: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Render a templated MCQ to a concrete question dict.
+
+    Output shape:
+      {
+        question_text, question_type='mcq',
+        option_a/b/c/d: str — rendered values
+        correct_answer: 'A' | 'B' | 'C' | 'D'
+        explanation, answer_data, template_data
+      }
+    Returns None on sampling / formula failure.
+    """
+    rng = random.Random(seed)
+    params = _sample_with_constraints_for_typed(template, rng)
+    if params is None:
+        return None
+
+    correct_value = _compute_answer(template.correct_formula, params)
+    if correct_value is None:
+        logger.warning(
+            "[Layer4-MCQ] correct_formula %r failed for params %r",
+            template.correct_formula, params,
+        )
+        return None
+
+    distractor_values = []
+    for f in template.distractor_formulas:
+        v = _compute_answer(f, params)
+        if v is None:
+            logger.warning(
+                "[Layer4-MCQ] distractor_formula %r failed for params %r",
+                f, params,
+            )
+            return None
+        distractor_values.append(v)
+
+    # Reject ambiguous distractors at render time. The validator
+    # extension (P2c) catches this at content-gen time too, but
+    # belt-and-suspenders.
+    EPS = 1e-6
+    if any(abs(v - correct_value) < EPS for v in distractor_values):
+        logger.warning(
+            "[Layer4-MCQ] distractor collides with correct value for params %r",
+            params,
+        )
+        return None
+    if len(set(round(v, 6) for v in distractor_values)) < len(distractor_values):
+        logger.warning(
+            "[Layer4-MCQ] distractors collide with each other for params %r",
+            params,
+        )
+        return None
+
+    correct_str = _format_answer(correct_value, template.answer_unit)
+    distractor_strs = [_format_answer(v, template.answer_unit) for v in distractor_values]
+
+    # Randomise which letter the correct answer lands at.
+    options_values = [correct_str] + distractor_strs
+    indices = list(range(4))
+    rng.shuffle(indices)
+    correct_index = indices.index(0)  # 0 is the correct one
+    correct_letter = chr(ord('A') + correct_index)
+    shuffled = [options_values[i] for i in indices]
+
+    try:
+        question_text = template.template_text.format(**params)
+        explanation = template.explanation_template.format(
+            **params, answer=correct_str,
+        )
+    except KeyError as e:
+        logger.warning(
+            "[Layer4-MCQ] template references unknown parameter %r", e,
+        )
+        return None
+
+    return {
+        "question_text": question_text,
+        "question": question_text,
+        "question_type": "mcq",
+        "option_a": shuffled[0],
+        "option_b": shuffled[1],
+        "option_c": shuffled[2],
+        "option_d": shuffled[3],
+        "correct_answer": correct_letter,
+        "explanation": explanation,
+        "answer_data": {
+            "computed": correct_value,
+            "correct_letter": correct_letter,
+            "unit": template.answer_unit,
+            "parameters": params,
+        },
+        "template_data": template.model_dump(),
+    }
+
+
+def render_fill_blank(
+    template: ParametricFillBlankTemplate,
+    *,
+    seed: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Render a templated fill-in-blank to a concrete question dict.
+
+    The stem keeps `___` placeholders intact for the student. The
+    bank stores per-blank computed values for deterministic grading.
+
+    Output answer_data:
+      {
+        text_template: stem with `___` slots,
+        blanks: [computed values per blank, in order],
+        accept_alternatives: [],
+      }
+    """
+    rng = random.Random(seed)
+    params = _sample_with_constraints_for_typed(template, rng)
+    if params is None:
+        return None
+
+    blank_values = []
+    for f in template.blank_formulas:
+        v = _compute_answer(f, params)
+        if v is None:
+            logger.warning(
+                "[Layer4-Fill] blank_formula %r failed for params %r",
+                f, params,
+            )
+            return None
+        blank_values.append(v)
+
+    # Substitute parameters into stem (keep `___` intact for the UI).
+    try:
+        stem_filled = template.template_text.format(**params)
+    except KeyError as e:
+        logger.warning(
+            "[Layer4-Fill] template references unknown parameter %r", e,
+        )
+        return None
+
+    # Validate ___ count matches blank count.
+    blank_count = stem_filled.count("___")
+    if blank_count != len(blank_values):
+        logger.warning(
+            "[Layer4-Fill] stem has %d `___` slots but %d blank_formulas",
+            blank_count, len(blank_values),
+        )
+        return None
+
+    blank_strs = [_format_answer(v, template.answer_unit) for v in blank_values]
+
+    try:
+        explanation = template.explanation_template.format(
+            **params,
+            answer=blank_strs[0] if len(blank_strs) == 1 else " / ".join(blank_strs),
+        )
+    except KeyError as e:
+        logger.warning(
+            "[Layer4-Fill] explanation references unknown parameter %r", e,
+        )
+        return None
+
+    return {
+        "question_text": stem_filled,
+        "question": stem_filled,
+        "question_type": "fill_in_blank",
+        "explanation": explanation,
+        "answer_data": {
+            "text_template": stem_filled,
+            "blanks": blank_strs,
+            "computed": blank_values,
+            "accept_alternatives": [[] for _ in blank_strs],
+            "parameters": params,
+        },
+        "template_data": template.model_dump(),
+    }
+
+
+def render_matching(
+    template: ParametricMatchingTemplate,
+    *,
+    seed: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Render a templated matching question. Samples `pair_count`
+    independent (left, right) pairs from the template's parameter
+    spec. Optionally adds `distractor_count` extra wrong-side options.
+
+    Output answer_data:
+      {
+        pairs: [{left, right}, ...],   # the correct pairing
+        distractor_rights: [str, ...], # extra wrong-side options
+      }
+    """
+    rng = random.Random(seed)
+    pairs = []
+    seen_lefts = set()
+    seen_rights = set()
+    # Sample distinct pairs — re-roll if a left or right collides.
+    safety = template.pair_count * 10  # bounded retry loop
+    while len(pairs) < template.pair_count and safety > 0:
+        safety -= 1
+        params = _sample_with_constraints_for_typed(template, rng)
+        if params is None:
+            return None
+        right_value = _compute_answer(template.right_formula, params)
+        if right_value is None:
+            return None
+        try:
+            left_str = template.left_formula.format(**params)
+        except KeyError as e:
+            logger.warning(
+                "[Layer4-Match] left_formula references unknown param %r", e,
+            )
+            return None
+        right_str = _format_answer(right_value, getattr(template, 'answer_unit', None))
+        if left_str in seen_lefts or right_str in seen_rights:
+            continue
+        seen_lefts.add(left_str)
+        seen_rights.add(right_str)
+        pairs.append({"left": left_str, "right": right_str})
+
+    if len(pairs) < template.pair_count:
+        logger.warning(
+            "[Layer4-Match] could not produce %d distinct pairs",
+            template.pair_count,
+        )
+        return None
+
+    # Generate distractor rights — extra samples whose right-value
+    # doesn't collide with any of the correct rights.
+    distractors = []
+    safety = template.distractor_count * 10
+    while len(distractors) < template.distractor_count and safety > 0:
+        safety -= 1
+        params = _sample_with_constraints_for_typed(template, rng)
+        if params is None:
+            break
+        v = _compute_answer(template.right_formula, params)
+        if v is None:
+            continue
+        s = _format_answer(v, getattr(template, 'answer_unit', None))
+        if s in seen_rights or s in distractors:
+            continue
+        distractors.append(s)
+
+    explanation = template.explanation_template
+    try:
+        # Best-effort substitution — explanation may reference {param}
+        # of the FIRST pair's params for illustrative purposes.
+        first_params = (
+            {} if not pairs else {}  # we don't track per-pair params; skip
+        )
+        explanation_filled = explanation
+    except Exception:
+        explanation_filled = explanation
+
+    return {
+        "question_text": template.framing_text,
+        "question": template.framing_text,
+        "question_type": "matching",
+        "explanation": explanation_filled,
+        "answer_data": {
+            "pairs": pairs,
+            "distractor_rights": distractors,
+        },
+        "template_data": template.model_dump(),
+    }
+
+
+def render_short_answer(
+    template: ParametricShortAnswerTemplate,
+    *,
+    seed: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Render a templated short-answer question (two-field design).
+
+    The student fills two boxes:
+      - final_answer:  graded deterministically against the formula
+      - working:       LLM-reviewed against canonical_working
+                       (which the runtime tutor uses as the
+                       reference text — never authored by the LLM
+                       at grade time)
+
+    Output answer_data:
+      {
+        model_answer: str — the final answer (deterministic grade)
+        canonical_working: str — reference text for LLM working review
+        computed: float — numeric value of the final answer
+      }
+    """
+    rng = random.Random(seed)
+    params = _sample_with_constraints_for_typed(template, rng)
+    if params is None:
+        return None
+
+    final_value = _compute_answer(template.final_answer_formula, params)
+    if final_value is None:
+        logger.warning(
+            "[Layer4-ShortAns] formula %r failed for params %r",
+            template.final_answer_formula, params,
+        )
+        return None
+
+    final_str = _format_answer(final_value, template.answer_unit)
+
+    try:
+        question_text = template.template_text.format(**params)
+        canonical = template.canonical_working.format(
+            **params, answer=final_str,
+        )
+    except KeyError as e:
+        logger.warning(
+            "[Layer4-ShortAns] template references unknown parameter %r", e,
+        )
+        return None
+
+    return {
+        "question_text": question_text,
+        "question": question_text,
+        "question_type": "short_answer",
+        "explanation": canonical,
+        "answer_data": {
+            "model_answer": final_str,
+            "canonical_working": canonical,
+            "computed": final_value,
+            "unit": template.answer_unit,
+            "parameters": params,
+        },
+        "template_data": template.model_dump(),
+    }
+
+
+def render_typed(question_type: str, template, *, seed: Optional[int] = None):
+    """Single dispatch entry — picks the right renderer based on
+    the runtime type of `template`. Mirrors parse_template's routing.
+    """
+    if isinstance(template, ParametricMCQTemplate):
+        return render_mcq(template, seed=seed)
+    if isinstance(template, ParametricFillBlankTemplate):
+        return render_fill_blank(template, seed=seed)
+    if isinstance(template, ParametricMatchingTemplate):
+        return render_matching(template, seed=seed)
+    if isinstance(template, ParametricShortAnswerTemplate):
+        return render_short_answer(template, seed=seed)
+    if isinstance(template, ParametricQuestionTemplate):
+        return render_template(template, seed=seed)
+    raise ValueError(
+        f"render_typed: don't know how to render {type(template).__name__}"
+    )
 
 
 # ============================================================================
