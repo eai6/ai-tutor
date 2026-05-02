@@ -544,7 +544,7 @@
     <span style="font-size: 1.25rem;">🔁</span>
     <div style="flex: 1; min-width: 240px;">
         <strong style="color: #5b21b6;">Regenerate content</strong>
-        <div style="font-size: 0.8rem; color: #6d28d9;">Pick what to refresh. Lesson steps regenerate the teaching script + worked examples. Exit tickets replace the question bank{% if course.is_math %} and rebuild the summative{% endif %}. Mastery levels and the permanent competency transcript are always preserved; per-lesson exit-ticket attempts on regenerated lessons reset.</div>
+        <div style="font-size: 0.8rem; color: #6d28d9;">Pick what to refresh. Lesson steps regenerate the teaching script + worked examples. Exit tickets replace the question bank{% if course.is_math %} and rebuild the summative{% endif %}. All student data — mastery levels, permanent competency transcript, AND exit-ticket attempt history — is preserved across the regen.</div>
     </div>
     <form method="post" action="{% url 'dashboard:course_regenerate_all' course.id %}" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
         {% csrf_token %}
@@ -552,18 +552,18 @@
             <input type="checkbox" name="regen_steps" value="1" checked style="accent-color:#7c3aed;">
             Lesson steps
         </label>
-        <label style="font-size:0.78rem; color:#5b21b6; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Replace ExitTicketQuestion rows. Drops attempt history on affected lessons. ~30s/lesson.">
+        <label style="font-size:0.78rem; color:#5b21b6; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Replace ExitTicketQuestion rows in place. Attempt history is preserved (FK is to ExitTicket, not the questions). ~30s/lesson.">
             <input type="checkbox" name="regen_exit_tickets" value="1" checked style="accent-color:#7c3aed;">
             Exit tickets
         </label>
         {% if course.is_math %}
-        <label style="font-size:0.78rem; color:#5b21b6; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Re-sample the summative bank from current exit tickets. No LLM call. Drops summative attempts.">
+        <label style="font-size:0.78rem; color:#5b21b6; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Re-sample the summative bank from current exit tickets. No LLM call. Attempt history preserved.">
             <input type="checkbox" name="regen_summative" value="1" checked style="accent-color:#7c3aed;">
             Summative bank
         </label>
         {% endif %}
         <button type="submit" class="btn btn-secondary btn-sm" style="border-color:#a78bfa; color:#5b21b6;"
-                onclick="return confirm('Regenerate the selected content?\n\nMastery levels + permanent competency transcript are preserved.\nExit-ticket attempt history on affected lessons resets.\nRuns 3 lessons in parallel in the background — refresh to watch progress.');">
+                onclick="return confirm('Regenerate the selected content?\n\nAll student data is preserved — mastery levels, competency transcript, AND exit-ticket attempt history.\nRuns 10 lessons in parallel in the background — this page auto-refreshes every 12s while content is generating.');">
             🔁 Regenerate
         </button>
     </form>

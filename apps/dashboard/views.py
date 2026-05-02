@@ -3354,12 +3354,8 @@ def course_regenerate_all(request, course_id):
         request,
         f"Regenerating {scope_human} in '{course.title}' "
         f"({lesson_count} lesson(s)).{duration_msg} "
-        f"Running 3 in parallel — refresh this page to watch progress. "
-        f"Student mastery + permanent competency transcript are preserved"
-        + (
-            "; per-lesson exit-ticket attempts on regenerated lessons reset."
-            if regen_et else "."
-        ),
+        f"Running 10 in parallel — refresh this page to watch progress. "
+        f"Student mastery + permanent competency transcript are preserved."
     )
     return redirect('dashboard:course_detail', course_id=course.id)
 

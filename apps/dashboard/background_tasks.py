@@ -1267,10 +1267,32 @@ def generate_complete_course(
         # whole lesson — steps are already regenerated and saved;
         # the exit ticket can be retried independently. Skipped
         # when do_exit_tickets is False.
+        #
+        # Even when do_steps is False (exit-ticket-only regen), we
+        # mark content_status='generating' for the duration so the
+        # dashboard's per-lesson spinner + page-level banner fire.
+        # Without this the regen ran silently and the teacher had no
+        # idea anything was happening. Status is restored at the end.
         et_status = None
         et_error = None
         if do_exit_tickets:
             et_status = 'ok'
+            prev_status = None
+            marked_generating = False
+            if not do_steps:
+                # Steps phase already set 'generating'; only mark
+                # here for exit-ticket-only runs.
+                try:
+                    lesson.refresh_from_db()
+                    prev_status = lesson.content_status
+                    if prev_status != 'generating':
+                        lesson.content_status = 'generating'
+                        lesson.updated_at = timezone.now()
+                        lesson.save(update_fields=['content_status', 'updated_at'])
+                        marked_generating = True
+                except Exception:
+                    pass
+
             try:
                 lesson.refresh_from_db()
                 et_result = generate_exit_ticket_for_lesson(
@@ -1284,6 +1306,24 @@ def generate_complete_course(
                 et_status = 'failed'
                 et_error = str(e)
                 log(f"   ⚠️ {lesson.title}: exit-ticket regen crashed — {e}")
+
+            # Restore content_status. generate_exit_ticket_for_lesson
+            # may have already set READY_WITH_WARNINGS — in which case
+            # leave it. Otherwise fall back to the prior status (likely
+            # 'ready') or 'ready' itself.
+            if marked_generating:
+                try:
+                    lesson.refresh_from_db()
+                    if lesson.content_status == 'generating':
+                        restore_to = (
+                            prev_status if prev_status and prev_status != 'generating'
+                            else 'ready'
+                        )
+                        lesson.content_status = restore_to
+                        lesson.updated_at = timezone.now()
+                        lesson.save(update_fields=['content_status', 'updated_at'])
+                except Exception:
+                    pass
 
         return {
             'lesson': lesson.title,
