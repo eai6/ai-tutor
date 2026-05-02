@@ -508,22 +508,17 @@ code fence. Example shape:
 
         try:
             print(f"[ContentGen] [{lesson.title}] Expanding to granular sub-skills...", flush=True)
-            create_kwargs = dict(
-                response_model=None,  # raw response — we'll parse JSON ourselves
-                messages=[
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-            )
-            if self._model_config.provider == 'google':
-                create_kwargs['generation_config'] = {'max_tokens': 1500}
-            else:
-                create_kwargs['max_tokens'] = 1500
-
             # Use a direct LLM call (not via instructor) so we avoid the
             # response_model schema cost for this small free-form list.
-            from apps.llm.client import get_llm_client_for_purpose
-            llm = get_llm_client_for_purpose('generation', self.institution_id)
+            # Previously imported a non-existent ``get_llm_client_for_purpose``
+            # which silently raised ImportError every time, swallowed by
+            # the except below — every lesson's enabling_objectives stayed
+            # empty. Use the same ``ModelConfig.get_for('generation')`` +
+            # ``get_llm_client`` chain the rest of the file uses.
+            from apps.llm.client import get_llm_client
+            from apps.llm.models import ModelConfig
+            cfg = ModelConfig.get_for('generation') or self._model_config
+            llm = get_llm_client(cfg)
             response = llm.generate(
                 [{'role': 'user', 'content': prompt}],
                 system_prompt=sys_prompt,
