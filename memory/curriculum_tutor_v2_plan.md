@@ -295,3 +295,22 @@ All five answered + locked above:
 ## Next step
 
 Plan locked. Start P1 (items 1 + 3, ~1.5 hrs).
+
+## Progress (2026-05-02)
+
+- **P1** ✅ shipped — `53ca5af`
+- **P2** ✅ shipped — `9ddba9b` → `986109d` (parametric templates for MCQ/fill/matching/short_answer + content-gen wiring)
+- **P3** ✅ shipped — `02e0244` (deterministic grading for all bank-pulled questions via `_grade_against_last_bank_question`)
+- **P4** ✅ working tree (uncommitted) — EO-driven remediation walkthrough:
+  - `_build_eo_competency_map`, `_ordered_failed_questions` (in `conversational_tutor.py`)
+  - `_generate_remediation_opening` returns `(message, turn_metadata)` so the first walkthrough question's `bank_question_ref` is persisted on the saved tutor turn
+  - `_maybe_advance_walkthrough` advances queue per turn; uses P3's `_pending_bank_grade`
+  - Persists `eo_competency` to `ExitTicketAttempt.answers['eo_competency']`
+- **P5** ✅ working tree (uncommitted) — EO-aware bank sampling + re-quiz:
+  - `compute_student_eo_competency(student, lesson)` reads past attempts (latest-wins per EO)
+  - `sample_session_pool(lesson, seed, student=None)` weighted draw (failed=5x / unattempted=3x / mastered=1x)
+  - `build_remediation_requiz_queue(lesson, failed_eos, walkthrough_question_ids, seed, per_eo=2)` — fresh questions per failed EO with walked-question exclusion + variety across seeds
+  - `_begin_requiz` builds queue + transitions phase walkthrough → requiz; `_finish_remediation` promotes 100%-correct EOs to mastered + emits per-EO summary
+  - 32 new unit tests pass; full 742-test suite green
+
+**Phase state machine:** `walkthrough` → `requiz` → `done`. Walkthrough exhausting transitions to requiz; requiz exhausting promotes EOs and transitions to done.

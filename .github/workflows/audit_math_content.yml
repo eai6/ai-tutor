@@ -1,0 +1,101 @@
+name: Audit math content (read-only)
+
+# Manually-triggered audit of EXISTING math content against
+# Layers 1 + 2 — does NOT regenerate or mutate anything. Walks
+# every LessonStep + ExitTicketQuestion (lesson exit tickets +
+# summative banks) and reports:
+#   - Layer 1 auto-correct findings (steps, questions)
+#   - Layer 1 detect-only findings (answer-key-bound)
+#   - Layer 2 answer-key mismatches (the most damaging class)
+#
+# Use this BEFORE regenerating to see which lessons actually
+# have problems, so you can target the regen instead of sweeping
+# everything.
+#
+# Trigger from the GitHub UI:
+#   Actions → "Audit math content (read-only)" → "Run workflow"
+# Or from the CLI:
+#   gh workflow run audit_math_content.yml -f math_only=true
+#
+# Output streams to the workflow log; the CSV with per-finding
+# detail is uploaded as a build artifact you can download.
+
+on:
+  workflow_dispatch:
+    inputs:
+      math_only:
+        description: "Math courses only (skip geography/etc.)"
+        type: boolean
+        required: true
+        default: true
+      course_id:
+        description: "Limit to one course id (blank = all)"
+        type: string
+        required: false
+        default: ""
+      limit:
+        description: "Stop after N lessons (blank = all). Use for spot-checks."
+        type: string
+        required: false
+        default: ""
+
+env:
+  RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  APP: ${{ secrets.CONTAINER_APP_NAME }}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60   # generous; audit is read-only and fast (~1s/lesson)
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build audit argv
+        id: build
+        run: |
+          ARGS="scripts/audit_existing_content.py --csv /tmp/audit.csv"
+          if [ "${{ inputs.math_only }}" = "true" ]; then
+            ARGS="$ARGS --math-only"
+          fi
+          if [ -n "${{ inputs.course_id }}" ]; then
+            ARGS="$ARGS --course-id ${{ inputs.course_id }}"
+          fi
+          if [ -n "${{ inputs.limit }}" ]; then
+            ARGS="$ARGS --limit ${{ inputs.limit }}"
+          fi
+          echo "argv: python $ARGS"
+          echo "argv=$ARGS" >> "$GITHUB_OUTPUT"
+
+      - name: Run audit in prod Container App
+        run: |
+          # The audit script is read-only (no INSERT/UPDATE/DELETE
+          # in the ORM calls). Output streams to stdout so we see
+          # per-lesson findings + the AGGREGATE block live.
+          az containerapp exec \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --command "python ${{ steps.build.outputs.argv }}"
+
+      - name: Copy CSV out of container
+        run: |
+          # Print the CSV body to the workflow log so you can grep
+          # in the run page. Also write it next to the workflow
+          # workspace so the upload-artifact step can pick it up.
+          az containerapp exec \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --command "cat /tmp/audit.csv" > audit.csv 2>&1 || true
+          echo "----- /tmp/audit.csv head -----"
+          head -50 audit.csv || true
+          echo "----- size -----"
+          wc -l audit.csv || true
+
+      - name: Upload audit CSV as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: math-content-audit
+          path: audit.csv
+          if-no-files-found: warn

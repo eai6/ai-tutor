@@ -39,11 +39,119 @@ CANDIDATES_PER_STEP = 5
 # convention.
 SENTINEL_NO_QUESTION = 0
 
+# Sampling weights per item 4 of memory/curriculum_tutor_v2_plan.md.
+# Failed EOs get 5x weight, unattempted 3x, mastered 1x — biases the
+# session pool toward sub-skills the student is weak on.
+EO_WEIGHT_FAILED = 5
+EO_WEIGHT_UNATTEMPTED = 3
+EO_WEIGHT_MASTERED = 1
+
+
+def compute_student_eo_competency(student, lesson) -> Dict[str, str]:
+    """Build a per-EO competency status map for one student on one lesson.
+
+    Reads past ``ExitTicketAttempt.answers['eo_competency']`` rows for
+    the lesson's exit ticket. Latest attempt wins per EO so that a
+    student who fails an EO once and then masters it on a retake is
+    correctly tagged 'mastered'.
+
+    Returns ``{eo_text: status}`` where status is one of:
+      - ``'mastered'``   — most recent attempt for this EO had every
+                           question correct
+      - ``'failed'``     — most recent attempt had at least one wrong
+      - ``'unattempted'``— EO has never been seen on a graded attempt
+                           (or student has no past attempts)
+
+    EOs that don't appear in any past attempt are NOT in the returned
+    dict — callers should treat missing keys as ``'unattempted'``.
+    """
+    from apps.tutoring.models import ExitTicket, ExitTicketAttempt
+    if student is None or lesson is None:
+        return {}
+    et = ExitTicket.objects.filter(lesson=lesson).first()
+    if et is None:
+        return {}
+    # Latest first by completion time, falling back to start time so
+    # in-progress attempts still slot in correctly.
+    attempts = list(
+        ExitTicketAttempt.objects
+        .filter(exit_ticket=et, student=student)
+        .order_by('-completed_at', '-started_at')
+        .values_list('answers', flat=True)
+    )
+    status: Dict[str, str] = {}
+    for answers in attempts:
+        if not isinstance(answers, dict):
+            continue
+        eo_block = answers.get('eo_competency') or {}
+        if not isinstance(eo_block, dict):
+            continue
+        for eo, bucket in eo_block.items():
+            eo_key = (eo or '').strip()
+            if not eo_key or eo_key in status:
+                # Latest attempt wins — earlier attempts don't override
+                continue
+            if not isinstance(bucket, dict):
+                continue
+            if bucket.get('is_mastered'):
+                status[eo_key] = 'mastered'
+            elif (bucket.get('asked') or 0) > 0:
+                status[eo_key] = 'failed'
+    return status
+
+
+def _eo_weight(eo: str, competency: Dict[str, str]) -> int:
+    """Look up the sampling weight for one EO."""
+    if not eo:
+        return EO_WEIGHT_UNATTEMPTED
+    s = competency.get(eo.strip())
+    if s == 'failed':
+        return EO_WEIGHT_FAILED
+    if s == 'mastered':
+        return EO_WEIGHT_MASTERED
+    return EO_WEIGHT_UNATTEMPTED
+
+
+def _question_eo_key(q) -> str:
+    """Pick the EO tag we sample by — prefer the specific
+    enabling_objective, fall back to the broader concept_tag."""
+    return (
+        getattr(q, 'enabling_objective', None)
+        or getattr(q, 'concept_tag', None)
+        or ''
+    ).strip()
+
+
+def _weighted_sample_without_replacement(
+    population: List,
+    weights: List[int],
+    k: int,
+    rng: random.Random,
+) -> List:
+    """Draw ``k`` items from ``population`` weighted by ``weights``,
+    without replacement. ``random.sample`` doesn't support weights
+    and ``random.choices`` is with-replacement, so we roll our own.
+    O(k * n); banks are small (~35) so this is fine."""
+    pop = list(population)
+    w = list(weights)
+    chosen: List = []
+    while pop and len(chosen) < k:
+        # All-zero weights would crash random.choices — fall back to
+        # uniform when nothing has positive mass.
+        if not any(w):
+            idx = rng.randrange(len(pop))
+        else:
+            idx = rng.choices(range(len(pop)), weights=w, k=1)[0]
+        chosen.append(pop.pop(idx))
+        w.pop(idx)
+    return chosen
+
 
 def sample_session_pool(
     lesson,
     seed: int,
     pool_size: int = POOL_SIZE_PER_LESSON,
+    student=None,
 ) -> List:
     """Sample a deterministic per-session pool from the lesson's
     published exit-ticket bank.
@@ -53,11 +161,15 @@ def sample_session_pool(
     given the seed, so reloading the session reconstructs the same
     pool from engine_state.
 
+    When ``student`` is provided, the draw is biased by the student's
+    per-EO competency (failed=5x, unattempted=3x, mastered=1x). When
+    ``student`` is None, the draw is uniform — preserves the prior
+    behaviour for callers that don't track student state.
+
     Returns a list of ExitTicketQuestion objects. Empty list if the
-    lesson has no published bank yet (e.g. teacher hasn't approved the
-    exit ticket).
+    lesson has no published bank yet.
     """
-    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+    from apps.tutoring.models import ExitTicketQuestion
     bank_qs = ExitTicketQuestion.objects.filter(
         exit_ticket__lesson=lesson,
         exit_ticket__is_published=True,
@@ -68,7 +180,11 @@ def sample_session_pool(
     if len(bank) <= pool_size:
         return bank
     rng = random.Random(seed)
-    return rng.sample(bank, pool_size)
+    if student is None:
+        return rng.sample(bank, pool_size)
+    competency = compute_student_eo_competency(student, lesson)
+    weights = [_eo_weight(_question_eo_key(q), competency) for q in bank]
+    return _weighted_sample_without_replacement(bank, weights, pool_size, rng)
 
 
 def pick_candidates_for_step(
@@ -128,6 +244,62 @@ def pick_published_for_concept_tag(
             return matches
     # Fallback — any published bank question for this lesson
     return list(base.order_by('order_index')[:max_candidates])
+
+
+def build_remediation_requiz_queue(
+    lesson,
+    failed_eos: List[str],
+    walkthrough_question_ids: Optional[List[int]] = None,
+    seed: int = 0,
+    per_eo: int = 2,
+) -> List:
+    """Build the post-walkthrough re-quiz queue (P5).
+
+    For each failed EO (in lesson-EO order — caller controls ordering),
+    pick ``per_eo`` fresh published-bank questions tagged to that EO,
+    excluding any the student has already walked through. Within each
+    EO, the pick is randomised by ``seed`` so retakes draw a different
+    sample each time — gives the student a VARIETY of questions per EO
+    across attempts (per the explicit user requirement).
+
+    Falls back to walked questions when no fresh ones exist for an EO,
+    rather than skipping the EO entirely. The re-quiz must consistently
+    cover every failed EO.
+
+    Returns a flat list of ``ExitTicketQuestion`` rows in EO-then-pick
+    order (all EO-1 picks, then all EO-2 picks, ...). Empty list when
+    no failed EOs supplied.
+    """
+    from django.db.models import Q
+    from apps.tutoring.models import ExitTicketQuestion
+    if not failed_eos:
+        return []
+    rng = random.Random(seed)
+    walked = set(walkthrough_question_ids or [])
+    queue: List = []
+    seen: set = set()
+    for eo in failed_eos:
+        eo_key = (eo or '').strip()
+        if not eo_key:
+            continue
+        base = ExitTicketQuestion.objects.filter(
+            exit_ticket__lesson=lesson,
+            exit_ticket__is_published=True,
+        ).filter(
+            Q(enabling_objective=eo_key) | Q(concept_tag=eo_key),
+        )
+        fresh = [q for q in base if q.id not in walked and q.id not in seen]
+        if not fresh:
+            # Allow re-using walked questions before skipping the EO —
+            # consistent EO coverage matters more than freshness.
+            fresh = [q for q in base if q.id not in seen]
+        if not fresh:
+            continue
+        chosen = rng.sample(fresh, min(per_eo, len(fresh)))
+        for q in chosen:
+            queue.append(q)
+            seen.add(q.id)
+    return queue
 
 
 def render_bank_block(

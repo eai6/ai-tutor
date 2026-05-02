@@ -1808,6 +1808,15 @@ Keep it to 2-3 sentences."""
             self.conversation.append({"role": "assistant", "content": clean_response})
             return self._handle_exit_ticket()
 
+        # P4 — remediation walkthrough advancement. If the student
+        # just answered a walkthrough question, advance to the next
+        # failed question and append it to the tutor's response. The
+        # bank grader (P3) already verdicted the previous question,
+        # the LLM's response provided scaffolding; now we move on.
+        clean_response = self._maybe_advance_walkthrough(
+            clean_response, turn_metadata,
+        )
+
         # Save state
         self._save_state()
 
@@ -3902,7 +3911,12 @@ Follow the current step; this concept will be covered in sequence."""
 
         pool_ids = (self.session.engine_state or {}).get('question_pool_ids')
         if pool_ids is None:
-            pool = sample_session_pool(self.lesson, seed=self.session.id)
+            # P5 — bias the per-session pool toward the student's weak
+            # EOs (failed=5x, unattempted=3x, mastered=1x). See
+            # memory/curriculum_tutor_v2_plan.md item 4.
+            pool = sample_session_pool(
+                self.lesson, seed=self.session.id, student=self.student,
+            )
             pool_ids = [q.id for q in pool]
             state = self.session.engine_state or {}
             state['question_pool_ids'] = pool_ids
@@ -6061,6 +6075,88 @@ Which concept numbers were meaningfully covered?"""
             },
         )
     
+    def _build_eo_competency_map(
+        self, results: List[Dict],
+    ) -> Dict[str, Dict]:
+        """Build a per-EO competency map from exit-ticket results.
+
+        For each enabling_objective the questions tested, count
+        how many were asked, how many the student got right, and
+        which question ids they failed. Used by the remediation
+        flow to name EOs got/missed and queue failed questions
+        in lesson-EO order. See P4 of
+        memory/curriculum_tutor_v2_plan.md.
+
+        Returns:
+          {
+            "<eo text>": {
+              "asked": int, "correct": int,
+              "failed_question_ids": [int, ...],
+              "is_mastered": bool,  # all asked == correct
+            },
+            ...
+          }
+        """
+        eo_map: Dict[str, Dict] = {}
+        for r in results:
+            # Prefer the SPECIFIC enabling_objective; fall back to
+            # the broader concept_tag for older content where the
+            # sub-objective wasn't populated.
+            eo = (r.get('enabling_objective') or r.get('concept_tag') or '').strip()
+            if not eo:
+                continue
+            bucket = eo_map.setdefault(eo, {
+                'asked': 0, 'correct': 0, 'failed_question_ids': [],
+            })
+            bucket['asked'] += 1
+            if r.get('is_correct'):
+                bucket['correct'] += 1
+            else:
+                qid = r.get('question_id') or r.get('index')
+                if qid is not None:
+                    bucket['failed_question_ids'].append(qid)
+        for eo, b in eo_map.items():
+            b['is_mastered'] = (b['asked'] > 0 and b['correct'] == b['asked'])
+        return eo_map
+
+    def _ordered_failed_questions(
+        self,
+        failed_questions: List[Dict],
+        eo_map: Dict[str, Dict],
+    ) -> List[Dict]:
+        """Order failed questions for the remediation walkthrough.
+
+        Per the v2 plan locked decision: walk in LESSON-EO order
+        (the order EOs appear on the lesson, not ad-hoc grouping).
+        For each EO in lesson order, walk through ALL failed questions
+        tagged to that EO before moving to the next EO.
+        """
+        lesson_eos = list(self.lesson.enabling_objectives or [])
+        # Bucket failed_questions by EO for lookup
+        by_eo: Dict[str, List[Dict]] = {}
+        for fq in failed_questions:
+            eo = (fq.get('enabling_objective') or fq.get('concept_tag') or '').strip()
+            by_eo.setdefault(eo, []).append(fq)
+
+        ordered: List[Dict] = []
+        seen_ids = set()
+        # First pass — iterate lesson EOs in order
+        for lesson_eo in lesson_eos:
+            for fq in by_eo.get(lesson_eo, []):
+                fid = fq.get('id')
+                if fid not in seen_ids:
+                    ordered.append(fq)
+                    seen_ids.add(fid)
+        # Second pass — append any failed questions whose EO didn't
+        # match a lesson EO (drift, untagged) at the end so they don't
+        # get dropped from the walkthrough.
+        for fq in failed_questions:
+            fid = fq.get('id')
+            if fid not in seen_ids:
+                ordered.append(fq)
+                seen_ids.add(fid)
+        return ordered
+
     def _start_remediation(
         self,
         results: List[Dict],
@@ -6070,8 +6166,11 @@ Which concept numbers were meaningfully covered?"""
         """
         Start targeted remediation based on failed ENABLING OBJECTIVES.
 
-        Identifies which EOs the student missed on the exit ticket
-        (via concept_tag = EO text), then re-teaches those specific objectives.
+        Builds a per-EO competency map (got vs missed) and queues the
+        failed questions in lesson-EO order. The remediation walkthrough
+        then steps through every failed question, using the bank's
+        canonical explanation as scaffolding. See P4 of
+        memory/curriculum_tutor_v2_plan.md.
         """
         self.remediation_attempt = getattr(self, 'remediation_attempt', 0) + 1
         self.is_remediation = True
@@ -6095,19 +6194,35 @@ Which concept numbers were meaningfully covered?"""
         # attempt count; mastery only promotes, never demotes).
         self._update_competency(score=score, total=len(results), passed=False)
 
-        # Record ExitTicketAttempt per active participant (G3: group-aware)
+        # Record ExitTicketAttempt per active participant (G3: group-aware).
+        # Persist the EO competency map under answers['eo_competency']
+        # so the dashboard + future sampling can read it (P4).
+        eo_competency_for_attempt = self._build_eo_competency_map(results)
         try:
             from apps.tutoring.models import ExitTicket, ExitTicketAttempt
             exit_ticket = ExitTicket.objects.filter(lesson=self.lesson).first()
             if exit_ticket:
-                answer_data = []
+                per_question = []
                 for r in results:
-                    answer_data.append({
+                    per_question.append({
                         'concept_tag': r.get('concept_tag', ''),
+                        'enabling_objective': r.get('enabling_objective', ''),
                         'correct': r.get('is_correct', False),
                         'selected': r.get('selected', ''),
                         'question_type': r.get('question_type', 'mcq'),
                     })
+                answer_data = {
+                    'per_question': per_question,
+                    'eo_competency': {
+                        eo: {
+                            'asked': b['asked'],
+                            'correct': b['correct'],
+                            'failed_question_ids': b['failed_question_ids'],
+                            'is_mastered': b['is_mastered'],
+                        }
+                        for eo, b in eo_competency_for_attempt.items()
+                    },
+                }
                 try:
                     participants = list(self.session.active_students)
                 except Exception:
@@ -6159,6 +6274,32 @@ Which concept numbers were meaningfully covered?"""
         self.failed_exit_questions = failed_questions
         self._failed_eos = list(failed_eos)
 
+        # P4 — build per-EO competency map + ordered failed-question
+        # queue. Persist to engine_state so the walkthrough can drive
+        # the next-question selection across turns. Also persist the
+        # competency map to ExitTicketAttempt.answers so the dashboard
+        # + future sampling can read it. See v2 plan items 4 + 6.
+        eo_competency = self._build_eo_competency_map(results)
+        ordered_failed = self._ordered_failed_questions(failed_questions, eo_competency)
+
+        state = self.session.engine_state or {}
+        state['remediation_eo_competency'] = {
+            eo: {
+                'asked': b['asked'],
+                'correct': b['correct'],
+                'failed_question_ids': b['failed_question_ids'],
+                'is_mastered': b['is_mastered'],
+            }
+            for eo, b in eo_competency.items()
+        }
+        state['remediation_walkthrough_queue'] = [
+            {'id': fq.get('id'), 'eo': (fq.get('enabling_objective') or fq.get('concept_tag') or '')[:200]}
+            for fq in ordered_failed
+        ]
+        state['remediation_walkthrough_index'] = 0
+        state['remediation_phase'] = 'walkthrough'
+        self.session.engine_state = state
+
         # Mark failed EO concepts as NOT covered
         failed_ids = {fq['id'] for fq in failed_questions}
         for concept in self.exit_ticket_concepts:
@@ -6174,11 +6315,16 @@ Which concept numbers were meaningfully covered?"""
 
         self._save_state()
 
-        # Generate EO-focused remediation message
-        message = self._generate_remediation_opening(score, len(results), failed_questions)
-        
-        # Save the message
-        self._save_turn("tutor", message)
+        # Generate EO-focused remediation message. The opener returns
+        # turn_metadata carrying bank_question_ref for the first
+        # walkthrough question, so the next student reply is graded
+        # by the bank grader (P3) and _maybe_advance_walkthrough fires.
+        message, turn_metadata = self._generate_remediation_opening(
+            score, len(results), failed_questions,
+        )
+
+        # Save the message + bank ref
+        self._save_turn("tutor", message, metadata=turn_metadata)
         self.conversation.append({"role": "assistant", "content": message})
         
         return TutorMessage(
@@ -6199,80 +6345,327 @@ Which concept numbers were meaningfully covered?"""
         score: int,
         total: int,
         failed_questions: List[Dict]
-    ) -> str:
-        """Generate EO-focused remediation opening.
+    ) -> Tuple[str, Dict]:
+        """Generate the EO-driven remediation opening (P4).
 
-        For math lessons, the check-understanding question is pulled
-        from the published bank (no LLM authoring) and appended to the
-        opening. The LLM writes only the re-teaching prose. See
-        memory/tutor_no_authoring_plan.md.
+        Names which EOs the student GOT and which they MISSED, then
+        poses the FIRST failed question (verbatim from the bank) so
+        the walkthrough begins immediately. The walkthrough advances
+        question-by-question on subsequent turns — see
+        _maybe_advance_walkthrough.
+
+        Returns (message, turn_metadata). The metadata carries
+        ``bank_question_ref`` for the first walkthrough question so
+        the next student reply is graded against it by the bank
+        grader (P3 plumbing).
         """
-        failed_eos = getattr(self, '_failed_eos', [])
+        state = self.session.engine_state or {}
+        eo_competency = state.get('remediation_eo_competency') or {}
+        walkthrough_queue = state.get('remediation_walkthrough_queue') or []
 
-        eo_list = (
-            "\n".join(f"  - {eo}" for eo in failed_eos[:4])
-            if failed_eos else "  - (general review needed)"
+        # Build human-readable lists of got vs missed EOs
+        mastered_eos = [eo for eo, b in eo_competency.items() if b.get('is_mastered')]
+        missed_eos = [
+            (eo, b) for eo, b in eo_competency.items()
+            if not b.get('is_mastered')
+        ]
+
+        # Render lists for the prompt
+        if mastered_eos:
+            mastered_block = (
+                "EOs the student MASTERED:\n" +
+                "\n".join(f"  ✓ {eo}" for eo in mastered_eos[:6])
+            )
+        else:
+            mastered_block = "(no EOs fully mastered this attempt)"
+
+        if missed_eos:
+            missed_block = (
+                "EOs the student MISSED:\n" +
+                "\n".join(
+                    f"  ✗ {eo} ({b['correct']}/{b['asked']})"
+                    for eo, b in missed_eos[:6]
+                )
+            )
+        else:
+            missed_block = "(no EOs missed)"
+
+        # Fetch the first failed question for the walkthrough opener.
+        from apps.tutoring.models import ExitTicketQuestion
+        from apps.tutoring.question_bank import render_question_to_prose
+
+        first_question = None
+        if walkthrough_queue:
+            first_id = walkthrough_queue[0].get('id')
+            first_question = ExitTicketQuestion.objects.filter(id=first_id).first()
+
+        prompt = f"""The student just completed the exit ticket but didn't pass.
+Score: {score}/{total} (needed {self._exit_ticket_passing_score()} to pass)
+Attempt number: {self.remediation_attempt}
+
+{mastered_block}
+
+{missed_block}
+
+Generate a warm, encouraging opening message that:
+1. Acknowledges their effort and credits the EOs they MASTERED by name (use exact EO text from above).
+2. Names the EOs they MISSED by name and explains we'll walk through every question they got wrong, one at a time.
+3. Reassures them this is normal — re-doing missed questions is the fastest way to lock in the gap.
+4. Hands off to the walkthrough by saying something like "Let's start with the first question you missed:".
+
+DO NOT author a question yourself. The first failed exit-ticket question
+will be appended verbatim after your response so the walkthrough begins
+immediately. Just write the opening prose — 3-5 sentences — and stop.
+"""
+        opening_prose = self._generate_response(prompt)
+
+        # Append the first failed question verbatim from the bank.
+        # Record bank_question_ref on turn_metadata so the next student
+        # reply is graded against it (see _grade_against_last_bank_question).
+        turn_metadata: Dict = {}
+        if first_question is not None:
+            rendered = render_question_to_prose(first_question)
+            if rendered:
+                turn_metadata['bank_question_ref'] = {
+                    'kind': 'exit_ticket_question',
+                    'id': first_question.id,
+                    'question_type': first_question.question_type or 'mcq',
+                }
+                opening_prose = (
+                    opening_prose.rstrip()
+                    + "\n\n**Question 1 of "
+                    + f"{len(walkthrough_queue)}:**\n\n"
+                    + rendered
+                )
+        return opening_prose, turn_metadata
+
+    def _exit_ticket_passing_score(self) -> int:
+        """Lookup the lesson's exit-ticket passing score, with a
+        sensible fallback when no ExitTicket exists."""
+        from apps.tutoring.models import ExitTicket
+        et = ExitTicket.objects.filter(lesson=self.lesson).first()
+        return et.passing_score if et else 8
+
+    def _maybe_advance_walkthrough(
+        self, clean_response: str, turn_metadata: Dict,
+    ) -> str:
+        """Drive the EO-driven remediation flow forward (P4 + P5).
+
+        Two phases live here:
+          - ``walkthrough`` — replay every failed exit-ticket question.
+          - ``requiz`` — fresh questions per failed EO drawn by
+            weighted sampling, used to PROMOTE EOs back to mastered.
+
+        Each call: if the student just answered the previously-posed
+        bank question (``_pending_bank_grade`` was set this turn),
+        advance the active queue. When the walkthrough ends we build
+        the re-quiz queue and pose its first question. When the re-quiz
+        ends we promote any EO that scored 100% on its re-quiz, then
+        append a closing summary.
+
+        ``turn_metadata['bank_question_ref']`` is set whenever a new
+        question is posed so the next student turn grades against it.
+        """
+        if not getattr(self, 'is_remediation', False):
+            return clean_response
+        state = self.session.engine_state or {}
+        phase = state.get('remediation_phase')
+        if phase not in ('walkthrough', 'requiz'):
+            return clean_response
+        bank_grade = getattr(self, '_pending_bank_grade', None)
+        if bank_grade is None or bank_grade.is_correct is None:
+            return clean_response
+
+        # If we're in re-quiz, record the per-EO outcome BEFORE advancing
+        # so a later "promote to mastered" check has the data.
+        if phase == 'requiz':
+            self._record_requiz_result(state, bank_grade.is_correct)
+
+        if phase == 'walkthrough':
+            queue = list(state.get('remediation_walkthrough_queue') or [])
+            idx = state.get('remediation_walkthrough_index', 0) + 1
+            state['remediation_walkthrough_index'] = idx
+            if idx >= len(queue):
+                # Walkthrough complete — start the re-quiz.
+                return self._begin_requiz(state, clean_response, turn_metadata)
+            return self._pose_next_remediation_question(
+                state, queue, idx, label='Question',
+                clean_response=clean_response, turn_metadata=turn_metadata,
+            )
+
+        # phase == 'requiz'
+        queue = list(state.get('remediation_requiz_queue') or [])
+        idx = state.get('remediation_requiz_index', 0) + 1
+        state['remediation_requiz_index'] = idx
+        if idx >= len(queue):
+            return self._finish_remediation(state, clean_response)
+        return self._pose_next_remediation_question(
+            state, queue, idx, label='Re-quiz',
+            clean_response=clean_response, turn_metadata=turn_metadata,
         )
 
-        # For math lessons, pull a published bank question for the first
-        # failed EO and instruct the LLM NOT to author its own check.
-        try:
-            is_math_lesson = self.lesson.unit.course.is_math
-        except Exception:
-            is_math_lesson = False
-        bank_question = None
-        if is_math_lesson and failed_eos:
-            from apps.tutoring.question_bank import pick_published_for_concept_tag
-            picks = pick_published_for_concept_tag(
-                self.lesson, failed_eos[0], max_candidates=1,
+    def _pose_next_remediation_question(
+        self,
+        state: Dict,
+        queue: List[Dict],
+        idx: int,
+        label: str,
+        clean_response: str,
+        turn_metadata: Dict,
+    ) -> str:
+        """Render queue[idx] verbatim from the bank, append to the
+        tutor response, and record bank_question_ref so the next
+        student reply gets graded. Persists ``state`` back to the
+        session (caller has already mutated the index)."""
+        from apps.tutoring.models import ExitTicketQuestion
+        from apps.tutoring.question_bank import render_question_to_prose
+        self.session.engine_state = state
+        next_id = queue[idx].get('id')
+        next_q = ExitTicketQuestion.objects.filter(id=next_id).first()
+        if next_q is None:
+            return clean_response
+        rendered = render_question_to_prose(next_q)
+        if not rendered:
+            return clean_response
+        turn_metadata['bank_question_ref'] = {
+            'kind': 'exit_ticket_question',
+            'id': next_q.id,
+            'question_type': next_q.question_type or 'mcq',
+        }
+        return (
+            clean_response.rstrip()
+            + f"\n\n**{label} {idx + 1} of {len(queue)}:**\n\n"
+            + rendered
+        )
+
+    def _record_requiz_result(self, state: Dict, is_correct: bool) -> None:
+        """Tally the previous re-quiz question's verdict per EO so the
+        end-of-requiz pass can promote EOs that scored 100%."""
+        idx = state.get('remediation_requiz_index', 0)
+        queue = list(state.get('remediation_requiz_queue') or [])
+        if not (0 <= idx < len(queue)):
+            return
+        eo = (queue[idx].get('eo') or '').strip()
+        if not eo:
+            return
+        results = state.setdefault('remediation_requiz_results', {})
+        bucket = results.setdefault(eo, {'asked': 0, 'correct': 0})
+        bucket['asked'] += 1
+        if is_correct:
+            bucket['correct'] += 1
+
+    def _begin_requiz(
+        self,
+        state: Dict,
+        clean_response: str,
+        turn_metadata: Dict,
+    ) -> str:
+        """Walkthrough finished — build the re-quiz queue (item 4
+        weighted sampling, 2 fresh questions per failed EO) and pose
+        the first one. Falls through to _finish_remediation when no
+        failed EOs need re-quizzing."""
+        from apps.tutoring.question_bank import build_remediation_requiz_queue
+        eo_competency = state.get('remediation_eo_competency') or {}
+        # Lesson-EO order so the re-quiz follows the same sequence as
+        # the walkthrough did. EOs not in the lesson list (drift) get
+        # appended at the end.
+        lesson_eos = list(self.lesson.enabling_objectives or [])
+        failed_eos = [
+            eo for eo in lesson_eos
+            if eo in eo_competency and not eo_competency[eo].get('is_mastered')
+        ]
+        for eo, b in eo_competency.items():
+            if eo not in failed_eos and not b.get('is_mastered'):
+                failed_eos.append(eo)
+
+        walked_ids = [
+            q.get('id') for q in
+            (state.get('remediation_walkthrough_queue') or [])
+            if q.get('id') is not None
+        ]
+        # Seed: session id + retry count → different sample each retake.
+        seed = (self.session.id or 0) + (
+            getattr(self, 'remediation_attempt', 0) * 1000
+        )
+        requiz_qs = build_remediation_requiz_queue(
+            self.lesson, failed_eos,
+            walkthrough_question_ids=walked_ids, seed=seed,
+        )
+        if not requiz_qs:
+            return self._finish_remediation(state, clean_response)
+
+        state['remediation_phase'] = 'requiz'
+        state['remediation_requiz_queue'] = [
+            {
+                'id': q.id,
+                'eo': (q.enabling_objective or q.concept_tag or '')[:200],
+            }
+            for q in requiz_qs
+        ]
+        state['remediation_requiz_index'] = 0
+        state['remediation_requiz_results'] = {}
+        self.session.engine_state = state
+
+        # Compose a hand-off message + first re-quiz question
+        intro = (
+            "\n\n**Walkthrough complete.** "
+            "Now let's see if those gaps are closed — I'll quiz you "
+            f"on {len(failed_eos)} weak objective"
+            f"{'s' if len(failed_eos) != 1 else ''} with fresh questions."
+        )
+        return self._pose_next_remediation_question(
+            state,
+            queue=state['remediation_requiz_queue'],
+            idx=0,
+            label='Re-quiz',
+            clean_response=clean_response.rstrip() + intro,
+            turn_metadata=turn_metadata,
+        )
+
+    def _finish_remediation(self, state: Dict, clean_response: str) -> str:
+        """Re-quiz exhausted (or skipped) — promote EOs that scored
+        100% on re-quiz to mastered, transition phase=done, and
+        append a closing summary that names which EOs are now mastered
+        vs still need work."""
+        results = state.get('remediation_requiz_results') or {}
+        competency = state.get('remediation_eo_competency') or {}
+        promoted: List[str] = []
+        still_weak: List[str] = []
+        for eo, r in results.items():
+            asked = r.get('asked', 0)
+            correct = r.get('correct', 0)
+            if asked > 0 and correct == asked:
+                promoted.append(eo)
+                if eo in competency:
+                    competency[eo]['is_mastered'] = True
+            else:
+                still_weak.append(eo)
+
+        state['remediation_eo_competency'] = competency
+        state['remediation_phase'] = 'done'
+        self.session.engine_state = state
+
+        lines = ["\n\n**Remediation complete.**"]
+        if promoted:
+            lines.append("Promoted to mastered:")
+            for eo in promoted:
+                lines.append(f"  ✓ {eo}")
+        if still_weak:
+            lines.append("Still needs work:")
+            for eo in still_weak:
+                lines.append(f"  ✗ {eo}")
+        if not promoted and not still_weak:
+            # Re-quiz was skipped (no failed EOs) — keep the wrap brief
+            lines = [
+                "\n\n**Walkthrough complete.** When you're ready, "
+                "take the exit ticket again."
+            ]
+        else:
+            lines.append(
+                "When you're ready, take the exit ticket again — "
+                "you'll see fresh questions on these same objectives."
             )
-            if picks:
-                bank_question = picks[0]
-
-        if bank_question is not None:
-            prompt = f"""The student just completed the exit ticket but didn't pass.
-Score: {score}/{total} (needed 8 to pass)
-Attempt number: {self.remediation_attempt}
-
-ENABLING OBJECTIVES they need to work on:
-{eo_list}
-
-Generate an encouraging RE-TEACHING message that:
-1. Acknowledges their effort positively (no shame!)
-2. Names the specific enabling objectives they'll review (use the EO text above)
-3. Reassures them this is normal — learning takes practice
-4. RE-TEACHES the FIRST enabling objective above. Walk through the rule, give a worked example using ONLY numbers that appear in the lesson's teacher_script — do NOT invent new numerical examples.
-
-DO NOT pose a check-understanding question yourself. A verified question
-will be appended after your response. Just stop after the re-teaching.
-
-Keep it warm, supportive, and focused. 3-4 sentences total."""
-            opening_prose = self._generate_response(prompt)
-            from apps.tutoring.question_bank import render_question_to_prose
-            rendered = render_question_to_prose(bank_question)
-            if rendered:
-                return (opening_prose.rstrip() + "\n\n" + rendered).strip()
-            return opening_prose
-
-        # Non-math (or no bank match) — preserve current behaviour.
-        prompt = f"""The student just completed the exit ticket but didn't pass.
-Score: {score}/{total} (needed 8 to pass)
-Attempt number: {self.remediation_attempt}
-
-ENABLING OBJECTIVES they need to work on:
-{eo_list}
-
-Generate an encouraging message that:
-1. Acknowledges their effort positively (no shame!)
-2. Names the specific enabling objectives they'll review (use the EO text above)
-3. Reassures them this is normal — learning takes practice
-4. Starts teaching the FIRST enabling objective from the list above
-5. Ask a simple question to check their understanding of that first EO
-
-Keep it warm, supportive, and focused. 3-4 sentences + a question.
-Do NOT just ask a quiz question — actually RE-TEACH the concept first, then check understanding."""
-
-        return self._generate_response(prompt)
+        return clean_response.rstrip() + "\n" + "\n".join(lines)
     
     # =========================================================================
     # HELPERS
