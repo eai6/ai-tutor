@@ -649,6 +649,23 @@ def student_detail(request, student_id):
     from apps.accounts.models import PlatformConfig
     config = PlatformConfig.load()
 
+    # Lessons where this student has at least one exit-ticket attempt.
+    # Drives the UN (Unassessed) category — a student who hasn't taken
+    # the ticket isn't "below expectation", they just haven't been
+    # measured. Mirrors the same UN logic on the lesson-level report.
+    from apps.tutoring.models import ExitTicketAttempt as _ETAttempt
+    attempted_lesson_ids = set(
+        _ETAttempt.objects
+        .filter(student=student)
+        .values_list('exit_ticket__lesson_id', flat=True)
+    )
+    UN_CATEGORY = {
+        'code': 'UN',
+        'label': 'Unassessed',
+        'color': '#6b7280',
+        'description': 'Has not yet taken the exit ticket.',
+    }
+
     competency_data = []
     for cid, cp in courses_progress.items():
         course = cp['course']
@@ -662,10 +679,10 @@ def student_detail(request, student_id):
             mastery_level__gte=config.threshold_me_min / 100.0,
         ).count()
         pct = round(achieved / total_eo * 100) if total_eo else 0
-        category = config.categorize_student(pct)
 
         # Per-lesson breakdown
         lesson_competencies = []
+        course_has_any_attempt = False
         for unit in course.units.all().order_by('order_index'):
             for lesson in unit.lessons.filter(is_published=True).order_by('order_index'):
                 lesson_eos = eo_skills.filter(primary_lesson=lesson)
@@ -677,7 +694,11 @@ def student_detail(request, student_id):
                     mastery_level__gte=config.threshold_me_min / 100.0,
                 ).count()
                 lesson_pct = round(lesson_achieved / lesson_total * 100) if lesson_total else 0
-                lesson_cat = config.categorize_student(lesson_pct)
+                if lesson.id in attempted_lesson_ids:
+                    lesson_cat = config.categorize_student(lesson_pct)
+                    course_has_any_attempt = True
+                else:
+                    lesson_cat = UN_CATEGORY
                 lesson_competencies.append({
                     'lesson': lesson,
                     'achieved': lesson_achieved,
@@ -685,6 +706,13 @@ def student_detail(request, student_id):
                     'pct': lesson_pct,
                     'category': lesson_cat,
                 })
+
+        # Course-level category: if the student hasn't attempted ANY
+        # exit ticket in this course, flag the whole course as UN.
+        if course_has_any_attempt:
+            category = config.categorize_student(pct)
+        else:
+            category = UN_CATEGORY
 
         competency_data.append({
             'course': course,
