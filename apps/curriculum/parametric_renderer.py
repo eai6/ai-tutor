@@ -140,6 +140,190 @@ class ParametricQuestionTemplate(BaseModel):
     )
 
 
+class ParametricMCQTemplate(BaseModel):
+    """Templated MCQ. The correct answer AND 3 distractors all
+    derive from the same parameter sample, so distractors stay
+    plausible (same units, same magnitude). The server randomises
+    which letter (A/B/C/D) the correct answer lands at per render.
+
+    Example
+    -------
+        template_text = "Three angles around a point are {a}°, {b}°, "
+                        "and x°. What is x?"
+        parameters    = {"a": ParameterSpec(int, 30, 150, step=5),
+                         "b": ParameterSpec(int, 30, 150, step=5)}
+        correct_formula     = "360 - a - b"
+        distractor_formulas = ["a + b",       # forgot to subtract
+                               "180 - a - b", # wrong rule
+                               "360 - a"]     # forgot one term
+    """
+
+    template_text: str = Field(
+        description="Question stem with named slots in {braces}."
+    )
+    parameters: Dict[str, ParameterSpec]
+    correct_formula: str = Field(
+        description="Pure-arithmetic expression yielding the correct answer."
+    )
+    distractor_formulas: List[str] = Field(
+        description=(
+            "Exactly 3 expressions for the wrong options. Each must "
+            "yield a value DIFFERENT from correct_formula across all "
+            "samples (validator rejects ambiguous distractors)."
+        ),
+    )
+    answer_unit: Optional[str] = Field(default=None)
+    explanation_template: str = Field(
+        description="Explanation with {param} + {answer} slots."
+    )
+    constraints: Optional[List[str]] = Field(default=None)
+
+    @field_validator("distractor_formulas")
+    @classmethod
+    def _three_distractors(cls, v):
+        if len(v) != 3:
+            raise ValueError(
+                f"distractor_formulas must have exactly 3 entries (got {len(v)})"
+            )
+        return v
+
+
+class ParametricFillBlankTemplate(BaseModel):
+    """Templated fill-in-blank. The stem contains one or more `___`
+    slots; each is filled by evaluating the corresponding entry in
+    blank_formulas. Answers are graded blank-by-blank.
+
+    Example
+    -------
+        template_text  = "Two angles are {a}° and {b}°. The third "
+                         "angle is ___° and the sum of all three is ___°."
+        parameters     = {"a": ..., "b": ...}
+        blank_formulas = ["360 - a - b", "360"]   # one per `___`, in order
+    """
+
+    template_text: str = Field(
+        description=(
+            "Stem with `___` for each blank. Number of `___` must "
+            "match len(blank_formulas)."
+        )
+    )
+    parameters: Dict[str, ParameterSpec]
+    blank_formulas: List[str] = Field(
+        description="One arithmetic formula per `___` slot, in order."
+    )
+    answer_unit: Optional[str] = Field(default=None)
+    explanation_template: str
+    constraints: Optional[List[str]] = Field(default=None)
+
+    @field_validator("blank_formulas")
+    @classmethod
+    def _at_least_one_blank(cls, v):
+        if not v:
+            raise ValueError("blank_formulas must have at least one entry")
+        return v
+
+
+class ParametricMatchingTemplate(BaseModel):
+    """Templated matching. The renderer samples the parameters
+    `pair_count` times, producing a fresh (left, right) pair per
+    sample. Distractors are extra wrong-side options drawn from
+    additional samples or perturbations.
+
+    Example
+    -------
+        framing_text  = "Match each angle pair to its sum."
+        parameters    = {"a": ..., "b": ...}
+        pair_count    = 5
+        left_formula  = "{a}° + {b}°"   # display string for the left
+        right_formula = "a + b"          # arithmetic for the right
+        distractor_count = 2
+    """
+
+    framing_text: str = Field(
+        description="Instruction text shown above the pair list."
+    )
+    parameters: Dict[str, ParameterSpec]
+    pair_count: int = Field(
+        default=4,
+        ge=4, le=6,
+        description="Number of pairs to render (4-6).",
+    )
+    left_formula: str = Field(
+        description=(
+            "String template for the left side of each pair. Uses "
+            "{param} slots — substituted with each per-pair sample. "
+            "Example: '{a}° + {b}°'."
+        )
+    )
+    right_formula: str = Field(
+        description="Arithmetic for the right side. Example: 'a + b'."
+    )
+    distractor_count: int = Field(default=2, ge=0, le=3)
+    explanation_template: str
+    constraints: Optional[List[str]] = Field(default=None)
+
+
+class ParametricShortAnswerTemplate(BaseModel):
+    """Two-field short answer (per the user's note in the v2 plan).
+
+    The student fills two boxes:
+      - final_answer:  numeric/short value, deterministically graded
+                       against final_answer_formula
+      - working:       prose, LLM-reviewed against canonical_working
+                       (which the bank's `explanation` field also stores)
+
+    This keeps the platform-wide rule intact (LLM never calculates
+    correct answers) while still grading prose working — the LLM
+    only compares the student's working against a reference text it
+    didn't author. The reference is the canonical worked explanation
+    produced at template creation time.
+    """
+
+    template_text: str = Field(
+        description="The question prose (with {param} slots)."
+    )
+    parameters: Dict[str, ParameterSpec]
+    final_answer_formula: str = Field(
+        description="Arithmetic expression for the final-answer box."
+    )
+    canonical_working: str = Field(
+        description=(
+            "Reference text showing the steps a correct working "
+            "should include. The runtime LLM compares the student's "
+            "working against this. Uses {param} + {answer} slots."
+        )
+    )
+    answer_unit: Optional[str] = Field(default=None)
+    constraints: Optional[List[str]] = Field(default=None)
+
+
+# Discriminated parse — content-gen routes by question_type.
+def parse_template(question_type: str, data: dict):
+    """Parse a template dict into the right Pydantic model based on
+    question_type. Returns the model on success, raises Pydantic
+    ValidationError on schema violation.
+
+    Routing:
+      'mcq'             -> ParametricMCQTemplate
+      'fill_in_blank'   -> ParametricFillBlankTemplate
+      'matching'        -> ParametricMatchingTemplate
+      'short_answer'    -> ParametricShortAnswerTemplate
+      'short_numeric'   -> ParametricQuestionTemplate (existing)
+      anything else     -> raises ValueError
+    """
+    routing = {
+        'mcq': ParametricMCQTemplate,
+        'fill_in_blank': ParametricFillBlankTemplate,
+        'matching': ParametricMatchingTemplate,
+        'short_answer': ParametricShortAnswerTemplate,
+        'short_numeric': ParametricQuestionTemplate,
+    }
+    cls = routing.get(question_type)
+    if cls is None:
+        raise ValueError(f"unknown question_type: {question_type!r}")
+    return cls.model_validate(data)
+
+
 # ============================================================================
 # Sampling
 # ============================================================================

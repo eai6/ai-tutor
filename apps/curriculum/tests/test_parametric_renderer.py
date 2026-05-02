@@ -15,14 +15,160 @@ import unittest
 
 from apps.curriculum.parametric_renderer import (
     ParameterSpec,
+    ParametricFillBlankTemplate,
+    ParametricMCQTemplate,
+    ParametricMatchingTemplate,
     ParametricQuestionTemplate,
+    ParametricShortAnswerTemplate,
     TemplateValidationError,
     _check_constraint,
     _compute_answer,
     _sample_parameters,
+    parse_template,
     render_template,
     validate_template,
 )
+
+
+# ============================================================================
+# P2a — schema for new template types (MCQ / fill / matching / short_answer)
+# ============================================================================
+
+
+class TestParametricMCQTemplate(unittest.TestCase):
+    def test_valid_mcq_template(self):
+        t = ParametricMCQTemplate(
+            template_text="Three angles around a point are {a}°, {b}°, and x°. What is x?",
+            parameters={
+                "a": ParameterSpec(type="int", min=30, max=150, step=5),
+                "b": ParameterSpec(type="int", min=30, max=150, step=5),
+            },
+            correct_formula="360 - a - b",
+            distractor_formulas=["a + b", "180 - a - b", "360 - a"],
+            answer_unit="°",
+            explanation_template="x = 360 - {a} - {b} = {answer}.",
+        )
+        self.assertEqual(t.correct_formula, "360 - a - b")
+        self.assertEqual(len(t.distractor_formulas), 3)
+
+    def test_two_distractors_rejected(self):
+        with self.assertRaises(Exception):
+            ParametricMCQTemplate(
+                template_text="x",
+                parameters={},
+                correct_formula="1",
+                distractor_formulas=["1", "2"],  # only 2
+                explanation_template="x",
+            )
+
+    def test_four_distractors_rejected(self):
+        with self.assertRaises(Exception):
+            ParametricMCQTemplate(
+                template_text="x",
+                parameters={},
+                correct_formula="1",
+                distractor_formulas=["1", "2", "3", "4"],  # too many
+                explanation_template="x",
+            )
+
+
+class TestParametricFillBlankTemplate(unittest.TestCase):
+    def test_valid_fill_template(self):
+        t = ParametricFillBlankTemplate(
+            template_text="Third is ___° and sum is ___°.",
+            parameters={
+                "a": ParameterSpec(type="int", min=30, max=150),
+                "b": ParameterSpec(type="int", min=30, max=150),
+            },
+            blank_formulas=["360 - a - b", "360"],
+            explanation_template="x",
+        )
+        self.assertEqual(len(t.blank_formulas), 2)
+
+    def test_zero_blanks_rejected(self):
+        with self.assertRaises(Exception):
+            ParametricFillBlankTemplate(
+                template_text="No blanks here.",
+                parameters={},
+                blank_formulas=[],
+                explanation_template="x",
+            )
+
+
+class TestParametricMatchingTemplate(unittest.TestCase):
+    def test_valid_matching_template(self):
+        t = ParametricMatchingTemplate(
+            framing_text="Match each angle pair to its sum.",
+            parameters={
+                "a": ParameterSpec(type="int", min=10, max=80),
+                "b": ParameterSpec(type="int", min=10, max=80),
+            },
+            pair_count=5,
+            left_formula="{a}° + {b}°",
+            right_formula="a + b",
+            distractor_count=2,
+            explanation_template="x",
+        )
+        self.assertEqual(t.pair_count, 5)
+        self.assertEqual(t.distractor_count, 2)
+
+    def test_pair_count_below_4_rejected(self):
+        with self.assertRaises(Exception):
+            ParametricMatchingTemplate(
+                framing_text="x", parameters={}, pair_count=3,
+                left_formula="x", right_formula="1",
+                explanation_template="x",
+            )
+
+    def test_pair_count_above_6_rejected(self):
+        with self.assertRaises(Exception):
+            ParametricMatchingTemplate(
+                framing_text="x", parameters={}, pair_count=7,
+                left_formula="x", right_formula="1",
+                explanation_template="x",
+            )
+
+
+class TestParametricShortAnswerTemplate(unittest.TestCase):
+    def test_valid_short_answer_template(self):
+        t = ParametricShortAnswerTemplate(
+            template_text="Three angles are {a}°, {b}°, x°.",
+            parameters={
+                "a": ParameterSpec(type="int", min=30, max=150),
+                "b": ParameterSpec(type="int", min=30, max=150),
+            },
+            final_answer_formula="360 - a - b",
+            canonical_working="Step 1: Sum to 360. Step 2: x = 360 - {a} - {b} = {answer}.",
+            answer_unit="°",
+        )
+        self.assertEqual(t.final_answer_formula, "360 - a - b")
+        # Two-field design: canonical_working is the LLM-review reference
+        self.assertIn("Step 1", t.canonical_working)
+
+
+class TestParseTemplateDispatch(unittest.TestCase):
+    def test_routes_to_mcq(self):
+        t = parse_template("mcq", {
+            "template_text": "x",
+            "parameters": {},
+            "correct_formula": "1",
+            "distractor_formulas": ["2", "3", "4"],
+            "explanation_template": "x",
+        })
+        self.assertIsInstance(t, ParametricMCQTemplate)
+
+    def test_routes_to_short_numeric_existing_class(self):
+        t = parse_template("short_numeric", {
+            "template_text": "x = {a}",
+            "parameters": {"a": {"type": "int", "min": 1, "max": 10}},
+            "answer_formula": "a",
+            "explanation_template": "x = {answer}",
+        })
+        self.assertIsInstance(t, ParametricQuestionTemplate)
+
+    def test_unknown_question_type_raises(self):
+        with self.assertRaises(ValueError):
+            parse_template("totally_made_up", {})
 
 
 # Reusable: the canonical "sum to 360°" template.
