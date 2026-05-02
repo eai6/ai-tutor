@@ -1485,6 +1485,19 @@ Keep it to 2-3 sentences."""
         # Get curriculum context from knowledge base
         kb_context = self._get_knowledge_context(student_input)
 
+        # P3 — deterministic grading for bank-pulled questions. If the
+        # PREVIOUS tutor turn rendered a bank question, fetch it and
+        # grade the student's reply against the bank's stored answer.
+        # The verdict is injected into the prompt as an
+        # <evaluation_signal> block so the LLM cannot disagree with
+        # the bank. See memory/curriculum_tutor_v2_plan.md item 5
+        # (the platform-wide rule).
+        self._pending_bank_grade = None
+        try:
+            self._grade_against_last_bank_question(student_input)
+        except Exception as e:
+            logger.warning(f"[BankGrade] grade attempt crashed: {e}")
+
         # Deterministic math check BEFORE response generation (Layer 1 + 2 of
         # math-tutor false-positive fix). When the expected answer is numeric
         # and the student's reply parses as a number, we compute correctness
@@ -1599,6 +1612,11 @@ Keep it to 2-3 sentences."""
             rendered = render_question_to_prose(picked_question)
             if rendered:
                 clean_response = (clean_response.rstrip() + "\n\n" + rendered).strip()
+            # Record the bank-pull on turn metadata so the NEXT
+            # respond() call can grade the student's reply against
+            # the bank's stored answer (P3 — deterministic grading
+            # for bank questions).
+            self._record_bank_question_on_turn(turn_metadata, picked_question)
 
         # Verify calculations in math responses
         if self.lesson.unit.course.is_math:
@@ -1904,6 +1922,8 @@ Keep it to 2-3 sentences."""
             rendered = render_question_to_prose(picked_question)
             if rendered:
                 clean_content = (clean_content.rstrip() + "\n\n" + rendered).strip()
+            # Record bank-pull (streaming parity with respond()).
+            self._record_bank_question_on_turn(turn_metadata, picked_question)
 
         # Verify calculations in math responses
         if self.lesson.unit.course.is_math:
@@ -3464,7 +3484,17 @@ Follow the current step; this concept will be covered in sequence."""
                 bare_answer=bare,
                 bare_answer_count_for_step=bare_count,
             )
-        elif getattr(self, '_pending_bare_answer', False):
+
+        # P3 — bank grading verdict. When the previous turn rendered a
+        # bank question, the deterministic grader has already judged
+        # the student's reply. This block is the signal the LLM reads
+        # to decide what to say. The platform-wide rule is enforced
+        # here: the LLM is told the verdict, not asked for one.
+        bank_grade = getattr(self, '_pending_bank_grade', None)
+        if bank_grade is not None and bank_grade.is_correct is not None:
+            system_prompt += self._build_bank_grade_signal_block(bank_grade)
+
+        if pending_check is None and getattr(self, '_pending_bare_answer', False):
             # Bare numeric answer on a math practice/quiz step but no
             # expected_answer to check against (i.e. the tutor invented
             # an interim arithmetic question on the fly). Without this
@@ -3937,6 +3967,78 @@ Follow the current step; this concept will be covered in sequence."""
             if qt:
                 stems.append(qt.strip())
         return stems
+
+    def _record_bank_question_on_turn(self, turn_metadata: Dict, entry) -> None:
+        """When a tutor turn renders a bank question, write the entry's
+        identity onto turn_metadata so the NEXT respond() call can
+        grade the student's reply against the bank's stored answer.
+
+        Uses {kind, id, question_type} so the grader doesn't need the
+        Pydantic id_map (which only lives in memory for the current turn).
+        """
+        if entry is None:
+            return
+        # LessonStep — slot 0 in the bank block. Graded against
+        # LessonStep.expected_answer via the existing
+        # _deterministic_math_check; we still record it for forensics.
+        if hasattr(entry, 'teacher_script'):
+            turn_metadata['bank_question_ref'] = {
+                'kind': 'lesson_step',
+                'id': entry.id,
+                'question_type': 'short_numeric',
+            }
+            return
+        # ExitTicketQuestion — bank slots 1..N
+        turn_metadata['bank_question_ref'] = {
+            'kind': 'exit_ticket_question',
+            'id': entry.id,
+            'question_type': getattr(entry, 'question_type', 'mcq') or 'mcq',
+        }
+
+    def _grade_against_last_bank_question(self, student_input: str):
+        """If the most recent tutor turn rendered a bank question, run
+        the deterministic grader (apps.tutoring.bank_grader) on the
+        student's reply. Sets self._pending_bank_grade for the
+        upcoming LLM call's evaluation_signal block.
+
+        Returns the BankGradeResult, or None when no bank question was
+        in flight or grading was skipped.
+        """
+        from apps.tutoring.models import SessionTurn
+        last_tutor_turn = (
+            SessionTurn.objects
+            .filter(session=self.session, role='tutor')
+            .order_by('-created_at')
+            .first()
+        )
+        if last_tutor_turn is None:
+            return None
+        ref = (last_tutor_turn.metadata or {}).get('bank_question_ref') or {}
+        kind = ref.get('kind')
+        ref_id = ref.get('id')
+        if not kind or not ref_id:
+            return None
+
+        # Resolve the question record.
+        question = None
+        if kind == 'lesson_step':
+            from apps.curriculum.models import LessonStep
+            question = LessonStep.objects.filter(id=ref_id).first()
+        elif kind == 'exit_ticket_question':
+            from apps.tutoring.models import ExitTicketQuestion
+            question = ExitTicketQuestion.objects.filter(id=ref_id).first()
+        if question is None:
+            return None
+
+        from apps.tutoring.bank_grader import grade_bank_response
+        result = grade_bank_response(question, student_input)
+        self._pending_bank_grade = result
+        logger.info(
+            "[BankGrade] session=%s ref=%s:%s is_correct=%s expected=%r student=%r",
+            self.session.id, kind, ref_id,
+            result.is_correct, result.expected, result.student_parsed,
+        )
+        return result
 
     # =========================================================================
     # CONTEXT HELPERS
@@ -4461,6 +4563,41 @@ Follow the current step; this concept will be covered in sequence."""
             "\n</evaluation_signal>"
         )
         return block
+
+    def _build_bank_grade_signal_block(self, grade) -> str:
+        """Render the <bank_evaluation_signal> block when the previous
+        turn rendered a bank question and the deterministic grader
+        produced a verdict. Tells the LLM the verdict and forbids it
+        from disagreeing — platform-wide rule (LLM never calculates).
+        """
+        verdict = "CORRECT" if grade.is_correct else "INCORRECT"
+        if grade.is_correct:
+            guidance = (
+                "The bank's stored answer matches the student's response. "
+                "Confirm correctness briefly, then move forward — either "
+                "advance to the next step OR pose the next bank question. "
+                "Do NOT re-derive the answer yourself; the bank says it's "
+                "right, and the bank is the source of truth."
+            )
+        else:
+            guidance = (
+                "The student's response does NOT match the bank's stored "
+                "answer. You MUST NOT say 'correct', 'right', 'exactly', "
+                "or any equivalent praise. Do not state the correct answer "
+                "yet — first ask the student to walk through their working, "
+                "then use the bank's stored explanation as the canonical "
+                "scaffolding for re-teaching. The bank is the source of "
+                "truth; do NOT re-derive or second-guess the verdict."
+            )
+        return (
+            "\n\n<bank_evaluation_signal>"
+            f"\nStudent's response (parsed): {grade.student_parsed!r}"
+            f"\nExpected (from the bank): {grade.expected!r}"
+            f"\nVerdict: {verdict}"
+            f"\nDetail: {grade.detail}"
+            f"\n{guidance}"
+            "\n</bank_evaluation_signal>"
+        )
 
     def _build_bare_answer_only_block(
         self,
