@@ -1782,8 +1782,8 @@ Keep it to 2-3 sentences."""
             self.conversation.append({"role": "assistant", "content": clean_response})
             return self._handle_exit_ticket()
 
-        # Remediation safety valve: force exit ticket after 15 remediation exchanges
-        if getattr(self, 'is_remediation', False) and self.exchange_count >= 15:
+        # Remediation safety valve: force exit ticket after 30 remediation exchanges
+        if getattr(self, 'is_remediation', False) and self.exchange_count >= 30:
             self.session_state = SessionState.EXIT_TICKET
             self._save_state()
             self._save_turn("tutor", clean_response, metadata=turn_metadata)
@@ -2024,7 +2024,7 @@ Keep it to 2-3 sentences."""
 
         # Remediation safety valve
         if (not show_exit_ticket and getattr(self, 'is_remediation', False)
-                and self.exchange_count >= 15):
+                and self.exchange_count >= 30):
             self.session_state = SessionState.EXIT_TICKET
             show_exit_ticket = True
 
@@ -4695,8 +4695,8 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         # At least 3 exchanges per failed EO, hard floor of 6 — prevents premature re-quiz
         min_exchanges = max(6, n_failed * 3)
 
-        # Safety valve: max 15 exchanges in remediation
-        if self.exchange_count >= 15:
+        # Safety valve: max 30 exchanges in remediation
+        if self.exchange_count >= 30:
             logger.info(f"[Remediation] Safety valve fired at {self.exchange_count} exchanges")
             return True
 
@@ -5185,11 +5185,17 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         Safety valves (hard rules, not LLM):
         | Rule                  | Threshold                                        |
         |-----------------------|--------------------------------------------------|
-        | Hard cap (any step)   | 8 exchanges -> force advance                     |
+        | Hard cap (any step)   | 30 exchanges -> force advance                    |
         | Min exchanges before  | teach/worked_example: 2, practice/quiz/summary: 1 |
         | Practice fast-path    | correct answer -> immediate advance               |
-        | Practice attempt cap  | max_attempts + 2 exchanges -> force advance       |
-        | Evaluator failure     | Fall back to exchange-count rules                 |
+
+        Philosophy (2026-05-01): the tutor's job is to help the student
+        gain the sub-competency, not to march through steps. ONE cap
+        applies to every step type — 30 exchanges. The per-practice
+        attempt cap and the per-step-type fallback rules were both
+        REMOVED because they fired earlier than the hard cap and
+        forced advancement when students were still working.
+        Correctness is still the fast path out of any step.
         """
         if self.current_topic_index >= len(self.steps):
             return False
@@ -5198,8 +5204,11 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         step_type = step.step_type or 'teach'
         exchanges = self.step_exchange_count
 
-        # 1. Hard cap: always advance after 6 exchanges on any step
-        if exchanges >= 6:
+        # 1. Hard cap: always advance after 30 exchanges on any step.
+        # Single, generous cap — keeps the tutor with a student who's
+        # genuinely working through the sub-competency, while still
+        # preventing a session from getting permanently stuck.
+        if exchanges >= 30:
             logger.info(f"Hard cap: advancing step {self.current_topic_index} after {exchanges} exchanges")
             return True
 
@@ -5213,28 +5222,24 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
             logger.info(f"Practice fast-path: correct answer on step {self.current_topic_index}")
             return True
 
-        # 4. Practice attempt cap
-        if step_type in ('practice', 'quiz'):
-            max_attempts = getattr(step, 'max_attempts', 3) or 3
-            if exchanges >= max_attempts + 1:
-                logger.info(f"Practice attempt cap: advancing step {self.current_topic_index} after {exchanges} exchanges")
-                return True
-
         # 5. Use pre-computed eval result or call LLM evaluator
         if eval_result is None:
             eval_result = self._evaluate_step(student_input, tutor_response)
         if eval_result is not None:
             return eval_result.step_complete
 
-        # 6. Fallback to exchange-count rules if evaluator fails
-        logger.info(f"Evaluator fallback for step {self.current_topic_index} ({step_type})")
-        if step_type in ('teach', 'worked_example'):
-            return exchanges >= 3
-        if step_type in ('practice', 'quiz'):
-            return is_correct or exchanges >= 4
-        if step_type == 'summary':
-            return exchanges >= 1
-        return exchanges >= 2
+        # 6. Evaluator failed (network / parse error). Don't force
+        # advancement — wait for the 30-exchange hard cap above
+        # OR for the evaluator to recover on the next turn.
+        # The old per-step-type fallback rules (3/4/1/2 exchanges)
+        # were removed 2026-05-01 because they fired earlier than
+        # the hard cap and contradicted the "stay until they get it"
+        # principle.
+        logger.info(
+            f"Evaluator failed for step {self.current_topic_index} "
+            f"({step_type}); deferring to hard cap"
+        )
+        return False
 
     def _keyword_concept_coverage_check(self, conversation_text: str):
         """
