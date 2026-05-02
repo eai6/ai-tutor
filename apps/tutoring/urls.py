@@ -14,6 +14,7 @@ urlpatterns = [
 
     # Chat-based AI Tutor API (active)
     path('api/chat/start/<int:lesson_id>/', views.chat_start_session, name='chat_start_session'),
+    path('api/chat/restart/<int:lesson_id>/', views.chat_restart_session, name='chat_restart_session'),
     path('api/chat/<int:session_id>/respond/', views.chat_respond, name='chat_respond'),
     path('api/chat/<int:session_id>/exit-ticket/', views.chat_exit_ticket, name='chat_exit_ticket'),
     path('api/chat/<int:session_id>/review/', views.chat_start_review, name='chat_start_review'),

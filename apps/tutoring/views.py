@@ -815,6 +815,64 @@ def chat_start_session(request, lesson_id):
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
+def chat_restart_session(request, lesson_id):
+    """Archive the student's current session for this lesson and start fresh.
+
+    Marks ANY of the student's existing sessions for this lesson
+    (Active or Completed) as ABANDONED-on-restart so the next call
+    to chat_start_session creates a brand-new session.
+
+    What's PRESERVED across restart (the user has been emphatic):
+      - StudentLessonProgress (mastery_level + best_score, monotonic)
+      - StudentCompetencyRecord (permanent transcript)
+      - StudentSkillMastery (skill graph)
+      - All ExitTicketAttempt rows (every purpose)
+      - The old TutorSession row + its SessionTurn rows (historical)
+
+    What gets reset:
+      - A NEW TutorSession is created on the next chat_start_session
+        call (engine_state={}, current_step_index=0).
+    """
+    institution = get_user_institution(request.user)
+    if institution:
+        lesson = get_object_or_404(
+            Lesson.objects.filter(
+                Q(unit__course__institution=institution)
+                | Q(unit__course__institution__isnull=True)
+            ),
+            id=lesson_id,
+            is_published=True,
+        )
+    else:
+        lesson = get_object_or_404(Lesson, id=lesson_id, is_published=True)
+
+    now = timezone.now()
+    archived = 0
+    qs = TutorSession.objects.filter(
+        student=request.user,
+        lesson=lesson,
+        status__in=[
+            TutorSession.Status.ACTIVE,
+            TutorSession.Status.COMPLETED,
+        ],
+    )
+    for sess in qs:
+        sess.status = TutorSession.Status.ABANDONED
+        if sess.ended_at is None:
+            sess.ended_at = now
+        sess.save(update_fields=['status', 'ended_at'])
+        archived += 1
+
+    return JsonResponse({
+        "restarted": True,
+        "lesson_id": lesson.id,
+        "sessions_archived": archived,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
 def chat_respond(request, session_id):
     """Handle student message in conversational tutoring (streaming SSE)."""
     from django.http import StreamingHttpResponse

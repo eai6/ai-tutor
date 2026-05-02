@@ -57,6 +57,9 @@
                 <button type="button" role="menuitem" onclick="closeHeaderMenu(); toggleAudioMode();">
                     <span class="hm-emoji" aria-hidden="true">🔊</span> Toggle audio
                 </button>
+                <button type="button" role="menuitem" onclick="closeHeaderMenu(); restartLesson();">
+                    <span class="hm-emoji" aria-hidden="true">🔄</span> Restart lesson
+                </button>
             </div>
         </div>
     </header>
@@ -2339,6 +2342,32 @@ document.addEventListener('keydown', function (e) {
 
 // ── Difficulty Signal ──
 let currentDifficultyLevel = 0;
+
+async function restartLesson() {
+    const ok = confirm(
+        "Restart this lesson?\n\n"
+        + "Your current chat will be archived and you'll start fresh from "
+        + "the beginning. Don't worry — your past scores, exit-ticket "
+        + "attempts, and overall progress are kept safe."
+    );
+    if (!ok) return;
+    try {
+        const response = await fetch(`/tutor/api/chat/restart/${lessonId}/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        });
+        if (!response.ok) {
+            alert('Could not restart the lesson. Please try again.');
+            return;
+        }
+        // Reload the page — chat_start_session will create a fresh
+        // session because the previous one was just archived.
+        window.location.reload();
+    } catch (e) {
+        console.error('Restart error:', e);
+        alert('Could not restart the lesson. Please try again.');
+    }
+}
 
 async function sendDifficultySignal(signal) {
     if (!sessionId) return;
