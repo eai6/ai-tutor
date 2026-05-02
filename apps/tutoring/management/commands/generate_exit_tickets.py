@@ -249,6 +249,49 @@ is 35; the floor is 25 — better fewer high-quality templated
 questions than free-form math the system can't verify.
 
 ═══════════════════════════════════════════════════════════════════════
+CONCEPTUAL INTEGRITY (READ BEFORE WRITING ANY QUESTION)
+═══════════════════════════════════════════════════════════════════════
+
+A question is BROKEN if its premise contradicts the lesson's core rule,
+even when the arithmetic "works out". The student is being taught the
+RULE; the question's setup must respect it.
+
+Rules of thumb:
+
+A. If the lesson states "X equals Y" as a fact (e.g., angles around a
+   point = 360°, angles on a straight line = 180°, interior angles of
+   a triangle = 180°), then EVERY problem premise must be consistent
+   with that fact. Do NOT pose "Three angles around a point are 120°,
+   130°, 140°" — that sum is 390° and violates the rule.
+
+B. NEVER ask "What is the sum of these angles?" when the lesson's
+   defining rule already gives that sum. The answer is the rule
+   itself, not arithmetic on the given values. Acceptable framings:
+   "Find the missing angle x" / "Each of N equal angles measures…" /
+   "If two angles are A and B, what is the third…".
+
+C. For templated math, ENFORCE the integrity rule in the
+   `constraints` list. Examples:
+
+   - Lesson: angles around a point.
+     Template: "Three angles around a point are {a}°, {b}°, and x°. Find x."
+     constraints MUST include: ["a + b < 360", "a > 0", "b > 0"]
+     (so a missing angle exists AND every value is positive).
+
+   - Lesson: angles around a point, equal partition.
+     Template: "{n} equal angles around a point. What is each?"
+     constraints: ["360 % n == 0"] when integer answers are required,
+     or simply ["n >= 2"] when decimals are acceptable.
+
+   - Lesson: angles on a straight line.
+     Template: "Two angles on a straight line are {a}° and x°. Find x."
+     constraints: ["a > 0", "a < 180"] (so x exists and is positive).
+
+D. If you cannot write a constraint that PROVES the premise is
+   consistent with the lesson's rule, the template is unsafe — pick
+   a different question shape.
+
+═══════════════════════════════════════════════════════════════════════
 REQUIREMENTS
 ═══════════════════════════════════════════════════════════════════════
 1. Generate up to 35 questions, ALL templated. Bank floor is 25.
@@ -264,6 +307,9 @@ REQUIREMENTS
 6. NO data_interpretation. NO figures (text-only).
 7. Diversify the templates — don't emit 35 sum-to-360 questions.
    Use the full range of patterns the lesson objective covers.
+8. Every template's `constraints` list must enforce conceptual
+   integrity (see CONCEPTUAL INTEGRITY above). A template without
+   guard constraints WILL be rejected.
 
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (single-step formula, small integers)
