@@ -37,33 +37,31 @@
 </div>
 
 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
-    <!-- Course Progress -->
+    <!-- Sessions chart -->
     <div class="card">
         <div class="card-header">
-            <h2 class="card-title">Course Progress</h2>
-            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary btn-sm">View All</a>
+            <h2 class="card-title">Sessions (Last 14 Days)</h2>
         </div>
         <div class="card-body">
-            {% if course_progress %}
-                {% for cp in course_progress %}
-                <div style="margin-bottom: 1.25rem;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                        <span style="font-weight: 500;">{{ cp.course.title }}</span>
-                        <span style="color: var(--gray-500);">{{ cp.progress }}%</span>
+            <div id="activity-chart-wrap" style="display:flex; gap:0.4rem; height:240px;">
+                <div id="activity-y-axis" style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-right:0.25rem; padding-bottom:24px; font-size:0.7rem; color:var(--gray-500); min-width:1.6rem; user-select:none;">
+                    <!-- Y-axis tick labels rendered by JS -->
+                </div>
+                <div id="activity-plot" style="position:relative; flex:1; display:flex; flex-direction:column;">
+                    <div id="activity-gridlines" style="position:absolute; inset:0 0 24px 0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none;">
+                        <!-- Horizontal gridlines rendered by JS -->
                     </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ cp.progress }}%;"></div>
+                    <div id="activity-bars" style="position:relative; flex:1; display:flex; align-items:flex-end; gap:4px; z-index:1;">
+                        <!-- Bars rendered by JS -->
+                    </div>
+                    <div id="activity-x-axis" style="display:flex; gap:4px; height:24px; padding-top:0.25rem; font-size:0.7rem; color:var(--gray-500);">
+                        <!-- Date labels rendered by JS -->
                     </div>
                 </div>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <p>No courses yet. <a href="{% url 'dashboard:curriculum_upload' %}">Upload a curriculum</a> to get started.</p>
-                </div>
-            {% endif %}
+            </div>
         </div>
     </div>
-    
+
     <!-- Recent Activity -->
     <div class="card">
         <div class="card-header">
@@ -110,54 +108,94 @@
     </div>
 </div>
 
-<!-- Activity Chart -->
-<div class="card" style="margin-top: 1.5rem;">
-    <div class="card-header">
-        <h2 class="card-title">Sessions (Last 14 Days)</h2>
-    </div>
-    <div class="card-body">
-        <div id="activity-chart" style="height: 200px; display: flex; align-items: flex-end; gap: 4px;">
-            <!-- Chart rendered by JS -->
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Simple bar chart
+    // Sessions bar chart with readable Y-axis. Computes 5 evenly-
+    // spaced ticks (0..ceil(max)) with a "nice" step so labels are
+    // round integers instead of awkward fractions, then renders
+    // matching gridlines + bar heights.
     const activityData = {{ activity_data|safe }};
-    const chart = document.getElementById('activity-chart');
-    
+
+    function niceCeil(value) {
+        // Pick the smallest "nice" upper bound >= value, where nice
+        // means {1, 2, 5} × 10^n. Keeps Y-axis ticks readable.
+        if (value <= 0) return 1;
+        const exp = Math.floor(Math.log10(value));
+        const base = Math.pow(10, exp);
+        const m = value / base;
+        let nice;
+        if (m <= 1) nice = 1;
+        else if (m <= 2) nice = 2;
+        else if (m <= 5) nice = 5;
+        else nice = 10;
+        return nice * base;
+    }
+
     if (activityData && activityData.length > 0) {
-        const maxVal = Math.max(...activityData.map(d => d.sessions), 1);
-        
+        const rawMax = Math.max(...activityData.map(d => d.sessions), 1);
+        const yMax = niceCeil(rawMax);
+        const tickCount = 5;  // 0, 25%, 50%, 75%, 100%
+        const ticks = [];
+        for (let i = tickCount - 1; i >= 0; i--) {
+            ticks.push(Math.round((yMax * i) / (tickCount - 1)));
+        }
+
+        // Y-axis labels (top → bottom, so top = max)
+        const yAxisEl = document.getElementById('activity-y-axis');
+        ticks.forEach(t => {
+            const span = document.createElement('span');
+            span.textContent = t;
+            yAxisEl.appendChild(span);
+        });
+
+        // Horizontal gridlines aligned with each tick
+        const gridEl = document.getElementById('activity-gridlines');
+        ticks.forEach((_, i) => {
+            const line = document.createElement('div');
+            line.style.borderTop = i === ticks.length - 1
+                ? '1px solid var(--gray-300)'   // x-axis baseline
+                : '1px dashed var(--gray-200)';
+            line.style.height = '0';
+            gridEl.appendChild(line);
+        });
+
+        // Bars
+        const barsEl = document.getElementById('activity-bars');
+        const xAxisEl = document.getElementById('activity-x-axis');
         activityData.forEach(d => {
-            const bar = document.createElement('div');
-            bar.style.flex = '1';
-            bar.style.display = 'flex';
-            bar.style.flexDirection = 'column';
-            bar.style.alignItems = 'center';
-            bar.style.gap = '4px';
-            
+            const barWrap = document.createElement('div');
+            barWrap.style.flex = '1';
+            barWrap.style.display = 'flex';
+            barWrap.style.flexDirection = 'column';
+            barWrap.style.justifyContent = 'flex-end';
+            barWrap.style.alignItems = 'center';
+            barWrap.style.minWidth = '0';
+
             const barFill = document.createElement('div');
+            const heightPct = (d.sessions / yMax) * 100;
             barFill.style.width = '100%';
             barFill.style.background = 'var(--primary)';
             barFill.style.borderRadius = '4px 4px 0 0';
-            barFill.style.height = Math.max((d.sessions / maxVal) * 160, 4) + 'px';
+            barFill.style.height = heightPct + '%';
+            barFill.style.minHeight = d.sessions > 0 ? '2px' : '0';
             barFill.style.transition = 'height 0.3s';
-            barFill.title = `${d.date}: ${d.sessions} sessions`;
-            
-            const label = document.createElement('div');
-            label.style.fontSize = '10px';
-            label.style.color = 'var(--gray-500)';
-            label.style.transform = 'rotate(-45deg)';
-            label.style.whiteSpace = 'nowrap';
-            label.textContent = d.date;
-            
-            bar.appendChild(barFill);
-            bar.appendChild(label);
-            chart.appendChild(bar);
+            barFill.title = `${d.date}: ${d.sessions} session${d.sessions === 1 ? '' : 's'}`;
+            barWrap.appendChild(barFill);
+            barsEl.appendChild(barWrap);
+
+            const dateLabel = document.createElement('div');
+            dateLabel.style.flex = '1';
+            dateLabel.style.textAlign = 'center';
+            dateLabel.style.minWidth = '0';
+            dateLabel.style.overflow = 'hidden';
+            dateLabel.style.whiteSpace = 'nowrap';
+            // Show only day-of-month on narrow widths; full label on hover.
+            const parts = d.date.split(' ');
+            dateLabel.textContent = parts[1] || d.date;
+            dateLabel.title = d.date;
+            xAxisEl.appendChild(dateLabel);
         });
     }
 </script>

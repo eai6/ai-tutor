@@ -281,54 +281,6 @@ def dashboard_home(request):
                 ([primary.username] if primary else []) + [u.username for u in others]
             )
 
-    # Course progress — fraction of (students_in_course_grade × lessons)
-    # cells where the student has mastered the lesson (passed the exit
-    # ticket). Each course targets a specific grade (Course.grade_level
-    # like 'S1' or 'S1,S2'); the denominator only counts students whose
-    # StudentProfile.grade_level matches one of the course's grades, so
-    # 4 pilot students in a 50-student school don't get diluted by 46
-    # off-grade students.
-    courses = filter_by_institution(
-        Course.objects.all(), institution
-    ).annotate(
-        lesson_count=Count('units__lessons'),
-        mastered_count=Count(
-            'units__lessons__student_progress',
-            filter=Q(units__lessons__student_progress__mastery_level='mastered')
-        )
-    )
-
-    # Bucket students by grade once, so we can look up cohort size per
-    # course without re-querying.
-    students_by_grade = {}
-    for sp in StudentProfile.objects.filter(user_id__in=student_ids).only('grade_level'):
-        g = (sp.grade_level or '').strip()
-        if g:
-            students_by_grade[g] = students_by_grade.get(g, 0) + 1
-
-    def cohort_size(course_grade: str) -> int:
-        """Students in any of the course's target grades. Course.grade_level
-        can be comma-separated ('S1,S2'); empty means 'all students'."""
-        course_grade = (course_grade or '').strip()
-        if not course_grade:
-            return total_students
-        grades = {g.strip() for g in course_grade.split(',') if g.strip()}
-        return sum(n for g, n in students_by_grade.items() if g in grades)
-
-    course_progress = []
-    for course in courses:
-        cohort = cohort_size(course.grade_level)
-        if course.lesson_count > 0 and cohort > 0:
-            progress_pct = round(
-                (course.mastered_count / (course.lesson_count * cohort)) * 100
-            )
-        else:
-            progress_pct = 0
-        course_progress.append({
-            'course': course,
-            'progress': min(progress_pct, 100),
-        })
-
     # Activity chart data (last 14 days)
     activity_data = []
     for i in range(14, -1, -1):
@@ -353,7 +305,6 @@ def dashboard_home(request):
         'avg_competency': avg_competency,
         'at_risk_count': at_risk_students,
         'recent_sessions': recent_sessions,
-        'course_progress': course_progress,
         'activity_data': json.dumps(activity_data),
         'progress_stats': progress_stats,
     }
