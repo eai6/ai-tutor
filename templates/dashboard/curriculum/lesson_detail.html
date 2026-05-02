@@ -209,10 +209,23 @@
                     <button type="submit" class="btn btn-secondary btn-sm">Unpublish</button>
                 </form>
                 {% endif %}
-                <form method="post" action="{% url 'dashboard:lesson_regenerate' lesson.id %}" style="display: inline;">
+                <form method="post" action="{% url 'dashboard:lesson_regenerate' lesson.id %}"
+                      style="display:inline-flex; align-items:center; gap:0.4rem; flex-wrap:wrap; background:#f5f3ff; border:1px solid #ddd6fe; padding:0.3rem 0.6rem; border-radius:8px;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-primary btn-sm" onclick="this.disabled=true; this.innerHTML='Regenerating...'; this.form.submit();">
-                        🔄 Regenerate Content
+                    <input type="hidden" name="scope_marker" value="1">
+                    <label style="font-size:0.75rem; color:#5b21b6; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
+                           title="Wipe + regenerate LessonStep rows. ~2 min. Uncheck to keep the teaching script and only refresh the exit ticket.">
+                        <input type="checkbox" name="regen_steps" value="1" checked style="accent-color:#7c3aed;">
+                        Steps
+                    </label>
+                    <label style="font-size:0.75rem; color:#5b21b6; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
+                           title="Force-replace ExitTicketQuestion rows. ~30s. Attempt history is preserved.">
+                        <input type="checkbox" name="regen_exit_tickets" value="1" checked style="accent-color:#7c3aed;">
+                        Exit ticket
+                    </label>
+                    <button type="submit" class="btn btn-primary btn-sm"
+                            onclick="this.disabled=true; this.innerHTML='Regenerating…'; this.form.submit();">
+                        🔄 Regenerate
                     </button>
                 </form>
                 {% endif %}

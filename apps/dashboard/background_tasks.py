@@ -864,6 +864,79 @@ Return ONLY the JSON array, no other text."""
         return 0
 
 
+def regenerate_lesson_exit_ticket_only(
+    lesson_id: int, institution_id: int, log_fn=None,
+):
+    """Regenerate ONLY the exit-ticket question bank for one lesson —
+    steps are preserved. Mirrors the exit-ticket-only path inside
+    generate_complete_course but scoped to a single lesson so the
+    teacher can fix a bad question bank without paying for a full
+    step regen.
+
+    Sets ``content_status='generating'`` for the duration so the
+    dashboard's per-lesson spinner + page-level banner fire, then
+    restores the prior status when done. Uses ``force_regenerate=True``
+    on ``generate_exit_ticket_for_lesson`` to do an in-place replace
+    of the questions; ``ExitTicketAttempt`` history survives because
+    the FK is to ``ExitTicket`` (not ``ExitTicketQuestion``).
+    """
+    from apps.curriculum.models import Lesson
+    from apps.curriculum.content_generator import (
+        generate_exit_ticket_for_lesson,
+    )
+
+    connection.close()
+
+    def log(msg):
+        print(f"[ExitTicketRegen] {msg}", flush=True)
+        if log_fn:
+            log_fn(msg)
+        else:
+            logger.info(msg)
+
+    try:
+        lesson = Lesson.objects.get(id=lesson_id)
+    except Lesson.DoesNotExist:
+        log(f"lesson {lesson_id} disappeared")
+        return {'success': False, 'error': 'lesson disappeared'}
+
+    prev_status = lesson.content_status
+    marked_generating = False
+    if prev_status != 'generating':
+        lesson.content_status = 'generating'
+        lesson.updated_at = timezone.now()
+        lesson.save(update_fields=['content_status', 'updated_at'])
+        marked_generating = True
+
+    log(f"🔁 {lesson.title} — exit ticket only (steps preserved)")
+    try:
+        result = generate_exit_ticket_for_lesson(
+            lesson, institution_id, force_regenerate=True,
+        )
+        ok = bool(result.get('success'))
+        if not ok:
+            log(f"   ⚠️ {lesson.title}: {result.get('error')}")
+    except Exception as e:
+        log(f"   ❌ {lesson.title}: crashed — {e}")
+        result = {'success': False, 'error': str(e)}
+        ok = False
+
+    if marked_generating:
+        try:
+            lesson.refresh_from_db()
+            if lesson.content_status == 'generating':
+                lesson.content_status = (
+                    prev_status if prev_status and prev_status != 'generating'
+                    else 'ready'
+                )
+                lesson.updated_at = timezone.now()
+                lesson.save(update_fields=['content_status', 'updated_at'])
+        except Exception:
+            pass
+
+    return {'success': ok, **(result or {})}
+
+
 def generate_complete_lesson(lesson_id: int, institution_id: int, log_fn=None):
     """
     Atomic function that generates all content for one lesson.

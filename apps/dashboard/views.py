@@ -3363,17 +3363,30 @@ def course_regenerate_all(request, course_id):
 @teacher_required
 @require_POST
 def lesson_regenerate(request, lesson_id):
-    """Regenerate full pipeline: steps, media, exit tickets, and skills.
+    """Regenerate one lesson with per-scope opt-in.
 
-    Runs the pipeline in a background thread (via run_async +
-    generate_complete_lesson) so the HTTP request returns immediately.
-    The browser used to hang waiting for 5+ minutes of image generation;
-    Azure's gateway / fetch timeout would fire as a 'stream timeout'
-    even though the underlying task was succeeding. The course detail
-    page already polls + auto-recovers stuck lessons (10-min cutoff)."""
+    POST flags (mirrors the course-level form):
+      regen_steps          — wipe + regenerate LessonStep rows
+      regen_exit_tickets   — force-replace the ExitTicketQuestion bank
+                             (attempt history preserved)
+
+    Default when neither flag is sent: regenerate everything (back-compat
+    for callers that haven't been updated yet — the per-lesson ⚡ button
+    on course_detail still posts without flags).
+
+    Exit-ticket-only is the cheap-fix path: ~30s vs ~3min for steps.
+    Used when the teacher wants to refresh the question bank without
+    paying to rebuild the teaching script. Steps stay intact.
+
+    Runs in a background thread so the HTTP request returns immediately.
+    The course detail page polls + auto-recovers stuck lessons (10-min
+    cutoff)."""
     from apps.curriculum.models import Lesson
-    from apps.tutoring.models import ExitTicket
-    from apps.dashboard.background_tasks import run_async, generate_complete_lesson
+    from apps.dashboard.background_tasks import (
+        run_async,
+        generate_complete_lesson,
+        regenerate_lesson_exit_ticket_only,
+    )
     from apps.accounts.models import Institution
 
     institution = request.staff_ctx['institution']
@@ -3383,10 +3396,8 @@ def lesson_regenerate(request, lesson_id):
         lookup['unit__course__institution'] = institution
     lesson = get_object_or_404(Lesson, **lookup)
 
-    # Guard: skip if a generation is already in flight. This is THE
-    # bug that produced "cancelled before media" + multi-spawn loops:
-    # each rapid click was wiping in-progress state and spawning a
-    # new task that pre-empted the previous.
+    # Guard: skip if a generation is already in flight. Rapid clicks
+    # used to wipe in-progress state and spawn pre-empting tasks.
     if lesson.content_status == 'generating':
         messages.info(
             request,
@@ -3395,34 +3406,71 @@ def lesson_regenerate(request, lesson_id):
         )
         return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
 
-    # Wipe partial state then spawn. Status='empty' is the signal the
-    # worker reads as "not running yet"; the worker sets 'generating'
-    # itself once it starts. Bumping updated_at is critical — the
-    # course-detail auto-recovery uses it as a "is this lesson stale?"
-    # signal, and a save with update_fields=['content_status'] alone
-    # leaves updated_at untouched (Django doesn't auto-bump auto_now
-    # fields when update_fields is specified).
-    #
-    # We DO NOT delete the ExitTicket here. Exit-ticket questions are
-    # stable assessment items — regenerating lesson steps doesn't
-    # require new questions. Keeping the ExitTicket row preserves all
-    # ExitTicketAttempt history (which CASCADEs from ExitTicket).
-    # The pipeline's `_generate_exit_ticket` skips when an existing
-    # ticket has questions, so this is naturally idempotent. If a
-    # teacher genuinely wants new exit-ticket questions, that becomes
-    # a separate explicit action.
+    # Resolve scope. The new form posts ``scope_marker=1`` so we can
+    # distinguish it from legacy callers (the per-lesson ⚡ button on
+    # course_detail still posts without flags). Legacy callers default
+    # to "regen everything"; the new form respects the checkboxes —
+    # including the "both unchecked" case, which becomes a validation
+    # error rather than silently doing the full regen.
+    has_scope_marker = bool(request.POST.get('scope_marker'))
+    if has_scope_marker:
+        regen_steps = bool(request.POST.get('regen_steps'))
+        regen_et = bool(request.POST.get('regen_exit_tickets'))
+    else:
+        regen_steps = True
+        regen_et = True
+    if not (regen_steps or regen_et):
+        messages.warning(
+            request,
+            "Pick at least one thing to regenerate (lesson steps or exit ticket).",
+        )
+        return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
+    inst = institution or lesson.unit.course.institution or Institution.get_global()
+
+    # Exit-ticket-only path — preserves steps. Cheap (~30s).
+    if regen_et and not regen_steps:
+        run_async(regenerate_lesson_exit_ticket_only, lesson.id, inst.id)
+        messages.success(
+            request,
+            f"Regenerating exit ticket for '{lesson.title}'. "
+            f"Usually ~30s — the lesson page will update automatically. "
+            f"Lesson steps and attempt history are preserved.",
+        )
+        return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
+    # Steps regen (with or without exit-ticket replace) — full pipeline.
+    # Wipe steps + bump updated_at so the course-detail auto-recovery
+    # treats this lesson as freshly running.
     lesson.steps.all().delete()
     lesson.content_status = 'empty'
     lesson.updated_at = timezone.now()
     lesson.save(update_fields=['content_status', 'updated_at'])
 
-    inst = institution or lesson.unit.course.institution or Institution.get_global()
-    run_async(generate_complete_lesson, lesson.id, inst.id)
+    # When exit ticket is ALSO requested, do the in-place replace AFTER
+    # the steps pipeline finishes — the pipeline's _generate_exit_ticket
+    # has skip-if-exists semantics, so we follow up with force_regenerate.
+    # Each callee manages its own DB connection (connection.close at
+    # their entry), so the closure doesn't need to.
+    lesson_id_local = lesson.id
+    inst_id_local = inst.id
+
+    def _full_then_et():
+        generate_complete_lesson(lesson_id_local, inst_id_local)
+        regenerate_lesson_exit_ticket_only(lesson_id_local, inst_id_local)
+
+    if regen_et:
+        run_async(_full_then_et)
+        scope_msg = "lesson steps + exit ticket"
+    else:
+        run_async(generate_complete_lesson, lesson.id, inst.id)
+        scope_msg = "lesson steps (exit ticket preserved)"
 
     messages.success(
         request,
-        f"Regenerating '{lesson.title}'. This usually takes 1–3 minutes — "
-        f"the lesson page will update automatically.",
+        f"Regenerating {scope_msg} for '{lesson.title}'. "
+        f"This usually takes 1–3 minutes — the lesson page will update "
+        f"automatically.",
     )
     return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
 
