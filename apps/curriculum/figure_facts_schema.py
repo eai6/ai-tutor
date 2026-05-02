@@ -131,6 +131,17 @@ class FigureFacts(BaseModel):
             "were verified at content-gen / backfill time."
         ),
     )
+    generation_prompt: Optional[str] = Field(
+        default=None,
+        description=(
+            "Original LLM prompt used to generate this figure. Stored so "
+            "the runtime tutor can see what the figure was MEANT to "
+            "depict — extra context for scaffolding when a student asks "
+            "about something the extracted facts don't cover. Only set "
+            "for newly-generated figures; backfilled figures don't have "
+            "the original prompt available."
+        ),
+    )
 
     @field_validator("scene_description")
     @classmethod

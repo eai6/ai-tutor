@@ -214,12 +214,24 @@ def extract_figure_facts(
     return facts, None
 
 
-def extract_and_save_for_asset(asset, *, force: bool = False) -> Tuple[bool, Optional[str]]:
+def extract_and_save_for_asset(
+    asset,
+    *,
+    force: bool = False,
+    generation_prompt: Optional[str] = None,
+) -> Tuple[bool, Optional[str]]:
     """Extract `figure_facts` for a saved MediaAsset and persist it.
 
     Best-effort. Used by every code path that creates a new image
     (auto-generated images, teacher uploads, content regen) so that
     every figure entering the system arrives with facts attached.
+
+    Args:
+      generation_prompt: optional original LLM prompt used to create
+        the image. When provided, stored alongside the extracted
+        facts so the runtime tutor sees both what's IN the figure
+        and what it was MEANT to depict. See P1/item-3 of
+        memory/curriculum_tutor_v2_plan.md.
 
     Skips when:
       - asset is not an image
@@ -256,10 +268,16 @@ def extract_and_save_for_asset(asset, *, force: bool = False) -> Tuple[bool, Opt
     if err is not None or facts is None:
         return False, err or "unknown_extractor_error"
 
+    if generation_prompt:
+        # Stash the original prompt so the tutor sees the intent
+        # alongside what the extractor found IN the image.
+        facts.generation_prompt = generation_prompt[:2000]
+
     asset.figure_facts = facts.model_dump(mode="json")
     asset.save(update_fields=["figure_facts", "updated_at"])
     logger.info(
         f"[FigureFacts] saved facts for asset #{asset.id} "
-        f"(type={facts.type}, features={len(facts.labelled_features)})"
+        f"(type={facts.type}, features={len(facts.labelled_features)}"
+        f"{', prompt-attached' if generation_prompt else ''})"
     )
     return True, None

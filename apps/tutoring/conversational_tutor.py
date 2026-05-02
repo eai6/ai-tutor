@@ -3759,6 +3759,9 @@ Follow the current step; this concept will be covered in sequence."""
             if not isinstance(facts, dict):
                 continue
             block = [f"\n<figure_facts source=\"{asset.title[:80]}\">"]
+            gen_prompt = (facts.get('generation_prompt') or '').strip()
+            if gen_prompt:
+                block.append(f"  Original generation prompt: {gen_prompt[:280]}")
             scene = (facts.get('scene_description') or '').strip()
             if scene:
                 block.append(f"  Scene: {scene}")

@@ -514,7 +514,10 @@ class ImageGenerationService:
                 from apps.curriculum.figure_facts_extractor import (
                     extract_and_save_for_asset,
                 )
-                saved, ff_err = extract_and_save_for_asset(asset)
+                saved, ff_err = extract_and_save_for_asset(
+                    asset,
+                    generation_prompt=prompt,
+                )
                 if not saved and ff_err and ff_err != "already_has_facts":
                     logger.info(
                         f"[FigureFacts] skip asset #{asset.id}: {ff_err}"

@@ -1556,6 +1556,41 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None, force_re
     if existing and existing.questions.exists() and not force_regenerate:
         return {'success': True, 'skipped': True, 'questions_created': 0}
 
+    # P1 (item 1) — EO attachment parity. If the lesson has no
+    # enabling_objectives populated, run the same expansion the step
+    # generation pipeline runs. Without this, the exit-ticket prompt
+    # has no canonical EOs to copy from and the post-hoc normaliser
+    # has nothing to snap against — every emission gets dropped and
+    # remediation can only target the broad learning objective.
+    # See memory/curriculum_tutor_v2_plan.md.
+    eos_before = len(lesson.enabling_objectives or [])
+    if eos_before == 0:
+        try:
+            generator = LessonContentGenerator(institution_id=institution_id)
+            unit = lesson.unit
+            course = unit.course if unit else None
+            curriculum_context = {
+                'subject': course.title if course else '',
+                'grade_level': course.grade_level if course else '',
+                'terminal_objectives': list(unit.terminal_objectives or []) if unit else [],
+                'lesson_title': lesson.title,
+                'lesson_objective': lesson.objective or '',
+            }
+            generator._expand_to_granular_subskills(lesson, curriculum_context)
+            lesson.refresh_from_db()
+            eos_after = len(lesson.enabling_objectives or [])
+            print(
+                f"[ContentGen] [{lesson.title}] EO attachment parity — "
+                f"expanded {eos_before} → {eos_after} enabling objectives",
+                flush=True,
+            )
+        except Exception as e:
+            logger.warning(
+                f"[{lesson.title}] EO expansion before exit-ticket regen "
+                f"failed: {e}. Continuing — questions will be tagged with "
+                f"concept_tag only."
+            )
+
     # Get LLM client
     model_config = ModelConfig.get_for('exit_tickets') or ModelConfig.get_for('tutoring')
     if not model_config:

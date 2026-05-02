@@ -391,6 +391,40 @@ class FigureFactsBlockTest(TestCase):
         self.assertIn('PREFER ANCHOR PROMPTS', block)
         self.assertIn('HONEST UNCERTAINTY', block)
 
+    def test_block_renders_generation_prompt_when_present(self):
+        """The optional generation_prompt should appear in the block
+        when set, giving the tutor context about what the figure was
+        meant to depict (not just what's in it)."""
+        prompted_asset = MediaAsset(
+            institution=self.institution,
+            title='prompted-figure.png',
+            asset_type=MediaAsset.AssetType.IMAGE,
+            figure_facts={
+                'type': 'parallel_lines_with_transversal',
+                'scene_description': 'Two parallel lines cut by a transversal.',
+                'labelled_features': [],
+                'angle_relationships': [],
+                'extra_facts': [],
+                'anchor_prompts': [],
+                'generation_prompt': 'A schematic geometry diagram showing two horizontal parallel lines crossed by a diagonal transversal, with all 8 angles labelled 1 through 8.',
+            },
+        )
+        prompted_asset.file.name = 'test/prompted-figure.png'
+        prompted_asset.save()
+        bare_step = LessonStep.objects.create(
+            lesson=self.lesson, phase='explore', step_type='explore',
+            order_index=77,
+            teacher_script="t", expected_answer="",
+            media={'images': [{'url': '/media/test/prompted-figure.png',
+                               'alt': 'x', 'caption': 'x'}]},
+        )
+        tutor = self._make_tutor(self.lesson, [bare_step])
+        block = tutor._build_figure_facts_block()
+        self.assertIn("Original generation prompt:", block)
+        self.assertIn("schematic geometry diagram", block)
+        # Scene still rendered alongside the prompt
+        self.assertIn("Two parallel lines cut by a transversal", block)
+
     def test_block_skips_assets_without_figure_facts(self):
         # New asset, same URL, but figure_facts=None — no block
         no_facts_asset = MediaAsset(
