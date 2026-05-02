@@ -1798,9 +1798,9 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
         templated_count = 0
         if is_math_lesson_l4:
             from apps.curriculum.parametric_renderer import (
-                ParametricQuestionTemplate,
-                render_template,
-                validate_template,
+                parse_template,
+                render_typed,
+                validate_template_typed,
             )
             kept = []
             for i, q in enumerate(questions):
@@ -1821,45 +1821,56 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                     })
                     continue
 
-                # Schema validation (pydantic). Catches malformed
-                # template_text, bad parameter specs, etc.
+                # Resolve the template TYPE from the question's
+                # question_type field. Defaults to 'short_numeric'
+                # for backward compat with templates the LLM emits
+                # without an explicit question_type.
+                q_type = (q.get('question_type') or 'short_numeric').strip()
+
+                # Schema validation (pydantic) via parse_template —
+                # routes by question_type to the right model class.
                 try:
-                    tmpl = ParametricQuestionTemplate.model_validate(tmpl_data)
+                    tmpl = parse_template(q_type, tmpl_data)
                 except Exception as e:
                     layer4_rejections.append({
                         'question_index': i,
                         'reason': 'schema_invalid',
-                        'message': f'Template schema invalid: {e}',
+                        'message': f'Template schema invalid for {q_type!r}: {e}',
                         'question_text': (q.get('question') or '')[:120],
                     })
                     continue
 
                 # Behavior validation: sample N parameter sets, run
-                # the formula, confirm slots fill cleanly. Catches
-                # constraint contradictions, broken formulas, NaN
-                # answers, missing slots.
-                err = validate_template(tmpl, n_samples=10)
+                # the formula(s), confirm slots fill cleanly + type-
+                # specific invariants (distractor uniqueness for MCQ,
+                # blank-count match for fill, pair-count achievable
+                # for matching, etc.).
+                err = validate_template_typed(tmpl, n_samples=10)
                 if err is not None:
                     layer4_rejections.append({
                         'question_index': i,
                         'reason': err.kind,
                         'message': err.message,
                         'sample_params': err.sample_params,
-                        'question_text': (q.get('question') or tmpl.template_text)[:120],
+                        'question_text': (
+                            q.get('question')
+                            or getattr(tmpl, 'template_text', '')
+                            or getattr(tmpl, 'framing_text', '')
+                        )[:120],
                     })
                     continue
 
                 # Render a concrete instance (deterministic seed
                 # based on lesson + position so retake re-renders
                 # use a different seed).
-                rendered = render_template(tmpl, seed=lesson.id * 1000 + i)
+                rendered = render_typed(q_type, tmpl, seed=lesson.id * 1000 + i)
                 if rendered is None:
                     layer4_rejections.append({
                         'question_index': i,
                         'reason': 'render_failed',
                         'message': (
-                            'render_template returned None despite '
-                            'passing validate_template — sampling or '
+                            f'render_typed({q_type!r}) returned None despite '
+                            'passing validate_template_typed — sampling or '
                             'formula edge case'
                         ),
                         'question_text': (q.get('question') or '')[:120],
@@ -1874,8 +1885,6 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                     'enabling_objective', 'difficulty', 'source',
                 )
                 preserved = {k: q[k] for k in preserve_keys if q.get(k)}
-                if q.get('question_type') and q['question_type'] != 'short_numeric':
-                    preserved['question_type'] = q['question_type']
                 q.clear()
                 q.update(rendered)
                 q.update(preserved)
@@ -1905,9 +1914,9 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
             and layer4_rejections
         ):
             from apps.curriculum.parametric_renderer import (
-                ParametricQuestionTemplate,
-                render_template,
-                validate_template,
+                parse_template,
+                render_typed,
+                validate_template_typed,
             )
             shortfall = BANK_TARGET - len(questions)
             print(
@@ -1966,27 +1975,33 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                             'question_text': (rq.get('question') or '')[:120],
                         })
                         continue
+                    rq_type = (rq.get('question_type') or 'short_numeric').strip()
                     try:
-                        tmpl = ParametricQuestionTemplate.model_validate(tmpl_data)
+                        tmpl = parse_template(rq_type, tmpl_data)
                     except Exception as e:
                         layer4_rejections.append({
                             'question_index': len(questions) + j,
                             'reason': 'schema_invalid_after_retry',
-                            'message': f'{e}',
+                            'message': f'{rq_type}: {e}',
                             'question_text': (rq.get('question') or '')[:120],
                         })
                         continue
-                    err = validate_template(tmpl, n_samples=10)
+                    err = validate_template_typed(tmpl, n_samples=10)
                     if err is not None:
                         layer4_rejections.append({
                             'question_index': len(questions) + j,
                             'reason': f'{err.kind}_after_retry',
                             'message': err.message,
-                            'question_text': (rq.get('question') or tmpl.template_text)[:120],
+                            'question_text': (
+                                rq.get('question')
+                                or getattr(tmpl, 'template_text', '')
+                                or getattr(tmpl, 'framing_text', '')
+                            )[:120],
                         })
                         continue
-                    rendered = render_template(
-                        tmpl, seed=lesson.id * 1000 + len(questions) + j,
+                    rendered = render_typed(
+                        rq_type, tmpl,
+                        seed=lesson.id * 1000 + len(questions) + j,
                     )
                     if rendered is None:
                         continue
@@ -2196,14 +2211,24 @@ Every enabling objective must be assessed by at least 1 question. Distribute que
                     objective_data['terminal_objective'] = q['terminal_objective']
 
                 if q_type == 'mcq':
+                    # MCQ. For Layer 4 templated MCQ, render_mcq has
+                    # already populated option_a/b/c/d + correct_answer
+                    # (the letter). For free-form (non-math, no template)
+                    # MCQ, the LLM emitted q['correct'] which we map to
+                    # correct_answer.
                     kwargs.update({
                         'option_a': q.get('option_a', ''),
                         'option_b': q.get('option_b', ''),
                         'option_c': q.get('option_c', ''),
                         'option_d': q.get('option_d', ''),
-                        'correct_answer': q.get('correct', ''),
+                        'correct_answer': q.get('correct_answer') or q.get('correct') or '',
                     })
-                    mcq_data = {}
+                    # answer_data carries source HTML, objective linkage,
+                    # and (for templated) the full computed payload from
+                    # the renderer (parameters, computed value, etc.).
+                    mcq_data = q.get('answer_data') or {}
+                    if not isinstance(mcq_data, dict):
+                        mcq_data = {}
                     if q.get('source'):
                         mcq_data['source'] = q['source']
                     mcq_data.update(objective_data)

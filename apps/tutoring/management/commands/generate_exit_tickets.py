@@ -142,12 +142,105 @@ WORKED EXAMPLES (5 patterns covering different shapes)
   }}}}
 
 ═══════════════════════════════════════════════════════════════════════
-QUESTION TYPE FIELD
+ADDITIONAL TEMPLATE TYPES (MCQ / fill_in_blank / matching / short_answer)
 ═══════════════════════════════════════════════════════════════════════
 
-Templated math questions use `question_type: "short_numeric"`. The
-backend renders them as fill-in-blank-style at runtime: the student
-types the numeric answer, the grader compares to the computed value.
+Beyond `short_numeric`, four more templated formats are available.
+EACH is fully computable — the backend renders the prose AND
+computes the correct answer from your formula(s). Pick whichever
+format best fits the question pattern.
+
+6) MCQ — templated multiple choice (4 options, 1 correct, 3 distractors)
+{{"question_type": "mcq", "concept_tag": "broad learning objective", "enabling_objective": "EXACT EO TEXT", "difficulty": "easy",
+  "template": {{
+    "template_text": "Three angles around a point are {{a}}°, {{b}}°, and x°. What is x?",
+    "parameters": {{
+      "a": {{"type": "int", "min": 30, "max": 150, "step": 5}},
+      "b": {{"type": "int", "min": 30, "max": 150, "step": 5}}
+    }},
+    "correct_formula": "360 - a - b",
+    "distractor_formulas": ["a + b - 90", "180 - a + b", "a * 2 + b"],
+    "answer_unit": "°",
+    "explanation_template": "x = 360 - {{a}} - {{b}} = {{answer}}.",
+    "constraints": ["a + b < 350"]
+  }}}}
+
+  Distractor formulas MUST yield values DIFFERENT from
+  correct_formula across all parameter samples (the validator
+  rejects "plausible" distractors that secretly equal the correct
+  answer for some sample). The backend randomises which letter
+  (A/B/C/D) the correct answer lands at per render.
+
+7) FILL_IN_BLANK — one or more `___` slots, each with its own formula
+{{"question_type": "fill_in_blank", "concept_tag": "broad learning objective", "enabling_objective": "EXACT EO TEXT", "difficulty": "medium",
+  "template": {{
+    "template_text": "Two angles around a point are {{a}}° and {{b}}°. The third angle is ___° and the sum of all three angles is ___°.",
+    "parameters": {{
+      "a": {{"type": "int", "min": 30, "max": 150, "step": 5}},
+      "b": {{"type": "int", "min": 30, "max": 150, "step": 5}}
+    }},
+    "blank_formulas": ["360 - a - b", "360"],
+    "answer_unit": "°",
+    "explanation_template": "Third angle = 360° - {{a}}° - {{b}}° = {{answer}}.",
+    "constraints": ["a + b < 350"]
+  }}}}
+
+  Number of `___` in template_text MUST equal len(blank_formulas).
+
+8) MATCHING — N pairs (left ↔ right) sampled from one formula pair
+{{"question_type": "matching", "concept_tag": "broad learning objective", "enabling_objective": "EXACT EO TEXT", "difficulty": "medium",
+  "template": {{
+    "framing_text": "Match each angle pair to its sum.",
+    "parameters": {{
+      "a": {{"type": "int", "min": 10, "max": 80, "step": 5}},
+      "b": {{"type": "int", "min": 10, "max": 80, "step": 5}}
+    }},
+    "pair_count": 4,
+    "left_formula": "{{a}}° + {{b}}°",
+    "right_formula": "a + b",
+    "answer_unit": "°",
+    "distractor_count": 2,
+    "explanation_template": "Each right is the sum of the two angles on its left."
+  }}}}
+
+  pair_count is 4-6. left_formula is a STRING template (uses
+  {{param}} substitution); right_formula is ARITHMETIC. The
+  backend samples N times to produce distinct pairs + extra
+  distractor right-side options.
+
+9) SHORT_ANSWER — two-field: deterministic final answer + LLM-reviewed working
+{{"question_type": "short_answer", "concept_tag": "broad learning objective", "enabling_objective": "EXACT EO TEXT", "difficulty": "hard",
+  "template": {{
+    "template_text": "Three angles around a point are {{a}}°, {{b}}°, and x°. Find x and show your working.",
+    "parameters": {{
+      "a": {{"type": "int", "min": 30, "max": 150, "step": 5}},
+      "b": {{"type": "int", "min": 30, "max": 150, "step": 5}}
+    }},
+    "final_answer_formula": "360 - a - b",
+    "canonical_working": "Step 1: Angles around a point sum to 360°. Step 2: x = 360° - {{a}}° - {{b}}° = {{answer}}.",
+    "answer_unit": "°",
+    "constraints": ["a + b < 350"]
+  }}}}
+
+  The student fills TWO boxes: a final-answer box (graded
+  deterministically vs final_answer_formula) and a working box
+  (LLM-reviewed against canonical_working — the LLM compares the
+  student's prose against your reference text, never authoring its
+  own answer).
+
+═══════════════════════════════════════════════════════════════════════
+QUESTION TYPE FIELD + FORMAT MIX
+═══════════════════════════════════════════════════════════════════════
+
+Locked format mix for math exit tickets (35 total):
+  - 15 MCQ              (question_type: "mcq")
+  - 7  fill_in_blank    (question_type: "fill_in_blank")
+  - 6  matching         (question_type: "matching")
+  - 7  short_numeric    (question_type: "short_numeric")
+
+Note: short_answer is OPTIONAL — use it sparingly when a question
+genuinely benefits from showing working AND the canonical_working
+is precise enough for the LLM to compare against.
 
 If a question genuinely cannot be templated (e.g., qualitative
 reasoning, proof, multi-step word problem with branching), it is
@@ -159,6 +252,7 @@ questions than free-form math the system can't verify.
 REQUIREMENTS
 ═══════════════════════════════════════════════════════════════════════
 1. Generate up to 35 questions, ALL templated. Bank floor is 25.
+   Format mix: 15 MCQ / 7 fill_in_blank / 6 matching / 7 short_numeric.
 2. Each question MUST have BOTH:
    - concept_tag: broad learning objective (the lesson's main objective)
    - enabling_objective: EXACT TEXT of one ENABLING OBJECTIVE from below
