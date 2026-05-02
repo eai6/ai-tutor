@@ -1462,6 +1462,7 @@ body {
 {% endif %}
 <script>
 const lessonId = {{ lesson.id }};
+const IS_MATH_LESSON = {% if is_math_lesson %}true{% else %}false{% endif %};
 let sessionId = null;
 let exitTicketData = null;
 let exitAnswers = {};
@@ -2095,6 +2096,31 @@ function renderProbeWidget(probe) {
                 submit.click();
             }
         });
+        // Math symbol toolbar above the input on math lessons —
+        // students need °, π, √, etc. for many quick-check answers.
+        if (IS_MATH_LESSON) {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'probe-math-toolbar';
+            toolbar.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.25rem;margin-bottom:0.4rem;';
+            ['°','π','√','²','³','±','≤','≥','≠','×','÷','½','¼','¾','θ'].forEach(sym => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = sym;
+                btn.style.cssText = 'font-size:0.9rem;padding:0.18rem 0.5rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;';
+                btn.addEventListener('click', () => {
+                    if (locked) return;
+                    const start = input.selectionStart || 0;
+                    const end = input.selectionEnd || 0;
+                    input.value = input.value.slice(0, start) + sym + input.value.slice(end);
+                    const caret = start + sym.length;
+                    input.focus();
+                    input.setSelectionRange(caret, caret);
+                    selected = input.value;
+                });
+                toolbar.appendChild(btn);
+            });
+            wrap.appendChild(toolbar);
+        }
         wrap.appendChild(input);
     }
 
@@ -2509,11 +2535,15 @@ function showExitTicket() {
         <div class="exit-progress-bar"><div class="exit-progress-fill" id="exit-progress-fill" style="width:0%"></div></div>
     </div>`;
 
-    // Group questions by section (keep original flat index for grading)
+    // Group questions by section (keep original flat index for grading).
+    // short_numeric (Layer 4 templated math questions) shares the
+    // 'written' bucket — same render branch (text input + math
+    // toolbar), same answer-collection helper.
     const buckets = { mcq: [], fill_in_blank: [], matching: [], written: [] };
+    const WRITTEN_TYPES = new Set(['short_answer', 'data_interpretation', 'short_numeric']);
     exitTicketData.questions.forEach((q, origIdx) => {
         const qType = q.question_type || 'mcq';
-        const bucket = (qType === 'short_answer' || qType === 'data_interpretation') ? 'written' : qType;
+        const bucket = WRITTEN_TYPES.has(qType) ? 'written' : qType;
         if (buckets[bucket]) buckets[bucket].push({ q, origIdx });
         else buckets.mcq.push({ q, origIdx }); // fallback
     });
@@ -2594,7 +2624,7 @@ function showExitTicket() {
                         </div>
                     `).join('')}
                 </div>`;
-            } else if (qType === 'short_answer' || qType === 'data_interpretation') {
+            } else if (qType === 'short_answer' || qType === 'data_interpretation' || qType === 'short_numeric') {
                 const ad = q.answer_data || {};
                 let dataDesc = '';
                 // Preferred path: server-rendered SVG from a figure_spec.
