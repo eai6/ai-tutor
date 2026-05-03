@@ -274,17 +274,17 @@ C. For templated math, ENFORCE the integrity rule in the
    `constraints` list. Examples:
 
    - Lesson: angles around a point.
-     Template: "Three angles around a point are {a}°, {b}°, and x°. Find x."
+     Template: "Three angles around a point are {{a}}°, {{b}}°, and x°. Find x."
      constraints MUST include: ["a + b < 360", "a > 0", "b > 0"]
      (so a missing angle exists AND every value is positive).
 
    - Lesson: angles around a point, equal partition.
-     Template: "{n} equal angles around a point. What is each?"
+     Template: "{{n}} equal angles around a point. What is each?"
      constraints: ["360 % n == 0"] when integer answers are required,
      or simply ["n >= 2"] when decimals are acceptable.
 
    - Lesson: angles on a straight line.
-     Template: "Two angles on a straight line are {a}° and x°. Find x."
+     Template: "Two angles on a straight line are {{a}}° and x°. Find x."
      constraints: ["a > 0", "a < 180"] (so x exists and is positive).
 
 D. If you cannot write a constraint that PROVES the premise is
@@ -299,14 +299,14 @@ The validator rejects templates that fall into the following traps.
 Reading these will save you from re-trying.
 
 P1. EXPLANATION SLOT SYNTAX. `explanation_template` slots are
-    DECLARED PARAMETER NAMES ONLY, plus the special `{answer}` slot.
+    DECLARED PARAMETER NAMES ONLY, plus the special `{{answer}}` slot.
     You may NOT put arithmetic inside slot braces.
-    ❌ "By Pythagoras: c = √({a*a} + {b*b}) = {answer}"
+    ❌ "By Pythagoras: c = √({{a*a}} + {{b*b}}) = {{answer}}"
        (rejected: 'a*a' is not a parameter)
-    ✓ "By Pythagoras: c = √({a}² + {b}²) ≈ {answer}"
-       (the ² is just a literal character; {a} and {b} reference
-       declared parameters; {answer} reads the computed value)
-    ✓ "Each interior angle = 180 × ({n} - 2) ÷ {n} = {answer}°"
+    ✓ "By Pythagoras: c = √({{a}}² + {{b}}²) ≈ {{answer}}"
+       (the ² is just a literal character; {{a}} and {{b}} reference
+       declared parameters; {{answer}} reads the computed value)
+    ✓ "Each interior angle = 180 × ({{n}} - 2) ÷ {{n}} = {{answer}}°"
        (n is a declared param; arithmetic stays OUTSIDE the braces
        as plain text)
 
@@ -315,13 +315,13 @@ P2. CONSTRAINT-RANGE CONSISTENCY. Your `constraints` list must be
     parameter values from the ranges and rejects those that violate
     the constraints; if your ranges and constraints disagree, every
     sample fails.
-    ❌ parameters: {"a": {"min": 10, "max": 50}}, constraints: ["a > 100"]
+    ❌ parameters: {{"a": {{"min": 10, "max": 50}}}}, constraints: ["a > 100"]
        (rejected: max(a)=50 makes "a > 100" unsatisfiable)
-    ❌ parameters: {"angle": {"min": 30, "max": 150}}, constraints:
+    ❌ parameters: {{"angle": {{"min": 30, "max": 150}}}}, constraints:
        ["360 % (180 - angle) == 0"]
        (rejected: only a few angles in [30,150] satisfy this — the
        sampler can't find one in 50 tries)
-    ✓ parameters: {"a": {"min": 110, "max": 170}}, constraints: ["a > 100"]
+    ✓ parameters: {{"a": {{"min": 110, "max": 170}}}}, constraints: ["a > 100"]
        (range and constraint agree)
     ✓ Use simpler constraints like ["a > 0", "a + b < 350"] over
        complex divisibility/modulo predicates that prune the
@@ -346,17 +346,17 @@ P4. CO-INTERIOR / SAME-SIDE INTERIOR ANGLES. "Two parallel lines
 
 P5. POLYGON SIDE-COUNT QUESTIONS. "Find the number of sides given
     each interior angle of θ°" only has integer solutions for
-    θ ∈ {60, 90, 108, 120, 128.57, 135, 140, 144, 147.27, 150, ...}.
+    θ ∈ {{60, 90, 108, 120, 128.57, 135, 140, 144, 147.27, 150, ...}}.
     If you sample θ ∈ [60, 170], most samples don't yield integer
     sides. Either restrict parameters to a hand-picked list (use
     "step": that lands on valid values) OR pick a different
     question shape (give n, find θ — always integer).
 
-P6. SLOT NAMES vs ANSWER LABELS. The `{answer}` slot in
+P6. SLOT NAMES vs ANSWER LABELS. The `{{answer}}` slot in
     `explanation_template` is the SINGLE computed answer (or, for
     fill_in_blank, "answer1 / answer2 / …"). Don't reference
-    `{angle}`, `{result}`, or any made-up name. Only declared
-    parameters and `{answer}`.
+    `{{angle}}`, `{{result}}`, or any made-up name. Only declared
+    parameters and `{{answer}}`.
 
 ═══════════════════════════════════════════════════════════════════════
 REQUIREMENTS

@@ -1870,25 +1870,44 @@ RULES:
    gets at least 1 question. Do NOT repeat the same EO for every question.
 """
 
-    # Use math-specific or general exit ticket prompt
+    # Use math-specific or general exit ticket prompt.
+    # ``str.format()`` failures here used to silently kill the regen
+    # (any literal "{a}" in the prompt template — added as
+    # documentation — would raise KeyError before the LLM call).
+    # Wrap in try/except + loud log so the same trap doesn't strand
+    # a regen again.
     is_math = lesson.unit.course.is_math if lesson.unit and lesson.unit.course else False
-    if is_math:
-        from apps.tutoring.management.commands.generate_exit_tickets import MATH_EXIT_TICKET_PROMPT
-        prompt = MATH_EXIT_TICKET_PROMPT.format(
-            lesson_title=lesson.title,
-            lesson_objective=lesson.objective or '',
-            subject=subject,
-            exam_context=exam_context,
-            seychelles_context=seychelles_context + objectives_context,
+    fmt_kwargs = dict(
+        lesson_title=lesson.title,
+        lesson_objective=lesson.objective or '',
+        subject=subject,
+        exam_context=exam_context,
+        seychelles_context=seychelles_context + objectives_context,
+    )
+    try:
+        if is_math:
+            from apps.tutoring.management.commands.generate_exit_tickets import MATH_EXIT_TICKET_PROMPT
+            prompt = MATH_EXIT_TICKET_PROMPT.format(**fmt_kwargs)
+        else:
+            prompt = EXIT_TICKET_PROMPT.format(**fmt_kwargs)
+        print(
+            f"[ContentGen] [{lesson.title}] exit-ticket prompt built "
+            f"({len(prompt)} chars, {'math' if is_math else 'general'})",
+            flush=True,
         )
-    else:
-        prompt = EXIT_TICKET_PROMPT.format(
-            lesson_title=lesson.title,
-            lesson_objective=lesson.objective or '',
-            subject=subject,
-            exam_context=exam_context,
-            seychelles_context=seychelles_context + objectives_context,
+    except KeyError as e:
+        # KeyError from .format() means the prompt template has a
+        # stray single-brace placeholder. Re-raise with a clearer
+        # message so the surrounding handler logs it as a real bug
+        # (vs swallowing it as a generic 'a' message).
+        msg = (
+            f"exit-ticket prompt .format() failed on key {e!r} — likely "
+            f"a documentation example with single-brace {{name}} that "
+            f"should be {{{{name}}}}. Check the most recent edits to "
+            f"MATH_EXIT_TICKET_PROMPT / EXIT_TICKET_PROMPT."
         )
+        print(f"[ContentGen] [{lesson.title}] ❌ {msg}", flush=True)
+        return {'success': False, 'error': msg}
 
     # Append real assessment format examples from worksheets/exams
     if assessment_format_context:
@@ -1909,6 +1928,11 @@ RULES:
     exit_sys_prompt = exit_sys_prompt + "\n\n" + dok_guidance_for("assessment")
 
     try:
+        print(
+            f"[ContentGen] [{lesson.title}] calling LLM for exit ticket "
+            f"({llm_client.__class__.__name__})…",
+            flush=True,
+        )
         messages = [{"role": "user", "content": prompt}]
         response = llm_client.generate(messages, system_prompt=exit_sys_prompt, max_tokens=16000)
 
@@ -1916,7 +1940,26 @@ RULES:
         questions = parse_llm_json(response.content, expect_array=True)
 
         if not questions or not isinstance(questions, list) or len(questions) < 10:
+            print(
+                f"[ContentGen] [{lesson.title}] ❌ insufficient LLM "
+                f"output: {len(questions) if questions else 0} questions "
+                f"parsed",
+                flush=True,
+            )
             return {'success': False, 'error': f'Insufficient questions: {len(questions) if questions else 0}'}
+
+        # Pre-Layer-4 type counts so the format-mix retry can attribute
+        # the LLM's first-pass distribution.
+        from collections import Counter
+        first_pass_types = Counter(
+            (q.get('question_type') or 'short_numeric').strip()
+            for q in questions[:35]
+        )
+        print(
+            f"[ContentGen] [{lesson.title}] LLM first-pass: {len(questions)} "
+            f"questions, types={dict(first_pass_types)}",
+            flush=True,
+        )
 
         questions = questions[:35]
 
