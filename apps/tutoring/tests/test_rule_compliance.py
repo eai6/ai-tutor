@@ -7,6 +7,10 @@ These tests cover:
     client (no live model calls, deterministic JSON)
   - Integration into validate_tutor_response — that violations land
     in `issues` and trigger regeneration via _REGEN_ISSUES
+  - Prompt-content regression guards — the judge prompt and bank
+    block must explicitly call out the fake-scaffolding pattern
+    ("if angles measure X°, Y°, Z° — do they sum to T?") so a
+    future prompt edit can't silently re-open the gap.
 """
 
 from unittest.mock import MagicMock
@@ -22,6 +26,8 @@ from apps.tutoring.rule_compliance import (
     RULE_RULE_1,
     RuleComplianceResult,
     RuleViolation,
+    _JUDGE_SYSTEM,
+    _has_relevant_content,
     check_rule_compliance,
 )
 from apps.tutoring.validator import (
@@ -30,6 +36,18 @@ from apps.tutoring.validator import (
     ISSUE_RULE1_VIOLATION,
     ValidationResult,
     validate_tutor_response,
+)
+
+
+# The exact transcript that was shipping past the judge before the
+# 2026-05 tightening. Drives the regression-guard tests below.
+FAKE_SCAFFOLDING_TRANSCRIPT = (
+    "Right—you've got the first piece! A full spin is 360°. Now let me "
+    "show you why this matters when angles meet at a point.\n\n"
+    "Here's the key: any angles that meet at a single point always sum "
+    "to 360°.\n\n"
+    "Let's test this: if three angles around a point measure 100°, "
+    "120°, and 80°, do they sum to 360°?"
 )
 
 
@@ -341,3 +359,171 @@ class ValidatorIntegrationTest(TestCase):
         )
         self.assertNotIn("rule_check", result.layers_run)
         self.assertNotIn(ISSUE_RULE1_VIOLATION, result.issues)
+
+
+# ============================================================================
+# Regression guards for the 2026-05 fake-scaffolding fix
+# ============================================================================
+#
+# The transcript "if three angles around a point measure 100°, 120°, and 80°,
+# do they sum to 360°?" slipped past the judge because the prompt told it
+# to "be conservative" and explicitly carved out scaffolding questions.
+# The tightening (commit 85e7289) calls out the pattern by name. These
+# tests guard against silent regressions in:
+#   1. The judge SYSTEM prompt content
+#   2. The bank-block content rendered into the tutor's prompt
+#   3. The pre-filter accepting this kind of response (so the LLM call
+#      actually runs)
+#   4. End-to-end: when the judge flags it, validation triggers regen.
+
+
+class JudgePromptContentTest(TestCase):
+    """Prompt-content guards. If someone edits _JUDGE_SYSTEM and drops
+    the explicit fake-scaffolding callout, this fails — forcing the
+    edit through a deliberate test update."""
+
+    def test_judge_prompt_calls_out_fake_scaffolding_by_example(self):
+        # The exact pattern the tutor used in the field is named.
+        self.assertIn("100°", _JUDGE_SYSTEM)
+        self.assertIn("120°", _JUDGE_SYSTEM)
+        self.assertIn("80°", _JUDGE_SYSTEM)
+        self.assertIn("do they sum to 360°", _JUDGE_SYSTEM)
+
+    def test_judge_prompt_treats_invented_numbers_as_authoring(self):
+        # Hypothetical / rhetorical scaffolding is NOT an exception
+        # for invented numbers.
+        lower = _JUDGE_SYSTEM.lower()
+        self.assertIn("invent", lower)
+        self.assertIn("hypothetical", lower)
+        self.assertIn("violation", lower)
+
+    def test_judge_prompt_no_longer_tells_judge_to_be_conservative(self):
+        # Old wording told the judge "Be conservative — only flag CLEAR
+        # violations". That language let the model hedge on borderline
+        # cases. The new wording flips the bias — false positives are
+        # cheap (one regen), false negatives ship a wrong lesson.
+        self.assertNotIn("Be conservative", _JUDGE_SYSTEM)
+        self.assertIn("FLAG", _JUDGE_SYSTEM)
+
+    def test_judge_prompt_links_implicit_sum_claim_to_arithmetic_rule(self):
+        # The "do they sum to T?" framing carries an implicit
+        # arithmetic claim — the judge must know to flag both
+        # NO_AUTHORING and ARITHMETIC.
+        self.assertIn("100+120+80", _JUDGE_SYSTEM.replace(" ", ""))
+        self.assertIn("FALSE", _JUDGE_SYSTEM)
+        self.assertIn("300", _JUDGE_SYSTEM)
+
+
+class BankBlockContentTest(TestCase):
+    """The <question_bank> block in the tutor system prompt is the
+    LLM's primary instruction for not authoring. Guard the wording."""
+
+    def _render_block(self):
+        # Build a minimal step + candidates and render. We only inspect
+        # the static rule preamble, so duck-typed objects are fine.
+        from apps.tutoring.question_bank import render_bank_block
+        step = MagicMock()
+        step.teacher_script = "If a + b + x = 360 and a = 100, b = 120, find x."
+        step.expected_answer = "140"
+        candidate = MagicMock()
+        candidate.id = 1
+        candidate.question_text = "Two angles are 70° and 80°. Find the third."
+        candidate.concept_tag = "Angles around a point"
+        candidate.question_type = "short_numeric"
+        candidate.answer_data = {}
+        block, _id_map = render_bank_block(step, [candidate])
+        return block
+
+    def test_bank_block_uses_hard_rule_language(self):
+        block = self._render_block()
+        self.assertIn("HARD RULE", block)
+        self.assertIn("EVERY phase", block)
+
+    def test_bank_block_explicitly_bans_invented_numbers_with_examples(self):
+        block = self._render_block()
+        # Both example shapes that the tutor was abusing in the field.
+        self.assertIn("100°, 120°, and 80°", block)
+        self.assertIn("imagine angles", block.lower())
+
+    def test_bank_block_lists_the_allowed_exceptions(self):
+        block = self._render_block()
+        # Conceptual scaffolding + rule recital are the only carved-out
+        # paths to ask a question without |||QUESTION:N|||.
+        self.assertIn("conceptual scaffolding", block.lower())
+        self.assertIn("reciting the lesson rule", block.lower())
+
+    def test_bank_block_keeps_the_signal_syntax(self):
+        block = self._render_block()
+        self.assertIn("|||QUESTION:N|||", block)
+
+
+class PreFilterTest(TestCase):
+    """The pre-filter exists to short-circuit the judge on conversational
+    turns. The fake-scaffolding transcript MUST pass the pre-filter so
+    the judge gets a chance to flag it."""
+
+    def test_fake_scaffolding_transcript_passes_pre_filter(self):
+        self.assertTrue(_has_relevant_content(FAKE_SCAFFOLDING_TRANSCRIPT))
+
+    def test_pure_conceptual_question_still_short_circuits(self):
+        # No digits, no praise stem, no question-mark trigger ⇒ skip.
+        # Keeps the cost-saving path intact for harmless turns.
+        self.assertFalse(_has_relevant_content("Let's keep going."))
+
+
+class FakeScaffoldingIntegrationTest(TestCase):
+    """End-to-end: the user's transcript, with a judge that catches it,
+    must lead to a regeneration. This is the concrete fix-shape: when
+    the LLM judge does its job, the engine retries."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.institution = Institution.objects.create(name="V2", slug="v2")
+        cls.math_course = Course.objects.create(
+            institution=cls.institution, title="Math S3 Sum",
+            grade_level="S3", is_published=True, subject_type='math',
+        )
+        cls.unit = Unit.objects.create(
+            course=cls.math_course, title="Angles", order_index=0,
+        )
+        cls.lesson = Lesson.objects.create(
+            unit=cls.unit, title="Angles around a point",
+            objective="Find a missing angle x given that all angles sum to 360°.",
+            order_index=0, is_published=True,
+        )
+
+    def test_fake_scaffolding_transcript_triggers_regeneration(self):
+        # Simulate the (now-tightened) judge correctly flagging both
+        # rules on the field transcript.
+        client = _mock_llm_client({
+            "violations": [
+                {
+                    "rule": "NO_AUTHORING",
+                    "evidence": "if three angles around a point measure 100°, 120°, and 80°",
+                    "suggested_fix": "Use |||QUESTION:N||| from the bank.",
+                },
+                {
+                    "rule": "ARITHMETIC",
+                    "evidence": "do they sum to 360°? (100+120+80 = 300)",
+                    "suggested_fix": "Pick numbers that satisfy the rule.",
+                },
+            ],
+        })
+        result = validate_tutor_response(
+            FAKE_SCAFFOLDING_TRANSCRIPT,
+            is_correct=None,
+            bare_answer=False,
+            step_type='practice',
+            lesson=self.lesson,
+            llm_client=client,
+            fact_check=False,  # isolate to the rule-check layer
+            bank_stems=["Two angles are 70° and 80°. Find the third."],
+            student_input="360 degrees",
+        )
+        self.assertIn(ISSUE_AUTHORING_VIOLATION, result.issues)
+        self.assertIn(ISSUE_ARITHMETIC_VIOLATION, result.issues)
+        self.assertTrue(
+            result.needs_regeneration,
+            "fake-scaffolding transcript with both rules flagged must "
+            "trigger the regeneration path",
+        )
