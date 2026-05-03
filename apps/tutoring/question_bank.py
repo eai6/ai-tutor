@@ -325,11 +325,25 @@ def render_bank_block(
     id_map: Dict[int, object] = {SENTINEL_NO_QUESTION: step}
     lines: List[str] = ["<question_bank>"]
     lines.append(
-        "  ALL questions you pose MUST come from this bank. You may NOT"
-        " author new questions or invent numerical examples. To pose a"
-        " question, end your response with:  |||QUESTION:N|||"
-        " (use 0 to pose the current step's question, or 1..N to pose a"
-        " bank candidate)."
+        "  HARD RULE — questions you pose MUST come from this bank.\n"
+        "  This applies to EVERY phase, including teach/explain. If your"
+        " response contains a question with specific numerical values"
+        " (\"if three angles measure 100°, 120°, and 80°…\", \"imagine"
+        " angles of 73° and 45°…\"), those numbers MUST come from a"
+        " bank entry below. Made-up numbers are a hard violation —"
+        " the system will reject the response and ask you to retry.\n"
+        "  Allowed without using the bank:\n"
+        "    • Pure conceptual scaffolding (\"which rule applies?\",\n"
+        "      \"what do you do first?\")\n"
+        "    • Reciting the lesson rule (\"angles around a point sum to 360°\")\n"
+        "  NOT allowed:\n"
+        "    • Inventing a numerical example to illustrate the rule\n"
+        "    • 'Hypothetical' premises with specific numbers (still authoring)\n"
+        "    • Verifying your made-up numbers add up — the safe pattern\n"
+        "      is to pose a bank question via |||QUESTION:N||| instead.\n"
+        "  To pose a question, end your response with: |||QUESTION:N|||"
+        " (use 0 for the current step's canonical question, or 1..N for"
+        " a bank candidate)."
     )
 
     # Slot 0 — the step's own canonical practice question.
