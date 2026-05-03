@@ -1,0 +1,166 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}{{ grade }} class{% endblock %}
+{% block page_title %}{{ grade }} class{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:class_list' %}" style="display:inline-flex; align-items:center; gap:0.4rem; color:var(--gray-500); text-decoration:none; margin-bottom:1rem;">
+    ← All classes
+</a>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:1.5rem; gap:1rem; flex-wrap:wrap;">
+    <div>
+        <h1 style="margin:0; font-size:1.6rem;">{{ grade }} class</h1>
+        <p style="color:var(--gray-500); margin:0.25rem 0 0;">
+            {{ student_count }} student{{ student_count|pluralize }}
+            ·
+            {{ course_stats|length }} course{{ course_stats|length|pluralize }} for this grade
+        </p>
+    </div>
+</div>
+
+<!-- Courses for this class -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Courses for {{ grade }}</h2>
+    </div>
+    <div class="card-body" style="padding:1rem 1.25rem;">
+        {% if course_stats %}
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
+            {% for cs in course_stats %}
+            <div style="border:1px solid var(--gray-200); border-radius:10px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:0.6rem;">
+                <div>
+                    <div style="font-weight:600; color:var(--gray-900); font-size:0.95rem;">{{ cs.course.title }}</div>
+                    <div style="font-size:0.78rem; color:var(--gray-500); margin-top:0.2rem;">
+                        {{ cs.lesson_count }} lesson{{ cs.lesson_count|pluralize }}
+                        {% if cs.students_with_attempts %} · {{ cs.students_with_attempts }} student{{ cs.students_with_attempts|pluralize }} attempted{% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+                        <span style="font-size:0.78rem; color:var(--gray-500);">Class mastery</span>
+                        <span style="font-weight:700; color:{% if cs.avg_mastery_pct >= 70 %}#059669{% elif cs.avg_mastery_pct >= 30 %}#d97706{% else %}#6b7280{% endif %};">
+                            {{ cs.avg_mastery_pct }}%
+                        </span>
+                    </div>
+                    <div style="height:6px; background:var(--gray-100); border-radius:999px; overflow:hidden;">
+                        <div style="height:100%; width:{{ cs.avg_mastery_pct }}%; background:{% if cs.avg_mastery_pct >= 70 %}#10b981{% elif cs.avg_mastery_pct >= 30 %}#f59e0b{% else %}#9ca3af{% endif %}; border-radius:999px;"></div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:0.4rem; margin-top:0.2rem; flex-wrap:wrap;">
+                    <a href="{% url 'dashboard:course_detail' cs.course.id %}" class="btn btn-secondary btn-sm" style="font-size:0.78rem;">Lessons</a>
+                    <a href="{% url 'dashboard:class_competency' cs.course.id %}" class="btn btn-sm" style="background:#0891b2; color:#fff; border:none; font-size:0.78rem; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:600;">Competency map</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--gray-500); margin:0;">No courses generated for {{ grade }} yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Students in this class -->
+<div class="card">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+        <div>
+            <h2 class="card-title">Students</h2>
+            <p style="font-size:0.875rem; color:var(--gray-500); margin-top:0.25rem;">
+                {{ student_count }} student{{ student_count|pluralize }} in {{ grade }}
+            </p>
+        </div>
+        {% if next_action %}
+        <button type="button" class="btn btn-primary btn-sm" onclick="togglePromoteForm()">{{ next_action }}</button>
+        {% endif %}
+    </div>
+
+    {% if next_action %}
+    <form method="post" action="{% url 'dashboard:promote_students' %}" id="promote-form" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="from_grade" value="{{ grade }}">
+        <input type="hidden" name="redirect_to" value="{% url 'dashboard:class_detail' grade %}">
+        <div style="padding:0.75rem 1rem; background:#eff6ff; border-bottom:1px solid #dbeafe; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+            <label style="font-size:0.875rem; font-weight:500; color:#1e40af;">
+                <input type="checkbox" id="select-all" onchange="toggleAllStudents(this)" style="margin-right:0.25rem;">
+                Select all
+            </label>
+            <span id="selected-count" style="font-size:0.78rem; color:#1e40af;">0 selected</span>
+            <button type="submit" class="btn btn-primary btn-sm">Confirm {{ next_action|lower }}</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="togglePromoteForm()">Cancel</button>
+        </div>
+    </form>
+    {% endif %}
+
+    <div class="card-body" style="padding:0;">
+        {% if students %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:40px;" class="promote-col" hidden></th>
+                    <th>Student</th>
+                    <th>Email</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td class="promote-col" hidden>
+                        <input type="checkbox" name="student_ids" value="{{ student.id }}" form="promote-form" class="student-checkbox" onchange="updateSelectedCount()">
+                    </td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:0.75rem;">
+                            <div style="width:32px; height:32px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.75rem;">
+                                {{ student.first_name|slice:":1"|upper }}{{ student.last_name|slice:":1"|upper }}
+                            </div>
+                            <span style="font-weight:500;">{{ student.first_name }} {{ student.last_name }}</span>
+                        </div>
+                    </td>
+                    <td style="color:var(--gray-500);">{{ student.email }}</td>
+                    <td>
+                        <a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-secondary btn-sm">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <h3>No students in {{ grade }}</h3>
+            <p>Students will appear here once their profile grade is set to {{ grade }}.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function togglePromoteForm() {
+    var form = document.getElementById('promote-form');
+    if (!form) return;
+    var cols = document.querySelectorAll('.promote-col');
+    var isVisible = form.style.display !== 'none';
+    form.style.display = isVisible ? 'none' : 'block';
+    cols.forEach(function (col) { col.hidden = isVisible; });
+    if (isVisible) {
+        // Reset selection on close
+        document.querySelectorAll('.student-checkbox').forEach(function (cb) { cb.checked = false; });
+        var selectAll = document.getElementById('select-all');
+        if (selectAll) selectAll.checked = false;
+        updateSelectedCount();
+    }
+}
+function toggleAllStudents(selectAllCb) {
+    document.querySelectorAll('.student-checkbox').forEach(function (cb) {
+        cb.checked = selectAllCb.checked;
+    });
+    updateSelectedCount();
+}
+function updateSelectedCount() {
+    var n = document.querySelectorAll('.student-checkbox:checked').length;
+    var el = document.getElementById('selected-count');
+    if (el) el.textContent = n + ' selected';
+}
+</script>
+{% endblock %}

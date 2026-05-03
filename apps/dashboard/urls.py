@@ -91,6 +91,7 @@ urlpatterns = [
     # Classes
     path('classes/', views.class_list, name='class_list'),
     path('classes/promote/', views.promote_students, name='promote_students'),
+    path('classes/<str:grade>/', views.class_detail, name='class_detail'),
     
     # Reports
     path('reports/', views.reports_overview, name='reports'),

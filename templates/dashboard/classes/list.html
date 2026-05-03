@@ -17,11 +17,14 @@
                     {% if grade == 'Unknown' or grade == '' %}
                         Unassigned
                     {% else %}
-                        {{ grade }}
+                        <a href="{% url 'dashboard:class_detail' grade %}" style="color:inherit; text-decoration:none;">{{ grade }} →</a>
                     {% endif %}
                 </h2>
                 <p style="font-size: 0.875rem; color: var(--gray-500); margin-top: 0.25rem;">
                     {{ students|length }} student{{ students|length|pluralize }}
+                    {% if grade != 'Unknown' and grade != '' %}
+                    · <a href="{% url 'dashboard:class_detail' grade %}" style="color:var(--primary); text-decoration:none;">Open class page</a>
+                    {% endif %}
                 </p>
             </div>
             {% with next=next_grade_map|default_if_none:"" %}

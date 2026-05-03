@@ -1640,6 +1640,97 @@ def class_list(request):
 
 
 @teacher_required
+def class_detail(request, grade):
+    """Detail page for one class — e.g. '/classes/S3/'. Shows every
+    course generated for this grade with the class mastery average,
+    plus the same roster + selective-promote flow as class_list, but
+    scoped to one grade only.
+
+    Class mastery average per course = (mastered lesson cells) /
+    (students in class × published lessons in course). Same shape as
+    the legacy course-progress metric, scoped to one grade so the
+    denominator isn't inflated by off-grade students.
+    """
+    from apps.tutoring.models import StudentLessonProgress
+    from apps.curriculum.models import Lesson
+
+    institution = request.staff_ctx['institution']
+
+    # Roster — institution-scoped students whose grade_level matches.
+    student_qs = filter_by_institution(
+        Membership.objects.filter(role='student', is_active=True),
+        institution,
+    ).select_related('user', 'user__student_profile')
+    students = []
+    for m in student_qs:
+        profile = getattr(m.user, 'student_profile', None)
+        if profile and (profile.grade_level or '').strip() == grade:
+            students.append(m.user)
+    students.sort(key=lambda u: ((u.first_name or '').lower(), (u.last_name or '').lower(), u.username))
+    student_ids = [s.id for s in students]
+
+    # Courses generated for this grade. Course.grade_level is comma-
+    # separated; empty means grade-agnostic (still shown).
+    courses_qs = filter_by_institution(Course.objects.all(), institution)
+    course_stats = []
+    for course in courses_qs.order_by('title'):
+        course_grades = {
+            g.strip() for g in (course.grade_level or '').split(',') if g.strip()
+        }
+        if course_grades and grade not in course_grades:
+            continue
+        lesson_ids = list(
+            Lesson.objects.filter(unit__course=course, is_published=True)
+            .values_list('id', flat=True)
+        )
+        total_lessons = len(lesson_ids)
+        if total_lessons and student_ids:
+            mastered = StudentLessonProgress.objects.filter(
+                lesson_id__in=lesson_ids,
+                student_id__in=student_ids,
+                mastery_level='mastered',
+            ).count()
+            avg_pct = round((mastered / (total_lessons * len(student_ids))) * 100)
+            students_with_attempts = StudentLessonProgress.objects.filter(
+                lesson_id__in=lesson_ids,
+                student_id__in=student_ids,
+            ).values('student_id').distinct().count()
+        else:
+            avg_pct = 0
+            students_with_attempts = 0
+            mastered = 0
+        course_stats.append({
+            'course': course,
+            'lesson_count': total_lessons,
+            'avg_mastery_pct': avg_pct,
+            'students_with_attempts': students_with_attempts,
+            'mastered_cells': mastered,
+        })
+
+    GRADE_ORDER = ['S1', 'S2', 'S3', 'S4', 'S5']
+    if grade in GRADE_ORDER and GRADE_ORDER.index(grade) < len(GRADE_ORDER) - 1:
+        next_grade = GRADE_ORDER[GRADE_ORDER.index(grade) + 1]
+        next_action = f'Promote to {next_grade}'
+    elif grade == 'S5':
+        next_grade = 'Graduate'
+        next_action = 'Graduate'
+    else:
+        next_grade = ''
+        next_action = ''
+
+    context = {
+        **request.staff_ctx,
+        'grade': grade,
+        'students': students,
+        'student_count': len(students),
+        'course_stats': course_stats,
+        'next_grade': next_grade,
+        'next_action': next_action,
+    }
+    return render(request, 'dashboard/classes/detail.html', context)
+
+
+@teacher_required
 @require_POST
 def promote_students(request):
     """Bulk promote students to the next grade level."""
@@ -1648,15 +1739,25 @@ def promote_students(request):
 
     GRADE_ORDER = ['S1', 'S2', 'S3', 'S4', 'S5']
 
+    # Where to send the user after the action — defaults to the
+    # all-classes index, but the class detail page sets ``redirect_to``
+    # to its own URL so the user lands back on the same scope.
+    redirect_to = request.POST.get('redirect_to') or ''
+
+    def _redirect_back():
+        if redirect_to:
+            return redirect(redirect_to)
+        return redirect('dashboard:class_list')
+
     if from_grade not in GRADE_ORDER:
         messages.error(request, f"Invalid grade: {from_grade}")
-        return redirect('dashboard:class_list')
+        return _redirect_back()
 
     idx = GRADE_ORDER.index(from_grade)
 
     if not student_ids:
         messages.warning(request, "No students selected.")
-        return redirect('dashboard:class_list')
+        return _redirect_back()
 
     if idx >= len(GRADE_ORDER) - 1:
         # S5 graduation: mark as graduated (empty grade)
@@ -1675,7 +1776,7 @@ def promote_students(request):
         ).update(grade_level=next_grade)
         messages.success(request, f"Promoted {updated} student(s) from {from_grade} to {next_grade}.")
 
-    return redirect('dashboard:class_list')
+    return _redirect_back()
 
 
 # ============================================================================
