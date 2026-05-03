@@ -3,9 +3,14 @@
 {% block title %}Staff{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Staff Accounts</h1>
-    <p class="muted">Platform admins (you) can delete teacher / staff accounts. Deletions cascade through their content + audit trail.</p>
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+    <div>
+        <h1>Staff Accounts</h1>
+        <p class="muted">Platform admins (you) can delete teacher / staff accounts. Deletions cascade through their content + audit trail.</p>
+    </div>
+    <a href="{% url 'accounts:invite_staff' %}" class="btn btn-primary" style="white-space:nowrap;">
+        + Invite Staff
+    </a>
 </div>
 
 <div class="card">
