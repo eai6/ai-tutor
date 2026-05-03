@@ -65,6 +65,8 @@ def get_staff_context(request):
             'is_aggregated': institution is None,
             'unreviewed_flag_count': flag_qs.count() + validator_count,
             'can_edit_content': True,  # Superadmin always has full access
+            'can_upload_curriculum': True,
+            'can_regenerate_courses': True,
         }
 
     # Regular staff — may belong to multiple schools
@@ -105,6 +107,8 @@ def get_staff_context(request):
         'is_aggregated': False,
         'unreviewed_flag_count': flag_qs.count() + validator_count,
         'can_edit_content': config.teachers_can_edit_content,
+        'can_upload_curriculum': config.teachers_can_upload_curriculum,
+        'can_regenerate_courses': config.teachers_can_regenerate_courses,
     }
 
 
@@ -1033,6 +1037,16 @@ def curriculum_upload(request):
     """Upload curriculum document with optional teaching material attachment."""
     institution = request.staff_ctx['institution']
     is_superadmin = request.user.is_staff
+
+    # Pilot-mode gate: teachers can review + edit courses but cannot
+    # upload new curriculum (it rebuilds the whole course). Toggle the
+    # platform flag teachers_can_upload_curriculum to True to lift.
+    if not request.staff_ctx.get('can_upload_curriculum'):
+        messages.warning(
+            request,
+            "Curriculum uploads are restricted to platform admins during the pilot."
+        )
+        return redirect('dashboard:curriculum_list')
 
     if institution is None and not is_superadmin:
         messages.warning(request, "Please select a specific school before uploading curriculum.")
@@ -3501,6 +3515,17 @@ def course_regenerate_all(request, course_id):
     from apps.dashboard.background_tasks import run_async, generate_complete_course
     from apps.accounts.models import Institution
 
+    # Pilot-mode gate: course-level regenerate is platform-admin only.
+    # Per-lesson regenerate (lesson_regenerate view) is governed by
+    # teachers_can_edit_content separately.
+    if not request.staff_ctx.get('can_regenerate_courses'):
+        messages.warning(
+            request,
+            "Course-level regenerate is restricted to platform admins during the pilot. "
+            "Use per-lesson regenerate for individual lessons."
+        )
+        return redirect('dashboard:course_detail', course_id=course_id)
+
     institution = request.staff_ctx['institution']
     lookup = {'id': course_id}
     if institution is not None:
@@ -4020,13 +4045,22 @@ def course_subject_type(request, course_id):
 def step_edit(request, step_id):
     """Edit a lesson step."""
     from apps.curriculum.models import LessonStep
-    
+
     institution = request.staff_ctx['institution']
-    
-    lookup = {'id': step_id}
+
+    # Include platform-wide courses (institution=None) so teachers
+    # whose membership is school-scoped can still edit lessons in
+    # courses that aren't owned by any single school. Without this,
+    # the lookup 404'd on every platform-wide course.
     if institution is not None:
-        lookup['lesson__unit__course__institution'] = institution
-    step = get_object_or_404(LessonStep, **lookup)
+        step = get_object_or_404(
+            LessonStep,
+            Q(lesson__unit__course__institution=institution)
+            | Q(lesson__unit__course__institution__isnull=True),
+            id=step_id,
+        )
+    else:
+        step = get_object_or_404(LessonStep, id=step_id)
     
     lesson = step.lesson
     total_steps = lesson.steps.count()

@@ -332,10 +332,21 @@ class PlatformConfig(models.Model):
         help_text="Recommend teacher to move on when ALL students achieve at least this % of objectives. Default: 70%"
     )
 
-    # Role-based access
+    # Role-based access. Three independent gates so the pilot can
+    # let teachers edit + publish lesson content while still keeping
+    # destructive curriculum operations (upload, course regen) on
+    # super-admin only.
     teachers_can_edit_content = models.BooleanField(
         default=False,
-        help_text="If False, teachers can only view content and reports — they cannot edit, publish, regenerate, delete, or upload curriculum. Super admins always have full access."
+        help_text="If False, teachers can only view content and reports — they cannot edit, publish, or delete lesson content. Super admins always have full access."
+    )
+    teachers_can_upload_curriculum = models.BooleanField(
+        default=False,
+        help_text="If False, teachers cannot upload new curriculum (PDF/DOCX → course generation). Super admin only by default — uploads are destructive and rebuild the whole course."
+    )
+    teachers_can_regenerate_courses = models.BooleanField(
+        default=False,
+        help_text="If False, teachers cannot trigger course-level regenerate (rebuilds every lesson + exit ticket in the course). Per-lesson regenerate is gated separately by teachers_can_edit_content."
     )
 
     updated_at = models.DateTimeField(auto_now=True)
