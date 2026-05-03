@@ -2179,6 +2179,137 @@ RULES:
                     flush=True,
                 )
 
+        # Format-mix retry — the LLM tends to anchor on short_numeric
+        # because it's the simplest template shape. If the bank came
+        # back with fewer than 12 of {mcq, fill_in_blank, matching}
+        # combined, run a targeted retry asking ONLY for those types.
+        # This is the difference between the user seeing 35 identical
+        # short_numeric questions vs the locked 7/15/7/6 mix.
+        if is_math_lesson_l4 and len(questions) >= BANK_FLOOR:
+            from collections import Counter
+            type_counts = Counter(
+                (q.get('question_type') or 'short_numeric').strip()
+                for q in questions
+            )
+            non_numeric = (
+                type_counts.get('mcq', 0)
+                + type_counts.get('fill_in_blank', 0)
+                + type_counts.get('matching', 0)
+            )
+            target_non_numeric = 12
+            if non_numeric < target_non_numeric:
+                from apps.curriculum.parametric_renderer import (
+                    parse_template,
+                    render_typed,
+                    validate_template_typed,
+                )
+                want_mcq = max(0, 15 - type_counts.get('mcq', 0))
+                want_fill = max(0, 7 - type_counts.get('fill_in_blank', 0))
+                want_match = max(0, 6 - type_counts.get('matching', 0))
+                shortfall_total = want_mcq + want_fill + want_match
+                print(
+                    f"[ContentGen] [{lesson.title}] Format-mix retry — "
+                    f"non_numeric={non_numeric} (target {target_non_numeric}). "
+                    f"Asking for {want_mcq} MCQ / {want_fill} fill / "
+                    f"{want_match} matching.",
+                    flush=True,
+                )
+                fmt_constraint = (
+                    "=" * 72 + "\n"
+                    "FORMAT MIX VIOLATION — TARGETED RETRY\n"
+                    + "=" * 72 + "\n\n"
+                    "The previous response used short_numeric for almost "
+                    "every question. The locked format mix requires "
+                    "diversity. Generate ONLY the missing types now:\n\n"
+                    f"  - {want_mcq} MCQ templates (question_type: 'mcq', "
+                    "with correct_formula + 3 distractor_formulas)\n"
+                    f"  - {want_fill} fill_in_blank templates "
+                    "(question_type: 'fill_in_blank', with "
+                    "blank_formulas — one per ___ slot in the prose)\n"
+                    f"  - {want_match} matching templates "
+                    "(question_type: 'matching', with framing_text + "
+                    "left_formula + right_formula + pair_count 4-6)\n\n"
+                    "Do NOT emit any short_numeric questions in this "
+                    "response. Re-read sections 6 / 7 / 8 of the "
+                    "ADDITIONAL TEMPLATE TYPES block in the original "
+                    "prompt for the exact schema. Constraints AND "
+                    "parameters MUST be satisfiable together (see "
+                    "COMMON FAILURE MODES P2).\n\n"
+                    "Original brief follows:\n\n"
+                )
+                try:
+                    fmt_response = llm_client.generate(
+                        [{"role": "user", "content": fmt_constraint + prompt}],
+                        system_prompt=exit_sys_prompt,
+                        max_tokens=16000,
+                    )
+                    from apps.llm.json_utils import parse_llm_json
+                    fmt_questions = parse_llm_json(
+                        fmt_response.content, expect_array=True,
+                    ) or []
+                    fmt_kept = 0
+                    for j, rq in enumerate(fmt_questions[:shortfall_total * 2]):
+                        rq_type = (rq.get('question_type') or '').strip()
+                        if rq_type not in ('mcq', 'fill_in_blank', 'matching'):
+                            continue
+                        # Skip if we already have enough of this type
+                        if rq_type == 'mcq' and type_counts.get('mcq', 0) >= 15:
+                            continue
+                        if rq_type == 'fill_in_blank' and type_counts.get('fill_in_blank', 0) >= 7:
+                            continue
+                        if rq_type == 'matching' and type_counts.get('matching', 0) >= 6:
+                            continue
+                        tmpl_data = rq.get('template')
+                        if not tmpl_data:
+                            continue
+                        try:
+                            tmpl = parse_template(rq_type, tmpl_data)
+                        except Exception:
+                            continue
+                        err = validate_template_typed(tmpl, n_samples=10)
+                        if err is not None:
+                            continue
+                        rendered = render_typed(
+                            rq_type, tmpl,
+                            seed=lesson.id * 1000 + len(questions) + j,
+                        )
+                        if rendered is None:
+                            continue
+                        preserve_keys = (
+                            'concept_tag', 'terminal_objective',
+                            'enabling_objective', 'difficulty', 'source',
+                        )
+                        preserved = {k: rq[k] for k in preserve_keys if rq.get(k)}
+                        preserved['question_type'] = rq_type
+                        rq.clear()
+                        rq.update(rendered)
+                        rq.update(preserved)
+                        # Drop a same-type short_numeric to make room
+                        # if we're at cap. Cap is BANK_TARGET (35).
+                        if len(questions) >= BANK_TARGET:
+                            for idx, existing_q in enumerate(questions):
+                                if (existing_q.get('question_type') or 'short_numeric').strip() == 'short_numeric' and type_counts.get('short_numeric', 0) > 7:
+                                    questions.pop(idx)
+                                    type_counts['short_numeric'] -= 1
+                                    break
+                            else:
+                                # No short_numeric to displace — give up
+                                # adding more.
+                                break
+                        questions.append(rq)
+                        type_counts[rq_type] = type_counts.get(rq_type, 0) + 1
+                        fmt_kept += 1
+                    print(
+                        f"[ContentGen] [{lesson.title}] Format-mix retry "
+                        f"added {fmt_kept} non-numeric questions; "
+                        f"final mix: {dict(type_counts)}",
+                        flush=True,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"[{lesson.title}] Format-mix retry crashed: {e}"
+                    )
+
         # Save to database — IN-PLACE replacement when an ExitTicket
         # already exists. Honoring the docstring promise: drop the
         # QUESTIONS only (cascade chain doesn't reach back up), keep
