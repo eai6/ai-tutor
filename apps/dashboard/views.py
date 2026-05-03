@@ -3612,7 +3612,19 @@ def lesson_regenerate(request, lesson_id):
 
     Runs in a background thread so the HTTP request returns immediately.
     The course detail page polls + auto-recovers stuck lessons (10-min
-    cutoff)."""
+    cutoff).
+
+    Permission: gated by ``can_regenerate_courses`` so the same flag
+    governs course-level AND per-lesson regeneration. Pilot teachers
+    can review + edit lessons but cannot regenerate.
+    """
+    if not request.staff_ctx.get('can_regenerate_courses'):
+        messages.warning(
+            request,
+            "Lesson regeneration is restricted to platform admins during the pilot.",
+        )
+        return redirect('dashboard:lesson_detail', lesson_id=lesson_id)
+
     from apps.curriculum.models import Lesson
     from apps.dashboard.background_tasks import (
         run_async,

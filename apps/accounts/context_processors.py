@@ -48,6 +48,29 @@ def institution_theme(request):
     return _build_theme_dict()
 
 
+def staff_flag(request):
+    """Expose ``is_staff_user`` to every template — True when the user
+    is a Django super-admin OR has an active Membership with role='staff'
+    (a teacher). Lets templates render staff-only chrome (back-to-dashboard
+    links, edit buttons, etc.) without each view computing it.
+
+    Defensive: false on unauthenticated / anon / errored requests."""
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return {'is_staff_user': False}
+    if user.is_staff or user.is_superuser:
+        return {'is_staff_user': True}
+    try:
+        from apps.accounts.models import Membership
+        return {
+            'is_staff_user': Membership.objects.filter(
+                user=user, role='staff', is_active=True,
+            ).exists(),
+        }
+    except Exception:
+        return {'is_staff_user': False}
+
+
 def email_verification_status(request):
     """Expose `user_email_verified` to every template so the soft-gate
     banner can decide whether to show. Defensive — handles users who

@@ -37,13 +37,14 @@
     <div class="catalog-header animate-in">
         <h1>Hello, {{ user.first_name|default:user.username }}!</h1>
         <p class="text-muted">Choose a subject to continue learning{% if student_grade %} &mdash; {{ student_grade }}{% endif %}</p>
-        {% if is_staff_viewer %}
+        {% if is_staff_user %}
         <div class="school-switcher" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
             <a href="{% url 'dashboard:home' %}"
                style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.4rem 0.85rem; background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.85rem;"
                title="Return to teacher dashboard">
                 ← Dashboard
             </a>
+            {% if is_staff_viewer %}
             <label for="school-select">Viewing as:</label>
             <select id="school-select" onchange="switchSchool(this.value)">
                 <option value="all" {% if not selected_school %}selected{% endif %}>All Schools</option>
@@ -51,6 +52,7 @@
                 <option value="{{ school.id }}" {% if selected_school.id == school.id %}selected{% endif %}>{{ school.name }}</option>
                 {% endfor %}
             </select>
+            {% endif %}
         </div>
         {% endif %}
     </div>

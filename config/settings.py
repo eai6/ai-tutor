@@ -91,6 +91,7 @@ TEMPLATES = [
                 'apps.accounts.context_processors.institution_theme',
                 'apps.accounts.context_processors.email_verification_status',
                 'apps.accounts.context_processors.baseline_recommendations',
+                'apps.accounts.context_processors.staff_flag',
             ],
         },
     },

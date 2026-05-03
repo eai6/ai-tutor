@@ -262,12 +262,12 @@
                     <button type="submit" class="btn btn-secondary btn-sm">Unpublish</button>
                 </form>
                 {% endif %}
-                {% if is_generating %}
+                {% if is_generating and can_regenerate_courses %}
                 <span style="display:inline-flex; align-items:center; gap:0.4rem; background:#dbeafe; border:1px solid #93c5fd; padding:0.3rem 0.7rem; border-radius:8px; font-size:0.78rem; color:#1e40af; font-weight:600;">
                     <span style="display:inline-block; animation:lesson-regen-spin 1.4s linear infinite;">⏳</span>
                     Regenerating…
                 </span>
-                {% else %}
+                {% elif can_regenerate_courses %}
                 <form method="post" action="{% url 'dashboard:lesson_regenerate' lesson.id %}"
                       style="display:inline-flex; align-items:center; gap:0.4rem; flex-wrap:wrap; background:#f5f3ff; border:1px solid #ddd6fe; padding:0.3rem 0.6rem; border-radius:8px;">
                     {% csrf_token %}

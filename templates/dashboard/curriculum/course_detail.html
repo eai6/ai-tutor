@@ -539,7 +539,12 @@
         </button>
     </form>
 </div>
+{% endif %}
 
+{# Course-level regenerate is gated separately from can_edit_content
+   so the pilot can let teachers edit lessons but block destructive
+   regeneration. #}
+{% if can_regenerate_courses %}
 <div class="bulk-actions" style="background: #f5f3ff; border: 1px solid #ddd6fe; margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">🔁</span>
     <div style="flex: 1; min-width: 240px;">
@@ -570,7 +575,10 @@
 </div>
 {% endif %}
 
-{% if can_edit_content %}
+{# Weekly assignments: a class-management feature, available to any
+   staff user — NOT gated by can_edit_content (which governs lesson
+   content editing). Teachers in the pilot need to assign weekly
+   lessons even when curriculum editing is locked down. #}
 <details class="card" style="margin: 1rem 0 2rem; padding: 0; overflow: hidden;">
     <summary style="cursor:pointer; padding:1rem 1.25rem; font-weight:600; color:#374151; font-size:0.95rem; background:#f9fafb; list-style:none; display:flex; justify-content:space-between; align-items:center;">
         <span>📅 Weekly assignments <span style="font-size:0.78rem;color:#6b7280;font-weight:500;margin-left:0.5rem;">— students see these in their weekly panel + Monday email</span></span>
@@ -622,7 +630,6 @@
         {% endfor %}
     </div>
 </details>
-{% endif %}
 
 <!-- Units and Lessons -->
 {% for unit in units %}
@@ -740,21 +747,21 @@
                 <div style="display: flex; gap: 0.25rem; flex-wrap: wrap; justify-content: flex-end;">
                     {% with lstats=lesson_stats|get_item:lesson.id %}
                         {% if lstats.content_status == 'generating' %}
+                            {% if can_regenerate_courses %}
                             <form method="post" action="{% url 'dashboard:cancel_lesson_generation' lesson.id %}" style="display: inline;">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-size: 0.75rem;" title="Stop generating this lesson">
                                     ⛔
                                 </button>
                             </form>
-                        {% else %}
+                            {% endif %}
+                        {% elif can_regenerate_courses %}
                             {% comment %}
-                            Always wire ⚡ to regenerate. Works for both empty
-                            lessons (wipes zero rows, then runs the pipeline)
-                            and lessons that already have content (wipe + rebuild).
-                            Per-lesson CAS guard inside generate_complete_lesson
-                            protects against double-fire — no need to globally
-                            disable the button just because some other lesson
-                            in the course is generating.
+                            ⚡ regenerates a single lesson. Pilot teachers
+                            can review and edit lessons but cannot trigger
+                            regeneration — the button only renders for
+                            users with can_regenerate_courses (super admins
+                            by default; flip the platform flag to extend).
                             {% endcomment %}
                             <form method="post" action="{% url 'dashboard:lesson_regenerate' lesson.id %}" style="display: inline;"
                                   onsubmit="return confirm('Regenerate this lesson?\n\nReplaces lesson steps and exit ticket. Mastery levels and the permanent competency transcript are preserved.');">
