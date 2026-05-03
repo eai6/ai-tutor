@@ -5752,21 +5752,19 @@ def feedback_submit(request):
 
 @login_required
 def feedback_list(request):
-    """Superadmin list of feedback reports. Staff see only their school's reports."""
+    """Super-admin list of feedback reports. Teachers cannot view —
+    feedback often references issues with content / other teachers'
+    work and isn't a per-school management tool."""
     from apps.dashboard.models import FeedbackReport
 
     if not (request.user.is_staff or request.user.is_superuser):
-        ctx = get_staff_context(request)
-        if not ctx:
-            messages.error(request, "Staff access required.")
-            return redirect('dashboard:home')
-        institution = ctx['institution']
-    else:
-        institution = None
+        messages.error(
+            request,
+            "Feedback reports are restricted to platform admins.",
+        )
+        return redirect('dashboard:home')
 
     qs = FeedbackReport.objects.select_related('user', 'institution', 'resolved_by')
-    if institution is not None:
-        qs = qs.filter(institution=institution)
 
     show = request.GET.get('show', 'open')
     if show == 'open':
@@ -5782,29 +5780,23 @@ def feedback_list(request):
         **ctx,
         'reports': page,
         'show': show,
-        'open_count': FeedbackReport.objects.filter(is_resolved=False).count() if institution is None
-                      else FeedbackReport.objects.filter(is_resolved=False, institution=institution).count(),
+        'open_count': FeedbackReport.objects.filter(is_resolved=False).count(),
     })
 
 
 @login_required
 @require_POST
 def feedback_resolve(request, report_id):
-    """Mark a feedback report resolved (or reopen it)."""
+    """Mark a feedback report resolved (or reopen it). Super-admin only."""
     from apps.dashboard.models import FeedbackReport
 
     if not (request.user.is_staff or request.user.is_superuser):
-        ctx = get_staff_context(request)
-        if not ctx:
-            return JsonResponse({"error": "Staff only"}, status=403)
-        institution = ctx['institution']
-        qs = FeedbackReport.objects.all()
-        if institution is not None:
-            qs = qs.filter(institution=institution)
-    else:
-        qs = FeedbackReport.objects.all()
+        return JsonResponse(
+            {"error": "Feedback reports are restricted to platform admins."},
+            status=403,
+        )
 
-    report = get_object_or_404(qs, id=report_id)
+    report = get_object_or_404(FeedbackReport, id=report_id)
     notes = (request.POST.get('notes') or '').strip()
 
     if report.is_resolved:
