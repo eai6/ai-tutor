@@ -4,110 +4,69 @@
 {% block page_title %}Classes{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-    <p style="color: var(--gray-500);">Students grouped by grade level</p>
+<div style="margin-bottom: 1.5rem;">
+    <p style="color: var(--gray-500); margin: 0;">
+        {{ total_students }} student{{ total_students|pluralize }} grouped into
+        {{ classes|length }} class{{ classes|length|pluralize:"es" }}.
+        Open a class to see its courses, mastery averages, and roster.
+        Promotion lives on the class page — pick the students you want to
+        move and confirm there.
+    </p>
 </div>
 
-{% if students_by_grade %}
-    {% for grade, students in students_by_grade.items %}
-    <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <h2 class="card-title">
-                    {% if grade == 'Unknown' or grade == '' %}
-                        Unassigned
-                    {% else %}
-                        <a href="{% url 'dashboard:class_detail' grade %}" style="color:inherit; text-decoration:none;">{{ grade }} →</a>
-                    {% endif %}
-                </h2>
-                <p style="font-size: 0.875rem; color: var(--gray-500); margin-top: 0.25rem;">
-                    {{ students|length }} student{{ students|length|pluralize }}
-                    {% if grade != 'Unknown' and grade != '' %}
-                    · <a href="{% url 'dashboard:class_detail' grade %}" style="color:var(--primary); text-decoration:none;">Open class page</a>
-                    {% endif %}
-                </p>
-            </div>
-            {% with next=next_grade_map|default_if_none:"" %}
-            {% if grade != 'Unknown' and grade != '' and next %}
-            <button type="button" class="btn btn-primary btn-sm" onclick="togglePromoteForm('{{ grade }}')">
-                {% for g, ng in next_grade_map.items %}{% if g == grade %}{% if ng == 'Graduate' %}Graduate{% else %}Promote to {{ ng }}{% endif %}{% endif %}{% endfor %}
-            </button>
-            {% endif %}
-            {% endwith %}
+{% if classes %}
+<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:1rem;">
+    {% for cls in classes %}
+    {% if cls.is_grade %}
+    <a href="{% url 'dashboard:class_detail' cls.grade %}"
+       class="card class-tile"
+       style="display:flex; flex-direction:column; padding:1.25rem 1.4rem; border-radius:12px; text-decoration:none; color:inherit; gap:0.4rem; border:1px solid var(--gray-200); background:#fff; transition:transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="background:var(--primary-light); color:var(--primary); font-weight:700; font-size:0.85rem; padding:0.2rem 0.7rem; border-radius:999px;">
+                {{ cls.grade }}
+            </span>
+            <span style="font-size:0.75rem; color:var(--gray-500);">→</span>
         </div>
-        <form method="post" action="{% url 'dashboard:promote_students' %}" id="promote-form-{{ grade }}" style="display:none;">
-            {% csrf_token %}
-            <input type="hidden" name="from_grade" value="{{ grade }}">
-            <div style="padding: 0.75rem 1rem; background: #eff6ff; border-bottom: 1px solid #dbeafe; display: flex; align-items: center; gap: 0.75rem;">
-                <label style="font-size: 0.875rem; font-weight: 500; color: #1e40af;">
-                    <input type="checkbox" onchange="toggleAllStudents(this, '{{ grade }}')" style="margin-right: 0.25rem;">
-                    Select All
-                </label>
-                <button type="submit" class="btn btn-primary btn-sm">
-                    {% for g, ng in next_grade_map.items %}{% if g == grade %}{% if ng == 'Graduate' %}Confirm Graduation{% else %}Confirm Promotion{% endif %}{% endif %}{% endfor %}
-                </button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="togglePromoteForm('{{ grade }}')">Cancel</button>
-            </div>
-        </form>
-        <div class="card-body" style="padding: 0;">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;" class="promote-col promote-col-{{ grade }}" hidden></th>
-                        <th>Student</th>
-                        <th>Email</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for student in students %}
-                    <tr>
-                        <td class="promote-col promote-col-{{ grade }}" hidden>
-                            <input type="checkbox" name="student_ids" value="{{ student.id }}" form="promote-form-{{ grade }}">
-                        </td>
-                        <td>
-                            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem;">
-                                    {{ student.first_name|slice:":1"|upper }}{{ student.last_name|slice:":1"|upper }}
-                                </div>
-                                <span style="font-weight: 500;">{{ student.first_name }} {{ student.last_name }}</span>
-                            </div>
-                        </td>
-                        <td style="color: var(--gray-500);">{{ student.email }}</td>
-                        <td>
-                            <a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-secondary btn-sm">View</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div style="font-size:1.4rem; font-weight:700; color:var(--gray-900); line-height:1.1;">
+            {{ cls.count }}
+        </div>
+        <div style="font-size:0.82rem; color:var(--gray-500);">
+            student{{ cls.count|pluralize }}
+        </div>
+    </a>
+    {% else %}
+    <div class="card"
+         style="display:flex; flex-direction:column; padding:1.25rem 1.4rem; border-radius:12px; gap:0.4rem; border:1px dashed var(--gray-200); background:#f9fafb;">
+        <span style="background:var(--gray-100); color:var(--gray-500); font-weight:600; font-size:0.78rem; padding:0.2rem 0.7rem; border-radius:999px; align-self:flex-start;">
+            {{ cls.grade }}
+        </span>
+        <div style="font-size:1.4rem; font-weight:700; color:var(--gray-700); line-height:1.1;">
+            {{ cls.count }}
+        </div>
+        <div style="font-size:0.78rem; color:var(--gray-500);">
+            student{{ cls.count|pluralize }} without a grade set on their profile
         </div>
     </div>
+    {% endif %}
     {% endfor %}
+</div>
+
+<style>
+    a.class-tile:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+        border-color: var(--primary);
+    }
+</style>
 {% else %}
 <div class="card">
     <div class="empty-state">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
         </svg>
-        <h3>No Students Yet</h3>
+        <h3>No students yet</h3>
         <p>Students will appear here once they join and complete their profiles.</p>
     </div>
 </div>
 {% endif %}
-
-<script>
-function togglePromoteForm(grade) {
-    const form = document.getElementById('promote-form-' + grade);
-    const cols = document.querySelectorAll('.promote-col-' + grade);
-    const isVisible = form.style.display !== 'none';
-    form.style.display = isVisible ? 'none' : 'block';
-    cols.forEach(col => col.hidden = isVisible);
-}
-
-function toggleAllStudents(selectAllCb, grade) {
-    const checkboxes = document.querySelectorAll('#promote-form-' + grade + ' ~ .card-body input[name="student_ids"], .promote-col-' + grade + ' input[name="student_ids"]');
-    checkboxes.forEach(cb => cb.checked = selectAllCb.checked);
-}
-</script>
 {% endblock %}

@@ -1603,39 +1603,45 @@ def curriculum_process_api(request, upload_id):
 # Class Management
 # ============================================================================
 
-@teacher_required  
+@teacher_required
 def class_list(request):
-    """List and manage classes/groups."""
+    """All classes overview — one summary card per grade. The student
+    list + promote action live on the dedicated class detail page; this
+    page is just for picking which class to drill into."""
     institution = request.staff_ctx['institution']
-    
-    # For now, show students grouped by grade
-    students_by_grade = {}
-    
+
+    counts = {}
     memberships = filter_by_institution(
         Membership.objects.filter(role='student', is_active=True),
-        institution
-    ).select_related('user', 'user__student_profile')
-    
+        institution,
+    ).select_related('user__student_profile')
     for m in memberships:
         profile = getattr(m.user, 'student_profile', None)
-        grade = profile.grade_level if profile else 'Unknown'
-        
-        if grade not in students_by_grade:
-            students_by_grade[grade] = []
-        students_by_grade[grade].append(m.user)
-    
-    # Build next-grade map for promote buttons in template
-    grade_order = ['S1', 'S2', 'S3', 'S4', 'S5']
-    next_grade_map = {}
-    for i, g in enumerate(grade_order):
-        next_grade_map[g] = grade_order[i + 1] if i < len(grade_order) - 1 else 'Graduate'
+        grade = (profile.grade_level if profile else '') or 'Unassigned'
+        counts[grade] = counts.get(grade, 0) + 1
+
+    # Canonical S1..S5 order, with Unassigned at the end. Skip grades
+    # that have zero students so the grid doesn't show empty cards.
+    canonical = ['S1', 'S2', 'S3', 'S4', 'S5']
+    classes = []
+    for g in canonical:
+        if counts.get(g):
+            classes.append({'grade': g, 'count': counts[g], 'is_grade': True})
+    if counts.get('Unassigned'):
+        classes.append({
+            'grade': 'Unassigned', 'count': counts['Unassigned'], 'is_grade': False,
+        })
+    # Anything custom (e.g. legacy "Form 4") that isn't in the canonical list
+    for g, n in counts.items():
+        if g in canonical or g == 'Unassigned':
+            continue
+        classes.append({'grade': g, 'count': n, 'is_grade': True})
 
     context = {
         **request.staff_ctx,
-        'students_by_grade': students_by_grade,
-        'next_grade_map': next_grade_map,
+        'classes': classes,
+        'total_students': sum(counts.values()),
     }
-
     return render(request, 'dashboard/classes/list.html', context)
 
 
