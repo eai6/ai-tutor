@@ -541,9 +541,11 @@
 </div>
 {% endif %}
 
-{# Course-level regenerate is gated separately from can_edit_content
-   so the pilot can let teachers edit lessons but block destructive
-   regeneration. #}
+{% comment %}
+Course-level regenerate is gated separately from can_edit_content
+so the pilot can let teachers edit lessons but block destructive
+regeneration.
+{% endcomment %}
 {% if can_regenerate_courses %}
 <div class="bulk-actions" style="background: #f5f3ff; border: 1px solid #ddd6fe; margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">🔁</span>
@@ -575,10 +577,12 @@
 </div>
 {% endif %}
 
-{# Weekly assignments: a class-management feature, available to any
-   staff user — NOT gated by can_edit_content (which governs lesson
-   content editing). Teachers in the pilot need to assign weekly
-   lessons even when curriculum editing is locked down. #}
+{% comment %}
+Weekly assignments: a class-management feature, available to any
+staff user — NOT gated by can_edit_content (which governs lesson
+content editing). Teachers in the pilot need to assign weekly
+lessons even when curriculum editing is locked down.
+{% endcomment %}
 <details class="card" style="margin: 1rem 0 2rem; padding: 0; overflow: hidden;">
     <summary style="cursor:pointer; padding:1rem 1.25rem; font-weight:600; color:#374151; font-size:0.95rem; background:#f9fafb; list-style:none; display:flex; justify-content:space-between; align-items:center;">
         <span>📅 Weekly assignments <span style="font-size:0.78rem;color:#6b7280;font-weight:500;margin-left:0.5rem;">— students see these in their weekly panel + Monday email</span></span>
