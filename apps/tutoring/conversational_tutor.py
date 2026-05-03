@@ -1618,12 +1618,20 @@ Keep it to 2-3 sentences."""
             # for bank questions).
             self._record_bank_question_on_turn(turn_metadata, picked_question)
 
-        # Verify calculations in math responses
+        # Verify calculations in math responses (LLM-based — replaces
+        # the regex verify_calculations so we also catch implicit
+        # prose claims like "do they sum to 360°?" which the regex
+        # missed). Pre-filtered on digits so conversational turns
+        # skip the LLM call.
         if self.lesson.unit.course.is_math:
-            from apps.tutoring.math_tools import verify_calculations
-            clean_response, corrections = verify_calculations(clean_response)
+            from apps.tutoring.llm_arithmetic_verifier import verify_arithmetic_claims
+            clean_response, corrections = verify_arithmetic_claims(
+                clean_response, llm_client=self.llm_client,
+            )
             if corrections:
-                logger.info(f"[MathCheck] Fixed {len(corrections)} calculation(s) in response")
+                logger.info(
+                    f"[MathCheck] LLM flagged {len(corrections)} arithmetic correction(s)"
+                )
 
         # Post-generation praise filter (Layer 3). Defense-in-depth: strip
         # praise when the deterministic math check said wrong OR when the
@@ -1934,12 +1942,16 @@ Keep it to 2-3 sentences."""
             # Record bank-pull (streaming parity with respond()).
             self._record_bank_question_on_turn(turn_metadata, picked_question)
 
-        # Verify calculations in math responses
+        # Verify calculations (streaming parity with respond()) — LLM-based.
         if self.lesson.unit.course.is_math:
-            from apps.tutoring.math_tools import verify_calculations
-            clean_content, corrections = verify_calculations(clean_content)
+            from apps.tutoring.llm_arithmetic_verifier import verify_arithmetic_claims
+            clean_content, corrections = verify_arithmetic_claims(
+                clean_content, llm_client=self.llm_client,
+            )
             if corrections:
-                logger.info(f"[MathCheck] Fixed {len(corrections)} calculation(s) in response")
+                logger.info(
+                    f"[MathCheck] LLM flagged {len(corrections)} arithmetic correction(s)"
+                )
 
         # Post-generation praise filter (Layer 3, streaming parity).
         praise_stripped = False

@@ -23,28 +23,35 @@ logger = logging.getLogger(__name__)
 def _normalize_enabling_objective(
     question_eo: str,
     canonical_eos: List[str],
+    *,
+    llm_client=None,
 ) -> tuple[str, str]:
     """Snap an LLM-emitted enabling_objective to one of the lesson's
     canonical enabling_objectives.
 
     The LLM is told to copy lesson EOs verbatim, but it drifts —
     paraphrasing, capitalisation changes, trailing punctuation,
-    occasional invention. This pass enforces the constraint
-    deterministically:
+    occasional invention. This pass enforces the constraint:
 
-      1. Exact match → keep verbatim.
-      2. Fuzzy match (case + whitespace + punctuation normalised, or
-         high overlap with exactly one canonical EO) → snap to the
-         canonical text.
-      3. No match → drop the tag (return ''). The question itself is
-         kept; only the bad tag is cleared so it can't pollute
-         remediation targeting.
+      1. Exact match → keep verbatim. (no LLM call)
+      2. Normalised exact match (case/whitespace/punctuation drift) →
+         snap. (no LLM call)
+      3. ``llm_client`` provided → ask the model to pick the closest
+         canonical EO or drop. Replaces the brittle substring-match
+         heuristic, which produced ambiguous-drop on EOs whose stems
+         shared common substrings ("angles around a point" was a
+         substring of every EO in the same lesson, so every emission
+         got dropped).
+      4. ``llm_client`` not provided → fall back to the substring
+         heuristic so callers without LLM access still get something.
+      5. No match → drop the tag (return ''). The question itself is
+         kept; only the bad tag is cleared.
 
     Returns (normalised_eo, status), where status is one of:
-      - 'exact'   — already matched verbatim
-      - 'snapped' — fuzzy-matched and rewritten to canonical
-      - 'dropped' — no match, tag cleared
-      - 'empty'   — input was empty to begin with
+      - 'exact'    — already matched verbatim
+      - 'snapped'  — fuzzy / LLM-snapped to canonical
+      - 'dropped'  — no match, tag cleared
+      - 'empty'    — input was empty to begin with
     """
     raw = (question_eo or '').strip()
     if not raw:
@@ -52,26 +59,29 @@ def _normalize_enabling_objective(
     canonical = [(eo or '').strip() for eo in canonical_eos if (eo or '').strip()]
     if not canonical:
         return '', 'dropped'
-    # 1. Exact match
+
     if raw in canonical:
         return raw, 'exact'
 
     def _norm(s: str) -> str:
-        # Lowercase, collapse whitespace, strip trailing punctuation.
         import re as _re
         out = _re.sub(r'\s+', ' ', s.lower().strip())
         return _re.sub(r'[\s.,;:!?]+$', '', out)
 
     raw_n = _norm(raw)
     by_norm = {_norm(eo): eo for eo in canonical}
-
-    # 2a. Normalised exact match (case / punctuation / whitespace drift)
     if raw_n in by_norm:
         return by_norm[raw_n], 'snapped'
 
-    # 2b. Substring match — if the LLM truncated or extended the EO
-    # text, accept when there's exactly ONE canonical EO that's a
-    # substring of the input or vice versa. Ambiguous → drop.
+    if llm_client is not None:
+        snapped = _llm_snap_eo(raw, canonical, llm_client)
+        if snapped:
+            return snapped, 'snapped'
+        return '', 'dropped'
+
+    # Legacy fallback when no LLM is wired in: substring heuristic.
+    # Demonstrably brittle (every EO in a lesson tends to share the
+    # broad concept as a substring) — kept only for the no-LLM path.
     contains_matches = [
         eo for eo_n, eo in by_norm.items()
         if eo_n and (eo_n in raw_n or raw_n in eo_n)
@@ -80,6 +90,52 @@ def _normalize_enabling_objective(
         return contains_matches[0], 'snapped'
 
     return '', 'dropped'
+
+
+def _llm_snap_eo(raw: str, canonical: List[str], llm_client) -> str:
+    """Ask the LLM to pick the canonical EO that best matches ``raw``.
+
+    Returns the canonical EO string when the model picks one of the
+    listed options, or ``''`` when the model says 'none' / outputs
+    something off-list. Failures are non-fatal — caller falls back
+    to dropping the tag.
+    """
+    import json
+    options_block = "\n".join(
+        f"  [{i + 1}] {eo}" for i, eo in enumerate(canonical)
+    )
+    prompt = (
+        "Pick the canonical enabling objective that best matches the "
+        "emitted text. Reply with ONLY the integer index (1-based), or "
+        "0 if NONE of the options is a clear match.\n\n"
+        f"Emitted: {raw[:300]}\n\n"
+        "Canonical options:\n"
+        f"{options_block}\n"
+    )
+    sys_prompt = (
+        "You are a strict classifier. Output ONLY a single integer — "
+        "the 1-based index of the best matching option, or 0 for none. "
+        "No prose, no JSON, no code fence."
+    )
+    try:
+        response = llm_client.generate(
+            messages=[{"role": "user", "content": prompt}],
+            system_prompt=sys_prompt,
+            max_tokens=10,
+        )
+        raw_out = (response.content or '').strip()
+        # Pull the first integer out of the response.
+        import re as _re
+        m = _re.search(r'\d+', raw_out)
+        if not m:
+            return ''
+        idx = int(m.group(0))
+        if idx <= 0 or idx > len(canonical):
+            return ''
+        return canonical[idx - 1]
+    except Exception as e:
+        logger.info("[EOSnap] LLM call failed: %s", e)
+        return ''
 
 
 def _coverage_gaps(lesson, exit_ticket) -> list:
