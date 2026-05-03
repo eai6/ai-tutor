@@ -5784,6 +5784,27 @@ def class_competency(request, course_id):
             .values_list('user_id', flat=True)
         )
 
+    # Grade scope — Mathematics S3 should only count S3 students, not
+    # the entire school's roster. Course.grade_level can be a single
+    # grade ("S3") or a comma-separated set ("S1,S2"). Empty means the
+    # course is grade-agnostic and we keep the full roster.
+    #
+    # No fallback when zero students match: if the course is for S3
+    # and nobody has grade=S3 on their profile, the right answer is
+    # "no students" (which surfaces the missing grade_level data
+    # problem) rather than silently counting every student in the
+    # school.
+    course_grades = {
+        g.strip() for g in (course.grade_level or '').split(',') if g.strip()
+    }
+    if course_grades and roster_ids:
+        roster_ids = list(
+            StudentProfile.objects.filter(
+                user_id__in=roster_ids,
+                grade_level__in=course_grades,
+            ).values_list('user_id', flat=True)
+        )
+
     matrix = class_competency_matrix(course, students=roster_ids)
 
     # Class readiness score — average of "% of class mastered (latest ≥70)"
