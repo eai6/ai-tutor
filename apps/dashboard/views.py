@@ -723,14 +723,38 @@ def student_detail(request, student_id):
             'lessons': lesson_competencies,
         })
 
+    # Promote / demote action labels — staff use these one-off on the
+    # student page (vs the bulk flow on the class page). An empty
+    # grade means the student already graduated → only "demote back to
+    # S5" makes sense.
+    profile = getattr(student, 'student_profile', None)
+    current_grade = (profile.grade_level if profile else '') or ''
+    GRADE_ORDER = ['S1', 'S2', 'S3', 'S4', 'S5']
+    promote_label = ''
+    demote_label = ''
+    if current_grade in GRADE_ORDER:
+        idx = GRADE_ORDER.index(current_grade)
+        if idx < len(GRADE_ORDER) - 1:
+            promote_label = f'Promote to {GRADE_ORDER[idx + 1]}'
+        else:
+            promote_label = 'Graduate'
+        if idx > 0:
+            demote_label = f'Demote to {GRADE_ORDER[idx - 1]}'
+    elif current_grade == '':
+        # Graduated — can be reactivated to S5.
+        demote_label = 'Reactivate at S5'
+
     context = {
         **request.staff_ctx,
         'student': student,
-        'profile': getattr(student, 'student_profile', None),
+        'profile': profile,
         'stats': stats,
         'sessions': sessions,
         'courses_progress': courses_progress.values(),
         'competency_data': competency_data,
+        'current_grade': current_grade,
+        'promote_label': promote_label,
+        'demote_label': demote_label,
     }
 
     return render(request, 'dashboard/students/detail.html', context)
@@ -1724,6 +1748,13 @@ def class_detail(request, grade):
         next_grade = ''
         next_action = ''
 
+    if grade in GRADE_ORDER and GRADE_ORDER.index(grade) > 0:
+        prev_grade = GRADE_ORDER[GRADE_ORDER.index(grade) - 1]
+        prev_action = f'Demote to {prev_grade}'
+    else:
+        prev_grade = ''
+        prev_action = ''
+
     context = {
         **request.staff_ctx,
         'grade': grade,
@@ -1732,6 +1763,8 @@ def class_detail(request, grade):
         'course_stats': course_stats,
         'next_grade': next_grade,
         'next_action': next_action,
+        'prev_grade': prev_grade,
+        'prev_action': prev_action,
     }
     return render(request, 'dashboard/classes/detail.html', context)
 
@@ -1739,9 +1772,18 @@ def class_detail(request, grade):
 @teacher_required
 @require_POST
 def promote_students(request):
-    """Bulk promote students to the next grade level."""
+    """Move students up or down a grade.
+
+    ``direction``:
+      - ``'up'`` (default) — promote to the next grade. S5 → graduate
+        (clears grade_level + deactivates membership).
+      - ``'down'`` — demote to the previous grade. S1 cannot be
+        demoted further. Demoting an empty/graduated grade reactivates
+        the student at S5.
+    """
     student_ids = request.POST.getlist('student_ids')
     from_grade = request.POST.get('from_grade', '')
+    direction = (request.POST.get('direction') or 'up').lower()
 
     GRADE_ORDER = ['S1', 'S2', 'S3', 'S4', 'S5']
 
@@ -1755,33 +1797,71 @@ def promote_students(request):
             return redirect(redirect_to)
         return redirect('dashboard:class_list')
 
-    if from_grade not in GRADE_ORDER:
-        messages.error(request, f"Invalid grade: {from_grade}")
-        return _redirect_back()
-
-    idx = GRADE_ORDER.index(from_grade)
-
     if not student_ids:
         messages.warning(request, "No students selected.")
         return _redirect_back()
 
-    if idx >= len(GRADE_ORDER) - 1:
-        # S5 graduation: mark as graduated (empty grade)
-        updated = StudentProfile.objects.filter(
-            user_id__in=student_ids, grade_level=from_grade
-        ).update(grade_level='')
-        # Deactivate memberships
-        Membership.objects.filter(
-            user_id__in=student_ids, role='student', is_active=True
-        ).update(is_active=False)
-        messages.success(request, f"Graduated {updated} student(s) from {from_grade}.")
-    else:
-        next_grade = GRADE_ORDER[idx + 1]
-        updated = StudentProfile.objects.filter(
-            user_id__in=student_ids, grade_level=from_grade
-        ).update(grade_level=next_grade)
-        messages.success(request, f"Promoted {updated} student(s) from {from_grade} to {next_grade}.")
+    # Allow empty `from_grade` only when demoting a graduated student
+    # back to S5. Other operations require a valid source grade.
+    if direction == 'up':
+        if from_grade not in GRADE_ORDER:
+            messages.error(request, f"Invalid grade: {from_grade}")
+            return _redirect_back()
+        idx = GRADE_ORDER.index(from_grade)
+        if idx >= len(GRADE_ORDER) - 1:
+            # S5 graduation
+            updated = StudentProfile.objects.filter(
+                user_id__in=student_ids, grade_level=from_grade,
+            ).update(grade_level='')
+            Membership.objects.filter(
+                user_id__in=student_ids, role='student', is_active=True,
+            ).update(is_active=False)
+            messages.success(request, f"Graduated {updated} student(s) from {from_grade}.")
+        else:
+            next_grade = GRADE_ORDER[idx + 1]
+            updated = StudentProfile.objects.filter(
+                user_id__in=student_ids, grade_level=from_grade,
+            ).update(grade_level=next_grade)
+            messages.success(
+                request,
+                f"Promoted {updated} student(s) from {from_grade} to {next_grade}.",
+            )
+        return _redirect_back()
 
+    if direction == 'down':
+        # Empty source grade = graduated student returning to S5.
+        if not from_grade:
+            updated = StudentProfile.objects.filter(
+                user_id__in=student_ids, grade_level='',
+            ).update(grade_level='S5')
+            # Reactivate any deactivated graduate memberships
+            Membership.objects.filter(
+                user_id__in=student_ids, role='student', is_active=False,
+            ).update(is_active=True)
+            messages.success(
+                request,
+                f"Reactivated {updated} graduated student(s) at S5.",
+            )
+            return _redirect_back()
+
+        if from_grade not in GRADE_ORDER:
+            messages.error(request, f"Invalid grade: {from_grade}")
+            return _redirect_back()
+        idx = GRADE_ORDER.index(from_grade)
+        if idx == 0:
+            messages.warning(request, "S1 students can't be demoted further.")
+            return _redirect_back()
+        prev_grade = GRADE_ORDER[idx - 1]
+        updated = StudentProfile.objects.filter(
+            user_id__in=student_ids, grade_level=from_grade,
+        ).update(grade_level=prev_grade)
+        messages.success(
+            request,
+            f"Demoted {updated} student(s) from {from_grade} to {prev_grade}.",
+        )
+        return _redirect_back()
+
+    messages.error(request, f"Unknown direction: {direction}")
     return _redirect_back()
 
 

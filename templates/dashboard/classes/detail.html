@@ -71,15 +71,21 @@
                 {{ student_count }} student{{ student_count|pluralize }} in {{ grade }}
             </p>
         </div>
-        {% if next_action %}
-        <button type="button" class="btn btn-primary btn-sm" onclick="togglePromoteForm()">{{ next_action }}</button>
-        {% endif %}
+        <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            {% if next_action %}
+            <button type="button" class="btn btn-primary btn-sm" onclick="openPromoteForm('up')">{{ next_action }}</button>
+            {% endif %}
+            {% if prev_action %}
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openPromoteForm('down')">{{ prev_action }}</button>
+            {% endif %}
+        </div>
     </div>
 
-    {% if next_action %}
+    {% if next_action or prev_action %}
     <form method="post" action="{% url 'dashboard:promote_students' %}" id="promote-form" style="display:none;">
         {% csrf_token %}
         <input type="hidden" name="from_grade" value="{{ grade }}">
+        <input type="hidden" name="direction" id="promote-direction" value="up">
         <input type="hidden" name="redirect_to" value="{% url 'dashboard:class_detail' grade %}">
         <div style="padding:0.75rem 1rem; background:#eff6ff; border-bottom:1px solid #dbeafe; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
             <label style="font-size:0.875rem; font-weight:500; color:#1e40af;">
@@ -87,8 +93,8 @@
                 Select all
             </label>
             <span id="selected-count" style="font-size:0.78rem; color:#1e40af;">0 selected</span>
-            <button type="submit" class="btn btn-primary btn-sm">Confirm {{ next_action|lower }}</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="togglePromoteForm()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="confirm-btn">Confirm</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closePromoteForm()">Cancel</button>
         </div>
     </form>
     {% endif %}
@@ -136,20 +142,29 @@
 </div>
 
 <script>
-function togglePromoteForm() {
+var PROMOTE_LABELS = {
+    'up': '{{ next_action|escapejs }}',
+    'down': '{{ prev_action|escapejs }}',
+};
+function openPromoteForm(direction) {
     var form = document.getElementById('promote-form');
     if (!form) return;
-    var cols = document.querySelectorAll('.promote-col');
-    var isVisible = form.style.display !== 'none';
-    form.style.display = isVisible ? 'none' : 'block';
-    cols.forEach(function (col) { col.hidden = isVisible; });
-    if (isVisible) {
-        // Reset selection on close
-        document.querySelectorAll('.student-checkbox').forEach(function (cb) { cb.checked = false; });
-        var selectAll = document.getElementById('select-all');
-        if (selectAll) selectAll.checked = false;
-        updateSelectedCount();
-    }
+    var dirInput = document.getElementById('promote-direction');
+    var btn = document.getElementById('confirm-btn');
+    if (dirInput) dirInput.value = direction;
+    if (btn) btn.textContent = 'Confirm — ' + (PROMOTE_LABELS[direction] || direction);
+    form.style.display = 'block';
+    document.querySelectorAll('.promote-col').forEach(function (col) { col.hidden = false; });
+}
+function closePromoteForm() {
+    var form = document.getElementById('promote-form');
+    if (!form) return;
+    form.style.display = 'none';
+    document.querySelectorAll('.promote-col').forEach(function (col) { col.hidden = true; });
+    document.querySelectorAll('.student-checkbox').forEach(function (cb) { cb.checked = false; });
+    var selectAll = document.getElementById('select-all');
+    if (selectAll) selectAll.checked = false;
+    updateSelectedCount();
 }
 function toggleAllStudents(selectAllCb) {
     document.querySelectorAll('.student-checkbox').forEach(function (cb) {

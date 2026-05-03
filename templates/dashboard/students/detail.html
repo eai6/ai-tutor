@@ -29,7 +29,27 @@
                 </div>
                 {% endif %}
             </div>
-            <div>
+            <div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:flex-start;">
+                {% if promote_label %}
+                <form method="post" action="{% url 'dashboard:promote_students' %}" onsubmit="return confirm('{{ promote_label }} for {{ student.first_name }} {{ student.last_name }}?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="student_ids" value="{{ student.id }}">
+                    <input type="hidden" name="from_grade" value="{{ current_grade }}">
+                    <input type="hidden" name="direction" value="up">
+                    <input type="hidden" name="redirect_to" value="{% url 'dashboard:student_detail' student.id %}">
+                    <button type="submit" class="btn btn-primary btn-sm" style="white-space:nowrap;">{{ promote_label }}</button>
+                </form>
+                {% endif %}
+                {% if demote_label %}
+                <form method="post" action="{% url 'dashboard:promote_students' %}" onsubmit="return confirm('{{ demote_label }} for {{ student.first_name }} {{ student.last_name }}?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="student_ids" value="{{ student.id }}">
+                    <input type="hidden" name="from_grade" value="{{ current_grade }}">
+                    <input type="hidden" name="direction" value="down">
+                    <input type="hidden" name="redirect_to" value="{% url 'dashboard:student_detail' student.id %}">
+                    <button type="submit" class="btn btn-secondary btn-sm" style="white-space:nowrap;">{{ demote_label }}</button>
+                </form>
+                {% endif %}
                 <form method="post" action="{% url 'dashboard:delete_student' student.id %}" onsubmit="return confirm('Permanently delete student account &quot;{{ student.username }}&quot;? This removes their tutoring history and exit ticket attempts and cannot be undone.');">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">Delete student</button>
