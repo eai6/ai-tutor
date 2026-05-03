@@ -292,10 +292,93 @@ D. If you cannot write a constraint that PROVES the premise is
    a different question shape.
 
 ═══════════════════════════════════════════════════════════════════════
+COMMON FAILURE MODES — fix these BEFORE you emit the template
+═══════════════════════════════════════════════════════════════════════
+
+The validator rejects templates that fall into the following traps.
+Reading these will save you from re-trying.
+
+P1. EXPLANATION SLOT SYNTAX. `explanation_template` slots are
+    DECLARED PARAMETER NAMES ONLY, plus the special `{answer}` slot.
+    You may NOT put arithmetic inside slot braces.
+    ❌ "By Pythagoras: c = √({a*a} + {b*b}) = {answer}"
+       (rejected: 'a*a' is not a parameter)
+    ✓ "By Pythagoras: c = √({a}² + {b}²) ≈ {answer}"
+       (the ² is just a literal character; {a} and {b} reference
+       declared parameters; {answer} reads the computed value)
+    ✓ "Each interior angle = 180 × ({n} - 2) ÷ {n} = {answer}°"
+       (n is a declared param; arithmetic stays OUTSIDE the braces
+       as plain text)
+
+P2. CONSTRAINT-RANGE CONSISTENCY. Your `constraints` list must be
+    SATISFIABLE given your `parameters` ranges. The renderer samples
+    parameter values from the ranges and rejects those that violate
+    the constraints; if your ranges and constraints disagree, every
+    sample fails.
+    ❌ parameters: {"a": {"min": 10, "max": 50}}, constraints: ["a > 100"]
+       (rejected: max(a)=50 makes "a > 100" unsatisfiable)
+    ❌ parameters: {"angle": {"min": 30, "max": 150}}, constraints:
+       ["360 % (180 - angle) == 0"]
+       (rejected: only a few angles in [30,150] satisfy this — the
+       sampler can't find one in 50 tries)
+    ✓ parameters: {"a": {"min": 110, "max": 170}}, constraints: ["a > 100"]
+       (range and constraint agree)
+    ✓ Use simpler constraints like ["a > 0", "a + b < 350"] over
+       complex divisibility/modulo predicates that prune the
+       sample space too aggressively.
+
+P3. TRIANGLE-INEQUALITY TEMPLATES. Don't pose "find the area of a
+    triangle with sides a, b, c" with random sides — most random
+    triples violate a + b > c. Use a different formulation:
+    ❌ parameters: a/b/c each in [3, 30], constraint:
+       "a + b > c and b + c > a and a + c > b"
+       (most samples violate the inequality; rejected after 50 tries)
+    ✓ Pose Heron's law on a known-valid triple (e.g., let
+       a=base, b=height, derived) OR use a different shape (rectangle,
+       trapezoid with explicit parallel sides + height) where the
+       parameters are independent.
+
+P4. CO-INTERIOR / SAME-SIDE INTERIOR ANGLES. "Two parallel lines
+    cut by a transversal — find the co-interior angle to a°" needs
+    a constraint like "a > 0 and a < 180" — but if your parameter
+    range is already (10, 170) the constraint is redundant. Drop the
+    redundant constraint OR widen the parameter range.
+
+P5. POLYGON SIDE-COUNT QUESTIONS. "Find the number of sides given
+    each interior angle of θ°" only has integer solutions for
+    θ ∈ {60, 90, 108, 120, 128.57, 135, 140, 144, 147.27, 150, ...}.
+    If you sample θ ∈ [60, 170], most samples don't yield integer
+    sides. Either restrict parameters to a hand-picked list (use
+    "step": that lands on valid values) OR pick a different
+    question shape (give n, find θ — always integer).
+
+P6. SLOT NAMES vs ANSWER LABELS. The `{answer}` slot in
+    `explanation_template` is the SINGLE computed answer (or, for
+    fill_in_blank, "answer1 / answer2 / …"). Don't reference
+    `{angle}`, `{result}`, or any made-up name. Only declared
+    parameters and `{answer}`.
+
+═══════════════════════════════════════════════════════════════════════
 REQUIREMENTS
 ═══════════════════════════════════════════════════════════════════════
 1. Generate up to 35 questions, ALL templated. Bank floor is 25.
-   Format mix: 15 MCQ / 7 fill_in_blank / 6 matching / 7 short_numeric.
+
+   Format mix is MANDATORY (NOT a suggestion):
+     - 15 MCQ              (question_type: "mcq")
+     - 7  fill_in_blank    (question_type: "fill_in_blank")
+     - 6  matching         (question_type: "matching")
+     - 7  short_numeric    (question_type: "short_numeric")
+
+   A bank with 35 short_numeric and zero of the other types is a
+   format-mix violation. Pick MCQ/fill/matching templates from the
+   worked examples (sections 6, 7, 8 above) and adapt them to the
+   lesson topic — they're computable just like short_numeric, just
+   with one extra field (correct_formula + distractor_formulas, or
+   blank_formulas, or pair_count + left/right_formula).
+
+   Generate IN ORDER: questions 1-7 short_numeric, 8-22 MCQ,
+   23-29 fill_in_blank, 30-35 matching. This forces format
+   diversity from the start instead of all short_numeric first.
 2. Each question MUST have BOTH:
    - concept_tag: broad learning objective (the lesson's main objective)
    - enabling_objective: EXACT TEXT of one ENABLING OBJECTIVE from below
