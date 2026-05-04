@@ -1788,6 +1788,7 @@ Keep it to 2-3 sentences."""
                 rule_check=False,  # avoid second rule-check (latency cap)
                 student_input=student_input,
                 bank_stems=self._current_bank_stems(),
+                bank_signal_used=bool(getattr(self, '_bank_signal_used_this_turn', False)),
             )
             clean_response = revalidation.content
             turn_metadata['regenerated'] = True
@@ -1802,6 +1803,27 @@ Keep it to 2-3 sentences."""
                 media = [regen_media]
             if regen_artifact:
                 artifact_html = regen_artifact
+
+            # FORCE-INJECT — last-resort structural enforcement.
+            # If the regenerated response STILL has authoring_violation
+            # (the LLM is committed to writing its own questions despite
+            # the system prompt + regen), strip the LLM's question and
+            # append a verified bank entry. The student never sees an
+            # LLM-authored numerical question — guaranteed.
+            from apps.tutoring.validator import ISSUE_AUTHORING_VIOLATION
+            if ISSUE_AUTHORING_VIOLATION in (revalidation.issues or []):
+                forced = self._force_inject_bank_question(
+                    clean_response, turn_metadata,
+                )
+                if forced:
+                    clean_response = forced
+                    turn_metadata['force_injected'] = True
+                    logger.warning(
+                        "[ForceInject] session=%s — LLM persistently "
+                        "authored despite regen; replaced question "
+                        "stem with bank entry.",
+                        self.session.id,
+                    )
 
         # Record media for this turn (for resume artifact panel)
         if media:
@@ -3560,6 +3582,31 @@ Follow the current step; this concept will be covered in sequence."""
                 "\n</mobile_response_format>"
             )
 
+        # Per-turn structural reminder — math only. Repeated last so it
+        # sits in the highest-salience position of the prompt every turn,
+        # regardless of how long the conversation has grown. The prose
+        # rules above dilute as context expands; this block is the
+        # short, machine-checked line of defense the validator enforces.
+        try:
+            is_math_final = self.lesson.unit.course.is_math
+        except Exception:
+            is_math_final = False
+        if is_math_final:
+            system_prompt += (
+                "\n\n<final_reminder>"
+                "\nMATH RULE — every numerical question you pose this turn"
+                "\nMUST end with one of these signals on its own line:"
+                "\n  |||QUESTION:N|||      — pose bank slot N (see <question_bank>)"
+                "\n  |||QUESTION_EO:N|||   — pose any bank question for EO N"
+                "\n"
+                "\nA numerical question without one of these signals will be"
+                "\nrejected by the system and replaced with a bank question."
+                "\nDo NOT invent angle measures, sums, side lengths, or any"
+                "\nother numerical example. If you need a numerical example,"
+                "\nemit a signal — never type the numbers yourself."
+                "\n</final_reminder>"
+            )
+
         return system_prompt
 
     def _build_group_session_block(self) -> str:
@@ -3988,6 +4035,78 @@ Follow the current step; this concept will be covered in sequence."""
 
         self._question_id_map = id_map
         return block
+
+    def _force_inject_bank_question(
+        self, response: str, turn_metadata: Dict,
+    ) -> Optional[str]:
+        """Last-resort structural enforcement: when the LLM has authored
+        a numerical question despite the system prompt + one regen,
+        strip its question and append a verified bank entry.
+
+        Strategy:
+          1. Truncate the response at the first '?' so the LLM's
+             teaching prose stays but the unsafe question is dropped.
+             We snap back to the start of the sentence containing the
+             '?' (last '. ' / '! ' / '\\n' before it) so the truncation
+             reads cleanly.
+          2. Pick a bank entry — prefer slot 0 (the current step's
+             canonical question), fall back to the first available
+             ExitTicketQuestion in the id_map.
+          3. Append the verbatim rendered bank stem.
+          4. Record bank_question_ref on turn_metadata so the next
+             student reply gets graded deterministically.
+
+        Returns the rewritten response, or None if there's no bank
+        entry to fall back to (in which case the original response
+        ships unchanged — better to leak a bad question once than
+        crash the turn).
+        """
+        id_map = getattr(self, '_question_id_map', {}) or {}
+        if not id_map:
+            return None
+
+        # Pick the entry: current step (slot 0) is the most contextually
+        # appropriate. Falls back to the first non-zero slot.
+        entry = id_map.get(0)
+        if entry is None:
+            for k in sorted(id_map.keys()):
+                if k != 0:
+                    entry = id_map[k]
+                    break
+        if entry is None:
+            return None
+
+        # Truncate at the first '?' (or last paragraph if no '?').
+        cut = response.find('?')
+        if cut >= 0:
+            # Snap back to the end of the previous sentence so the
+            # cut reads cleanly.
+            prelude_end = cut + 1  # default: keep the question mark
+            for sep in ['. ', '! ', '\n\n', '\n']:
+                last = response.rfind(sep, 0, cut)
+                if last > 0:
+                    prelude_end = last + len(sep)
+                    break
+            prose = response[:prelude_end].rstrip()
+        else:
+            # No '?' — keep all but the last paragraph.
+            paras = response.rsplit('\n\n', 1)
+            prose = paras[0].rstrip() if len(paras) > 1 else response.rstrip()
+
+        from apps.tutoring.question_bank import render_question_to_prose
+        rendered = render_question_to_prose(entry)
+        if not rendered:
+            return None
+
+        # Record the bank ref so the next student turn grades against it.
+        self._record_bank_question_on_turn(turn_metadata, entry)
+
+        note = (
+            "\n\nLet's try a verified question from the bank:\n\n"
+            if prose else
+            "Let's try a verified question from the bank:\n\n"
+        )
+        return f"{prose}{note}{rendered}".strip()
 
     def _parse_question_signal(
         self, text: str,
