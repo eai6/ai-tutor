@@ -3948,10 +3948,20 @@ Follow the current step; this concept will be covered in sequence."""
     def _build_question_bank_block(self) -> str:
         """Build the <question_bank> block for math sessions.
 
-        The tutor MUST NOT author its own arithmetic questions. Every
-        question posed during a math session comes from this bank:
-        either the current step's `teacher_script` (slot 0) or one of
-        the published `ExitTicketQuestion` rows for the same lesson.
+        The tutor MUST NOT author its own arithmetic questions during
+        ANY phase (engage, explain, worked_example, practice, quiz,
+        summary). Every question with numerical values comes from
+        this bank:
+          - slot 0 — current step's teacher_script (canonical)
+          - slots 1..N — exit-ticket bank candidates for the lesson
+          - slots N+1..M — all OTHER lesson step teacher_scripts so
+            warmup / review / engage phases can pose questions from
+            steps not yet reached
+
+        Without the "all lesson steps" pool, engage/warmup phases
+        had nothing in the bank → LLM defaulted to authoring. Even
+        when the LLM tried to copy verified numbers it paraphrased
+        and used questions out of step order.
 
         See memory/tutor_no_authoring_plan.md.
 
@@ -4001,13 +4011,41 @@ Follow the current step; this concept will be covered in sequence."""
             by_id = {q.id: q for q in qs}
             pool = [by_id[i] for i in pool_ids if i in by_id]
 
-        if not pool:
-            return ''
-
         candidates = pick_candidates_for_step(
             pool, current_step.concept_tag or '',
         )
         block, id_map = render_bank_block(current_step, candidates)
+
+        # Augment with all OTHER lesson step questions so engage /
+        # warmup / explain phases can pose verified questions from
+        # any step. Cap to keep prompt size sane.
+        other_steps = [
+            s for s in self.steps
+            if s.id != current_step.id
+            and (getattr(s, 'teacher_script', '') or '').strip()
+        ]
+        if other_steps:
+            next_slot = max(id_map.keys()) + 1 if id_map else 1
+            extra_lines = ["", "  Additional lesson-step questions (slots "
+                           f"{next_slot}+ — pose any of these via "
+                           "|||QUESTION:N||| during teach / engage / "
+                           "review phases):"]
+            for s in other_steps[:15]:  # cap so prompt stays compact
+                id_map[next_slot] = s
+                stem = (s.teacher_script or '').strip()
+                expected = (getattr(s, 'expected_answer', '') or '').strip()
+                line = f"  [{next_slot}] (step {s.order_index + 1}, {s.step_type}) {stem[:300]}"
+                if expected:
+                    line += f"   (expected_answer: {expected[:60]})"
+                extra_lines.append(line)
+                next_slot += 1
+            # Slot the additions BEFORE the closing tag.
+            if "</question_bank>" in block:
+                block = block.replace(
+                    "</question_bank>",
+                    "\n".join(extra_lines) + "\n</question_bank>",
+                )
+
         self._question_id_map = id_map
         return block
 

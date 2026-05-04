@@ -250,19 +250,25 @@ def validate_tutor_response(
         issues.append(ISSUE_ARITHMETIC_VIOLATION)
         extra_meta["arithmetic_corrections"] = list(arithmetic_corrections)
 
-    # (b) AUTHORING gate: math + practice/quiz step + the response
-    #     contains a question with specific numerical values + the
-    #     LLM did NOT emit a bank pull signal (|||QUESTION:N||| or
-    #     |||QUESTION_EO:N|||). The LLM-judge already flags this in
-    #     spirit but is occasionally lenient — this is the deterministic
-    #     backstop. Triggers regen.
+    # (b) AUTHORING gate: math + ANY phase + the response contains a
+    #     question with specific numerical values + the LLM did NOT
+    #     emit a bank pull signal (|||QUESTION:N||| or |||QUESTION_EO:N|||).
+    #
+    #     Was previously gated on practice/quiz only. Field bug: the
+    #     LLM was authoring during engage/warmup phases (where the
+    #     gate didn't fire) — paraphrasing later steps' questions
+    #     instead of pulling from the bank. Extending to all phases
+    #     means the LLM has to use |||QUESTION:N||| to pose a
+    #     numerical question regardless of which step it's on.
+    #
+    #     Conceptual / non-numerical questions ("which rule applies?")
+    #     pass _has_numerical_question and are not blocked.
     try:
         is_math_for_authoring = lesson.unit.course.is_math
     except Exception:
         is_math_for_authoring = False
     if (
         is_math_for_authoring
-        and step_type in {"practice", "quiz"}
         and bank_signal_used is False
         and _has_numerical_question(content)
     ):
@@ -270,6 +276,7 @@ def validate_tutor_response(
         if ISSUE_AUTHORING_VIOLATION not in issues:
             issues.append(ISSUE_AUTHORING_VIOLATION)
         extra_meta["authoring_gate_fired"] = True
+        extra_meta["authoring_gate_step_type"] = step_type or ""
 
     return ValidationResult(
         content=content,
