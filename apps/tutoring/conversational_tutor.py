@@ -1826,26 +1826,17 @@ Keep it to 2-3 sentences."""
             if regen_artifact:
                 artifact_html = regen_artifact
 
-            # FORCE-INJECT — last-resort structural enforcement.
-            # If the regenerated response STILL has authoring_violation
-            # (the LLM is committed to writing its own questions despite
-            # the system prompt + regen), strip the LLM's question and
-            # append a verified bank entry. The student never sees an
-            # LLM-authored numerical question — guaranteed.
-            from apps.tutoring.validator import ISSUE_AUTHORING_VIOLATION
-            if ISSUE_AUTHORING_VIOLATION in (revalidation.issues or []):
-                forced = self._force_inject_bank_question(
-                    clean_response, turn_metadata,
-                )
-                if forced:
-                    clean_response = forced
-                    turn_metadata['force_injected'] = True
-                    logger.warning(
-                        "[ForceInject] session=%s — LLM persistently "
-                        "authored despite regen; replaced question "
-                        "stem with bank entry.",
-                        self.session.id,
-                    )
+            # NOTE: force-inject of bank questions on persistent
+            # authoring_violation was tried and removed (2026-05-04) —
+            # the truncate-at-'?'-then-append helper produced half-baked
+            # responses ("Quick check before we apply it:" with no
+            # question following) when the LLM's question shape didn't
+            # match the helper's expectations. The helper itself
+            # (_force_inject_bank_question) is still defined below for
+            # potential future use, but is no longer invoked. Cleaner
+            # alternatives discussed in the chat — leaning toward
+            # bank-only system-prompt scaffolding instead of post-hoc
+            # surgery on the response text.
 
         # Record media for this turn (for resume artifact panel)
         if media:
