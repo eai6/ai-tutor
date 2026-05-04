@@ -1238,7 +1238,10 @@ body {
 /* Mobile overflow menu — kebab + popover. Hidden on desktop; takes
    over for the difficulty + audio buttons on narrow screens. */
 .header-kebab {
-    display: none;
+    /* Always visible — mobile uses it to collapse all the secondary
+       header actions, desktop uses it to expose Restart lesson which
+       has no top-level button. */
+    display: inline-flex;
     background: transparent;
     border: 1px solid #e4e4e7;
     border-radius: 8px;
