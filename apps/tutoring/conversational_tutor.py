@@ -1634,20 +1634,37 @@ Keep it to 2-3 sentences."""
             # for bank questions).
             self._record_bank_question_on_turn(turn_metadata, picked_question)
 
-        # Verify calculations in math responses (LLM-based — replaces
-        # the regex verify_calculations so we also catch implicit
-        # prose claims like "do they sum to 360°?" which the regex
-        # missed). Pre-filtered on digits so conversational turns
-        # skip the LLM call.
+        # Combined post-response judge — math-only. ONE LLM call
+        # evaluating arithmetic + factual + rule_compliance, replacing
+        # the three separate calls (verify_arithmetic_claims +
+        # validator.L4 fact_check + validator.L5 rule_check). Roughly
+        # halves post-response cost on Opus tutoring. The validator
+        # below consumes `combined_result` and skips its L4/L5 LLM
+        # calls accordingly.
         arithmetic_corrections: List[Dict] = []
+        combined_judge_result = None
         if self.lesson.unit.course.is_math:
-            from apps.tutoring.llm_arithmetic_verifier import verify_arithmetic_claims
-            clean_response, arithmetic_corrections = verify_arithmetic_claims(
-                clean_response, llm_client=self.llm_client,
+            from apps.tutoring.combined_judge import run_combined_judge
+            combined_judge_result = run_combined_judge(
+                clean_response,
+                lesson=self.lesson,
+                llm_client=self.llm_client,
+                bank_stems=self._current_bank_stems(),
+                student_input=student_input,
+                answer_was_bare=turn_bare_answer,
+                answer_was_wrong=(
+                    turn_math_check is not None
+                    and turn_math_check.is_correct is False
+                ),
+            )
+            if combined_judge_result.corrected_response:
+                clean_response = combined_judge_result.corrected_response
+            arithmetic_corrections = list(
+                combined_judge_result.arithmetic_corrections
             )
             if arithmetic_corrections:
                 logger.info(
-                    f"[MathCheck] LLM flagged {len(arithmetic_corrections)} arithmetic correction(s) — will trigger regen"
+                    f"[CombinedJudge] flagged {len(arithmetic_corrections)} arithmetic correction(s) — will trigger regen"
                 )
 
         # Post-generation praise filter (Layer 3). Defense-in-depth: strip
@@ -1736,6 +1753,11 @@ Keep it to 2-3 sentences."""
             bank_stems=self._current_bank_stems(),
             arithmetic_corrections=arithmetic_corrections,
             bank_signal_used=bool(getattr(self, '_bank_signal_used_this_turn', False)),
+            combined_result=combined_judge_result,
+            # Combined judge already covered fact + rule. Skip the
+            # legacy L4/L5 LLM calls so they don't run twice.
+            fact_check=(combined_judge_result is None),
+            rule_check=(combined_judge_result is None),
         )
         if validation.content != clean_response:
             clean_response = validation.content

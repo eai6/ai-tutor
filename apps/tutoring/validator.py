@@ -122,6 +122,7 @@ def validate_tutor_response(
     bank_stems: Optional[List[str]] = None,
     arithmetic_corrections: Optional[List[Dict]] = None,
     bank_signal_used: Optional[bool] = None,
+    combined_result=None,
 ) -> ValidationResult:
     """Run V1+V2 validator layers over a tutor response.
 
@@ -182,61 +183,82 @@ def validate_tutor_response(
             content = new_content
             issues.append(ISSUE_UNFOUNDED_PRAISE_STRIPPED)
 
-    # L4 — factual claim verification (V2). Gated to responses that
-    # contain detectable numeric / named claims so we don't burn LLM
-    # budget on conversational turns. Failures are non-blocking; we
-    # log them to metadata for teacher review.
-    if fact_check and lesson is not None and llm_client is not None:
-        layers_run.append("fact_check")
-        fc: FactCheckResult = verify_response(
-            content, lesson=lesson, llm_client=llm_client,
-        )
-        extra_meta.update(fc.to_metadata())
-        if fc.contradicted_claims:
+    # L4 + L5 — factual claims and rule compliance.
+    #
+    # Preferred path: caller already ran apps.tutoring.combined_judge,
+    # passes the result via `combined_result`, and we just consume the
+    # verdicts. This is what conversational_tutor.py does on math turns
+    # — collapses three serial LLM calls (arithmetic + fact + rule) into
+    # one.
+    #
+    # Legacy path (no combined_result): run the two judges separately.
+    # Used for non-math callers and tests that haven't migrated.
+    if combined_result is not None:
+        layers_run.append("fact_check_combined")
+        layers_run.append("rule_check_combined")
+        extra_meta.update(combined_result.to_metadata())
+        if combined_result.contradicted_claims:
             issues.append(ISSUE_NUMERIC_CLAIM_CONTRADICTED)
-        unverified = [c for c in fc.claims if c.status == "unverified"]
-        if unverified:
+        if combined_result.unverified_claims:
             issues.append(ISSUE_NUMERIC_CLAIM_UNVERIFIED)
-
-    # L5 — rule-compliance check (P5 of memory/tutor_no_authoring_plan.md).
-    # LLM-as-judge for: NO_AUTHORING (questions outside the bank),
-    # ARITHMETIC (prose-form arithmetic that verify_calculations regex
-    # missed), RULE_1 (praise synonyms when bare/wrong). Math-only —
-    # gated on lesson.unit.course.is_math because non-math sessions
-    # have no bank and no math claims to check.
-    if (
-        rule_check
-        and lesson is not None
-        and llm_client is not None
-    ):
-        try:
-            is_math_lesson = lesson.unit.course.is_math
-        except Exception:
-            is_math_lesson = False
-        if is_math_lesson:
-            layers_run.append("rule_check")
+        if combined_result.has_violations:
             from apps.tutoring.rule_compliance import (
                 RULE_ARITHMETIC,
                 RULE_NO_AUTHORING,
                 RULE_RULE_1,
-                check_rule_compliance,
             )
-            rc = check_rule_compliance(
-                content,
-                llm_client=llm_client,
-                bank_stems=bank_stems or [],
-                student_input=student_input or "",
-                answer_was_bare=bool(bare_answer),
-                answer_was_wrong=(is_correct is False),
+            if RULE_NO_AUTHORING in combined_result.violated_rules:
+                issues.append(ISSUE_AUTHORING_VIOLATION)
+            if RULE_ARITHMETIC in combined_result.violated_rules:
+                issues.append(ISSUE_ARITHMETIC_VIOLATION)
+            if RULE_RULE_1 in combined_result.violated_rules:
+                issues.append(ISSUE_RULE1_VIOLATION)
+    else:
+        if fact_check and lesson is not None and llm_client is not None:
+            layers_run.append("fact_check")
+            fc: FactCheckResult = verify_response(
+                content, lesson=lesson, llm_client=llm_client,
             )
-            extra_meta.update(rc.to_metadata())
-            if rc.has_violations:
-                if RULE_NO_AUTHORING in rc.violated_rules:
-                    issues.append(ISSUE_AUTHORING_VIOLATION)
-                if RULE_ARITHMETIC in rc.violated_rules:
-                    issues.append(ISSUE_ARITHMETIC_VIOLATION)
-                if RULE_RULE_1 in rc.violated_rules:
-                    issues.append(ISSUE_RULE1_VIOLATION)
+            extra_meta.update(fc.to_metadata())
+            if fc.contradicted_claims:
+                issues.append(ISSUE_NUMERIC_CLAIM_CONTRADICTED)
+            unverified = [c for c in fc.claims if c.status == "unverified"]
+            if unverified:
+                issues.append(ISSUE_NUMERIC_CLAIM_UNVERIFIED)
+
+        if (
+            rule_check
+            and lesson is not None
+            and llm_client is not None
+        ):
+            try:
+                is_math_lesson = lesson.unit.course.is_math
+            except Exception:
+                is_math_lesson = False
+            if is_math_lesson:
+                layers_run.append("rule_check")
+                from apps.tutoring.rule_compliance import (
+                    RULE_ARITHMETIC,
+                    RULE_NO_AUTHORING,
+                    RULE_RULE_1,
+                    check_rule_compliance,
+                )
+                rc = check_rule_compliance(
+                    content,
+                    llm_client=llm_client,
+                    bank_stems=bank_stems or [],
+                    student_input=student_input or "",
+                    answer_was_bare=bool(bare_answer),
+                    answer_was_wrong=(is_correct is False),
+                )
+                extra_meta.update(rc.to_metadata())
+                if rc.has_violations:
+                    if RULE_NO_AUTHORING in rc.violated_rules:
+                        issues.append(ISSUE_AUTHORING_VIOLATION)
+                    if RULE_ARITHMETIC in rc.violated_rules:
+                        issues.append(ISSUE_ARITHMETIC_VIOLATION)
+                    if RULE_RULE_1 in rc.violated_rules:
+                        issues.append(ISSUE_RULE1_VIOLATION)
 
     # L6 — deterministic gates that don't rely on the LLM judge.
     #
