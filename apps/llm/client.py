@@ -116,6 +116,31 @@ class AnthropicClient(BaseLLMClient):
                     return limit
         return max_tokens
 
+    def _supports_temperature(self) -> bool:
+        """Newer Anthropic models (extended-thinking series) deprecate
+        the `temperature` parameter and 400 if it is sent. Detect those
+        and omit the parameter. Conservative: only known-deprecated
+        model families are excluded; everything else still gets the
+        configured temperature.
+        """
+        model = (self.config.model_name or "").lower()
+        # Opus 4.7 onwards rejects temperature with
+        #   400 invalid_request_error: `temperature` is deprecated for this model
+        if "opus-4-7" in model:
+            return False
+        return True
+
+    def _stream_kwargs(self, max_tokens: int, system_prompt: str, messages: list[dict]) -> dict:
+        kwargs = dict(
+            model=self.config.model_name,
+            max_tokens=max_tokens,
+            system=system_prompt,
+            messages=messages,
+        )
+        if self._supports_temperature():
+            kwargs["temperature"] = self.config.temperature
+        return kwargs
+
     def generate(
         self,
         messages: list[dict],
@@ -133,11 +158,9 @@ class AnthropicClient(BaseLLMClient):
             try:
                 full_content = ""
                 with self.client.messages.stream(
-                    model=self.config.model_name,
-                    max_tokens=resolved_max_tokens,
-                    temperature=self.config.temperature,
-                    system=system_prompt,
-                    messages=messages,
+                    **self._stream_kwargs(
+                        resolved_max_tokens, system_prompt, messages,
+                    )
                 ) as stream:
                     for text in stream.text_stream:
                         full_content += text
@@ -167,17 +190,15 @@ class AnthropicClient(BaseLLMClient):
         system_prompt: str,
     ) -> Generator[str, None, LLMResponse]:
         """Stream response from Claude API."""
-        
+
         full_content = ""
         tokens_in = 0
         tokens_out = 0
-        
+
         with self.client.messages.stream(
-            model=self.config.model_name,
-            max_tokens=self.config.max_tokens,
-            temperature=self.config.temperature,
-            system=system_prompt,
-            messages=messages,
+            **self._stream_kwargs(
+                self.config.max_tokens, system_prompt, messages,
+            )
         ) as stream:
             for text in stream.text_stream:
                 full_content += text

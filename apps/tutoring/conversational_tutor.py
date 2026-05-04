@@ -5021,7 +5021,10 @@ INSTRUCTIONS FOR step_complete:
             if getattr(self, '_instructor_provider', None) == 'google':
                 create_kwargs['generation_config'] = {'max_tokens': 1024}
             else:
-                create_kwargs['max_tokens'] = 150
+                # 1024 not 150 — Opus and other extended-thinking models
+                # produce verbose reasoning before the tool_use block;
+                # 150 truncated mid-reasoning and broke instructor parsing.
+                create_kwargs['max_tokens'] = 1024
             result = self.instructor_client.chat.completions.create(**create_kwargs)
             logger.info(
                 f"Step eval [{step_type}] step={self.current_topic_index}: "
@@ -5544,7 +5547,9 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
             if getattr(self, '_instructor_provider', None) == 'google':
                 create_kwargs['generation_config'] = {'max_tokens': 1024}
             else:
-                create_kwargs['max_tokens'] = 50
+                # See _evaluate_step note — Opus needs headroom for the
+                # tool_use reasoning block; 50 was Sonnet-tuned.
+                create_kwargs['max_tokens'] = 1024
             result = self.instructor_client.chat.completions.create(**create_kwargs)
             logger.info(f"LLM evaluation: {'correct' if result.correct else 'incorrect'} (step {self.current_topic_index})")
             return {"correct": result.correct}
@@ -5729,7 +5734,9 @@ Which concept numbers were meaningfully covered?"""
             if getattr(self, '_instructor_provider', None) == 'google':
                 create_kwargs['generation_config'] = {'max_tokens': 1024}
             else:
-                create_kwargs['max_tokens'] = 100
+                # See _evaluate_step note — Opus needs headroom for the
+                # tool_use reasoning block; 100 was Sonnet-tuned.
+                create_kwargs['max_tokens'] = 1024
             result = self.instructor_client.chat.completions.create(**create_kwargs)
             for idx in result.covered_indices:
                 if 1 <= idx <= len(uncovered):
