@@ -37,17 +37,31 @@ def compute_passing_threshold_pct(exit_ticket: Optional[ExitTicket]) -> float:
     return round((exit_ticket.passing_score or 8) / per_attempt, 4)
 
 
-def best_attempt(student: User, lesson: Lesson) -> Optional[ExitTicketAttempt]:
-    """Return the best (highest score) ExitTicketAttempt for this student+lesson,
-    or None if none exist."""
+def latest_attempt(student: User, lesson: Lesson) -> Optional[ExitTicketAttempt]:
+    """Return the MOST RECENT ExitTicketAttempt for this student+lesson,
+    or None if none exist.
+
+    Competency / score reads use "latest" semantics — we want to know
+    where the student is RIGHT NOW, not where they were at their best.
+    A student who passed once and is failing now should show as
+    failing, not as mastered. The historical promotion is captured by
+    StudentCompetencyRecord (permanent transcript) instead.
+    """
     return (
         ExitTicketAttempt.objects.filter(
             student=student,
             exit_ticket__lesson=lesson,
+            completed_at__isnull=False,
         )
-        .order_by("-score", "-completed_at")
+        .order_by("-completed_at", "-started_at")
         .first()
     )
+
+
+# Back-compat alias. Older callers used `best_attempt`; the semantics
+# now are "latest", not "best". Imports that still reference the old
+# name continue to work but get the new behaviour.
+best_attempt = latest_attempt
 
 
 def per_concept_breakdown(attempt: ExitTicketAttempt) -> List[Dict]:
@@ -99,30 +113,40 @@ def competency_snapshot(student: User, lesson: Lesson) -> Dict:
         student=student, lesson=lesson,
     ).first()
 
-    attempt = best_attempt(student, lesson)
+    attempt = latest_attempt(student, lesson)
 
+    # Note on field names: ``best_score_pct`` is kept as a key for
+    # back-compat with downstream consumers, but its VALUE is now the
+    # latest-attempt score (StudentLessonProgress.best_score is
+    # overwritten on every attempt instead of monotonically tracked).
+    # Same for ``best_attempt`` — populated from the most recent
+    # ExitTicketAttempt.
     snapshot = {
         "lesson_id": lesson.id,
         "lesson_title": lesson.title,
         "mastery_level": progress.mastery_level if progress else "not_started",
         "best_score_pct": progress.best_score if progress and progress.best_score is not None else None,
+        "latest_score_pct": progress.best_score if progress and progress.best_score is not None else None,
         "passing_threshold_pct": threshold_pct,
         "attempts_count": progress.attempts_count if progress else 0,
         "last_attempt_at": progress.last_attempt_at.isoformat() if progress and progress.last_attempt_at else None,
         "best_attempt": None,
+        "latest_attempt": None,
         "per_concept": [],
         "weak_concepts": [],
     }
 
     if attempt is not None:
         per_concept = per_concept_breakdown(attempt)
-        snapshot["best_attempt"] = {
+        attempt_payload = {
             "attempt_id": attempt.id,
             "completed_at": attempt.completed_at.isoformat() if attempt.completed_at else None,
             "score": attempt.score,
             "total": len(attempt.answers or []),
             "passed": attempt.passed,
         }
+        snapshot["best_attempt"] = attempt_payload  # back-compat alias
+        snapshot["latest_attempt"] = attempt_payload
         snapshot["per_concept"] = per_concept
         snapshot["weak_concepts"] = weak_concepts(per_concept)
 

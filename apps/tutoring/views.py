@@ -2102,8 +2102,8 @@ def lesson_pretest(request, lesson_id):
                 lesson=lesson,
                 defaults={'institution': sess_inst, 'mastery_level': 'mastered'},
             )
-            if progress.best_score is None or score_pct > progress.best_score:
-                progress.best_score = score_pct
+            # Latest score wins (mirrors _update_competency in the engine).
+            progress.best_score = score_pct
             progress.attempts_count = (progress.attempts_count or 0) + 1
             progress.last_attempt_at = timezone.now()
             progress.mastery_level = 'mastered'

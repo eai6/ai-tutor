@@ -125,8 +125,12 @@ class CompetencyTestCase(TestCase):
         )
         self.assertEqual(progress.best_score, 1.0)  # perfect score
 
-    def test_mastery_is_monotonic(self):
-        """Second attempt with a lower score must not demote from mastered."""
+    def test_mastery_demotes_on_failed_retake(self):
+        """A failed retake demotes mastery_level + overwrites best_score
+        with the latest (lower) score. Per the 2026-05 reset, the
+        catalog should reflect where the student is RIGHT NOW, not
+        their historical peak. Permanent transcript
+        (StudentCompetencyRecord) keeps the high-water mark."""
         tutor, session = self._make_tutor()
         tutor._load_exit_ticket_concepts()
         # First: pass with perfect score
@@ -139,16 +143,15 @@ class CompetencyTestCase(TestCase):
         self.assertEqual(progress.mastery_level, "mastered")
         self.assertEqual(progress.best_score, 1.0)
 
-        # Second: fail badly. Mastery must stay, best_score unchanged.
-        # Re-use the tutor+session or make a new session — simulate retake.
+        # Second: fail badly. Mastery demotes, best_score = latest score.
         tutor2, session2 = self._make_tutor()
         tutor2._load_exit_ticket_concepts()
         with patch.object(tutor2, "_grade_exit_question", return_value=False):
             tutor2._submit_exit_ticket_inner([{"answer": "B"} for _ in range(10)])
 
         progress.refresh_from_db()
-        self.assertEqual(progress.mastery_level, "mastered")
-        self.assertEqual(progress.best_score, 1.0)
+        self.assertEqual(progress.mastery_level, "in_progress")
+        self.assertAlmostEqual(progress.best_score, 0.0, places=3)
         self.assertEqual(progress.attempts_count, 2)
 
     def test_attempts_count_increments_on_each_submission(self):
@@ -166,7 +169,11 @@ class CompetencyTestCase(TestCase):
         self.assertEqual(progress.mastery_level, "in_progress")
         self.assertAlmostEqual(progress.best_score, 0.0, places=3)
 
-    def test_best_score_improves_over_attempts(self):
+    def test_score_reflects_latest_attempt(self):
+        """``best_score`` is named for legacy reasons but now stores
+        the LATEST attempt's score — not the historical best. The
+        catalog needs to surface where students currently are, not
+        their peak. Verify with three attempts that go up then down."""
         tutor, session = self._make_tutor()
         tutor._load_exit_ticket_concepts()
         # First attempt: 4/10
@@ -188,12 +195,13 @@ class CompetencyTestCase(TestCase):
         self.assertAlmostEqual(progress.best_score, 0.8, places=3)
         self.assertEqual(progress.mastery_level, "mastered")
 
-        # Third: 6/10 (worse). best_score must not decrease.
+        # Third: 6/10 (worse). Score follows latest, mastery demotes.
         tutor3, session3 = self._make_tutor()
         tutor3._load_exit_ticket_concepts()
         side = [True] * 6 + [False] * 4
         with patch.object(tutor3, "_grade_exit_question", side_effect=side):
             tutor3._submit_exit_ticket_inner([{"answer": "A"} for _ in range(10)])
         progress.refresh_from_db()
-        self.assertAlmostEqual(progress.best_score, 0.8, places=3)
+        self.assertAlmostEqual(progress.best_score, 0.6, places=3)
+        self.assertEqual(progress.mastery_level, "in_progress")
         self.assertEqual(progress.attempts_count, 3)

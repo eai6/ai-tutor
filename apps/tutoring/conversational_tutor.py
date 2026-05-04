@@ -5927,18 +5927,29 @@ Which concept numbers were meaningfully covered?"""
                 lesson=self.lesson,
                 defaults={'institution': self.session.institution},
             )
-            if progress.best_score is None or score_pct > progress.best_score:
-                progress.best_score = score_pct
+            # ``best_score`` is now LATEST score, not historical best.
+            # Competency reads should reflect where the student is RIGHT
+            # NOW, not where they peaked. Permanent transcript
+            # (StudentCompetencyRecord) preserves the high-water mark
+            # for longitudinal reporting; this field tracks current
+            # state for the catalog / dashboard.
+            progress.best_score = score_pct
             progress.attempts_count = (progress.attempts_count or 0) + 1
             progress.last_attempt_at = now
             progress.last_completion_session = self.session
             progress.last_completion_was_group = was_group
             newly_mastered = False
-            if passed and progress.mastery_level != 'mastered':
-                progress.mastery_level = 'mastered'
-                newly_mastered = True
-            elif progress.mastery_level == 'not_started' and progress.attempts_count > 0:
-                progress.mastery_level = 'in_progress'
+            if passed:
+                if progress.mastery_level != 'mastered':
+                    progress.mastery_level = 'mastered'
+                    newly_mastered = True
+            else:
+                # Failed this attempt → demote mastery so the catalog
+                # shows the student as needing more work. Was promote-
+                # only; per the 2026-05 reset, mastery reflects current
+                # competency, not ever-achieved status.
+                if progress.attempts_count > 0:
+                    progress.mastery_level = 'in_progress'
             progress.save(
                 update_fields=[
                     'best_score',
