@@ -397,6 +397,14 @@ def _correct_answer_for_log(question) -> str:
 
 _QUESTION_SIGNAL = re.compile(r'\|\|\|QUESTION\s*:\s*(\d+)\s*\|\|\|')
 
+# New: EO-targeted bank pull. The LLM emits the EO index it wants a
+# question for; the server resolves to a published bank question
+# tagged with that EO. Lets the LLM ask "give me a question on EO 3"
+# without preloading a fixed candidate slate per turn — frees up the
+# system prompt size budget AND lets remediation walk through any
+# EO without the engine having to predict candidates per step.
+_QUESTION_EO_SIGNAL = re.compile(r'\|\|\|QUESTION_EO\s*:\s*(\d+)\s*\|\|\|')
+
 
 def parse_question_signal(
     text: str,
@@ -412,6 +420,44 @@ def parse_question_signal(
         return text, None
     clean = (text[:match.start()] + text[match.end():]).rstrip()
     return clean, int(match.group(1))
+
+
+def parse_question_eo_signal(
+    text: str,
+) -> Tuple[str, Optional[int]]:
+    """Extract |||QUESTION_EO:N||| from the response text.
+
+    Returns (clean_text, eo_index_or_None). Index is 1-based and
+    refers to the lesson's enabling_objectives list (the same order
+    the tutor sees in the [ENABLING OBJECTIVES] block). The caller
+    resolves the index → EO text → published bank question.
+    """
+    match = _QUESTION_EO_SIGNAL.search(text)
+    if not match:
+        return text, None
+    clean = (text[:match.start()] + text[match.end():]).rstrip()
+    return clean, int(match.group(1))
+
+
+def pick_question_for_eo(
+    lesson, eo_text: str, *, exclude_ids: Optional[List[int]] = None,
+):
+    """Resolve the EO signal — return one published ExitTicketQuestion
+    matching the EO, optionally excluding ids the tutor has already
+    posed this session. Falls through to ``pick_published_for_concept_tag``
+    so it inherits the same EO → concept_tag → fallback chain."""
+    candidates = pick_published_for_concept_tag(
+        lesson, eo_text, max_candidates=10,
+    )
+    if not candidates:
+        return None
+    excl = set(exclude_ids or [])
+    for q in candidates:
+        if q.id not in excl:
+            return q
+    # Everything was excluded → return the first anyway so the tutor
+    # still has SOMETHING; the caller can dedupe semantically.
+    return candidates[0]
 
 
 def render_question_to_prose(entry) -> str:

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from apps.tutoring.praise_filter import strip_praise_if_wrong, _PRAISE_RE
 from apps.tutoring.fact_verifier import verify_response, FactCheckResult
@@ -120,6 +120,8 @@ def validate_tutor_response(
     student_input: Optional[str] = None,
     rule_check: bool = True,
     bank_stems: Optional[List[str]] = None,
+    arithmetic_corrections: Optional[List[Dict]] = None,
+    bank_signal_used: Optional[bool] = None,
 ) -> ValidationResult:
     """Run V1+V2 validator layers over a tutor response.
 
@@ -236,6 +238,39 @@ def validate_tutor_response(
                 if RULE_RULE_1 in rc.violated_rules:
                     issues.append(ISSUE_RULE1_VIOLATION)
 
+    # L6 — deterministic gates that don't rely on the LLM judge.
+    #
+    # (a) arithmetic_corrections from the LLM arithmetic verifier:
+    #     when the verifier flagged ANY claim as wrong, force regen.
+    #     The verifier was previously logging-only; now it's a hard
+    #     trigger so bad math never ships even if the rule_compliance
+    #     judge is lenient.
+    if arithmetic_corrections:
+        layers_run.append("arithmetic_corrections")
+        issues.append(ISSUE_ARITHMETIC_VIOLATION)
+        extra_meta["arithmetic_corrections"] = list(arithmetic_corrections)
+
+    # (b) AUTHORING gate: math + practice/quiz step + the response
+    #     contains a question with specific numerical values + the
+    #     LLM did NOT emit a bank pull signal (|||QUESTION:N||| or
+    #     |||QUESTION_EO:N|||). The LLM-judge already flags this in
+    #     spirit but is occasionally lenient — this is the deterministic
+    #     backstop. Triggers regen.
+    try:
+        is_math_for_authoring = lesson.unit.course.is_math
+    except Exception:
+        is_math_for_authoring = False
+    if (
+        is_math_for_authoring
+        and step_type in {"practice", "quiz"}
+        and bank_signal_used is False
+        and _has_numerical_question(content)
+    ):
+        layers_run.append("authoring_gate")
+        if ISSUE_AUTHORING_VIOLATION not in issues:
+            issues.append(ISSUE_AUTHORING_VIOLATION)
+        extra_meta["authoring_gate_fired"] = True
+
     return ValidationResult(
         content=content,
         issues=issues,
@@ -246,3 +281,20 @@ def validate_tutor_response(
             **extra_meta,
         },
     )
+
+
+# A "math question signature" — at least one '?' AND at least two
+# digit groups (numbers separated by ops, units, words) inside the
+# 200 chars before the question mark. Tuned to catch authored
+# practice questions ("if angles are 60° and x°, find x?") while
+# letting purely conceptual questions ("which rule applies?") through.
+_NUMERICAL_QUESTION_RE = re.compile(
+    r"(?:\d[\d.]*\s*[°%a-zA-Z]?[\s,].*?){2,}\?",
+    re.DOTALL,
+)
+
+
+def _has_numerical_question(text: str) -> bool:
+    if not text:
+        return False
+    return bool(_NUMERICAL_QUESTION_RE.search(text))

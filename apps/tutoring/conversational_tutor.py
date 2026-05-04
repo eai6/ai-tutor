@@ -1493,6 +1493,8 @@ Keep it to 2-3 sentences."""
         # the bank. See memory/curriculum_tutor_v2_plan.md item 5
         # (the platform-wide rule).
         self._pending_bank_grade = None
+        self._pending_bank_question = None
+        self._bank_signal_used_this_turn = False
         try:
             self._grade_against_last_bank_question(student_input)
         except Exception as e:
@@ -1607,6 +1609,20 @@ Keep it to 2-3 sentences."""
         # question text the LLM might have written in prose is
         # superseded by the canonical bank stem.
         clean_response, picked_question = self._parse_question_signal(clean_response)
+        # Also parse |||QUESTION_EO:N||| — EO-targeted bank pull. The
+        # LLM signals which EO it wants a question for; the server
+        # resolves to a published bank question tagged with that EO.
+        # Lets the tutor request fresh questions outside the per-step
+        # candidate slate (e.g. during a remediation walk that crosses
+        # EOs).
+        clean_response, eo_pulled_question = self._parse_question_eo_signal(
+            clean_response,
+        )
+        # Use the EO-pulled question if the simple signal wasn't fired.
+        if picked_question is None and eo_pulled_question is not None:
+            picked_question = eo_pulled_question
+        # Track for the validator's authoring gate.
+        self._bank_signal_used_this_turn = picked_question is not None
         if picked_question is not None:
             from apps.tutoring.question_bank import render_question_to_prose
             rendered = render_question_to_prose(picked_question)
@@ -1623,14 +1639,15 @@ Keep it to 2-3 sentences."""
         # prose claims like "do they sum to 360°?" which the regex
         # missed). Pre-filtered on digits so conversational turns
         # skip the LLM call.
+        arithmetic_corrections: List[Dict] = []
         if self.lesson.unit.course.is_math:
             from apps.tutoring.llm_arithmetic_verifier import verify_arithmetic_claims
-            clean_response, corrections = verify_arithmetic_claims(
+            clean_response, arithmetic_corrections = verify_arithmetic_claims(
                 clean_response, llm_client=self.llm_client,
             )
-            if corrections:
+            if arithmetic_corrections:
                 logger.info(
-                    f"[MathCheck] LLM flagged {len(corrections)} arithmetic correction(s)"
+                    f"[MathCheck] LLM flagged {len(arithmetic_corrections)} arithmetic correction(s) — will trigger regen"
                 )
 
         # Post-generation praise filter (Layer 3). Defense-in-depth: strip
@@ -1717,6 +1734,8 @@ Keep it to 2-3 sentences."""
             llm_client=self.llm_client,
             student_input=student_input,
             bank_stems=self._current_bank_stems(),
+            arithmetic_corrections=arithmetic_corrections,
+            bank_signal_used=bool(getattr(self, '_bank_signal_used_this_turn', False)),
         )
         if validation.content != clean_response:
             clean_response = validation.content
@@ -3435,6 +3454,22 @@ Follow the current step; this concept will be covered in sequence."""
                 "\nDo NOT skip rungs for a struggling student. Do NOT linger on Rung 1"
                 "\nfor a student who showed mastery — say so and move them up."
                 "\n"
+                "\n=== RULE 4.5 (NON-NEGOTIABLE): BANK IS THE SOURCE OF TRUTH ==="
+                "\nFor math practice + quiz steps, you MUST use questions, "
+                "answers, and explanations VERBATIM from the question_bank "
+                "below. Never:"
+                "\n  - author your own arithmetic question (use |||QUESTION:N|||"
+                " or |||QUESTION_EO:N||| to pull from the bank instead)"
+                "\n  - solve the question yourself when grading (the server "
+                "already graded against the bank's stored answer; you read "
+                "the verdict, you don't recompute)"
+                "\n  - paraphrase or 'improve' the canonical explanation "
+                "(quote the bank's working line by line)"
+                "\nThe system enforces this with a deterministic gate — any "
+                "math question you type without a |||QUESTION:N||| or "
+                "|||QUESTION_EO:N||| signal triggers a regeneration. Save "
+                "yourself the round-trip and signal up front."
+                "\n"
                 "\n=== RULE 5 (NON-NEGOTIABLE): CONCEPTUAL INTEGRITY ==="
                 "\nWhen you make up a numerical example to illustrate a rule, the"
                 "\nnumbers MUST satisfy the rule. The whole point of the lesson is"
@@ -3999,6 +4034,52 @@ Follow the current step; this concept will be covered in sequence."""
             )
         return clean_text, entry
 
+    def _parse_question_eo_signal(
+        self, text: str,
+    ) -> Tuple[str, Optional[object]]:
+        """Parse |||QUESTION_EO:N||| — EO-targeted bank pull.
+
+        N is 1-based into ``self.enabling_objectives`` (the same order
+        the tutor sees in the [ENABLING OBJECTIVES] block). Resolves
+        to a published ExitTicketQuestion tagged with that EO.
+        """
+        from apps.tutoring.question_bank import (
+            parse_question_eo_signal, pick_question_for_eo,
+        )
+        clean_text, n = parse_question_eo_signal(text)
+        if n is None:
+            return clean_text, None
+        eos = self.enabling_objectives or []
+        if not (1 <= n <= len(eos)):
+            logger.warning(
+                "[QuestionBank] LLM emitted |||QUESTION_EO:%d||| "
+                "but lesson only has %d EO(s)",
+                n, len(eos),
+            )
+            return clean_text, None
+        eo_text = (eos[n - 1].get('objective') or '').strip()
+        if not eo_text:
+            return clean_text, None
+        # Exclude any bank question we've already rendered this session
+        # so the tutor doesn't re-pose the same item back-to-back.
+        already = (self.session.engine_state or {}).get('rendered_bank_ids', [])
+        question = pick_question_for_eo(
+            self.lesson, eo_text, exclude_ids=already,
+        )
+        if question is None:
+            logger.info(
+                "[QuestionBank] no published bank question for EO %r",
+                eo_text[:80],
+            )
+            return clean_text, None
+        # Track for future exclusion
+        state = self.session.engine_state or {}
+        rendered = list(state.get('rendered_bank_ids') or [])
+        rendered.append(question.id)
+        state['rendered_bank_ids'] = rendered[-30:]  # cap so JSON stays small
+        self.session.engine_state = state
+        return clean_text, question
+
     def _current_bank_stems(self) -> List[str]:
         """Flatten the active question_id_map to a list of stem strings.
 
@@ -4083,6 +4164,11 @@ Follow the current step; this concept will be covered in sequence."""
         from apps.tutoring.bank_grader import grade_bank_response
         result = grade_bank_response(question, student_input)
         self._pending_bank_grade = result
+        # Stash the full question so the next-turn prompt builder can
+        # surface the canonical explanation / step-by-step working —
+        # the tutor uses it to scaffold remediation after a wrong
+        # answer (rather than re-deriving the math itself).
+        self._pending_bank_question = question
         logger.info(
             "[BankGrade] session=%s ref=%s:%s is_correct=%s expected=%r student=%r",
             self.session.id, kind, ref_id,
@@ -4619,32 +4705,65 @@ Follow the current step; this concept will be covered in sequence."""
         turn rendered a bank question and the deterministic grader
         produced a verdict. Tells the LLM the verdict and forbids it
         from disagreeing — platform-wide rule (LLM never calculates).
+
+        Includes the bank's stored explanation / canonical working so
+        the LLM can scaffold remediation against it instead of
+        re-deriving (and risking new errors).
         """
         verdict = "CORRECT" if grade.is_correct else "INCORRECT"
         if grade.is_correct:
             guidance = (
                 "The bank's stored answer matches the student's response. "
                 "Confirm correctness briefly, then move forward — either "
-                "advance to the next step OR pose the next bank question. "
-                "Do NOT re-derive the answer yourself; the bank says it's "
-                "right, and the bank is the source of truth."
+                "advance to the next step OR pose the next bank question "
+                "(via |||QUESTION:N||| or |||QUESTION_EO:N|||). DO NOT "
+                "re-derive the answer yourself; the bank is the source of "
+                "truth. If the student wants to see the working, QUOTE the "
+                "canonical_working / explanation below verbatim — never "
+                "compute a fresh derivation."
             )
         else:
             guidance = (
                 "The student's response does NOT match the bank's stored "
                 "answer. You MUST NOT say 'correct', 'right', 'exactly', "
-                "or any equivalent praise. Do not state the correct answer "
-                "yet — first ask the student to walk through their working, "
-                "then use the bank's stored explanation as the canonical "
-                "scaffolding for re-teaching. The bank is the source of "
-                "truth; do NOT re-derive or second-guess the verdict."
+                "or any equivalent praise. Do NOT compute the correct "
+                "answer yourself — the bank already has it (above). When "
+                "the student is ready, walk them through the canonical "
+                "explanation below LINE BY LINE, quoting the bank's "
+                "wording. Do NOT paraphrase or invent intermediate steps. "
+                "The bank is the source of truth for both the answer "
+                "and the working."
             )
+
+        # Pull the stored explanation from the cached question. Limit
+        # to ~600 chars so the prompt stays compact.
+        question = getattr(self, '_pending_bank_question', None)
+        canonical_block = ""
+        if question is not None:
+            explanation = (getattr(question, 'explanation', '') or '').strip()
+            if explanation:
+                canonical_block = (
+                    f"\nCanonical explanation / working (from the bank):"
+                    f"\n  {explanation[:600]}"
+                )
+            # Some templated entries store extended working under
+            # answer_data['canonical_working'] (short_answer + a few
+            # other types). Surface that too when present.
+            adata = getattr(question, 'answer_data', None) or {}
+            if isinstance(adata, dict):
+                cw = (adata.get('canonical_working') or '').strip()
+                if cw and cw != explanation:
+                    canonical_block += (
+                        f"\nCanonical step-by-step:\n  {cw[:600]}"
+                    )
+
         return (
             "\n\n<bank_evaluation_signal>"
             f"\nStudent's response (parsed): {grade.student_parsed!r}"
             f"\nExpected (from the bank): {grade.expected!r}"
             f"\nVerdict: {verdict}"
             f"\nDetail: {grade.detail}"
+            f"{canonical_block}"
             f"\n{guidance}"
             "\n</bank_evaluation_signal>"
         )
