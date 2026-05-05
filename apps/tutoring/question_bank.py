@@ -358,24 +358,30 @@ def build_remediation_requiz_queue(
 def render_bank_block(
     step,
     candidates: List,
+    *,
+    include_step_slot: bool = True,
+    prereq_questions: Optional[List] = None,
 ) -> Tuple[str, Dict[int, object]]:
     """Render the <question_bank> XML block for the system prompt.
 
-    The block is the LLM's *only* allowed source for new questions:
-      [0] is the current step's own teacher_script (canonical practice
-          question for this step)
-      [1..N] are the candidate bank questions for this step's concept
+    Slot inventory:
+      [0] = current step's teacher_script when ``include_step_slot=True``
+            AND step_type is question-shaped (practice / quiz /
+            worked_example). For TEACH/SUMMARY steps the teacher_script
+            is teaching content (delivered via the system prompt as
+            content-to-deliver, not a posable question), so the
+            caller passes include_step_slot=False and slot 0 is
+            omitted.
+      [1..N] = exit-ticket bank candidates matching this step's EO.
+      [N+1..M] = prerequisite-lesson exit-ticket questions
+                 (when ``prereq_questions`` is provided, typically only
+                 on engage / warmup turns) — labelled clearly so the
+                 LLM knows they're for "previous lesson recap" use.
 
-    The LLM picks one by emitting |||QUESTION:N||| as the LAST line of
-    its response. The server intercepts and renders the bank entry's
-    text verbatim — the LLM never speaks the question stem itself.
-
-    Returns (block_text, id_map). id_map is {1-indexed-id: object} where
-    object is either the LessonStep (for id 0) or an ExitTicketQuestion
-    (for ids 1..N). Used by parse_question_signal to look up the chosen
-    entry.
+    The LLM picks one by calling pose_question(slot=N). Server resolves
+    the slot via id_map and renders the bank entry verbatim.
     """
-    id_map: Dict[int, object] = {SENTINEL_NO_QUESTION: step}
+    id_map: Dict[int, object] = {}
     lines: List[str] = ["<question_bank>"]
     lines.append(
         "  HARD RULE — questions you pose MUST come from this bank.\n"
@@ -395,24 +401,33 @@ def render_bank_block(
         "    • Any sentence ending in '?' that contains digits\n"
         "  If you need to pose a question with numerical values, the\n"
         "  ONLY path is: invoke pose_question(slot=N) with N from the\n"
-        "  list below. Slot 0 = current step's canonical question.\n"
-        "  Slots 1+ = exit-ticket bank questions for this step's concept."
+        "  list below. Slot 0 (when listed) = current step's canonical\n"
+        "  question; slots 1+ = exit-ticket bank questions for this\n"
+        "  step's concept; later slots labelled 'previous lesson recap'\n"
+        "  are warmup material from a prerequisite lesson — use those\n"
+        "  ONLY for warmup / engage turns."
     )
 
     # Slot 0 — the step's own canonical practice question.
-    teacher_script = (getattr(step, 'teacher_script', '') or '').strip()
-    expected = (getattr(step, 'expected_answer', '') or '').strip()
-    lines.append(f"  [0] (current step) {teacher_script[:300]}")
-    if expected:
-        lines.append(f"      expected_answer: {expected[:120]}")
+    # Skipped for step types where teacher_script is teaching content
+    # (delivered via the system prompt's CONTENT TO TEACH block) rather
+    # than a posable question.
+    if include_step_slot:
+        id_map[SENTINEL_NO_QUESTION] = step
+        teacher_script = (getattr(step, 'teacher_script', '') or '').strip()
+        expected = (getattr(step, 'expected_answer', '') or '').strip()
+        lines.append(f"  [0] (current step) {teacher_script[:300]}")
+        if expected:
+            lines.append(f"      expected_answer: {expected[:120]}")
 
-    # Slots 1..N — bank candidates.
-    for i, q in enumerate(candidates, start=1):
-        id_map[i] = q
+    # Slots 1..N — current-lesson bank candidates.
+    next_slot = 1
+    for q in candidates:
+        id_map[next_slot] = q
         stem = (getattr(q, 'question_text', '') or '').strip()
         correct = _correct_answer_for_log(q)
         tag = (getattr(q, 'concept_tag', '') or '').strip()
-        line = f"  [{i}] {stem[:300]}"
+        line = f"  [{next_slot}] {stem[:300]}"
         meta_bits = []
         if tag:
             meta_bits.append(f"concept={tag}")
@@ -421,6 +436,32 @@ def render_bank_block(
         if meta_bits:
             line += f"   ({', '.join(meta_bits)})"
         lines.append(line)
+        next_slot += 1
+
+    # Prerequisite-lesson questions (warmup recap material).
+    if prereq_questions:
+        lines.append("")
+        lines.append(
+            "  Previous-lesson recap questions (use ONLY for warmup /"
+            " engage turns to review prior content):"
+        )
+        for q in prereq_questions:
+            id_map[next_slot] = q
+            stem = (getattr(q, 'question_text', '') or '').strip()
+            correct = _correct_answer_for_log(q)
+            prev_lesson_title = ''
+            try:
+                prev_lesson_title = (
+                    q.exit_ticket.lesson.title or ''
+                ).strip()
+            except Exception:
+                pass
+            line = f"  [{next_slot}] (previous lesson — {prev_lesson_title[:60]}) {stem[:300]}"
+            if correct:
+                line += f"   (answer={correct})"
+            lines.append(line)
+            next_slot += 1
+
     lines.append("</question_bank>")
     return "\n" + "\n".join(lines) + "\n", id_map
 

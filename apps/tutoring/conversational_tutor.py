@@ -1777,7 +1777,14 @@ Keep it to 2-3 sentences."""
                 self.session.id, validation.issues,
             )
             try:
-                self._pending_regen_constraint = self._build_regen_constraint_block(validation)
+                # Pass the previous (violating) response into the
+                # constraint block so the regen is an EDIT task, not a
+                # blind re-generation. The LLM sees what it wrote and
+                # can preserve teaching value while replacing the
+                # flagged segments.
+                self._pending_regen_constraint = self._build_regen_constraint_block(
+                    validation, previous_response=clean_response,
+                )
                 regen_raw = self._generate_contextual_response(
                     student_input,
                     kb_context,
@@ -3626,12 +3633,20 @@ Follow the current step; this concept will be covered in sequence."""
                 "\nthere is no question_text parameter — you cannot pass"
                 "\narbitrary text."
                 "\n"
-                "\nDo NOT type questions in your text response. Numerical"
-                "\nquestions in prose (sentences ending in '?' that contain"
-                "\ndigits) will be stripped before reaching the student."
-                "\nDo NOT invent angle measures, sums, side lengths, or any"
-                "\nother numerical example. The bank is the only source"
-                "\nof truth — call pose_question(slot=N) to use it."
+                "\nDo NOT type questions in your text response. If you"
+                "\ntype a numerical question (any sentence ending in '?'"
+                "\nthat contains 2+ specific numbers like angles, sums,"
+                "\nor measurements), the post-response judge will flag it"
+                "\nas NO_AUTHORING and your response will be regenerated."
+                "\nThe bank is the ONLY source of truth — call"
+                "\npose_question(slot=N) to use it."
+                "\n"
+                "\nIf the bank has no question that fits (e.g. you want"
+                "\na warmup recap from the previous lesson and no"
+                "\n\"previous lesson recap\" slot is listed), do a"
+                "\nCONCEPTUAL warmup instead — \"What rule did we learn"
+                "\nlast time about angles around a point?\" — never"
+                "\ninvent specific numerical values."
                 "\n</final_reminder>"
             )
 
@@ -4038,22 +4053,112 @@ Follow the current step; this concept will be covered in sequence."""
             enabling_objective=getattr(current_step, 'enabling_objective', '') or '',
             concept_tag=current_step.concept_tag or '',
         )
-        block, id_map = render_bank_block(current_step, candidates)
 
-        # Cross-step augmentation REMOVED (2026-05-04). The bank for a
-        # step is: slot 0 (this step's teacher_script) + slots 1..N
-        # (exit-ticket questions matching this step's EO/tag, or a
-        # random sample if no match). No other-step lesson questions.
+        # Slot 0 is the current step's teacher_script. For practice /
+        # quiz / worked_example steps, that's a posable canonical
+        # question. For TEACH / SUMMARY / engage steps, the
+        # teacher_script is teaching content (delivered via the system
+        # prompt's CONTENT TO TEACH block) — posing it via the tool
+        # produces a duplicated intro, so we drop it from the bank.
+        question_shaped_step_types = {'practice', 'quiz', 'worked_example'}
+        include_step_slot = (
+            (current_step.step_type or '') in question_shaped_step_types
+        )
+
+        # Engage / warmup turns: include questions from prerequisite
+        # lessons' published exit-ticket banks so the LLM can pose a
+        # verified previous-lesson question instead of authoring one.
+        # Without this, the warmup directive ("a quick warm-up from
+        # last week") had no source and the LLM was inventing numbers.
+        prereq_questions = []
+        is_engage_or_warmup = (
+            (current_step.phase or '').lower() in ('engage', 'warmup')
+            or self.current_topic_index == 0
+        )
+        if is_engage_or_warmup:
+            prereq_questions = self._pull_prerequisite_recap_questions(
+                max_per_lesson=3, max_total=6,
+            )
+
+        block, id_map = render_bank_block(
+            current_step, candidates,
+            include_step_slot=include_step_slot,
+            prereq_questions=prereq_questions,
+        )
 
         self._question_id_map = id_map
         logger.info(
-            "[QuestionTool] build_bank: step=%d eo='%s' tag='%s' slots=%s",
+            "[QuestionTool] build_bank: step=%d step_type=%s phase=%s "
+            "eo='%s' tag='%s' slots=%s prereq_count=%d include_slot_0=%s",
             self.current_topic_index,
+            current_step.step_type or '',
+            current_step.phase or '',
             (getattr(current_step, 'enabling_objective', '') or '')[:60],
             current_step.concept_tag or '',
             sorted(id_map.keys()),
+            len(prereq_questions),
+            include_step_slot,
         )
         return block
+
+    def _pull_prerequisite_recap_questions(
+        self, *, max_per_lesson: int = 3, max_total: int = 6,
+    ) -> List:
+        """Pull a small sample of published exit-ticket questions from
+        each prerequisite lesson, scoped to the current course.
+
+        Used for engage / warmup turns so the LLM can pose a verified
+        previous-lesson question via the pose_question tool instead of
+        inventing one in prose ("Three angles around a point measure
+        78°, 102°, and 115°. What is the fourth?" — that came from the
+        previous lesson but the bank had no slot for it).
+
+        Bounded to per_lesson + total caps so the system prompt doesn't
+        balloon. Returns ExitTicketQuestion instances ordered by
+        prerequisite strength (essential first).
+        """
+        try:
+            from apps.tutoring.skills_models import LessonPrerequisite
+            from apps.tutoring.models import ExitTicketQuestion
+        except Exception as e:
+            logger.info(
+                "[QuestionTool] prereq pull skipped — import failure: %s", e,
+            )
+            return []
+        try:
+            prereqs = (
+                LessonPrerequisite.objects
+                .filter(lesson=self.lesson)
+                .select_related('prerequisite')
+                .order_by('-strength', '-is_direct')
+            )
+        except Exception as e:
+            logger.info(
+                "[QuestionTool] prereq pull skipped — query failure: %s", e,
+            )
+            return []
+        out: List = []
+        for lp in prereqs:
+            prev = lp.prerequisite
+            if not prev or not getattr(prev, 'is_published', False):
+                continue
+            qs = list(
+                ExitTicketQuestion.objects.filter(
+                    exit_ticket__lesson=prev,
+                    exit_ticket__is_published=True,
+                ).order_by('?')[:max_per_lesson]
+            )
+            for q in qs:
+                out.append(q)
+                if len(out) >= max_total:
+                    break
+            if len(out) >= max_total:
+                break
+        logger.info(
+            "[QuestionTool] prereq_pull: lesson=%s prereq_count=%d → %d question(s)",
+            self.lesson.id, prereqs.count(), len(out),
+        )
+        return out
 
     # =========================================================================
     # POSE-QUESTION TOOL (Anthropic tool use) — see memory/pose_question_tool_plan.md
@@ -4761,13 +4866,21 @@ Follow the current step; this concept will be covered in sequence."""
             return 'explain'
         return self.session_state.value  # "exit_ticket" or "completed"
 
-    def _build_regen_constraint_block(self, validation) -> str:
+    def _build_regen_constraint_block(
+        self, validation, previous_response: str = '',
+    ) -> str:
         """Build a system-prompt block injected on regeneration (V3).
 
-        Tells the LLM what was wrong with the previous response so it
-        can produce a better one. Triggers on contradicted curriculum
-        claims OR rule-compliance violations (P5 — NO_AUTHORING /
-        ARITHMETIC / RULE_1).
+        The regen LLM is given:
+          1. The list of violations the judge flagged
+          2. The PREVIOUS response text it produced (the violating one)
+          3. An instruction to EDIT that text — preserve the teaching
+             value, fix only the flagged issues. Editing-with-context
+             is more reliable than blind regeneration because the LLM
+             can see what was good and target the fix.
+
+        Triggers on contradicted curriculum claims OR rule-compliance
+        violations (P5 — NO_AUTHORING / ARITHMETIC / RULE_1).
         """
         meta = validation.metadata or {}
         contradicted = meta.get('factual_claims_contradicted', []) or []
@@ -4775,10 +4888,25 @@ Follow the current step; this concept will be covered in sequence."""
         rule_violations = meta.get('rule_violations', []) or []
         parts = ["\n\n<regeneration_required>"]
         parts.append(
-            "Your PREVIOUS attempt at this turn was rejected by the"
-            " response validator. Rewrite the response. Do NOT repeat"
-            " the same mistakes."
+            "Your previous response had violations flagged by the"
+            " post-response judge. Rewrite the response — keep the"
+            " teaching value, fix the issues. Do NOT repeat the"
+            " mistakes."
         )
+
+        # Show the previous response as the editing context. The LLM
+        # gets to see what it wrote so it can preserve the salvageable
+        # parts (greeting, framing, conceptual scaffold) while
+        # surgically replacing the violating bits.
+        prev = (previous_response or '').strip()
+        if prev:
+            # Cap to keep prompt size sane; 2000 chars covers any
+            # realistic tutor turn (typical ~300-800 chars).
+            parts.append("PREVIOUS RESPONSE (your earlier output for THIS turn — edit it, do not start over):")
+            parts.append("---")
+            parts.append(prev[:2000])
+            parts.append("---")
+
         if contradicted:
             parts.append(
                 "Curriculum CONTRADICTS these claims (do not restate them):"
@@ -4806,21 +4934,31 @@ Follow the current step; this concept will be covered in sequence."""
                     line += f" → fix: {fix[:160]}"
                 parts.append(line)
             parts.append(
-                "If NO_AUTHORING was flagged: do NOT pose a new question in"
-                " your prose. To pose a question, call the pose_question"
-                " tool with a slot from <question_bank>."
+                "EDITING GUIDANCE:"
             )
             parts.append(
-                "If ARITHMETIC was flagged: redo any number-claim using the"
-                " corrected value, or omit the calculation."
+                "If NO_AUTHORING was flagged: REMOVE the numerical"
+                " question from your prose. If you still want to ask"
+                " one this turn, call the pose_question tool with a"
+                " slot from <question_bank> instead. If no fitting"
+                " bank slot exists, replace the numerical question"
+                " with a CONCEPTUAL one (\"What rule applies?\")."
             )
             parts.append(
-                "If RULE_1 was flagged: remove ALL praise and ask the student"
-                " to walk through their working before any confirmation."
+                "If ARITHMETIC was flagged: rewrite the number-claim"
+                " with the correct value, or omit the calculation"
+                " entirely."
+            )
+            parts.append(
+                "If RULE_1 was flagged: remove ALL praise and replace"
+                " with a request for the student's working — \"Walk"
+                " me through your steps\" or \"Show me how you got"
+                " there\"."
             )
         parts.append(
-            "Be honest about uncertainty. End with a question. Keep it"
-            " concise (one new idea at a time)."
+            "Edit the previous response to fix these violations. Keep"
+            " whatever was good (greeting, framing, conceptual scaffold)."
+            " End with a question. One new idea at a time."
         )
         parts.append("</regeneration_required>")
         return "\n".join(parts)

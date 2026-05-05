@@ -401,6 +401,72 @@ class OpenAIClient(BaseLLMClient):
             stop_reason=response.choices[0].finish_reason,
         )
 
+    def generate_with_tools(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        tools: list[dict],
+        max_tokens: int | None = None,
+    ):
+        """OpenAI function-calling wrapper.
+
+        Accepts the same Anthropic-style tool schema {name, description,
+        input_schema} and converts to OpenAI's {type: "function",
+        function: {name, description, parameters}} shape. Returns the
+        raw ChatCompletion response so the caller can introspect
+        choices[0].message.tool_calls (list of tool calls, each with
+        .function.name and .function.arguments JSON-string).
+        """
+        openai_tools = []
+        for t in tools or []:
+            openai_tools.append({
+                "type": "function",
+                "function": {
+                    "name": t.get("name"),
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema") or {"type": "object", "properties": {}},
+                },
+            })
+
+        openai_messages = [{"role": "system", "content": system_prompt}]
+        openai_messages.extend(messages)
+
+        kwargs = dict(
+            model=self.config.model_name,
+            messages=openai_messages,
+            tools=openai_tools,
+        )
+        # Reasoning models (o1/o3 family) reject `max_tokens` — they
+        # use `max_completion_tokens` and ignore `temperature`. Fall back
+        # gracefully on TypeError so we don't have to maintain a list.
+        max_t = max_tokens or self.config.max_tokens
+        try:
+            response = self.client.chat.completions.create(
+                **kwargs,
+                max_tokens=max_t,
+                temperature=self.config.temperature,
+            )
+        except Exception as e:
+            msg = str(e).lower()
+            if "max_tokens" in msg or "temperature" in msg:
+                # Reasoning model — retry with the supported params only.
+                logger.info(
+                    "[OpenAITools] retrying without max_tokens/temperature for %s",
+                    self.config.model_name,
+                )
+                response = self.client.chat.completions.create(**kwargs)
+            else:
+                raise
+        logger.info(
+            "[OpenAITools] response: model=%s in=%d out=%d finish=%s tool_calls=%d",
+            response.model,
+            getattr(response.usage, 'prompt_tokens', 0),
+            getattr(response.usage, 'completion_tokens', 0),
+            response.choices[0].finish_reason,
+            len(response.choices[0].message.tool_calls or []),
+        )
+        return response
+
 
 class GeminiClient(BaseLLMClient):
     """Client for Google's Gemini API."""
@@ -552,6 +618,70 @@ class GeminiClient(BaseLLMClient):
             model=self.config.model_name,
             stop_reason='stop',
         )
+
+    def generate_with_tools(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        tools: list[dict],
+        max_tokens: int | None = None,
+    ):
+        """Gemini function-calling wrapper.
+
+        Accepts the same Anthropic-style tool schema {name, description,
+        input_schema} and converts to Gemini's FunctionDeclaration shape.
+        Returns the raw GenerateContentResponse so the caller can
+        introspect candidates[0].content.parts for FunctionCall blocks.
+        """
+        from google.genai import types
+
+        # Convert Anthropic-style tools to Gemini function declarations.
+        function_decls = []
+        for t in tools or []:
+            function_decls.append(types.FunctionDeclaration(
+                name=t.get("name") or "",
+                description=t.get("description") or "",
+                parameters=t.get("input_schema") or {"type": "OBJECT"},
+            ))
+        gemini_tools = [types.Tool(function_declarations=function_decls)] if function_decls else None
+
+        gemini_contents = self._build_contents(messages)
+
+        config_kwargs = dict(
+            system_instruction=system_prompt,
+            max_output_tokens=max_tokens or self.config.max_tokens,
+            temperature=self.config.temperature,
+        )
+        if gemini_tools:
+            config_kwargs["tools"] = gemini_tools
+
+        response = self.client.models.generate_content(
+            model=self.config.model_name,
+            contents=gemini_contents,
+            config=types.GenerateContentConfig(**config_kwargs),
+        )
+        # Summary log
+        function_call_count = 0
+        text_chars = 0
+        try:
+            for cand in (response.candidates or []):
+                for part in (cand.content.parts or []):
+                    if getattr(part, "function_call", None):
+                        function_call_count += 1
+                    elif getattr(part, "text", None):
+                        text_chars += len(part.text or "")
+        except Exception:
+            pass
+        logger.info(
+            "[GeminiTools] response: model=%s in=%d out=%d "
+            "function_calls=%d text_chars=%d",
+            self.config.model_name,
+            getattr(response.usage_metadata, "prompt_token_count", 0) or 0,
+            getattr(response.usage_metadata, "candidates_token_count", 0) or 0,
+            function_call_count,
+            text_chars,
+        )
+        return response
 
 
 class MockLLMClient(BaseLLMClient):
