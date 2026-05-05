@@ -73,6 +73,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.safety.SafetyMiddleware',
+    # Forces a password change after an admin reset (sets
+    # Membership.password_reset_required=True). Must come AFTER
+    # AuthenticationMiddleware (request.user must be set).
+    'apps.accounts.password_reset_middleware.PasswordResetRequiredMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

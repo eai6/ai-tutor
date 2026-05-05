@@ -87,6 +87,16 @@ class Membership(models.Model):
     is_active = models.BooleanField(default=True)
     joined_at = models.DateTimeField(auto_now_add=True)
 
+    # Set to True when an admin resets the user's password. Cleared
+    # the moment the user successfully changes it. The login flow
+    # checks this flag and redirects to a "set new password" screen
+    # if any of the user's memberships have it true. Per-membership
+    # rather than per-user because admin reset is an institution-
+    # scoped action — but in practice we set it on every membership
+    # the target user has, so any session of theirs forces the
+    # change.
+    password_reset_required = models.BooleanField(default=False)
+
     class Meta:
         # A user can only have one role per institution
         unique_together = ['user', 'institution']

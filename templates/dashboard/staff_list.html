@@ -39,6 +39,14 @@
                     </td>
                     <td style="padding:0.75rem 1rem;text-align:right;">
                         {% if not row.is_self %}
+                        <button type="button"
+                                class="btn btn-sm staff-reset-btn"
+                                data-user-id="{{ row.user.id }}"
+                                data-username="{{ row.user.username }}"
+                                data-email="{{ row.user.email }}"
+                                style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-right:0.4rem;">
+                            Reset password
+                        </button>
                         <form method="post" action="{% url 'dashboard:delete_staff' row.user.id %}" style="display:inline;" onsubmit="return confirm('Permanently delete staff account &quot;{{ row.user.username }}&quot;? This cascades through their data and cannot be undone.');">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-danger btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Delete</button>
@@ -53,4 +61,163 @@
         </table>
     </div>
 </div>
+
+<!-- Reset-password modal: choose flavour, then show result. Closed by default. -->
+<div id="reset-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:8px;width:min(440px,92vw);box-shadow:0 8px 30px rgba(0,0,0,0.2);overflow:hidden;">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid #e4e4e7;">
+            <h3 id="reset-modal-title" style="margin:0;font-size:1.05rem;color:#111;">Reset password</h3>
+            <p id="reset-modal-subtitle" style="margin:0.3rem 0 0;font-size:0.85rem;color:#6b7280;"></p>
+        </div>
+        <div id="reset-modal-body" style="padding:1.1rem 1.25rem;font-size:0.9rem;color:#1f2937;">
+            <div id="reset-step-choose">
+                <p style="margin:0 0 0.75rem;color:#374151;">Pick how to deliver the new password:</p>
+                <button type="button" id="reset-choice-email" style="display:block;width:100%;text-align:left;padding:0.7rem 0.85rem;border:1px solid #d4d4d8;border-radius:6px;background:#fff;cursor:pointer;margin-bottom:0.5rem;">
+                    <strong style="color:#111;">Email a reset link</strong>
+                    <span id="reset-email-recipient" style="display:block;font-size:0.78rem;color:#6b7280;margin-top:2px;"></span>
+                </button>
+                <button type="button" id="reset-choice-show" style="display:block;width:100%;text-align:left;padding:0.7rem 0.85rem;border:1px solid #d4d4d8;border-radius:6px;background:#fff;cursor:pointer;">
+                    <strong style="color:#111;">Show a temporary password</strong>
+                    <span style="display:block;font-size:0.78rem;color:#6b7280;margin-top:2px;">Copy it and share with the user. They'll be forced to change it on next login.</span>
+                </button>
+            </div>
+            <div id="reset-step-working" style="display:none;color:#374151;">Working…</div>
+            <div id="reset-step-result-show" style="display:none;">
+                <p style="margin:0 0 0.5rem;color:#374151;">Temporary password for <strong id="reset-result-username"></strong>:</p>
+                <div style="display:flex;gap:0.4rem;">
+                    <code id="reset-result-password" style="flex:1;font-family:ui-monospace,monospace;font-size:1.05rem;background:#f5f3ff;color:#5b21b6;padding:0.55rem 0.7rem;border-radius:6px;letter-spacing:1px;border:1px solid #ddd6fe;"></code>
+                    <button type="button" id="reset-copy-btn" style="background:#5b21b6;color:#fff;border:none;border-radius:6px;padding:0 0.85rem;cursor:pointer;font-size:0.85rem;">Copy</button>
+                </div>
+                <p style="margin:0.6rem 0 0;font-size:0.78rem;color:#6b7280;">⚠️ Won't be shown again. The user will be required to change it on next login.</p>
+            </div>
+            <div id="reset-step-result-email" style="display:none;color:#065f46;">
+                <p style="margin:0;">✅ Reset link emailed to <strong id="reset-result-email-addr"></strong>. The link expires shortly.</p>
+            </div>
+            <div id="reset-step-error" style="display:none;color:#991b1b;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:0.6rem 0.75rem;margin-top:0.6rem;"></div>
+        </div>
+        <div style="padding:0.75rem 1.25rem;border-top:1px solid #e4e4e7;background:#fafafa;text-align:right;">
+            <button type="button" id="reset-modal-close" style="background:#fff;color:#374151;border:1px solid #d4d4d8;border-radius:6px;padding:0.4rem 0.85rem;cursor:pointer;font-size:0.85rem;">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const modal = document.getElementById('reset-modal');
+    const subtitle = document.getElementById('reset-modal-subtitle');
+    const stepChoose = document.getElementById('reset-step-choose');
+    const stepWorking = document.getElementById('reset-step-working');
+    const stepShow = document.getElementById('reset-step-result-show');
+    const stepEmail = document.getElementById('reset-step-result-email');
+    const stepError = document.getElementById('reset-step-error');
+    const emailRecipient = document.getElementById('reset-email-recipient');
+    const usernameOut = document.getElementById('reset-result-username');
+    const passwordOut = document.getElementById('reset-result-password');
+    const emailAddrOut = document.getElementById('reset-result-email-addr');
+    const closeBtn = document.getElementById('reset-modal-close');
+    const choiceEmail = document.getElementById('reset-choice-email');
+    const choiceShow = document.getElementById('reset-choice-show');
+    const copyBtn = document.getElementById('reset-copy-btn');
+
+    let currentUserId = null;
+
+    function csrf() {
+        const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+
+    function showSteps({ choose=false, working=false, show=false, email=false, error=null }) {
+        stepChoose.style.display = choose ? '' : 'none';
+        stepWorking.style.display = working ? '' : 'none';
+        stepShow.style.display = show ? '' : 'none';
+        stepEmail.style.display = email ? '' : 'none';
+        stepError.style.display = error ? '' : 'none';
+        if (error) stepError.textContent = error;
+    }
+
+    function open(userId, username, email) {
+        currentUserId = userId;
+        subtitle.textContent = `For ${username}` + (email ? ` (${email})` : '');
+        if (email) {
+            emailRecipient.textContent = `Send to ${email}`;
+            choiceEmail.disabled = false;
+            choiceEmail.style.opacity = '1';
+            choiceEmail.style.cursor = 'pointer';
+        } else {
+            emailRecipient.textContent = 'No email on file — pick "Show" instead.';
+            choiceEmail.disabled = true;
+            choiceEmail.style.opacity = '0.5';
+            choiceEmail.style.cursor = 'not-allowed';
+        }
+        showSteps({ choose: true });
+        modal.style.display = 'flex';
+    }
+
+    function close() {
+        modal.style.display = 'none';
+        currentUserId = null;
+    }
+
+    async function doShow() {
+        showSteps({ working: true });
+        try {
+            const resp = await fetch(`/dashboard/staff/${currentUserId}/reset-password/show/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf() },
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                showSteps({ choose: true, error: data.error || 'Reset failed.' });
+                return;
+            }
+            usernameOut.textContent = data.username;
+            passwordOut.textContent = data.temporary_password;
+            showSteps({ show: true });
+        } catch (e) {
+            showSteps({ choose: true, error: 'Network error: ' + e.message });
+        }
+    }
+
+    async function doEmail() {
+        showSteps({ working: true });
+        try {
+            const resp = await fetch(`/dashboard/staff/${currentUserId}/reset-password/email/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf() },
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                showSteps({ choose: true, error: data.error || 'Email failed.' });
+                return;
+            }
+            emailAddrOut.textContent = data.email;
+            showSteps({ email: true });
+        } catch (e) {
+            showSteps({ choose: true, error: 'Network error: ' + e.message });
+        }
+    }
+
+    document.querySelectorAll('.staff-reset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            open(btn.dataset.userId, btn.dataset.username, btn.dataset.email);
+        });
+    });
+    closeBtn.addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    choiceEmail.addEventListener('click', () => { if (!choiceEmail.disabled) doEmail(); });
+    choiceShow.addEventListener('click', doShow);
+    copyBtn.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(passwordOut.textContent);
+            copyBtn.textContent = 'Copied';
+            setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+        } catch (e) {
+            const range = document.createRange();
+            range.selectNode(passwordOut);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+        }
+    });
+})();
+</script>
 {% endblock %}

@@ -4024,6 +4024,181 @@ def delete_staff(request, user_id):
     return redirect('dashboard:staff_list')
 
 
+# ----------------------------------------------------------------
+# Admin-initiated password reset for staff accounts
+#
+# Two flavours:
+#   show  — generate a random password, return it to the admin
+#           ONCE so they can hand-deliver it (works without email).
+#   email — generate a one-time reset link via Django's built-in
+#           default_token_generator, email it to the staff user.
+#
+# Both flavours: set Membership.password_reset_required=True on
+# every membership the target user has. The middleware redirects
+# the user to a forced-change screen on their next request after
+# login until they set a new password — at which point the flag
+# clears.
+# ----------------------------------------------------------------
+
+
+def _generate_temp_password(length: int = 12) -> str:
+    """Random password — letters + digits only, avoids ambiguous chars
+    (no 0/O, 1/l/I) so the admin can read it back to the user
+    over phone / SMS without confusion."""
+    import secrets
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _flag_password_reset_required(target_user):
+    """Set Membership.password_reset_required=True on every membership
+    the user has. Login-side middleware reads this and redirects."""
+    from apps.accounts.models import Membership
+    Membership.objects.filter(user=target_user).update(
+        password_reset_required=True,
+    )
+
+
+@staff_required
+@require_POST
+def staff_reset_password_show(request, user_id):
+    """Admin-initiated reset that returns the new password JSON for
+    one-time display. The admin copies it and shares with the user
+    out-of-band (in person, phone, signal, etc.). Forces the user
+    to change it on their next login.
+    """
+    from django.contrib.auth.models import User
+    from django.http import JsonResponse
+    from apps.safety import SafetyAuditLog
+
+    if not request.user.is_staff:
+        return JsonResponse({"error": "Admin access required"}, status=403)
+    target = get_object_or_404(User, id=user_id)
+    if target.id == request.user.id:
+        return JsonResponse({"error": "Use the account-settings page to change your own password."}, status=400)
+
+    new_password = _generate_temp_password()
+    target.set_password(new_password)
+    target.save(update_fields=['password'])
+    _flag_password_reset_required(target)
+
+    SafetyAuditLog.log(
+        'password_reset',
+        user=request.user,
+        details={
+            'mode': 'admin_resets_staff_show',
+            'target_user_id': target.id,
+            'target_username': target.username,
+        },
+        severity='warning',
+        request=request,
+    )
+    logger.info(
+        f"[StaffReset] admin={request.user.username} reset staff={target.username} "
+        f"via show (forced-change=True)"
+    )
+    return JsonResponse({
+        "username": target.username,
+        "temporary_password": new_password,
+        "must_change_on_next_login": True,
+    })
+
+
+@staff_required
+@require_POST
+def staff_reset_password_email(request, user_id):
+    """Admin-initiated reset that emails the user a one-time link.
+    Uses Django's built-in default_token_generator (same one
+    powering PasswordResetView) so the link expires per the
+    Django default (3 days).
+    """
+    from django.contrib.auth.models import User
+    from django.contrib.auth.tokens import default_token_generator
+    from django.utils.http import urlsafe_base64_encode
+    from django.utils.encoding import force_bytes
+    from django.urls import reverse
+    from django.core.mail import send_mail
+    from django.conf import settings as dj_settings
+    from django.http import JsonResponse
+    from apps.safety import SafetyAuditLog
+
+    if not request.user.is_staff:
+        return JsonResponse({"error": "Admin access required"}, status=403)
+    target = get_object_or_404(User, id=user_id)
+    if target.id == request.user.id:
+        return JsonResponse({"error": "Use the account-settings page to change your own password."}, status=400)
+    if not target.email:
+        return JsonResponse({"error": "User has no email address on file"}, status=400)
+
+    _flag_password_reset_required(target)
+
+    uidb64 = urlsafe_base64_encode(force_bytes(target.pk))
+    token = default_token_generator.make_token(target)
+    try:
+        reset_path = reverse(
+            'password_reset_confirm', kwargs={'uidb64': uidb64, 'token': token},
+        )
+    except Exception:
+        # If the URL name isn't wired, fall back to the canonical Django path
+        reset_path = f"/accounts/reset/{uidb64}/{token}/"
+    reset_url = request.build_absolute_uri(reset_path)
+
+    try:
+        from apps.dashboard.models import PlatformConfig
+        platform_name = PlatformConfig.load().platform_name or 'AI Tutor'
+    except Exception:
+        platform_name = 'AI Tutor'
+    sender_name = request.user.get_full_name() or request.user.username
+
+    try:
+        send_mail(
+            subject=f"Your {platform_name} password was reset",
+            message=(
+                f"Hello {target.first_name or target.username},\n\n"
+                f"An administrator ({sender_name}) reset your "
+                f"{platform_name} password. Use the link below to "
+                f"choose a new password — the link is one-time and "
+                f"expires shortly.\n\n"
+                f"{reset_url}\n\n"
+                f"If you didn't expect this, contact your "
+                f"administrator immediately.\n\n"
+                f"— {platform_name}"
+            ),
+            from_email=dj_settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[target.email],
+            fail_silently=False,
+        )
+    except Exception as e:
+        logger.error(
+            f"[StaffReset] email to {target.email} failed: {e}", exc_info=True,
+        )
+        return JsonResponse({
+            "error": f"Email delivery failed — try the show-password option instead. ({e})",
+        }, status=502)
+
+    SafetyAuditLog.log(
+        'password_reset',
+        user=request.user,
+        details={
+            'mode': 'admin_resets_staff_email',
+            'target_user_id': target.id,
+            'target_username': target.username,
+            'target_email': target.email,
+        },
+        severity='warning',
+        request=request,
+    )
+    logger.info(
+        f"[StaffReset] admin={request.user.username} emailed reset link to "
+        f"staff={target.username} <{target.email}>"
+    )
+    return JsonResponse({
+        "username": target.username,
+        "email": target.email,
+        "sent": True,
+    })
+
+
 @teacher_required
 @require_POST
 def course_subject_type(request, course_id):

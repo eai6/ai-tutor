@@ -45,6 +45,10 @@ urlpatterns = [
         template_name='accounts/password_reset_complete.html',
     ), name='password_reset_complete'),
 
+    # Forced password change after admin reset
+    path('password/change-required/', views.password_change_required,
+         name='password_change_required'),
+
     # Logout
     path('logout/', views.logout_view, name='logout'),
 

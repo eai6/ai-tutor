@@ -605,6 +605,47 @@ def logout_view(request):
 
 
 @login_required
+def password_change_required(request):
+    """Forced password-change view shown after an admin reset.
+
+    The middleware (apps.accounts.password_reset_middleware) redirects
+    here whenever any of the user's memberships has
+    ``password_reset_required=True``. On successful change, all of
+    the user's memberships have the flag cleared and the user is
+    redirected to the appropriate landing page.
+    """
+    from django.contrib.auth.forms import SetPasswordForm
+    from django.contrib.auth import update_session_auth_hash
+    from apps.accounts.models import Membership
+
+    user = request.user
+
+    if request.method == 'POST':
+        form = SetPasswordForm(user, request.POST)
+        if form.is_valid():
+            form.save()
+            # Clear the flag on every membership the user has, so they
+            # don't get bounced back to this page on the next request.
+            Membership.objects.filter(user=user).update(
+                password_reset_required=False,
+            )
+            update_session_auth_hash(request, user)
+            messages.success(
+                request,
+                "Password updated. You can continue using the platform now.",
+            )
+            # Send to the landing page; the post-login dispatcher will
+            # route to dashboard / chat as appropriate.
+            return redirect('accounts:landing')
+    else:
+        form = SetPasswordForm(user)
+
+    return render(request, 'accounts/password_change_required.html', {
+        'form': form,
+    })
+
+
+@login_required
 def delete_account(request):
     """Self-service account deletion.
 
