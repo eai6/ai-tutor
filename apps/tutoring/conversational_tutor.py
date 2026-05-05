@@ -2281,6 +2281,119 @@ Keep it to 2-3 sentences."""
         media_id_map = getattr(self, '_media_id_map', {})
         return [media_id_map[mid] for mid in step_media_ids if mid in media_id_map]
 
+    # Cache: avoid re-reading the same image bytes per turn within a
+    # session. Keyed by (current_topic_index, media_url) → image_block.
+    def _get_step_vision_block(self):
+        """Build a content block to attach the current step's primary
+        image to the LLM call so the model can SEE the figure rather
+        than relying on metadata alone.
+
+        Format is provider-agnostic: returns Anthropic's image content
+        block shape ({"type":"image","source":{"type":"base64", ...}}).
+        The Anthropic SDK accepts it directly; OpenAIClient and
+        GeminiClient have multimodal adapters that translate this
+        shape (see _build_contents in GeminiClient).
+
+        Returns None when:
+          - the current step has no attached media
+          - the file can't be read (URL unreachable, missing file)
+          - the lesson is non-math (skip to keep cost down — vision
+            is most valuable for diagrammatic math content)
+        """
+        try:
+            if not self.lesson.unit.course.is_math:
+                return None
+        except Exception:
+            return None
+        if self.current_topic_index >= len(self.steps):
+            return None
+        media = self._get_step_media()
+        if not media:
+            return None
+        primary = media[0]
+        url = primary.get('url') or ''
+        if not url:
+            return None
+        # Per-session cache to avoid re-reading the same file every turn.
+        cache = getattr(self, '_vision_cache', None)
+        if cache is None:
+            cache = {}
+            self._vision_cache = cache
+        cache_key = (self.current_topic_index, url)
+        if cache_key in cache:
+            return cache[cache_key]
+
+        try:
+            data, media_type = self._read_image_for_vision(url)
+        except Exception as e:
+            logger.warning("[Vision] failed to read step image %s: %s", url, e)
+            cache[cache_key] = None
+            return None
+        if not data:
+            cache[cache_key] = None
+            return None
+        # Anthropic image content block shape — also recognised by
+        # GeminiClient._build_contents and OpenAIClient (when wired
+        # up to handle multimodal user messages).
+        block = {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": media_type,
+                "data": data,
+            },
+        }
+        cache[cache_key] = block
+        logger.info(
+            "[Vision] attaching step=%d image url=%s media_type=%s bytes=%d",
+            self.current_topic_index, url[-60:], media_type, len(data) * 3 // 4,
+        )
+        return block
+
+    def _read_image_for_vision(self, url: str):
+        """Read an image at `url` (filesystem path, /media/... URL, or
+        absolute http(s) URL) and return (base64_str, media_type).
+
+        Strategy:
+          1. If local file path or /media/... URL → read from disk
+             relative to settings.MEDIA_ROOT.
+          2. If absolute http(s) URL → download via requests with a
+             short timeout. Fail silently → return ('', '').
+        """
+        import base64
+        import os
+        from django.conf import settings
+
+        media_type = 'image/png'
+        if url.lower().endswith(('.jpg', '.jpeg')):
+            media_type = 'image/jpeg'
+        elif url.lower().endswith('.gif'):
+            media_type = 'image/gif'
+        elif url.lower().endswith('.webp'):
+            media_type = 'image/webp'
+
+        # Local-path branch
+        if url.startswith('/media/') or not url.startswith(('http://', 'https://')):
+            relative = url[len('/media/'):] if url.startswith('/media/') else url
+            local_path = os.path.join(settings.MEDIA_ROOT, relative.lstrip('/'))
+            if not os.path.exists(local_path):
+                return '', ''
+            with open(local_path, 'rb') as f:
+                raw = f.read()
+            return base64.b64encode(raw).decode('ascii'), media_type
+
+        # Remote-URL branch
+        try:
+            import requests
+            resp = requests.get(url, timeout=4)
+            if resp.status_code != 200:
+                return '', ''
+            return base64.b64encode(resp.content).decode('ascii'), (
+                resp.headers.get('Content-Type', media_type).split(';')[0]
+            )
+        except Exception:
+            return '', ''
+
     def _build_media_context(self, media: List[Dict]) -> str:
         """Build context about what images are being shown for the LLM."""
         if not media:
@@ -5449,19 +5562,40 @@ Follow the current step; this concept will be covered in sequence."""
             return None
 
         criteria_map = {
+            # Loosened (2026-05-05): old criteria required BOTH content
+            # delivery AND a perfect comprehension check, which made
+            # the LLM judge return step_complete=False even when
+            # students were clearly engaging. New criteria: complete
+            # when the student has shown they understand the concept,
+            # via correct or substantively-engaged answers. Hard cap
+            # of 10 exchanges still backstops anything that drags.
             'teach': (
-                "Complete when the teaching content has been delivered "
-                "AND the student answered a comprehension check correctly."
+                "Complete when the student has shown they understand "
+                "the concept — either by correctly answering a "
+                "comprehension check OR by accurately paraphrasing / "
+                "extending the idea in their own words. Don't require "
+                "a perfect textbook answer; a meaningful demonstration "
+                "of understanding is enough."
             ),
             'worked_example': (
-                "Complete when the example has been walked through AND "
-                "the student explained a step back correctly."
+                "Complete when the student has explained at least one "
+                "step of the example back correctly OR demonstrated "
+                "they can apply the same method to a similar setup."
             ),
-            'practice': "Complete when the student answered the question correctly.",
-            'quiz': "Complete when the student answered the question correctly.",
+            'practice': (
+                "Complete when the student gives the FINAL correct "
+                "answer to the posed question. Partial working / "
+                "intermediate steps that are correct so far do NOT "
+                "complete the step — wait for the final answer."
+            ),
+            'quiz': (
+                "Complete when the student gives the FINAL correct "
+                "answer to the posed question. Partial working that "
+                "is correct so far does NOT complete the step."
+            ),
             'summary': (
-                "Complete when the key points have been stated AND the "
-                "student acknowledged understanding."
+                "Complete when the student acknowledges the key points "
+                "(any 'got it' / 'makes sense' / paraphrase counts)."
             ),
         }
         # Last 4 conversation turns for context (kept short — judge
@@ -6012,7 +6146,18 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
 
         # Advance topic based on step-type completion criteria (NOT during remediation)
         if self.session_state == SessionState.TUTORING and not getattr(self, 'is_remediation', False):
-            should_advance = self._should_advance_step(student_input, tutor_response, is_correct, step_eval_result)
+            # Track whether is_correct came from a deterministic source.
+            # The fast-path advances on is_correct=True ONLY when it's
+            # deterministic (the student's reply matches expected_answer
+            # exactly). LLM-judged is_correct could be a sub-step
+            # working line — we don't want to advance prematurely.
+            is_correct_was_deterministic = (
+                eval_layer == 'deterministic_numeric'
+            )
+            should_advance = self._should_advance_step(
+                student_input, tutor_response, is_correct, step_eval_result,
+                is_correct_was_deterministic=is_correct_was_deterministic,
+            )
             if should_advance and self.current_topic_index < len(self.steps) - 1:
                 # Check concept boundary gating
                 if self._is_at_concept_boundary():
@@ -6205,28 +6350,38 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
             return {"correct": True, "signal": True}
         return {"correct": False, "signal": False}
 
-    def _should_advance_step(self, student_input: str, tutor_response: str, is_correct: bool, eval_result=None) -> bool:
+    def _should_advance_step(
+        self,
+        student_input: str,
+        tutor_response: str,
+        is_correct: bool,
+        eval_result=None,
+        *,
+        is_correct_was_deterministic: bool = False,
+    ) -> bool:
         """Determine if the current step is complete.
 
         Safety valves (hard rules, not LLM):
-        | Rule                       | Threshold                                              |
-        |----------------------------|--------------------------------------------------------|
-        | Per-step-type hard cap     | teach / worked_example / summary: 10 ; practice / quiz: 30 |
-        | Min exchanges before eval  | teach / worked_example: 2 ; others: 1                  |
-        | Correct-answer fast-path   | is_correct=True (after min floor) -> advance ANY type  |
+        | Rule                              | Threshold                                              |
+        |-----------------------------------|--------------------------------------------------------|
+        | Per-step-type hard cap            | teach / worked_example / summary: 10 ; practice / quiz: 30 |
+        | Min exchanges before eval         | teach / worked_example: 2 ; others: 1                  |
+        | Deterministic-correct fast-path   | practice/quiz + is_correct=True from deterministic check |
+        | step_complete fast-path           | LLM judge says step_complete=True                      |
 
         2026-05-05: switched from a single 30-exchange global cap to
         per-step-type caps. Teach / worked_example / summary are short
-        instructional steps — students who haven't moved on after 10
-        turns of teaching aren't going to. Practice / quiz keep 30 to
-        allow time to wrestle with hard problems.
+        instructional steps; practice / quiz keep 30 for wrestling time.
 
-        Also added a correct-answer fast-path for ALL step types (was
-        only practice/quiz). When the merged combined_judge is
-        conservative on step_complete (saying "completed when X AND
-        student answered correctly" but reporting step_complete=False
-        even after a correct answer), is_correct=True is sufficient to
-        advance — the student demonstrated mastery, ship it.
+        2026-05-05 (later): tightened the correct-answer fast-path.
+        Originally fired on ANY is_correct=True, which could advance
+        practice steps prematurely when the LLM judge marks a correct
+        SUB-STEP ("first I subtract 5 → 3x = 15") as answer_correct=True.
+        Now: fast-path on correct only fires when the verdict is
+        DETERMINISTIC (student's reply matches expected_answer exactly).
+        For LLM-judged correctness on partial work, defer to
+        step_complete — the LLM is in a better position to judge
+        whether the WHOLE problem was solved.
         """
         if self.current_topic_index >= len(self.steps):
             return False
@@ -6253,15 +6408,20 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         if exchanges < min_exchanges:
             return False
 
-        # 3. Correct-answer fast-path. Applies to ALL step types: when
-        # the student demonstrably answered correctly, advance even if
-        # the LLM judge is conservative on step_complete. This is the
-        # fix for the "tutor stuck on teach step" bug where the merged
-        # judge would say answer_correct=True but step_complete=False
-        # because its strict "X AND Y" criteria weren't 100% met.
-        if is_correct is True:
+        # 3. Deterministic-correct fast-path. Only fires when the
+        # is_correct verdict came from the deterministic numeric check
+        # (student typed the FINAL answer that matches expected_answer
+        # with tolerance), AND the step is practice/quiz where final
+        # answer = step done. For teach/worked_example/summary, the
+        # student isn't being asked for a single final answer — defer
+        # to step_complete from the LLM judge.
+        if (
+            is_correct is True
+            and is_correct_was_deterministic
+            and step_type in ('practice', 'quiz')
+        ):
             logger.info(
-                "[StepAdvance] CORRECT_ANSWER step=%d type=%s → advance",
+                "[StepAdvance] DETERMINISTIC_CORRECT step=%d type=%s → advance",
                 self.current_topic_index, step_type,
             )
             return True
