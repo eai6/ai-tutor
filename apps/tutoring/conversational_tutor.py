@@ -4219,6 +4219,24 @@ Follow the current step; this concept will be covered in sequence."""
                 "[QuestionTool] prereq pull skipped — query failure: %s", e,
             )
             return []
+        # Recap questions get rendered WITHOUT the original lesson's
+        # diagram (we don't pull the previous lesson's media — the
+        # auto-attach uses CURRENT-step media which would be the
+        # wrong picture). Two-layer filter to keep recap questions
+        # purely numeric / verbal:
+        #   1. Restrict to question_type in {short_numeric, fill_in_blank} —
+        #      these are the bank's text-only formats. MCQ + matching
+        #      tend to reference "the diagram" or option visuals.
+        #   2. Drop any remaining stem that references a figure /
+        #      diagram (defense in depth).
+        diagram_required_re = re.compile(
+            r'\b(in the diagram|in the figure|see the diagram|look at|'
+            r'shown below|the diagram|the figure|the image|the picture|'
+            r'pictured|labelled|labeled)\b',
+            re.IGNORECASE,
+        )
+        NUMERIC_RECAP_TYPES = ('short_numeric', 'fill_in_blank')
+
         out: List = []
         for lp in prereqs:
             prev = lp.prerequisite
@@ -4228,10 +4246,18 @@ Follow the current step; this concept will be covered in sequence."""
                 ExitTicketQuestion.objects.filter(
                     exit_ticket__lesson=prev,
                     exit_ticket__is_published=True,
-                ).order_by('?')[:max_per_lesson]
+                    question_type__in=NUMERIC_RECAP_TYPES,
+                ).order_by('?')[: max_per_lesson * 3]  # over-fetch then filter
             )
+            kept_for_lesson = 0
             for q in qs:
+                stem = (getattr(q, 'question_text', '') or '')
+                if diagram_required_re.search(stem):
+                    continue
                 out.append(q)
+                kept_for_lesson += 1
+                if kept_for_lesson >= max_per_lesson:
+                    break
                 if len(out) >= max_total:
                     break
             if len(out) >= max_total:
