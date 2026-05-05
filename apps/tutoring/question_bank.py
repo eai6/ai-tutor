@@ -25,9 +25,12 @@ Pieces:
 
 from __future__ import annotations
 
+import logging
 import random
 import re
 from typing import Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 # Defaults sized for one session. Small enough to fit the prompt context
 # comfortably; large enough that the LLM has variety per step.
@@ -194,20 +197,28 @@ def pick_candidates_for_step(
 ) -> List:
     """Return up to N pool questions whose concept_tag matches.
 
-    Fallback: if the exact concept_tag has no match, return any pool
-    questions (still valid because they belong to the same lesson and
-    have been teacher-verified). The bank is small and topically
-    homogeneous, so a same-lesson question is a reasonable substitute.
+    STRICT: no fallback. If the current step's concept_tag has no
+    matches in the pool, returns []. The previous "any same-lesson
+    question" fallback was leaking later-step questions onto earlier
+    steps (e.g. step 1 surfacing a step-4 question because the pool
+    is sampled across the whole lesson).
+
+    The caller is expected to fall back to slot 0 (the current
+    step's own teacher_script) when the bank is empty for this step.
     """
     if not pool:
+        logger.info("[QuestionTool] pick_candidates_for_step: empty pool")
         return []
     tag = (concept_tag or '').strip()
-    if tag:
-        matches = [q for q in pool if (q.concept_tag or '').strip() == tag]
-        if matches:
-            return matches[:max_candidates]
-    # Fallback — same-lesson questions, no concept_tag filter
-    return pool[:max_candidates]
+    if not tag:
+        logger.info("[QuestionTool] pick_candidates_for_step: no concept_tag — returning []")
+        return []
+    matches = [q for q in pool if (q.concept_tag or '').strip() == tag]
+    logger.info(
+        "[QuestionTool] pick_candidates_for_step: tag='%s' pool=%d matches=%d",
+        tag, len(pool), len(matches),
+    )
+    return matches[:max_candidates]
 
 
 def pick_published_for_concept_tag(
@@ -217,15 +228,16 @@ def pick_published_for_concept_tag(
 ):
     """Query the published bank directly for matches by tag.
 
-    Used by the remediation flow, which doesn't go through the per-
-    session pool — the failed EOs may not be in the sampled subset,
-    so we hit the full published bank instead.
+    STRICT: no cross-tag fallback. Returns only questions matching
+    the requested EO or concept_tag. If neither matches, returns [].
 
-    Match precedence (specific → general):
+    The previous fallback ("any published bank question for this
+    lesson") leaked later-step questions onto earlier steps. Callers
+    that want a cross-step bank must explicitly pass each step's tag.
+
+    Match precedence:
       1. enabling_objective exact match — narrow sub-objective targeting
       2. concept_tag exact match — broad learning-objective grouping
-      3. any published bank question for this lesson — fallback so the
-         tutor always has something verified to pose
     """
     from apps.tutoring.models import ExitTicketQuestion
     base = ExitTicketQuestion.objects.filter(
@@ -233,17 +245,28 @@ def pick_published_for_concept_tag(
         exit_ticket__is_published=True,
     )
     tag = (concept_tag or '').strip()
-    if tag:
-        # Sub-objective match first — most specific
-        matches = list(base.filter(enabling_objective=tag).order_by('order_index')[:max_candidates])
-        if matches:
-            return matches
-        # Then broader concept_tag
-        matches = list(base.filter(concept_tag=tag).order_by('order_index')[:max_candidates])
-        if matches:
-            return matches
-    # Fallback — any published bank question for this lesson
-    return list(base.order_by('order_index')[:max_candidates])
+    if not tag:
+        logger.info(
+            "[QuestionTool] pick_published_for_concept_tag: no tag → []"
+        )
+        return []
+    matches = list(
+        base.filter(enabling_objective=tag).order_by('order_index')[:max_candidates]
+    )
+    if matches:
+        logger.info(
+            "[QuestionTool] pick_published_for_concept_tag: eo='%s' matches=%d",
+            tag, len(matches),
+        )
+        return matches
+    matches = list(
+        base.filter(concept_tag=tag).order_by('order_index')[:max_candidates]
+    )
+    logger.info(
+        "[QuestionTool] pick_published_for_concept_tag: concept_tag='%s' matches=%d",
+        tag, len(matches),
+    )
+    return matches
 
 
 def build_remediation_requiz_queue(
@@ -326,24 +349,24 @@ def render_bank_block(
     lines: List[str] = ["<question_bank>"]
     lines.append(
         "  HARD RULE — questions you pose MUST come from this bank.\n"
-        "  This applies to EVERY phase, including teach/explain. If your"
-        " response contains a question with specific numerical values"
-        " (\"if three angles measure 100°, 120°, and 80°…\", \"imagine"
-        " angles of 73° and 45°…\"), those numbers MUST come from a"
-        " bank entry below. Made-up numbers are a hard violation —"
-        " the system will reject the response and ask you to retry.\n"
-        "  Allowed without using the bank:\n"
+        "  To ask any numerical question, you MUST call the\n"
+        "  pose_question tool with a slot index from this bank.\n"
+        "  Do NOT type questions in your text response — the tool\n"
+        "  is the only legal channel.\n"
+        "  Allowed in your text response (no tool needed):\n"
         "    • Pure conceptual scaffolding (\"which rule applies?\",\n"
-        "      \"what do you do first?\")\n"
-        "    • Reciting the lesson rule (\"angles around a point sum to 360°\")\n"
-        "  NOT allowed:\n"
-        "    • Inventing a numerical example to illustrate the rule\n"
-        "    • 'Hypothetical' premises with specific numbers (still authoring)\n"
-        "    • Verifying your made-up numbers add up — the safe pattern\n"
-        "      is to pose a bank question via |||QUESTION:N||| instead.\n"
-        "  To pose a question, end your response with: |||QUESTION:N|||"
-        " (use 0 for the current step's canonical question, or 1..N for"
-        " a bank candidate)."
+        "      \"what do you do first?\") — no specific numbers\n"
+        "    • Reciting the lesson rule (\"angles around a point\n"
+        "      sum to 360°\") — no question being posed\n"
+        "  NOT allowed in your text response:\n"
+        "    • Inventing a numerical example (\"if angles are 100°,\n"
+        "      120°, and 80°…\")\n"
+        "    • Hypothetical premises with specific numbers\n"
+        "    • Any sentence ending in '?' that contains digits\n"
+        "  If you need to pose a question with numerical values, the\n"
+        "  ONLY path is: invoke pose_question(slot=N) with N from the\n"
+        "  list below. Slot 0 = current step's canonical question.\n"
+        "  Slots 1+ = exit-ticket bank questions for this step's concept."
     )
 
     # Slot 0 — the step's own canonical practice question.

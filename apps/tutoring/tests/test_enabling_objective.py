@@ -122,9 +122,13 @@ class EnablingObjectiveFieldTest(TestCase):
         self.assertEqual(len(picks), 1)
         self.assertEqual(picks[0].id, broad_only.id)
 
-    def test_pick_published_falls_back_to_any_lesson_question(self):
-        """When NO field matches at all, fall back to any published
-        bank question for the lesson."""
+    def test_pick_published_returns_empty_when_no_field_matches(self):
+        """STRICT: no cross-tag fallback (2026-05-04). The previous
+        "any lesson question" fallback was leaking later-step questions
+        onto earlier steps. When a tag has no match, we return [] so
+        the caller can fall back to slot 0 (current step's
+        teacher_script) instead of pulling unrelated bank questions.
+        """
         ExitTicketQuestion.objects.create(
             exit_ticket=self.ticket,
             question_text="Generic",
@@ -137,5 +141,4 @@ class EnablingObjectiveFieldTest(TestCase):
         picks = pick_published_for_concept_tag(
             self.lesson, "no_such_tag_anywhere", max_candidates=1,
         )
-        # Falls back to any lesson question rather than empty list
-        self.assertEqual(len(picks), 1)
+        self.assertEqual(picks, [])

@@ -437,24 +437,31 @@ class BankBlockContentTest(TestCase):
     def test_bank_block_uses_hard_rule_language(self):
         block = self._render_block()
         self.assertIn("HARD RULE", block)
-        self.assertIn("EVERY phase", block)
+        # Tool-use rewrite (2026-05-04): the block now directs the LLM
+        # to call the pose_question tool. Normalise whitespace so the
+        # check survives line breaks in the prompt template.
+        normalised = " ".join(block.split())
+        self.assertIn("MUST call the pose_question tool", normalised)
 
-    def test_bank_block_explicitly_bans_invented_numbers_with_examples(self):
+    def test_bank_block_bans_invented_numbers_with_concrete_example(self):
         block = self._render_block()
-        # Both example shapes that the tutor was abusing in the field.
-        self.assertIn("100°, 120°, and 80°", block)
-        self.assertIn("imagine angles", block.lower())
+        # The block illustrates the NOT-allowed pattern with a concrete
+        # numeric example so the LLM doesn't have to abstract the rule.
+        self.assertIn("100°", block)
+        self.assertIn("120°", block)
+        self.assertIn("80°", block)
 
     def test_bank_block_lists_the_allowed_exceptions(self):
         block = self._render_block()
         # Conceptual scaffolding + rule recital are the only carved-out
-        # paths to ask a question without |||QUESTION:N|||.
+        # paths to ask a question without invoking the tool.
         self.assertIn("conceptual scaffolding", block.lower())
         self.assertIn("reciting the lesson rule", block.lower())
 
-    def test_bank_block_keeps_the_signal_syntax(self):
+    def test_bank_block_directs_to_pose_question_tool(self):
         block = self._render_block()
-        self.assertIn("|||QUESTION:N|||", block)
+        self.assertIn("pose_question", block)
+        self.assertIn("slot", block.lower())
 
 
 class PreFilterTest(TestCase):

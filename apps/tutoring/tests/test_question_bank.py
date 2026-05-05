@@ -127,12 +127,15 @@ class QuestionBankHelpersTest(TestCase):
         for q in cands:
             self.assertEqual(q.concept_tag, "angles_around_point")
 
-    def test_pick_candidates_falls_back_when_no_tag_match(self):
+    def test_pick_candidates_returns_empty_when_no_tag_match(self):
+        """STRICT: no fallback. Previous "any same-lesson question"
+        fallback was leaking later-step questions onto earlier steps;
+        the bank scope is now strict per concept_tag. The caller
+        uses slot 0 (current step's teacher_script) when this is empty.
+        """
         pool = sample_session_pool(self.lesson, seed=1, pool_size=20)
         cands = pick_candidates_for_step(pool, "no_such_tag_in_bank")
-        # Fallback returns same-lesson questions even though tag missed
-        self.assertGreater(len(cands), 0)
-        self.assertLessEqual(len(cands), CANDIDATES_PER_STEP)
+        self.assertEqual(cands, [])
 
     def test_pick_candidates_caps_at_max(self):
         pool = sample_session_pool(self.lesson, seed=1, pool_size=20)
@@ -161,7 +164,10 @@ class QuestionBankHelpersTest(TestCase):
     def test_render_bank_block_includes_no_authoring_rule(self):
         block, _ = render_bank_block(self.step, [])
         self.assertIn("MUST come from this bank", block)
-        self.assertIn("|||QUESTION:N|||", block)
+        # Tool-based posing replaced the legacy signal-string. The
+        # block now instructs the LLM to call pose_question instead
+        # of typing |||QUESTION:N|||.
+        self.assertIn("pose_question", block)
 
     def test_parse_signal_extracts_id_and_strips(self):
         text = "Let's try this one. |||QUESTION:3|||"

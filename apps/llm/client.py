@@ -217,6 +217,82 @@ class AnthropicClient(BaseLLMClient):
             stop_reason="end_turn",
         )
 
+    def generate_with_tools(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        tools: list[dict],
+        max_tokens: int | None = None,
+    ):
+        """Non-streaming call that returns the full Anthropic Message
+        object (not just text) so the caller can introspect tool_use
+        content blocks.
+
+        Used by the tutor's pose_question tool flow — the LLM emits a
+        tool_use block to pose a verified bank question and the server
+        renders it. Streaming is intentionally NOT used here because
+        the tool-use flow needs the whole message structure, not a
+        text stream.
+
+        Returns:
+          anthropic.types.Message with .content (list of blocks),
+          .stop_reason, .usage. Caller is responsible for assembling
+          the final response text from the blocks.
+        """
+        resolved_max_tokens = self._clamp_max_tokens(
+            max_tokens or self.config.max_tokens
+        )
+        kwargs = dict(
+            model=self.config.model_name,
+            max_tokens=resolved_max_tokens,
+            system=system_prompt,
+            messages=messages,
+            tools=tools,
+        )
+        if self._supports_temperature():
+            kwargs["temperature"] = self.config.temperature
+        logger.info(
+            "[QuestionTool] llm_call: messages=%d system_chars=%d "
+            "tools=%d max_tokens=%d model=%s",
+            len(messages), len(system_prompt or ""),
+            len(tools or []), resolved_max_tokens,
+            self.config.model_name,
+        )
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                message = self.client.messages.create(**kwargs)
+                # Summarise the response so failures are diagnosable
+                # without reading the whole tool-use block.
+                block_summary = []
+                for b in (message.content or []):
+                    btype = getattr(b, "type", "unknown")
+                    if btype == "tool_use":
+                        name = getattr(b, "name", "?")
+                        block_summary.append(f"tool_use({name})")
+                    elif btype == "text":
+                        text_len = len(getattr(b, "text", "") or "")
+                        block_summary.append(f"text({text_len}c)")
+                    else:
+                        block_summary.append(btype)
+                logger.info(
+                    "[QuestionTool] llm_response: stop_reason=%s in=%d out=%d "
+                    "blocks=[%s]",
+                    message.stop_reason,
+                    message.usage.input_tokens,
+                    message.usage.output_tokens,
+                    ", ".join(block_summary),
+                )
+                return message
+            except (anthropic.RateLimitError, anthropic.InternalServerError) as e:
+                if attempt >= self.MAX_RETRIES:
+                    raise
+                wait = self.RETRY_BACKOFF[attempt]
+                logger.warning(
+                    "[QuestionTool] llm_call retry %d/%d in %ds: %s",
+                    attempt + 1, self.MAX_RETRIES + 1, wait, e,
+                )
+                time.sleep(wait)
+
 
 class OllamaClient(BaseLLMClient):
     """

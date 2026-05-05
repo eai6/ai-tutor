@@ -1604,35 +1604,16 @@ Keep it to 2-3 sentences."""
         clean_response, artifact_html = self._parse_artifact_signal(clean_response)
         # Parse |||PROBE:{json}||| for easy-mode interactive widget.
         clean_response, parsed_probe = self._parse_probe_signal(clean_response)
-        # Parse |||QUESTION:N||| (no-authoring tutor). When the LLM
-        # picks a bank entry we render it verbatim and append, so any
-        # question text the LLM might have written in prose is
-        # superseded by the canonical bank stem.
-        clean_response, picked_question = self._parse_question_signal(clean_response)
-        # Also parse |||QUESTION_EO:N||| — EO-targeted bank pull. The
-        # LLM signals which EO it wants a question for; the server
-        # resolves to a published bank question tagged with that EO.
-        # Lets the tutor request fresh questions outside the per-step
-        # candidate slate (e.g. during a remediation walk that crosses
-        # EOs).
-        clean_response, eo_pulled_question = self._parse_question_eo_signal(
-            clean_response,
-        )
-        # Use the EO-pulled question if the simple signal wasn't fired.
-        if picked_question is None and eo_pulled_question is not None:
-            picked_question = eo_pulled_question
-        # Track for the validator's authoring gate.
-        self._bank_signal_used_this_turn = picked_question is not None
-        if picked_question is not None:
-            from apps.tutoring.question_bank import render_question_to_prose
-            rendered = render_question_to_prose(picked_question)
-            if rendered:
-                clean_response = (clean_response.rstrip() + "\n\n" + rendered).strip()
-            # Record the bank-pull on turn metadata so the NEXT
-            # respond() call can grade the student's reply against
-            # the bank's stored answer (P3 — deterministic grading
-            # for bank questions).
-            self._record_bank_question_on_turn(turn_metadata, picked_question)
+        # NOTE: |||QUESTION:N||| / |||QUESTION_EO:N||| signal parsing
+        # was REMOVED (2026-05-04). Math turns now route through the
+        # pose_question Anthropic tool — _generate_response handles
+        # the tool call and writes bank_question_ref to
+        # _pending_pose_question_meta, which is merged into
+        # turn_metadata below. The signal-parse helpers
+        # (_parse_question_signal, _parse_question_eo_signal) remain
+        # in the file for tests and possible future reuse but are no
+        # longer invoked by respond().
+        # _bank_signal_used_this_turn is set inside the tool handler.
 
         # Combined post-response judge — math-only. ONE LLM call
         # evaluating arithmetic + factual + rule_compliance, replacing
@@ -1732,6 +1713,20 @@ Keep it to 2-3 sentences."""
             turn_metadata['bare_answer_count_for_step'] = step_bare_count
             if step_bare_count >= 3:
                 turn_metadata['bare_answer_flagged'] = True
+
+        # Merge pose_question tool metadata (if the math turn used the
+        # tool path, the handler stored bank_question_ref + related
+        # fields on _pending_pose_question_meta).
+        pose_meta = getattr(self, '_pending_pose_question_meta', None) or {}
+        if pose_meta:
+            for k, v in pose_meta.items():
+                turn_metadata[k] = v
+            logger.info(
+                "[QuestionTool] merged pose_meta into turn_metadata: keys=%s",
+                list(pose_meta.keys()),
+            )
+        # Reset for the next turn so a stale ref can't bleed across.
+        self._pending_pose_question_meta = {}
 
         # Socratic validator V1 — universal praise gate + structural checks.
         # Runs AFTER the math-specific praise filter so it acts as a
@@ -1986,15 +1981,10 @@ Keep it to 2-3 sentences."""
 
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
         clean_content, parsed_media, gen_request = self._parse_media_signal(full_response)
-        # Parse |||QUESTION:N||| — render bank entry verbatim and append.
-        clean_content, picked_question = self._parse_question_signal(clean_content)
-        if picked_question is not None:
-            from apps.tutoring.question_bank import render_question_to_prose
-            rendered = render_question_to_prose(picked_question)
-            if rendered:
-                clean_content = (clean_content.rstrip() + "\n\n" + rendered).strip()
-            # Record bank-pull (streaming parity with respond()).
-            self._record_bank_question_on_turn(turn_metadata, picked_question)
+        # NOTE: |||QUESTION:N||| signal parsing removed (2026-05-04).
+        # Streaming path is unused in production (Azure CA buffers) and
+        # the tool-use path lives in _generate_response. If streaming
+        # is ever revived, it will need to thread the tool path here.
 
         # Verify calculations (streaming parity with respond()) — LLM-based.
         if self.lesson.unit.course.is_math:
@@ -3273,7 +3263,12 @@ Key understanding needed: "{concept.get('explanation', 'Understand this concept 
 Follow the current step; this concept will be covered in sequence."""
     
     def _generate_response(self, prompt: str, fallback_context: str = "conversation") -> str:
-        """Call the LLM to generate a response."""
+        """Call the LLM to generate a response.
+
+        On math turns, routes through the pose_question tool so the LLM
+        cannot author numerical questions in free prose. On non-math
+        turns, falls back to plain text generation.
+        """
         self._last_response_was_fallback = False
 
         if not self.llm_client:
@@ -3287,12 +3282,65 @@ Follow the current step; this concept will be covered in sequence."""
             # Build messages
             messages = [{"role": "user", "content": prompt}]
 
-            # Call LLM (max_tokens and temperature come from ModelConfig)
-            response = self.llm_client.generate(
-                messages=messages,
-                system_prompt=self._build_system_prompt(),
+            # _build_system_prompt populates self._question_id_map as a
+            # side effect — must be called BEFORE _build_pose_question_tool.
+            system_prompt = self._build_system_prompt()
+
+            is_math = False
+            try:
+                is_math = bool(self.lesson.unit.course.is_math)
+            except Exception:
+                pass
+
+            tool = (
+                self._build_pose_question_tool()
+                if is_math and hasattr(self.llm_client, 'generate_with_tools')
+                else None
             )
 
+            if tool is not None:
+                # Math + tool-capable client → tool-use path. The LLM
+                # cannot type a numerical question in prose; the only
+                # way to ask is via pose_question(slot=N).
+                self._pending_pose_question_meta = {}
+                try:
+                    message = self.llm_client.generate_with_tools(
+                        messages=messages,
+                        system_prompt=system_prompt,
+                        tools=[tool],
+                        max_tokens=2048,
+                    )
+                    # The handler iterates message.content as a list of
+                    # blocks. If we got back something that doesn't
+                    # quack like an Anthropic Message (e.g. a test
+                    # MagicMock without proper structure), fall through
+                    # to the plain-text path below.
+                    if not hasattr(message, 'content') or not isinstance(
+                        getattr(message, 'content', None), list
+                    ):
+                        raise TypeError(
+                            f"generate_with_tools returned non-Message: "
+                            f"{type(message).__name__}"
+                        )
+                    final_text = self._handle_pose_question_message(
+                        message, self._pending_pose_question_meta,
+                    )
+                    return final_text.strip()
+                except (NotImplementedError, AttributeError, TypeError) as e:
+                    logger.warning(
+                        "[QuestionTool] tool path unavailable, "
+                        "falling back to text path: %s", e,
+                    )
+
+            # Non-math (or non-Anthropic) → plain text generation.
+            logger.info(
+                "[QuestionTool] generate: TEXT_PATH is_math=%s has_tool_method=%s",
+                is_math, hasattr(self.llm_client, 'generate_with_tools'),
+            )
+            response = self.llm_client.generate(
+                messages=messages,
+                system_prompt=system_prompt,
+            )
             return response.content.strip()
 
         except Exception as e:
@@ -3441,9 +3489,10 @@ Follow the current step; this concept will be covered in sequence."""
                 "\n"
                 "\n=== R1: BANK IS THE SOURCE OF TRUTH ==="
                 "\nFor any question with numerical values:"
-                "\n  • POSE — only via |||QUESTION:N||| or |||QUESTION_EO:N||| "
-                "from the <question_bank> below. Free-typed numerical "
-                "questions trigger an automatic regeneration."
+                "\n  • POSE — call the pose_question tool with a slot from "
+                "the <question_bank> below. The tool is the ONLY way to "
+                "ask a numerical question. Do NOT type questions in your "
+                "text response — the system will strip them."
                 "\n  • GRADE — read the verdict from <bank_evaluation_signal> "
                 "or <math_evaluation_signal>. The server already checked "
                 "against the bank's stored answer; do NOT recompute."
@@ -3607,16 +3656,18 @@ Follow the current step; this concept will be covered in sequence."""
         if is_math_final:
             system_prompt += (
                 "\n\n<final_reminder>"
-                "\nMATH RULE — every numerical question you pose this turn"
-                "\nMUST end with one of these signals on its own line:"
-                "\n  |||QUESTION:N|||      — pose bank slot N (see <question_bank>)"
-                "\n  |||QUESTION_EO:N|||   — pose any bank question for EO N"
+                "\nMATH RULE — to ask any numerical question this turn,"
+                "\nyou MUST call the pose_question tool. The tool's slot"
+                "\nparameter is the only way to identify a bank entry;"
+                "\nthere is no question_text parameter — you cannot pass"
+                "\narbitrary text."
                 "\n"
-                "\nA numerical question without one of these signals will be"
-                "\nrejected by the system and replaced with a bank question."
+                "\nDo NOT type questions in your text response. Numerical"
+                "\nquestions in prose (sentences ending in '?' that contain"
+                "\ndigits) will be stripped before reaching the student."
                 "\nDo NOT invent angle measures, sums, side lengths, or any"
-                "\nother numerical example. If you need a numerical example,"
-                "\nemit a signal — never type the numbers yourself."
+                "\nother numerical example. The bank is the only source"
+                "\nof truth — call pose_question(slot=N) to use it."
                 "\n</final_reminder>"
             )
 
@@ -4016,110 +4067,259 @@ Follow the current step; this concept will be covered in sequence."""
         )
         block, id_map = render_bank_block(current_step, candidates)
 
-        # Augment with all OTHER lesson step questions so engage /
-        # warmup / explain phases can pose verified questions from
-        # any step. Cap to keep prompt size sane.
-        other_steps = [
-            s for s in self.steps
-            if s.id != current_step.id
-            and (getattr(s, 'teacher_script', '') or '').strip()
-        ]
-        if other_steps:
-            next_slot = max(id_map.keys()) + 1 if id_map else 1
-            extra_lines = ["", "  Additional lesson-step questions (slots "
-                           f"{next_slot}+ — pose any of these via "
-                           "|||QUESTION:N||| during teach / engage / "
-                           "review phases):"]
-            for s in other_steps[:15]:  # cap so prompt stays compact
-                id_map[next_slot] = s
-                stem = (s.teacher_script or '').strip()
-                expected = (getattr(s, 'expected_answer', '') or '').strip()
-                line = f"  [{next_slot}] (step {s.order_index + 1}, {s.step_type}) {stem[:300]}"
-                if expected:
-                    line += f"   (expected_answer: {expected[:60]})"
-                extra_lines.append(line)
-                next_slot += 1
-            # Slot the additions BEFORE the closing tag.
-            if "</question_bank>" in block:
-                block = block.replace(
-                    "</question_bank>",
-                    "\n".join(extra_lines) + "\n</question_bank>",
-                )
+        # NOTE: previous "Additional lesson-step questions" augmentation
+        # was REMOVED (2026-05-04). It surfaced every other step's
+        # canonical question with the instruction "pose any of these
+        # during teach / engage / review", which leaked step-4's
+        # question onto step-1 — exactly the bug the user flagged.
+        # Bank scope is now strict: slot 0 = current step's
+        # teacher_script; slots 1..N = ExitTicketQuestion rows tagged
+        # to THIS step's concept_tag. No cross-step leakage.
 
         self._question_id_map = id_map
+        logger.info(
+            "[QuestionTool] build_bank: step=%d tag='%s' slots=%s",
+            self.current_topic_index,
+            current_step.concept_tag or '',
+            sorted(id_map.keys()),
+        )
         return block
 
-    def _force_inject_bank_question(
-        self, response: str, turn_metadata: Dict,
-    ) -> Optional[str]:
-        """Last-resort structural enforcement: when the LLM has authored
-        a numerical question despite the system prompt + one regen,
-        strip its question and append a verified bank entry.
+    # =========================================================================
+    # POSE-QUESTION TOOL (Anthropic tool use) — see memory/pose_question_tool_plan.md
+    # =========================================================================
 
-        Strategy:
-          1. Truncate the response at the first '?' so the LLM's
-             teaching prose stays but the unsafe question is dropped.
-             We snap back to the start of the sentence containing the
-             '?' (last '. ' / '! ' / '\\n' before it) so the truncation
-             reads cleanly.
-          2. Pick a bank entry — prefer slot 0 (the current step's
-             canonical question), fall back to the first available
-             ExitTicketQuestion in the id_map.
-          3. Append the verbatim rendered bank stem.
-          4. Record bank_question_ref on turn_metadata so the next
-             student reply gets graded deterministically.
+    POSE_QUESTION_TOOL_NAME = "pose_question"
 
-        Returns the rewritten response, or None if there's no bank
-        entry to fall back to (in which case the original response
-        ships unchanged — better to leak a bad question once than
-        crash the turn).
+    def _build_pose_question_tool(self) -> Optional[dict]:
+        """Build the Anthropic tool definition for pose_question.
+
+        The tool is the ONLY way for the LLM to ask a numerical question.
+        Its only data parameters are `slot` (an integer index into the
+        bank) and `lead_in` (an optional one-sentence framing). There is
+        NO `question_text` parameter — the LLM cannot pass arbitrary text
+        because the API will reject inputs that don't match the schema.
+
+        Returns the tool dict, or None when there is no bank to pose
+        from (e.g. non-math lesson, or empty id_map). When None the
+        caller falls back to plain text generation.
         """
         id_map = getattr(self, '_question_id_map', {}) or {}
         if not id_map:
+            logger.info(
+                "[QuestionTool] build_tool: SKIP — empty id_map (non-math or empty bank)"
+            )
             return None
 
-        # Pick the entry: current step (slot 0) is the most contextually
-        # appropriate. Falls back to the first non-zero slot.
-        entry = id_map.get(0)
-        if entry is None:
-            for k in sorted(id_map.keys()):
-                if k != 0:
-                    entry = id_map[k]
-                    break
-        if entry is None:
-            return None
+        slot_keys = sorted(id_map.keys())
+        max_slot = max(slot_keys)
 
-        # Truncate at the first '?' (or last paragraph if no '?').
-        cut = response.find('?')
-        if cut >= 0:
-            # Snap back to the end of the previous sentence so the
-            # cut reads cleanly.
-            prelude_end = cut + 1  # default: keep the question mark
-            for sep in ['. ', '! ', '\n\n', '\n']:
-                last = response.rfind(sep, 0, cut)
-                if last > 0:
-                    prelude_end = last + len(sep)
-                    break
-            prose = response[:prelude_end].rstrip()
-        else:
-            # No '?' — keep all but the last paragraph.
-            paras = response.rsplit('\n\n', 1)
-            prose = paras[0].rstrip() if len(paras) > 1 else response.rstrip()
+        # Slot menu — short, factual. The LLM already has the full
+        # <question_bank> block in the system prompt; this menu is
+        # just a quick reference inside the tool description.
+        menu_lines = []
+        for slot in slot_keys:
+            entry = id_map[slot]
+            stem = ''
+            if hasattr(entry, 'teacher_script'):
+                stem = (getattr(entry, 'teacher_script', '') or '').strip()
+            else:
+                stem = (getattr(entry, 'question_text', '') or '').strip()
+            menu_lines.append(f"  {slot}: {stem[:120]}")
+        menu = "\n".join(menu_lines)
 
-        from apps.tutoring.question_bank import render_question_to_prose
-        rendered = render_question_to_prose(entry)
-        if not rendered:
-            return None
-
-        # Record the bank ref so the next student turn grades against it.
-        self._record_bank_question_on_turn(turn_metadata, entry)
-
-        note = (
-            "\n\nLet's try a verified question from the bank:\n\n"
-            if prose else
-            "Let's try a verified question from the bank:\n\n"
+        tool = {
+            "name": self.POSE_QUESTION_TOOL_NAME,
+            "description": (
+                "Pose a verified bank question to the student. This is "
+                "the ONLY way to ask any numerical question. NEVER type "
+                "questions in your text response — invoke this tool "
+                "instead. The slot index refers to the <question_bank> "
+                "block in the system prompt. Slot 0 is the current "
+                "step's canonical question; slots 1+ are exit-ticket "
+                "bank questions tagged to this step's concept.\n\n"
+                "Available slots:\n" + menu
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "slot": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": max_slot,
+                        "description": (
+                            "Bank slot to pose. Must be one of: "
+                            f"{slot_keys}"
+                        ),
+                    },
+                    "lead_in": {
+                        "type": "string",
+                        "description": (
+                            "Optional one-sentence framing displayed "
+                            "before the question (e.g. \"Right — let's "
+                            "apply that. Try this:\"). Do NOT include a "
+                            "question yourself."
+                        ),
+                    },
+                },
+                "required": ["slot"],
+            },
+        }
+        logger.info(
+            "[QuestionTool] build_tool: slots=%s max_slot=%d",
+            slot_keys, max_slot,
         )
-        return f"{prose}{note}{rendered}".strip()
+        return tool
+
+    # Defense-in-depth regex — strips numerical questions from text
+    # blocks if the LLM somehow puts one there instead of using the
+    # tool. Same shape as the validator's _NUMERICAL_QUESTION_RE but
+    # operates on the LLM output before it reaches the student.
+    _NUMERICAL_QUESTION_DEFENSE_RE = re.compile(
+        r"(?:[^.!?\n]*?\d[^.!?\n]*?){1,}\?",
+        re.DOTALL,
+    )
+
+    def _strip_text_block_numerical_questions(self, text: str) -> Tuple[str, int]:
+        """Defense-in-depth: remove sentences ending in '?' that contain
+        2+ digit-bearing tokens (i.e. numerical questions). Returns
+        (cleaned_text, chars_stripped). With the pose_question tool
+        this should rarely fire; when it does we log a warning so we
+        can observe how often the LLM bypasses the tool.
+        """
+        if not text or '?' not in text:
+            return text, 0
+        cleaned = self._NUMERICAL_QUESTION_DEFENSE_RE.sub('', text)
+        # Tidy whitespace from the strip.
+        cleaned = re.sub(r'[ \t]+', ' ', cleaned)
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
+        diff = len(text) - len(cleaned)
+        if diff > 0:
+            logger.warning(
+                "[QuestionTool] defense_strip: STRIPPED %d chars — LLM "
+                "put a numerical question in a text block instead of "
+                "calling pose_question",
+                diff,
+            )
+        return cleaned, diff
+
+    def _handle_pose_question_message(
+        self,
+        message,
+        turn_metadata: Dict,
+    ) -> str:
+        """Process an Anthropic Message returned by generate_with_tools.
+
+        Walks content blocks in order:
+          - text block → append text to the response
+          - tool_use block (pose_question) → resolve slot in id_map,
+            render the bank entry verbatim, append to the response,
+            and record bank_question_ref on turn_metadata so the next
+            student reply gets graded deterministically.
+          - any other tool_use → ignored (the tool is the only one
+            we expose).
+
+        Returns the final response string the student will see.
+
+        Heavy logging at every branch — by the time we hit production,
+        the logs should make it obvious which step in this pipeline
+        failed if the response is wrong.
+        """
+        from apps.tutoring.question_bank import render_question_to_prose
+
+        id_map = getattr(self, '_question_id_map', {}) or {}
+        text_parts: List[str] = []
+        tool_use_count = 0
+        bank_rendered = False
+
+        for block in (message.content or []):
+            btype = getattr(block, 'type', None)
+            if btype == 'text':
+                raw_text = (getattr(block, 'text', '') or '')
+                # Defense in depth — strip any numerical question the
+                # LLM tried to slip into prose instead of using the tool.
+                clean_text, _ = self._strip_text_block_numerical_questions(raw_text)
+                if clean_text.strip():
+                    text_parts.append(clean_text.strip())
+            elif btype == 'tool_use':
+                tool_use_count += 1
+                tool_name = getattr(block, 'name', '')
+                if tool_name != self.POSE_QUESTION_TOOL_NAME:
+                    logger.warning(
+                        "[QuestionTool] tool_call: UNEXPECTED tool_name='%s' — ignoring",
+                        tool_name,
+                    )
+                    continue
+                tool_input = getattr(block, 'input', {}) or {}
+                slot = tool_input.get('slot')
+                lead_in = (tool_input.get('lead_in') or '').strip()
+                logger.info(
+                    "[QuestionTool] tool_call: slot=%s lead_in=%r",
+                    slot, lead_in[:80],
+                )
+                if not isinstance(slot, int):
+                    logger.error(
+                        "[QuestionTool] tool_call: NON_INT slot=%r — falling back to slot 0",
+                        slot,
+                    )
+                    slot = 0
+                if slot not in id_map:
+                    logger.error(
+                        "[QuestionTool] resolve_slot: slot=%d NOT_IN_ID_MAP keys=%s — falling back to slot 0",
+                        slot, sorted(id_map.keys()),
+                    )
+                    slot = 0
+                entry = id_map.get(slot)
+                if entry is None:
+                    logger.error(
+                        "[QuestionTool] resolve_slot: id_map[%d] is None — skipping render",
+                        slot,
+                    )
+                    continue
+                kind = 'lesson_step' if hasattr(entry, 'teacher_script') else 'exit_ticket_question'
+                logger.info(
+                    "[QuestionTool] resolve_slot: slot=%d → %s(id=%s)",
+                    slot, kind, getattr(entry, 'id', '?'),
+                )
+                rendered = render_question_to_prose(entry)
+                if not rendered:
+                    logger.error(
+                        "[QuestionTool] render: EMPTY for slot=%d", slot,
+                    )
+                    continue
+                logger.info(
+                    "[QuestionTool] render: chars=%d slot=%d", len(rendered), slot,
+                )
+                self._record_bank_question_on_turn(turn_metadata, entry)
+                # Compose: optional lead-in, blank line, rendered stem.
+                if lead_in:
+                    text_parts.append(lead_in)
+                text_parts.append(rendered)
+                bank_rendered = True
+                # Track for the validator's authoring gate so it knows
+                # a verified bank pull happened on this turn.
+                self._bank_signal_used_this_turn = True
+            else:
+                logger.info(
+                    "[QuestionTool] block: ignoring type=%r", btype,
+                )
+
+        final = "\n\n".join(text_parts).strip()
+        logger.info(
+            "[QuestionTool] final: chars=%d tool_use_count=%d bank_rendered=%s "
+            "stop_reason=%s",
+            len(final), tool_use_count, bank_rendered,
+            getattr(message, 'stop_reason', '?'),
+        )
+        return final
+
+    # NOTE: _force_inject_bank_question REMOVED (2026-05-04). The
+    # tool-use path makes it impossible for the LLM to author a
+    # numerical question, so post-hoc truncate-and-replace surgery
+    # is no longer needed. The helper produced half-baked tutor
+    # responses ("Quick check before we apply it:" with no question
+    # following) when the LLM's question shape didn't match the
+    # truncation heuristic.
 
     def _parse_question_signal(
         self, text: str,
@@ -4658,8 +4858,8 @@ Follow the current step; this concept will be covered in sequence."""
                 parts.append(line)
             parts.append(
                 "If NO_AUTHORING was flagged: do NOT pose a new question in"
-                " your prose. To pose a question, end with |||QUESTION:N|||"
-                " selecting an entry from <question_bank>."
+                " your prose. To pose a question, call the pose_question"
+                " tool with a slot from <question_bank>."
             )
             parts.append(
                 "If ARITHMETIC was flagged: redo any number-claim using the"
@@ -4826,9 +5026,9 @@ Follow the current step; this concept will be covered in sequence."""
                 "The bank's stored answer matches the student's response. "
                 "Confirm correctness briefly, then move forward — either "
                 "advance to the next step OR pose the next bank question "
-                "(via |||QUESTION:N||| or |||QUESTION_EO:N|||). DO NOT "
-                "re-derive the answer yourself; the bank is the source of "
-                "truth. If the student wants to see the working, QUOTE the "
+                "by calling the pose_question tool. DO NOT re-derive the "
+                "answer yourself; the bank is the source of truth. If the "
+                "student wants to see the working, QUOTE the "
                 "canonical_working / explanation below verbatim — never "
                 "compute a fresh derivation."
             )
