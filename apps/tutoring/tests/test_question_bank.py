@@ -122,20 +122,55 @@ class QuestionBankHelpersTest(TestCase):
 
     def test_pick_candidates_filters_by_concept_tag(self):
         pool = sample_session_pool(self.lesson, seed=1, pool_size=20)
-        cands = pick_candidates_for_step(pool, "angles_around_point")
+        cands = pick_candidates_for_step(pool, concept_tag="angles_around_point")
         # All returned candidates must carry the requested tag
         for q in cands:
             self.assertEqual(q.concept_tag, "angles_around_point")
 
-    def test_pick_candidates_returns_empty_when_no_tag_match(self):
-        """STRICT: no fallback. Previous "any same-lesson question"
-        fallback was leaking later-step questions onto earlier steps;
-        the bank scope is now strict per concept_tag. The caller
-        uses slot 0 (current step's teacher_script) when this is empty.
-        """
+    def test_pick_candidates_prefers_enabling_objective_over_concept_tag(self):
+        """EO is the structured curriculum primitive — match by EO
+        first when both are provided. Tag is the legacy fallback."""
         pool = sample_session_pool(self.lesson, seed=1, pool_size=20)
-        cands = pick_candidates_for_step(pool, "no_such_tag_in_bank")
-        self.assertEqual(cands, [])
+        eo_value = "find_missing_angle_around_point"
+        # Tag a few of the bank questions with a specific EO so we can
+        # detect that the EO match fired (not concept_tag).
+        for q in pool[:3]:
+            q.enabling_objective = eo_value
+            q.save(update_fields=['enabling_objective'])
+        cands = pick_candidates_for_step(
+            pool,
+            enabling_objective=eo_value,
+            concept_tag="angles_on_line",  # different tag — would NOT match
+        )
+        self.assertGreater(len(cands), 0)
+        for q in cands:
+            self.assertEqual(q.enabling_objective, eo_value)
+
+    def test_pick_candidates_falls_back_to_concept_tag_when_eo_blank(self):
+        pool = sample_session_pool(self.lesson, seed=1, pool_size=20)
+        cands = pick_candidates_for_step(
+            pool,
+            enabling_objective="",  # blank EO (older content)
+            concept_tag="angles_around_point",
+        )
+        self.assertGreater(len(cands), 0)
+        for q in cands:
+            self.assertEqual(q.concept_tag, "angles_around_point")
+
+    def test_pick_candidates_random_fallback_when_no_tag_match(self):
+        """Policy (2026-05-05): when neither EO nor concept_tag matches,
+        return a random sample from the session pool. The pool is
+        already lesson-scoped + session-seeded, so this is a stable
+        random pick — not a global leak. Bank is never empty when the
+        lesson has any published questions."""
+        pool = sample_session_pool(self.lesson, seed=1, pool_size=20)
+        cands = pick_candidates_for_step(
+            pool, concept_tag="no_such_tag_in_bank",
+        )
+        self.assertGreater(len(cands), 0)
+        self.assertLessEqual(len(cands), CANDIDATES_PER_STEP)
+        for q in cands:
+            self.assertEqual(q.exit_ticket.lesson_id, self.lesson.id)
 
     def test_pick_candidates_caps_at_max(self):
         pool = sample_session_pool(self.lesson, seed=1, pool_size=20)

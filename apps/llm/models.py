@@ -124,6 +124,12 @@ class ModelConfig(models.Model):
         SKILL_EXTRACTION = 'skill_extraction', 'Skill Extraction'
         IMAGE_GENERATION = 'image_generation', 'Image Generation'
         HELP_ASSISTANT = 'help_assistant', 'In-app Help Assistant'
+        # Post-response sanity checker (combined_judge: arithmetic +
+        # factual + rule_compliance). Lower-cost / faster model than
+        # tutoring on purpose — judge calls run after every tutor turn,
+        # so a 5x cheaper / 2x faster Sonnet model dramatically cuts
+        # per-turn latency without compromising rule enforcement.
+        JUDGE = 'judge', 'Post-response Judge'
 
     institution = models.ForeignKey(
         Institution,

@@ -217,9 +217,13 @@ class PoseQuestionMessageHandlerTest(TestCase):
         # Slot 0 (the LessonStep) gets posed instead.
         self.assertIn("Three angles are 95°, 70°, x°", out)
 
-    def test_text_block_with_numerical_question_is_stripped(self):
-        """Defense in depth: if the LLM puts a numerical question in a
-        text block instead of using the tool, strip it."""
+    def test_text_block_passes_through_verbatim(self):
+        """Policy (2026-05-05): text blocks pass through as-is. We do
+        NOT edit the tutor message in place — that produced robotic
+        output ("Quick check:" with no question). When the LLM authors
+        a numerical question in prose, the combined judge flags
+        NO_AUTHORING and the V3 regen path takes one clean retry.
+        Editing in place is gone for good."""
         tutor = self._make_tutor()
         message = _fake_message([
             _fake_text_block(
@@ -228,10 +232,10 @@ class PoseQuestionMessageHandlerTest(TestCase):
             _fake_tool_use_block("pose_question", {"slot": 0}),
         ])
         out = tutor._handle_pose_question_message(message, {})
-        # The invented question must NOT survive.
-        self.assertNotIn("100°, 120°, 80°", out)
-        self.assertNotIn("what's the fourth?", out.lower())
-        # The bank question must.
+        # Text block content survives verbatim.
+        self.assertIn("100°", out)
+        self.assertIn("120°", out)
+        # Bank question is also rendered after the text block.
         self.assertIn("Three angles are 95°, 70°, x°", out)
 
     def test_text_only_response_passes_through(self):
@@ -245,6 +249,93 @@ class PoseQuestionMessageHandlerTest(TestCase):
         out = tutor._handle_pose_question_message(message, {})
         # Conceptual question without digits — keeps as-is.
         self.assertIn("Let's review the rule first", out)
+
+    def test_text_block_with_digits_passes_through_unchanged(self):
+        """Whatever the LLM types in a text block reaches the student
+        verbatim. Editing in place is no longer used. If the LLM types
+        a numerical question, the combined judge regenerates the turn
+        (one clean retry) — we don't surgically edit."""
+        tutor = self._make_tutor()
+        message = _fake_message(
+            [_fake_text_block(
+                "Remember the rule: angles around a point sum to 360°. "
+                "Does that ring a bell?"
+            )],
+            stop_reason="end_turn",
+        )
+        out = tutor._handle_pose_question_message(message, {})
+        self.assertIn("ring a bell?", out)
+        self.assertIn("360°", out)
+
+
+class JudgeClientRoutingTest(TestCase):
+    """The combined judge runs on a faster Purpose.JUDGE model (Sonnet
+    by default) — keeps tutor on Opus while cutting per-turn latency."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.institution = Institution.objects.create(name="T", slug="t")
+        cls.student = User.objects.create_user(username="stu", password="pw")
+        cls.course = Course.objects.create(
+            institution=cls.institution, title="Math",
+            grade_level="S3", is_published=True, subject_type='math',
+        )
+        cls.unit = Unit.objects.create(
+            course=cls.course, title="U", order_index=0,
+        )
+        cls.lesson = Lesson.objects.create(
+            unit=cls.unit, title="L", objective="o",
+            order_index=0, is_published=True,
+        )
+        LessonStep.objects.create(
+            lesson=cls.lesson, phase='practice', step_type='practice',
+            order_index=0, teacher_script="q", expected_answer="a",
+        )
+
+    def test_judge_client_resolves_to_purpose_judge_when_configured(self):
+        from apps.llm.models import ModelConfig
+        from apps.tutoring.conversational_tutor import ConversationalTutor
+        # Ensure a Purpose.JUDGE config exists (the migration seeds one
+        # but the test DB may need re-seeding).
+        ModelConfig.objects.get_or_create(
+            institution=self.institution,
+            purpose='judge',
+            defaults=dict(
+                name='Test judge',
+                provider='anthropic',
+                model_name='claude-sonnet-4-20250514',
+                api_key_env_var='ANTHROPIC_API_KEY',
+                api_key_encrypted='',
+                is_active=True,
+            ),
+        )
+        session = TutorSession.objects.create(
+            institution=self.institution, student=self.student,
+            lesson=self.lesson, status="active", engine_state={},
+        )
+        tutor = ConversationalTutor(session)
+        tutor._llm_client = MagicMock()  # tutor stays whatever
+        # Resolve judge_client — should hit Purpose.JUDGE config (Sonnet).
+        client = tutor.judge_client
+        self.assertIsNotNone(client)
+        self.assertEqual(client.config.purpose, 'judge')
+        self.assertEqual(client.config.model_name, 'claude-sonnet-4-20250514')
+
+    def test_judge_client_falls_back_to_llm_client_when_unconfigured(self):
+        from apps.llm.models import ModelConfig
+        from apps.tutoring.conversational_tutor import ConversationalTutor
+        ModelConfig.objects.filter(purpose='judge', is_active=True).update(is_active=False)
+        try:
+            session = TutorSession.objects.create(
+                institution=self.institution, student=self.student,
+                lesson=self.lesson, status="active", engine_state={},
+            )
+            tutor = ConversationalTutor(session)
+            sentinel = MagicMock(name="tutor_llm_client")
+            tutor._llm_client = sentinel
+            self.assertIs(tutor.judge_client, sentinel)
+        finally:
+            ModelConfig.objects.filter(purpose='judge').update(is_active=True)
 
 
 class BankScopeStrictTest(TestCase):

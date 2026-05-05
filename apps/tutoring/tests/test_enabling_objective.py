@@ -122,16 +122,15 @@ class EnablingObjectiveFieldTest(TestCase):
         self.assertEqual(len(picks), 1)
         self.assertEqual(picks[0].id, broad_only.id)
 
-    def test_pick_published_returns_empty_when_no_field_matches(self):
-        """STRICT: no cross-tag fallback (2026-05-04). The previous
-        "any lesson question" fallback was leaking later-step questions
-        onto earlier steps. When a tag has no match, we return [] so
-        the caller can fall back to slot 0 (current step's
-        teacher_script) instead of pulling unrelated bank questions.
-        """
+    def test_pick_published_random_fallback_when_no_field_matches(self):
+        """Policy (2026-05-05): when no EO/tag match, return a random
+        question from the lesson's published bank. Avoids empty banks
+        (the LLM would otherwise have to fall through to slot 0 only)
+        without leaking across lessons. The fallback is bounded to
+        the current lesson, not a global leak."""
         ExitTicketQuestion.objects.create(
             exit_ticket=self.ticket,
-            question_text="Generic",
+            question_text="Generic lesson question",
             option_a="A", option_b="B", option_c="C", option_d="D",
             correct_answer="A", explanation="",
             concept_tag="not the requested tag",
@@ -141,4 +140,6 @@ class EnablingObjectiveFieldTest(TestCase):
         picks = pick_published_for_concept_tag(
             self.lesson, "no_such_tag_anywhere", max_candidates=1,
         )
-        self.assertEqual(picks, [])
+        self.assertEqual(len(picks), 1)
+        # Bounded to this lesson — no cross-lesson leak.
+        self.assertEqual(picks[0].exit_ticket.lesson_id, self.lesson.id)

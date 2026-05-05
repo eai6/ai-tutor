@@ -394,17 +394,6 @@ a different approach -- no rush."
 - NEVER say "which of these", "which one of the following", or reference a list of
   options you haven't actually written out. If your question requires choices, either
   list them explicitly or rephrase as an open-ended question instead.
-- To show interactive content (data tables, comparison charts, diagrams), wrap HTML in:
-  |||ARTIFACT:html|||
-  <table style="width:100%;border-collapse:collapse">
-    <tr><th style="padding:8px;border:1px solid #ddd">Header</th></tr>
-    <tr><td style="padding:8px;border:1px solid #ddd">Data</td></tr>
-  </table>
-  |||/ARTIFACT|||
-  Use this for data tables, comparison charts, or visual aids that enhance understanding.
-  Keep HTML simple — use inline styles only, no external resources.
-  You CAN include <img> tags referencing uploaded textbook/worksheet figures if available in the media catalog.
-  Use artifacts when a table, diagram, or structured visualization would be clearer than plain text.
 </format_rules>
 
 </system_prompt>"""
@@ -446,14 +435,6 @@ class TutorMessage:
     streak_count: int = 0
     practice_score: str = ""
     milestone: Optional[str] = None
-
-    # Rich HTML artifact (rendered in sandboxed iframe)
-    artifact_html: Optional[str] = None
-
-    # Easy-mode interactive probe (MCQ / fill-in-blank widget). When
-    # set, the frontend renders an inline widget below the tutor's
-    # text. Set by _parse_probe_signal from a |||PROBE:{json}||| tag.
-    probe: Optional[Dict] = None
 
     # Metadata
     skills_covered: List[str] = field(default_factory=list)
@@ -1214,6 +1195,43 @@ class ConversationalTutor:
         return self._llm_client
 
     @property
+    def judge_client(self):
+        """Lazy load the post-response judge LLM client.
+
+        The judge is a sanity layer (combined_judge: arithmetic +
+        factual + rule_compliance) — it doesn't need the tutor's
+        reasoning depth. Routing it to a faster / cheaper model
+        (Sonnet/Haiku) cuts per-turn latency without compromising
+        rule enforcement. Falls back to the tutoring client when no
+        Purpose.JUDGE config is active (legacy behaviour).
+        """
+        if not hasattr(self, '_judge_client'):
+            self._judge_client = None
+        if self._judge_client is None:
+            try:
+                from apps.llm.models import ModelConfig
+                from apps.llm.client import get_llm_client
+
+                config = ModelConfig.get_for('judge')
+                if config:
+                    self._judge_client = get_llm_client(config)
+                    logger.info(
+                        "[QuestionTool] judge_client: provider=%s model=%s",
+                        config.provider, config.model_name,
+                    )
+                else:
+                    # No dedicated judge config → fall back to tutoring.
+                    self._judge_client = self.llm_client
+                    logger.info(
+                        "[QuestionTool] judge_client: no Purpose.JUDGE config; "
+                        "falling back to tutoring client",
+                    )
+            except Exception as e:
+                logger.error(f"Could not load judge client: {e}")
+                self._judge_client = self.llm_client
+        return self._judge_client
+
+    @property
     def instructor_client(self):
         """Lazy load instructor-wrapped client for structured LLM output."""
         if self._instructor_client is None:
@@ -1345,16 +1363,9 @@ Keep it to 1-2 sentences + question, ~60 words max."""
 
         response = self._generate_response(prompt, fallback_context="resume")
 
-        # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
-        clean_response, parsed_media, gen_request = self._parse_media_signal(response)
-        clean_response, artifact_html = self._parse_artifact_signal(clean_response)
+        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
+        clean_response, parsed_media = self._parse_media_signal(response)
         media = [parsed_media] if parsed_media else []
-
-        # On-the-fly image generation via safety pipeline
-        if not media and gen_request:
-            generated = self._safe_generate_image(gen_request['category'], gen_request['description'])
-            if generated:
-                media = [generated]
 
         # Fallback: if resume message references visual content but no signal emitted
         if not media:
@@ -1376,7 +1387,7 @@ Keep it to 1-2 sentences + question, ~60 words max."""
             self.conversation.append({"role": "assistant", "content": clean_response})
             self._save_state()
 
-        return self._create_message(clean_response, media=media, artifact_html=artifact_html)
+        return self._create_message(clean_response, media=media)
 
     def start_review(self) -> TutorMessage:
         """Start a review session for a completed lesson.
@@ -1599,21 +1610,10 @@ Keep it to 2-3 sentences."""
         self._pending_math_student_input = None
         self._pending_bare_answer = False
 
-        # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
-        clean_response, parsed_media, gen_request = self._parse_media_signal(response)
-        clean_response, artifact_html = self._parse_artifact_signal(clean_response)
-        # Parse |||PROBE:{json}||| for easy-mode interactive widget.
-        clean_response, parsed_probe = self._parse_probe_signal(clean_response)
-        # NOTE: |||QUESTION:N||| / |||QUESTION_EO:N||| signal parsing
-        # was REMOVED (2026-05-04). Math turns now route through the
-        # pose_question Anthropic tool — _generate_response handles
-        # the tool call and writes bank_question_ref to
-        # _pending_pose_question_meta, which is merged into
-        # turn_metadata below. The signal-parse helpers
-        # (_parse_question_signal, _parse_question_eo_signal) remain
-        # in the file for tests and possible future reuse but are no
-        # longer invoked by respond().
-        # _bank_signal_used_this_turn is set inside the tool handler.
+        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean.
+        # MEDIA is the only inline signal channel; questions go through
+        # the pose_question Anthropic tool inside _generate_response.
+        clean_response, parsed_media = self._parse_media_signal(response)
 
         # Combined post-response judge — math-only. ONE LLM call
         # evaluating arithmetic + factual + rule_compliance, replacing
@@ -1626,10 +1626,14 @@ Keep it to 2-3 sentences."""
         combined_judge_result = None
         if self.lesson.unit.course.is_math:
             from apps.tutoring.combined_judge import run_combined_judge
+            # Route the judge to the dedicated judge_client (Sonnet 4 by
+            # default) so post-response checking doesn't pay the Opus
+            # cost/latency twice. Tutor stays on Opus where reasoning
+            # depth matters; judges run on a faster model.
             combined_judge_result = run_combined_judge(
                 clean_response,
                 lesson=self.lesson,
-                llm_client=self.llm_client,
+                llm_client=self.judge_client,
                 bank_stems=self._current_bank_stems(),
                 student_input=student_input,
                 answer_was_bare=turn_bare_answer,
@@ -1685,12 +1689,6 @@ Keep it to 2-3 sentences."""
 
         media = [parsed_media] if parsed_media else []
 
-        # On-the-fly image generation via safety pipeline
-        if not media and gen_request:
-            generated = self._safe_generate_image(gen_request['category'], gen_request['description'])
-            if generated:
-                media = [generated]
-
         # Fallback: if tutor references visual content but no signal emitted
         if not media:
             visual_refs = ['diagram', 'figure', 'image', 'picture', 'illustration', 'chart', 'graph', 'map']
@@ -1743,7 +1741,7 @@ Keep it to 2-3 sentences."""
             bare_answer=turn_bare_answer,
             step_type=(current_step.step_type if current_step else None),
             lesson=self.lesson,
-            llm_client=self.llm_client,
+            llm_client=self.judge_client,  # judge runs on Sonnet, not Opus
             student_input=student_input,
             bank_stems=self._current_bank_stems(),
             arithmetic_corrections=arithmetic_corrections,
@@ -1789,8 +1787,7 @@ Keep it to 2-3 sentences."""
             finally:
                 self._pending_regen_constraint = None
 
-            regen_clean, regen_media, regen_gen = self._parse_media_signal(regen_raw)
-            regen_clean, regen_artifact = self._parse_artifact_signal(regen_clean)
+            regen_clean, regen_media = self._parse_media_signal(regen_raw)
             # Skip math praise filter on regen — issues that triggered
             # regen aren't praise-related, and we want a clean second
             # chance from the LLM.
@@ -1800,7 +1797,7 @@ Keep it to 2-3 sentences."""
                 bare_answer=turn_bare_answer,
                 step_type=(current_step.step_type if current_step else None),
                 lesson=self.lesson,
-                llm_client=self.llm_client,
+                llm_client=self.judge_client,  # judge runs on Sonnet, not Opus
                 fact_check=False,  # avoid second fact-check (latency cap)
                 rule_check=False,  # avoid second rule-check (latency cap)
                 student_input=student_input,
@@ -1818,8 +1815,6 @@ Keep it to 2-3 sentences."""
             # Update media if regen produced a different signal
             if regen_media:
                 media = [regen_media]
-            if regen_artifact:
-                artifact_html = regen_artifact
 
             # NOTE: force-inject of bank questions on persistent
             # authoring_violation was tried and removed (2026-05-04) —
@@ -1881,9 +1876,7 @@ Keep it to 2-3 sentences."""
         self._save_turn("tutor", clean_response, metadata=turn_metadata)
         self.conversation.append({"role": "assistant", "content": clean_response})
 
-        return self._create_message(
-            clean_response, media=media, artifact_html=artifact_html, probe=parsed_probe,
-        )
+        return self._create_message(clean_response, media=media)
 
     def _prepare_response(self, student_input: str) -> Optional[Dict]:
         """
@@ -1980,11 +1973,11 @@ Keep it to 2-3 sentences."""
         self._pending_bare_answer = False
 
         # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
-        clean_content, parsed_media, gen_request = self._parse_media_signal(full_response)
-        # NOTE: |||QUESTION:N||| signal parsing removed (2026-05-04).
-        # Streaming path is unused in production (Azure CA buffers) and
-        # the tool-use path lives in _generate_response. If streaming
-        # is ever revived, it will need to thread the tool path here.
+        clean_content, parsed_media = self._parse_media_signal(full_response)
+        # NOTE: |||QUESTION:N|||, |||GENERATE:...|||, |||ARTIFACT:...|||,
+        # |||PROBE:...||| signals all removed. Streaming path is unused
+        # in production (Azure CA buffers); if it is revived it will
+        # need to thread the pose_question tool path here too.
 
         # Verify calculations (streaming parity with respond()) — LLM-based.
         if self.lesson.unit.course.is_math:
@@ -2024,12 +2017,6 @@ Keep it to 2-3 sentences."""
 
         # Media from LLM signal, with fallback for phantom references
         media = [parsed_media] if parsed_media else []
-
-        # On-the-fly image generation via safety pipeline
-        if not media and gen_request:
-            generated = self._safe_generate_image(gen_request['category'], gen_request['description'])
-            if generated:
-                media = [generated]
 
         # Fallback: if tutor references visual content but no signal was emitted,
         # auto-attach the current step's media to avoid "look at the diagram" with no diagram
@@ -2407,10 +2394,10 @@ IMPORTANT: You are showing these images with your response.
         
         return list(set(terms))[:10]  # Limit to 10 unique terms
     
-    def _safe_generate_image(self, category: str, description: str) -> Optional[Dict]:
-        """Disabled — tutor only uses pre-attached step media (teacher-reviewed).
-        On-the-fly generation was unreliable and created broken figure references."""
-        return None
+    # NOTE (2026-05-05): _safe_generate_image REMOVED. On-the-fly
+    # image generation via |||GENERATE:category:description||| was
+    # disabled before, then deleted here. The tutor only surfaces
+    # pre-attached step media via the |||MEDIA:N||| signal.
 
     def _get_relevant_media_for_response(self, response: str) -> List[Dict]:
         """
@@ -2463,14 +2450,8 @@ IMPORTANT: You are showing these images with your response.
                                 'description': img.get('alt', '') or img.get('caption', ''),
                             })
         
-        # If no existing media matches well, try to generate one
-        if not media and should_show_media:
-            visual_need = self._determine_visual_need(response)
-            if visual_need:
-                generated = self._safe_generate_image('diagram', visual_need)
-                if generated:
-                    media.append(generated)
-        
+        # On-the-fly generation removed — return whatever we matched
+        # from existing step media (or empty list if no good match).
         return media
     
     def _determine_visual_need(self, response: str) -> Optional[str]:
@@ -2599,16 +2580,9 @@ IMPORTANT: Any question you ask must be complete and self-contained. Never say "
 
         response = self._generate_response(prompt, fallback_context="opening")
 
-        # Parse |||MEDIA:N||| or |||GENERATE:...||| signal BEFORE saving — keeps DB clean
-        clean_response, parsed_media, gen_request = self._parse_media_signal(response)
-        clean_response, artifact_html = self._parse_artifact_signal(clean_response)
+        # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
+        clean_response, parsed_media = self._parse_media_signal(response)
         media = [parsed_media] if parsed_media else []
-
-        # On-the-fly image generation via safety pipeline
-        if not media and gen_request:
-            generated = self._safe_generate_image(gen_request['category'], gen_request['description'])
-            if generated:
-                media = [generated]
 
         # Fallback: if opening references visual content but no signal emitted
         if not media:
@@ -2629,7 +2603,7 @@ IMPORTANT: Any question you ask must be complete and self-contained. Never say "
         self.conversation.append({"role": "assistant", "content": clean_response})
         self._save_state()
 
-        return self._create_message(clean_response, media=media, artifact_html=artifact_html)
+        return self._create_message(clean_response, media=media)
 
     def _build_student_profile_block(self) -> str:
         """Build [STUDENT PROFILE] context block with mastery data (R11)."""
@@ -2823,33 +2797,14 @@ CRITICAL: When the student answers correctly, do NOT revert to asking them to ex
         elif level <= -1:
             intensity = "moderately" if level == -1 else "significantly"
             blocks.append(f"""[DIFFICULTY ADJUSTMENT — EASY MODE]
-Student is in easy mode (struggle level: {abs(level)}/2). The pilot
-feedback was clear: lower-performing students need MCQ / fill-in-blank
-formats with visual anchors, NOT open-text working-required questions.
+Student is in easy mode (struggle level: {abs(level)}/2). Lower-
+performing students need MCQ / fill-in-blank formats with visual
+anchors, NOT open-text working-required questions.
 
-QUESTION FORMAT (this is the important change):
-- Pose practice questions as MCQ or fill-in-blank, NOT open-ended.
-- ALSO emit a |||PROBE:{{json}}||| signal at the END of your message
-  whenever you ask a practice question. The frontend renders an
-  interactive widget (radio buttons / input) below your message
-  and gives the student instant feedback (sparkle on correct, hint
-  on wrong). Without the signal the question is plain text only.
-
-PROBE TAG SCHEMA — emit AFTER your prose, on its own line, EXACTLY:
-  |||PROBE:{{"type":"mcq","stem":"<question>","options":["A text","B text","C text","D text"],"answer":"B","hints":["hint if they pick wrong","second-try hint"]}}|||
-or for fill-in-blank:
-  |||PROBE:{{"type":"fill","stem":"<question>","answer":"42","alternates":["forty-two"],"hints":["..."]}}|||
-
-Rules for the JSON:
-- Use double-quoted JSON. No trailing commas. No comments.
-- For mcq: exactly 4 options. `answer` is a single letter A/B/C/D.
-- For fill: `answer` is the canonical correct value. `alternates`
-  is optional and lists equivalent accepted forms (e.g. "42" and
-  "forty-two", or "0.5" and "1/2").
-- `hints`: 1-3 short, encouraging nudges. Don't reveal the answer.
-- The `stem` should match (or summarize) the question text in your
-  prose so the widget makes sense even without scrolling.
-
+QUESTION FORMAT:
+- Prefer MCQ or fill-in-blank bank questions over open-ended.
+  Use the pose_question tool to render bank entries — many bank
+  entries are MCQ and the tool renders the options on screen.
 - For math: STILL show worked examples first (math memory rules),
   but the student's PRACTICE response is a letter or single number.
 - Always include or reference a visual/diagram when one helps anchor
@@ -3457,9 +3412,18 @@ Follow the current step; this concept will be covered in sequence."""
             "\n   ask 'What makes you think that?' or 'Walk me through how you got"
             "\n   there.'"
             "\n"
-            "\n2. ASK A QUESTION. Almost every turn should END with a question that"
-            "\n   moves the student forward. Rare exception: a wrap-up turn after"
-            "\n   the student has demonstrated mastery."
+            "\n2. ALWAYS END WITH A QUESTION. The tutor leads the session —"
+            "\n   you are not waiting for the student to drive the next move."
+            "\n   EVERY turn must end with a question that moves the student"
+            "\n   forward. No exceptions except the final wrap-up turn after the"
+            "\n   student has demonstrated mastery of the lesson objective."
+            "\n   For math turns: if the question is numerical, call the"
+            "\n   pose_question tool — do NOT type the question in prose."
+            "\n   For non-numerical questions (\"which rule applies?\","
+            "\n   \"what did you notice?\", \"walk me through your steps\"),"
+            "\n   end your text response with the question itself — never"
+            "\n   end with a colon or trailing fragment like \"Quick check:\""
+            "\n   without a question following."
             "\n"
             "\n3. ONE NEW IDEA AT A TIME. Do not list 5 facts in a single turn."
             "\n   Introduce one concept, ask the student to engage with it, then"
@@ -3851,8 +3815,8 @@ Follow the current step; this concept will be covered in sequence."""
         catalog += "\n\nTo show media, write EXACTLY |||MEDIA:N||| as the LAST line."
         catalog += "\nDo NOT embed media references anywhere in your response text."
         catalog += "\nUse at most ONE media item per response."
-        catalog += "\n\nIf none of the above media fits what you need, you may generate a new image:"
-        catalog += "\n|||GENERATE:category:description||| (as the LAST line)"
+        catalog += "\nIf no item in the catalog fits what you want to show, omit"
+        catalog += "\nthe signal entirely and teach with text."
         catalog += "\n</media_catalog>"
         return catalog
 
@@ -4062,24 +4026,30 @@ Follow the current step; this concept will be covered in sequence."""
             by_id = {q.id: q for q in qs}
             pool = [by_id[i] for i in pool_ids if i in by_id]
 
+        # Match the bank candidates to the current step's enabling
+        # objective (preferred), falling back to concept_tag, then to
+        # a random sample of the lesson's pool. EO is the structured
+        # curriculum primitive — exit-ticket questions and lesson
+        # steps both carry it, and it's what drives the rest of the
+        # competency / remediation system. concept_tag is kept as a
+        # legacy fallback for older content.
         candidates = pick_candidates_for_step(
-            pool, current_step.concept_tag or '',
+            pool,
+            enabling_objective=getattr(current_step, 'enabling_objective', '') or '',
+            concept_tag=current_step.concept_tag or '',
         )
         block, id_map = render_bank_block(current_step, candidates)
 
-        # NOTE: previous "Additional lesson-step questions" augmentation
-        # was REMOVED (2026-05-04). It surfaced every other step's
-        # canonical question with the instruction "pose any of these
-        # during teach / engage / review", which leaked step-4's
-        # question onto step-1 — exactly the bug the user flagged.
-        # Bank scope is now strict: slot 0 = current step's
-        # teacher_script; slots 1..N = ExitTicketQuestion rows tagged
-        # to THIS step's concept_tag. No cross-step leakage.
+        # Cross-step augmentation REMOVED (2026-05-04). The bank for a
+        # step is: slot 0 (this step's teacher_script) + slots 1..N
+        # (exit-ticket questions matching this step's EO/tag, or a
+        # random sample if no match). No other-step lesson questions.
 
         self._question_id_map = id_map
         logger.info(
-            "[QuestionTool] build_bank: step=%d tag='%s' slots=%s",
+            "[QuestionTool] build_bank: step=%d eo='%s' tag='%s' slots=%s",
             self.current_topic_index,
+            (getattr(current_step, 'enabling_objective', '') or '')[:60],
             current_step.concept_tag or '',
             sorted(id_map.keys()),
         )
@@ -4171,37 +4141,14 @@ Follow the current step; this concept will be covered in sequence."""
         )
         return tool
 
-    # Defense-in-depth regex — strips numerical questions from text
-    # blocks if the LLM somehow puts one there instead of using the
-    # tool. Same shape as the validator's _NUMERICAL_QUESTION_RE but
-    # operates on the LLM output before it reaches the student.
-    _NUMERICAL_QUESTION_DEFENSE_RE = re.compile(
-        r"(?:[^.!?\n]*?\d[^.!?\n]*?){1,}\?",
-        re.DOTALL,
-    )
-
-    def _strip_text_block_numerical_questions(self, text: str) -> Tuple[str, int]:
-        """Defense-in-depth: remove sentences ending in '?' that contain
-        2+ digit-bearing tokens (i.e. numerical questions). Returns
-        (cleaned_text, chars_stripped). With the pose_question tool
-        this should rarely fire; when it does we log a warning so we
-        can observe how often the LLM bypasses the tool.
-        """
-        if not text or '?' not in text:
-            return text, 0
-        cleaned = self._NUMERICAL_QUESTION_DEFENSE_RE.sub('', text)
-        # Tidy whitespace from the strip.
-        cleaned = re.sub(r'[ \t]+', ' ', cleaned)
-        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
-        diff = len(text) - len(cleaned)
-        if diff > 0:
-            logger.warning(
-                "[QuestionTool] defense_strip: STRIPPED %d chars — LLM "
-                "put a numerical question in a text block instead of "
-                "calling pose_question",
-                diff,
-            )
-        return cleaned, diff
+    # NOTE: text-block defense-strip REMOVED (2026-05-04). Editing the
+    # tutor's text after generation produced robotic-feeling output
+    # ("Quick check:" with no question following) when the heuristic
+    # caught a benign question. Per user direction: never edit the
+    # tutor message in place. If the LLM authors a numerical question
+    # in a text block instead of calling pose_question, the combined
+    # judge flags NO_AUTHORING and the V3 regen path handles it —
+    # one clean retry, then ship the regen output as-is. No surgery.
 
     def _handle_pose_question_message(
         self,
@@ -4235,12 +4182,14 @@ Follow the current step; this concept will be covered in sequence."""
         for block in (message.content or []):
             btype = getattr(block, 'type', None)
             if btype == 'text':
+                # Pass text blocks through verbatim — no in-place
+                # editing. If the LLM authors a numerical question in
+                # prose, the combined judge flags NO_AUTHORING and the
+                # V3 regen path takes one clean retry. Editing in place
+                # produced robotic output and is no longer used.
                 raw_text = (getattr(block, 'text', '') or '')
-                # Defense in depth — strip any numerical question the
-                # LLM tried to slip into prose instead of using the tool.
-                clean_text, _ = self._strip_text_block_numerical_questions(raw_text)
-                if clean_text.strip():
-                    text_parts.append(clean_text.strip())
+                if raw_text.strip():
+                    text_parts.append(raw_text.strip())
             elif btype == 'tool_use':
                 tool_use_count += 1
                 tool_name = getattr(block, 'name', '')
@@ -7170,78 +7119,35 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
             metadata=metadata or {},
         )
     
-    def _parse_probe_signal(self, text: str) -> Tuple[str, Optional[Dict]]:
-        """Parse |||PROBE:{json}||| from LLM output for the easy-mode
-        interactive question widget (MCQ / fill-in-blank).
+    # NOTE (2026-05-05): _parse_probe_signal REMOVED. The
+    # |||PROBE:{json}||| inline-widget channel is gone. MCQ rendering
+    # now happens via the pose_question tool resolving an
+    # ExitTicketQuestion bank slot — render_question_to_prose puts
+    # the options on screen verbatim. The probe regex was also
+    # fragile (broke on stems containing '{' or '}' such as LaTeX
+    # \frac{1}{2}), which leaked raw JSON into the chat.
 
-        Expected JSON shape:
-          {
-            "type": "mcq" | "fill",
-            "stem": "<question text — usually duplicated above>",
-            "options": ["...", "...", "...", "..."],   // mcq only
-            "answer": "B" | "42" | "8.5",               // canonical
-            "alternates": ["forty-two", ...],           // optional, fill
-            "hints": ["...", "..."]                     // shown on wrong
-          }
+    def _parse_media_signal(self, text: str) -> Tuple[str, Optional[Dict]]:
+        """Parse |||MEDIA:N||| from LLM output.
 
-        Returns (clean_text, probe_dict_or_None). The signal is always
-        stripped from the response so it never reaches the DB or the
-        student's chat bubble.
+        Returns (clean_text, media_dict or None). The signal is always
+        stripped so nothing leaks into DB or student chat.
+
+        NOTE (2026-05-05): the |||GENERATE:category:description|||
+        on-the-fly image-generation channel was REMOVED. The only
+        media path is now showing existing entries from the catalog.
+        Defensive cleanup of any historical GENERATE tag in saved
+        content lives in _create_message.
         """
-        import json as _json
-        match = re.search(r'\|\|\|PROBE\s*:\s*(\{.+?\})\s*\|\|\|', text, re.DOTALL)
-        if not match:
-            return text, None
-        clean_text = (text[:match.start()] + text[match.end():]).strip()
-        try:
-            probe = _json.loads(match.group(1))
-        except Exception:
-            return clean_text, None
-        if not isinstance(probe, dict):
-            return clean_text, None
-        ptype = (probe.get('type') or '').lower()
-        if ptype not in ('mcq', 'fill'):
-            return clean_text, None
-        # Normalize fields the frontend depends on.
-        normalized = {
-            'type': ptype,
-            'stem': str(probe.get('stem') or ''),
-            'options': list(probe.get('options') or []) if ptype == 'mcq' else [],
-            'answer': str(probe.get('answer') or '').strip(),
-            'alternates': [str(a).strip() for a in (probe.get('alternates') or []) if str(a).strip()],
-            'hints': [str(h).strip() for h in (probe.get('hints') or []) if str(h).strip()],
-        }
-        return clean_text, normalized
-
-    def _parse_media_signal(self, text: str) -> Tuple[str, Optional[Dict], Optional[Dict]]:
-        """Parse |||MEDIA:N||| or |||GENERATE:category:description||| from LLM output.
-
-        Returns (clean_text, media_dict or None, generate_request or None).
-        Signals are always stripped so nothing leaks into DB or student chat.
-        """
-        # Check for existing media signal
         match = re.search(r'\|\|\|MEDIA\s*:\s*(\d+)\s*\|\|\|', text)
         if match:
             clean_text = text[:match.start()].rstrip()
             media_id = int(match.group(1))
             if media_id == 0:
-                return clean_text, None, None
+                return clean_text, None
             media_id_map = getattr(self, '_media_id_map', {})
-            return clean_text, media_id_map.get(media_id), None
-
-        # Check for generation signal
-        gen_match = re.search(r'\|\|\|GENERATE\s*:\s*(\w+)\s*:\s*(.+?)\s*\|\|\|', text)
-        if gen_match:
-            clean_text = text[:gen_match.start()].rstrip()
-            category = gen_match.group(1).lower()
-            description = gen_match.group(2).strip()
-            return clean_text, None, {
-                'generate': True,
-                'category': category,
-                'description': description,
-            }
-
-        return text, None, None
+            return clean_text, media_id_map.get(media_id)
+        return text, None
 
     def _check_milestone(self) -> Optional[str]:
         """Check if the student hit a milestone worth celebrating."""
@@ -7266,53 +7172,26 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
 
         return None
 
-    def _parse_artifact_signal(self, text: str) -> Tuple[str, Optional[str]]:
-        """Parse |||ARTIFACT:html|||...|||/ARTIFACT||| from LLM output.
-
-        Returns (clean_text, artifact_html_or_None).
-        """
-        pattern = r'\|\|\|ARTIFACT:html\|\|\|(.*?)\|\|\|/ARTIFACT\|\|\|'
-        match = re.search(pattern, text, re.DOTALL)
-        if match:
-            clean_text = text[:match.start()].rstrip() + text[match.end():].lstrip()
-            artifact_html = match.group(1).strip()
-            return clean_text, self._sanitize_artifact_html(artifact_html)
-        return text, None
-
-    _SAFE_TAGS = frozenset(
-        'div span table thead tbody tr th td p h1 h2 h3 h4 h5 h6 '
-        'ul ol li strong em b i br hr sup sub code pre '
-        'figure figcaption caption '
-        'svg path circle rect line text g polyline polygon'.split()
-    )
-    _SAFE_ATTRS = frozenset(
-        'class style id colspan rowspan width height viewBox '
-        'd cx cy r x y x1 y1 x2 y2 fill stroke stroke-width '
-        'font-size text-anchor transform points xmlns'.split()
-    )
-
-    def _sanitize_artifact_html(self, html: str) -> str:
-        """Defense-in-depth: strip dangerous tags/attributes from artifact HTML.
-
-        Primary security is the frontend sandboxed iframe; this is belt-and-suspenders.
-        """
-        # Strip script, iframe, object, embed, form, link tags entirely
-        html = re.sub(r'<\s*script[^>]*>.*?</\s*script\s*>', '', html, flags=re.DOTALL | re.IGNORECASE)
-        html = re.sub(r'<\s*iframe[^>]*>.*?</\s*iframe\s*>', '', html, flags=re.DOTALL | re.IGNORECASE)
-        html = re.sub(r'<\s*/?(object|embed|form|link|meta|base)\b[^>]*>', '', html, flags=re.IGNORECASE)
-        # Strip event handler attributes (onclick, onerror, onload, etc.)
-        html = re.sub(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', '', html, flags=re.IGNORECASE)
-        html = re.sub(r'\s+on\w+\s*=\s*\S+', '', html, flags=re.IGNORECASE)
-        # Strip javascript: URLs
-        html = re.sub(r'href\s*=\s*["\']javascript:[^"\']*["\']', '', html, flags=re.IGNORECASE)
-        return html.strip()
+    # NOTE (2026-05-05): _parse_artifact_signal + _sanitize_artifact_html
+    # REMOVED. The |||ARTIFACT:html|||...|||/ARTIFACT||| inline-HTML
+    # channel is gone. Tables / diagrams now belong in lesson media
+    # (uploaded ahead of time) and are surfaced via |||MEDIA:N|||.
+    # Defensive cleanup of any historical ARTIFACT tag in saved
+    # content lives in _create_message.
 
     def _create_message(
-        self, content: str, media: List[Dict] = None, artifact_html: str = None,
-        probe: Optional[Dict] = None,
+        self, content: str, media: List[Dict] = None,
     ) -> TutorMessage:
-        """Create a TutorMessage from content."""
-        # Defense-in-depth: strip legacy, MEDIA, GENERATE, ARTIFACT, and PROBE signal tags
+        """Create a TutorMessage from content.
+
+        NOTE (2026-05-05): the optional `artifact_html` and `probe`
+        parameters were REMOVED — those signal channels are gone. The
+        only output channels are text + an optional media attachment.
+        """
+        # Defense-in-depth: strip legacy + current signal tags from the
+        # content before saving. Even though the LLM is no longer
+        # instructed to emit GENERATE / ARTIFACT / PROBE, we still
+        # strip them from any historical content loaded from the DB.
         content = re.sub(r'\[SHOW_MEDIA\s*:[^\]]*\]', '', content, flags=re.IGNORECASE)
         content = re.sub(r'\|\|\|MEDIA\s*:\s*\d+\s*\|\|\|', '', content)
         content = re.sub(r'\|\|\|GENERATE\s*:\s*\w+\s*:.+?\|\|\|', '', content)
@@ -7333,8 +7212,6 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
             content=content,
             phase=self._get_display_phase(),
             media=media or [],
-            artifact_html=artifact_html,
-            probe=probe,
             expects_response=self.session_state != SessionState.COMPLETED,
             step_number=step_num,
             total_steps=total,

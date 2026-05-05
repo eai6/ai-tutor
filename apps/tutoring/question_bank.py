@@ -192,33 +192,58 @@ def sample_session_pool(
 
 def pick_candidates_for_step(
     pool: List,
-    concept_tag: str,
+    enabling_objective: str = '',
+    concept_tag: str = '',
     max_candidates: int = CANDIDATES_PER_STEP,
 ) -> List:
-    """Return up to N pool questions whose concept_tag matches.
+    """Return up to N candidate bank questions for the current step.
 
-    STRICT: no fallback. If the current step's concept_tag has no
-    matches in the pool, returns []. The previous "any same-lesson
-    question" fallback was leaking later-step questions onto earlier
-    steps (e.g. step 1 surfacing a step-4 question because the pool
-    is sampled across the whole lesson).
-
-    The caller is expected to fall back to slot 0 (the current
-    step's own teacher_script) when the bank is empty for this step.
+    Match precedence (specific → general):
+      1. enabling_objective exact match — the structured curriculum
+         primitive. ExitTicketQuestions are tagged with the EO they
+         test; LessonSteps are tagged with the EO they teach. Match
+         these and the bank slot is exactly the right scope.
+      2. concept_tag exact match — legacy / coarser grouping. Used
+         only when no EO is set (older content that pre-dates the
+         EO field on LessonStep).
+      3. Random fallback — when the step has no EO/tag or no match,
+         return up to N from the session pool. The pool is already
+         lesson-scoped and session-seeded, so this is a stable
+         random sample of the lesson's published bank, NOT a global
+         leak. Bank is never empty if the lesson has any published
+         exit-ticket questions.
     """
     if not pool:
         logger.info("[QuestionTool] pick_candidates_for_step: empty pool")
         return []
+
+    eo = (enabling_objective or '').strip()
+    if eo:
+        matches = [q for q in pool if (q.enabling_objective or '').strip() == eo]
+        if matches:
+            logger.info(
+                "[QuestionTool] pick_candidates_for_step: EO='%s' pool=%d matches=%d (EO_MATCH)",
+                eo[:60], len(pool), len(matches),
+            )
+            return matches[:max_candidates]
+
     tag = (concept_tag or '').strip()
-    if not tag:
-        logger.info("[QuestionTool] pick_candidates_for_step: no concept_tag — returning []")
-        return []
-    matches = [q for q in pool if (q.concept_tag or '').strip() == tag]
+    if tag:
+        matches = [q for q in pool if (q.concept_tag or '').strip() == tag]
+        if matches:
+            logger.info(
+                "[QuestionTool] pick_candidates_for_step: tag='%s' pool=%d matches=%d (TAG_MATCH)",
+                tag, len(pool), len(matches),
+            )
+            return matches[:max_candidates]
+
+    # Random fallback — pool is already lesson-scoped + session-seeded.
     logger.info(
-        "[QuestionTool] pick_candidates_for_step: tag='%s' pool=%d matches=%d",
-        tag, len(pool), len(matches),
+        "[QuestionTool] pick_candidates_for_step: no EO/tag match — "
+        "using random pool sample of %d (RANDOM_FALLBACK)",
+        min(len(pool), max_candidates),
     )
-    return matches[:max_candidates]
+    return pool[:max_candidates]
 
 
 def pick_published_for_concept_tag(
@@ -228,16 +253,15 @@ def pick_published_for_concept_tag(
 ):
     """Query the published bank directly for matches by tag.
 
-    STRICT: no cross-tag fallback. Returns only questions matching
-    the requested EO or concept_tag. If neither matches, returns [].
+    Match precedence (specific → general):
+      1. enabling_objective exact match — preferred curriculum primitive
+      2. concept_tag exact match — legacy / coarser grouping
+      3. Random fallback — when nothing matches, return up to N
+         random questions from the lesson's published bank. Bank is
+         never empty if the lesson has any published questions.
 
-    The previous fallback ("any published bank question for this
-    lesson") leaked later-step questions onto earlier steps. Callers
-    that want a cross-step bank must explicitly pass each step's tag.
-
-    Match precedence:
-      1. enabling_objective exact match — narrow sub-objective targeting
-      2. concept_tag exact match — broad learning-objective grouping
+    Used by the remediation flow which doesn't go through the per-
+    session pool, so we hit the published bank directly.
     """
     from apps.tutoring.models import ExitTicketQuestion
     base = ExitTicketQuestion.objects.filter(
@@ -245,26 +269,32 @@ def pick_published_for_concept_tag(
         exit_ticket__is_published=True,
     )
     tag = (concept_tag or '').strip()
-    if not tag:
-        logger.info(
-            "[QuestionTool] pick_published_for_concept_tag: no tag → []"
+    if tag:
+        matches = list(
+            base.filter(enabling_objective=tag).order_by('order_index')[:max_candidates]
         )
-        return []
-    matches = list(
-        base.filter(enabling_objective=tag).order_by('order_index')[:max_candidates]
-    )
-    if matches:
-        logger.info(
-            "[QuestionTool] pick_published_for_concept_tag: eo='%s' matches=%d",
-            tag, len(matches),
+        if matches:
+            logger.info(
+                "[QuestionTool] pick_published_for_concept_tag: eo='%s' matches=%d (EO_MATCH)",
+                tag[:60], len(matches),
+            )
+            return matches
+        matches = list(
+            base.filter(concept_tag=tag).order_by('order_index')[:max_candidates]
         )
-        return matches
-    matches = list(
-        base.filter(concept_tag=tag).order_by('order_index')[:max_candidates]
-    )
+        if matches:
+            logger.info(
+                "[QuestionTool] pick_published_for_concept_tag: tag='%s' matches=%d (TAG_MATCH)",
+                tag[:60], len(matches),
+            )
+            return matches
+
+    # Random fallback — order_by('?') is DB-agnostic random.
+    matches = list(base.order_by('?')[:max_candidates])
     logger.info(
-        "[QuestionTool] pick_published_for_concept_tag: concept_tag='%s' matches=%d",
-        tag, len(matches),
+        "[QuestionTool] pick_published_for_concept_tag: tag='%s' "
+        "no match — using %d random from lesson bank (RANDOM_FALLBACK)",
+        tag[:60] if tag else "(none)", len(matches),
     )
     return matches
 
