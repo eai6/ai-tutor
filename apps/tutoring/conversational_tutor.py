@@ -3042,11 +3042,22 @@ SCAFFOLDING TONE ({intensity} application):
         student_input: str,
         kb_context: str,
         visual_instructions: str = "",
+        *,
+        omit_history: bool = False,
     ) -> str:
         """Build the LLM user prompt for generating a tutoring response.
 
         Shared by _generate_contextual_response() and respond_stream()
         to prevent the two copies from diverging.
+
+        When ``omit_history=True``, the CONVERSATION CONTEXT and STUDENT
+        JUST SAID sections are dropped — the caller is passing
+        conversation history as a structured ``messages`` array instead
+        of embedding it in this prompt. This is the right shape for
+        models that follow turn-array semantics (Sonnet, gpt-4o, Gemini)
+        and stops the looping behaviour where the model treats the
+        explicit STEP DIRECTIVE as the latest instruction and ignores
+        the embedded history.
         """
         # During remediation, override step guidance with EO-focused instructions
         if getattr(self, 'is_remediation', False):
@@ -3103,12 +3114,18 @@ SCAFFOLDING TONE ({intensity} application):
                 "Do NOT reference figures or diagrams that are not in the catalog."
             )
 
-        return f"""CONVERSATION CONTEXT:
-{self._format_recent_conversation(5)}
+        # When omit_history=True, the conversation history flows
+        # through as a proper messages array. The directive below
+        # references the student's latest turn implicitly (the model
+        # already sees it as the most recent user message).
+        history_block = (
+            ""
+            if omit_history
+            else f"CONVERSATION CONTEXT:\n{self._format_recent_conversation(5)}\n\n"
+            f'STUDENT JUST SAID: "{student_input}"\n\n'
+        )
 
-STUDENT JUST SAID: "{student_input}"
-
-LESSON CONTEXT:
+        return f"""{history_block}LESSON CONTEXT:
 {self.lesson_context}
 
 CURRICULUM KNOWLEDGE:
@@ -3158,7 +3175,15 @@ YOUR RESPONSE:"""
         media_context: str = "",
         visual_requested: bool = False
     ) -> str:
-        """Generate a response based on student input and context."""
+        """Generate a response based on student input and context.
+
+        Conversation history flows through as a proper ``messages``
+        array (set via ``self.conversation``). The per-turn directive
+        block becomes a system-prompt suffix. This is the structural
+        fix for the looping behaviour where models treat the explicit
+        STEP DIRECTIVE as the latest instruction and ignore embedded
+        history.
+        """
         visual_instructions = ""
         if media_context:
             visual_instructions = f"\n{media_context}\n"
@@ -3171,8 +3196,10 @@ YOUR RESPONSE:"""
                 "- Continue with the lesson\n"
             )
 
-        prompt = self._build_response_prompt(student_input, kb_context, visual_instructions)
-        return self._generate_response(prompt)
+        directive_block = self._build_response_prompt(
+            student_input, kb_context, visual_instructions, omit_history=True,
+        )
+        return self._generate_response(directive_block)
     
     def _get_next_uncovered_concept(self) -> str:
         """Get the next uncovered exit ticket concept to focus on."""
@@ -3241,12 +3268,36 @@ Follow the current step; this concept will be covered in sequence."""
             return self._fallback_response(fallback_context)
 
         try:
-            # Build messages
-            messages = [{"role": "user", "content": prompt}]
+            # Conversation history → proper messages array. The caller's
+            # `prompt` is the per-turn directive (step task, kb context,
+            # response rules) which now becomes a system-prompt suffix
+            # rather than embedded text in a single user message. This
+            # is structural fix (A) — see the architecture map: prior
+            # behaviour put history in the user prompt as text, which
+            # gpt-4o (and to a lesser extent Sonnet) ignored in favour
+            # of the most concrete directive, causing TEACH-step loops.
+            messages = list(self.conversation)
+            # Edge: if there's no history yet (first turn / start path),
+            # prepend a placeholder so the API doesn't reject an empty
+            # messages array. The directive in the system prompt drives
+            # the response.
+            if not messages:
+                messages = [{"role": "user", "content": "Begin the lesson."}]
+            # If the last turn is from the assistant (rare — happens on
+            # certain resume paths), append a marker user turn so the
+            # API has a proper user→assistant alternation.
+            if messages and messages[-1].get("role") == "assistant":
+                messages.append({"role": "user", "content": "Continue."})
 
             # _build_system_prompt populates self._question_id_map as a
             # side effect — must be called BEFORE _build_pose_question_tool.
-            system_prompt = self._build_system_prompt()
+            base_system_prompt = self._build_system_prompt()
+            system_prompt = (
+                base_system_prompt
+                + "\n\n<turn_directive>\n"
+                + (prompt or "").strip()
+                + "\n</turn_directive>"
+            )
 
             is_math = False
             try:
@@ -4084,6 +4135,7 @@ Follow the current step; this concept will be covered in sequence."""
             current_step, candidates,
             include_step_slot=include_step_slot,
             prereq_questions=prereq_questions,
+            is_engage_or_warmup=is_engage_or_warmup,
         )
 
         self._question_id_map = id_map
@@ -4112,6 +4164,17 @@ Follow the current step; this concept will be covered in sequence."""
         inventing one in prose ("Three angles around a point measure
         78°, 102°, and 115°. What is the fourth?" — that came from the
         previous lesson but the bank had no slot for it).
+
+        Returns [] when:
+          - the lesson has no prerequisites configured (legitimate —
+            first lesson in a unit, foundational topics, intro lessons)
+          - prerequisites exist but none of them have published bank
+            questions yet (curriculum still being built)
+          - the prerequisite-tracking models can't be imported
+            (defensive — never crash the turn)
+        Empty list flows naturally through render_bank_block, which
+        emits an explicit "no recap available — use a conceptual hook"
+        note for the LLM on engage/warmup turns.
 
         Bounded to per_lesson + total caps so the system prompt doesn't
         balloon. Returns ExitTicketQuestion instances ordered by
@@ -4619,9 +4682,47 @@ Follow the current step; this concept will be covered in sequence."""
 
         # Step-type-specific task directive + content
         if step.step_type == 'teach':
-            parts.append("YOUR TASK: Deliver this teaching content. Explain clearly, then ask a comprehension check.")
-            parts.append("IMPORTANT: Your comprehension check must be a complete, self-contained question. Never say 'which of these' or reference options you haven't listed.")
-            parts.append(f"\nCONTENT TO TEACH:\n{teacher_script}")
+            # CRITICAL: respond to the student's last answer FIRST. Without
+            # this guidance the model just re-delivers the teaching content
+            # turn after turn (gpt-4o was looping "Welcome, Edward! Today
+            # we're learning…" with each rephrasing).
+            already_delivered = self.step_exchange_count > 0
+            if already_delivered:
+                parts.append(
+                    "YOUR TASK: The teaching content has ALREADY been delivered "
+                    "in a previous turn (see CONVERSATION CONTEXT above). DO NOT "
+                    "re-deliver or rephrase the same content. Instead:"
+                )
+                parts.append(
+                    "  1. RESPOND to what the student JUST SAID — acknowledge "
+                    "their answer (correct / partially correct / not quite) "
+                    "with specific feedback referring to their words."
+                )
+                parts.append(
+                    "  2. If their answer is correct, advance the discussion "
+                    "with the next idea OR signal completion (the engine will "
+                    "move to the next step)."
+                )
+                parts.append(
+                    "  3. If wrong/partial, give a TARGETED hint pointing at "
+                    "the misconception and ask them to retry."
+                )
+                parts.append(
+                    "  4. End with a question that moves forward — never with "
+                    "the SAME comprehension check you already asked."
+                )
+            else:
+                parts.append(
+                    "YOUR TASK: Deliver this teaching content. Explain clearly, "
+                    "then ask a comprehension check that the student has not "
+                    "answered yet."
+                )
+                parts.append(
+                    "IMPORTANT: Your comprehension check must be a complete, "
+                    "self-contained question. Never say 'which of these' or "
+                    "reference options you haven't listed."
+                )
+            parts.append(f"\nCONTENT TO TEACH (for reference, do NOT re-recite verbatim):\n{teacher_script}")
         elif step.step_type == 'worked_example':
             if self.current_topic_index in self.shown_worked_example_indices and self.step_exchange_count > 0:
                 parts.append(
@@ -4633,9 +4734,41 @@ Follow the current step; this concept will be covered in sequence."""
                 parts.append("YOUR TASK: Walk through this worked example step by step, then ask the student to explain a step back.")
             parts.append(f"\nEXAMPLE:\n{teacher_script}")
         elif step.step_type in ('practice', 'quiz'):
-            parts.append("YOUR TASK: Ask the EXACT question below verbatim, then grade the student's answer against the expected answer.")
+            # Same anti-loop guidance as TEACH: after the question has
+            # been posed once, switch from "ask the question" to
+            # "respond to the student's answer." gpt-4o was looping
+            # the same True/False question after the student answered.
+            already_posed = self.step_exchange_count > 0
+            if already_posed:
+                parts.append(
+                    "YOUR TASK: The question has ALREADY been posed in a "
+                    "previous turn (see CONVERSATION CONTEXT above). DO NOT "
+                    "re-pose the same question. Instead:"
+                )
+                parts.append(
+                    "  1. Read the EXPECTED ANSWER below and read what the "
+                    "student JUST SAID. Decide: correct / partially correct "
+                    "/ wrong."
+                )
+                parts.append(
+                    "  2. If correct: confirm briefly using the canonical "
+                    "explanation, then signal completion (the engine will "
+                    "advance to the next step). Do NOT pose another question "
+                    "from this step."
+                )
+                parts.append(
+                    "  3. If wrong: give a TARGETED hint pointing at the "
+                    "misconception (do NOT reveal the answer until 5+ wrong "
+                    "attempts), and ask them to retry."
+                )
+                parts.append(
+                    "  4. Never re-state the same question stem the student "
+                    "already saw. End with a question that moves forward."
+                )
+            else:
+                parts.append("YOUR TASK: Ask the EXACT question below verbatim, then grade the student's answer against the expected answer.")
             if step.question:
-                parts.append(f"\nQUESTION (ask verbatim): {step.question}")
+                parts.append(f"\nQUESTION (for reference): {step.question}")
             if step.expected_answer:
                 parts.append(f"EXPECTED ANSWER: {step.expected_answer}")
 

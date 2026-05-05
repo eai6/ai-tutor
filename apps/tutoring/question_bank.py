@@ -361,6 +361,7 @@ def render_bank_block(
     *,
     include_step_slot: bool = True,
     prereq_questions: Optional[List] = None,
+    is_engage_or_warmup: bool = False,
 ) -> Tuple[str, Dict[int, object]]:
     """Render the <question_bank> XML block for the system prompt.
 
@@ -461,6 +462,21 @@ def render_bank_block(
                 line += f"   (answer={correct})"
             lines.append(line)
             next_slot += 1
+    elif is_engage_or_warmup:
+        # Engage / warmup turn but no recap material is available
+        # (lesson has no prerequisites, OR the prereqs have no
+        # published bank questions). Tell the LLM explicitly so it
+        # doesn't try to invent "from last week" warmup questions.
+        # Some lessons legitimately have no prereqs — first lesson
+        # in a unit, foundational topics, intro lessons.
+        lines.append("")
+        lines.append(
+            "  No previous-lesson recap available for this lesson —"
+            " do NOT do a 'from last week' warmup with invented numbers."
+            " Open the lesson directly with a CONCEPTUAL hook ('What"
+            " do you already know about angles?') or dive into the"
+            " step content."
+        )
 
     lines.append("</question_bank>")
     return "\n" + "\n".join(lines) + "\n", id_map

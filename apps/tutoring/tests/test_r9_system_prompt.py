@@ -84,9 +84,16 @@ class TestR9SystemPrompt(BaseTutoringTestCase):
             tutor._generate_response("test input")
 
             mock_build.assert_called()
-            # Verify the system_prompt kwarg passed to generate
+            # Verify the system_prompt kwarg passed to generate. The
+            # caller-provided per-turn directive ("test input") is
+            # appended to the system prompt as a <turn_directive>
+            # block (structural fix A — see _generate_response). So
+            # the system prompt STARTS WITH the built prompt and
+            # CONTAINS the directive.
             call_kwargs = mock_llm.generate.call_args[1]
-            self.assertEqual(call_kwargs['system_prompt'], 'CUSTOM PROMPT')
+            self.assertTrue(call_kwargs['system_prompt'].startswith('CUSTOM PROMPT'))
+            self.assertIn('<turn_directive>', call_kwargs['system_prompt'])
+            self.assertIn('test input', call_kwargs['system_prompt'])
 
     def test_prompt_contains_formatting_guidance(self):
         """Format rules should include bold key terms and list guidance."""
