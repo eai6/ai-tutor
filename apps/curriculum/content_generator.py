@@ -1428,10 +1428,30 @@ CONTENT GUIDELINES:
         canonical_eos_for_steps = list(lesson.enabling_objectives or [])
         step_eo_stats = {'exact': 0, 'snapped': 0, 'dropped': 0, 'empty': 0}
         step_eo_dropped_examples: List[Dict] = []
+        # LLM-snap client for EO normalization. Without this the
+        # function falls into a brittle substring heuristic that
+        # silently drops most LLM-emitted EOs (Martin's pilot showed
+        # 1/10 steps tagged on "Angles around a point"). Build once
+        # per lesson, reuse across all steps in the loop.
+        eo_snap_client = None
+        try:
+            from apps.llm.client import get_llm_client
+            from apps.llm.models import ModelConfig
+            _cfg = ModelConfig.get_for('generation') or self._model_config
+            if _cfg is not None:
+                eo_snap_client = get_llm_client(_cfg)
+        except Exception as e:
+            print(
+                f"[ContentGen] [{lesson.title}] EO-snap client unavailable "
+                f"(falling back to substring heuristic): {e}",
+                flush=True,
+            )
+
         for step_data in steps:
             raw_eo = step_data.get('enabling_objective', '') or ''
             normalised, status = _normalize_enabling_objective(
                 raw_eo, canonical_eos_for_steps,
+                llm_client=eo_snap_client,
             )
             step_eo_stats[status] = step_eo_stats.get(status, 0) + 1
             step_data['enabling_objective'] = normalised
@@ -2490,10 +2510,28 @@ RULES:
                 'exact': 0, 'snapped': 0, 'dropped': 0, 'empty': 0,
             }
             eo_dropped_examples: List[Dict] = []
+            # LLM-snap client — same rationale as the steps path:
+            # without it, _normalize_enabling_objective falls into a
+            # brittle substring heuristic that drops most emitted EOs.
+            q_eo_snap_client = None
+            try:
+                from apps.llm.client import get_llm_client
+                from apps.llm.models import ModelConfig
+                _cfg = ModelConfig.get_for('generation') or self._model_config
+                if _cfg is not None:
+                    q_eo_snap_client = get_llm_client(_cfg)
+            except Exception as e:
+                print(
+                    f"[ContentGen] [{lesson.title}] question EO-snap client "
+                    f"unavailable (falling back to substring): {e}",
+                    flush=True,
+                )
+
             for q in questions:
                 raw_eo = q.get('enabling_objective', '') or ''
                 normalised, status = _normalize_enabling_objective(
                     raw_eo, canonical_eos,
+                    llm_client=q_eo_snap_client,
                 )
                 eo_validation_stats[status] = eo_validation_stats.get(status, 0) + 1
                 q['enabling_objective'] = normalised

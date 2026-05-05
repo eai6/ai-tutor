@@ -312,6 +312,105 @@ def _grade_matching(question, raw) -> BankGradeResult:
     )
 
 
+# ─── LessonStep (slot 0 in the bank) ──────────────────────────────
+
+
+def grade_lesson_step_response(step, student_input) -> BankGradeResult:
+    """Grade a student's reply against a LessonStep (the canonical
+    question for slot 0 of the bank).
+
+    LessonStep has a different field shape than ExitTicketQuestion —
+    no `question_type`, no `correct_answer`, no `option_a/b/c/d`.
+    Calling `grade_bank_response` on a LessonStep silently fell into
+    the MCQ default and returned `is_correct=None expected=None`
+    every time (this is what Martin saw in the logs). Dispatch by
+    `step.answer_type` and grade against `step.expected_answer`.
+    """
+    if step is None:
+        return BankGradeResult(is_correct=None, skip_reason="no_step")
+    if student_input is None:
+        return BankGradeResult(is_correct=None, skip_reason="no_student_input")
+    if isinstance(student_input, str) and not student_input.strip():
+        return BankGradeResult(is_correct=None, skip_reason="empty_student_input")
+
+    answer_type = (getattr(step, "answer_type", "") or "").lower()
+    expected = (getattr(step, "expected_answer", "") or "").strip()
+
+    if answer_type in ("", "none"):
+        return BankGradeResult(is_correct=None, skip_reason="lesson_step_no_answer_type")
+    if not expected:
+        return BankGradeResult(is_correct=None, skip_reason="lesson_step_no_expected")
+
+    raw = student_input if not isinstance(student_input, str) else student_input.strip()
+
+    if answer_type == "short_numeric":
+        return BankGradeResult(
+            is_correct=_numeric_equal(str(raw), expected),
+            expected=expected,
+            student_parsed=str(raw)[:60],
+        )
+
+    if answer_type == "true_false":
+        return BankGradeResult(
+            is_correct=(_norm(str(raw)) == _norm(expected)),
+            expected=expected,
+            student_parsed=_norm(str(raw)),
+        )
+
+    if answer_type == "multiple_choice":
+        # LessonStep stores `choices` as a JSON list; expected_answer
+        # is the canonical answer (letter, index, or option text).
+        choices = list(getattr(step, "choices", None) or [])
+
+        # Direct letter answer ("A" / "(B)" / "C.")
+        letter_match = re.match(
+            r"^[\(\[]?\s*([A-D])\s*[\)\]\.]*$", str(raw).strip(), re.IGNORECASE,
+        )
+        if letter_match:
+            student_letter = letter_match.group(1).upper()
+            expected_letter = expected.upper().strip()
+            if expected_letter in {"A", "B", "C", "D"}:
+                return BankGradeResult(
+                    is_correct=(student_letter == expected_letter),
+                    expected=expected_letter,
+                    student_parsed=student_letter,
+                )
+            # expected is option text or index — map student's letter
+            # to the indexed choice and compare.
+            idx = ord(student_letter) - ord("A")
+            if 0 <= idx < len(choices):
+                picked = str(choices[idx])
+                return BankGradeResult(
+                    is_correct=_numeric_equal(picked, expected),
+                    expected=expected,
+                    student_parsed=picked,
+                    detail={"matched_letter": student_letter},
+                )
+
+        # Full-text match against expected (handles both letter-form
+        # and option-text-form expected_answer values).
+        return BankGradeResult(
+            is_correct=_numeric_equal(str(raw), expected),
+            expected=expected,
+            student_parsed=str(raw)[:60],
+        )
+
+    if answer_type == "free_text":
+        # Free-text working can't be deterministically graded — defer
+        # to the LLM evaluator. Caller treats is_correct=None as "no
+        # signal" and falls through to the next layer.
+        return BankGradeResult(
+            is_correct=None,
+            skip_reason="lesson_step_free_text_defer_to_llm",
+            expected=expected,
+        )
+
+    return BankGradeResult(
+        is_correct=None,
+        skip_reason=f"lesson_step_unknown_answer_type:{answer_type}",
+    )
+
+
 # ─── short_answer (two-field design) ───────────────────────────────
 
 

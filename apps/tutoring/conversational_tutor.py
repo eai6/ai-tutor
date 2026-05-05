@@ -4267,6 +4267,20 @@ Follow the current step; this concept will be covered in sequence."""
                 self.lesson, seed=self.session.id, student=self.student,
             )
             pool_ids = [q.id for q in pool]
+            # Audit log: surface lessons that ship with an empty
+            # published bank early, so we don't have to mine chat
+            # transcripts to find them. The runtime is graceful
+            # (random fallback in pick_candidates_for_step), but the
+            # content gap should be fixed at the source — this log is
+            # the signal that triggers that work.
+            if not pool:
+                logger.warning(
+                    "[BankAudit] bank_empty_for_lesson lesson_id=%s "
+                    "title=%r — no published ExitTicketQuestion rows. "
+                    "Tutor will run with no verified bank to ground on.",
+                    self.lesson.id,
+                    (self.lesson.title or '')[:80],
+                )
             state = self.session.engine_state or {}
             state['question_pool_ids'] = pool_ids
             self.session.engine_state = state
@@ -4686,6 +4700,11 @@ Follow the current step; this concept will be covered in sequence."""
                 )
 
         final = "\n\n".join(text_parts).strip()
+        # Surface tool-use rate to the structured per-turn log
+        # ([TurnSummary] in _save_turn). Sonnet's 3% compliance was
+        # only visible after scraping these lines individually before.
+        turn_metadata['tool_use_count'] = tool_use_count
+        turn_metadata['bank_rendered'] = bank_rendered
         logger.info(
             "[QuestionTool] final: chars=%d tool_use_count=%d bank_rendered=%s "
             "stop_reason=%s",
@@ -4841,19 +4860,32 @@ Follow the current step; this concept will be covered in sequence."""
         if not kind or not ref_id:
             return None
 
-        # Resolve the question record.
+        # Resolve the question record + grade with the right shape.
+        # LessonStep and ExitTicketQuestion have different field shapes
+        # (LessonStep uses answer_type/expected_answer; ExitTicketQuestion
+        # uses question_type/correct_answer/option_a..d). Dispatch by
+        # kind so we don't silently fall into the MCQ default — that's
+        # what produced [BankGrade] is_correct=None expected=None
+        # student=None for every slot-0 turn in Martin's session.
+        from apps.tutoring.bank_grader import (
+            grade_bank_response,
+            grade_lesson_step_response,
+        )
         question = None
         if kind == 'lesson_step':
             from apps.curriculum.models import LessonStep
             question = LessonStep.objects.filter(id=ref_id).first()
+            if question is None:
+                return None
+            result = grade_lesson_step_response(question, student_input)
         elif kind == 'exit_ticket_question':
             from apps.tutoring.models import ExitTicketQuestion
             question = ExitTicketQuestion.objects.filter(id=ref_id).first()
-        if question is None:
+            if question is None:
+                return None
+            result = grade_bank_response(question, student_input)
+        else:
             return None
-
-        from apps.tutoring.bank_grader import grade_bank_response
-        result = grade_bank_response(question, student_input)
         self._pending_bank_grade = result
         # Stash the full question so the next-turn prompt builder can
         # surface the canonical explanation / step-by-step working —
@@ -5347,10 +5379,13 @@ Follow the current step; this concept will be covered in sequence."""
                 " entirely."
             )
             parts.append(
-                "If RULE_1 was flagged: remove ALL praise and replace"
-                " with a request for the student's working — \"Walk"
-                " me through your steps\" or \"Show me how you got"
-                " there\"."
+                "If RULE_1 was flagged: drop the praise. Then either"
+                " ask one focused question that probes the student's"
+                " reasoning, OR transition forward without restating"
+                " their answer. Phrase the question naturally — do"
+                " NOT default to a stock phrase like \"walk me through"
+                " your steps\" or \"show me how you got there\". Vary"
+                " your wording across turns."
             )
         parts.append(
             "Edit the previous response to fix these violations. Keep"
@@ -5410,6 +5445,16 @@ Follow the current step; this concept will be covered in sequence."""
         re.IGNORECASE,
     )
 
+    # A CHAINED arithmetic expression IS the working — at least two
+    # operations (or an op followed by '='). "180-62-30=88" is working;
+    # "x=88" is just an assignment (still bare); "5 1/4" is a single
+    # fractional answer (still bare). Single binary ops like "5×4"
+    # without a result also stay bare — the student should write the
+    # computed value.
+    _ARITHMETIC_EXPRESSION_RE = re.compile(
+        r"\d\s*[+\-*/×÷]\s*\d.*[+\-*/×÷=]"
+    )
+
     def _is_bare_math_answer(self, student_input: str) -> bool:
         """Return True when the student's reply looks like a naked numeric
         answer with no working/explanation (M9 pedagogy layer).
@@ -5418,6 +5463,9 @@ Follow the current step; this concept will be covered in sequence."""
           - Input has content and parses as a single number
           - Input is short (<= 40 chars)
           - Input contains none of the 'working' marker words
+          - Input contains no arithmetic expression (operators between
+            digits or an '=' sign — that's the student showing working
+            in compact form, e.g. "180-62-30=88")
         """
         if not student_input:
             return False
@@ -5428,6 +5476,8 @@ Follow the current step; this concept will be covered in sequence."""
         if parsed is None:
             return False
         if self._BARE_WORKING_MARKERS.search(text):
+            return False
+        if self._ARITHMETIC_EXPRESSION_RE.search(text):
             return False
         return True
 
@@ -8016,6 +8066,73 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
             content=content,
             metadata=metadata or {},
         )
+        # Structured per-turn log line for offline analysis (Phase 5 of
+        # memory/martin_session_fix_plan.md). Single line covers the
+        # signals we previously had to scrape across multiple log
+        # entries: eval_layer, is_correct, bank state, tool use,
+        # validator issues, regen count, bare-answer flag. Skipping
+        # student turns keeps the log volume halved without losing
+        # the verdict-side information.
+        if role == "tutor":
+            self._emit_turn_summary_log(content, metadata or {})
+
+    def _emit_turn_summary_log(self, content: str, metadata: Dict) -> None:
+        """Emit one [TurnSummary] structured log line per tutor turn.
+
+        Pulls fields that are otherwise spread across:
+          - turn_metadata (eval_layer, is_correct, validator_issues,
+            regenerated, bare_answer, praise_stripped, tool_use_count)
+          - engine state (current step index, step type/phase,
+            session_state, bank pool size for empty-bank detection)
+          - bank id_map (whether tools were offered this turn)
+
+        Format: key=value pairs so it's grep-friendly AND parseable.
+        """
+        try:
+            import json as _json
+            step_idx = self.current_topic_index
+            step = (
+                self.steps[step_idx]
+                if 0 <= step_idx < len(self.steps)
+                else None
+            )
+            id_map = getattr(self, '_question_id_map', None) or {}
+            engine_state = self.session.engine_state or {}
+            pool_ids = engine_state.get('question_pool_ids')
+
+            payload = {
+                "session": self.session.id,
+                "turn": len(self.conversation),
+                "step_index": step_idx,
+                "step_type": getattr(step, 'step_type', '') if step else '',
+                "step_phase": getattr(step, 'phase', '') if step else '',
+                "session_state": str(getattr(self, 'session_state', '')),
+                "is_remediation": bool(getattr(self, 'is_remediation', False)),
+                "content_chars": len(content or ''),
+                # Eval layer & correctness
+                "eval_layer": metadata.get('eval_layer'),
+                "is_correct": metadata.get('is_correct'),
+                "bare_answer": bool(metadata.get('bare_answer')),
+                "praise_stripped": bool(metadata.get('praise_stripped')),
+                # Bank + tool state
+                "bank_pool_size": len(pool_ids) if pool_ids is not None else None,
+                "bank_offered": bool(id_map),
+                "bank_slot_count": len(id_map),
+                "bank_signal_used": bool(getattr(self, '_bank_signal_used_this_turn', False)),
+                # Tool use (populated by _handle_pose_question_message)
+                "tool_use_count": metadata.get('tool_use_count', 0),
+                # Validator + regen
+                "validator_issues": list(metadata.get('validator_issues', []) or []),
+                "regenerated": bool(metadata.get('regenerated')),
+                "regeneration_reason": list(metadata.get('regeneration_reason', []) or []),
+                # Step eval (combined judge CHECK 4)
+                "step_complete": metadata.get('step_complete'),
+            }
+            # JSON-safe single line. Use logger.info — Azure picks it up.
+            logger.info("[TurnSummary] %s", _json.dumps(payload, default=str))
+        except Exception as e:
+            # Logging must never break the turn.
+            logger.warning("[TurnSummary] emit failed: %s", e)
     
     # NOTE (2026-05-05): _parse_probe_signal REMOVED. The
     # |||PROBE:{json}||| inline-widget channel is gone. MCQ rendering

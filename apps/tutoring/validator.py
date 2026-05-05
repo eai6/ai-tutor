@@ -76,15 +76,14 @@ class ValidationResult:
         return any(i in self._REGEN_ISSUES for i in self.issues)
 
 
-# Patterns that constitute a question (broader than '?' alone — some
-# Socratic prompts read as imperatives like "Walk me through it.").
-_QUESTION_RE = re.compile(
-    r"\?\s*$|"
-    r"\b(walk me through|tell me|explain|describe|why|how|what|which|when|where|"
-    r"can you|could you|would you|try to|let's check|let's see|show me|"
-    r"think about|what do you think|give it a try)\b",
-    re.IGNORECASE,
-)
+# A response qualifies as ending-in-question only when there's an
+# actual '?' on the tail line. The regex used to accept imperative
+# phrases ("let's check", "show me", "walk me through") as questions
+# without a '?', which let bland transitions slip through and made
+# the validator rubber-stamp the regen-prescribed stock phrases. The
+# Socratic approach is valid — but it should always be expressed as
+# an actual question.
+_QUESTION_RE = re.compile(r"\?")
 
 # Heuristic: a response is "info-dumpy" when it contains many distinct
 # named concepts (proper nouns, acronyms, numbers) without any question
