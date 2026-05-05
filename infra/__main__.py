@@ -145,7 +145,12 @@ file_share = storage.FileShare(
     share_name="media",
     account_name=sa.name,
     resource_group_name=rg.name,
-    share_quota=5,  # 5 GiB – increase as needed
+    # 2026-05-05: bumped 5 → 100 GiB after generated images filled
+    # the share and image generation started failing with errno 28.
+    # Long-term plan: migrate generated images to Azure Blob (see
+    # memory/azure_blob_storage_plan.md) — keeps the platform
+    # portable to other clouds + decouples from filesystem quotas.
+    share_quota=100,  # 100 GiB
 )
 
 storage_keys = pulumi.Output.all(rg.name, sa.name).apply(
