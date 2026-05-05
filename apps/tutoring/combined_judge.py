@@ -136,10 +136,21 @@ class CombinedJudgeResult:
 
 
 _JUDGE_SYSTEM = (
-    "You are a strict reviewer for a math tutor's most recent response. "
-    "Run FOUR checks and report all findings in ONE JSON object.\n"
+    "You are a strict reviewer for a tutor's most recent response. "
+    "Subject can be math OR a non-math subject (geography, science, "
+    "history, language, etc.) — see input.subject_is_math.\n"
     "\n"
-    "CHECK 1 — ARITHMETIC. Find every arithmetic claim in the response "
+    "Run up to FOUR checks and report all findings in ONE JSON object.\n"
+    "Skip checks that don't apply:\n"
+    "  - input.subject_is_math == false → SKIP CHECK 1 (arithmetic) "
+    "and CHECK 3 (rule compliance — those rules are math-specific). "
+    "Return [] for arithmetic_corrections and rule_violations.\n"
+    "  - input.factual_claims == [] → SKIP CHECK 2 (factual). Return "
+    "[] for fact_claims.\n"
+    "  - input.step_context == {} → SKIP CHECK 4 (step eval). Return "
+    "answer_correct=null, step_complete=false.\n"
+    "\n"
+    "CHECK 1 — ARITHMETIC (math only). Find every arithmetic claim in the response "
     "and verify the math. Both EXPLICIT and IMPLICIT shapes count:\n"
     '  EXPLICIT: "8 × 2.5 = 20", "65 + 125 = 180".\n'
     '  IMPLICIT: "do they sum to 360°?" with the values 100°, 120°, 80° '
@@ -231,6 +242,7 @@ def _build_user_prompt(
     factual_claims: List[str],
     evidence: str,
     step_context: Optional[dict] = None,
+    subject_is_math: bool = True,
 ) -> str:
     bank_block = (
         "\n".join(f"  - {s.strip()[:200]}" for s in bank_stems[:10])
@@ -246,6 +258,11 @@ def _build_user_prompt(
         "evidence": (evidence or "(no evidence retrieved)")[:3000],
         # Step context for CHECK 4. Empty dict → judge skips step eval.
         "step_context": step_context or {},
+        # Subject signal for the judge — math turns get arithmetic
+        # + RULE_1 (don't praise bare numeric) checks; non-math turns
+        # skip those (no arithmetic to verify, no bare-numeric rule).
+        # CHECK 2 (factual) and CHECK 4 (step eval) run for both.
+        "subject_is_math": bool(subject_is_math),
     }
     return (
         "Run all four checks on the tutor's response below. Reply with "
@@ -292,6 +309,7 @@ def run_combined_judge(
     answer_was_bare: bool = False,
     answer_was_wrong: bool = False,
     step_context: Optional[dict] = None,
+    subject_is_math: bool = True,
     max_claims: int = 5,
     max_arithmetic_corrections: int = 8,
     max_violations: int = 5,
@@ -356,6 +374,7 @@ def run_combined_judge(
         factual_claims=factual_claims,
         evidence=evidence,
         step_context=step_context,
+        subject_is_math=subject_is_math,
     )
     # Track whether the caller asked for step eval. If they didn't pass
     # context, mark step_eval_skipped on the result so callers can tell.

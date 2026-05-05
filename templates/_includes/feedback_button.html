@@ -569,7 +569,21 @@
 
         let screenshotBlob = null;
         if (wantScreenshot) {
-            screenshotBlob = await captureScreenshot();
+            // Hide the feedback modal during capture so it doesn't
+            // appear in the screenshot. opacity:0 preserves layout
+            // (no reflow that would break the getDisplayMedia user-
+            // gesture context). pointer-events:none stops accidental
+            // clicks while invisible. Restore in `finally`.
+            const prevOpacity = overlay.style.opacity;
+            const prevPointerEvents = overlay.style.pointerEvents;
+            overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none';
+            try {
+                screenshotBlob = await captureScreenshot();
+            } finally {
+                overlay.style.opacity = prevOpacity;
+                overlay.style.pointerEvents = prevPointerEvents;
+            }
             // If capture failed/declined, just submit without it —
             // don't block the feedback flow on an attachment.
         }

@@ -2679,9 +2679,18 @@ function showExitTicket() {
                 <textarea class="exit-textarea" data-q="${origIdx}" rows="3" placeholder="Type your answer..." oninput="collectTextAnswer(${origIdx}, this)"></textarea>`;
             }
 
+            // Fill-in-blank renders the sentence with input fields
+            // EMBEDDED in bodyHTML (text_template with ___ replaced
+            // by inputs). Showing q.question as a separate stem above
+            // would duplicate the same sentence — once with "___" and
+            // once with the input fields. Suppress the stem div for
+            // fill_in_blank; the body carries the full question.
+            const stemDiv = (qType === 'fill_in_blank')
+                ? ''
+                : `<div class="question-text">${q.question}</div>`;
             div.innerHTML = `
                 <div class="question-num">${qLabel}</div>
-                <div class="question-text">${q.question}</div>
+                ${stemDiv}
                 ${bodyHTML}
             `;
             sectionDiv.appendChild(div);

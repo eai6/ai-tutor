@@ -1624,41 +1624,52 @@ Keep it to 2-3 sentences."""
         # calls accordingly.
         arithmetic_corrections: List[Dict] = []
         combined_judge_result = None
-        if self.lesson.unit.course.is_math:
-            from apps.tutoring.combined_judge import run_combined_judge
-            # Route the judge to the dedicated judge_client (Sonnet 4 by
-            # default) so post-response checking doesn't pay the Opus
-            # cost/latency twice. Tutor stays on Opus where reasoning
-            # depth matters; judges run on a faster model.
-            #
-            # Step-eval is folded into this same call (formerly a
-            # separate instructor _evaluate_step call). Min-exchange
-            # floor: skip step eval on the first turn of teach /
-            # worked_example so the LLM doesn't advance prematurely.
-            combined_judge_result = run_combined_judge(
-                clean_response,
-                lesson=self.lesson,
-                llm_client=self.judge_client,
-                bank_stems=self._current_bank_stems(),
-                student_input=student_input,
-                answer_was_bare=turn_bare_answer,
-                answer_was_wrong=(
-                    turn_math_check is not None
-                    and turn_math_check.is_correct is False
-                ),
-                step_context=self._build_step_eval_context(
-                    student_input, clean_response,
-                ),
+        # Combined judge is universal (2026-05-05). All subjects get
+        # post-response checking — math turns get arithmetic +
+        # NO_AUTHORING + RULE_1 + factual + step-eval; non-math turns
+        # get factual + step-eval (the math-specific checks short-
+        # circuit naturally because there are no arithmetic claims to
+        # check and no bank-required-questions to author against).
+        # Geography "Mahé has 90,000 people" claims still get fact-
+        # checked against the curriculum KB.
+        try:
+            subject_is_math = bool(self.lesson.unit.course.is_math)
+        except Exception:
+            subject_is_math = False
+        from apps.tutoring.combined_judge import run_combined_judge
+        # Route the judge to the dedicated judge_client (Sonnet 4 by
+        # default) — separate from the tutoring model so post-response
+        # checking doesn't compete with the tutor for bandwidth.
+        #
+        # Step-eval is folded into this same call (formerly a
+        # separate instructor _evaluate_step call). Min-exchange
+        # floor: skip step eval on the first turn of teach /
+        # worked_example so the LLM doesn't advance prematurely.
+        combined_judge_result = run_combined_judge(
+            clean_response,
+            lesson=self.lesson,
+            llm_client=self.judge_client,
+            bank_stems=self._current_bank_stems(),
+            student_input=student_input,
+            answer_was_bare=turn_bare_answer,
+            answer_was_wrong=(
+                turn_math_check is not None
+                and turn_math_check.is_correct is False
+            ),
+            step_context=self._build_step_eval_context(
+                student_input, clean_response,
+            ),
+            subject_is_math=subject_is_math,
+        )
+        if combined_judge_result.corrected_response:
+            clean_response = combined_judge_result.corrected_response
+        arithmetic_corrections = list(
+            combined_judge_result.arithmetic_corrections
+        )
+        if arithmetic_corrections:
+            logger.info(
+                f"[CombinedJudge] flagged {len(arithmetic_corrections)} arithmetic correction(s) — will trigger regen"
             )
-            if combined_judge_result.corrected_response:
-                clean_response = combined_judge_result.corrected_response
-            arithmetic_corrections = list(
-                combined_judge_result.arithmetic_corrections
-            )
-            if arithmetic_corrections:
-                logger.info(
-                    f"[CombinedJudge] flagged {len(arithmetic_corrections)} arithmetic correction(s) — will trigger regen"
-                )
 
         # Post-generation praise filter (Layer 3). Defense-in-depth: strip
         # praise when the deterministic math check said wrong OR when the
@@ -2297,14 +2308,12 @@ Keep it to 2-3 sentences."""
         Returns None when:
           - the current step has no attached media
           - the file can't be read (URL unreachable, missing file)
-          - the lesson is non-math (skip to keep cost down — vision
-            is most valuable for diagrammatic math content)
+
+        Universal across subjects (was math-only): geography maps,
+        science diagrams, history primary-source images all benefit
+        from the tutor SEEING the figure. The "is_math" gate was
+        dropped 2026-05-05 per user direction.
         """
-        try:
-            if not self.lesson.unit.course.is_math:
-                return None
-        except Exception:
-            return None
         if self.current_topic_index >= len(self.steps):
             return None
         media = self._get_step_media()
@@ -3472,14 +3481,21 @@ Follow the current step; this concept will be covered in sequence."""
             except Exception:
                 pass
 
+            # Bank + pose_question tool is universal (2026-05-05).
+            # Any subject's lesson with a populated bank gets the
+            # tool — geography MCQ, science fill-in-blank, history
+            # short-answer all benefit from verified-question grounding.
+            # _build_pose_question_tool() returns None when the
+            # id_map is empty (no bank for this lesson), in which
+            # case we fall through to the plain text path.
             tool = (
                 self._build_pose_question_tool()
-                if is_math and hasattr(self.llm_client, 'generate_with_tools')
+                if hasattr(self.llm_client, 'generate_with_tools')
                 else None
             )
 
             if tool is not None:
-                # Math + tool-capable client → tool-use path. The LLM
+                # Tool-capable client + bank exists → tool-use path. The LLM
                 # cannot type a numerical question in prose; the only
                 # way to ask is via pose_question(slot=N).
                 self._pending_pose_question_meta = {}
@@ -4222,11 +4238,12 @@ Follow the current step; this concept will be covered in sequence."""
         # Reset every turn so a stale map can't bleed across responses.
         self._question_id_map = {}
 
-        try:
-            if not self.lesson.unit.course.is_math:
-                return ''
-        except Exception:
-            return ''
+        # Universal across subjects (2026-05-05): the bank + tool was
+        # math-only, but verified question grounding is just as
+        # valuable for geography MCQ ("which is the largest island?"),
+        # science fill-in-blank ("photosynthesis converts ___ into
+        # ___"), etc. Now any subject's lesson with published
+        # exit-ticket questions gets the bank + pose_question tool.
         if self.current_topic_index >= len(self.steps):
             return ''
         current_step = self.steps[self.current_topic_index]
@@ -4465,13 +4482,24 @@ Follow the current step; this concept will be covered in sequence."""
         tool = {
             "name": self.POSE_QUESTION_TOOL_NAME,
             "description": (
-                "Pose a verified bank question to the student. This is "
-                "the ONLY way to ask any numerical question. NEVER type "
-                "questions in your text response — invoke this tool "
-                "instead. The slot index refers to the <question_bank> "
-                "block in the system prompt. Slot 0 is the current "
-                "step's canonical question; slots 1+ are exit-ticket "
-                "bank questions tagged to this step's concept.\n\n"
+                "Pose a verified question from the bank to the student. "
+                "Use this when you want to ask a question that has a "
+                "known correct answer — multiple choice, fill-in-blank, "
+                "short answer, numerical, etc. The slot index refers "
+                "to the <question_bank> in the system prompt. Slot 0 "
+                "is the current step's canonical question; slots 1+ "
+                "are exit-ticket bank questions tagged to this step's "
+                "concept; later slots labelled 'previous lesson recap' "
+                "are for warmup turns.\n\n"
+                "For math turns specifically, this tool is the ONLY "
+                "legal way to ask a numerical question — never type "
+                "such a question in your text response. For other "
+                "subjects, prefer this tool for verified-answer "
+                "questions, but free-prose conceptual questions "
+                "(\"What do you think causes…?\") remain fine.\n\n"
+                "IMPORTANT: emit a real tool_use block — do NOT type "
+                "the call as text in your response. The student "
+                "literally sees raw text characters.\n\n"
                 "Available slots:\n" + menu
             ),
             "input_schema": {
