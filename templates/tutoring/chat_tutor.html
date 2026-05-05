@@ -200,17 +200,8 @@
         <div class="lightbox-caption" id="lightbox-caption"></div>
     </div>
 
-    <!-- Exit Ticket Modal -->
-    <div class="modal" id="exit-modal" style="display: none;">
-        <div class="modal-content exit-ticket">
-            <h2>Exit Quiz</h2>
-            <p class="modal-subtitle">Answer all questions. You need 8/10 to pass.</p>
-            <div id="exit-questions"></div>
-            <button class="submit-btn" id="submit-exit" onclick="submitExitTicket()" disabled>
-                Submit Quiz
-            </button>
-        </div>
-    </div>
+    {# Exit Ticket Modal — shared partial; see _partials/exit_modal.html. #}
+    {% include "tutoring/_partials/exit_modal.html" %}
 
     <!-- Completion Modal -->
     <div class="modal" id="complete-modal" style="display: none;">
@@ -966,197 +957,7 @@ body {
 .modal-content h2 { margin-bottom: 0.375rem; font-size: 1.25rem; }
 .modal-subtitle { color: #71717a; margin-bottom: 1.5rem; font-size: 0.9375rem; }
 
-/* Exit Ticket */
-.exit-progress {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: #fff;
-    padding: 0.75rem 0;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid #e4e4e7;
-}
-.exit-progress-text { font-size: 0.8125rem; font-weight: 600; color: #71717a; margin-bottom: 0.375rem; }
-.exit-progress-bar { height: 4px; background: #e4e4e7; border-radius: 999px; overflow: hidden; }
-.exit-progress-fill { height: 100%; background: #10b981; border-radius: 999px; transition: width 0.3s ease; }
-
-.exit-section { margin-bottom: 2rem; }
-.exit-section:last-of-type { margin-bottom: 1rem; }
-.exit-section-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.25rem;
-}
-.section-letter {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    font-weight: 800;
-    font-size: 0.875rem;
-    color: #fff;
-    flex-shrink: 0;
-}
-.section-letter-A { background: #3b82f6; }
-.section-letter-B { background: #ec4899; }
-.section-letter-C { background: #8b5cf6; }
-.section-letter-D { background: #059669; }
-.section-name { font-size: 1rem; font-weight: 700; color: #18181b; }
-.section-instruction { font-size: 0.8125rem; color: #71717a; font-style: italic; margin: 0.25rem 0 1rem 2.75rem; }
-
-.exit-question {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid #f4f4f5;
-}
-.exit-question:last-of-type { border-bottom: none; padding-bottom: 0; }
-.question-num { font-size: 0.8125rem; font-weight: 700; color: #71717a; margin-bottom: 0.375rem; }
-.question-text { font-weight: 500; margin-bottom: 0.75rem; line-height: 1.5; }
-
-.options { display: flex; flex-direction: column; gap: 0.375rem; }
-.option {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.625rem 0.875rem;
-    border: 2px solid #e4e4e7;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-size: 0.9375rem;
-}
-.option:hover { border-color: #a1a1aa; }
-.option.selected { border-color: #18181b; background: #fafafa; }
-.option.correct { border-color: #10b981; background: #d1fae5; }
-.option.incorrect { border-color: #ef4444; background: #fee2e2; }
-
-.option .letter {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: #f4f4f5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.8125rem;
-    flex-shrink: 0;
-}
-.option.selected .letter { background: #18181b; color: #fff; }
-
-/* ── Multi-Format Exit Ticket Styles (P1.3) ── */
-.q-type-badge {
-    display: inline-block;
-    font-size: 0.625rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 0.125rem 0.5rem;
-    border-radius: 999px;
-    margin-left: 0.5rem;
-    vertical-align: middle;
-}
-.q-type-mcq { background: #dbeafe; color: #1e40af; }
-.q-type-fill_in_blank { background: #fce7f3; color: #9d174d; }
-.q-type-matching { background: #ede9fe; color: #7c3aed; }
-.q-type-short_answer { background: #d1fae5; color: #065f46; }
-.q-type-data_interpretation { background: #fef3c7; color: #92400e; }
-
-.exit-blank-input {
-    display: inline-block;
-    width: 120px;
-    padding: 0.25rem 0.5rem;
-    border: 2px solid #a1a1aa;
-    border-radius: 0.375rem;
-    font-size: 0.9375rem;
-    text-align: center;
-    margin: 0 0.25rem;
-}
-.exit-blank-input:focus { border-color: #18181b; outline: none; }
-
-.matching-body { display: flex; flex-direction: column; gap: 0.5rem; }
-.matching-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-}
-.matching-left {
-    font-weight: 600;
-    min-width: 100px;
-    padding: 0.375rem 0.75rem;
-    background: #f4f4f5;
-    border-radius: 0.375rem;
-}
-.matching-arrow { color: #a1a1aa; font-size: 1.25rem; }
-.matching-select {
-    flex: 1;
-    padding: 0.5rem;
-    border: 2px solid #e4e4e7;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    background: #fff;
-}
-.matching-select:focus { border-color: #18181b; outline: none; }
-.matching-row.answered { background: #f8fafc; border-radius: 0.375rem; }
-.matching-row.answered .matching-left { background: #e0f2fe; }
-
-.exit-textarea {
-    width: 100%;
-    padding: 0.75rem;
-    border: 2px solid #e4e4e7;
-    border-radius: 0.5rem;
-    font-size: 0.9375rem;
-    font-family: inherit;
-    resize: vertical;
-    min-height: 80px;
-}
-.exit-textarea:focus { border-color: #18181b; outline: none; }
-
-.data-description {
-    padding: 0.75rem;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    margin-bottom: 0.75rem;
-    white-space: pre-wrap;
-    font-family: monospace;
-}
-
-.exit-result-correct {
-    margin-top: 0.75rem;
-    padding: 0.625rem 0.875rem;
-    background: #d1fae5;
-    border: 1px solid #6ee7b7;
-    border-radius: 0.5rem;
-    color: #065f46;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-.exit-result-incorrect {
-    margin-top: 0.75rem;
-    padding: 0.625rem 0.875rem;
-    background: #fee2e2;
-    border: 1px solid #fca5a5;
-    border-radius: 0.5rem;
-    color: #991b1b;
-    font-size: 0.875rem;
-}
-.exit-result-correct::before { content: '\2713 '; font-weight: 700; }
-.exit-result-incorrect::before { content: '\2717 '; font-weight: 700; }
-.exit-correct-answer {
-    margin-top: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: #f0fdf4;
-    border-left: 3px solid #10b981;
-    border-radius: 0 0.375rem 0.375rem 0;
-    font-size: 0.8125rem;
-    color: #166534;
-}
+/* Exit-ticket modal CSS now lives in templates/tutoring/_partials/exit_modal.html */
 
 /* ── Rich HTML Artifact Rendering ── */
 .artifact-inline {
@@ -1440,17 +1241,8 @@ body {
     .artifact-panel { display: none !important; }
     .media-panel-trigger { max-width: 100%; border: none; }
     .media-panel-trigger img { max-width: 100%; }
-    /* Exit ticket mobile */
+    /* Exit-ticket mobile rules now live in the exit_modal partial. */
     .modal { padding: 0; }
-    .modal-content.exit-ticket { border-radius: 0; max-width: 100%; max-height: 100vh; padding: 1rem; }
-    .option { min-height: 48px; padding: 0.75rem 1rem; font-size: 1rem; }
-    .exit-blank-input { width: 100%; max-width: 160px; font-size: 16px; padding: 0.5rem; }
-    .matching-row { flex-direction: column; align-items: stretch; gap: 0.375rem; }
-    .matching-arrow { display: none; }
-    .matching-left { text-align: center; }
-    .matching-select { width: 100%; font-size: 16px; padding: 0.625rem; }
-    .exit-textarea { font-size: 16px; min-height: 100px; }
-    .section-instruction { margin-left: 0; }
 }
 @media (max-width: 640px) {
     .chat-messages { padding: 1rem 0.75rem; }
@@ -1474,8 +1266,53 @@ body {
 const lessonId = {{ lesson.id }};
 const IS_MATH_LESSON = {% if is_math_lesson %}true{% else %}false{% endif %};
 let sessionId = null;
-let exitTicketData = null;
-let exitAnswers = {};
+// exitTicketData / exitAnswers / pendingPlots are owned by the
+// _partials/exit_modal.html script; we read/write them via
+// window.* so the bindings stay in sync.
+
+// Wire the shared exit-ticket modal: where to POST and what to do
+// after results are painted. Set BEFORE any user action — the partial
+// reads it lazily inside submitExitTicket().
+window.EXIT_MODAL_CONFIG = {
+    submitUrl: () => `/tutor/api/chat/${sessionId}/exit-ticket/`,
+    onResult: function(data, container) {
+        if (!data || !data.exit_ticket) return;
+        const competency = data.exit_ticket.competency || null;
+        const results = data.exit_ticket.results || [];
+        const score = competency ? competency.score : results.filter(r => r.is_correct).length;
+        const total = competency ? competency.total : results.length;
+        const threshold = competency ? competency.passing_threshold : 8;
+        const passed = score >= threshold;
+        const scorePct = competency ? Math.round(competency.score_pct * 100) : Math.round(score / Math.max(total, 1) * 100);
+        const thresholdPct = competency ? Math.round(competency.passing_threshold_pct * 100) : Math.round(threshold / Math.max(total, 1) * 100);
+        const bestPct = competency && competency.best_score_pct !== null ? Math.round(competency.best_score_pct * 100) : null;
+        const attempts = competency ? competency.attempts_count : null;
+        const weakConcepts = competency ? competency.weak_concepts : [];
+
+        const summaryDiv = document.createElement('div');
+        summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid #e4e4e7;';
+        const weakHtml = (weakConcepts && weakConcepts.length)
+            ? `<div style="font-size:0.85rem;color:#71717a;margin-top:0.75rem;">Areas to revisit: <strong>${weakConcepts.slice(0, 3).map(c => c).join(', ')}</strong></div>`
+            : '';
+        const bestHtml = (bestPct !== null)
+            ? `<div style="font-size:0.8125rem;color:#71717a;margin-top:0.25rem;">Your best: <strong>${bestPct}%</strong> · ${attempts} attempt${attempts === 1 ? '' : 's'}</div>`
+            : '';
+        summaryDiv.innerHTML = `
+            <div style="font-size:2rem;font-weight:800;color:${passed ? '#10b981' : '#ef4444'};margin-bottom:0.25rem;">${score} / ${total}</div>
+            <div style="font-size:0.95rem;color:#71717a;">${scorePct}% — passing threshold ${thresholdPct}%</div>
+            ${bestHtml}
+            <div style="font-size:1rem;color:#71717a;margin-top:1rem;margin-bottom:0.5rem;">${passed ? 'Great work! You passed!' : 'Keep going — review the explanations above, then continue.'}</div>
+            ${weakHtml}
+            <div style="font-size:0.8125rem;color:#a1a1aa;margin-top:1rem;margin-bottom:1.5rem;">Scroll up to review your answers and explanations.</div>
+            <button onclick="continueAfterExit()" class="btn btn-primary" style="font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;">
+                ${passed ? '✓ Continue' : '→ Continue to Review'}
+            </button>
+        `;
+        container.appendChild(summaryDiv);
+        summaryDiv.scrollIntoView({behavior: 'smooth'});
+        window._exitResultData = data;
+    },
+};
 
 // Auto-resize sandboxed artifact iframes via postMessage
 window.addEventListener('message', (e) => {
@@ -2519,385 +2356,12 @@ function updateStreamingMessage(div, content, media = []) {
     scrollToBottom();
 }
 
-const EXIT_SECTIONS = [
-    { key: 'mcq', letter: 'A', name: 'Multiple Choice', instruction: 'Choose the best answer for each question.' },
-    { key: 'fill_in_blank', letter: 'B', name: 'Fill in the Blanks', instruction: 'Complete each sentence by filling in the missing word(s).' },
-    { key: 'matching', letter: 'C', name: 'Matching', instruction: 'Match each item on the left with its correct pair on the right.' },
-    { key: 'written', letter: 'D', name: 'Written Response', instruction: 'Write your answer in the space provided.' },
-];
+// EXIT_SECTIONS, pendingPlots, showExitTicket, selectOption,
+// collectBlankAnswer, collectMatchingAnswer, collectTextAnswer,
+// insertMathSymbol, checkExitSubmitReady, submitExitTicket,
+// showExitResults, drainPendingPlots, plotSpecAsTable, escapeHtml,
+// and getCookie all live in templates/tutoring/_partials/exit_modal.html.
 
-// Holds plot specs that need to be rendered after the exit-ticket DOM
-// is built. Drained by drainPendingPlots() once the modal is shown.
-let pendingPlots = [];
-
-function showExitTicket() {
-    if (!exitTicketData) return;
-    document.getElementById('input-area').style.display = 'none';
-
-    const container = document.getElementById('exit-questions');
-    container.innerHTML = '';
-    pendingPlots = [];
-
-    // Progress indicator
-    const totalQ = exitTicketData.questions.length;
-    container.innerHTML = `<div class="exit-progress">
-        <div class="exit-progress-text" id="exit-progress-text">0 of ${totalQ} answered</div>
-        <div class="exit-progress-bar"><div class="exit-progress-fill" id="exit-progress-fill" style="width:0%"></div></div>
-    </div>`;
-
-    // Group questions by section (keep original flat index for grading).
-    // short_numeric (Layer 4 templated math questions) shares the
-    // 'written' bucket — same render branch (text input + math
-    // toolbar), same answer-collection helper.
-    const buckets = { mcq: [], fill_in_blank: [], matching: [], written: [] };
-    const WRITTEN_TYPES = new Set(['short_answer', 'data_interpretation', 'short_numeric']);
-    exitTicketData.questions.forEach((q, origIdx) => {
-        const qType = q.question_type || 'mcq';
-        const bucket = WRITTEN_TYPES.has(qType) ? 'written' : qType;
-        if (buckets[bucket]) buckets[bucket].push({ q, origIdx });
-        else buckets.mcq.push({ q, origIdx }); // fallback
-    });
-
-    // Render sections
-    EXIT_SECTIONS.forEach(sec => {
-        const items = buckets[sec.key];
-        if (!items || items.length === 0) return;
-
-        const sectionDiv = document.createElement('div');
-        sectionDiv.className = 'exit-section';
-        sectionDiv.innerHTML = `
-            <div class="exit-section-header">
-                <span class="section-letter section-letter-${sec.letter}">${sec.letter}</span>
-                <span class="section-name">${sec.name}</span>
-            </div>
-            <p class="section-instruction">${sec.instruction}</p>
-        `;
-
-        items.forEach((item, secIdx) => {
-            const { q, origIdx } = item;
-            const qType = q.question_type || 'mcq';
-            const qLabel = `${sec.letter}${secIdx + 1}`;
-            const div = document.createElement('div');
-            div.className = 'exit-question';
-            div.setAttribute('data-original-q', origIdx);
-
-            let bodyHTML = '';
-
-            // Render generated figure if available (any question type)
-            const qAnswerData = q.answer_data || {};
-            if (qAnswerData.figure_url) {
-                bodyHTML += `<div style="text-align:center;margin-bottom:0.75rem;">
-                    <img src="${qAnswerData.figure_url}" style="max-width:100%;border-radius:0.5rem;border:1px solid #e4e4e7;" alt="Question figure">
-                </div>`;
-            }
-
-            if (qType === 'mcq') {
-                // Source-based MCQ: render source HTML above options
-                let sourceHTML = '';
-                if (q.source) {
-                    if (/<[a-z][\s\S]*>/i.test(q.source) && window.DOMPurify) {
-                        const clean = DOMPurify.sanitize(q.source);
-                        sourceHTML = `<div class="data-description-rich" style="margin-bottom:0.75rem;"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:200px;border:none;"></iframe></div>`;
-                    } else {
-                        sourceHTML = `<div class="data-description" style="margin-bottom:0.75rem;">${q.source}</div>`;
-                    }
-                }
-                bodyHTML = `${sourceHTML}<div class="options" data-q="${origIdx}">
-                    ${(q.options || []).map(opt => `
-                        <div class="option" data-letter="${opt.letter}" onclick="selectOption(${origIdx}, '${opt.letter}', this)">
-                            <span class="letter">${opt.letter}</span>
-                            <span>${opt.text}</span>
-                        </div>
-                    `).join('')}
-                </div>`;
-            } else if (qType === 'fill_in_blank') {
-                const ad = q.answer_data || {};
-                const tpl = (ad.text_template || '').replace(/___/g, () =>
-                    `<input type="text" class="exit-blank-input" data-q="${origIdx}" placeholder="..." oninput="collectBlankAnswer(${origIdx})">`
-                );
-                bodyHTML = `<div class="fill-blank-body" data-q="${origIdx}">${tpl}</div>`;
-            } else if (qType === 'matching') {
-                const ad = q.answer_data || {};
-                const pairs = ad.pairs || [];
-                const allRights = pairs.map(p => p.right).concat(ad.distractor_rights || []);
-                allRights.sort(() => Math.random() - 0.5);
-                const optionsHTML = allRights.map(r => `<option value="${r}">${r}</option>`).join('');
-                bodyHTML = `<div class="matching-body" data-q="${origIdx}">
-                    ${pairs.map((p, pi) => `
-                        <div class="matching-row">
-                            <span class="matching-left">${p.left}</span>
-                            <span class="matching-arrow">&rarr;</span>
-                            <select class="matching-select" data-q="${origIdx}" data-pair="${pi}" onchange="collectMatchingAnswer(${origIdx})">
-                                <option value="">Select...</option>
-                                ${optionsHTML}
-                            </select>
-                        </div>
-                    `).join('')}
-                </div>`;
-            } else if (qType === 'short_answer' || qType === 'data_interpretation' || qType === 'short_numeric') {
-                const ad = q.answer_data || {};
-                let dataDesc = '';
-                // Preferred path: server-rendered SVG from a figure_spec.
-                // Bar/line/pie/scatter sized correctly from actual values.
-                if (ad.figure_svg) {
-                    dataDesc = `<div class="data-description-figure" style="background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:8px;margin-bottom:8px;">`
-                        + ad.figure_svg
-                        + `</div>`;
-                } else if (ad.figure_url) {
-                    // Pipeline-generated raster image fallback.
-                    const altText = escapeHtml(ad.figure_description || 'Question figure');
-                    dataDesc = `<div class="data-description-figure" style="text-align:center;margin-bottom:8px;">`
-                        + `<img src="${escapeHtml(ad.figure_url)}" alt="${altText}" style="max-width:100%;border-radius:8px;border:1px solid #e4e4e7;">`
-                        + (ad.figure_source ? `<div style="font-size:0.7rem;color:#71717a;margin-top:4px;">Source: ${escapeHtml(ad.figure_source)}</div>` : ``)
-                        + `</div>`;
-                } else if (ad.data_description) {
-                    // HTML / plain-text data block (kept for non-chartable
-                    // tabular reference data).
-                    if (/<[a-z][\s\S]*>/i.test(ad.data_description) && window.DOMPurify) {
-                        const clean = DOMPurify.sanitize(ad.data_description);
-                        dataDesc = `<div class="data-description-rich"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:250px;border:none;"></iframe></div>`;
-                    } else {
-                        dataDesc = `<div class="data-description">${ad.data_description}</div>`;
-                    }
-                } else if (ad.figure_description) {
-                    // No image generated yet — fall back to the textual
-                    // description so the question is still answerable.
-                    dataDesc = `<div class="data-description" style="font-style:italic;color:#52525b;">${escapeHtml(ad.figure_description)}</div>`;
-                }
-                // Math-symbol picker. Students rarely produce °/π/√/etc.
-                // from a phone keyboard; the grader normalises symbols
-                // (apps/tutoring/summative_grading.py::_math_norm) but the
-                // picker is still helpful when a teacher's expected
-                // working uses them. Click inserts at cursor position.
-                const mathBar = `
-                    <div class="math-toolbar" data-q="${origIdx}" style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-bottom:0.4rem;">
-                        ${['°','π','√','²','³','±','≤','≥','≠','×','÷','½','¼','¾'].map(sym =>
-                            `<button type="button" class="math-sym-btn" onclick="insertMathSymbol(${origIdx}, '${sym}')" style="font-size:0.95rem;padding:0.18rem 0.5rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">${sym}</button>`
-                        ).join('')}
-                    </div>`;
-                bodyHTML = `${dataDesc}${mathBar}
-                <textarea class="exit-textarea" data-q="${origIdx}" rows="3" placeholder="Type your answer..." oninput="collectTextAnswer(${origIdx}, this)"></textarea>`;
-            }
-
-            // Fill-in-blank renders the sentence with input fields
-            // EMBEDDED in bodyHTML (text_template with ___ replaced
-            // by inputs). Showing q.question as a separate stem above
-            // would duplicate the same sentence — once with "___" and
-            // once with the input fields. Suppress the stem div for
-            // fill_in_blank; the body carries the full question.
-            const stemDiv = (qType === 'fill_in_blank')
-                ? ''
-                : `<div class="question-text">${q.question}</div>`;
-            div.innerHTML = `
-                <div class="question-num">${qLabel}</div>
-                ${stemDiv}
-                ${bodyHTML}
-            `;
-            sectionDiv.appendChild(div);
-        });
-
-        container.appendChild(sectionDiv);
-    });
-
-    document.getElementById('exit-modal').style.display = 'flex';
-
-    // Render Chart.js plots for any data_interpretation questions that
-    // shipped a plot_spec. Deferred so the canvases are guaranteed to
-    // be in the DOM when Chart.js looks them up.
-    setTimeout(drainPendingPlots, 0);
-
-    // Auto-resize iframes to fit their content
-    setTimeout(function() {
-        document.querySelectorAll('.data-description-rich iframe').forEach(function(iframe) {
-            iframe.addEventListener('load', function() {
-                try {
-                    var h = iframe.contentDocument.documentElement.scrollHeight;
-                    iframe.style.height = (h + 16) + 'px';
-                } catch(e) {}
-            });
-            // Trigger for already-loaded iframes
-            try {
-                if (iframe.contentDocument && iframe.contentDocument.documentElement) {
-                    var h = iframe.contentDocument.documentElement.scrollHeight;
-                    if (h > 50) iframe.style.height = (h + 16) + 'px';
-                }
-            } catch(e) {}
-        });
-    }, 200);
-}
-
-function selectOption(qIndex, letter, el) {
-    el.parentElement.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
-    el.classList.add('selected');
-    exitAnswers[qIndex] = letter;
-    checkExitSubmitReady();
-}
-
-function collectBlankAnswer(qIndex) {
-    const inputs = document.querySelectorAll(`.exit-blank-input[data-q="${qIndex}"]`);
-    const values = Array.from(inputs).map(inp => inp.value.trim());
-    exitAnswers[qIndex] = values;
-    checkExitSubmitReady();
-}
-
-function collectMatchingAnswer(qIndex) {
-    const selects = document.querySelectorAll(`.matching-select[data-q="${qIndex}"]`);
-    const q = exitTicketData.questions[qIndex];
-    const pairs = (q.answer_data || {}).pairs || [];
-    const mapping = {};
-    selects.forEach((sel, idx) => {
-        if (sel.value && idx < pairs.length) mapping[pairs[idx].left] = sel.value;
-    });
-    exitAnswers[qIndex] = mapping;
-    selects.forEach(sel => {
-        const row = sel.closest('.matching-row');
-        if (row) row.classList.toggle('answered', !!sel.value);
-    });
-    checkExitSubmitReady();
-}
-
-function collectTextAnswer(qIndex, el) {
-    exitAnswers[qIndex] = el.value.trim();
-    // Auto-grow textarea
-    el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
-    checkExitSubmitReady();
-}
-
-// Insert a math symbol at the cursor position of the MAIN chat input
-// (#user-input). Mirrors insertMathSymbol's behaviour for the
-// per-question textareas, but targets the conversation textarea so
-// students typing answers DURING the lesson can also drop math
-// symbols without fighting their phone keyboard.
-function insertChatSymbol(sym) {
-    const ta = document.getElementById('user-input');
-    if (!ta) return;
-    const start = ta.selectionStart || 0;
-    const end = ta.selectionEnd || 0;
-    const before = ta.value.slice(0, start);
-    const after = ta.value.slice(end);
-    ta.value = before + sym + after;
-    const caret = start + sym.length;
-    ta.focus();
-    ta.setSelectionRange(caret, caret);
-    // Auto-resize logic mirrors the textarea's input listener.
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-}
-
-// Insert a math symbol at the cursor position of the answer textarea
-// for question qIndex. The grader normalises math symbols on the
-// server side too, so typing "38°" and "38" are equivalent — but the
-// picker is still useful when a teacher's expected working uses
-// symbols and students want to mirror the format.
-function insertMathSymbol(qIndex, sym) {
-    const ta = document.querySelector(`textarea.exit-textarea[data-q="${qIndex}"]`);
-    if (!ta) return;
-    const start = ta.selectionStart || 0;
-    const end = ta.selectionEnd || 0;
-    const before = ta.value.slice(0, start);
-    const after = ta.value.slice(end);
-    ta.value = before + sym + after;
-    const caret = start + sym.length;
-    ta.focus();
-    ta.setSelectionRange(caret, caret);
-    // Re-fire collection + auto-grow
-    collectTextAnswer(qIndex, ta);
-}
-
-function checkExitSubmitReady() {
-    const total = exitTicketData.questions.length;
-    let answered = 0;
-    for (let i = 0; i < total; i++) {
-        const a = exitAnswers[i];
-        if (a !== undefined && a !== '' && a !== null) {
-            if (Array.isArray(a) && a.some(v => v)) answered++;
-            else if (typeof a === 'object' && !Array.isArray(a) && Object.keys(a).length > 0) answered++;
-            else if (typeof a === 'string' && a) answered++;
-        }
-    }
-    document.getElementById('submit-exit').disabled = answered < total;
-    // Update progress indicator
-    const progText = document.getElementById('exit-progress-text');
-    const progFill = document.getElementById('exit-progress-fill');
-    if (progText) progText.textContent = `${answered} of ${total} answered`;
-    if (progFill) progFill.style.width = `${(answered / total) * 100}%`;
-}
-
-async function submitExitTicket() {
-    const answers = [];
-    for (let i = 0; i < exitTicketData.questions.length; i++) {
-        answers.push(exitAnswers[i] || '');
-    }
-
-    try {
-        // Exit-ticket submit is critical (lots of student work). Use
-        // fetchWithRetry so a transient blip doesn't lose the answers.
-        const fetcher = (window.NetHelpers && window.NetHelpers.fetchWithRetry) || fetch;
-        const response = await fetcher(`/tutor/api/chat/${sessionId}/exit-ticket/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            body: JSON.stringify({ answers }),
-            timeoutMs: 90000,
-            retries: 3,
-        });
-
-        const data = await response.json();
-
-        if (data.exit_ticket && data.exit_ticket.results) {
-            showExitResults(data.exit_ticket.results);
-
-            // Competency block from the server (C5). Falls back to client
-            // compute for older servers that haven't been upgraded yet.
-            const competency = data.exit_ticket.competency || null;
-            const score = competency ? competency.score : data.exit_ticket.results.filter(r => r.is_correct).length;
-            const total = competency ? competency.total : data.exit_ticket.results.length;
-            const threshold = competency ? competency.passing_threshold : 8;
-            const passed = score >= threshold;
-            const scorePct = competency ? Math.round(competency.score_pct * 100) : Math.round(score / Math.max(total, 1) * 100);
-            const thresholdPct = competency ? Math.round(competency.passing_threshold_pct * 100) : Math.round(threshold / Math.max(total, 1) * 100);
-            const bestPct = competency && competency.best_score_pct !== null ? Math.round(competency.best_score_pct * 100) : null;
-            const attempts = competency ? competency.attempts_count : null;
-            const weakConcepts = competency ? competency.weak_concepts : [];
-
-            const container = document.getElementById('exit-questions');
-            const summaryDiv = document.createElement('div');
-            summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid #e4e4e7;';
-            const weakHtml = (weakConcepts && weakConcepts.length)
-                ? `<div style="font-size:0.85rem;color:#71717a;margin-top:0.75rem;">Areas to revisit: <strong>${weakConcepts.slice(0, 3).map(c => c).join(', ')}</strong></div>`
-                : '';
-            const bestHtml = (bestPct !== null)
-                ? `<div style="font-size:0.8125rem;color:#71717a;margin-top:0.25rem;">Your best: <strong>${bestPct}%</strong> · ${attempts} attempt${attempts === 1 ? '' : 's'}</div>`
-                : '';
-            summaryDiv.innerHTML = `
-                <div style="font-size:2rem;font-weight:800;color:${passed ? '#10b981' : '#ef4444'};margin-bottom:0.25rem;">${score} / ${total}</div>
-                <div style="font-size:0.95rem;color:#71717a;">${scorePct}% — passing threshold ${thresholdPct}%</div>
-                ${bestHtml}
-                <div style="font-size:1rem;color:#71717a;margin-top:1rem;margin-bottom:0.5rem;">${passed ? 'Great work! You passed!' : 'Keep going — review the explanations above, then continue.'}</div>
-                ${weakHtml}
-                <div style="font-size:0.8125rem;color:#a1a1aa;margin-top:1rem;margin-bottom:1.5rem;">Scroll up to review your answers and explanations.</div>
-                <button onclick="continueAfterExit()" class="btn btn-primary" style="font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;">
-                    ${passed ? '✓ Continue' : '→ Continue to Review'}
-                </button>
-            `;
-            container.appendChild(summaryDiv);
-            summaryDiv.scrollIntoView({behavior: 'smooth'});
-
-            // Hide submit button
-            document.getElementById('submit-exit').style.display = 'none';
-
-            // Store data for continue handler
-            window._exitResultData = data;
-        }
-
-    } catch (error) {
-        console.error('Submit error:', error);
-        alert('Failed to submit. Please try again.');
-    }
-}
 
 function continueAfterExit() {
     const data = window._exitResultData;
@@ -2911,204 +2375,7 @@ function continueAfterExit() {
     }
 }
 
-// ─── Chart.js plot rendering for exit-ticket data_interpretation questions ───
 
-const _PLOT_COLORS = [
-    'rgba(99, 102, 241, 0.7)',   // indigo
-    'rgba(16, 185, 129, 0.7)',   // emerald
-    'rgba(245, 158, 11, 0.7)',   // amber
-    'rgba(239, 68, 68, 0.7)',    // red
-    'rgba(139, 92, 246, 0.7)',   // violet
-    'rgba(20, 184, 166, 0.7)',   // teal
-    'rgba(236, 72, 153, 0.7)',   // pink
-];
-
-function escapeHtml(s) {
-    if (s == null) return '';
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-/**
- * Convert a normalized plot_spec into a Chart.js config.
- * Spec shape (LLM-friendly, kept simple):
- *   {
- *     type: 'bar' | 'line' | 'pie' | 'doughnut' | 'scatter',
- *     title?: string,
- *     x_label?: string, y_label?: string,
- *     labels?: [string],
- *     datasets: [
- *       { label: string, data?: [number], points?: [[x,y]], color?: string }
- *     ],
- *     source?: string,
- *   }
- */
-function specToChartConfig(spec) {
-    const allowed = new Set(['bar', 'line', 'pie', 'doughnut', 'scatter']);
-    const type = allowed.has(spec.type) ? spec.type : 'bar';
-    const datasets = (spec.datasets || []).map((ds, i) => {
-        const color = ds.color || _PLOT_COLORS[i % _PLOT_COLORS.length];
-        const base = {
-            label: ds.label || ('Series ' + (i + 1)),
-            backgroundColor: color,
-            borderColor: color.replace(/,\s*0\.7\)/, ', 1)'),
-            borderWidth: 2,
-        };
-        if (type === 'scatter' && Array.isArray(ds.points)) {
-            base.data = ds.points.map(([x, y]) => ({ x, y }));
-            base.showLine = false;
-            base.pointRadius = 5;
-        } else {
-            base.data = Array.isArray(ds.data) ? ds.data : [];
-            if (type === 'line') {
-                base.tension = 0.2;
-                base.fill = false;
-            }
-        }
-        return base;
-    });
-
-    const showLegend = datasets.length > 1 || ['pie', 'doughnut'].includes(type);
-    const config = {
-        type: type,
-        data: { labels: spec.labels || [], datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: showLegend, position: 'bottom' },
-            },
-            scales: ['pie', 'doughnut'].includes(type) ? {} : {
-                x: {
-                    title: { display: !!spec.x_label, text: spec.x_label || '' },
-                },
-                y: {
-                    title: { display: !!spec.y_label, text: spec.y_label || '' },
-                    beginAtZero: true,
-                },
-            },
-        },
-    };
-    return config;
-}
-
-function drainPendingPlots() {
-    if (typeof Chart === 'undefined') {
-        // Chart.js failed to load — fall back gracefully by writing
-        // the spec as a simple table.
-        pendingPlots.forEach(p => {
-            const canvas = document.getElementById(p.canvasId);
-            if (canvas && canvas.parentElement) {
-                canvas.parentElement.innerHTML = plotSpecAsTable(p.spec);
-            }
-        });
-        pendingPlots = [];
-        return;
-    }
-    pendingPlots.forEach(p => {
-        const canvas = document.getElementById(p.canvasId);
-        if (!canvas) return;
-        try {
-            new Chart(canvas, specToChartConfig(p.spec));
-        } catch (e) {
-            console.warn('Chart render failed', e);
-            if (canvas.parentElement) {
-                canvas.parentElement.innerHTML = plotSpecAsTable(p.spec);
-            }
-        }
-    });
-    pendingPlots = [];
-}
-
-function plotSpecAsTable(spec) {
-    // No-Chart-js fallback: render the data as a plain HTML table so
-    // the question is still answerable.
-    const headers = ['', ...(spec.labels || [])];
-    const rows = (spec.datasets || []).map(ds => {
-        const cells = (ds.data || ds.points || []).map(v => Array.isArray(v) ? v.join(',') : v);
-        return `<tr><th>${escapeHtml(ds.label)}</th>${cells.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`;
-    }).join('');
-    return `<table class="data-description-fallback" style="width:100%;border-collapse:collapse">
-        <thead><tr>${headers.map(h => `<th style="padding:6px 10px;border:1px solid #e4e4e7;background:#f4f4f5;">${escapeHtml(h)}</th>`).join('')}</tr></thead>
-        <tbody>${rows}</tbody>
-    </table>`;
-}
-
-function showExitResults(results) {
-    results.forEach(r => {
-        const qType = r.question_type || 'mcq';
-        const qDiv = document.querySelector(`.exit-question[data-original-q="${r.index}"]`);
-        if (!qDiv) return;
-
-        // Disable all inputs
-        qDiv.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
-        qDiv.querySelectorAll('.option').forEach(opt => { opt.style.pointerEvents = 'none'; });
-
-        if (qType === 'mcq') {
-            const options = qDiv.querySelector('.options');
-            if (options) {
-                options.querySelectorAll('.option').forEach(opt => {
-                    const letter = opt.dataset.letter;
-                    if (r.is_correct && letter === r.selected) {
-                        opt.classList.add('correct');
-                    } else if (!r.is_correct && letter === r.selected) {
-                        opt.classList.add('incorrect');
-                    }
-                    // Do NOT highlight the correct answer when wrong
-                });
-            }
-        } else if (qType === 'fill_in_blank') {
-            const inputs = qDiv.querySelectorAll('.exit-blank-input');
-            inputs.forEach(inp => {
-                if (r.is_correct) {
-                    inp.style.borderColor = '#10b981';
-                    inp.style.background = '#d1fae5';
-                } else {
-                    inp.style.borderColor = '#ef4444';
-                    inp.style.background = '#fee2e2';
-                }
-            });
-            // Do NOT show correct answers — just indicate wrong
-        } else if (qType === 'matching') {
-            const selects = qDiv.querySelectorAll('.matching-select');
-            selects.forEach(sel => {
-                if (r.is_correct) {
-                    sel.style.borderColor = '#10b981';
-                    sel.style.background = '#d1fae5';
-                } else {
-                    sel.style.borderColor = '#ef4444';
-                    sel.style.background = '#fee2e2';
-                }
-            });
-            // Do NOT show correct pairs
-        } else if (qType === 'short_answer' || qType === 'data_interpretation') {
-            const textarea = qDiv.querySelector('.exit-textarea');
-            if (textarea) {
-                textarea.style.borderColor = r.is_correct ? '#10b981' : '#ef4444';
-                textarea.style.background = r.is_correct ? '#d1fae5' : '#fee2e2';
-            }
-            // Do NOT show model answer or keywords
-        }
-
-        // Add result indicator — correct gets ✓, wrong gets explanation as hint (not the answer)
-        const indicator = document.createElement('div');
-        indicator.className = r.is_correct ? 'exit-result-correct' : 'exit-result-incorrect';
-        if (r.is_correct) {
-            indicator.textContent = 'Correct!';
-        } else {
-            // Show explanation as a hint — helps student understand WHY they're wrong
-            // without giving the answer directly
-            indicator.innerHTML = r.explanation
-                ? '<strong>Hint:</strong> ' + r.explanation
-                : 'Not quite — review this topic during remediation.';
-        }
-        qDiv.appendChild(indicator);
-    });
-}
 
 function showCompletion(message, gamification) {
     document.getElementById('input-area').style.display = 'none';
@@ -3182,20 +2449,6 @@ function scrollToBottom() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function getCookie(name) {
-    let value = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let c of cookies) {
-            c = c.trim();
-            if (c.startsWith(name + '=')) {
-                value = decodeURIComponent(c.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return value;
-}
 
 // =============================================================================
 // ARTIFACT PANEL — EXPAND + ZOOM + PAN

@@ -5,6 +5,7 @@ Tutoring Views - Web endpoints for the chat-based conversational tutor.
 import json
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
@@ -2000,11 +2001,12 @@ def summative_review(request, course_id, attempt_id):
 
 @login_required
 def lesson_pretest(request, lesson_id):
-    """GET: render the pre-test form (10 random questions).
-    POST: grade, save attempt, route to catalog (pass) or tutor (fail)."""
+    """GET: render the pre-test page (uses the shared exit-ticket modal).
+    POST (JSON): grade, save attempt, return JSON with redirect URL."""
     from apps.tutoring.models import (
         ExitTicket, ExitTicketQuestion, ExitTicketAttempt, StudentLessonProgress,
     )
+    import json as _json
     import random as _random
 
     institution = get_user_institution(request.user)
@@ -2032,28 +2034,46 @@ def lesson_pretest(request, lesson_id):
         return redirect('tutoring:catalog')
 
     PRETEST_SIZE = 10
+    catalog_url = reverse('tutoring:catalog')
+    tutor_url = reverse('tutoring:tutor_interface', kwargs={'lesson_id': lesson.id})
 
     if request.method == 'POST':
-        # Grade. Selected IDs come from a hidden field set on GET.
-        selected_ids = [
-            int(x) for x in (request.POST.get('selected_question_ids') or '').split(',')
-            if x.strip().isdigit()
-        ]
+        # Modal posts JSON: { answers: [...], selected_question_ids: [...] }.
+        # answers[i] aligns with selected_question_ids[i] — same flat index
+        # the modal uses internally.
+        try:
+            payload = _json.loads(request.body.decode('utf-8') or '{}')
+        except (UnicodeDecodeError, ValueError):
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+
+        raw_ids = payload.get('selected_question_ids') or []
+        selected_ids = []
+        for x in raw_ids:
+            try:
+                selected_ids.append(int(x))
+            except (TypeError, ValueError):
+                continue
         if not selected_ids:
-            django_messages.error(request, "Pre-test session expired. Please retry.")
-            return redirect('tutoring:lesson_pretest', lesson_id=lesson.id)
+            return JsonResponse({'error': 'pretest_session_expired'}, status=400)
+
+        answers = payload.get('answers') or []
+        if len(answers) != len(selected_ids):
+            return JsonResponse({'error': 'answer_count_mismatch'}, status=400)
 
         questions = list(ExitTicketQuestion.objects.filter(id__in=selected_ids))
         q_by_id = {q.id: q for q in questions}
-        ordered = [q_by_id[qid] for qid in selected_ids if qid in q_by_id]
+        # Preserve the order the client used (matches its `answers` array).
+        pairs = [(qid, ans) for qid, ans in zip(selected_ids, answers) if qid in q_by_id]
 
         correct = 0
         per_question = []
+        results = []
         achieved_eos = set()
         failed_eos = set()
-        for q in ordered:
-            student_answer = (request.POST.get(f'q_{q.id}') or '').strip()
-            is_correct = _grade_pretest_question(q, student_answer)
+        for index, (qid, raw_answer) in enumerate(pairs):
+            q = q_by_id[qid]
+            answer_str = _normalize_pretest_answer(q, raw_answer)
+            is_correct = _grade_pretest_question(q, answer_str)
             if is_correct:
                 correct += 1
             tag = (q.concept_tag or '').strip()
@@ -2062,18 +2082,24 @@ def lesson_pretest(request, lesson_id):
             per_question.append({
                 'question_id': q.id,
                 'concept_tag': tag,
-                'student_answer': student_answer,
+                'student_answer': answer_str,
                 'correct': is_correct,
+            })
+            results.append({
+                'index': index,
+                'question_type': q.question_type or 'mcq',
+                'is_correct': is_correct,
+                'selected': raw_answer if isinstance(raw_answer, str) else '',
+                'explanation': '',  # No answer leak before the tutor session.
             })
 
         passing = exit_ticket.passing_score or 8
-        # Scale the threshold to the pre-test size if the configured
-        # passing_score was set for a 10-question post-test.
         if PRETEST_SIZE != 10 and passing > PRETEST_SIZE:
             passing = max(1, int(round(passing * PRETEST_SIZE / 10)))
+        total = len(pairs)
         passed = correct >= passing
 
-        attempt = ExitTicketAttempt.objects.create(
+        ExitTicketAttempt.objects.create(
             exit_ticket=exit_ticket,
             student=request.user,
             session=None,  # diagnostic happens before any tutor session
@@ -2081,11 +2107,11 @@ def lesson_pretest(request, lesson_id):
             score=correct,
             passed=passed,
             answers={
-                'selected_question_ids': selected_ids,
+                'selected_question_ids': [qid for qid, _ in pairs],
                 'per_question': per_question,
                 'achieved_eos': sorted(achieved_eos),
                 'failed_eos': sorted(failed_eos),
-                'total': len(ordered),
+                'total': total,
                 'passing_score': passing,
             },
             completed_at=timezone.now(),
@@ -2094,22 +2120,20 @@ def lesson_pretest(request, lesson_id):
         if passed:
             # Lesson considered mastered — pre-test demonstrated the
             # competency. Mirrors _update_competency from the engine.
-            score_pct = correct / len(ordered) if ordered else 0.0
+            score_pct = correct / total if total else 0.0
             score_pct = max(0.0, min(1.0, round(score_pct, 4)))
             sess_inst = lesson.unit.course.institution if lesson.unit else None
-            progress, _ = StudentLessonProgress.objects.get_or_create(
+            prog, _ = StudentLessonProgress.objects.get_or_create(
                 student=request.user,
                 lesson=lesson,
                 defaults={'institution': sess_inst, 'mastery_level': 'mastered'},
             )
-            # Latest score wins (mirrors _update_competency in the engine).
-            progress.best_score = score_pct
-            progress.attempts_count = (progress.attempts_count or 0) + 1
-            progress.last_attempt_at = timezone.now()
-            progress.mastery_level = 'mastered'
-            progress.save()
+            prog.best_score = score_pct
+            prog.attempts_count = (prog.attempts_count or 0) + 1
+            prog.last_attempt_at = timezone.now()
+            prog.mastery_level = 'mastered'
+            prog.save()
 
-            # Refresh skills snapshot so the next lesson's tutor sees this.
             try:
                 from apps.tutoring.competency_tracker import refresh_student_snapshot
                 if lesson.unit and lesson.unit.course:
@@ -2117,20 +2141,23 @@ def lesson_pretest(request, lesson_id):
             except Exception:
                 pass
 
-            django_messages.success(
-                request,
-                f"🎯 Pre-test passed ({correct}/{len(ordered)}) — '{lesson.title}' marked complete!",
-            )
-            return redirect('tutoring:catalog')
+            message = f"Pre-test passed ({correct}/{total}) — '{lesson.title}' marked complete!"
+            redirect_url = catalog_url
+        else:
+            message = f"Got {correct}/{total}. Let's work on the parts you missed."
+            redirect_url = tutor_url
 
-        # Failed: route to tutor with the diagnostic primed. The
-        # engine reads the most recent DIAGNOSTIC attempt on session
-        # init and surfaces it in a [PRE-TEST RESULT] prompt block.
-        django_messages.info(
-            request,
-            f"Got {correct}/{len(ordered)}. Let's work on the parts you missed.",
-        )
-        return redirect('tutoring:tutor_interface', lesson_id=lesson.id)
+        return JsonResponse({
+            'passed': passed,
+            'score': correct,
+            'total': total,
+            'passing_score': passing,
+            'message': message,
+            'redirect_url': redirect_url,
+            'exit_ticket': {
+                'results': results,
+            },
+        })
 
     # GET — sample 10 questions and render. Sample anew each visit so a
     # student abandoning + retrying doesn't see the same set.
@@ -2146,12 +2173,63 @@ def lesson_pretest(request, lesson_id):
         return redirect('tutoring:tutor_interface', lesson_id=lesson.id)
 
     sampled = _random.sample(pool, PRETEST_SIZE)
-    return render(request, 'tutoring/diagnostic.html', {
+    exit_ticket_data = _serialize_pretest_questions_for_modal(sampled)
+    return render(request, 'tutoring/pretest.html', {
         'lesson': lesson,
-        'questions': sampled,
-        'selected_question_ids': ','.join(str(q.id) for q in sampled),
-        'total': PRETEST_SIZE,
+        'exit_ticket_data': exit_ticket_data,
     })
+
+
+def _serialize_pretest_questions_for_modal(questions):
+    """Build the same shape `_handle_exit_ticket` produces in the engine
+    so the shared exit-modal partial can render the pre-test directly."""
+    out_questions = []
+    for i, q in enumerate(questions):
+        q_type = (q.question_type or 'mcq')
+        q_data = {
+            'index': i,
+            'question_type': q_type,
+            'question': q.question_text,
+        }
+        if q_type == 'mcq':
+            q_data['options'] = [
+                {'letter': 'A', 'text': q.option_a},
+                {'letter': 'B', 'text': q.option_b},
+                {'letter': 'C', 'text': q.option_c},
+                {'letter': 'D', 'text': q.option_d},
+            ]
+            if q.answer_data and q.answer_data.get('source'):
+                q_data['source'] = q.answer_data['source']
+        else:
+            q_data['answer_data'] = q.answer_data or {}
+        out_questions.append(q_data)
+    return {
+        'questions': out_questions,
+        'total': len(out_questions),
+        'selected_question_ids': [q.id for q in questions],
+    }
+
+
+def _normalize_pretest_answer(q, raw_answer) -> str:
+    """The modal posts answers in the same per-type shape the live exit
+    ticket uses; the pretest grader takes a single string. Convert."""
+    import json as _json
+    qtype = (q.question_type or 'mcq').lower()
+    if qtype == 'mcq':
+        return str(raw_answer or '').strip()
+    if qtype == 'fill_in_blank':
+        if isinstance(raw_answer, list):
+            # Single-blank pre-test grading: take first non-empty entry.
+            for v in raw_answer:
+                if str(v).strip():
+                    return str(v).strip()
+            return ''
+        return str(raw_answer or '').strip()
+    if qtype == 'matching':
+        if isinstance(raw_answer, dict):
+            return _json.dumps(raw_answer)
+        return str(raw_answer or '').strip()
+    return str(raw_answer or '').strip()
 
 
 def _grade_pretest_question(q, student_answer: str) -> bool:

@@ -4451,12 +4451,13 @@ def step_edit(request, step_id):
         else:
             step.choices = []
 
-        # Parse hints (one per line)
+        # Parse hints (one per line) → hint_1 / hint_2 / hint_3.
+        # `step.hints` is a read-only @property; assigning to it 500s.
         hints_text = request.POST.get('hints', '')
-        if hints_text.strip():
-            step.hints = [h.strip() for h in hints_text.split('\n') if h.strip()]
-        else:
-            step.hints = []
+        parsed_hints = [h.strip() for h in hints_text.split('\n') if h.strip()] if hints_text.strip() else []
+        step.hint_1 = parsed_hints[0] if len(parsed_hints) > 0 else ''
+        step.hint_2 = parsed_hints[1] if len(parsed_hints) > 1 else ''
+        step.hint_3 = parsed_hints[2] if len(parsed_hints) > 2 else ''
 
         step.save()
 

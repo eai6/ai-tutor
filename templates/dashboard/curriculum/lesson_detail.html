@@ -656,22 +656,24 @@
         <div class="exit-q-card" data-question-id="{{ question.id }}" style="padding: 1rem; background: var(--gray-50); border-radius: 8px; margin-bottom: 1rem; position: relative;">
             <!-- View mode -->
             <div class="q-view">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div style="font-weight: 600; margin-bottom: 0.75rem; flex: 1;">
-                        Q{{ forloop.counter }}: {{ question.question_text }}
-                    </div>
-                    <div style="display: flex; gap: 0.375rem; margin-left: 0.5rem; flex-shrink: 0; flex-wrap: wrap;">
-                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.question_type == 'mcq' %}#e0e7ff{% elif question.question_type == 'fill_in_blank' %}#fce7f3{% elif question.question_type == 'matching' %}#ede9fe{% elif question.question_type == 'short_answer' %}#ecfdf5{% else %}#fff7ed{% endif %};">{{ question.get_question_type_display }}</span>
-                        {% if question.difficulty %}
-                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}#d1fae5{% elif question.difficulty == 'hard' %}#fee2e2{% else %}#fef3c7{% endif %};">{{ question.difficulty }}</span>
-                        {% endif %}
-                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe;" title="Learning objective (broad)">{% if question.concept_tag %}{{ question.concept_tag }}{% else %}<span style="color:#a16207;">no learning objective</span>{% endif %}</span>
-                        {% if question.enabling_objective %}
-                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dcfce7; color: #166534; font-weight: 500;" title="Enabling objective / sub-skill — used for remediation targeting">EO: {{ question.enabling_objective }}</span>
-                        {% else %}
-                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fef3c7; color: #92400e; font-weight: 500;" title="No enabling objective tagged — regenerate the lesson's exit ticket to populate, or edit this question to set it manually">⚠️ no enabling objective</span>
-                        {% endif %}
-                    </div>
+                {# Stem first at full width; badges wrap onto their own row
+                   below. The EO label can be a full sentence, so trying to
+                   share a flex row with it squeezed the stem to ~1 word
+                   per line. #}
+                <div style="font-weight: 600; margin-bottom: 0.5rem;">
+                    Q{{ forloop.counter }}: {{ question.question_text }}
+                </div>
+                <div style="display: flex; gap: 0.375rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.question_type == 'mcq' %}#e0e7ff{% elif question.question_type == 'fill_in_blank' %}#fce7f3{% elif question.question_type == 'matching' %}#ede9fe{% elif question.question_type == 'short_answer' %}#ecfdf5{% else %}#fff7ed{% endif %};">{{ question.get_question_type_display }}</span>
+                    {% if question.difficulty %}
+                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}#d1fae5{% elif question.difficulty == 'hard' %}#fee2e2{% else %}#fef3c7{% endif %};">{{ question.difficulty }}</span>
+                    {% endif %}
+                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe;" title="Learning objective (broad)">{% if question.concept_tag %}{{ question.concept_tag }}{% else %}<span style="color:#a16207;">no learning objective</span>{% endif %}</span>
+                    {% if question.enabling_objective %}
+                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dcfce7; color: #166534; font-weight: 500; max-width: 100%;" title="Enabling objective / sub-skill — used for remediation targeting">EO: {{ question.enabling_objective }}</span>
+                    {% else %}
+                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fef3c7; color: #92400e; font-weight: 500;" title="No enabling objective tagged — regenerate the lesson's exit ticket to populate, or edit this question to set it manually">⚠️ no enabling objective</span>
+                    {% endif %}
                 </div>
 
                 <!-- Full objective references shown below the stem so

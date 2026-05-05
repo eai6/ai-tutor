@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ lesson.title }} — Quick check{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Hide base.html chrome — the modal is the page. */
+    .header { display: none !important; }
+    .container { max-width: 100% !important; padding: 0 !important; }
+    body { background: #f4f4f5; overflow: hidden; }
+
+    .pretest-page {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        background: #f4f4f5;
+    }
+
+    .pretest-topbar {
+        flex-shrink: 0;
+        background: #fff;
+        border-bottom: 1px solid #e4e4e7;
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .pretest-topbar .back-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px; height: 36px;
+        border-radius: 8px;
+        color: #71717a; text-decoration: none;
+    }
+    .pretest-topbar .back-link:hover { background: #f4f4f5; color: #18181b; }
+    .pretest-topbar h1 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #18181b;
+        margin: 0;
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pretest-topbar .skip {
+        font-size: 0.8rem;
+        color: #71717a;
+        text-decoration: none;
+        padding: 0.25rem 0.6rem;
+        border-radius: 999px;
+        border: 1px solid #e4e4e7;
+        white-space: nowrap;
+    }
+    .pretest-topbar .skip:hover { background: #fafafa; color: #18181b; }
+
+    /* The modal renders via the partial; the page underneath stays
+       blank-but-styled so there's never a flash of stem-less content. */
+    .pretest-placeholder {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #a1a1aa;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="exit-modal-shell pretest-page">
+    <div class="pretest-topbar">
+        <a class="back-link" href="{% url 'tutoring:catalog' %}" aria-label="Back to catalog">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </a>
+        <h1>🎯 Quick check — {{ lesson.title }}</h1>
+        <a class="skip" href="{% url 'tutoring:tutor_interface' lesson.id %}">Skip</a>
+    </div>
+
+    <div class="pretest-placeholder">Loading questions…</div>
+
+    {{ exit_ticket_data|json_script:"exit-ticket-data" }}
+    {% include "tutoring/_partials/exit_modal.html" %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    // Read the server-rendered question payload (modal-shape).
+    const payload = JSON.parse(document.getElementById('exit-ticket-data').textContent);
+    window.exitTicketData = payload;
+
+    const PRETEST_URL = "{% url 'tutoring:lesson_pretest' lesson.id %}";
+    const TUTOR_URL = "{% url 'tutoring:tutor_interface' lesson.id %}";
+    const CATALOG_URL = "{% url 'tutoring:catalog' %}";
+
+    window.EXIT_MODAL_CONFIG = {
+        submitUrl: PRETEST_URL,
+        extraBody: { selected_question_ids: payload.selected_question_ids },
+        title: '🎯 Quick check',
+        subtitle: '{{ lesson.title|escapejs }} — {{ exit_ticket_data.total }} questions, ~5 minutes. Pass and the lesson is marked complete; otherwise the tutor focuses on what you missed.',
+        submitButtonLabel: 'Submit pre-test',
+        autoOpen: true,
+        onResult: function(data, container) {
+            const score = (data && data.score) || 0;
+            const total = (data && data.total) || 0;
+            const passed = !!(data && data.passed);
+            const message = (data && data.message) || (passed
+                ? `Pre-test passed (${score}/${total}) — lesson marked complete!`
+                : `Got ${score}/${total}. Let's work on the parts you missed.`);
+            const redirectUrl = (data && data.redirect_url) || (passed ? CATALOG_URL : TUTOR_URL);
+
+            const summaryDiv = document.createElement('div');
+            summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid #e4e4e7;';
+            summaryDiv.innerHTML = `
+                <div style="font-size:2rem;font-weight:800;color:${passed ? '#10b981' : '#ef4444'};margin-bottom:0.25rem;">${score} / ${total}</div>
+                <div style="font-size:0.95rem;color:#71717a;">${passed ? 'Great work! You passed.' : 'Some gaps — the tutor will focus there.'}</div>
+                <div style="font-size:0.9rem;color:#52525b;margin:0.75rem 0 1.25rem;">${message}</div>
+                <a href="${redirectUrl}" class="btn btn-primary" style="display:inline-block;font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;background:#18181b;color:#fff;text-decoration:none;font-weight:600;">
+                    ${passed ? '✓ Continue' : '→ Start the lesson'}
+                </a>
+            `;
+            container.appendChild(summaryDiv);
+            summaryDiv.scrollIntoView({behavior: 'smooth'});
+        },
+    };
+})();
+</script>
+{% endblock %}
