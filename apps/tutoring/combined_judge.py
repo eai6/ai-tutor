@@ -60,6 +60,14 @@ class CombinedJudgeResult:
     fact_claims: List[ClaimVerdict] = field(default_factory=list)
     # Rule compliance ------------------------------------------------------
     rule_violations: List[RuleViolation] = field(default_factory=list)
+    # Step evaluation (merged from former _evaluate_step instructor call) -
+    # answer_correct: True/False/None tri-state for the student's reply
+    # step_complete: should the engine advance to the next step
+    # step_eval_reasoning: short rationale for telemetry / teacher review
+    answer_correct: Optional[bool] = None
+    step_complete: bool = False
+    step_eval_reasoning: str = ""
+    step_eval_skipped: bool = False
     # Bookkeeping ----------------------------------------------------------
     skipped: bool = False
     skip_reason: str = ""
@@ -113,6 +121,14 @@ class CombinedJudgeResult:
                 }
                 for v in self.rule_violations
             ],
+            # Step evaluation — merged from the former instructor
+            # _evaluate_step call. Same keys the dashboard already
+            # expects (answer_correct, step_complete) plus a short
+            # rationale for teacher review.
+            "answer_correct": self.answer_correct,
+            "step_complete": self.step_complete,
+            "step_eval_reasoning": self.step_eval_reasoning,
+            "step_eval_skipped": self.step_eval_skipped,
             # Combined-judge specific
             "combined_judge_used": not self.skipped,
             "combined_judge_skip_reason": self.skip_reason,
@@ -121,7 +137,7 @@ class CombinedJudgeResult:
 
 _JUDGE_SYSTEM = (
     "You are a strict reviewer for a math tutor's most recent response. "
-    "Run THREE checks and report all findings in ONE JSON object.\n"
+    "Run FOUR checks and report all findings in ONE JSON object.\n"
     "\n"
     "CHECK 1 — ARITHMETIC. Find every arithmetic claim in the response "
     "and verify the math. Both EXPLICIT and IMPLICIT shapes count:\n"
@@ -150,9 +166,8 @@ _JUDGE_SYSTEM = (
     "with invented numbers (\"if angles measure 100°, 120°, 80° — do "
     "they sum to 360°?\") IS a violation. ALLOWED: pure conceptual "
     "scaffolding (\"which rule applies?\"), reciting a rule without "
-    "specific numerical setup, posing a question via |||QUESTION:N||| "
-    "or |||QUESTION_EO:N|||, or reusing a stem that appears verbatim in "
-    "input.bank_stems.\n"
+    "specific numerical setup, posing a question via the pose_question "
+    "tool, or reusing a stem that appears verbatim in input.bank_stems.\n"
     "  ARITHMETIC — flag this rule whenever any arithmetic claim is "
     "wrong, in addition to listing the correction in arithmetic_corrections.\n"
     "  RULE_1 — when input.student_answer_was_bare or "
@@ -161,6 +176,32 @@ _JUDGE_SYSTEM = (
     "it\", \"you've got the rule\", \"you understand\", \"smart\", \"spot "
     "on\" are all violations in that context. Asking the student to "
     "walk through their work is the correct response — NOT a violation.\n"
+    "\n"
+    "CHECK 4 — STEP EVALUATION (merged from former instructor "
+    "_evaluate_step). Read input.step_context which gives:\n"
+    "  - step_type (teach / worked_example / practice / quiz / summary)\n"
+    "  - completion_criteria (what marks the step as complete)\n"
+    "  - expected_answer (when applicable)\n"
+    "  - recent_conversation (last few turns of context)\n"
+    "Decide TWO things based on the student's last input + tutor's reply:\n"
+    "  answer_correct (true/false/null tri-state):\n"
+    "    - true: the student gave a clear, demonstrably correct answer to "
+    "a specific question.\n"
+    "    - false: the student gave a clear, demonstrably wrong answer to "
+    "a specific question.\n"
+    "    - null: the student is acknowledging the teaching ('ok', 'got it', "
+    "'interesting'), asking their own question, expressing confusion, "
+    "sharing tangential thoughts, or there was no expected answer to "
+    "compare against. Default to null when uncertain — never penalize a "
+    "student for engaging conversationally.\n"
+    "  step_complete (boolean):\n"
+    "    - Apply the completion_criteria. A step is NOT complete just "
+    "because the student is engaged; it is complete when the criteria "
+    "are met or the student has demonstrated mastery of this step's "
+    "objective.\n"
+    "  step_eval_reasoning (short rationale for telemetry — 1 sentence).\n"
+    "If input.step_context is empty (no step in flight), set "
+    "answer_correct=null, step_complete=false, step_eval_reasoning=''.\n"
     "\n"
     "Output JSON ONLY (no prose, no code fence) of the shape:\n"
     "{\n"
@@ -171,7 +212,10 @@ _JUDGE_SYSTEM = (
     '"evidence": "<<=80 char quote>"}],\n'
     '  "rule_violations": [{"rule": "NO_AUTHORING|ARITHMETIC|RULE_1", '
     '"evidence": "<<=120 char quote>", '
-    '"suggested_fix": "<one-sentence rewrite>"}]\n'
+    '"suggested_fix": "<one-sentence rewrite>"}],\n'
+    '  "answer_correct": true|false|null,\n'
+    '  "step_complete": true|false,\n'
+    '  "step_eval_reasoning": "<one-sentence rationale>"\n'
     "}\n"
     "Return empty arrays for any check that has nothing to flag."
 )
@@ -186,6 +230,7 @@ def _build_user_prompt(
     answer_was_wrong: bool,
     factual_claims: List[str],
     evidence: str,
+    step_context: Optional[dict] = None,
 ) -> str:
     bank_block = (
         "\n".join(f"  - {s.strip()[:200]}" for s in bank_stems[:10])
@@ -199,9 +244,11 @@ def _build_user_prompt(
         "verified_question_bank": bank_block,
         "factual_claims": factual_claims,
         "evidence": (evidence or "(no evidence retrieved)")[:3000],
+        # Step context for CHECK 4. Empty dict → judge skips step eval.
+        "step_context": step_context or {},
     }
     return (
-        "Run all three checks on the tutor's response below. Reply with "
+        "Run all four checks on the tutor's response below. Reply with "
         "ONLY the JSON object specified — no prose, no code fence.\n\n"
         f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
     )
@@ -244,11 +291,12 @@ def run_combined_judge(
     student_input: str = "",
     answer_was_bare: bool = False,
     answer_was_wrong: bool = False,
+    step_context: Optional[dict] = None,
     max_claims: int = 5,
     max_arithmetic_corrections: int = 8,
     max_violations: int = 5,
 ) -> CombinedJudgeResult:
-    """Run all three post-response checks in a single LLM call.
+    """Run all four post-response checks in a single LLM call.
 
     Args:
       response_text: tutor's clean response (after media/question parsing).
@@ -257,6 +305,12 @@ def run_combined_judge(
       bank_stems: list of allowed-question stems for NO_AUTHORING context.
       student_input: student's last message — needed for RULE_1 context.
       answer_was_bare / answer_was_wrong: signal for RULE_1.
+      step_context: dict with step_type / completion_criteria /
+        expected_answer / recent_conversation. When provided, the
+        judge also returns answer_correct + step_complete (CHECK 4),
+        replacing the former instructor _evaluate_step call. Pass
+        None or {} to skip step evaluation (e.g. when the caller
+        will handle it elsewhere).
 
     Returns CombinedJudgeResult. The original response text is preserved
     on `corrected_response` if no corrections apply.
@@ -301,7 +355,11 @@ def run_combined_judge(
         answer_was_wrong=answer_was_wrong,
         factual_claims=factual_claims,
         evidence=evidence,
+        step_context=step_context,
     )
+    # Track whether the caller asked for step eval. If they didn't pass
+    # context, mark step_eval_skipped on the result so callers can tell.
+    step_context_provided = bool(step_context)
 
     try:
         llm_response = llm_client.generate(
@@ -377,6 +435,22 @@ def run_combined_judge(
                 RuleViolation(rule=rule, evidence=evidence, suggested_fix=fix)
             )
 
+    # Step evaluation (CHECK 4) — replaces the former instructor
+    # _evaluate_step call. Only meaningful when the caller passed
+    # a step_context.
+    if step_context_provided:
+        ac = data.get("answer_correct", None)
+        if ac is True or ac is False:
+            result.answer_correct = ac
+        else:
+            result.answer_correct = None  # tri-state null
+        sc = data.get("step_complete", False)
+        result.step_complete = bool(sc) is True
+        rs = data.get("step_eval_reasoning", "") or ""
+        result.step_eval_reasoning = str(rs)[:280]
+    else:
+        result.step_eval_skipped = True
+
     if result.arithmetic_corrections:
         logger.info(
             "[CombinedJudge] flagged %d arithmetic correction(s)",
@@ -386,6 +460,12 @@ def run_combined_judge(
         logger.info(
             "[CombinedJudge] flagged rule violations: %s",
             result.violated_rules,
+        )
+    if step_context_provided:
+        logger.info(
+            "[CombinedJudge] step_eval: answer_correct=%s step_complete=%s — %s",
+            result.answer_correct, result.step_complete,
+            (result.step_eval_reasoning or "")[:80],
         )
 
     return result

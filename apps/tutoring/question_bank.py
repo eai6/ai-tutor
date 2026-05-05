@@ -576,13 +576,43 @@ def render_question_to_prose(entry) -> str:
     Verbatim — no paraphrasing. For MCQ, includes the lettered options.
     The caller substitutes this string in place of any LLM-authored
     question stem in the response.
+
+    LessonStep field choice:
+      - For practice/quiz steps, render LessonStep.question (the
+        student-facing question) and append choices for MCQ. The
+        teacher_script for those steps is the tutor's setup directive
+        ("Now try a similar problem…") — not what should be posed to
+        the student.
+      - For worked_example, render teacher_script (it's the example
+        walkthrough).
+      - For other types or when question is empty, fall back to
+        teacher_script.
     """
     if entry is None:
         return ''
     # LessonStep — pose the canonical practice question.
-    teacher_script = getattr(entry, 'teacher_script', None)
-    if teacher_script is not None:
-        return teacher_script.strip()
+    if hasattr(entry, 'teacher_script'):
+        step_type = (getattr(entry, 'step_type', '') or '').strip()
+        question = (getattr(entry, 'question', '') or '').strip()
+        teacher_script = (getattr(entry, 'teacher_script', '') or '').strip()
+        if step_type in ('practice', 'quiz') and question:
+            atype = (getattr(entry, 'answer_type', '') or '').lower()
+            if atype == 'multiple_choice':
+                choices = list(getattr(entry, 'choices', None) or [])
+                rendered_choices = []
+                for i, c in enumerate(choices[:4]):
+                    label = chr(ord('A') + i)
+                    s = str(c).strip()
+                    if s.upper().startswith(f"{label})"):
+                        rendered_choices.append(f"  {s}")
+                    else:
+                        rendered_choices.append(f"  {label}) {s}")
+                if rendered_choices:
+                    return question + "\n\n" + "\n".join(rendered_choices)
+            return question
+        if teacher_script:
+            return teacher_script
+        return question
 
     # ExitTicketQuestion — render stem + options if MCQ.
     stem = (getattr(entry, 'question_text', '') or '').strip()

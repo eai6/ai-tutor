@@ -1630,6 +1630,11 @@ Keep it to 2-3 sentences."""
             # default) so post-response checking doesn't pay the Opus
             # cost/latency twice. Tutor stays on Opus where reasoning
             # depth matters; judges run on a faster model.
+            #
+            # Step-eval is folded into this same call (formerly a
+            # separate instructor _evaluate_step call). Min-exchange
+            # floor: skip step eval on the first turn of teach /
+            # worked_example so the LLM doesn't advance prematurely.
             combined_judge_result = run_combined_judge(
                 clean_response,
                 lesson=self.lesson,
@@ -1640,6 +1645,9 @@ Keep it to 2-3 sentences."""
                 answer_was_wrong=(
                     turn_math_check is not None
                     and turn_math_check.is_correct is False
+                ),
+                step_context=self._build_step_eval_context(
+                    student_input, clean_response,
                 ),
             )
             if combined_judge_result.corrected_response:
@@ -1680,6 +1688,12 @@ Keep it to 2-3 sentences."""
                 is_correct=False,
                 context=praise_context,
                 student_input=student_input,
+                # Rotate the opener so it doesn't read as a stuck record
+                # ("Show me your working, step by step." every turn).
+                # Bare-answer counter for this step is a natural rotator.
+                rotate_index=self.bare_answer_counts_by_step.get(
+                    self.current_topic_index, 0,
+                ),
             )
             if praise_stripped:
                 logger.info(
@@ -1698,8 +1712,13 @@ Keep it to 2-3 sentences."""
                     media = [step_media[0]]
 
         # Analyze student response for adaptation (returns metadata dict).
+        # Pass the combined_judge_result through so the analyser can
+        # consume its step-eval verdict instead of making a second
+        # _evaluate_step LLM call.
         turn_metadata = self._analyze_student_response(
-            student_input, clean_response, math_check=turn_math_check,
+            student_input, clean_response,
+            math_check=turn_math_check,
+            combined_judge_result=combined_judge_result,
         )
         if praise_stripped:
             turn_metadata['praise_stripped'] = True
@@ -5344,6 +5363,98 @@ Follow the current step; this concept will be covered in sequence."""
             "\n</evaluation_signal>"
         )
 
+    # ------------------------------------------------------------------
+    # Step-eval context (consumed by combined_judge as CHECK 4)
+    # ------------------------------------------------------------------
+
+    # Step types whose teacher_script is a question (slot-0-posable).
+    _QUESTION_SHAPED_STEPS = ('practice', 'quiz', 'worked_example')
+    # Min exchanges before step-eval fires for each step type. Below
+    # the floor we skip step eval entirely (no judge step verdict, no
+    # advancement). Stops the model from rushing teach/worked_example
+    # off the very first turn before the student has actually engaged.
+    _STEP_EVAL_MIN_EXCHANGES = {
+        'teach': 2,
+        'worked_example': 2,
+        'practice': 1,
+        'quiz': 1,
+        'summary': 1,
+    }
+
+    def _build_step_eval_context(
+        self, student_input: str, tutor_response: str,
+    ) -> Optional[dict]:
+        """Build the step_context payload for combined_judge CHECK 4.
+
+        Returns None when step eval should be skipped (no step in
+        flight, exit-ticket phase, or below the min-exchange floor for
+        the current step type). When None, the judge sees an empty
+        step_context and reports answer_correct=null,
+        step_complete=false (skipping the eval).
+        """
+        if self.session_state != SessionState.TUTORING:
+            return None
+        if self.current_topic_index >= len(self.steps):
+            return None
+        step = self.steps[self.current_topic_index]
+        step_type = (step.step_type or 'teach').strip()
+        floor = self._STEP_EVAL_MIN_EXCHANGES.get(step_type, 1)
+        if self.step_exchange_count < floor:
+            logger.info(
+                "[CombinedJudge] step_eval: SKIPPED step=%d type=%s "
+                "exchanges=%d < floor=%d",
+                self.current_topic_index, step_type,
+                self.step_exchange_count, floor,
+            )
+            return None
+
+        criteria_map = {
+            'teach': (
+                "Complete when the teaching content has been delivered "
+                "AND the student answered a comprehension check correctly."
+            ),
+            'worked_example': (
+                "Complete when the example has been walked through AND "
+                "the student explained a step back correctly."
+            ),
+            'practice': "Complete when the student answered the question correctly.",
+            'quiz': "Complete when the student answered the question correctly.",
+            'summary': (
+                "Complete when the key points have been stated AND the "
+                "student acknowledged understanding."
+            ),
+        }
+        # Last 4 conversation turns for context (kept short — judge
+        # already gets the full turn pair via student_input + tutor_response).
+        recent = self.conversation[-(4 * 2):] if len(self.conversation) > 4 else self.conversation
+        recent_text = "\n".join(
+            f"{'TUTOR' if m['role'] == 'assistant' else 'STUDENT'}: "
+            f"{(m.get('content') or '')[:200]}"
+            for m in recent
+        )
+
+        atype = (step.answer_type or '').lower()
+        format_hint = ''
+        if atype == 'multiple_choice':
+            format_hint = "Answer format: multiple_choice. Correct iff student's letter matches expected_answer (A/B/C/D)."
+        elif atype == 'true_false':
+            format_hint = "Answer format: true_false. Correct iff student's response (True/False) matches expected_answer exactly."
+        elif atype == 'short_numeric':
+            format_hint = "Answer format: short_numeric. Strip units, compare numerically with ±5% tolerance."
+        elif atype == 'free_text':
+            format_hint = "Answer format: free_text. Compare conceptually; accept paraphrases that capture key points."
+
+        return {
+            "step_type": step_type,
+            "step_index": self.current_topic_index,
+            "exchanges_on_this_step": self.step_exchange_count,
+            "completion_criteria": criteria_map.get(step_type, criteria_map['teach']),
+            "expected_answer": (step.expected_answer or '')[:300],
+            "teacher_script_excerpt": (step.teacher_script or '')[:400],
+            "format_hint": format_hint,
+            "recent_conversation": recent_text[:1500],
+        }
+
     def _evaluate_step(self, student_input: str, tutor_response: str) -> Optional[StepEvaluationResult]:
         """Merged LLM evaluator: answer correctness + step completion in one call.
 
@@ -5352,6 +5463,11 @@ Follow the current step; this concept will be covered in sequence."""
         - worked_example: complete when example walked through + student explained a step back
         - practice/quiz: complete when answered correctly OR exhausted max_attempts
         - summary: complete when key points stated + student acknowledged
+
+        NOTE (2026-05-05): on math turns, step eval is now folded into
+        run_combined_judge (CHECK 4) — see _build_step_eval_context.
+        This method remains as the fallback for non-math sessions where
+        the combined judge isn't running.
         """
         if not self.instructor_client:
             return None
@@ -5402,52 +5518,62 @@ Follow the current step; this concept will be covered in sequence."""
         }
         completion_criteria = criteria.get(step_type, criteria['teach'])
 
-        # Last 4 conversation turns for context
-        recent = self.conversation[-(4*2):] if len(self.conversation) > 4 else self.conversation
-        convo_text = "\n".join(
-            f"{'TUTOR' if m['role'] == 'assistant' else 'STUDENT'}: {m['content'][:200]}"
-            for m in recent
+        # System prompt holds the step context + completion criteria.
+        # Conversation history flows through as a proper messages array
+        # (structural fix A — same shape as the main tutor call) so the
+        # evaluator reads turn structure natively instead of parsing
+        # "TUTOR: …\nSTUDENT: …" embedded text.
+        eval_system = (
+            "You are a tutoring step evaluator. Assess answer correctness "
+            "and step completion based on the conversation that follows.\n\n"
+            f"STEP CONTEXT:\n{chr(10).join(step_context_parts)}\n\n"
+            f"COMPLETION CRITERIA: {completion_criteria}\n\n"
+            "INSTRUCTIONS FOR answer_correct:\n"
+            "- Return TRUE if the student gave a clear, demonstrably correct "
+            "answer to a specific question.\n"
+            "- Return FALSE only when the student gave a clear, demonstrably "
+            "wrong answer to a specific question.\n"
+            "- Return NULL when none of these apply: the student is "
+            "acknowledging the teaching ('ok', 'got it', 'interesting'), "
+            "asking their own question, expressing confusion, sharing "
+            "tangential thoughts, or there was no expected_answer to "
+            "compare against. Default to NULL when uncertain — never "
+            "penalize a student for engaging conversationally.\n\n"
+            "INSTRUCTIONS FOR step_complete:\n"
+            "- Apply the COMPLETION CRITERIA above. A step is NOT complete "
+            "just because the student is engaged; it is complete when the "
+            "criteria are met or the student has demonstrated mastery of "
+            "this step's objective."
         )
 
-        prompt = f"""Evaluate this tutoring exchange.
-
-STEP CONTEXT:
-{chr(10).join(step_context_parts)}
-
-COMPLETION CRITERIA: {completion_criteria}
-
-RECENT CONVERSATION:
-{convo_text}
-
-STUDENT JUST SAID: {student_input[:500]}
-TUTOR REPLIED: {tutor_response[:500]}
-
-INSTRUCTIONS FOR answer_correct:
-- Return TRUE if the student gave a clear, demonstrably correct answer
-  to a specific question.
-- Return FALSE only when the student gave a clear, demonstrably wrong
-  answer to a specific question.
-- Return NULL when none of these apply: the student is acknowledging
-  the teaching ("ok", "got it", "interesting"), asking their own
-  question, expressing confusion, sharing tangential thoughts, or there
-  was no expected_answer to compare against. Default to NULL when
-  uncertain — never penalize a student for engaging conversationally.
-
-INSTRUCTIONS FOR step_complete:
-- Apply the COMPLETION CRITERIA above. A step is NOT complete just
-  because the student is engaged; it is complete when the criteria are
-  met or the student has demonstrated mastery of this step's objective.
-
-1. Did the student demonstrably answer correctly, demonstrably answer
-   incorrectly, or was there nothing to evaluate (return null)?
-2. Is this step complete — should the system advance to the next step?"""
+        # Build messages from conversation history. Cap to last ~10
+        # turns to keep the eval call cheap; the latest turn pair
+        # (student_input → tutor_response) is what the verdict mostly
+        # rests on, but the evaluator can use prior turns to judge
+        # whether teaching content was already delivered.
+        history = self.conversation[-10:] if len(self.conversation) > 10 else list(self.conversation)
+        # Append the freshly-generated tutor response since it's not
+        # yet in self.conversation at this point in the flow.
+        eval_messages = list(history)
+        if (not eval_messages) or eval_messages[-1].get('role') != 'assistant':
+            eval_messages.append({"role": "assistant", "content": tutor_response[:1500]})
+        # Final user marker pinning what the evaluator should answer.
+        eval_messages.append({
+            "role": "user",
+            "content": (
+                "Based on the conversation above, evaluate the latest "
+                "tutor turn against this step's completion criteria. "
+                "Return: answer_correct (true|false|null), "
+                "step_complete (true|false), reasoning (one sentence)."
+            ),
+        })
 
         try:
             create_kwargs = dict(
                 response_model=StepEvaluationResult,
                 messages=[
-                    {"role": "system", "content": "You are a tutoring step evaluator. Assess answer correctness and step completion."},
-                    {"role": "user", "content": prompt},
+                    {"role": "system", "content": eval_system},
+                    *eval_messages,
                 ],
                 max_retries=2,
             )
@@ -5672,6 +5798,7 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         student_input: str,
         tutor_response: str,
         math_check: Optional[MathCheckResult] = None,
+        combined_judge_result=None,
     ) -> Dict:
         """Analyze student response to adapt future instruction and track concept coverage.
 
@@ -5714,6 +5841,25 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
             is_correct = math_check.is_correct
             eval_layer = 'deterministic_numeric'
             eval_reasoning = math_check.reasoning
+        elif combined_judge_result is not None and not getattr(
+            combined_judge_result, 'step_eval_skipped', False,
+        ):
+            # Step eval was folded into the combined judge — use its
+            # verdict instead of calling _evaluate_step (saves 1 LLM
+            # call per math turn).
+            ac = getattr(combined_judge_result, 'answer_correct', None)
+            sc = bool(getattr(combined_judge_result, 'step_complete', False))
+            reasoning = getattr(combined_judge_result, 'step_eval_reasoning', '') or ''
+            # Build a StepEvaluationResult-shape adapter for downstream
+            # callers (_should_advance_step expects it).
+            step_eval_result = StepEvaluationResult(
+                answer_correct=ac,
+                step_complete=sc,
+                reasoning=reasoning[:280],
+            )
+            is_correct = ac
+            eval_layer = 'combined_judge'
+            eval_reasoning = reasoning
         else:
             if step_type in ('practice', 'quiz', 'teach', 'worked_example') and self.instructor_client:
                 step_eval_result = self._evaluate_step(student_input, tutor_response)
@@ -6056,8 +6202,11 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
             logger.info(f"Hard cap: advancing step {self.current_topic_index} after {exchanges} exchanges")
             return True
 
-        # 2. Min exchange floor
-        min_exchanges = {'teach': 1, 'worked_example': 1}.get(step_type, 1)
+        # 2. Min exchange floor — single source of truth defined on the
+        # class as _STEP_EVAL_MIN_EXCHANGES. teach / worked_example
+        # require >=2 exchanges before any step-eval fires; practice /
+        # quiz / summary advance after >=1.
+        min_exchanges = self._STEP_EVAL_MIN_EXCHANGES.get(step_type, 1)
         if exchanges < min_exchanges:
             return False
 
@@ -6066,11 +6215,17 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
             logger.info(f"Practice fast-path: correct answer on step {self.current_topic_index}")
             return True
 
-        # 5. Use pre-computed eval result or call LLM evaluator
+        # 4. Use pre-computed eval result. When math turns flow through
+        # combined_judge, the step verdict is already computed in CHECK
+        # 4 of that single call — eval_result is the adapter built by
+        # _analyze_student_response and we DO NOT make a second
+        # instructor _evaluate_step call. Fallback to instructor only
+        # for non-math sessions or when combined_judge skipped step
+        # eval (below the min-exchange floor).
         if eval_result is None:
             eval_result = self._evaluate_step(student_input, tutor_response)
         if eval_result is not None:
-            return eval_result.step_complete
+            return bool(getattr(eval_result, 'step_complete', False))
 
         # 6. Evaluator failed (network / parse error). Don't force
         # advancement — wait for the 30-exchange hard cap above

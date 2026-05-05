@@ -71,9 +71,39 @@ _NEUTRAL_OPENER = (
 )
 
 
+# Pools rotated by `rotate_index` to stop the same opener landing turn
+# after turn (pilot transcripts showed "Show me your working, step by
+# step" repeating across multiple turns and feeling robotic). The
+# openers are still neutral on correctness — they ask for working
+# without confirming or denying.
+_WRONG_OPENERS = [
+    "Let's check this one together — can you walk me through your steps?",
+    "Hmm, let's slow down. Talk me through how you got there.",
+    "Before I weigh in — show me how you worked it out.",
+    "Tell me your reasoning step by step so I can see where to help.",
+]
+
+_BARE_UNKNOWN_OPENERS = [
+    "Before I check that — show me your working, step by step.",
+    "Talk me through how you arrived at that.",
+    "Walk me through your reasoning before I confirm anything.",
+    "What did you do first? Show me each step.",
+]
+
+# bare_correct gets a templated opener (echoes student input) plus a
+# tail. The tail rotates so it doesn't read like a stuck record.
+_BARE_CORRECT_TAILS = [
+    "Walk me through how you got there before I check it with you.",
+    "Tell me how you reached that — then I'll confirm.",
+    "Talk me through your steps so I can see your reasoning.",
+    "Show me each step you took to get there.",
+]
+
+
 def _opener_for_context(
     context: Optional[str],
     student_input: Optional[str] = None,
+    rotate_index: int = 0,
 ) -> str:
     """Pick the right neutral opener for the situation.
 
@@ -84,10 +114,13 @@ def _opener_for_context(
     the next step". The student sees a tutor that asked for working
     *after* it already affirmed the answer.
 
+    `rotate_index` lets the caller rotate through opener variations to
+    stop the same line repeating turn-after-turn (pilot UX feedback).
+    Typical caller passes the bare-answer counter for the current step.
+
     Three contexts:
-      - "wrong"          — student's answer is wrong. Keep the original
-                           opener — asking to walk through the steps is
-                           exactly what we want.
+      - "wrong"          — student's answer is wrong. Asks them to walk
+                           through their working.
       - "bare_correct"   — student gave a bare numeric answer that
                            happens to match. Per math_teaching Rule 1
                            we still must not praise; ask for working
@@ -98,25 +131,20 @@ def _opener_for_context(
                            working without implying anything about
                            correctness.
     """
+    idx = max(0, int(rotate_index or 0))
     if context == "bare_correct":
         echo = (student_input or "").strip()
+        tail = _BARE_CORRECT_TAILS[idx % len(_BARE_CORRECT_TAILS)]
         if echo:
             # Truncate to keep the opener tight — long pasted answers
             # (e.g. "1/2 + 1/3 = 5/6") fit, full essays do not.
             echo = echo if len(echo) <= 60 else echo[:60].rstrip() + "…"
-            return (
-                f"I see you wrote {echo}. Walk me through how you got "
-                "there before I check it with you."
-            )
-        return (
-            "Show me your working step by step before I check the answer."
-        )
+            return f"I see you wrote {echo}. {tail}"
+        return tail
     if context == "bare_unknown":
-        return (
-            "Before I check that — show me your working, step by step."
-        )
+        return _BARE_UNKNOWN_OPENERS[idx % len(_BARE_UNKNOWN_OPENERS)]
     # Default / "wrong"
-    return _NEUTRAL_OPENER
+    return _WRONG_OPENERS[idx % len(_WRONG_OPENERS)]
 
 
 def _split_first_sentence(text: str) -> Tuple[str, str]:
@@ -141,6 +169,7 @@ def strip_praise_if_wrong(
     is_correct: bool,
     context: Optional[str] = None,
     student_input: Optional[str] = None,
+    rotate_index: int = 0,
 ) -> Tuple[str, bool]:
     """Return (possibly-rewritten text, was_modified).
 
@@ -191,7 +220,7 @@ def strip_praise_if_wrong(
         # and strip any stray praise from the rest (preserves original
         # rest content).
         rest_stripped = _tidy(_PRAISE_RE.sub("", rest_orig)) if rest_orig else ""
-        opener = _opener_for_context(context, student_input)
+        opener = _opener_for_context(context, student_input, rotate_index=rotate_index)
         cleaned = opener + (" " + rest_stripped if rest_stripped else "")
     else:
         # Light strip across the entire text.
