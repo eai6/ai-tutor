@@ -3856,8 +3856,11 @@ Follow the current step; this concept will be covered in sequence."""
                 "\nthat contains 2+ specific numbers like angles, sums,"
                 "\nor measurements), the post-response judge will flag it"
                 "\nas NO_AUTHORING and your response will be regenerated."
-                "\nThe bank is the ONLY source of truth — call"
-                "\npose_question(slot=N) to use it."
+                "\nThe bank is the ONLY source of truth — invoke the"
+                "\npose_question tool to use it. Do NOT type the tool"
+                "\ncall as text — emit it as a real tool_use block. If"
+                "\nyou write text like 'pose_question(slot=0)' the"
+                "\nstudent will literally see those characters."
                 "\n"
                 "\nIf the bank has no question that fits (e.g. you want"
                 "\na warmup recap from the previous lesson and no"
@@ -4511,6 +4514,29 @@ Follow the current step; this concept will be covered in sequence."""
     # judge flags NO_AUTHORING and the V3 regen path handles it —
     # one clean retry, then ship the regen output as-is. No surgery.
 
+    # Defensive strip for leaked tool-call syntax in text blocks.
+    # Some turns the LLM types the literal `pose_question(slot=N)`
+    # syntax instead of emitting a real tool_use block — the student
+    # then sees those characters as raw text. We strip them.
+    # Conservative: only matches the exact pose_question(slot=...)
+    # shape, not other text containing parens or "pose_question".
+    _LEAKED_TOOL_CALL_RE = re.compile(
+        r"\bpose_question\s*\(\s*slot\s*=\s*\d+\s*(?:,\s*lead_in\s*=\s*[\"'][^\"']*[\"']\s*)?\)",
+        re.IGNORECASE,
+    )
+
+    def _strip_leaked_tool_call_syntax(self, text: str) -> Tuple[str, int]:
+        """Remove `pose_question(slot=N)` shaped text from a text block.
+        Returns (cleaned, chars_removed)."""
+        if not text or 'pose_question' not in text.lower():
+            return text, 0
+        cleaned = self._LEAKED_TOOL_CALL_RE.sub('', text)
+        # Tidy stray whitespace + dangling punctuation left behind.
+        cleaned = re.sub(r' {2,}', ' ', cleaned)
+        cleaned = re.sub(r'\s+([.!?])', r'\1', cleaned)
+        cleaned = cleaned.strip()
+        return cleaned, len(text) - len(cleaned)
+
     def _handle_pose_question_message(
         self,
         message,
@@ -4548,9 +4574,26 @@ Follow the current step; this concept will be covered in sequence."""
                 # prose, the combined judge flags NO_AUTHORING and the
                 # V3 regen path takes one clean retry. Editing in place
                 # produced robotic output and is no longer used.
+                #
+                # ONE exception: leaked tool-call syntax. Sometimes
+                # the LLM types `pose_question(slot=N)` as literal
+                # text instead of emitting a real tool_use block. The
+                # student sees those characters and is confused. This
+                # is clearly garbage output (not teaching content) so
+                # we strip it. Coupled with the prompt update telling
+                # the LLM to "emit it as a real tool_use call" not
+                # type the syntax.
                 raw_text = (getattr(block, 'text', '') or '')
-                if raw_text.strip():
-                    text_parts.append(raw_text.strip())
+                cleaned, leaked = self._strip_leaked_tool_call_syntax(raw_text)
+                if leaked:
+                    logger.warning(
+                        "[QuestionTool] LEAKED_TOOL_SYNTAX in text block — "
+                        "stripped %d chars. The LLM typed the call instead "
+                        "of emitting a tool_use block.",
+                        leaked,
+                    )
+                if cleaned.strip():
+                    text_parts.append(cleaned.strip())
             elif btype == 'tool_use':
                 tool_use_count += 1
                 tool_name = getattr(block, 'name', '')

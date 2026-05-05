@@ -379,8 +379,9 @@ def render_bank_block(
                  on engage / warmup turns) — labelled clearly so the
                  LLM knows they're for "previous lesson recap" use.
 
-    The LLM picks one by calling pose_question(slot=N). Server resolves
-    the slot via id_map and renders the bank entry verbatim.
+    The LLM picks one by calling the pose_question tool with a slot
+    index. Server resolves the slot via id_map and renders the bank
+    entry verbatim.
     """
     id_map: Dict[int, object] = {}
     lines: List[str] = ["<question_bank>"]
@@ -401,11 +402,14 @@ def render_bank_block(
         "    • Hypothetical premises with specific numbers\n"
         "    • Any sentence ending in '?' that contains digits\n"
         "  If you need to pose a question with numerical values, the\n"
-        "  ONLY path is: invoke pose_question(slot=N) with N from the\n"
-        "  list below. Slot 0 (when listed) = current step's canonical\n"
-        "  question; slots 1+ = exit-ticket bank questions for this\n"
-        "  step's concept; later slots labelled 'previous lesson recap'\n"
-        "  are warmup material from a prerequisite lesson — use those\n"
+        "  ONLY path is to invoke the pose_question tool with a slot\n"
+        "  number from the list below. Do NOT type the tool call as\n"
+        "  text — the system will not parse it; emit it as a real\n"
+        "  tool_use call.\n"
+        "  Slot 0 (when listed) = current step's canonical question;\n"
+        "  slots 1+ = exit-ticket bank questions for this step's\n"
+        "  concept; later slots labelled 'previous lesson recap' are\n"
+        "  warmup material from a prerequisite lesson — use those\n"
         "  ONLY for warmup / engage turns."
     )
 
