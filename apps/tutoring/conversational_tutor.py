@@ -5406,6 +5406,20 @@ Follow the current step; this concept will be covered in sequence."""
         'quiz': 1,
         'summary': 1,
     }
+    # Hard cap per step type: force advance after this many exchanges
+    # regardless of LLM verdict. Prevents the tutor from getting stuck
+    # on a single step. teach / worked_example / summary are short
+    # instructional steps — students who haven't moved on after 10
+    # turns of teaching aren't going to. practice / quiz can take
+    # longer (multiple wrong attempts + retries are normal).
+    _STEP_HARD_CAP_EXCHANGES = {
+        'teach': 10,
+        'worked_example': 10,
+        'practice': 30,
+        'quiz': 30,
+        'summary': 10,
+    }
+    _STEP_HARD_CAP_DEFAULT = 30
 
     def _build_step_eval_context(
         self, student_input: str, tutor_response: str,
@@ -6192,26 +6206,27 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         return {"correct": False, "signal": False}
 
     def _should_advance_step(self, student_input: str, tutor_response: str, is_correct: bool, eval_result=None) -> bool:
-        """Determine if the current step is complete using merged LLM evaluator.
-
-        Args:
-            eval_result: Pre-computed StepEvaluationResult from _analyze_student_response.
-                         If provided, avoids a redundant _evaluate_step() LLM call.
+        """Determine if the current step is complete.
 
         Safety valves (hard rules, not LLM):
-        | Rule                  | Threshold                                        |
-        |-----------------------|--------------------------------------------------|
-        | Hard cap (any step)   | 30 exchanges -> force advance                    |
-        | Min exchanges before  | teach/worked_example: 2, practice/quiz/summary: 1 |
-        | Practice fast-path    | correct answer -> immediate advance               |
+        | Rule                       | Threshold                                              |
+        |----------------------------|--------------------------------------------------------|
+        | Per-step-type hard cap     | teach / worked_example / summary: 10 ; practice / quiz: 30 |
+        | Min exchanges before eval  | teach / worked_example: 2 ; others: 1                  |
+        | Correct-answer fast-path   | is_correct=True (after min floor) -> advance ANY type  |
 
-        Philosophy (2026-05-01): the tutor's job is to help the student
-        gain the sub-competency, not to march through steps. ONE cap
-        applies to every step type — 30 exchanges. The per-practice
-        attempt cap and the per-step-type fallback rules were both
-        REMOVED because they fired earlier than the hard cap and
-        forced advancement when students were still working.
-        Correctness is still the fast path out of any step.
+        2026-05-05: switched from a single 30-exchange global cap to
+        per-step-type caps. Teach / worked_example / summary are short
+        instructional steps — students who haven't moved on after 10
+        turns of teaching aren't going to. Practice / quiz keep 30 to
+        allow time to wrestle with hard problems.
+
+        Also added a correct-answer fast-path for ALL step types (was
+        only practice/quiz). When the merged combined_judge is
+        conservative on step_complete (saying "completed when X AND
+        student answered correctly" but reporting step_complete=False
+        even after a correct answer), is_correct=True is sufficient to
+        advance — the student demonstrated mastery, ship it.
         """
         if self.current_topic_index >= len(self.steps):
             return False
@@ -6220,25 +6235,35 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         step_type = step.step_type or 'teach'
         exchanges = self.step_exchange_count
 
-        # 1. Hard cap: always advance after 30 exchanges on any step.
-        # Single, generous cap — keeps the tutor with a student who's
-        # genuinely working through the sub-competency, while still
-        # preventing a session from getting permanently stuck.
-        if exchanges >= 30:
-            logger.info(f"Hard cap: advancing step {self.current_topic_index} after {exchanges} exchanges")
+        # 1. Per-step-type hard cap. Forces advance regardless of LLM
+        # verdict so a stuck judge / stuck student can't trap the
+        # session indefinitely on one step.
+        hard_cap = self._STEP_HARD_CAP_EXCHANGES.get(
+            step_type, self._STEP_HARD_CAP_DEFAULT,
+        )
+        if exchanges >= hard_cap:
+            logger.info(
+                "[StepAdvance] HARD_CAP step=%d type=%s exchanges=%d >= cap=%d → advance",
+                self.current_topic_index, step_type, exchanges, hard_cap,
+            )
             return True
 
-        # 2. Min exchange floor — single source of truth defined on the
-        # class as _STEP_EVAL_MIN_EXCHANGES. teach / worked_example
-        # require >=2 exchanges before any step-eval fires; practice /
-        # quiz / summary advance after >=1.
+        # 2. Min exchange floor before any advancement decision fires.
         min_exchanges = self._STEP_EVAL_MIN_EXCHANGES.get(step_type, 1)
         if exchanges < min_exchanges:
             return False
 
-        # 3. Practice fast-path: correct answer -> immediate advance
-        if step_type in ('practice', 'quiz') and is_correct:
-            logger.info(f"Practice fast-path: correct answer on step {self.current_topic_index}")
+        # 3. Correct-answer fast-path. Applies to ALL step types: when
+        # the student demonstrably answered correctly, advance even if
+        # the LLM judge is conservative on step_complete. This is the
+        # fix for the "tutor stuck on teach step" bug where the merged
+        # judge would say answer_correct=True but step_complete=False
+        # because its strict "X AND Y" criteria weren't 100% met.
+        if is_correct is True:
+            logger.info(
+                "[StepAdvance] CORRECT_ANSWER step=%d type=%s → advance",
+                self.current_topic_index, step_type,
+            )
             return True
 
         # 4. Use pre-computed eval result. When math turns flow through
@@ -6251,7 +6276,13 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         if eval_result is None:
             eval_result = self._evaluate_step(student_input, tutor_response)
         if eval_result is not None:
-            return bool(getattr(eval_result, 'step_complete', False))
+            sc = bool(getattr(eval_result, 'step_complete', False))
+            if sc:
+                logger.info(
+                    "[StepAdvance] LLM_VERDICT step=%d type=%s step_complete=True → advance",
+                    self.current_topic_index, step_type,
+                )
+            return sc
 
         # 6. Evaluator failed (network / parse error). Don't force
         # advancement — wait for the 30-exchange hard cap above
@@ -6452,12 +6483,117 @@ Which concept numbers were meaningfully covered?"""
             is_complete=True,
         )
     
-    def _grade_exit_question(self, question, student_answer) -> bool:
-        """Grade an exit ticket question based on its type (P1.3).
+    # ------------------------------------------------------------------
+    # Exit-ticket grading helpers (split: deterministic vs LLM-batch)
+    # ------------------------------------------------------------------
 
-        Returns True if correct, False otherwise. All grading is deterministic
-        (no LLM) for speed and consistency.
+    def _grade_mcq_deterministic(self, question, student_answer) -> bool:
+        """Pure letter compare for MCQ. No LLM."""
+        ans = student_answer if isinstance(student_answer, str) else str(student_answer or '')
+        return ans.upper().strip() == (question.correct_answer or '').upper().strip()
+
+    def _try_numeric_fast_path(
+        self, question, student_answer,
+    ) -> Optional[bool]:
+        """Numeric tolerance grading for fill_in_blank with numeric blanks.
+        Returns True/False when the verdict is unambiguous, or None to
+        defer to the LLM batch."""
+        q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
+        if q_type != 'fill_in_blank':
+            return None
+        is_math = self.lesson.unit.course.is_math if self.lesson.unit and self.lesson.unit.course else False
+        if not is_math:
+            return None
+        data = question.answer_data or {}
+        blanks = data.get('blanks', []) or []
+        if not blanks:
+            return None
+        student_blanks = student_answer if isinstance(student_answer, list) else [student_answer]
+        from apps.tutoring.math_tools import safe_eval_expression
+        correct_count = 0
+        evaluated_count = 0
+        for idx, expected in enumerate(blanks):
+            given = str(student_blanks[idx] if idx < len(student_blanks) else '').strip()
+            expected_val = safe_eval_expression(str(expected))
+            given_val = safe_eval_expression(given)
+            if expected_val is not None and given_val is not None:
+                evaluated_count += 1
+                if abs(expected_val - given_val) < 0.01:
+                    correct_count += 1
+                continue
+            # Plain string match fallback (case-insensitive)
+            if given.lower() == str(expected).lower():
+                correct_count += 1
+                evaluated_count += 1
+        if evaluated_count == 0:
+            return None  # nothing parseable; defer to LLM
+        threshold = max(1, len(blanks) // 2 + 1)
+        if correct_count >= threshold:
+            return True
+        if correct_count == 0:
+            return False
+        return None  # partial — let LLM decide
+
+    def _build_batch_grade_item(
+        self, index: int, question, student_answer,
+    ):
+        """Serialise one exit-ticket question into a BatchGradeItem
+        for the batched LLM grader."""
+        from apps.tutoring.exit_ticket_grader import BatchGradeItem
+        q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
+        data = question.answer_data or {}
+        is_math = self.lesson.unit.course.is_math if self.lesson.unit and self.lesson.unit.course else False
+
+        if q_type == 'fill_in_blank':
+            blanks = data.get('blanks', []) or []
+            student_blanks = student_answer if isinstance(student_answer, list) else [student_answer]
+            expected = "; ".join(str(b) for b in blanks)
+            student_str = "; ".join(str(b) for b in student_blanks)
+        elif q_type == 'matching':
+            pairs = data.get('pairs', []) or []
+            expected = "; ".join(
+                f"{p.get('left', '')} → {p.get('right', '')}"
+                for p in pairs
+            )
+            student_map = student_answer if isinstance(student_answer, dict) else {}
+            student_str = "; ".join(
+                f"{k} → {v}" for k, v in student_map.items()
+            )
+        else:  # short_answer / data_interpretation
+            expected = str(data.get('model_answer', '') or '')
+            student_str = str(student_answer or '')
+
+        keywords = list(data.get('keywords', []) or [])
+        return BatchGradeItem(
+            index=index,
+            question_text=question.question_text,
+            q_type=q_type,
+            expected=expected,
+            keywords=keywords,
+            student_answer=student_str,
+            is_math=is_math,
+        )
+
+    def _grade_exit_question(self, question, student_answer) -> bool:
+        """Per-question grader entry point.
+
+        Lookup order:
+          1. _exit_ticket_batch_cache (set by _submit_exit_ticket_inner
+             after running the batched LLM grader). Returns the cached
+             verdict for LLM-graded questions in O(1) — no extra call.
+          2. MCQ → deterministic letter match.
+          3. Numeric fast-path for fill_in_blank with numeric blanks.
+          4. Per-question LLM grading (legacy / fallback path used by
+             remediation walkthrough or when the batch was skipped).
+
+        Tests can still patch this method; the patch overrides every
+        path including the cache.
         """
+        # 1. Batch cache check (set during exit-ticket submission)
+        cache = getattr(self, '_exit_ticket_batch_cache', None)
+        if cache and getattr(question, 'id', None) in cache:
+            return bool(cache[question.id])
+
         q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
         data = question.answer_data or {}
 
@@ -6466,12 +6602,16 @@ Which concept numbers were meaningfully covered?"""
             if q_type == 'mcq':
                 q_type = 'fill_in_blank' if isinstance(student_answer, list) else 'matching'
 
-        # MCQ: deterministic — letter match only
+        # 2. MCQ deterministic
         if q_type == 'mcq':
-            ans = student_answer if isinstance(student_answer, str) else str(student_answer or '')
-            return ans.upper().strip() == (question.correct_answer or '').upper().strip()
+            return self._grade_mcq_deterministic(question, student_answer)
 
-        # All other types: use LLM-based evaluation
+        # 3. Numeric fast-path
+        fast = self._try_numeric_fast_path(question, student_answer)
+        if fast is not None:
+            return fast
+
+        # 4. Legacy per-question LLM grading
         return self._llm_grade_exit_question(question, student_answer, q_type, data)
 
     def _llm_grade_exit_question(self, question, student_answer, q_type: str, data: dict) -> bool:
@@ -6646,22 +6786,62 @@ Which concept numbers were meaningfully covered?"""
         q_map = {q.id: q for q in ExitTicketQuestion.objects.filter(id__in=selected_ids)}
         questions = [q_map[qid] for qid in selected_ids if qid in q_map]
 
-        # Grade
+        # Pre-grade pass: identify LLM-needing questions and grade
+        # them all in ONE batched LLM call. Deterministic types (MCQ,
+        # numeric fill_in_blank) are NOT included in the batch — they
+        # get scored by _grade_exit_question's fast-path during the
+        # main loop. Results land on _exit_ticket_batch_cache keyed
+        # by question.id so the per-question loop can read them
+        # without re-calling the LLM.
+        #
+        # The main loop still calls _grade_exit_question once per
+        # question — preserves the test seam (tests patch that
+        # method), and _grade_exit_question reads the cache before
+        # falling through to its legacy per-question path.
+        student_answers: Dict[int, object] = {}
+        batch_items: List = []
+        for i, q in enumerate(questions):
+            raw_answer = answers[i] if i < len(answers) else ''
+            if isinstance(raw_answer, dict) and 'answer' in raw_answer:
+                student_answer = raw_answer['answer']
+            elif isinstance(raw_answer, dict) and 'type' not in raw_answer and len(raw_answer) > 0:
+                student_answer = raw_answer
+            else:
+                student_answer = raw_answer
+            student_answers[i] = student_answer
+
+            q_type = getattr(q, 'question_type', 'mcq') or 'mcq'
+            if isinstance(student_answer, (list, dict)) and q_type == 'mcq':
+                q_type = 'fill_in_blank' if isinstance(student_answer, list) else 'matching'
+
+            if q_type == 'mcq':
+                continue  # deterministic — handled in the loop
+            if self._try_numeric_fast_path(q, student_answer) is not None:
+                continue  # numeric fast-path — handled in the loop
+            batch_items.append(self._build_batch_grade_item(i, q, student_answer))
+
+        # Run the batch (if any items need it). Cache results by
+        # question.id keyed so the per-question call site can pick up
+        # the verdict.
+        self._exit_ticket_batch_cache: Dict[int, bool] = {}
+        if batch_items:
+            from apps.tutoring.exit_ticket_grader import grade_written_responses_batch
+            batch_results = grade_written_responses_batch(
+                batch_items, llm_client=self.judge_client,
+            )
+            for r in batch_results:
+                # Map index → question.id so _grade_exit_question can
+                # look it up by question identity.
+                qid = questions[r.index].id if 0 <= r.index < len(questions) else None
+                if qid is not None:
+                    self._exit_ticket_batch_cache[qid] = r.correct
+
         correct = 0
         results = []
         failed_questions = []
 
         for i, q in enumerate(questions):
-            raw_answer = answers[i] if i < len(answers) else ''
-            # Support both old format (plain string) and new format ({type, answer})
-            if isinstance(raw_answer, dict) and 'answer' in raw_answer:
-                student_answer = raw_answer['answer']
-            elif isinstance(raw_answer, dict) and 'type' not in raw_answer and len(raw_answer) > 0:
-                # Matching answer: dict of {left: right} pairs
-                student_answer = raw_answer
-            else:
-                student_answer = raw_answer
-
+            student_answer = student_answers.get(i, '')
             is_correct = self._grade_exit_question(q, student_answer)
 
             # Record EO-skill practice from exit ticket (P1.2)
