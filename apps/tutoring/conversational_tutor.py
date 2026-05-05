@@ -3421,6 +3421,41 @@ Follow the current step; this concept will be covered in sequence."""
             if messages and messages[-1].get("role") == "assistant":
                 messages.append({"role": "user", "content": "Continue."})
 
+            # VISION: when the current step has an attached figure,
+            # convert the latest user message to a multimodal content
+            # block so the LLM can SEE the figure rather than relying
+            # on text metadata alone. Catches cases like the function-
+            # machine where the model misread "×4" as "2x" because it
+            # only had the abstract description, not the image.
+            #
+            # The image attaches FIRST in the content list (Anthropic
+            # best practice for grounding the model on a visual). The
+            # student's text follows so the model treats the visual as
+            # context for what's being asked.
+            vision_block = self._get_step_vision_block()
+            if vision_block:
+                for i in range(len(messages) - 1, -1, -1):
+                    if messages[i].get("role") == "user":
+                        existing_text = messages[i].get("content", "")
+                        # If content is already a list (rare — only on
+                        # subsequent turns within the same response),
+                        # don't double-attach.
+                        if isinstance(existing_text, list):
+                            break
+                        messages[i] = {
+                            "role": "user",
+                            "content": [
+                                vision_block,
+                                {"type": "text", "text": str(existing_text or "")},
+                            ],
+                        }
+                        logger.info(
+                            "[Vision] attached step image to user msg #%d "
+                            "for tutor turn",
+                            i,
+                        )
+                        break
+
             # _build_system_prompt populates self._question_id_map as a
             # side effect — must be called BEFORE _build_pose_question_tool.
             base_system_prompt = self._build_system_prompt()
