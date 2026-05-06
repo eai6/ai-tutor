@@ -179,66 +179,17 @@ def strip_praise_if_wrong(
     student_input: Optional[str] = None,
     rotate_index: int = 0,
 ) -> Tuple[str, bool]:
-    """Return (possibly-rewritten text, was_modified).
+    """Disabled 2026-05-06 per user direction. Returns input unchanged.
 
-    Only acts when is_correct is explicitly False. When is_correct is True
-    or None (unknown), returns the input unchanged.
-
-    Args:
-      response_text: the LLM response (post media-signal parsing).
-      is_correct: kept for backward compatibility — when False, the
-        filter runs. Callers that want to strip on bare-answer-correct
-        should pass `is_correct=False, context="bare_correct"` so the
-        opener fits the situation.
-      context: one of "wrong" (default), "bare_correct", "bare_unknown".
-        Picks the neutral opener used when heavy praise must be replaced.
-        See `_opener_for_context` for the rationale.
-      student_input: the student's literal reply. Used only when
-        context="bare_correct" so the opener can echo back what they
-        wrote ("I see you wrote 275. Walk me through...").
-
-    Strategy:
-      1. Strip praise patterns across the ENTIRE response text. Praise is
-         never appropriate when we know the student was wrong, and the LLM
-         sometimes sprinkles it across multiple sentences ("Brilliant!
-         You've got it — ...").
-      2. If the first sentence was heavy in praise (> 2 hits) or nearly
-         entirely praise, replace it with a context-appropriate opener so
-         the output doesn't read as a mangled fragment.
-      3. Tidy whitespace and punctuation artifacts from the stripping.
+    History: the post-process praise stripper was injecting stock
+    opener phrases ("Let's check this one together…", "What was your
+    first move on this?") that Sonnet then echoed turn-after-turn.
+    Each new opener pool became the next leak. Cleaner architecture:
+    handle praise-on-bare upstream (combined_judge RULE_1 → regen on
+    math turns; non-math praise is allowed). The function signature
+    is kept for backward compatibility with all existing call sites.
     """
-    if is_correct is True or is_correct is None:
-        return response_text, False
-    if not response_text:
-        return response_text, False
-
-    first_orig, rest_orig = _split_first_sentence(response_text)
-    first_hits = _PRAISE_RE.findall(first_orig)
-    rest_hits = _PRAISE_RE.findall(rest_orig) if rest_orig else []
-
-    if not first_hits and not rest_hits:
-        return response_text, False
-
-    heavy_praise = len(first_hits) > 2 or (
-        len(first_hits) >= 1 and len(first_orig.strip()) < 40
-    )
-
-    if heavy_praise:
-        # Replace the mangled opening with a context-appropriate opener
-        # and strip any stray praise from the rest (preserves original
-        # rest content).
-        rest_stripped = _tidy(_PRAISE_RE.sub("", rest_orig)) if rest_orig else ""
-        opener = _opener_for_context(context, student_input, rotate_index=rotate_index)
-        cleaned = opener + (" " + rest_stripped if rest_stripped else "")
-    else:
-        # Light strip across the entire text.
-        cleaned = _tidy(_PRAISE_RE.sub("", response_text))
-
-    # Re-capitalize first letter.
-    if cleaned and cleaned[0].islower():
-        cleaned = cleaned[0].upper() + cleaned[1:]
-
-    return cleaned.strip(), True
+    return response_text, False
 
 
 def _tidy(text: str) -> str:

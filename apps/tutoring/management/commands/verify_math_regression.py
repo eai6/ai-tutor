@@ -113,25 +113,21 @@ class Command(BaseCommand):
                 else:
                     new_verdict = "incorrect"
 
-                # Layer 3 replay (only meaningful if layer 1 said wrong)
+                # Layer 3 (post-process praise strip) was disabled
+                # 2026-05-06. Catch criterion is now purely:
+                # "does the deterministic numeric check correctly
+                # classify this row as wrong?". Praise on wrong answers
+                # is now handled upstream via combined_judge RULE_1
+                # → regen, not via post-process rewrite.
+                stripped_preview = ""
                 if check is not None and not check.is_correct and tutor_said:
-                    stripped, modified = strip_praise_if_wrong(
-                        tutor_said, is_correct=False,
-                    )
-                    stripped_preview = stripped[:200]
-                    if modified and not _PRAISE_RE.search(stripped):
+                    if _PRAISE_RE.search(tutor_said):
                         praise_triggered = True
-                    else:
-                        # The filter didn't catch the praise — unusual but
-                        # possible if the audit regex matched praise that
-                        # the filter regex doesn't (or left some through).
-                        praise_missed += 1
-                        failure_reason = failure_reason or "praise_not_stripped"
+                        stripped_preview = tutor_said[:200]
 
                 would_catch = (
                     check is not None
                     and not check.is_correct
-                    and praise_triggered
                 )
                 if would_catch:
                     caught += 1

@@ -61,23 +61,28 @@ class StructuralLayerTest(unittest.TestCase):
 
 
 class PedagogicalLayerTest(unittest.TestCase):
-    def test_praise_stripped_on_wrong_non_math(self):
-        """The crucial case the user reported: Geography lesson, thin
-        student answer, tutor says 'Brilliant!' — must be stripped."""
+    """Praise-stripping was disabled 2026-05-06 because the post-process
+    rewrite kept injecting stock opener phrases that Sonnet then echoed
+    turn-after-turn. Praise-on-bare/wrong is now handled UPSTREAM via
+    combined_judge RULE_1 → regen on math turns; non-math praise is
+    allowed through. These tests verify the new no-strip behavior."""
+
+    def test_praise_kept_on_wrong_non_math(self):
         result = validate_tutor_response(
             "Brilliant answer! You've got the core idea — "
             "money distribution shapes development.",
             is_correct=False, bare_answer=False, step_type='practice',
         )
-        self.assertIn(ISSUE_UNFOUNDED_PRAISE_STRIPPED, result.issues)
-        self.assertNotIn("brilliant", result.content.lower())
+        self.assertNotIn(ISSUE_UNFOUNDED_PRAISE_STRIPPED, result.issues)
+        self.assertIn("Brilliant", result.content)
 
-    def test_praise_stripped_on_bare_answer_even_when_correct(self):
+    def test_praise_kept_on_bare_answer_even_when_correct(self):
         result = validate_tutor_response(
             "Perfect! That's exactly right. Now let's move on.",
             is_correct=True, bare_answer=True, step_type='practice',
         )
-        self.assertIn(ISSUE_UNFOUNDED_PRAISE_STRIPPED, result.issues)
+        self.assertNotIn(ISSUE_UNFOUNDED_PRAISE_STRIPPED, result.issues)
+        self.assertIn("Perfect", result.content)
 
     def test_praise_kept_when_correct_and_not_bare(self):
         result = validate_tutor_response(

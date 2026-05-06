@@ -140,38 +140,26 @@ class MathTutoringIntegrationTest(TestCase):
     # Layer 1 — deterministic check
     # ------------------------------------------------------------------
 
-    def test_wrong_math_answer_marked_incorrect_without_llm_praise_leak(self):
-        """The production bug in miniature: student says '3 3/4' when the
-        expected answer is '5 1/4', LLM defies the signal and praises —
-        the fix must catch it."""
+    def test_wrong_math_answer_marked_incorrect(self):
+        """Student says '3 3/4' when expected is '5 1/4'. The
+        deterministic check correctly flips last_answer_correct to
+        False. Praise stripping was disabled 2026-05-06; combined-judge
+        RULE_1 → regen handles wrong-praise on math turns at the
+        upstream layer, not via post-process rewrite."""
         tutor, session, _ = self._make_tutor(
             "Brilliant, Vaani! You've got it — 21/4 = 5 1/4 kg. "
             "You correctly divided 21 by 4 to get 5 whole groups with 1 left over."
         )
-        msg = tutor.respond("3 3/4")
-
-        # Layer 3: praise stripped from content
-        content_lower = msg.content.lower()
-        self.assertNotIn("brilliant", content_lower)
-        self.assertNotIn("you've got it", content_lower)
-        self.assertNotIn("you got it", content_lower)
-
-        # last_answer_correct is the transient engine state used downstream
+        tutor.respond("3 3/4")
         self.assertFalse(tutor.last_answer_correct)
 
     def test_correct_math_answer_is_accepted(self):
-        """Correct bare answer: the verdict is correct, but praise still
-        gets stripped (M9 bare-answer gate + Socratic validator V1)."""
+        """Correct bare answer: verdict is correct, state advances."""
         tutor, session, _ = self._make_tutor(
             "That's exactly right — 21/4 = 5 1/4. Great work!"
         )
-        msg = tutor.respond("5 1/4")
-
-        # Verdict is correct: state advances and the analyzer marks it.
+        tutor.respond("5 1/4")
         self.assertTrue(tutor.last_answer_correct)
-        # But praise words must be stripped because the answer was bare.
-        self.assertNotIn("exactly", msg.content.lower())
-        self.assertNotIn("brilliant", msg.content.lower())
 
     def test_equivalent_fraction_form_accepted(self):
         """Student gives the improper fraction form (21/4) instead of
@@ -201,7 +189,7 @@ class MathTutoringIntegrationTest(TestCase):
         self.assertEqual(md.get("eval_layer"), "deterministic_numeric")
         self.assertAlmostEqual(md.get("student_answer_parsed"), 3.75)
         self.assertAlmostEqual(md.get("expected_answer_parsed"), 5.25)
-        self.assertTrue(md.get("praise_stripped"))
+        # praise_stripped no longer set — strip disabled 2026-05-06.
 
     def test_session_turn_metadata_populated_on_correct_answer(self):
         """Correct numeric answer → deterministic_numeric layer,
@@ -309,10 +297,10 @@ class MathTutoringIntegrationTest(TestCase):
     # Layer 4 — bare-answer gate (M9)
     # ------------------------------------------------------------------
 
-    def test_bare_correct_answer_still_strips_praise(self):
+    def test_bare_correct_answer_metadata(self):
         """Even when the answer is numerically correct, a bare response
-        (no working shown) should have praise stripped — per math_teaching
-        Rule 1, 'working before evaluation'."""
+        is flagged for downstream consumers (combined-judge RULE_1
+        regen path). Praise stripping was disabled 2026-05-06."""
         tutor, session, fake_llm = self._make_tutor(
             "Exactly right! 21/4 equals 5 1/4. Let's move on."
         )
@@ -326,9 +314,6 @@ class MathTutoringIntegrationTest(TestCase):
         md = tutor_turn.metadata or {}
         self.assertEqual(md.get("is_correct"), True)
         self.assertTrue(md.get("bare_answer"))
-        self.assertTrue(md.get("praise_stripped"))
-        # Content should no longer contain praise
-        self.assertNotIn("exactly", tutor_turn.content.lower())
 
     def test_bare_answer_signal_instructs_to_ask_for_working(self):
         """Signal block must tell the LLM to ask for working when bare."""
