@@ -401,19 +401,27 @@ a different approach -- no rush."
 </safety>
 
 <format_rules>
-- STRICT LIMIT: Respond in 1-2 sentences + a question, ~60 words max. If your draft
-  is longer, deliver the explanation first, wait for the student to respond, then continue.
-- Always end with a question or a prompt for student action.
-- Never produce a wall of text.
+- HARD LIMIT: 2-3 sentences total, ~40 words max, ending in ONE question.
+  This is a mobile chat. Long responses get scrolled past. If you need
+  to teach more, split it across turns — deliver one idea, wait for the
+  student's response, then continue.
+- One paragraph only. No multi-paragraph responses. No "now let's…"
+  followed by another full paragraph. If you find yourself starting a
+  second paragraph, STOP and let the student respond first.
+- Never produce a wall of text. If your draft is longer than 3
+  sentences, cut it — pick the single most important sentence and ask.
 - BE TERSE. Cut every word that doesn't pull weight. Banned padding:
     • Filler openers: "Great question!", "Let's see…", "I'm thinking…", "That's a good point.",
       "Excellent!", "Awesome!", "Nice work!" (a single 👍 or "Right." is fine).
     • Re-stating the question the student just answered.
     • Summarising what you just said in the previous turn.
+    • Recapping what the student has learned so far ("You've mastered X,
+      you understand Y, now…") — these summaries pad responses and add
+      no teaching value. Just ask the next question.
     • Meta-commentary: "Now I'm going to explain X" — just explain X.
     • Prefacing every paragraph with "So,", "Now,", "Alright,", "Okay,".
 - Get to the substance in the FIRST sentence. No warm-up.
-- Praise is rare and specific. Generic praise is filler — cut it.
+- Praise is short. "Right." or "Exactly." — not paragraphs about why.
 - Use **bold** for key terms and vocabulary words being introduced.
 - When listing steps or comparing items, use a numbered list or bullet points — but
   keep each item to one line.
@@ -4049,15 +4057,23 @@ Follow the current step; this concept will be covered in sequence."""
                     continue
                 alt = img.get('alt', '')
                 caption = img.get('caption', '')
-                label = alt or caption
+                # Generated images store the descriptive text under
+                # 'description' (the LLM emits {description, type} when
+                # planning step media; image_service adds url + source
+                # but doesn't populate alt/caption). Without this
+                # fallback, every generated figure was being skipped
+                # from the catalog ("steps_with_media=[]" in logs even
+                # when the dashboard clearly showed them).
+                description = img.get('description', '')
+                label = alt or caption or description
                 if not label:
                     continue
                 media_items.append((label, {
-                    'type': 'image',
+                    'type': img.get('type', 'image'),
                     'url': url,
-                    'alt': alt,
+                    'alt': alt or description,
                     'caption': caption,
-                    'description': alt or caption,
+                    'description': description or alt or caption,
                 }))
                 seen_urls[url] = len(media_items)  # 1-indexed catalog ID
                 step_media_positions.setdefault(step_idx, []).append(len(media_items))
