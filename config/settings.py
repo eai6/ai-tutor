@@ -112,6 +112,18 @@ DATABASES = {
     )
 }
 
+# SQLite-only tuning for local dev: WAL mode + 30s busy timeout. Without
+# these, the dev server's background content-gen tasks (run as threads
+# inside the same process) lock the DB and concurrent requests
+# ("POST /tutor/api/chat/start/...") fail with "database is locked".
+# Production (PostgreSQL) ignores both keys, so this is a no-op there.
+if DATABASES['default'].get('ENGINE', '').endswith('sqlite3'):
+    DATABASES['default'].setdefault('OPTIONS', {})
+    DATABASES['default']['OPTIONS']['timeout'] = 30
+    DATABASES['default']['OPTIONS']['init_command'] = (
+        "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;"
+    )
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

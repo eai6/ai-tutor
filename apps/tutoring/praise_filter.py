@@ -63,11 +63,13 @@ _PRAISE_PATTERNS = [
 
 _PRAISE_RE = re.compile("|".join(_PRAISE_PATTERNS), re.IGNORECASE | re.MULTILINE)
 
-# Default fallback: matches the original phrasing for the "answer is
-# wrong" case. Kept stable for tests and any caller that doesn't pass a
-# context.
+# Default fallback: kept stable for tests and any caller that doesn't
+# pass a context. The "Let's check this one together — can you walk me
+# through your steps?" phrasing was removed 2026-05-06 — pilot
+# transcripts showed it leaking turn-after-turn even on correct
+# answers because Sonnet recognised it as a stock pedagogical opener.
 _NEUTRAL_OPENER = (
-    "Let's check this one together — can you walk me through your steps?"
+    "What was your first move?"
 )
 
 
@@ -76,27 +78,33 @@ _NEUTRAL_OPENER = (
 # step" repeating across multiple turns and feeling robotic). The
 # openers are still neutral on correctness — they ask for working
 # without confirming or denying.
+#
+# Forbidden phrases (do NOT add back without sign-off):
+#   "Let's check this one together — can you walk me through your steps?"
+#   "Walk me through your steps"
+#   "Show me your working, step by step"
+# These three were the most-leaked stock openers in Martin's pilot.
 _WRONG_OPENERS = [
-    "Let's check this one together — can you walk me through your steps?",
-    "Hmm, let's slow down. Talk me through how you got there.",
-    "Before I weigh in — show me how you worked it out.",
-    "Tell me your reasoning step by step so I can see where to help.",
+    "What was your first move on this?",
+    "Hmm, let's slow down. Where did you start?",
+    "Before I weigh in, show me your working.",
+    "Tell me how you set it up.",
 ]
 
 _BARE_UNKNOWN_OPENERS = [
-    "Before I check that — show me your working, step by step.",
-    "Talk me through how you arrived at that.",
-    "Walk me through your reasoning before I confirm anything.",
-    "What did you do first? Show me each step.",
+    "How did you get there?",
+    "What did you do first?",
+    "Show me your working before I confirm anything.",
+    "What's the working behind that?",
 ]
 
 # bare_correct gets a templated opener (echoes student input) plus a
 # tail. The tail rotates so it doesn't read like a stuck record.
 _BARE_CORRECT_TAILS = [
-    "Walk me through how you got there before I check it with you.",
-    "Tell me how you reached that — then I'll confirm.",
-    "Talk me through your steps so I can see your reasoning.",
-    "Show me each step you took to get there.",
+    "How did you get there?",
+    "Show me your working and I'll confirm.",
+    "What was your first move?",
+    "What's the working behind that?",
 ]
 
 

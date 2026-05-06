@@ -353,6 +353,18 @@ FOLLOW THE LESSON SCRIPT
   "the image shows…"). Don't attach media just because the step has it
   available — a numeric warmup question with no visual reference should not
   show a figure that isn't relevant to it.
+- BANNED OPENERS — these exact phrases are forbidden in your responses
+  because they leaked verbatim across many turns in pilot testing and made
+  the tutor sound like a broken record:
+    • "Let's check this one together — can you walk me through your steps?"
+    • "Let's check this one together"
+    • "Walk me through your steps"
+    • "Walk me through how you got there"
+    • "Show me your working, step by step"
+    • "Before I check that — show me your working"
+  If you need to ask about reasoning, phrase it your own way every time —
+  vary the wording, keep it short, and never reuse the same opener across
+  consecutive turns.
 </principle>
 
 <session_structure>
@@ -1377,14 +1389,10 @@ Keep it to 1-2 sentences + question, ~60 words max."""
         clean_response, parsed_media = self._parse_media_signal(response)
         media = [parsed_media] if parsed_media else []
 
-        # Fallback: if resume message references visual content but no signal emitted
-        if not media:
-            visual_refs = ['diagram', 'figure', 'image', 'picture', 'illustration', 'chart', 'graph', 'map']
-            if any(ref in clean_response.lower() for ref in visual_refs):
-                step_media = self._get_step_media()
-                if step_media:
-                    media = [step_media[0]]
-                    logger.info(f"Auto-attached step media on resume (visual reference fallback)")
+        # Trust the |||MEDIA:N||| signal — no inference fallback. If
+        # the LLM wanted a figure shown, it emits the signal. Anything
+        # else (figurative language, conceptual references, prose
+        # mentions of "image"/"diagram") does NOT auto-attach.
 
         # Record media for this turn (for resume artifact panel)
         if media:
@@ -1724,13 +1732,8 @@ Keep it to 2-3 sentences."""
 
         media = [parsed_media] if parsed_media else []
 
-        # Fallback: if tutor references visual content but no signal emitted
-        if not media:
-            visual_refs = ['diagram', 'figure', 'image', 'picture', 'illustration', 'chart', 'graph', 'map']
-            if any(ref in clean_response.lower() for ref in visual_refs):
-                step_media = self._get_step_media()
-                if step_media:
-                    media = [step_media[0]]
+        # Trust the |||MEDIA:N||| signal — no inference fallback. If the
+        # LLM wanted a figure shown, it emits the signal.
 
         # Analyze student response for adaptation (returns metadata dict).
         # Pass the combined_judge_result through so the analyser can
@@ -2062,18 +2065,8 @@ Keep it to 2-3 sentences."""
                     self.session.id, self.current_topic_index, turn_bare_answer, praise_context,
                 )
 
-        # Media from LLM signal, with fallback for phantom references
+        # Media from LLM signal — no inference fallback. Trust |||MEDIA:N|||.
         media = [parsed_media] if parsed_media else []
-
-        # Fallback: if tutor references visual content but no signal was emitted,
-        # auto-attach the current step's media to avoid "look at the diagram" with no diagram
-        if not media:
-            visual_refs = ['diagram', 'figure', 'image', 'picture', 'illustration', 'chart', 'graph', 'map']
-            if any(ref in clean_content.lower() for ref in visual_refs):
-                step_media = self._get_step_media()
-                if step_media:
-                    media = [step_media[0]]
-                    logger.info(f"Auto-attached step media (visual reference fallback): {step_media[0].get('alt', '')[:50]}")
 
         # Record media for this turn (for resume artifact panel)
         if media:
@@ -2741,15 +2734,7 @@ IMPORTANT: Any question you ask must be complete and self-contained. Never say "
         # Parse |||MEDIA:N||| signal BEFORE saving — keeps DB clean
         clean_response, parsed_media = self._parse_media_signal(response)
         media = [parsed_media] if parsed_media else []
-
-        # Fallback: if opening references visual content but no signal emitted
-        if not media:
-            visual_refs = ['diagram', 'figure', 'image', 'picture', 'illustration', 'chart', 'graph', 'map']
-            if any(ref in clean_response.lower() for ref in visual_refs):
-                step_media = self._get_step_media()
-                if step_media:
-                    media = [step_media[0]]
-                    logger.info(f"Auto-attached step media in opening (visual reference fallback)")
+        # Trust the |||MEDIA:N||| signal — no inference fallback.
 
         # Record media for this turn (for resume artifact panel)
         if media:
@@ -4452,10 +4437,14 @@ Follow the current step; this concept will be covered in sequence."""
             prev = lp.prerequisite
             if not prev or not getattr(prev, 'is_published', False):
                 continue
+            # is_published is summative-only — see question_bank.py
+            # sample_session_pool. Filter by assessment_type instead so
+            # lesson-level recap banks aren't silently hidden.
+            from apps.tutoring.models import ExitTicket
             qs = list(
                 ExitTicketQuestion.objects.filter(
                     exit_ticket__lesson=prev,
-                    exit_ticket__is_published=True,
+                    exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
                     question_type__in=NUMERIC_RECAP_TYPES,
                 ).order_by('?')[: max_per_lesson * 3]  # over-fetch then filter
             )
@@ -4594,6 +4583,12 @@ Follow the current step; this concept will be covered in sequence."""
         r"\bpose_question\s*\(\s*slot\s*=\s*\d+\s*(?:,\s*lead_in\s*=\s*[\"'][^\"']*[\"']\s*)?\)",
         re.IGNORECASE,
     )
+
+    # NOTE: a `_VISUAL_REFERENCE_RE` lived here briefly to gate an
+    # auto-attach fallback when the LLM mentioned a figure without
+    # emitting |||MEDIA:N|||. That fallback was removed 2026-05-06:
+    # we now trust the explicit signal exclusively. If you need to
+    # re-add inference, do it as a defense-in-depth, not a primary path.
 
     def _strip_leaked_tool_call_syntax(self, text: str) -> Tuple[str, int]:
         """Remove `pose_question(slot=N)` shaped text from a text block.

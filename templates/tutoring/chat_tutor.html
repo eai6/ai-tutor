@@ -1741,6 +1741,19 @@ function addMessage(role, content, media = [], artifactHtml = null, probe = null
 
     const avatar = role === 'tutor' ? '🎓' : '👤';
 
+    // Clear the artifact panel when a tutor turn arrives WITHOUT media
+    // (and no rich-HTML artifact). The panel used to stay open with
+    // the previous figure even when the current turn didn't reference
+    // it, which read as "this image is relevant to what I'm saying"
+    // when it wasn't. Trust the |||MEDIA:N||| signal — if the LLM
+    // didn't attach media, hide the visual.
+    if (role === 'tutor'
+        && (!media || media.length === 0)
+        && !artifactHtml
+        && typeof closeArtifactPanel === 'function') {
+        closeArtifactPanel();
+    }
+
     let mediaHtml = '';
     if (media && media.length > 0) {
         mediaHtml = '<div class="message-media">';

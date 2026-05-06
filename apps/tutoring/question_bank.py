@@ -6,7 +6,9 @@ posed during a session comes from the published, teacher-verified bank:
 
   - LessonStep.teacher_script + LessonStep.expected_answer (canonical
     practice question per step)
-  - ExitTicketQuestion rows where parent ExitTicket.is_published=True
+  - ExitTicketQuestion rows whose parent ExitTicket.assessment_type ==
+    'exit_ticket' (i.e. lesson-level, not summative). is_published is a
+    summative-only flag and is NOT used to gate lesson banks here.
 
 This module is pure helpers — no engine state, no LLM calls. The
 conversational_tutor wires them in; the helpers are independently
@@ -172,10 +174,15 @@ def sample_session_pool(
     Returns a list of ExitTicketQuestion objects. Empty list if the
     lesson has no published bank yet.
     """
-    from apps.tutoring.models import ExitTicketQuestion
+    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+    # ExitTicket.is_published is "Summatives only — when False, students
+    # can't take the exam." Lesson-level exit tickets default to
+    # is_published=False; using that filter here meant the runtime
+    # never saw lesson-level banks even when the teacher dashboard
+    # showed them populated. Filter by assessment_type instead.
     bank_qs = ExitTicketQuestion.objects.filter(
         exit_ticket__lesson=lesson,
-        exit_ticket__is_published=True,
+        exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
     ).order_by('order_index')
     bank = list(bank_qs)
     if not bank:
@@ -263,10 +270,11 @@ def pick_published_for_concept_tag(
     Used by the remediation flow which doesn't go through the per-
     session pool, so we hit the published bank directly.
     """
-    from apps.tutoring.models import ExitTicketQuestion
+    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+    # See sample_session_pool — is_published is summative-only.
     base = ExitTicketQuestion.objects.filter(
         exit_ticket__lesson=lesson,
-        exit_ticket__is_published=True,
+        exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
     )
     tag = (concept_tag or '').strip()
     if tag:
@@ -324,7 +332,7 @@ def build_remediation_requiz_queue(
     no failed EOs supplied.
     """
     from django.db.models import Q
-    from apps.tutoring.models import ExitTicketQuestion
+    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
     if not failed_eos:
         return []
     rng = random.Random(seed)
@@ -337,7 +345,7 @@ def build_remediation_requiz_queue(
             continue
         base = ExitTicketQuestion.objects.filter(
             exit_ticket__lesson=lesson,
-            exit_ticket__is_published=True,
+            exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
         ).filter(
             Q(enabling_objective=eo_key) | Q(concept_tag=eo_key),
         )

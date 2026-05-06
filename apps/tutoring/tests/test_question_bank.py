@@ -63,33 +63,34 @@ class QuestionBankHelpersTest(TestCase):
                 concept_tag="angles_around_point" if i < 10 else "angles_on_line",
                 order_index=i,
             )
-        # A second lesson with an UNPUBLISHED ticket — pool for that
-        # lesson must be empty (the bank is gated on is_published).
-        cls.unpublished_lesson = Lesson.objects.create(
-            unit=cls.unit, title="Pending review",
-            objective="x", order_index=1, is_published=False,
-        )
-        cls.unpublished_ticket = ExitTicket.objects.create(
-            lesson=cls.unpublished_lesson, passing_score=8, is_published=False,
+        # A summative-type ExitTicket attached to a course (NOT a
+        # lesson) — pool for the LESSON pulls only its lesson-level
+        # bank, never summative questions. is_published on ExitTicket
+        # is summative-only; we gate on assessment_type instead.
+        cls.summative_ticket = ExitTicket.objects.create(
+            course=cls.course,
+            assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
+            passing_score=24, is_published=False,
         )
         ExitTicketQuestion.objects.create(
-            exit_ticket=cls.unpublished_ticket,
-            question_text="Unpublished — should never surface",
+            exit_ticket=cls.summative_ticket,
+            question_text="Summative — should never surface in lesson pool",
             option_a="A", option_b="B", option_c="C", option_d="D",
             correct_answer="A", explanation="",
             concept_tag="angles_around_point",
             order_index=0,
         )
 
-    def test_pool_excludes_unpublished_ticket_questions(self):
-        # Pool for the published lesson — only published bank questions
+    def test_pool_excludes_summative_questions(self):
+        # Pool for the lesson must contain only lesson-level questions,
+        # never summatives — even when the summative shares a tag.
         pool = sample_session_pool(self.lesson, seed=1, pool_size=20)
         for q in pool:
-            self.assertTrue(q.exit_ticket.is_published)
-            self.assertNotIn("Unpublished", q.question_text)
-        # Pool for the lesson whose ticket is_published=False — empty
-        empty = sample_session_pool(self.unpublished_lesson, seed=1)
-        self.assertEqual(empty, [])
+            self.assertEqual(
+                q.exit_ticket.assessment_type,
+                ExitTicket.AssessmentType.EXIT_TICKET,
+            )
+            self.assertNotIn("Summative", q.question_text)
 
     def test_pool_is_deterministic_per_seed(self):
         a = sample_session_pool(self.lesson, seed=42)

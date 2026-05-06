@@ -656,10 +656,12 @@
         <div class="exit-q-card" data-question-id="{{ question.id }}" style="padding: 1rem; background: var(--gray-50); border-radius: 8px; margin-bottom: 1rem; position: relative;">
             <!-- View mode -->
             <div class="q-view">
-                {# Stem first at full width; badges wrap onto their own row
-                   below. The EO label can be a full sentence, so trying to
-                   share a flex row with it squeezed the stem to ~1 word
-                   per line. #}
+                {% comment %}
+                    Stem first at full width; badges wrap onto their own row
+                    below. The EO label can be a full sentence, so trying to
+                    share a flex row with it squeezed the stem to ~1 word
+                    per line.
+                {% endcomment %}
                 <div style="font-weight: 600; margin-bottom: 0.5rem;">
                     Q{{ forloop.counter }}: {{ question.question_text }}
                 </div>

@@ -47,8 +47,12 @@ class TestStripPraiseIfWrong(unittest.TestCase):
         # Heavy praise should be replaced, not just stripped
         self.assertNotIn("Brilliant", result)
         self.assertNotIn("perfect", result.lower())
-        self.assertIn("Let's check this one together", result)
+        # Replaced with one of the rotating "wrong" openers — they no
+        # longer include the verbatim "Let's check this one together"
+        # phrase that leaked in pilot. Just confirm the rest survives.
         self.assertIn("Now let's move on", result)
+        # And the replacement opener is non-empty (not just stripped).
+        self.assertGreater(len(result), len("Now let's move on"))
 
     def test_preserves_second_sentence_with_correct_in_context(self):
         """'The correct next step' in the explanation isn't praise."""
@@ -160,16 +164,39 @@ class TestStripPraiseIfWrong(unittest.TestCase):
         )
         self.assertTrue(modified)
         self.assertNotIn("Excellent", result)
-        self.assertIn("show me your working", result.lower())
+        # The bare_unknown openers (post-2026-05-06) all neutrally
+        # request the working without claiming a verdict. Any of:
+        # "How did you get there?", "What did you do first?",
+        # "Show me your working before I confirm anything.",
+        # "What's the working behind that?".
+        self.assertTrue(
+            any(
+                phrase in result.lower()
+                for phrase in (
+                    "how did you get there",
+                    "what did you do first",
+                    "show me your working",
+                    "working behind that",
+                )
+            ),
+            f"opener missing expected neutral phrase: {result!r}",
+        )
 
     def test_default_context_is_backward_compatible(self):
-        """Callers that don't pass context still get the original
-        'Let's check this together' opener — preserving existing
-        behaviour for the wrong-answer code path."""
+        """Callers that don't pass context still get an opener from
+        the wrong-answer pool. The verbatim 'Let's check this one
+        together' was removed 2026-05-06 because it leaked across
+        pilot transcripts; we just verify the heavy praise was
+        replaced with SOME non-empty opener."""
         text = "Brilliant, perfect, excellent!"
         result, modified = strip_praise_if_wrong(text, is_correct=False)
         self.assertTrue(modified)
-        self.assertIn("Let's check this one together", result)
+        self.assertNotIn("Brilliant", result)
+        self.assertNotIn("perfect", result.lower())
+        # Forbidden phrases must not reappear.
+        self.assertNotIn("Let's check this one together", result)
+        # And we got a non-empty opener.
+        self.assertTrue(result.strip())
 
 
 if __name__ == "__main__":
