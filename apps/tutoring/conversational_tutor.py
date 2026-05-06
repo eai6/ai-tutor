@@ -353,6 +353,12 @@ FOLLOW THE LESSON SCRIPT
   "the image shows…"). Don't attach media just because the step has it
   available — a numeric warmup question with no visual reference should not
   show a figure that isn't relevant to it.
+- INVERSE RULE — if your text DOES reference a figure / diagram / image,
+  you MUST emit |||MEDIA:N||| in the same turn so the student actually
+  sees it. Saying "Looking at the diagram…" without attaching media
+  leaves the student asking "where is the diagram?". Either attach a
+  matching media item from the catalog, or rephrase the explanation
+  WITHOUT the deictic figure reference.
 - BANNED OPENERS — these exact phrases are forbidden in your responses
   because they leaked verbatim across many turns in pilot testing and made
   the tutor sound like a broken record:
@@ -969,6 +975,14 @@ class ConversationalTutor:
             int(k): int(v) for k, v in raw_bare_counts.items()
         }
 
+        # Track ExitTicketQuestion IDs already posed in this session so
+        # the bank picker doesn't recycle the same question after the
+        # student answered it. Reset only at session start.
+        self.shown_question_ids: set = set(
+            int(qid) for qid in (state.get('shown_question_ids', []) or [])
+            if str(qid).lstrip('-').isdigit()
+        )
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -1040,6 +1054,10 @@ class ConversationalTutor:
             'bare_answer_counts_by_step': {
                 str(k): v for k, v in getattr(self, 'bare_answer_counts_by_step', {}).items()
             },
+            # Bank questions already posed this session — bank picker
+            # excludes these so the tutor doesn't recycle the same
+            # question after the student answered it.
+            'shown_question_ids': sorted(getattr(self, 'shown_question_ids', set())),
             # Enabling objective coverage (P1.2)
             'covered_objectives': [
                 o['objective'] for o in getattr(self, 'enabling_objectives', [])
@@ -1794,6 +1812,8 @@ Keep it to 2-3 sentences."""
             # legacy L4/L5 LLM calls so they don't run twice.
             fact_check=(combined_judge_result is None),
             rule_check=(combined_judge_result is None),
+            # Used by the figure-ref-without-signal check.
+            media_attached=bool(media),
         )
         if validation.content != clean_response:
             clean_response = validation.content
@@ -2103,6 +2123,7 @@ Keep it to 2-3 sentences."""
             llm_client=self.llm_client,
             student_input=student_input,
             bank_stems=self._current_bank_stems(),
+            media_attached=bool(media),
         )
         if validation.content != clean_content:
             clean_content = validation.content
@@ -3728,6 +3749,14 @@ Follow the current step; this concept will be covered in sequence."""
                 "phrases like 'Before I check that — show me your "
                 "working' or 'walk me through your steps'."
                 "\n"
+                "\nMCQ value-form acceptance: when the bank pulled an "
+                "MCQ question and the student answered with the correct "
+                "VALUE (e.g. \"88\" when option A is \"88°\") rather "
+                "than the letter, ACCEPT IT and advance. Do NOT ask "
+                "them to translate to a letter — that's pedantic, not "
+                "pedagogical. The bank grader already maps value→letter "
+                "for you in <bank_evaluation_signal>."
+                "\n"
                 "\n=== R3: SCAFFOLD, DON'T SOLVE ==="
                 "\nNever do the math FOR the student. Three concrete forms:"
                 "\n  • Partial-correct working → ask 'what comes next?', "
@@ -4306,6 +4335,16 @@ Follow the current step; this concept will be covered in sequence."""
             by_id = {q.id: q for q in qs}
             pool = [by_id[i] for i in pool_ids if i in by_id]
 
+        # Drop questions already posed in this session so the tutor
+        # doesn't recycle the same question after the student answered
+        # it. If the filter empties the pool, fall back to the full
+        # pool — better to repeat than to ship an empty bank block.
+        shown = getattr(self, 'shown_question_ids', None) or set()
+        if shown:
+            unshown = [q for q in pool if q.id not in shown]
+            if unshown:
+                pool = unshown
+
         # Match the bank candidates to the current step's enabling
         # objective (preferred), falling back to concept_tag, then to
         # a random sample of the lesson's pool. EO is the structured
@@ -4852,7 +4891,17 @@ Follow the current step; this concept will be covered in sequence."""
                 'question_type': 'short_numeric',
             }
             return
-        # ExitTicketQuestion — bank slots 1..N
+        # ExitTicketQuestion — bank slots 1..N. Mark as shown so the
+        # session-pool picker excludes it on subsequent turns; this
+        # stops the tutor recycling the same question after a correct
+        # answer (the canonical-step slot 0 above is intentionally
+        # NOT tracked — it's the step's own question).
+        if not hasattr(self, 'shown_question_ids'):
+            self.shown_question_ids = set()
+        try:
+            self.shown_question_ids.add(int(entry.id))
+        except (TypeError, ValueError, AttributeError):
+            pass
         turn_metadata['bank_question_ref'] = {
             'kind': 'exit_ticket_question',
             'id': entry.id,

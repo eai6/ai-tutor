@@ -39,6 +39,24 @@ ISSUE_NUMERIC_CLAIM_CONTRADICTED = "numeric_claim_contradicted"
 ISSUE_AUTHORING_VIOLATION = "authoring_violation"
 ISSUE_ARITHMETIC_VIOLATION = "arithmetic_violation"
 ISSUE_RULE1_VIOLATION = "rule1_violation"
+# Tutor referenced a figure ("the diagram", "in the figure") but no
+# |||MEDIA:N||| signal was emitted, so the student saw the reference
+# without the visual. Soft issue for now — surfaced in [TurnSummary]
+# so we can see frequency before deciding whether to escalate to regen.
+ISSUE_FIGURE_REF_WITHOUT_SIGNAL = "figure_ref_without_signal"
+
+# Deictic figure references — phrases that strongly imply "I am
+# pointing at a visual right now". Used by the figure-ref-without-signal
+# validator check. Tighter than a substring match: requires "the/this/
+# that/our + figure-noun" or "shown above/below/here" — won't fire on
+# figurative "Picture yourself" / "imagine".
+_FIGURE_DEICTIC_RE = re.compile(
+    r"\b(?:the|this|that|these|those|our|in the|on the|"
+    r"look at the|see the)\s+"
+    r"(?:diagram|figure|image|picture|illustration|chart|graph|map)s?\b"
+    r"|\bshown\s+(?:above|below|here|in (?:the )?(?:diagram|figure|image))\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -56,6 +74,7 @@ class ValidationResult:
     _SOFT_ISSUES = frozenset({
         ISSUE_INFO_DUMP,
         ISSUE_NUMERIC_CLAIM_UNVERIFIED,
+        ISSUE_FIGURE_REF_WITHOUT_SIGNAL,
     })
 
     # Issues that should trigger regeneration (V3) — strong evidence
@@ -122,6 +141,7 @@ def validate_tutor_response(
     arithmetic_corrections: Optional[List[Dict]] = None,
     bank_signal_used: Optional[bool] = None,
     combined_result=None,
+    media_attached: bool = True,
 ) -> ValidationResult:
     """Run V1+V2 validator layers over a tutor response.
 
@@ -154,6 +174,15 @@ def validate_tutor_response(
     info_score = _info_dump_score(content)
     if info_score >= 6 and not _ends_with_question(content):
         issues.append(ISSUE_INFO_DUMP)
+
+    # Figure reference without |||MEDIA:N||| signal: tutor said "the
+    # diagram"/"in the figure" but no media was attached for this turn.
+    # The student sees a deictic reference to a visual that isn't there
+    # ("Looking at the diagram, you can see…" → "where is the diagram?").
+    # Soft issue for now — surfaced in [TurnSummary] without triggering
+    # regen, so we can quantify before deciding to escalate.
+    if not media_attached and _FIGURE_DEICTIC_RE.search(content):
+        issues.append(ISSUE_FIGURE_REF_WITHOUT_SIGNAL)
 
     # L2 — pedagogical praise gate (universal; previously math-only)
     layers_run.append("pedagogical")

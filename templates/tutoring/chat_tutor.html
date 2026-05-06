@@ -1332,6 +1332,26 @@ const sendBtn = document.getElementById('send-btn');
 const phaseBadge = document.getElementById('phase-badge');
 const stepProgress = document.getElementById('step-progress');
 
+// Insert a math symbol at the cursor of the chat input. Wired to the
+// .chat-math-btn buttons in #chat-math-toolbar via inline onclick.
+// Was removed accidentally during the exit-modal extraction refactor —
+// the buttons remained but the handler vanished, so clicks did nothing.
+function insertChatSymbol(sym) {
+    const ta = document.getElementById('user-input');
+    if (!ta) return;
+    const start = ta.selectionStart || 0;
+    const end = ta.selectionEnd || 0;
+    const before = ta.value.slice(0, start);
+    const after = ta.value.slice(end);
+    ta.value = before + sym + after;
+    const caret = start + sym.length;
+    ta.focus();
+    ta.setSelectionRange(caret, caret);
+    // Mirror the textarea auto-grow behavior the input listener uses.
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+}
+
 // Render LaTeX math in an element (KaTeX auto-render, math lessons only)
 function renderMath(el) {
     if (window.renderMathInElement && el) {
