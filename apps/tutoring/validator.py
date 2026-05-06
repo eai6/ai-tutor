@@ -74,7 +74,6 @@ class ValidationResult:
     _SOFT_ISSUES = frozenset({
         ISSUE_INFO_DUMP,
         ISSUE_NUMERIC_CLAIM_UNVERIFIED,
-        ISSUE_FIGURE_REF_WITHOUT_SIGNAL,
     })
 
     # Issues that should trigger regeneration (V3) — strong evidence
@@ -84,6 +83,10 @@ class ValidationResult:
         ISSUE_AUTHORING_VIOLATION,
         ISSUE_ARITHMETIC_VIOLATION,
         ISSUE_RULE1_VIOLATION,
+        # "Looking at the diagram…" with no |||MEDIA:N||| emitted —
+        # student sees the deictic reference without the visual.
+        # Regen with explicit instruction to either signal or rephrase.
+        ISSUE_FIGURE_REF_WITHOUT_SIGNAL,
     })
 
     @property

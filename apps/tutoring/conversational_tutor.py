@@ -5459,6 +5459,28 @@ Follow the current step; this concept will be covered in sequence."""
                 " your steps\" or \"show me how you got there\". Vary"
                 " your wording across turns."
             )
+        # Figure-reference-without-signal — text said "the diagram" /
+        # "in the figure" but no |||MEDIA:N||| was emitted. Two valid
+        # fixes: signal the matching media OR remove the deictic
+        # reference and explain in plain prose.
+        from apps.tutoring.validator import ISSUE_FIGURE_REF_WITHOUT_SIGNAL
+        if ISSUE_FIGURE_REF_WITHOUT_SIGNAL in (validation.issues or []):
+            parts.append(
+                "FIGURE_REF_WITHOUT_SIGNAL was flagged: your previous"
+                " response referenced a visual (\"the diagram\","
+                " \"looking at the figure\", \"shown above\") but did"
+                " NOT emit |||MEDIA:N||| — the student saw the"
+                " reference but no figure. Two valid fixes:"
+                "\n  (a) If a matching media item exists in the"
+                " <media_catalog>, append |||MEDIA:N||| as the LAST"
+                " line of your response so the student sees the"
+                " figure you referenced."
+                "\n  (b) If no matching figure is available, REMOVE"
+                " every \"the diagram / figure / image / picture /"
+                " shown above\" reference from your text and explain"
+                " the concept in plain prose instead."
+                " Pick one — do not leave the reference dangling."
+            )
         parts.append(
             "Edit the previous response to fix these violations. Keep"
             " whatever was good (greeting, framing, conceptual scaffold)."

@@ -11,6 +11,7 @@ Uses `instructor` library for guaranteed structured output from any LLM provider
 No manual JSON parsing — Pydantic models define the contract, instructor enforces it.
 """
 
+import re
 import time
 import logging
 from typing import Dict, List, Optional
@@ -136,6 +137,71 @@ def _llm_snap_eo(raw: str, canonical: List[str], llm_client) -> str:
     except Exception as e:
         logger.info("[EOSnap] LLM call failed: %s", e)
         return ''
+
+
+# Hard blocklist for distractor safety scan. Catches the most common
+# stereotype patterns the question generator has produced in pilot
+# (e.g. "Asians are naturally more intelligent", "Africa has no
+# resources", "Women can't do math"). Any match in question_text or
+# any choice → reject the question and emit a Layer-4-style log.
+# Intentionally narrow — relies on the LLM's content-gen prompt to
+# catch nuanced cases. This regex is the hard floor.
+_DISTRACTOR_BLOCKLIST_RE = re.compile(
+    r"\b(?:"
+    # Adjective-form: "Asians are naturally...", "Women aren't capable..."
+    r"(?:asian|african|european|american|white|black|hispanic|latino|"
+    r"arab|jewish|muslim|christian|hindu|buddhist|indian|chinese|"
+    r"japanese|men|women|boys|girls|males?|females?)s?\s+"
+    r"(?:are|aren'?t|is|isn'?t|can'?t|cannot|always|never|all|"
+    r"naturally|inherently|genetically|biologically)"
+    # Bare-region absolutes: "Africa has no resources", "Asia lacks..."
+    r"|(?:africa|asia|europe|america)\s+"
+    r"(?:has\s+no|have\s+no|lacks?|cannot|can'?t)"
+    # "naturally more X" / "naturally less Y"
+    r"|naturally\s+(?:more|less)\s+(?:intelligent|smart|stupid|"
+    r"capable|gifted|talented|advanced|primitive)"
+    # "[group] people are/can't/don't" — common stereotype shape
+    r"|(?:black|white|asian|african|brown)\s+people\s+"
+    r"(?:are|can'?t|don'?t|always|never)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _scan_question_for_unsafe_distractors(q: Dict) -> Optional[str]:
+    """Return a rejection reason string when any field of `q` contains
+    protected-class stereotype language, or None when the question is
+    clean. Checks question_text + all choice variants (option_a..d,
+    choices[], answer_data values).
+    """
+    fields_to_scan: List[str] = []
+    fields_to_scan.append(str(q.get('question_text') or q.get('question') or ''))
+    for k in ('option_a', 'option_b', 'option_c', 'option_d'):
+        v = q.get(k)
+        if v:
+            fields_to_scan.append(str(v))
+    for v in (q.get('choices') or []):
+        fields_to_scan.append(str(v))
+    ad = q.get('answer_data') or {}
+    if isinstance(ad, dict):
+        for k in ('text_template', 'data_description', 'figure_description'):
+            v = ad.get(k)
+            if v:
+                fields_to_scan.append(str(v))
+        for v in (ad.get('blanks') or []):
+            fields_to_scan.append(str(v))
+        for p in (ad.get('pairs') or []):
+            if isinstance(p, dict):
+                fields_to_scan.append(str(p.get('left', '')))
+                fields_to_scan.append(str(p.get('right', '')))
+    for f in fields_to_scan:
+        m = _DISTRACTOR_BLOCKLIST_RE.search(f)
+        if m:
+            return (
+                f"Distractor safety scan rejected: matched "
+                f"{m.group(0)!r} in {f[:120]!r}"
+            )
+    return None
 
 
 def _coverage_gaps(lesson, exit_ticket) -> list:
@@ -1145,7 +1211,20 @@ CONTENT GUIDELINES:
    - Example GOOD: "Schematic cross-section showing three layers of Earth with labels"
    - Example BAD: "Image of Earth's layers"
 3. Hints should scaffold from general to specific
-4. For MCQ, make distractors plausible but clearly wrong
+4. For MCQ, make distractors plausible but clearly wrong.
+   DISTRACTOR SAFETY RULES (hard requirements — questions that violate
+   any of these MUST be rewritten before submission):
+     - NEVER reference race, ethnicity, nationality, gender, religion,
+       caste, or any protected class in a distractor's rationale.
+       Bad: "Asians are naturally more intelligent". "Africa has no
+       resources". "Women are bad at math". Reject and rewrite.
+     - Distractors must come from concept-plausible mistakes — wrong
+       formula application, off-by-one, sign error, common
+       misconception, swapped variables. Not stereotypes.
+     - No "all of the above" / "none of the above" filler. Every
+       option must be a substantive answer the student could pick.
+     - Don't make the correct answer obviously longer or differently
+       formatted than distractors — that gives the answer away.
 5. PROACTIVELY ATTACH AND USE FIGURES. For any step teaching a VISUAL
    concept — geometric shapes, angle relationships, maps, charts,
    diagrams, cross-sections, processes with multiple parts — attach a
@@ -2548,6 +2627,31 @@ RULES:
                 f"empty={eo_validation_stats['empty']}",
                 flush=True,
             )
+
+            # Distractor safety scan — drop any question whose stem or
+            # choices reference protected-class stereotypes. Logged so
+            # the teacher can see what was rejected and request a regen.
+            unsafe_count = 0
+            safe_questions: List[Dict] = []
+            for q in questions:
+                rejection = _scan_question_for_unsafe_distractors(q)
+                if rejection:
+                    unsafe_count += 1
+                    print(
+                        f"[ContentGen] [{lesson.title}] DISTRACTOR REJECTED: "
+                        f"{rejection}",
+                        flush=True,
+                    )
+                    continue
+                safe_questions.append(q)
+            if unsafe_count:
+                print(
+                    f"[ContentGen] [{lesson.title}] dropped "
+                    f"{unsafe_count} question(s) for unsafe distractor "
+                    f"content. Regenerate to backfill.",
+                    flush=True,
+                )
+            questions = safe_questions
 
             for i, q in enumerate(questions):
                 q_type = q.get('question_type', 'mcq')

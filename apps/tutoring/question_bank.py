@@ -626,16 +626,75 @@ def render_question_to_prose(entry) -> str:
             return teacher_script
         return question
 
-    # ExitTicketQuestion — render stem + options if MCQ.
+    # ExitTicketQuestion — render stem with type-appropriate scaffolding.
     stem = (getattr(entry, 'question_text', '') or '').strip()
-    qtype = getattr(entry, 'question_type', 'mcq') or 'mcq'
-    if qtype != 'mcq':
+    qtype = (getattr(entry, 'question_type', 'mcq') or 'mcq').lower()
+    answer_data = getattr(entry, 'answer_data', None) or {}
+    if not isinstance(answer_data, dict):
+        answer_data = {}
+
+    if qtype == 'fill_in_blank':
+        # The actual sentence-with-blanks lives in
+        # answer_data.text_template — question_text is often just a
+        # short label like "Complete the sentence:". Without the
+        # template we render a truncated stub the student can't answer.
+        # Match the exit-modal frontend, which already pulls
+        # text_template (see _partials/exit_modal.html).
+        template = (answer_data.get('text_template') or '').strip()
+        if template:
+            if stem and stem.lower() not in template.lower():
+                return f"{stem}\n\n{template}"
+            return template
         return stem
-    options = []
-    for letter in ('A', 'B', 'C', 'D'):
-        opt = (getattr(entry, f'option_{letter.lower()}', '') or '').strip()
-        if opt:
-            options.append(f"  {letter}) {opt}")
-    if not options:
+
+    if qtype == 'matching':
+        # Render left → right pairing rows so the student sees the
+        # actual matching prompt instead of a bare "Match each angle…".
+        pairs = answer_data.get('pairs') or []
+        if pairs:
+            lines = [stem] if stem else []
+            lines.append("")
+            for p in pairs:
+                left = str(p.get('left', '')).strip()
+                if left:
+                    lines.append(f"  • {left}  →  ___")
+            distractors = [
+                str(r).strip()
+                for r in answer_data.get('distractor_rights', []) or []
+                if str(r).strip()
+            ]
+            right_pool = [str(p.get('right', '')).strip() for p in pairs
+                          if str(p.get('right', '')).strip()]
+            choices = [c for c in (right_pool + distractors) if c]
+            if choices:
+                lines.append("")
+                lines.append("Choose from: " + ", ".join(choices))
+            return "\n".join(lines).strip()
         return stem
-    return stem + "\n\n" + "\n".join(options)
+
+    if qtype in ('short_answer', 'data_interpretation', 'short_numeric'):
+        # Most short-answer banks store the full prompt in question_text;
+        # some carry a data_description / figure_description that adds
+        # context. Append when present so the student sees the same
+        # framing the exit-ticket modal would show.
+        extras = []
+        for key in ('data_description', 'figure_description'):
+            val = (answer_data.get(key) or '').strip()
+            if val and val not in stem:
+                extras.append(val)
+        if extras:
+            return stem + "\n\n" + "\n".join(extras)
+        return stem
+
+    if qtype == 'mcq':
+        options = []
+        for letter in ('A', 'B', 'C', 'D'):
+            opt = (getattr(entry, f'option_{letter.lower()}', '') or '').strip()
+            if opt:
+                options.append(f"  {letter}) {opt}")
+        if not options:
+            return stem
+        return stem + "\n\n" + "\n".join(options)
+
+    # Unknown type — fall back to the bare stem.
+    return stem
