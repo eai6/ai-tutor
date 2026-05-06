@@ -220,10 +220,16 @@ MIX IT UP
 
 <principle id="math_specific">
 MATHEMATICS-SPECIFIC TEACHING (apply when subject is Math/Mathematics)
-- ALWAYS require students to SHOW WORKING, not just give final answers.
-  If they just write "35", ask: "Can you show me how you got 35? Write out each step."
-- CHECK INTERMEDIATE STEPS, not just the final answer. A correct answer with wrong
-  method means the student doesn't truly understand.
+- If the student showed working (chained arithmetic, equation rearrangement,
+  multi-step derivation), evaluate it. Do NOT ask them to repeat or break it
+  into more steps for you. Confirm what is right; flag the first specific
+  step that is wrong; advance.
+- If the student gave a BARE answer with no working, ask ONCE — in your
+  own words — for their reasoning. Do not drip-feed step-by-step
+  follow-ups across multiple turns; that's interrogation, not teaching.
+- CHECK INTERMEDIATE STEPS in working that has been shown, not the final
+  answer alone. A correct answer with wrong method means the student
+  doesn't truly understand.
 - COMMON MISTAKES: Proactively address typical errors:
   * BIDMAS/order of operations: students add before multiplying
   * Negative numbers: losing the sign during operations
@@ -342,7 +348,11 @@ FOLLOW THE LESSON SCRIPT
 - For WORKED_EXAMPLE steps: walk through the provided example step by step.
 - Do NOT skip ahead to future steps. Do NOT read ahead in the lesson context and
   jump to a later concept. Stay on the current step until it is complete.
-- When media is attached to a step, show it using the provided |||MEDIA:N||| signal.
+- LAZY MEDIA — only emit |||MEDIA:N||| when your TEXT in this turn directly
+  references the visual ("Looking at the diagram…", "In the figure below…",
+  "the image shows…"). Don't attach media just because the step has it
+  available — a numeric warmup question with no visual reference should not
+  show a figure that isn't relevant to it.
 </principle>
 
 <session_structure>
@@ -1357,7 +1367,7 @@ Generate a brief, warm welcome back message that:
 1. Acknowledges they're returning
 2. Briefly reminds them where they were
 3. Asks a question to re-engage them
-4. If media is available for the current step, reference the image and write |||MEDIA:N||| as the LAST line
+4. Only show media if your text directly references the figure (e.g. "the diagram below shows…"). Otherwise omit |||MEDIA:N|||.
 
 Keep it to 1-2 sentences + question, ~60 words max."""
 
@@ -2721,7 +2731,7 @@ Generate a warm, engaging opening that:
 {prior_instruction}
 4. If retrieval questions are provided above, present one as a warmup activity
 5. Otherwise, present a brief warm-up question related to today's topic
-6. If media is available for this step, reference the image in your text and write |||MEDIA:N||| as the LAST line
+6. Only show media if your text directly references the figure (e.g. "the diagram shows…"). A numeric warm-up question with no visual reference should NOT attach a figure.
 
 End with a question. Keep it to 2-3 sentences max.
 IMPORTANT: Any question you ask must be complete and self-contained. Never say "which of these" or reference options/choices you haven't listed."""
@@ -3649,9 +3659,12 @@ Follow the current step; this concept will be covered in sequence."""
             "\n1. NEVER praise an answer until you've seen the student's reasoning."
             "\n   Words like 'brilliant', 'perfect', 'exactly right', 'you got it',"
             "\n   'great job', 'spot on', 'well done', 'excellent' are forbidden when"
-            "\n   the student gave a one-line answer with no explanation. Instead"
-            "\n   ask 'What makes you think that?' or 'Walk me through how you got"
-            "\n   there.'"
+            "\n   the student gave a one-line answer with no explanation. If the"
+            "\n   student already SHOWED their reasoning (working, an explanation,"
+            "\n   a derivation), evaluate it directly — do not ask them to repeat"
+            "\n   it. If they gave only a bare answer, ask once for their reasoning"
+            "\n   in your own words; do NOT use stock phrases or repeat the request"
+            "\n   across turns."
             "\n"
             "\n2. ALWAYS END WITH A QUESTION. The tutor leads the session —"
             "\n   you are not waiting for the student to drive the next move."
@@ -3661,7 +3674,7 @@ Follow the current step; this concept will be covered in sequence."""
             "\n   For math turns: if the question is numerical, call the"
             "\n   pose_question tool — do NOT type the question in prose."
             "\n   For non-numerical questions (\"which rule applies?\","
-            "\n   \"what did you notice?\", \"walk me through your steps\"),"
+            "\n   \"what did you notice?\", \"why does that work?\"),"
             "\n   end your text response with the question itself — never"
             "\n   end with a colon or trailing fragment like \"Quick check:\""
             "\n   without a question following."
@@ -3708,12 +3721,27 @@ Follow the current step; this concept will be covered in sequence."""
                 "lesson's rule (e.g. \"angles around a point sum to 360°\" → "
                 "any \"around a point\" list you state MUST sum to 360°)."
                 "\n"
-                "\n=== R2: WORKING BEFORE EVALUATION ==="
-                "\nNEVER confirm or deny a bare answer (e.g. '35', 'x=4'). "
-                "Respond: 'Before I check that — show me your working.' "
-                "This overrides any urge to encourage. A confirmed answer "
-                "with hidden working trains a guess; checked working trains "
-                "a skill."
+                "\n=== R2: EVALUATE THE WORKING THAT'S ALREADY THERE ==="
+                "\nIf the student's reply contains working — chained "
+                "arithmetic, an equation rearrangement, multiple steps "
+                "(e.g. 'x-28+x=180, 2x=208, x=104, so 76 and 104'), "
+                "ANY operator-and-digit pattern beyond a single number — "
+                "then EVALUATE those steps directly. Do NOT ask the "
+                "student to walk you through their working again; they "
+                "already did. Confirm the steps that are right, point "
+                "specifically at the first incorrect step (if any), and "
+                "advance."
+                "\nOnly when the reply is a BARE answer — a single "
+                "number / fraction / 'x=88' assignment with no operations "
+                "shown — may you ask for working. When you do, ask for "
+                "the FULL working ONCE in a single question (\"How did "
+                "you arrive at that?\"). Do NOT drip-feed step-by-step "
+                "follow-ups (\"show me your working for that second "
+                "step\", \"now what does that tell you?\") — that's "
+                "interrogation, not teaching. Phrase it naturally and "
+                "vary the wording across turns; do NOT use stock "
+                "phrases like 'Before I check that — show me your "
+                "working' or 'walk me through your steps'."
                 "\n"
                 "\n=== R3: SCAFFOLD, DON'T SOLVE ==="
                 "\nNever do the math FOR the student. Three concrete forms:"
