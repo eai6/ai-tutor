@@ -323,8 +323,11 @@ class FigureFactsBlockTest(TestCase):
         tutor.current_topic_index = current_topic_index
         return tutor
 
-    def test_block_empty_for_non_math_course(self):
-        # Non-math lesson with the same step shape — should return ''
+    def test_block_renders_for_non_math_course(self):
+        # Universal across subjects (was math-only). Geography lesson
+        # with the same step shape — should now render figure facts
+        # so the LLM gets the same anchor-the-figure context that
+        # math lessons get.
         geo_step = LessonStep.objects.create(
             lesson=self.geo_lesson, phase='explore', step_type='explore',
             order_index=0,
@@ -333,7 +336,9 @@ class FigureFactsBlockTest(TestCase):
                                'alt': 'x', 'caption': 'x'}]},
         )
         tutor = self._make_tutor(self.geo_lesson, [geo_step])
-        self.assertEqual(tutor._build_figure_facts_block(), '')
+        block = tutor._build_figure_facts_block()
+        # Should NOT be empty for non-math now.
+        self.assertIn('<figure_facts', block)
 
     def test_block_empty_when_step_has_no_media(self):
         bare_step = LessonStep.objects.create(

@@ -348,11 +348,17 @@ FOLLOW THE LESSON SCRIPT
 - For WORKED_EXAMPLE steps: walk through the provided example step by step.
 - Do NOT skip ahead to future steps. Do NOT read ahead in the lesson context and
   jump to a later concept. Stay on the current step until it is complete.
-- LAZY MEDIA — only emit |||MEDIA:N||| when your TEXT in this turn directly
-  references the visual ("Looking at the diagram…", "In the figure below…",
-  "the image shows…"). Don't attach media just because the step has it
-  available — a numeric warmup question with no visual reference should not
-  show a figure that isn't relevant to it.
+- USE VISUALS WHEN AVAILABLE — for any concept that benefits from a
+  visual (maps for geography, diagrams for geometry, processes for
+  science, structures for biology, primary-source images for history),
+  scan <media_catalog> for a relevant item. If one fits, REFERENCE it
+  in your text ("Looking at the map of Africa, you can see…") AND
+  emit |||MEDIA:N||| as the LAST line. Visuals make abstract concepts
+  concrete; don't teach a map-able concept in pure text when a map
+  exists.
+- LAZY MEDIA — but don't attach a figure that isn't relevant. A
+  numeric warmup with no visual concept should not auto-show a map.
+  Match relevance to the current concept being taught.
 - INVERSE RULE — if your text DOES reference a figure / diagram / image,
   you MUST emit |||MEDIA:N||| in the same turn so the student actually
   sees it. Saying "Looking at the diagram…" without attaching media
@@ -4090,6 +4096,21 @@ Follow the current step; this concept will be covered in sequence."""
         # Build numbered ID map
         self._media_id_map = {}
         self._step_media_ids = step_media_positions  # {step_index: [catalog_id, ...]}
+        # Observability: surface what the catalog has so we can debug
+        # "no figure shown" cases without crawling the LLM prompt.
+        try:
+            steps_with_media = sorted(step_media_positions.keys())
+            current_step_has_media = bool(
+                step_media_positions.get(self.current_topic_index)
+            )
+            logger.info(
+                "[MediaCatalog] lesson_id=%s items=%d steps_with_media=%s "
+                "current_step=%d current_step_has_media=%s",
+                self.lesson.id, len(media_items), steps_with_media,
+                self.current_topic_index, current_step_has_media,
+            )
+        except Exception:
+            pass
         if not media_items:
             return (
                 "\n\n<media_catalog>\n"
@@ -4123,15 +4144,12 @@ Follow the current step; this concept will be covered in sequence."""
         anchor prompts. Followed by usage rules forbidding "imagine X"
         when the figure is visible. See memory/figure_facts_plan.md.
 
-        Math-only — gated on Course.is_math. Empty string when there
-        is no current step, no attached figure, or no figure_facts on
-        the attached MediaAsset.
+        Universal across subjects (was math-only). Geography maps,
+        science diagrams, and history primary-source images all
+        benefit from the same anchor-and-don't-imagine guidance.
+        Empty string when there is no current step, no attached
+        figure, or no figure_facts on the attached MediaAsset.
         """
-        try:
-            if not self.lesson.unit.course.is_math:
-                return ''
-        except Exception:
-            return ''
         if self.current_topic_index >= len(self.steps):
             return ''
         current_step = self.steps[self.current_topic_index]
@@ -8218,6 +8236,16 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
                 "bank_offered": bool(id_map),
                 "bank_slot_count": len(id_map),
                 "bank_signal_used": bool(getattr(self, '_bank_signal_used_this_turn', False)),
+                # Media availability for current step (debugging
+                # "no figure shown" complaints — was the catalog
+                # populated AND did the LLM use it?).
+                "step_has_media": bool(
+                    (getattr(self, '_step_media_ids', {}) or {})
+                    .get(step_idx)
+                ),
+                "media_emitted_this_turn": bool(
+                    (self._turn_media or {}).get(str(len(self.conversation) - 1))
+                ),
                 # Tool use (populated by _handle_pose_question_message)
                 "tool_use_count": metadata.get('tool_use_count', 0),
                 # Validator + regen
