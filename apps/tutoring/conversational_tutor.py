@@ -5772,17 +5772,21 @@ Follow the current step; this concept will be covered in sequence."""
     # Hard cap per step type: force advance after this many exchanges
     # regardless of LLM verdict. Prevents the tutor from getting stuck
     # on a single step. teach / worked_example / summary are short
-    # instructional steps — students who haven't moved on after 10
-    # turns of teaching aren't going to. practice / quiz can take
-    # longer (multiple wrong attempts + retries are normal).
+    # Hard-cap exchanges per step. Reduced from 30 → 10 (2026-05-06)
+    # for practice/quiz: production transcripts showed sessions running
+    # 14+ exchanges on the final quiz step without the exit ticket
+    # firing because step_complete=null came back from the judge every
+    # turn. 10 is enough wrestling time for a single question with
+    # retries, and forces advancement so the exit ticket actually
+    # triggers.
     _STEP_HARD_CAP_EXCHANGES = {
         'teach': 10,
         'worked_example': 10,
-        'practice': 30,
-        'quiz': 30,
+        'practice': 10,
+        'quiz': 10,
         'summary': 10,
     }
-    _STEP_HARD_CAP_DEFAULT = 30
+    _STEP_HARD_CAP_DEFAULT = 10
 
     def _build_step_eval_context(
         self, student_input: str, tutor_response: str,
@@ -6612,16 +6616,17 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         """Determine if the current step is complete.
 
         Safety valves (hard rules, not LLM):
-        | Rule                              | Threshold                                              |
-        |-----------------------------------|--------------------------------------------------------|
-        | Per-step-type hard cap            | teach / worked_example / summary: 10 ; practice / quiz: 30 |
-        | Min exchanges before eval         | teach / worked_example: 2 ; others: 1                  |
+        | Rule                              | Threshold                              |
+        |-----------------------------------|----------------------------------------|
+        | Per-step-type hard cap            | 10 exchanges (all step types)          |
+        | Min exchanges before eval         | teach / worked_example: 2 ; others: 1  |
         | Deterministic-correct fast-path   | practice/quiz + is_correct=True from deterministic check |
-        | step_complete fast-path           | LLM judge says step_complete=True                      |
+        | step_complete fast-path           | LLM judge says step_complete=True      |
 
-        2026-05-05: switched from a single 30-exchange global cap to
-        per-step-type caps. Teach / worked_example / summary are short
-        instructional steps; practice / quiz keep 30 for wrestling time.
+        2026-05-06: caps reduced to a uniform 10 across all step types.
+        Production showed practice/quiz at 30 → step_complete null →
+        exit ticket never triggered. 10 forces advancement so sessions
+        complete in finite time even when the judge returns no signal.
 
         2026-05-05 (later): tightened the correct-answer fast-path.
         Originally fired on ANY is_correct=True, which could advance

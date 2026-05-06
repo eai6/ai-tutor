@@ -180,10 +180,16 @@ def sample_session_pool(
     # is_published=False; using that filter here meant the runtime
     # never saw lesson-level banks even when the teacher dashboard
     # showed them populated. Filter by assessment_type instead.
+    #
+    # 'matching' questions are excluded from the in-chat tutoring pool —
+    # they render awkwardly inline ("70° → ___, choose from: …") and
+    # confuse students. Matching stays in the EXIT TICKET (post-lesson
+    # modal where the UI can render proper select boxes). Tutoring
+    # uses MCQ / short_numeric / short_answer / fill_in_blank only.
     bank_qs = ExitTicketQuestion.objects.filter(
         exit_ticket__lesson=lesson,
         exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
-    ).order_by('order_index')
+    ).exclude(question_type='matching').order_by('order_index')
     bank = list(bank_qs)
     if not bank:
         return []

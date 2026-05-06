@@ -405,8 +405,11 @@ def run_combined_judge(
         result.skip_reason = f"judge_error: {type(e).__name__}"
         return result
 
-    # Arithmetic
+    # Arithmetic — math-only by definition. Drop any items the judge
+    # emits on non-math turns (defensive guard).
     arith_items = data.get("arithmetic_corrections") or []
+    if not subject_is_math:
+        arith_items = []
     if isinstance(arith_items, list):
         for item in arith_items[:max_arithmetic_corrections]:
             if not isinstance(item, dict):
@@ -447,7 +450,12 @@ def run_combined_judge(
         for missing in factual_claims[len(result.fact_claims):]:
             result.fact_claims.append(ClaimVerdict(missing, "unverified"))
 
-    # Rule violations
+    # Rule violations. Programmatic RULE_1 + ARITHMETIC gating: the
+    # judge prompt asks the LLM to skip these on non-math turns, but
+    # Sonnet has been observed to emit RULE_1 anyway (geography
+    # transcripts had rule1_violation on every conceptual answer).
+    # Filter here so a non-compliant judge can't trigger regen for a
+    # rule that doesn't apply.
     rule_items = data.get("rule_violations") or []
     if isinstance(rule_items, list):
         for item in rule_items[:max_violations]:
@@ -455,6 +463,11 @@ def run_combined_judge(
                 continue
             rule = str(item.get("rule") or "").strip().upper()
             if rule not in VALID_RULES:
+                continue
+            if not subject_is_math and rule in (RULE_RULE_1, RULE_ARITHMETIC):
+                logger.info(
+                    "[CombinedJudge] dropping %s on non-math turn", rule,
+                )
                 continue
             evidence = str(item.get("evidence") or "")[:200]
             fix = str(item.get("suggested_fix") or "")[:300]
