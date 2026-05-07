@@ -678,62 +678,13 @@ def student_detail(request, student_id):
         'description': 'Has not yet taken the exit ticket.',
     }
 
-    competency_data = []
-    for cid, cp in courses_progress.items():
-        course = cp['course']
-        eo_skills = Skill.objects.filter(course=course, is_enabling_objective=True)
-        total_eo = eo_skills.count()
-        if total_eo == 0:
-            continue
-
-        achieved = StudentSkillMastery.objects.filter(
-            student=student, skill__in=eo_skills,
-            mastery_level__gte=config.threshold_me_min / 100.0,
-        ).count()
-        pct = round(achieved / total_eo * 100) if total_eo else 0
-
-        # Per-lesson breakdown
-        lesson_competencies = []
-        course_has_any_attempt = False
-        for unit in course.units.all().order_by('order_index'):
-            for lesson in unit.lessons.filter(is_published=True).order_by('order_index'):
-                lesson_eos = eo_skills.filter(primary_lesson=lesson)
-                lesson_total = lesson_eos.count()
-                if lesson_total == 0:
-                    continue
-                lesson_achieved = StudentSkillMastery.objects.filter(
-                    student=student, skill__in=lesson_eos,
-                    mastery_level__gte=config.threshold_me_min / 100.0,
-                ).count()
-                lesson_pct = round(lesson_achieved / lesson_total * 100) if lesson_total else 0
-                if lesson.id in attempted_lesson_ids:
-                    lesson_cat = config.categorize_student(lesson_pct)
-                    course_has_any_attempt = True
-                else:
-                    lesson_cat = UN_CATEGORY
-                lesson_competencies.append({
-                    'lesson': lesson,
-                    'achieved': lesson_achieved,
-                    'total': lesson_total,
-                    'pct': lesson_pct,
-                    'category': lesson_cat,
-                })
-
-        # Course-level category: if the student hasn't attempted ANY
-        # exit ticket in this course, flag the whole course as UN.
-        if course_has_any_attempt:
-            category = config.categorize_student(pct)
-        else:
-            category = UN_CATEGORY
-
-        competency_data.append({
-            'course': course,
-            'achieved': achieved,
-            'total': total_eo,
-            'pct': pct,
-            'category': category,
-            'lessons': lesson_competencies,
-        })
+    # Competency Breakdown widget was removed from the student
+    # detail page (Edward, 2026-05-07) — same family as the per-EO
+    # tables dropped from the session report. The Course Progress
+    # card already conveys per-lesson mastery. Skipping the
+    # per-EO calculation saves ~N×M Skill / StudentSkillMastery
+    # queries per page render.
+    competency_data: list = []
 
     # Promote / demote action labels — staff use these one-off on the
     # student page (vs the bulk flow on the class page). An empty
