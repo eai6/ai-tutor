@@ -4,8 +4,8 @@
 {% block page_title %}Flagged Chats{% endblock %}
 
 {% block content %}
-<!-- Stats -->
-<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); max-width: 600px;">
+<!-- Stats — safety-only (validator flags removed, 2026-05-07) -->
+<div class="stats-grid" style="grid-template-columns: repeat(2, 1fr); max-width: 420px;">
     <div class="stat-card">
         <div class="stat-label">Safety Flags</div>
         <div class="stat-value">{{ total_flagged }}</div>
@@ -14,25 +14,15 @@
         <div class="stat-label">Unreviewed</div>
         <div class="stat-value" style="color: {% if unreviewed_count %}var(--danger){% else %}var(--success){% endif %}">{{ unreviewed_count }}</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-label">Validator Hard-Fails</div>
-        <div class="stat-value" style="color: {% if validator_flagged_count %}#92400e{% else %}var(--success){% endif %}">{{ validator_flagged_count }}</div>
-    </div>
 </div>
 
-<!-- Filters -->
+<!-- Filters: status only -->
 <div style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
     <div style="display:flex;gap:0.4rem;">
-        <span style="font-size:0.75rem;color:var(--gray-500);align-self:center;text-transform:uppercase;">Source:</span>
-        <a href="?flag_type=all&status={{ status_filter }}" class="btn {% if flag_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All flags</a>
-        <a href="?flag_type=safety&status={{ status_filter }}" class="btn {% if flag_filter == 'safety' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Safety</a>
-        <a href="?flag_type=validator&status={{ status_filter }}" class="btn {% if flag_filter == 'validator' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Validator</a>
-    </div>
-    <div style="display:flex;gap:0.4rem;">
         <span style="font-size:0.75rem;color:var(--gray-500);align-self:center;text-transform:uppercase;">Status:</span>
-        <a href="?status=all&flag_type={{ flag_filter }}" class="btn {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All</a>
-        <a href="?status=unreviewed&flag_type={{ flag_filter }}" class="btn {% if status_filter == 'unreviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Unreviewed</a>
-        <a href="?status=reviewed&flag_type={{ flag_filter }}" class="btn {% if status_filter == 'reviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Reviewed</a>
+        <a href="?status=all" class="btn {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All</a>
+        <a href="?status=unreviewed" class="btn {% if status_filter == 'unreviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Unreviewed</a>
+        <a href="?status=reviewed" class="btn {% if status_filter == 'reviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Reviewed</a>
     </div>
 </div>
 
@@ -59,29 +49,16 @@
                     </td>
                     <td>{{ s.lesson.title }}</td>
                     <td style="max-width: 240px;">
-                        {% if s.has_safety_flag %}
-                            <div style="font-size: 0.78rem;color:#991b1b;">⚠ Safety: {{ s.flag_reason|truncatewords:10 }}</div>
-                        {% endif %}
-                        {% if s.has_validator_flag %}
-                            <div style="font-size: 0.78rem;color:#92400e;">📚 Curriculum-contradicted claim(s)</div>
-                        {% endif %}
+                        <div style="font-size: 0.78rem;color:#991b1b;">⚠ Safety: {{ s.flag_reason|truncatewords:10 }}</div>
                     </td>
                     <td style="font-size: 0.875rem;">
-                        {% if s.flagged_at %}{{ s.flagged_at|timesince }} ago{% elif s.has_validator_flag %}{{ s.started_at|timesince }} ago{% else %}&mdash;{% endif %}
+                        {% if s.flagged_at %}{{ s.flagged_at|timesince }} ago{% else %}&mdash;{% endif %}
                     </td>
                     <td>
-                        {% if s.has_safety_flag %}
-                            {% if s.flag_reviewed %}<span class="badge badge-success">Reviewed</span>{% else %}<span class="badge badge-danger">Unreviewed</span>{% endif %}
-                        {% else %}
-                            <span class="badge" style="background:#fef3c7;color:#92400e;">Validator</span>
-                        {% endif %}
+                        {% if s.flag_reviewed %}<span class="badge badge-success">Reviewed</span>{% else %}<span class="badge badge-danger">Unreviewed</span>{% endif %}
                     </td>
                     <td>
-                        {% if s.has_safety_flag %}
-                            <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn-secondary btn-sm">View</a>
-                        {% else %}
-                            <a href="{% url 'dashboard:session_chat_history' s.id %}" class="btn btn-secondary btn-sm">View</a>
-                        {% endif %}
+                        <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn-secondary btn-sm">View</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -92,13 +69,13 @@
         {% if sessions.has_other_pages %}
         <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: center; gap: 0.5rem;">
             {% if sessions.has_previous %}
-                <a href="?status={{ status_filter }}&flag_type={{ flag_filter }}&page={{ sessions.previous_page_number }}" class="btn btn-secondary btn-sm">&larr; Previous</a>
+                <a href="?status={{ status_filter }}&page={{ sessions.previous_page_number }}" class="btn btn-secondary btn-sm">&larr; Previous</a>
             {% endif %}
             <span style="padding: 0.5rem 1rem; color: var(--gray-500);">
                 Page {{ sessions.number }} of {{ sessions.paginator.num_pages }}
             </span>
             {% if sessions.has_next %}
-                <a href="?status={{ status_filter }}&flag_type={{ flag_filter }}&page={{ sessions.next_page_number }}" class="btn btn-secondary btn-sm">Next &rarr;</a>
+                <a href="?status={{ status_filter }}&page={{ sessions.next_page_number }}" class="btn btn-secondary btn-sm">Next &rarr;</a>
             {% endif %}
         </div>
         {% endif %}

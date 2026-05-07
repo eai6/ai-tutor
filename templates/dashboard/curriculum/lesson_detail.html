@@ -381,13 +381,16 @@
             {% for p in prerequisites %}
             <span class="prereq-pill" data-prereq-id="{{ p.prerequisite.id }}" style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: #eff6ff; border-radius: 9999px; font-size: 0.875rem;">
                 {{ p.prerequisite.title }}
+                {% if user.is_superuser %}
                 <button type="button" onclick="removePrereq(this, {{ p.prerequisite.id }})" style="background: none; border: none; cursor: pointer; color: var(--gray-400); font-size: 1rem; line-height: 1; padding: 0;" title="Remove prerequisite">&times;</button>
+                {% endif %}
             </span>
             {% empty %}
             <span id="prereq-empty" style="color: var(--gray-500); font-size: 0.875rem;">No prerequisites. Students can start this lesson immediately.</span>
             {% endfor %}
         </div>
 
+        {% if user.is_superuser %}
         <div style="display: flex; gap: 0.5rem; align-items: center;">
             <select id="prereq-select" style="flex: 1; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
                 <option value="">-- Select a lesson --</option>
@@ -397,6 +400,7 @@
             </select>
             <button type="button" class="btn btn-primary btn-sm" onclick="addPrereq()">Add</button>
         </div>
+        {% endif %}
     </div>
 </div>
 
@@ -609,19 +613,23 @@
                     </div>
                     {% endif %}
                     
+                    {% if user.is_superuser %}
                     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-100);">
                         <a href="{% url 'dashboard:step_edit' step.id %}" class="btn btn-secondary btn-sm">Edit Step</a>
                     </div>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
         {% else %}
             <div style="text-align: center; padding: 2rem; color: var(--gray-500);">
                 <p>No steps generated yet.</p>
+                {% if user.is_superuser %}
                 <form method="post" action="{% url 'dashboard:lesson_generate_content' lesson.id %}" style="margin-top: 1rem;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-primary">⚡ Generate Content</button>
                 </form>
+                {% endif %}
             </div>
         {% endif %}
     </div>
@@ -723,20 +731,24 @@
                     <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:#fff;padding:0.75rem;">
                         {{ question.answer_data.figure_svg|safe }}
                     </div>
+                    {% if user.is_superuser %}
                     <div style="margin-bottom:0.5rem;">
                         <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
                            class="btn btn-sm btn-secondary"
                            style="font-size:0.75rem;text-decoration:none;">✎ Edit figure</a>
                     </div>
+                    {% endif %}
                     {% elif question.answer_data.figure_url %}
                     <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:#fff;padding:0.75rem;text-align:center;">
                         <img src="{{ question.answer_data.figure_url }}" alt="Question figure" style="max-width:100%;border-radius:4px;">
                     </div>
+                    {% if user.is_superuser %}
                     <div style="margin-bottom:0.5rem;">
                         <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
                            class="btn btn-sm btn-secondary"
                            style="font-size:0.75rem;text-decoration:none;">✎ Edit figure</a>
                     </div>
+                    {% endif %}
                     {% elif question.answer_data.data_description %}
                     <div class="rendered-html-frame" style="margin-bottom: 0.5rem; border: 1px solid #bfdbfe; border-radius: 6px; overflow: hidden; background: #f8fafc; padding: 0.75rem;">
                         {{ question.answer_data.data_description|safe }}
@@ -747,7 +759,7 @@
                            style="font-size:0.75rem;text-decoration:none;">✎ Add chart figure</a>
                     </div>
                     {% endif %}
-                    {% if question.question_type == 'data_interpretation' and not question.answer_data.figure_svg and not question.answer_data.figure_url and not question.answer_data.data_description %}
+                    {% if user.is_superuser and question.question_type == 'data_interpretation' and not question.answer_data.figure_svg and not question.answer_data.figure_url and not question.answer_data.data_description %}
                     <div style="margin-bottom:0.5rem;">
                         <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
                            class="btn btn-sm btn-secondary"
@@ -789,10 +801,12 @@
                 </div>
                 {% endif %}
 
+                {% if user.is_superuser %}
                 <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
                     <button type="button" onclick="editQuestion(this)" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Edit</button>
                     <button type="button" onclick="deleteQuestion(this)" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: var(--danger);">Delete</button>
                 </div>
+                {% endif %}
             </div>
 
             <!-- Edit mode (hidden by default) -->

@@ -126,19 +126,28 @@ class ImageGenerationService:
         textbook_context: str = "",
         include_bytes: bool = False,
         model_override: Optional[str] = None,
+        current_image_url: Optional[str] = None,
         **kwargs
     ) -> Optional[Dict]:
         """
-        Generate a new image.
+        Generate a new image — or EDIT an existing one when
+        `current_image_url` is supplied.
 
         Args:
-            prompt: Description of the image needed
+            prompt: Description of the image needed (or the edit
+                    instruction when current_image_url is set).
             category: Type of image (diagram, photo, illustration, etc.)
             textbook_context: Optional description of the textbook figure style
             include_bytes: If True, include '_raw_bytes' key with raw image data
             model_override: 'openai' or 'gemini' — force a specific provider
                             and skip cross-provider fallback. Used by the
                             teacher Regenerate UI.
+            current_image_url: When set, the provider EDITS this existing
+                               image rather than generating from scratch.
+                               OpenAI uses images.edit; Gemini sends the
+                               image as multimodal context. Falls back to
+                               full generation if the provider can't load
+                               the existing image.
 
         Returns:
             Dict with 'url', 'title', 'caption', 'generated', 'model' keys,
@@ -153,9 +162,15 @@ class ImageGenerationService:
         override = (model_override or '').lower().strip() or None
 
         if override == 'openai':
-            return self._generate_with_openai(prompt, category, textbook_context, include_bytes)
+            return self._generate_with_openai(
+                prompt, category, textbook_context, include_bytes,
+                current_image_url=current_image_url,
+            )
         if override in ('gemini', 'google'):
-            return self._generate_with_gemini(prompt, category, textbook_context, include_bytes)
+            return self._generate_with_gemini(
+                prompt, category, textbook_context, include_bytes,
+                current_image_url=current_image_url,
+            )
 
         # No override — primary by config, with cross-provider fallback.
         primary = self._configured_provider()
@@ -165,7 +180,10 @@ class ImageGenerationService:
             else (self._generate_with_gemini, self._generate_with_openai)
         )
         for fn in order:
-            result = fn(prompt, category, textbook_context, include_bytes)
+            result = fn(
+                prompt, category, textbook_context, include_bytes,
+                current_image_url=current_image_url,
+            )
             if result:
                 return result
 
@@ -177,8 +195,15 @@ class ImageGenerationService:
     def _generate_with_openai(
         self, prompt: str, category: str, textbook_context: str = "",
         include_bytes: bool = False,
+        current_image_url: Optional[str] = None,
     ) -> Optional[Dict]:
-        """Generate image via OpenAI Images API (gpt-image-2)."""
+        """Generate image via OpenAI Images API (gpt-image-2).
+
+        When `current_image_url` is supplied, calls images.edit so the
+        model EDITS the existing image rather than generating from
+        scratch. Falls back to full generation if the existing image
+        can't be loaded.
+        """
         api_key = self._get_openai_key()
         if not api_key:
             return None
@@ -194,15 +219,46 @@ class ImageGenerationService:
         # Use landscape for factual/spatial categories, square for the rest.
         size = "1536x1024" if category in FACTUAL_CATEGORIES else "1024x1024"
 
+        # Resolve the existing image bytes for edit-mode (if any).
+        existing_bytes = None
+        if current_image_url:
+            existing_bytes = self._read_image_bytes(current_image_url)
+            if existing_bytes is None:
+                logger.warning(
+                    "[ImageEdit] could not load current_image_url=%s — "
+                    "falling back to text-only generation",
+                    current_image_url,
+                )
+
         try:
-            logger.info(f"Generating image with {model}: {prompt[:80]}...")
             client = OpenAI(api_key=api_key)
-            response = client.images.generate(
-                model=model,
-                prompt=enhanced_prompt,
-                size=size,
-                n=1,
-            )  # noqa: B009
+            if existing_bytes:
+                # images.edit takes the prior image + a prompt that
+                # describes the edit. The model preserves what's good
+                # and changes what the prompt describes — much more
+                # stable than re-generating from scratch on every regen.
+                logger.info(
+                    f"Editing image with {model} ({len(existing_bytes)} bytes): "
+                    f"{prompt[:80]}..."
+                )
+                from io import BytesIO
+                buf = BytesIO(existing_bytes)
+                buf.name = "current.png"  # OpenAI SDK reads .name for MIME
+                response = client.images.edit(
+                    model=model,
+                    image=buf,
+                    prompt=enhanced_prompt,
+                    size=size,
+                    n=1,
+                )
+            else:
+                logger.info(f"Generating image with {model}: {prompt[:80]}...")
+                response = client.images.generate(
+                    model=model,
+                    prompt=enhanced_prompt,
+                    size=size,
+                    n=1,
+                )
             data = response.data[0] if response.data else None
             if not data:
                 logger.warning(f"{model}: empty response.data")
@@ -262,8 +318,13 @@ class ImageGenerationService:
     def _generate_with_gemini(
         self, prompt: str, category: str, textbook_context: str = "",
         include_bytes: bool = False,
+        current_image_url: Optional[str] = None,
     ) -> Optional[Dict]:
-        """Generate image — tries configured Gemini model, falls back to GEMINI_FALLBACK_MODEL on 503."""
+        """Generate image — tries configured Gemini model, falls back
+        to GEMINI_FALLBACK_MODEL on 503. When `current_image_url` is
+        supplied, sends the existing image as multimodal context so
+        the model edits it. Falls back to text-only if the image
+        can't be loaded."""
         api_key = self._get_gemini_key()
         if not api_key:
             return None
@@ -278,11 +339,35 @@ class ImageGenerationService:
         client = genai.Client(api_key=api_key)
         enhanced_prompt = self._enhance_prompt(prompt, category, textbook_context)
 
+        # Build the user-message parts. When current_image_url is
+        # supplied, prepend the existing image as multimodal context
+        # so Gemini edits it instead of generating from scratch.
+        user_parts = []
+        if current_image_url:
+            existing_bytes = self._read_image_bytes(current_image_url)
+            if existing_bytes:
+                mime = self._guess_mime(current_image_url)
+                try:
+                    user_parts.append(types.Part(
+                        inline_data=types.Blob(
+                            mime_type=mime, data=existing_bytes,
+                        )
+                    ))
+                except Exception as e:
+                    logger.warning(
+                        "[ImageEdit] Gemini inline_data failed: %s — "
+                        "falling back to text-only", e,
+                    )
+            else:
+                logger.warning(
+                    "[ImageEdit] could not load current_image_url=%s "
+                    "for Gemini — falling back to text-only",
+                    current_image_url,
+                )
+        user_parts.append(types.Part.from_text(text=enhanced_prompt))
+
         contents = [
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=enhanced_prompt)],
-            ),
+            types.Content(role="user", parts=user_parts),
         ]
 
         aspect = "16:9" if category in FACTUAL_CATEGORIES else "1:1"
@@ -473,6 +558,47 @@ class ImageGenerationService:
         )
 
         return f"{style}{context}{lesson_context}{textbook_style}{prompt}{anti_hallucination}"
+
+    # ─── Image-edit helpers ─────────────────────────────────────────
+
+    def _read_image_bytes(self, url: str) -> Optional[bytes]:
+        """Resolve a stored image URL (local /media/... path or absolute
+        http(s) URL) to raw bytes for use as multimodal input to the
+        edit-mode image regen path. Returns None on any failure so the
+        caller can fall back to text-only generation."""
+        if not url:
+            return None
+        try:
+            from django.conf import settings
+            import os
+            if url.startswith('/media/') or not url.startswith(('http://', 'https://')):
+                # Local file under MEDIA_ROOT
+                relative = url[len('/media/'):] if url.startswith('/media/') else url
+                local_path = os.path.join(settings.MEDIA_ROOT, relative.lstrip('/'))
+                if not os.path.exists(local_path):
+                    return None
+                with open(local_path, 'rb') as f:
+                    return f.read()
+            # Remote URL — short timeout so a stuck CDN doesn't block regen.
+            import requests
+            resp = requests.get(url, timeout=6)
+            if resp.status_code != 200:
+                return None
+            return resp.content
+        except Exception as e:
+            logger.warning("[ImageEdit] _read_image_bytes(%s) failed: %s", url[-60:], e)
+            return None
+
+    @staticmethod
+    def _guess_mime(url: str) -> str:
+        u = (url or '').lower()
+        if u.endswith(('.jpg', '.jpeg')):
+            return 'image/jpeg'
+        if u.endswith('.gif'):
+            return 'image/gif'
+        if u.endswith('.webp'):
+            return 'image/webp'
+        return 'image/png'
 
     # ─── Save ───────────────────────────────────────────────────────
 

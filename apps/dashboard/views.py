@@ -94,6 +94,12 @@ def get_staff_context(request):
     from apps.accounts.models import PlatformConfig
     config = PlatformConfig.load()
 
+    # Edward (2026-05-07): teachers should NOT be able to edit
+    # lessons, regenerate, or upload curriculum — those are platform-
+    # admin operations only. The PlatformConfig flags
+    # (teachers_can_*) are now ignored for staff; only superusers
+    # see editing affordances. Hard removal vs config flag was
+    # explicitly requested to remove the operational risk.
     return {
         'membership': membership,
         'institution': institution,
@@ -101,9 +107,9 @@ def get_staff_context(request):
         'all_schools': staff_schools if len(staff_schools) > 1 else [],
         'is_aggregated': False,
         'unreviewed_flag_count': _safety_flag_count(institution),
-        'can_edit_content': config.teachers_can_edit_content,
-        'can_upload_curriculum': config.teachers_can_upload_curriculum,
-        'can_regenerate_courses': config.teachers_can_regenerate_courses,
+        'can_edit_content': False,
+        'can_upload_curriculum': False,
+        'can_regenerate_courses': False,
     }
 
 
@@ -5803,10 +5809,17 @@ def exit_ticket_figure_edit(request, question_id):
                     else None
                 )
                 svc = ImageGenerationService(lesson=lesson, institution=inst)
+                # When the question already has a figure, pass it as
+                # vision context so the model EDITS the existing
+                # image rather than regenerating from scratch — keeps
+                # the prior figure's good parts and only changes what
+                # the new prompt describes (Edward, 2026-05-07).
+                current_url = (answer_data or {}).get('figure_url') or ''
                 result = svc.get_or_generate_image(
                     prompt=new_prompt,
                     category='diagram',
                     model_override=model_choice or None,
+                    current_image_url=current_url or None,
                 )
                 if result and result.get('url'):
                     # Strip ALL legacy figure fields so figure_url is the
