@@ -37,6 +37,23 @@
                     <line class="audio-off-icon" x1="17" y1="9" x2="23" y2="15" style="display:none"/>
                 </svg>
             </button>
+            {% comment %}Help / report-issue button in the chat header.
+               Replaces the floating .fb-btn on chat pages so it stops
+               overlapping the chat input on phones (B.1 in
+               memory/pilot_session_plan.md). Opens the same modal
+               via the global window.openHelpFeedback wired in
+               templates/_includes/feedback_button.html.{% endcomment %}
+            <button type="button"
+                    class="help-toggle fb-trigger"
+                    id="help-toggle"
+                    title="Help / report an issue"
+                    aria-label="Help / report an issue">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+            </button>
 
             {% comment %}Mobile-only overflow menu — collapses Too hard / Too easy / Audio
                into a single kebab button on narrow screens. The desktop
@@ -66,6 +83,9 @@
                 </button>
                 <button type="button" role="menuitem" onclick="closeHeaderMenu(); restartLesson();">
                     <span class="hm-emoji" aria-hidden="true">🔄</span> Restart lesson
+                </button>
+                <button type="button" role="menuitem" class="fb-trigger" onclick="closeHeaderMenu();">
+                    <span class="hm-emoji" aria-hidden="true">💬</span> Help / report an issue
                 </button>
             </div>
         </div>
@@ -1096,6 +1116,7 @@ body {
     /* Collapse all secondary header actions into the kebab menu. */
     .header-difficulty { display: none; }
     .audio-toggle { display: none; }
+    .help-toggle { display: none; }
     .header-kebab { display: inline-flex; }
 
     /* Trim the title row so the lesson name + phase badge fit. */
@@ -1192,6 +1213,30 @@ body {
 .audio-toggle:hover { background: #f4f4f5; color: #18181b; }
 .audio-toggle.active { background: #18181b; color: #fff; }
 .audio-toggle.active:hover { background: #27272a; }
+
+/* Help / report-issue button — same size + treatment as .audio-toggle.
+   Lives next to it in the header. Hidden on mobile because the kebab
+   overflow menu carries the same action there. */
+.help-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #71717a;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+.help-toggle:hover { background: #f4f4f5; color: #18181b; }
+
+/* Hide the floating .fb-btn while we're on the chat page — its
+   bottom-right position overlaps the chat input on phones. The
+   header button + mobile-overflow menu cover both surfaces. */
+.fb-btn { display: none !important; }
 
 .mic-btn {
     display: flex;

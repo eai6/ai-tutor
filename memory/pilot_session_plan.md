@@ -273,3 +273,50 @@ After Tier A ships:
 9. ~~Migration policy~~ — soft-deprecate (UI removal, no schema change).
 
 **One contradiction to flag for Edward:** in the body of A.4 (line 121) the retry cap was "3"; in §6 Q5 you said "6". I've gone with **6** (the §6 answer is later/more specific). Confirm if that's right.
+
+---
+
+## Status — pause for teacher training (2026-05-08)
+
+### Shipped + deployed
+- **A.0 Evaluation reliability** — non-answer guard, deterministic-first numeric/MCQ check, tri-state `is_correct=null` for conceptual replies. Done in commits before today.
+- **A.0.1 Split monolithic combined_judge into per-domain inspectors**
+  arithmetic / factual / rule / step_eval, concurrent via ThreadPoolExecutor, fail-soft, ~2KB prompts each. `combined_judge.run_combined_judge` kept as compat shim. Commit `560f2c6`.
+- **A.0.2 Replay scripts + audit harness**
+  `scripts/replay_failed_judge_transcripts.py` (5 curated production-failure cases) and `scripts/replay_transcripts_md.py` (full 62-turn replay over `memory/transcripts.md`). Both use the production `tutor.judge_client` so they hit the real JUDGE ModelConfig (Sonnet 4). Output → `memory/judge_disagreements_audit.md`.
+- **A.0.3 posed_question fix + tutor coherence + figure-ref + figure-vision judges**
+  - `_build_step_eval_context` now carries `posed_question` (step.teacher_script → fallback to last `?`-line of prior tutor turn). Step_eval prompt updated to anchor on it and ignore questions inside `tutor_response`. Fixes the prod bug where step_eval graded "subtract 65 from 180" against a freshly-authored 50° question.
+  - `apps/tutoring/judges/coherence.py` — flags within-response self-contradiction (the "let's do 3 angles / find the other angle" pattern from Savy Eva pilot). Maps to `ISSUE_TUTOR_INCOHERENT` → regen.
+  - `apps/tutoring/judges/figure_ref.py` — pure deterministic regex: tutor said "the diagram" with no `|||MEDIA:N|||` attached. Distinguishes references inside questions vs narrative.
+  - `apps/tutoring/judges/figure_vision.py` — when a figure IS attached and the response poses a figure-dependent question, vision-checks alignment. Maps to `ISSUE_FIGURE_MISMATCH` → regen.
+  - All wired into validator + regen-constraint block (new clauses for coherence + figure mismatch). Commit `560f2c6`.
+- **A.0.4 Unit tests for the 3 new judges** — 42 new tests covering skip gates, parse paths, fail-soft on bad JSON / exceptions, gating helpers. 675/675 total tests pass.
+- **A.3 "Server not available" diagnosis** — root cause was Container App `min=max=1` with no scaling rules. Documented; Pulumi change deferred to post-training.
+- **EO surface-area cleanup (UI only, soft-deprecation)** — commit `ab23ad2`:
+  - Session report: dropped "Competency by Objective" table + "Focus objectives" + "Objectives / Weak Areas" columns. Student rows deduped by display name (highest-pct wins).
+  - Lesson detail: dropped EO sidebar block + per-step / per-bank-question EO chips + untagged-EO warning banner.
+  - Live chat history: removed all judge metadata chips ("via combined_judge", "authoring_violation", validator_issues, eval_reasoning, working-state). Telemetry still on `turn.metadata` for debugging.
+
+### Audit: judge performance on real transcripts
+On the 62 student turns in `memory/transcripts.md`:
+- 35 / 62: NEW agrees with OLD → no change
+- 27 / 62: NEW disagrees:
+  - 16 OLD ✗ → NEW ✓ (false negatives fixed)
+  - 6 OLD ✗ → NEW ∅ (warm-up turns correctly null)
+  - 3 OLD ✓ → NEW ∅ (mid-step student no longer over-credited)
+  - 2 OLD ✓ → NEW ✗ (critical false positives caught — tutor praised wrong answer)
+- Manual audit: 22 NEW better, 4 borderline, 0 regressions.
+- New-judge fire rates: rule 85%, arithmetic 42%, figure_ref 23%, coherence 16%, figure_vision 0% (transcripts have no actual figures attached — needs live session test).
+
+### Deferred — explicitly waiting until after teacher training
+- **A.1 Stop reading EOs at runtime** — bank picker, judge, competency, dashboard still query `enabling_objective`. Risky surgery: bank selection + remediation depend on it. UI is already EO-free, so teachers don't see the system using EOs internally. Safe to defer.
+- **A.2 Stop populating EOs in content generation** — same risk profile. Holding until A.1 is done.
+- **A.4 Review = Remediation walkthrough** — auto-trigger on fail, 6-retry cap, hints-only. Engine + UI work. Hold.
+- **A.5 Figure prioritization in bank picker (STRICT)** — bank picker change. Hold.
+- ~~**B.1 Move feedback button to navbar**~~ DONE 2026-05-08. Help button lives in chat header (next to audio toggle); same modal opens via `window.openHelpFeedback`. Mobile shows it as "Help / report an issue" inside the kebab overflow. Floating `.fb-btn` is hidden on the chat page so it doesn't overlap the input. Other pages keep the floating button.
+- **B.2 Tutor encouragement nudge** — add to socratic_rules. Hold.
+- **B.3 Whiteboard (photo + canvas)** — hold.
+- **C-tier hard EO migration** — schema drop. Post-pilot.
+
+### Why this is the right pause point
+The judges fix LIVE bad tutoring (verdict reliability + missing figures + tutor self-contradiction) — students would feel those bugs every session. The remaining A-tier work changes data-model behaviour (bank selection, competency tracking, remediation) — risky to ship right before a training where teachers will be watching. Better state for training: students get reliable evaluation + cleaner teacher dashboard; nothing changes underneath that could surprise teachers mid-session.

@@ -499,6 +499,13 @@
     });
 
     openBtn.addEventListener('click', openModal);
+    // Expose so other UI surfaces (chat header, mobile overflow menu)
+    // can open the same modal without duplicating the markup.
+    window.openHelpFeedback = openModal;
+    // Wire any element marked .fb-trigger as an additional opener.
+    document.querySelectorAll('.fb-trigger').forEach(el => {
+        el.addEventListener('click', (e) => { e.preventDefault(); openModal(); });
+    });
     cancelBtn.addEventListener('click', closeModal);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
     document.addEventListener('keydown', (e) => {
