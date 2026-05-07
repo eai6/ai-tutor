@@ -212,17 +212,9 @@
     </div>
 </div>
 
-{% if covered_eos or failed_eos %}
-<div class="eo-section">
-    <h3>Enabling Objectives</h3>
-    {% for eo in covered_eos %}
-        <span class="eo-tag eo-covered">{{ eo }}</span>
-    {% endfor %}
-    {% for eo in failed_eos %}
-        <span class="eo-tag eo-failed">{{ eo }}</span>
-    {% endfor %}
-</div>
-{% endif %}
+{# Enabling-objective tags removed — lesson teaching objective is the
+   source of truth. EO system is being deprecated (see
+   memory/pilot_session_plan.md). #}
 
 {% if exit_score is not None %}
 <div class="exit-result">
