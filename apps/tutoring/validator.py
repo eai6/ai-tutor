@@ -53,6 +53,13 @@ ISSUE_TUTOR_INCOHERENT = "tutor_incoherent"
 # Source: figure_vision judge (LLM vision call). Catches mid-conversation
 # figure misalignment that the deterministic figure_ref check can't see.
 ISSUE_FIGURE_MISMATCH = "figure_mismatch"
+# Tutor's text disagrees with the deterministic verdict. Production
+# example (Edward, 2026-05-07): student answered "B" to a 4-option
+# MCQ where B was correct; deterministic_mcq returned True; but the
+# tutor's text said "That's not quite right. Let me help you understand
+# what went wrong." This must trigger regen so the student doesn't
+# see "you got it wrong" when they got it right.
+ISSUE_VERDICT_MISMATCH = "verdict_mismatch"
 
 # Deictic figure references — phrases that strongly imply "I am
 # pointing at a visual right now". Used by the figure-ref-without-signal
@@ -103,6 +110,10 @@ class ValidationResult:
         # instruction to either fix the question or pick a different
         # figure from the catalog.
         ISSUE_FIGURE_MISMATCH,
+        # Tutor said "not quite" when the answer was correct (or
+        # vice versa) — regen with instruction to align the text
+        # with the verdict.
+        ISSUE_VERDICT_MISMATCH,
     })
 
     @property
@@ -128,6 +139,30 @@ _QUESTION_RE = re.compile(r"\?")
 # at the end. Cheap and biased toward false negatives — meant to flag
 # obvious lectures, not all rich responses.
 _NAMED_CONCEPT_RE = re.compile(r"\b[A-Z]{2,5}\b|\b\d+(?:\.\d+)?(?:%|st|nd|rd|th)?\b")
+
+# Verdict-mismatch detection (ISSUE_VERDICT_MISMATCH).
+# Phrases the tutor uses to tell the student they got it WRONG:
+_NEGATIVE_VERDICT_RE = re.compile(
+    r"\b(?:not\s+(?:quite|right|correct)|"
+    r"that's\s+(?:not\s+(?:quite\s+)?right|incorrect|wrong)|"
+    r"that\s+(?:isn't|isn'?t\s+quite)\s+right|"
+    r"incorrect|wrong\s+answer|let me help (?:you )?(?:understand|see) what went wrong|"
+    r"you got (?:it )?wrong)\b",
+    re.IGNORECASE,
+)
+# Phrases the tutor uses to tell the student they got it RIGHT.
+# Kept tight — generic "good" / "nice" don't count as a correctness
+# claim; we only flag mismatch when the tutor explicitly says the
+# answer is correct.
+_POSITIVE_VERDICT_RE = re.compile(
+    r"\b(?:exactly\s+(?:right|correct)?|"
+    r"that's\s+(?:exactly\s+)?(?:right|correct)|"
+    r"correct(?:!)?(?:\s+answer)?|"
+    r"you('?ve)?\s+got\s+it|"
+    r"perfect(?:!|,)|"
+    r"(?:exactly|absolutely|spot\s+on)(?:!|,))",
+    re.IGNORECASE,
+)
 
 
 def _ends_with_question(text: str) -> bool:
@@ -193,6 +228,25 @@ def validate_tutor_response(
     info_score = _info_dump_score(content)
     if info_score >= 6 and not _ends_with_question(content):
         issues.append(ISSUE_INFO_DUMP)
+
+    # Verdict-mismatch — only fires when we have a high-confidence
+    # verdict (deterministic numeric / mcq) and the tutor's text
+    # contradicts it. Production case (Edward, 2026-05-07): student
+    # answered B, deterministic_mcq said correct, tutor said "not
+    # quite". Skip when is_correct is None — too risky on an LLM-only
+    # verdict to flag mismatch (the LLM judge could be wrong, the
+    # tutor could be reasonable).
+    eval_layer = (extra_meta.get("eval_layer") or "")
+    high_conf_verdict = (
+        combined_result is not None
+        and getattr(combined_result, "step_eval_source", "").startswith("deterministic")
+    )
+    if high_conf_verdict and is_correct is True and _NEGATIVE_VERDICT_RE.search(content):
+        issues.append(ISSUE_VERDICT_MISMATCH)
+        extra_meta["verdict_mismatch_direction"] = "tutor_said_wrong_was_right"
+    elif high_conf_verdict and is_correct is False and _POSITIVE_VERDICT_RE.search(content):
+        issues.append(ISSUE_VERDICT_MISMATCH)
+        extra_meta["verdict_mismatch_direction"] = "tutor_said_right_was_wrong"
 
     # Figure reference without |||MEDIA:N||| signal: tutor said "the
     # diagram"/"in the figure" but no media was attached for this turn.

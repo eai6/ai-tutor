@@ -1286,6 +1286,80 @@ class ConversationalTutor:
         return self._judge_client
 
     @property
+    def regen_clients(self):
+        """Lazy-load the regen ensemble clients.
+
+        Resolves all active `Purpose.REGEN` ModelConfigs and returns
+        the corresponding `BaseLLMClient` instances. When no active
+        REGEN configs exist, falls back to a single-element list
+        containing the tutoring client (so the ensemble degrades to
+        single-model regen).
+
+        The list determines the ensemble size — pilot can ship with 1
+        config (single-model regen, same behaviour as before but with
+        the focused prompt), or scale up to 2-3 by adding REGEN
+        ModelConfigs in the admin.
+        """
+        if not hasattr(self, '_regen_clients'):
+            self._regen_clients = None
+        if self._regen_clients is not None:
+            return self._regen_clients
+
+        try:
+            from apps.llm.models import ModelConfig
+            from apps.llm.client import get_llm_client
+
+            inst = self.lesson.unit.course.institution if self.lesson else None
+            qs = ModelConfig.objects.filter(
+                purpose='regen', is_active=True,
+            )
+            if inst is not None:
+                # Prefer institution-scoped configs; fall back to
+                # platform-wide (institution=None) when none exist.
+                inst_configs = list(qs.filter(institution=inst))
+                if inst_configs:
+                    configs = inst_configs
+                else:
+                    configs = list(qs.filter(institution__isnull=True))
+            else:
+                configs = list(qs)
+
+            if configs:
+                clients = []
+                for cfg in configs:
+                    try:
+                        clients.append(get_llm_client(cfg))
+                    except Exception as e:
+                        logger.warning(
+                            "[Regen] skipping REGEN config %s: %s",
+                            cfg.model_name, e,
+                        )
+                if clients:
+                    logger.info(
+                        "[Regen] ensemble configured: %d model(s) — %s",
+                        len(clients),
+                        ", ".join(
+                            f"{getattr(getattr(c, 'config', None), 'provider', '?')}/"
+                            f"{getattr(getattr(c, 'config', None), 'model_name', '?')}"
+                            for c in clients
+                        ),
+                    )
+                    self._regen_clients = clients
+                    return self._regen_clients
+
+            # No REGEN configs → degrade to single-model regen with
+            # the tutoring client. Same behaviour pre-ensemble.
+            logger.info(
+                "[Regen] no active Purpose.REGEN configs — falling back "
+                "to single-model regen with tutoring client"
+            )
+            self._regen_clients = [self.llm_client]
+        except Exception as e:
+            logger.error(f"[Regen] could not load regen clients: {e}")
+            self._regen_clients = [self.llm_client]
+        return self._regen_clients
+
+    @property
     def instructor_client(self):
         """Lazy load instructor-wrapped client for structured LLM output."""
         if self._instructor_client is None:
@@ -1856,57 +1930,80 @@ Keep it to 2-3 sentences."""
             if k in validation.metadata:
                 turn_metadata[k] = validation.metadata[k]
 
-        # V3 — regenerate once on hard fail. Capped to a single retry so
-        # one bad turn can't blow up latency or LLM cost.
+        # V3 — regen ensemble. Production logs (2026-05-07) showed the
+        # previous single-call regen (which appended a constraint
+        # block to the 30KB tutor system prompt) was being IGNORED by
+        # the LLM — regenerated text often had the same violations
+        # as the original. The new path:
+        #   1) builds a focused 1-2KB rewrite prompt (no tutor framing)
+        #   2) fans out to N concurrent REGEN ModelConfigs (or falls
+        #      back to single-model regen with the tutoring client)
+        #   3) judges every candidate concurrently and scores them
+        #   4) picks the best clean candidate; if none clean, lowers
+        #      temperature by 0.05 and retries (max 3 cycles)
+        #   5) on cap, sends the highest-scoring candidate or a
+        #      stock fallback
         if validation.needs_regeneration:
             logger.info(
                 "[Validator] regenerating session=%s (issues=%s)",
                 self.session.id, validation.issues,
             )
-            try:
-                # Pass the previous (violating) response into the
-                # constraint block so the regen is an EDIT task, not a
-                # blind re-generation. The LLM sees what it wrote and
-                # can preserve teaching value while replacing the
-                # flagged segments.
-                self._pending_regen_constraint = self._build_regen_constraint_block(
-                    validation, previous_response=clean_response,
-                )
-                regen_raw = self._generate_contextual_response(
-                    student_input,
-                    kb_context,
-                    media_context="",
-                    visual_requested=bool(visual_request),
-                )
-            finally:
-                self._pending_regen_constraint = None
+            from apps.tutoring.regen import run_regen_ensemble
 
-            regen_clean, regen_media = self._parse_media_signal(regen_raw)
-            # Skip math praise filter on regen — issues that triggered
-            # regen aren't praise-related, and we want a clean second
-            # chance from the LLM.
-            revalidation = validate_tutor_response(
-                regen_clean,
-                is_correct=turn_metadata.get('is_correct'),
-                bare_answer=turn_bare_answer,
-                step_type=(current_step.step_type if current_step else None),
+            # Carry session_id into validation metadata for log
+            # correlation in run_regen_ensemble.
+            validation.metadata = dict(validation.metadata or {})
+            validation.metadata.setdefault('session_id', self.session.id)
+
+            ensemble_result = run_regen_ensemble(
+                previous_response=clean_response,
+                validation=validation,
                 lesson=self.lesson,
-                llm_client=self.judge_client,  # judge runs on Sonnet, not Opus
-                fact_check=False,  # avoid second fact-check (latency cap)
-                rule_check=False,  # avoid second rule-check (latency cap)
-                student_input=student_input,
+                step_context=self._build_step_eval_context(
+                    student_input, clean_response,
+                    math_check=turn_math_check,
+                ),
                 bank_stems=self._current_bank_stems(),
-                bank_signal_used=bool(getattr(self, '_bank_signal_used_this_turn', False)),
+                media_catalog_text=getattr(self, '_last_media_catalog_text', '') or '',
+                attached_media=attached_media_list,
+                regen_clients=self.regen_clients,
+                judge_client=self.judge_client,
+                vision_client=self.judge_client,
+                image_reader=self._read_image_for_vision,
+                subject_is_math=subject_is_math,
+                bank_offered=bool(getattr(self, '_question_id_map', None)),
+                student_input=student_input,
+                answer_was_bare=turn_bare_answer,
+                answer_was_wrong=(
+                    turn_math_check is not None
+                    and turn_math_check.is_correct is False
+                ),
             )
-            clean_response = revalidation.content
+
+            # Re-parse a possible |||MEDIA:N||| in the chosen candidate.
+            regen_clean, regen_media = self._parse_media_signal(ensemble_result.text)
+            clean_response = regen_clean
+
             turn_metadata['regenerated'] = True
             turn_metadata['regeneration_reason'] = list(validation.issues)
-            if revalidation.issues:
-                # Merge issues from second pass for full audit trail
-                turn_metadata['validator_issues'] = list(
-                    set(turn_metadata.get('validator_issues', [])) | set(revalidation.issues)
-                )
-            # Update media if regen produced a different signal
+            turn_metadata['regen_cycles'] = ensemble_result.cycles_run
+            turn_metadata['regen_picked_model'] = ensemble_result.picked_model
+            turn_metadata['regen_clean'] = ensemble_result.clean
+            turn_metadata['regen_fallback_used'] = ensemble_result.fallback_used
+            turn_metadata['regen_elapsed_seconds'] = round(
+                ensemble_result.elapsed_seconds, 2,
+            )
+
+            if not ensemble_result.clean:
+                # Add an explicit issue so the [TurnSummary] log line
+                # surfaces "regen ended dirty" as a metric. The chosen
+                # candidate is still surfaced to the student (or stock
+                # fallback) — there's nothing better to send.
+                merged = set(turn_metadata.get('validator_issues', []))
+                merged.add('regen_did_not_clean')
+                turn_metadata['validator_issues'] = list(merged)
+
+            # Update attached media when the regen picked a different one.
             if regen_media:
                 media = [regen_media]
 
@@ -4159,6 +4256,10 @@ Follow the current step; this concept will be covered in sequence."""
         catalog += "\nIf no item in the catalog fits what you want to show, omit"
         catalog += "\nthe signal entirely and teach with text."
         catalog += "\n</media_catalog>"
+        # Cache the rendered catalog so the regen ensemble can reuse
+        # it without rebuilding (the regen prompt needs the same
+        # numbered list so the rewrite-LLM can emit |||MEDIA:N|||).
+        self._last_media_catalog_text = catalog
         return catalog
 
     def _build_figure_facts_block(self) -> str:
@@ -5511,6 +5612,7 @@ Follow the current step; this concept will be covered in sequence."""
             ISSUE_FIGURE_MISMATCH,
             ISSUE_FIGURE_REF_WITHOUT_SIGNAL,
             ISSUE_TUTOR_INCOHERENT,
+            ISSUE_VERDICT_MISMATCH,
         )
         if ISSUE_FIGURE_REF_WITHOUT_SIGNAL in (validation.issues or []):
             # Surface the specific phrases the figure_ref judge found.
@@ -5555,6 +5657,31 @@ Follow the current step; this concept will be covered in sequence."""
                 " just described, fix the question to match the setup,"
                 " or fix the setup to match the question — not both."
             )
+
+        # Verdict-mismatch — tutor's text contradicts the deterministic
+        # verdict (e.g. student said B for an MCQ, B is correct,
+        # deterministic verdict True, but tutor said "not quite").
+        if ISSUE_VERDICT_MISMATCH in (validation.issues or []):
+            direction = (meta.get('verdict_mismatch_direction') or '').strip()
+            if direction == 'tutor_said_wrong_was_right':
+                parts.append(
+                    "VERDICT_MISMATCH was flagged: the deterministic "
+                    "check (numeric / MCQ-letter) confirms the student's "
+                    "answer is CORRECT, but your previous response said "
+                    "it was wrong (\"not quite\", \"that's not right\"). "
+                    "Rewrite to confirm the student got it right and "
+                    "transition forward. Do NOT add a 'walk me through "
+                    "your working' interrogation — they answered correctly."
+                )
+            elif direction == 'tutor_said_right_was_wrong':
+                parts.append(
+                    "VERDICT_MISMATCH was flagged: the deterministic "
+                    "check confirms the student's answer is INCORRECT, "
+                    "but your previous response praised them as right "
+                    "(\"exactly\", \"perfect\"). Rewrite to point at "
+                    "the actual error and ask one focused question "
+                    "to help them find the right answer."
+                )
 
         # Figure-vision mismatch — attached figure doesn't match
         # the question. Two valid fixes: rewrite the question to match

@@ -130,6 +130,12 @@ class ModelConfig(models.Model):
         # so a 5x cheaper / 2x faster Sonnet model dramatically cuts
         # per-turn latency without compromising rule enforcement.
         JUDGE = 'judge', 'Post-response Judge'
+        # Regen ensemble — when the validator decides a tutor turn
+        # needs to be rewritten, the engine fans out to N concurrent
+        # `REGEN` configs (configurable: 1 / 2 / 3 models). Judges
+        # then score each candidate and the engine picks the best
+        # clean one. See apps/tutoring/regen/.
+        REGEN = 'regen', 'Tutor Response Regeneration'
 
     institution = models.ForeignKey(
         Institution,
