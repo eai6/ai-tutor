@@ -353,55 +353,10 @@
     </div>
 </div>
 
-<!-- Per-Objective Competency -->
-<div class="section-title">Competency by Objective</div>
-{% if total_terminal > 0 %}
-<div style="font-size:0.8125rem;color:var(--gray-500);margin-bottom:0.75rem;">
-    <span style="font-weight:600;color:#6366f1;">{{ total_terminal }} terminal objectives</span> (assessment targets)
-    {% if total_enabling > 0 %} + <span style="font-weight:600;color:#059669;">{{ total_enabling }} enabling objectives</span> (teaching steps){% endif %}
-</div>
-{% endif %}
-{% if objectives_data %}
-<table class="obj-table">
-    <thead>
-        <tr>
-            <th style="width:50%">Enabling Objective</th>
-            <th style="width:8%">Level</th>
-            <th style="width:22%">Competency</th>
-            <th style="width:20%">Students</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for obj in objectives_data %}
-        <tr>
-            <td class="cell-title">
-                {% if obj.objective_type == 'terminal' %}<span style="font-size:0.5625rem;font-weight:700;color:#6366f1;background:#ede9fe;padding:1px 4px;border-radius:3px;margin-right:4px;">TO</span>{% elif obj.objective_type == 'enabling' %}<span style="font-size:0.5625rem;font-weight:700;color:#059669;background:#d1fae5;padding:1px 4px;border-radius:3px;margin-right:4px;">EO</span>{% endif %}
-                {{ obj.objective|truncatewords:18 }}
-            </td>
-            <td data-label="Level"><span class="bloom-tag">{{ obj.bloom }}</span></td>
-            <td data-label="Competency">
-                <div class="competency-bar">
-                    <div class="competency-bar-track">
-                        <div class="competency-bar-fill {{ obj.color }}" style="width:{{ obj.pct }}%"></div>
-                    </div>
-                    <span class="competency-fraction">{{ obj.pct }}%</span>
-                </div>
-            </td>
-            <td data-label="Students">
-                <span>
-                    <span class="competency-fraction" style="color:{% if obj.pct >= 70 %}#059669{% elif obj.pct >= 40 %}#d97706{% else %}#dc2626{% endif %}">{{ obj.achieved }}/{{ obj.total }}</span>
-                    achieved
-                </span>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<div style="padding:2rem;text-align:center;color:#71717a;background:#fff;border-radius:0.75rem;">
-    No enabling objective data available yet. Students need to complete tutor sessions to generate competency data.
-</div>
-{% endif %}
+{# Per-objective table removed — the lesson has one teaching objective,
+   so the per-EO breakdown was always all-zeros (or duplicate). The
+   class-average + bucket counts above already convey lesson-level
+   competency. #}
 
 <!-- Students by Competency Category -->
 <div class="section-title">Students by Competency Category</div>
@@ -421,14 +376,6 @@
     <!-- Targeted Instruction Recommendation -->
     <div style="padding:0.75rem 1rem;background:{{ group.bg }}88;border-bottom:1px solid {{ group.border }};font-size:0.8125rem;color:#374151;">
         <strong>Instruction:</strong> {{ group.instruction }}
-        {% if group.common_weak %}
-        <div style="margin-top:0.375rem;font-size:0.75rem;color:#6b7280;">
-            <strong>Focus objectives:</strong>
-            {% for obj in group.common_weak %}
-                <span style="display:inline-block;background:#fff;padding:1px 6px;border-radius:4px;border:1px solid #e5e7eb;margin:2px 2px;">{{ obj }}</span>
-            {% endfor %}
-        </div>
-        {% endif %}
     </div>
 
     <!-- Student List -->
@@ -436,23 +383,17 @@
         <thead>
             <tr>
                 <th>Student</th>
-                <th>Objectives</th>
+                <th>Competency</th>
                 <th>Exit Quiz</th>
-                <th>Weak Areas</th>
             </tr>
         </thead>
         <tbody>
             {% for s in group.students %}
             <tr>
                 <td class="cell-title"><span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span></td>
-                <td data-label="Objectives">
+                <td data-label="Competency">
                     {% if s.has_exit_attempt %}
-                        <span>
-                            <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">
-                                {{ s.achieved }}/{{ s.total }}
-                            </span>
-                            <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">({{ s.pct }}%)</span>
-                        </span>
+                        <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">{{ s.pct }}%</span>
                     {% else %}
                         <span style="color:#a1a1aa;font-size:0.8125rem;">—</span>
                     {% endif %}
@@ -465,15 +406,6 @@
                         </span>
                     {% else %}
                         <span style="color:#a1a1aa;font-size:0.8125rem;">Not taken</span>
-                    {% endif %}
-                </td>
-                <td data-label="Weak Areas">
-                    {% if not s.has_exit_attempt %}
-                        <span style="color:#a1a1aa;font-size:0.75rem;">No data yet</span>
-                    {% elif s.weak_objectives %}
-                        <div class="weak-list">{{ s.weak_objectives|join:", " }}</div>
-                    {% else %}
-                        <span style="color:#059669;font-size:0.75rem;">All objectives met</span>
                     {% endif %}
                 </td>
             </tr>

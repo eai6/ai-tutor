@@ -2296,6 +2296,27 @@ def lesson_session_report(request, lesson_id):
 
     students_data.sort(key=lambda s: s['pct'])
 
+    # Dedupe by display name — test environments accumulate multiple
+    # User rows that share a full_name (e.g. several "Edward Amoah"
+    # accounts). A student must appear in exactly ONE category bucket;
+    # keep the row with the highest pct (so if one of the duplicates
+    # has assessment data, that's the one we surface instead of an
+    # unassessed twin).
+    _by_name = {}
+    for s in students_data:
+        u = s['student']
+        key = ((u.get_full_name() or u.username) or '').strip().lower()
+        if not key:
+            key = f"id:{u.id}"
+        existing = _by_name.get(key)
+        if existing is None or s['pct'] > existing['pct'] or (
+            s['pct'] == existing['pct']
+            and s['has_exit_attempt'] and not existing['has_exit_attempt']
+        ):
+            _by_name[key] = s
+    students_data = sorted(_by_name.values(), key=lambda s: s['pct'])
+    total_students = len(students_data)
+
     # ── Category counts ──
     category_counts = {'EE': 0, 'ME': 0, 'AE': 0, 'BE': 0, 'UN': 0}
     for s in students_data:

@@ -252,70 +252,13 @@
         <div class="bubble-wrapper left">
             <div class="bubble-role">Tutor</div>
             <div class="chat-bubble bubble-tutor">{{ turn.content }}</div>
-            {% comment %}Eval metadata + bare-answer flag (M4 / M9) — answers the teacher's question "why was this answer marked correct?"{% endcomment %}
-            {% if turn.metadata.eval_layer or turn.metadata.working_state %}
-            <div class="bubble-meta" style="font-size:0.7rem;color:#71717a;margin-top:0.25rem;display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
-                {% if turn.metadata.eval_layer %}
-                    {% if turn.metadata.is_correct %}
-                        <span style="background:#dcfce7;color:#166534;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;">✓ correct</span>
-                    {% else %}
-                        <span style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;">✗ incorrect</span>
-                    {% endif %}
-                    <span title="How this turn was evaluated">via {{ turn.metadata.eval_layer }}</span>
-                    {% if turn.metadata.student_answer_parsed is not None %}<span>· parsed: {{ turn.metadata.student_answer_parsed }}{% if turn.metadata.expected_answer_parsed is not None %} vs expected {{ turn.metadata.expected_answer_parsed }}{% endif %}</span>{% endif %}
-                {% endif %}
-                {% comment %}Layer S — student working analyzer signals. Different states are coloured to convey at-a-glance the student's progress: green = done + correct, blue = in progress, red = error/wrong, grey = no working.{% endcomment %}
-                {% if turn.metadata.working_state == 'complete_correct' %}
-                    <span title="Student showed complete, correct working" style="background:#dcfce7;color:#166534;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;">complete ✓</span>
-                {% elif turn.metadata.working_state == 'partial_correct' %}
-                    <span title="Student is partway through — tutor must ask 'what's next?', not finish for them" style="background:#dbeafe;color:#1e40af;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;">partial ➜</span>
-                {% elif turn.metadata.working_state == 'partial_wrong' %}
-                    <span title="Student's working has an error — tutor pointed at the first error step" style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;">step error</span>
-                {% elif turn.metadata.working_state == 'complete_wrong' %}
-                    <span title="Math is internally right but the setup was wrong" style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;">setup error</span>
-                {% elif turn.metadata.working_state == 'no_working' %}
-                    <span title="Student showed no equations — tutor asked them to write each step out" style="background:#f3f4f6;color:#52525b;padding:0.05rem 0.45rem;border-radius:999px;">no working</span>
-                {% endif %}
-                {% if turn.metadata.working_steps_count %}
-                    <span title="Equations the analyzer extracted from the student's reply">{{ turn.metadata.working_steps_count }} step{{ turn.metadata.working_steps_count|pluralize }}</span>
-                {% endif %}
-                {% if turn.metadata.working_first_error_idx %}
-                    <span title="Step where the working first went wrong" style="background:#fef3c7;color:#92400e;padding:0.05rem 0.45rem;border-radius:999px;">first error: step {{ turn.metadata.working_first_error_idx }}</span>
-                {% endif %}
-                {% if turn.metadata.working_propagated_idxs %}
-                    <span title="Steps that inherited the upstream error" style="background:#fef3c7;color:#92400e;padding:0.05rem 0.45rem;border-radius:999px;">propagates to step{{ turn.metadata.working_propagated_idxs|length|pluralize }} {% for idx in turn.metadata.working_propagated_idxs %}{{ idx }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
-                {% endif %}
-                {% if turn.metadata.bare_answer %}
-                    <span title="Student gave a bare numeric answer with no working" style="background:#fef3c7;color:#92400e;padding:0.05rem 0.45rem;border-radius:999px;">bare answer</span>
-                    {% if turn.metadata.bare_answer_flagged %}<span style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;font-weight:600;" title="3+ bare answers on this step — review">flagged</span>{% endif %}
-                {% endif %}
-                {% if turn.metadata.praise_stripped %}<span title="Praise words stripped from this response" style="background:#ede9fe;color:#5b21b6;padding:0.05rem 0.45rem;border-radius:999px;">praise stripped</span>{% endif %}
-                {% for issue in turn.metadata.validator_issues %}
-                    <span title="Socratic validator flagged this turn" style="background:#fee2e2;color:#991b1b;padding:0.05rem 0.45rem;border-radius:999px;">{{ issue }}</span>
-                {% endfor %}
-                {% if turn.metadata.factual_claims_checked %}
-                    <span title="Factual claims checked against curriculum + Seychelles context" style="background:#dbeafe;color:#1e40af;padding:0.05rem 0.45rem;border-radius:999px;">{{ turn.metadata.factual_claims_checked }} claim{{ turn.metadata.factual_claims_checked|pluralize }} fact-checked</span>
-                {% endif %}
-            </div>
-            {% if turn.metadata.factual_claims_contradicted %}
-            <div style="font-size:0.72rem;color:#991b1b;margin-top:0.2rem;">
-                ⚠ Contradicted by curriculum:
-                {% for c in turn.metadata.factual_claims_contradicted %}<span style="background:#fee2e2;padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
-            </div>
-            {% endif %}
-            {% if turn.metadata.factual_claims_unverified %}
-            <div style="font-size:0.72rem;color:#92400e;margin-top:0.2rem;">
-                Unverified (no curriculum support found):
-                {% for c in turn.metadata.factual_claims_unverified %}<span style="background:#fef3c7;padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
-            </div>
-            {% endif %}
-            {% if turn.metadata.eval_reasoning %}
-            <details style="font-size:0.7rem;color:#71717a;margin-top:0.2rem;">
-                <summary style="cursor:pointer;">why?</summary>
-                <span>{{ turn.metadata.eval_reasoning }}</span>
-            </details>
-            {% endif %}
-            {% endif %}
+            {% comment %}
+              Internal verdict / judge-tag chips ("via combined_judge",
+              "authoring_violation", validator_issues, eval_reasoning)
+              are intentionally NOT rendered here — teachers shouldn't
+              see internal evaluation plumbing. Verdict + reasoning
+              still live on turn.metadata for telemetry / debugging.
+            {% endcomment %}
             <div class="bubble-time">{{ turn.created_at|date:"H:i" }}</div>
         </div>
         {% endif %}
