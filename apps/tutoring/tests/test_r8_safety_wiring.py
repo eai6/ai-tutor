@@ -58,20 +58,19 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
 
     @patch('apps.safety.RateLimiter.record_message')
     @patch('apps.safety.RateLimiter.check_rate_limit')
-    @patch('apps.safety.ContentSafetyFilter.check_content')
+    @patch('apps.tutoring.judges.safety.run_safety_judge')
     @patch('apps.safety.ContentSafetyFilter.get_safe_response')
-    def test_chat_respond_blocks_harmful_content(self, mock_safe_resp, mock_check_content, mock_rate_check, mock_record):
-        """chat_respond should block harmful content."""
+    def test_chat_respond_blocks_harmful_content(self, mock_safe_resp, mock_safety_judge, mock_rate_check, mock_record):
+        """chat_respond should block harmful content (LLM safety judge path)."""
         from apps.tutoring.views import chat_respond
+        from apps.tutoring.judges.safety import SafetyResult
 
         mock_rate_check.return_value = (True, None)
-        mock_check_content.return_value = SafetyCheckResult(
-            is_safe=False,
-            flags=[ContentFlag.HARMFUL],
-            filtered_content='',
-            warnings=['Harmful content detected'],
-            blocked=True,
-            block_reason='harmful_content',
+        # Simulate the LLM safety judge flagging harmful content.
+        mock_safety_judge.return_value = SafetyResult(
+            severity="critical",
+            categories=["harmful"],
+            reasoning="explicit harmful content",
         )
         mock_safe_resp.return_value = "I can't help with that."
 

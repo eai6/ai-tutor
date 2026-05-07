@@ -55,15 +55,15 @@ def get_staff_context(request):
         if institution is not None:
             flag_qs = flag_qs.filter(institution=institution)
 
-        validator_count = _validator_flagged_count(institution)
-
+        # Validator flags removed from the safety badge per Edward
+        # (2026-05-07) — flagged dashboard is safety-only.
         return {
             'membership': None,
             'institution': institution,
             'role': 'superadmin',
             'all_schools': all_schools,
             'is_aggregated': institution is None,
-            'unreviewed_flag_count': flag_qs.count() + validator_count,
+            'unreviewed_flag_count': _safety_flag_count(institution),
             'can_edit_content': True,  # Superadmin always has full access
             'can_upload_curriculum': True,
             'can_regenerate_courses': True,
@@ -91,11 +91,6 @@ def get_staff_context(request):
 
     membership = next((m for m in memberships if m.institution == institution), memberships[0])
 
-    flag_qs = TutorSession.objects.filter(
-        is_flagged=True, flag_reviewed=False, institution=institution
-    )
-    validator_count = _validator_flagged_count(institution)
-
     from apps.accounts.models import PlatformConfig
     config = PlatformConfig.load()
 
@@ -105,27 +100,34 @@ def get_staff_context(request):
         'role': 'staff',
         'all_schools': staff_schools if len(staff_schools) > 1 else [],
         'is_aggregated': False,
-        'unreviewed_flag_count': flag_qs.count() + validator_count,
+        'unreviewed_flag_count': _safety_flag_count(institution),
         'can_edit_content': config.teachers_can_edit_content,
         'can_upload_curriculum': config.teachers_can_upload_curriculum,
         'can_regenerate_courses': config.teachers_can_regenerate_courses,
     }
 
 
-def _validator_flagged_count(institution) -> int:
-    """Count of sessions with at least one validator hard-fail turn.
-    Used in the nav badge alongside safety-flag count.
+def _safety_flag_count(institution) -> int:
+    """Count of unreviewed sessions with at least one harmful /
+    inappropriate / manipulation flag from the safety judge.
+
+    Per Edward (2026-05-07), the nav badge is safety-only — validator
+    flags (curriculum-contradicted etc.) do NOT contribute. The legacy
+    helper `_validator_flagged_count` was removed; if a future caller
+    needs that count, query SessionTurn.metadata directly.
     """
     from apps.tutoring.models import SessionTurn
-    from apps.tutoring.validator import ISSUE_NUMERIC_CLAIM_CONTRADICTED
 
-    session_ids = (
+    SAFETY_FLAG_TYPES = ('harmful', 'inappropriate', 'manipulation')
+    session_ids = set(
         SessionTurn.objects
-        .filter(metadata__icontains=ISSUE_NUMERIC_CLAIM_CONTRADICTED)
+        .filter(is_flagged=True, flag_type__in=SAFETY_FLAG_TYPES)
         .values_list('session_id', flat=True)
         .distinct()
     )
-    qs = TutorSession.objects.filter(id__in=set(session_ids))
+    qs = TutorSession.objects.filter(
+        id__in=session_ids, is_flagged=True, flag_reviewed=False,
+    )
     if institution is not None:
         qs = qs.filter(institution=institution)
     return qs.count()
@@ -4995,74 +4997,70 @@ def course_delete(request, course_id):
 def flagged_sessions(request):
     """List flagged tutoring sessions for staff review.
 
-    Two flag families now surface here (V4):
-      - Safety flags: SessionTurn-level from the safety filter (sets
-        TutorSession.is_flagged + flagged_at).
-      - Validator flags: turns whose metadata.validator_issues contains
-        a hard issue (numeric_claim_contradicted). Surface alongside so
-        teachers can audit pedagogy + facts in one place.
+    Scope (Edward, 2026-05-07): SAFETY-ONLY. The flagged dashboard is
+    a child-protection / classroom-safety surface — it must show only
+    student messages flagged as harmful / inappropriate / manipulation
+    by the LLM safety judge (apps/tutoring/judges/safety.py).
+
+    Explicitly EXCLUDED:
+      - Validator-flagged sessions (e.g. numeric_claim_contradicted) —
+        teachers don't need a child-protection dashboard polluted with
+        curriculum-disagreement audits. Those still surface in the
+        teacher monitor / session reports.
+      - off_topic flags from the legacy ContentSafetyFilter — dropped
+        as a category entirely.
+      - AI-output flags — unsafe tutor text never reaches the student
+        because the safety judge in run_all_judges triggers regen.
     """
     from apps.tutoring.models import SessionTurn
-    from apps.tutoring.validator import ISSUE_NUMERIC_CLAIM_CONTRADICTED
 
     institution = request.staff_ctx['institution']
     status_filter = request.GET.get('status', 'unreviewed')
-    flag_filter = request.GET.get('flag_type', 'all')
+    # `flag_filter` query-param kept for URL-compat but ignored: the
+    # only flag family rendered is safety. Existing links with
+    # ?flag_type=validator|safety|all will all show the safety set.
+    flag_filter = 'safety'
 
-    safety_qs = TutorSession.objects.filter(is_flagged=True)
-    safety_qs = filter_by_institution(safety_qs, institution)
-    if status_filter == 'unreviewed':
-        safety_qs = safety_qs.filter(flag_reviewed=False)
-    elif status_filter == 'reviewed':
-        safety_qs = safety_qs.filter(flag_reviewed=True)
+    # Allowed flag types — drop everything that isn't a child-protection
+    # category. SessionTurn.flag_type is set by the safety judge in
+    # views.respond() with one of: harmful, inappropriate, manipulation.
+    SAFETY_FLAG_TYPES = ('harmful', 'inappropriate', 'manipulation')
 
-    # Sessions with at least one validator hard-fail turn.
-    # __icontains on the JSONField avoids the JSON-array containment lookup
-    # which isn't supported on SQLite (test DB).  The issue string is
-    # unique enough that substring match is safe.
-    validator_session_ids = set(
+    safety_session_ids = set(
         SessionTurn.objects
-        .filter(metadata__icontains=ISSUE_NUMERIC_CLAIM_CONTRADICTED)
+        .filter(is_flagged=True, flag_type__in=SAFETY_FLAG_TYPES)
         .values_list('session_id', flat=True)
         .distinct()
     )
-    validator_qs = filter_by_institution(
-        TutorSession.objects.filter(id__in=validator_session_ids),
-        institution,
-    )
 
-    if flag_filter == 'safety':
-        qs = safety_qs
-    elif flag_filter == 'validator':
-        qs = validator_qs
-    else:
-        # union
-        ids = set(safety_qs.values_list('id', flat=True)) | set(
-            validator_qs.values_list('id', flat=True)
-        )
-        qs = filter_by_institution(
-            TutorSession.objects.filter(id__in=ids), institution,
-        )
+    qs = TutorSession.objects.filter(
+        is_flagged=True, id__in=safety_session_ids,
+    )
+    qs = filter_by_institution(qs, institution)
+    if status_filter == 'unreviewed':
+        qs = qs.filter(flag_reviewed=False)
+    elif status_filter == 'reviewed':
+        qs = qs.filter(flag_reviewed=True)
 
     qs = qs.select_related(
         'student', 'lesson', 'reviewed_by',
     ).order_by('-flagged_at', '-started_at')
 
-    # Counts for the page header
-    total_flagged = filter_by_institution(
-        TutorSession.objects.filter(is_flagged=True), institution
-    ).count()
-    unreviewed_count = filter_by_institution(
-        TutorSession.objects.filter(is_flagged=True, flag_reviewed=False), institution
-    ).count()
-    validator_flagged_count = validator_qs.count()
+    # Counts for the page header (safety-scoped now).
+    total_flagged_qs = filter_by_institution(
+        TutorSession.objects.filter(
+            is_flagged=True, id__in=safety_session_ids,
+        ),
+        institution,
+    )
+    total_flagged = total_flagged_qs.count()
+    unreviewed_count = total_flagged_qs.filter(flag_reviewed=False).count()
 
-    # Annotate each session with its flag categories so the template
-    # can render the right badges.
-    safety_id_set = set(safety_qs.values_list('id', flat=True))
+    # Annotate so the template marks each row as safety (no longer
+    # need has_validator_flag — validator flags don't surface here).
     for s in qs:
-        s.has_safety_flag = s.id in safety_id_set
-        s.has_validator_flag = s.id in validator_session_ids
+        s.has_safety_flag = True
+        s.has_validator_flag = False
 
     paginator = Paginator(qs, 25)
     page = paginator.get_page(request.GET.get('page'))
@@ -5074,7 +5072,8 @@ def flagged_sessions(request):
         'flag_filter': flag_filter,
         'total_flagged': total_flagged,
         'unreviewed_count': unreviewed_count,
-        'validator_flagged_count': validator_flagged_count,
+        # Kept in context for template compatibility; always 0 now.
+        'validator_flagged_count': 0,
     })
 
 

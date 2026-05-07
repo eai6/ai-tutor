@@ -60,6 +60,13 @@ ISSUE_FIGURE_MISMATCH = "figure_mismatch"
 # what went wrong." This must trigger regen so the student doesn't
 # see "you got it wrong" when they got it right.
 ISSUE_VERDICT_MISMATCH = "verdict_mismatch"
+# Safety judge flagged the tutor response (HARMFUL or INAPPROPRIATE
+# content). Triggers regen so unsafe text never reaches the student.
+# Student-side safety findings (HARMFUL / INAPPROPRIATE / MANIPULATION
+# from a student message) are NOT routed through this issue — they
+# go directly to SessionTurn.is_flagged via the safety judge call
+# in apps/tutoring/views.py and surface at /dashboard/flagged/.
+ISSUE_TUTOR_UNSAFE = "tutor_unsafe"
 
 # Deictic figure references — phrases that strongly imply "I am
 # pointing at a visual right now". Used by the figure-ref-without-signal
@@ -114,6 +121,9 @@ class ValidationResult:
         # vice versa) — regen with instruction to align the text
         # with the verdict.
         ISSUE_VERDICT_MISMATCH,
+        # Safety judge flagged the tutor response — regen so the
+        # student never sees the unsafe text.
+        ISSUE_TUTOR_UNSAFE,
     })
 
     @property
@@ -340,6 +350,20 @@ def validate_tutor_response(
                 combined_result.figure_mismatch_reason
             )
             extra_meta["figure_summary"] = combined_result.figure_summary
+        # Safety judge: tutor response flagged for harmful or
+        # inappropriate content. Always trigger regen so unsafe text
+        # never reaches the student. Categories + reasoning go into
+        # metadata so the regen prompt can name what to fix.
+        sev = getattr(combined_result, "safety_severity", "safe") or "safe"
+        if sev in ("warning", "critical"):
+            issues.append(ISSUE_TUTOR_UNSAFE)
+            extra_meta["safety_severity"] = sev
+            extra_meta["safety_categories"] = list(
+                getattr(combined_result, "safety_categories", []) or []
+            )
+            extra_meta["safety_reasoning"] = (
+                getattr(combined_result, "safety_reasoning", "") or ""
+            )
     else:
         if fact_check and lesson is not None and llm_client is not None:
             layers_run.append("fact_check")

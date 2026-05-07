@@ -934,25 +934,52 @@ def chat_respond(request, session_id):
     if not message:
         return JsonResponse({"error": "Message required"}, status=400)
 
-    # Content safety check (non-streaming)
-    safety_result = ContentSafetyFilter.check_content(message, context="student_input")
+    # Content safety check — LLM-based safety judge (apps/tutoring/judges/safety.py).
+    # Replaces the previous regex-only ContentSafetyFilter scan: an LLM
+    # catches paraphrased / subtle violations the regex couldn't see.
+    # On flag: write SafetyAuditLog + set SessionTurn.is_flagged so
+    # the message surfaces at /dashboard/flagged/ for teacher review.
+    # `critical` severity (HARMFUL) BLOCKS the request and sends a
+    # stock safety reply — same blocking behaviour as before. `warning`
+    # severity (INAPPROPRIATE / MANIPULATION) flags but does not block.
+    from apps.tutoring.judges.safety import run_safety_judge
+    from apps.llm.models import ModelConfig as _MC
+    from apps.llm.client import get_llm_client as _get_client
 
-    if safety_result.flags:
+    _safety_cfg = (
+        _MC.objects.filter(purpose='judge', is_active=True).first()
+        or _MC.objects.filter(purpose='tutoring', is_active=True).first()
+    )
+    _safety_client = None
+    if _safety_cfg is not None:
+        try:
+            _safety_client = _get_client(_safety_cfg)
+        except Exception as _e:
+            logger.warning("[Safety] could not load judge client: %s", _e)
+
+    safety_result = run_safety_judge(
+        message, role="student", llm_client=_safety_client,
+    )
+    safety_blocked = (safety_result.severity == "critical")
+
+    if safety_result.severity != "safe" and safety_result.categories:
         SafetyAuditLog.log(
             'content_flagged',
             user=request.user,
             session_id=session.id,
             details={
-                'flags': [f.value for f in safety_result.flags],
-                'warnings': safety_result.warnings,
+                'flags': list(safety_result.categories),
+                'severity': safety_result.severity,
+                'reasoning': safety_result.reasoning,
+                'source': 'student_input_llm',
             },
-            severity='warning' if not safety_result.blocked else 'critical',
+            severity='critical' if safety_blocked else 'warning',
             request=request,
         )
         # Flag the session
         if not session.is_flagged:
             session.is_flagged = True
-            session.flag_reason = ', '.join(f.value for f in safety_result.flags)
+            session.flag_reason = ', '.join(safety_result.categories)
             session.flagged_at = timezone.now()
             session.save(update_fields=['is_flagged', 'flag_reason', 'flagged_at'])
         # Flag the student turn (find most recent student turn)
@@ -961,11 +988,24 @@ def chat_respond(request, session_id):
         ).order_by('-created_at').first()
         if student_turn:
             student_turn.is_flagged = True
-            student_turn.flag_type = safety_result.flags[0].value
+            student_turn.flag_type = safety_result.categories[0]
             student_turn.save(update_fields=['is_flagged', 'flag_type'])
 
-    if safety_result.blocked:
-        safe_response = ContentSafetyFilter.get_safe_response(safety_result.flags[0])
+    if safety_blocked:
+        # Stock age-appropriate safety reply. The previous code path
+        # used ContentSafetyFilter.get_safe_response with regex flag
+        # categories; we keep that lookup as a fallback by category
+        # name when present, else default to a neutral message.
+        from apps.safety import ContentFlag
+        try:
+            flag_enum = ContentFlag(safety_result.categories[0])
+            safe_response = ContentSafetyFilter.get_safe_response(flag_enum)
+        except (ValueError, IndexError):
+            safe_response = (
+                "I'm here to help you learn. Let's stay focused on the "
+                "lesson — what part of this topic would you like to "
+                "work through together?"
+            )
 
         # Count safety strikes in this session (flagged student turns)
         strike_count = SessionTurn.objects.filter(
@@ -1012,8 +1052,14 @@ def chat_respond(request, session_id):
             "is_complete": False,
         })
 
-    # Use filtered content
-    message = safety_result.filtered_content
+    # PII redaction stays as a separate deterministic regex pass —
+    # the LLM safety judge focuses on harmful/inappropriate/manipulation
+    # content, not personal-info redaction. We pipe the message
+    # through the legacy ContentSafetyFilter ONLY for the redaction
+    # side-effect; flag handling above already came from the LLM judge.
+    _pii_pass = ContentSafetyFilter.check_content(message, context="student_input")
+    if _pii_pass.filtered_content and _pii_pass.filtered_content != message:
+        message = _pii_pass.filtered_content
 
     # Generate response (non-streaming for Azure Container Apps compatibility)
     import logging
@@ -1029,33 +1075,15 @@ def chat_respond(request, session_id):
         elapsed = time.time() - t0
         logger.info(f"[respond] Completed in {elapsed:.1f}s, phase={result.phase}")
 
-        # Safety check LLM response
-        ai_safety = ContentSafetyFilter.check_content(result.content, context="ai_output")
-        if ai_safety.flags:
-            SafetyAuditLog.log(
-                'ai_content_flagged',
-                user=request.user,
-                session_id=session.id,
-                details={
-                    'flags': [f.value for f in ai_safety.flags],
-                    'warnings': ai_safety.warnings,
-                    'source': 'ai_output',
-                },
-                severity='warning',
-                request=request,
-            )
-            if not session.is_flagged:
-                session.is_flagged = True
-                session.flag_reason = 'AI output: ' + ', '.join(f.value for f in ai_safety.flags)
-                session.flagged_at = timezone.now()
-                session.save(update_fields=['is_flagged', 'flag_reason', 'flagged_at'])
-            tutor_turn = SessionTurn.objects.filter(
-                session=session, role='tutor'
-            ).order_by('-created_at').first()
-            if tutor_turn:
-                tutor_turn.is_flagged = True
-                tutor_turn.flag_type = ai_safety.flags[0].value
-                tutor_turn.save(update_fields=['is_flagged', 'flag_type'])
+        # NOTE: post-response AI safety is now handled INSIDE
+        # ConversationalTutor.respond() via the safety judge in
+        # run_all_judges. When the judge flags a response, the
+        # validator raises ISSUE_TUTOR_UNSAFE → triggers the regen
+        # ensemble → the unsafe text is rewritten before reaching
+        # the student. Per Edward (2026-05-07): we don't need to
+        # flag tutor output for teacher review since unsafe text
+        # never reaches the student; only student input is flagged
+        # for /dashboard/flagged/.
 
         return JsonResponse({
             "message": result.content,

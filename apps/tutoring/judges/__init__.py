@@ -51,6 +51,7 @@ from apps.tutoring.judges.figure_vision import (
     run_figure_vision_judge,
 )
 from apps.tutoring.judges.rule import RuleResult, run_rule_judge
+from apps.tutoring.judges.safety import SafetyResult, run_safety_judge
 from apps.tutoring.judges.step_eval import StepEvalResult, run_step_eval_judge
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,9 @@ __all__ = [
     "FigureRefResult",
     "FigureVisionResult",
     "RuleResult",
+    "SafetyResult",
     "StepEvalResult",
+    "run_safety_judge",
 ]
 
 
@@ -82,7 +85,7 @@ def run_all_judges(
     step_context: Optional[dict] = None,
     subject_is_math: bool = True,
     bank_offered: bool = True,
-    max_workers: int = 6,
+    max_workers: int = 8,
 ) -> CombinedJudgeResult:
     """Run all domain judges concurrently and merge into a
     CombinedJudgeResult. Each judge is fail-soft — if one errors, the
@@ -173,6 +176,15 @@ def run_all_judges(
             image_reader=image_reader,
             llm_client=vc,
         )
+        # Safety — runs on EVERY tutor turn (no gating). Child
+        # protection is non-negotiable. role='tutor' so the judge
+        # ignores MANIPULATION (student-only category).
+        f_safety = ex.submit(
+            run_safety_judge,
+            response_text,
+            role="tutor",
+            llm_client=llm_client,
+        )
 
         arith = _safe_result(f_arith, "arithmetic", ArithmeticResult)
         fact = _safe_result(f_fact, "factual", FactualResult)
@@ -181,6 +193,7 @@ def run_all_judges(
         coh = _safe_result(f_coh, "coherence", CoherenceResult)
         figref = _safe_result(f_figref, "figure_ref", FigureRefResult)
         figvis = _safe_result(f_figvis, "figure_vision", FigureVisionResult)
+        safety = _safe_result(f_safety, "safety", SafetyResult)
 
     # Merge deterministically. No final LLM call — each judge's verdict
     # is independent and the merge is mechanical.
@@ -212,6 +225,11 @@ def run_all_judges(
         result.figure_mismatch_reason = figvis.mismatch_reason
         result.figure_summary = figvis.figure_summary
 
+    if safety and not safety.skipped:
+        result.safety_severity = safety.severity
+        result.safety_categories = list(safety.categories or [])
+        result.safety_reasoning = safety.reasoning
+
     # Sub-skip telemetry — same shape combined_judge produced so
     # validator + dashboard pickup keeps working.
     result.sub_skipped = {}
@@ -229,10 +247,12 @@ def run_all_judges(
         result.sub_skipped["figure_ref"] = figref.skip_reason
     if figvis and figvis.skipped:
         result.sub_skipped["figure_vision"] = figvis.skip_reason
+    if safety and safety.skipped:
+        result.sub_skipped["safety"] = safety.skip_reason
 
     logger.info(
         "[Judges] arith=%s fact=%s rule=%s step=%s coh=%s figref=%s figvis=%s "
-        "answer_correct=%s step_complete=%s step_source=%s",
+        "safety=%s answer_correct=%s step_complete=%s step_source=%s",
         "skipped" if (arith and arith.skipped) else f"corrections={len(result.arithmetic_corrections)}",
         "skipped" if (fact and fact.skipped) else f"claims={len(result.fact_claims)}",
         "skipped" if (rule and rule.skipped) else f"violations={len(result.rule_violations)}",
@@ -240,6 +260,10 @@ def run_all_judges(
         "skipped" if (coh and coh.skipped) else f"violations={len(result.coherence_violations)}",
         "skipped" if (figref and figref.skipped) else f"issues={len(result.figure_ref_issues)}",
         "skipped" if (figvis and figvis.skipped) else f"aligned={result.figure_aligned}",
+        ("skipped" if (safety and safety.skipped)
+         else f"{result.safety_severity}"
+              + (f"({','.join(result.safety_categories)})"
+                 if result.safety_categories else "")),
         result.answer_correct,
         result.step_complete,
         getattr(step, "source", ""),

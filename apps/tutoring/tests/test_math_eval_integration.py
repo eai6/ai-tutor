@@ -246,9 +246,12 @@ class MathTutoringIntegrationTest(TestCase):
         )
         tutor.respond("3 3/4")
 
-        # The generate() mock recorded call_args
-        call_kwargs = fake_llm.generate.call_args.kwargs
-        sys_prompt = call_kwargs.get("system_prompt", "")
+        # The same fake_llm now serves the tutor, the judges (rule,
+        # factual, step_eval, coherence, safety), AND the regen
+        # ensemble. `call_args` (last call) is non-deterministic —
+        # use the helper to find the tutor's call by its evaluation
+        # signal block.
+        sys_prompt = _tutor_system_prompt(fake_llm)
         self.assertIn("<evaluation_signal>", sys_prompt)
         self.assertIn("INCORRECT", sys_prompt)
         self.assertIn("3.75", sys_prompt)
@@ -340,7 +343,7 @@ class MathTutoringIntegrationTest(TestCase):
         tutor, session, fake_llm = self._make_tutor("Let's see your steps.")
         tutor.respond("5 1/4")
 
-        sys_prompt = fake_llm.generate.call_args.kwargs.get("system_prompt", "")
+        sys_prompt = _tutor_system_prompt(fake_llm)
         self.assertIn("<evaluation_signal>", sys_prompt)
         self.assertIn("Bare answer (no working shown): True", sys_prompt)
         # Guidance text should reference asking for working
@@ -490,7 +493,7 @@ class MathTutoringIntegrationTest(TestCase):
         """
         tutor, _session, fake_llm = self._make_tutor("Show me your working.")
         tutor.respond("5 1/4")  # bare numeric answer
-        sys_prompt = fake_llm.generate.call_args.kwargs.get("system_prompt", "")
+        sys_prompt = _tutor_system_prompt(fake_llm)
         # Existing bare-answer signal still fires
         self.assertIn("<evaluation_signal>", sys_prompt)
         # Layer S block does NOT fire when no steps extracted

@@ -139,6 +139,22 @@ def _violation_line(issue: str, meta: Dict) -> str:
     Keep these tight — the rewrite-LLM follows imperative instructions
     much better than abstract rule names.
     """
+    if issue == "tutor_unsafe":
+        sev = (meta.get("safety_severity") or "warning").strip()
+        cats = meta.get("safety_categories") or []
+        cat_str = ", ".join(str(c) for c in cats) if cats else "(unspecified)"
+        reason = (meta.get("safety_reasoning") or "").strip()
+        return (
+            f"- TUTOR_UNSAFE (severity={sev}): the original contained "
+            f"content classified as [{cat_str}]."
+            + (f" Reviewer reason: {reason}." if reason else "")
+            + " The rewrite MUST be age-appropriate (13–16) and free "
+            "of any harmful, sexual, self-harm, or substance-promoting "
+            "content. If the topic itself can't be taught safely, "
+            "redirect to a trusted adult and pivot to an on-topic "
+            "question from the BANK."
+        )
+
     if issue == "verdict_mismatch":
         direction = (meta.get("verdict_mismatch_direction") or "").strip()
         if direction == "tutor_said_wrong_was_right":

@@ -23,6 +23,8 @@ from apps.tutoring.combined_judge import CombinedJudgeResult
 # avoid but won't force a retry on.
 _HARD_PENALTY = 5.0   # rule violations, arithmetic, contradicted facts, coherence, figure issues
 _VERDICT_MISMATCH_PENALTY = 8.0  # extra-bad: text vs verdict mismatch
+_SAFETY_CRITICAL_PENALTY = 50.0  # harmful content — must dominate; never pick a critical
+_SAFETY_WARNING_PENALTY = 20.0   # inappropriate — heavy, but ranks above other issues
 _SOFT_PENALTY = 0.5   # unverified claims, longer-than-ideal
 
 
@@ -82,6 +84,18 @@ def score_candidate(jr: CombinedJudgeResult) -> Tuple[float, bool]:
     # Figure-vision misalignment.
     if jr.figure_aligned is False:
         score -= _HARD_PENALTY
+        hard_count += 1
+
+    # Safety — dominates everything else. A critical-severity candidate
+    # MUST never be picked over a non-critical one. The huge penalty
+    # ensures even a "clean except for safety:critical" candidate
+    # ranks below a "dirty in many ways but safety:safe" candidate.
+    sev = getattr(jr, "safety_severity", "safe") or "safe"
+    if sev == "critical":
+        score -= _SAFETY_CRITICAL_PENALTY
+        hard_count += 1
+    elif sev == "warning":
+        score -= _SAFETY_WARNING_PENALTY
         hard_count += 1
 
     # Step-eval verdict — if the candidate's text again disagrees with

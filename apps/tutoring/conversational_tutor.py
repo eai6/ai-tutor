@@ -5612,6 +5612,7 @@ Follow the current step; this concept will be covered in sequence."""
             ISSUE_FIGURE_MISMATCH,
             ISSUE_FIGURE_REF_WITHOUT_SIGNAL,
             ISSUE_TUTOR_INCOHERENT,
+            ISSUE_TUTOR_UNSAFE,
             ISSUE_VERDICT_MISMATCH,
         )
         if ISSUE_FIGURE_REF_WITHOUT_SIGNAL in (validation.issues or []):
@@ -5656,6 +5657,30 @@ Follow the current step; this concept will be covered in sequence."""
                 " posed a question that doesn't match the setup you"
                 " just described, fix the question to match the setup,"
                 " or fix the setup to match the question — not both."
+            )
+
+        # Safety — tutor response flagged HARMFUL or INAPPROPRIATE.
+        # This clause comes FIRST in the regen prompt because safety
+        # dominates: even if the rewrite has other issues, the rewrite
+        # must be safe. The score function further enforces this by
+        # making safety:critical / safety:warning impossible to pick.
+        if ISSUE_TUTOR_UNSAFE in (validation.issues or []):
+            sev = (meta.get('safety_severity') or '').strip()
+            cats = meta.get('safety_categories') or []
+            reasoning = (meta.get('safety_reasoning') or '').strip()
+            cat_str = ", ".join(str(c) for c in cats) if cats else "(unspecified)"
+            parts.append(
+                f"TUTOR_UNSAFE was flagged: the original response "
+                f"contained content classified as [{cat_str}] "
+                f"(severity={sev or 'warning'}). "
+                + (f"Reviewer reason: {reasoning}. " if reasoning else "")
+                + "The rewrite MUST be age-appropriate for a 13–16-year-old "
+                "student in a school setting, free of any harmful, "
+                "violent, sexual, or self-harm content, and must not "
+                "promote drugs / alcohol / gambling. If the original "
+                "topic itself is unsafe to teach, redirect the student "
+                "to ask a trusted adult or counsellor and pivot back "
+                "to the lesson with one focused, on-topic question."
             )
 
         # Verdict-mismatch — tutor's text contradicts the deterministic

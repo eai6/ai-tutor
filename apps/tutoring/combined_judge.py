@@ -86,6 +86,14 @@ class CombinedJudgeResult:
     figure_aligned: Optional[bool] = None
     figure_mismatch_reason: str = ""
     figure_summary: str = ""
+    # Safety — flagged child-protection / appropriateness violations
+    # in the tutor response. Severity: 'safe' | 'warning' | 'critical'.
+    # Categories: subset of {'harmful', 'inappropriate'}. (MANIPULATION
+    # is student-only and never appears here.) When non-safe, the
+    # validator raises ISSUE_TUTOR_UNSAFE → triggers regen.
+    safety_severity: str = "safe"
+    safety_categories: List[str] = field(default_factory=list)
+    safety_reasoning: str = ""
     # Bookkeeping ----------------------------------------------------------
     skipped: bool = False
     skip_reason: str = ""

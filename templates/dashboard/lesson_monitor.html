@@ -299,25 +299,12 @@
 </div>
 {% endif %}
 
-{% if recent_ai_guidances %}
-<!-- AI Monitor: Recent guidance sent to tutors -->
-<div class="card" style="margin-top: 1.5rem;border-left:4px solid #8b5cf6;">
-    <div class="card-header">
-        <h3 class="card-title" style="color:#8b5cf6;">Monitor AI — Recent guidance to tutors</h3>
-    </div>
-    <div class="card-body">
-        {% for g in recent_ai_guidances %}
-        <div style="padding:0.75rem 0;border-bottom:1px solid #f4f4f5;font-size:0.875rem;">
-            <div style="color:#71717a;font-size:0.75rem;margin-bottom:0.25rem;">{{ g.student_name }} &middot; {{ g.created_at|date:"H:i" }}</div>
-            <div>{{ g.message }}</div>
-        </div>
-        {% endfor %}
-        <div style="color:#a1a1aa;font-size:0.75rem;margin-top:0.75rem;">
-            Monitor AI reviews active sessions automatically every 5 minutes and injects guidance into the tutor for struggling students.
-        </div>
-    </div>
-</div>
-{% endif %}
+{% comment %}
+Monitor AI panel removed (Edward, 2026-05-07). The cognitive-load /
+recent-guidance UI was leaking platform internals to teachers; the
+underlying cognitive_load tracking still runs in the engine but
+isn't surfaced.
+{% endcomment %}
 
 <div class="refresh-note">Auto-refreshes every 10 seconds for active sessions.</div>
 {% endblock %}
