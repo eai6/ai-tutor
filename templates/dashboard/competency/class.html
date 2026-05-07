@@ -48,7 +48,8 @@
 </div>
 
 <p style="color:#4b5563;font-size:0.92rem;margin-bottom:1.25rem;line-height:1.55;">
-    Each row is one teaching objective — the atomic competency unit for this course. Columns are sourced from <strong>per-lesson exit tickets only</strong> (10 questions per lesson, far richer than the summative's ~5 sampled per objective). <strong>Baseline</strong> is each student's first exit-ticket attempt on the lesson; <strong>latest</strong> is the most recent; <strong>final</strong> is their best score so far. The course summative still produces an X/30 overall score and updates the SM-2 skills map for personalised tutoring — it just doesn't drive this matrix.
+    Each row is one teaching objective — one per published lesson.
+    <strong>Average competency</strong> is the class average of each student's most recent exit-ticket score on the lesson. <strong>Mastered</strong> counts students whose latest attempt is ≥70%. The course summative still produces an X/30 overall score and updates the SM-2 skills map for personalised tutoring — it just doesn't drive this matrix.
 </p>
 
 <div class="summary-row">
@@ -83,24 +84,14 @@
 </div>
 {% endif %}
 
-<div class="legend">
-    <span><span class="legend-swatch" style="background:#fbbf24;"></span>Baseline</span>
-    <span><span class="legend-swatch" style="background:#8b5cf6;"></span>Latest</span>
-    <span><span class="legend-swatch" style="background:#10b981;"></span>Final</span>
-    <span style="color:#9ca3af;">Empty cell = no student data yet for that measurement</span>
-</div>
-
 {% if matrix.objectives %}
 <div class="matrix">
     <table>
         <thead>
             <tr>
-                <th style="width:42%;">Teaching objective</th>
+                <th style="width:55%;">Teaching objective</th>
                 <th>Students</th>
-                <th>Baseline</th>
-                <th>Latest</th>
-                <th>Final</th>
-                <th>Δ (final − baseline)</th>
+                <th>Average competency</th>
                 <th>Mastered ≥70%</th>
             </tr>
         </thead>
@@ -110,30 +101,9 @@
                 <td class="obj">{{ r.tag }}</td>
                 <td><span class="pct-faint">{{ r.students_with_any }} / {{ matrix.total_students }}</span></td>
                 <td>
-                    {% if r.avg_baseline_pct is not None %}
-                    <span class="pct">{{ r.avg_baseline_pct|floatformat:0 }}%</span>
-                    <span class="pct-faint"> ({{ r.students_with_baseline }})</span>
-                    <div class="bar"><div class="bar-fill baseline" style="width: {{ r.avg_baseline_pct|floatformat:0 }}%;"></div></div>
-                    {% else %}<span class="pct-faint">—</span>{% endif %}
-                </td>
-                <td>
                     {% if r.avg_latest_pct is not None %}
                     <span class="pct">{{ r.avg_latest_pct|floatformat:0 }}%</span>
                     <div class="bar"><div class="bar-fill latest" style="width: {{ r.avg_latest_pct|floatformat:0 }}%;"></div></div>
-                    {% else %}<span class="pct-faint">—</span>{% endif %}
-                </td>
-                <td>
-                    {% if r.avg_final_pct is not None %}
-                    <span class="pct">{{ r.avg_final_pct|floatformat:0 }}%</span>
-                    <span class="pct-faint"> ({{ r.students_with_final }})</span>
-                    <div class="bar"><div class="bar-fill final" style="width: {{ r.avg_final_pct|floatformat:0 }}%;"></div></div>
-                    {% else %}<span class="pct-faint">—</span>{% endif %}
-                </td>
-                <td>
-                    {% if r.delta_pct is not None %}
-                        {% if r.delta_pct > 0 %}<span class="delta-pos">+{{ r.delta_pct|floatformat:0 }} pts</span>
-                        {% elif r.delta_pct < 0 %}<span class="delta-neg">{{ r.delta_pct|floatformat:0 }} pts</span>
-                        {% else %}<span class="delta-zero">0</span>{% endif %}
                     {% else %}<span class="pct-faint">—</span>{% endif %}
                 </td>
                 <td>

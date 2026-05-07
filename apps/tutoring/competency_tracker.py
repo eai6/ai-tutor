@@ -101,14 +101,13 @@ def collect_objective_signals_for_course(course, students=None) -> dict:
     ).order_by('student_id', 'completed_at')
 
     # Per-lesson ET attempts: roll the per-question concept_tag up to
-    # the lesson's primary objective at read time. This is what makes
-    # the competency matrix actually reflect what students attempted —
-    # the per-question tag stays fine-grained on the source
-    # ExitTicketQuestion (useful for tutor scaffolding inside a
-    # lesson) but the cross-attempt aggregation always uses
-    # lesson-level. Summative attempts already carry lesson-level
-    # tags from summative_generator, so this is a no-op for them.
-    from apps.curriculum.content_generator import combined_objectives_for_lesson
+    # the lesson's TEACHING objective (lesson.objective) at read time.
+    # Per Edward (2026-05-07): "1 lesson = 1 teaching objective". We
+    # used to read combined_objectives_for_lesson (which unions the
+    # unit's terminal_objectives + lesson's enabling_objectives) and
+    # that produced 394-row matrices for 4-lesson courses. Now we
+    # use lesson.objective (the parser's singular CharField) so each
+    # lesson contributes exactly one objective to the matrix.
     _lesson_obj_cache: Dict[int, str] = {}
     def _lesson_objective(lesson) -> str:
         if not lesson:
@@ -116,8 +115,10 @@ def collect_objective_signals_for_course(course, students=None) -> dict:
         cached = _lesson_obj_cache.get(lesson.id)
         if cached is not None:
             return cached
-        objs = combined_objectives_for_lesson(lesson)
-        primary = objs[0] if objs else (lesson.title or '')
+        primary = (
+            (getattr(lesson, 'objective', '') or '').strip()
+            or (getattr(lesson, 'title', '') or '').strip()
+        )
         _lesson_obj_cache[lesson.id] = primary
         return primary
 
@@ -204,21 +205,26 @@ def class_competency_matrix(course, *, students=None, objectives=None) -> dict:
             'students_attempted': int,
         }
     """
-    from apps.curriculum.content_generator import combined_objectives_for_lesson
-
-    # Build the canonical objective list from the curriculum (so we show
-    # gaps where no student has touched an objective yet).
+    # Build the canonical objective list from the curriculum: ONE row
+    # per published lesson, sourced from lesson.objective (the
+    # singular teaching objective per the parser's 1:1 contract).
+    # Fixed 2026-05-07 — was using combined_objectives_for_lesson
+    # which UNIONS unit terminal_objectives + lesson enabling_objectives,
+    # producing 394 rows for a 4-lesson Math S3 course. Now matches
+    # the EO-deprecation direction: 1 lesson = 1 teaching objective.
     if objectives is None:
         seen = set()
         canonical = []
         for unit in course.units.prefetch_related('lessons').order_by('order_index'):
-            for lesson in unit.lessons.order_by('order_index'):
-                for obj in combined_objectives_for_lesson(lesson):
-                    norm = _normalize_tag(obj)
-                    if norm in seen:
-                        continue
-                    seen.add(norm)
-                    canonical.append(obj)
+            for lesson in unit.lessons.filter(is_published=True).order_by('order_index'):
+                obj = (lesson.objective or '').strip() or (lesson.title or '').strip()
+                if not obj:
+                    continue
+                norm = _normalize_tag(obj)
+                if norm in seen:
+                    continue
+                seen.add(norm)
+                canonical.append(obj)
         objectives = canonical
 
     # Roster
