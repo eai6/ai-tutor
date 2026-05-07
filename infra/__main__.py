@@ -420,8 +420,35 @@ container_app = app.ContainerApp(
             ),
         ],
         scale=app.ScaleArgs(
+            # Pilot training (2026-05-07): scale out for read traffic.
+            # ChromaDB lives at VECTORDB_ROOT=/tmp/vectordb — each
+            # replica gets its own copy seeded from the Azure Files
+            # mount on startup (Dockerfile CMD `cp` step). That makes
+            # multi-replica READS safe (every replica has its own
+            # SQLite). WRITES to the vectordb (curriculum reindexing,
+            # teaching-materials upload) MUST be run from a single-
+            # replica mode — bring max_replicas back to 1 before any
+            # large reindex, or run the write via a separate one-off
+            # job. For the pilot the only writes happen during admin
+            # content uploads, which are infrequent and serialisable.
             min_replicas=1,
-            max_replicas=1,  # Keep at 1 for ChromaDB file-based storage
+            max_replicas=4,
+            rules=[
+                app.ScaleRuleArgs(
+                    name="http-concurrency",
+                    http=app.HttpScaleRuleArgs(
+                        metadata={
+                            # Spawn a new replica when each existing
+                            # replica is handling more than ~12
+                            # concurrent in-flight HTTP requests.
+                            # With gunicorn's 4 workers × 4 threads
+                            # = 16 concurrent capacity, 12 leaves
+                            # headroom before queuing.
+                            "concurrentRequests": "12",
+                        },
+                    ),
+                ),
+            ],
         ),
         volumes=[
             app.VolumeArgs(
