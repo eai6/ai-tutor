@@ -103,6 +103,78 @@
     </div>
 </div>
 
+{# Student scores — roster + per-student best/latest/attempts. Added 2026-05-07. #}
+{% if summative %}
+<div class="card" style="margin-bottom:1rem;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <h2 class="card-title">Student scores</h2>
+        <div style="font-size:0.78rem;color:var(--gray-500);">
+            {{ score_stats.attempted }} of {{ score_stats.total_students }} attempted
+            {% if score_stats.passed %}· <strong style="color:#059669;">{{ score_stats.passed }} passed</strong>{% endif %}
+            {% if score_stats.avg_best_pct is not None %}· avg best <strong>{{ score_stats.avg_best_pct }}%</strong>{% endif %}
+            · pass {{ score_stats.passing_pct }}%
+        </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+        {% if student_scores %}
+        <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+            <thead style="background:#f9fafb;">
+                <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
+                    <th style="padding:0.55rem 1rem;">Student</th>
+                    <th style="padding:0.55rem 1rem;">Best</th>
+                    <th style="padding:0.55rem 1rem;">Latest</th>
+                    <th style="padding:0.55rem 1rem;">Attempts</th>
+                    <th style="padding:0.55rem 1rem;">Last attempted</th>
+                    <th style="padding:0.55rem 1rem;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in student_scores %}
+                <tr style="border-top:1px solid var(--gray-100);">
+                    <td style="padding:0.5rem 1rem;">
+                        <div style="font-weight:500;">{{ r.user.first_name }} {{ r.user.last_name }}</div>
+                        <div style="font-size:0.78rem;color:var(--gray-500);">{{ r.user.username }}</div>
+                    </td>
+                    <td style="padding:0.5rem 1rem;">
+                        {% if r.has_attempt %}
+                            <strong>{{ r.best_score }} / {{ questions_per_attempt }}</strong>
+                            <span style="color:var(--gray-500);font-size:0.78rem;">· {{ r.best_pct }}%</span>
+                        {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
+                    </td>
+                    <td style="padding:0.5rem 1rem;">
+                        {% if r.has_attempt %}
+                            {{ r.latest_score }} / {{ questions_per_attempt }}
+                            <span style="color:var(--gray-500);font-size:0.78rem;">· {{ r.latest_pct }}%</span>
+                        {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
+                    </td>
+                    <td style="padding:0.5rem 1rem;">
+                        {% if r.has_attempt %}{{ r.attempts }}{% else %}<span style="color:var(--gray-400);">0</span>{% endif %}
+                    </td>
+                    <td style="padding:0.5rem 1rem;font-size:0.82rem;color:var(--gray-500);">
+                        {% if r.last_at %}{{ r.last_at|timesince }} ago{% else %}—{% endif %}
+                    </td>
+                    <td style="padding:0.5rem 1rem;">
+                        {% if not r.has_attempt %}
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:0.72rem;font-weight:600;">Not taken</span>
+                        {% elif r.passed %}
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#d1fae5;color:#065f46;font-size:0.72rem;font-weight:700;">Passed</span>
+                        {% else %}
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:0.72rem;font-weight:600;">Below pass</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="padding:2rem;text-align:center;color:var(--gray-500);">
+            No students enrolled in this course yet.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <div class="card">
     <div class="card-header">
         <h2 class="card-title">All {{ questions|length }} questions</h2>

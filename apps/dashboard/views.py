@@ -622,7 +622,18 @@ def student_detail(request, student_id):
     for p in progress_list:
         course = p.lesson.unit.course
         if course.id not in courses_progress:
-            total_in_course = course_lesson_counts.get(course.id, {}).get('count', 0)
+            # Resolve the denominator. course_lesson_counts only includes
+            # courses scoped to the teacher's institution — if the
+            # course is platform-wide / owned by another institution
+            # (a global course the student worked through), we need
+            # to count its published lessons directly so we don't
+            # render "1/0 lessons". Fixed 2026-05-07.
+            total_in_course = course_lesson_counts.get(course.id, {}).get('count')
+            if not total_in_course:
+                total_in_course = sum(
+                    u.lessons.filter(is_published=True).count()
+                    for u in course.units.all()
+                )
             courses_progress[course.id] = {
                 'course': course,
                 'lessons': [],
@@ -6052,8 +6063,9 @@ def summative_generate(request, course_id):
 @teacher_required
 def summative_review(request, course_id):
     """Teacher review of a course summative bank."""
-    from apps.tutoring.models import ExitTicket
+    from apps.tutoring.models import ExitTicket, ExitTicketAttempt
     from apps.tutoring.summative_selection import coverage_report
+    from apps.accounts.models import Membership
 
     institution = request.staff_ctx['institution']
     if institution is not None:
@@ -6072,9 +6084,102 @@ def summative_review(request, course_id):
 
     coverage = None
     questions = []
+    student_scores = []
+    score_stats = {
+        'attempted': 0, 'passed': 0, 'not_taken': 0,
+        'avg_best_pct': None, 'total_students': 0,
+    }
+    questions_per_attempt = 0
+
     if summative:
         coverage = coverage_report(summative)
         questions = list(summative.questions.order_by('order_index'))
+        questions_per_attempt = (
+            summative.questions_per_attempt or len(questions) or 30
+        )
+        passing_pct = (summative.passing_score or 70)
+
+        # Roster: all active students in the course's institution.
+        roster_qs = Membership.objects.filter(
+            role='student', is_active=True,
+        )
+        if course.institution_id:
+            roster_qs = roster_qs.filter(institution=course.institution)
+        roster_qs = roster_qs.select_related('user')
+        roster = list(roster_qs)
+
+        # Index attempts per student so a single pass over them
+        # populates best/latest/count for everyone.
+        attempts_qs = ExitTicketAttempt.objects.filter(
+            exit_ticket=summative, completed_at__isnull=False,
+        ).select_related('student').order_by('student_id', 'completed_at')
+
+        per_student = {}  # user_id → {best, best_pct, latest, latest_pct, attempts, last_at, passed}
+        for a in attempts_qs:
+            uid = a.student_id
+            pct = (a.score / questions_per_attempt * 100) if questions_per_attempt else 0
+            entry = per_student.setdefault(uid, {
+                'best_score': 0, 'best_pct': 0,
+                'latest_score': 0, 'latest_pct': 0,
+                'attempts': 0, 'last_at': None, 'passed_best': False,
+            })
+            entry['attempts'] += 1
+            entry['latest_score'] = a.score
+            entry['latest_pct'] = round(pct)
+            entry['last_at'] = a.completed_at
+            if pct > entry['best_pct']:
+                entry['best_score'] = a.score
+                entry['best_pct'] = round(pct)
+                entry['passed_best'] = (a.score >= (passing_pct / 100.0) * questions_per_attempt)
+
+        # Build the student rows (include not-attempted students so
+        # teachers see who hasn't started). Sort: attempted first by
+        # best-score desc, then not-taken alphabetically.
+        for m in roster:
+            user = m.user
+            entry = per_student.get(user.id)
+            if entry:
+                student_scores.append({
+                    'user': user,
+                    'has_attempt': True,
+                    'best_score': entry['best_score'],
+                    'best_pct': entry['best_pct'],
+                    'latest_score': entry['latest_score'],
+                    'latest_pct': entry['latest_pct'],
+                    'attempts': entry['attempts'],
+                    'last_at': entry['last_at'],
+                    'passed': entry['passed_best'],
+                })
+            else:
+                student_scores.append({
+                    'user': user,
+                    'has_attempt': False,
+                    'best_score': None, 'best_pct': None,
+                    'latest_score': None, 'latest_pct': None,
+                    'attempts': 0, 'last_at': None,
+                    'passed': False,
+                })
+        student_scores.sort(key=lambda r: (
+            0 if r['has_attempt'] else 1,
+            -(r['best_pct'] or 0),
+            (r['user'].get_full_name() or r['user'].username).lower(),
+        ))
+
+        attempted = sum(1 for r in student_scores if r['has_attempt'])
+        passed = sum(1 for r in student_scores if r['passed'])
+        avg_pct = None
+        if attempted:
+            avg_pct = round(
+                sum(r['best_pct'] for r in student_scores if r['has_attempt']) / attempted
+            )
+        score_stats = {
+            'attempted': attempted,
+            'passed': passed,
+            'not_taken': len(student_scores) - attempted,
+            'avg_best_pct': avg_pct,
+            'total_students': len(student_scores),
+            'passing_pct': passing_pct,
+        }
 
     return render(request, 'dashboard/summative/review.html', {
         **request.staff_ctx,
@@ -6082,6 +6187,9 @@ def summative_review(request, course_id):
         'summative': summative,
         'coverage': coverage,
         'questions': questions,
+        'student_scores': student_scores,
+        'score_stats': score_stats,
+        'questions_per_attempt': questions_per_attempt,
     })
 
 
