@@ -35,6 +35,27 @@ def _fake_llm_response(content: str) -> LLMResponse:
     )
 
 
+def _tutor_system_prompt(fake_llm) -> str:
+    """Find the tutor's system_prompt among all generate() calls.
+
+    The same fake_llm is used for both the tutor LLM and the judge clients
+    (rule / factual / step_eval). With per-domain concurrent judges, the
+    LAST call (call_args) is non-deterministic and usually a judge — but
+    the tutor system prompt is the only one containing
+    `<evaluation_signal>` (judges don't get that block). Pick that call.
+    Falls back to the largest system_prompt if no signal block is found
+    (the tutor prompt is much larger than any individual judge prompt).
+    """
+    candidates = []
+    for call in fake_llm.generate.call_args_list:
+        sp = call.kwargs.get("system_prompt", "") or ""
+        candidates.append(sp)
+    for sp in candidates:
+        if "<evaluation_signal>" in sp:
+            return sp
+    return max(candidates, key=len, default="")
+
+
 class MathTutoringIntegrationTest(TestCase):
     """Math lesson fixtures + tutor.respond() assertions."""
 
@@ -263,8 +284,7 @@ class MathTutoringIntegrationTest(TestCase):
         tutor, session, fake_llm = self._make_tutor("Thanks, let's continue.")
         tutor.respond("3 3/4")
 
-        call_kwargs = fake_llm.generate.call_args.kwargs
-        sys_prompt = call_kwargs.get("system_prompt", "")
+        sys_prompt = _tutor_system_prompt(fake_llm)
         # No deterministic numeric verdict (no expected to compare against).
         self.assertNotIn("Verdict: CORRECT", sys_prompt)
         self.assertNotIn("Verdict: INCORRECT", sys_prompt)
@@ -428,7 +448,7 @@ class MathTutoringIntegrationTest(TestCase):
                 "Let me check that addition."
             )
             tutor.respond("95 + 70 + 110 = 285")
-            sys_prompt = fake_llm.generate.call_args.kwargs.get("system_prompt", "")
+            sys_prompt = _tutor_system_prompt(fake_llm)
             self.assertIn("PARTIAL_WRONG", sys_prompt)
             self.assertIn("FIRST ERROR: Step 1", sys_prompt)
             self.assertIn("(correct: 275)", sys_prompt)

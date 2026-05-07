@@ -1695,10 +1695,18 @@ Keep it to 2-3 sentences."""
         # separate instructor _evaluate_step call). Min-exchange
         # floor: skip step eval on the first turn of teach /
         # worked_example so the LLM doesn't advance prematurely.
+        # Pass the figure attached this turn (if any) + a vision-capable
+        # image reader so the figure_ref / figure_vision judges can run.
+        # parsed_media is a single dict or None; the orchestrator
+        # accepts a list (multiple figures per turn possible in future).
+        attached_media_list = [parsed_media] if parsed_media else []
         combined_judge_result = run_combined_judge(
             clean_response,
             lesson=self.lesson,
             llm_client=self.judge_client,
+            vision_client=self.judge_client,
+            image_reader=self._read_image_for_vision,
+            attached_media=attached_media_list,
             bank_stems=self._current_bank_stems(),
             student_input=student_input,
             answer_was_bare=turn_bare_answer,
@@ -1708,8 +1716,10 @@ Keep it to 2-3 sentences."""
             ),
             step_context=self._build_step_eval_context(
                 student_input, clean_response,
+                math_check=turn_math_check,
             ),
             subject_is_math=subject_is_math,
+            bank_offered=bool(getattr(self, '_question_id_map', None)),
         )
         if combined_judge_result.corrected_response:
             clean_response = combined_judge_result.corrected_response
@@ -5497,14 +5507,25 @@ Follow the current step; this concept will be covered in sequence."""
         # "in the figure" but no |||MEDIA:N||| was emitted. Two valid
         # fixes: signal the matching media OR remove the deictic
         # reference and explain in plain prose.
-        from apps.tutoring.validator import ISSUE_FIGURE_REF_WITHOUT_SIGNAL
+        from apps.tutoring.validator import (
+            ISSUE_FIGURE_MISMATCH,
+            ISSUE_FIGURE_REF_WITHOUT_SIGNAL,
+            ISSUE_TUTOR_INCOHERENT,
+        )
         if ISSUE_FIGURE_REF_WITHOUT_SIGNAL in (validation.issues or []):
+            # Surface the specific phrases the figure_ref judge found.
+            ref_issues = (meta.get('figure_ref_issues') or [])[:3]
+            ref_block = ""
+            if ref_issues:
+                ref_block = "\n  Specific phrases flagged:" + "".join(
+                    f"\n    - {x}" for x in ref_issues
+                )
             parts.append(
                 "FIGURE_REF_WITHOUT_SIGNAL was flagged: your previous"
                 " response referenced a visual (\"the diagram\","
                 " \"looking at the figure\", \"shown above\") but did"
                 " NOT emit |||MEDIA:N||| — the student saw the"
-                " reference but no figure. Two valid fixes:"
+                " reference but no figure." + ref_block + " Two valid fixes:"
                 "\n  (a) If a matching media item exists in the"
                 " <media_catalog>, append |||MEDIA:N||| as the LAST"
                 " line of your response so the student sees the"
@@ -5515,6 +5536,49 @@ Follow the current step; this concept will be covered in sequence."""
                 " the concept in plain prose instead."
                 " Pick one — do not leave the reference dangling."
             )
+
+        # Coherence — tutor self-contradicted within the same turn.
+        if ISSUE_TUTOR_INCOHERENT in (validation.issues or []):
+            coh_violations = (meta.get('coherence_violations') or [])[:3]
+            v_block = ""
+            if coh_violations:
+                v_block = "\n  Contradictions flagged:" + "".join(
+                    f"\n    - {x}" for x in coh_violations
+                )
+            parts.append(
+                "TUTOR_INCOHERENT was flagged: your previous response"
+                " contradicts itself (e.g. introduces a setup with N"
+                " items, then poses a question with M items; or praises"
+                " the student then immediately corrects them)." + v_block +
+                " Pick ONE consistent framing and rewrite. If you"
+                " posed a question that doesn't match the setup you"
+                " just described, fix the question to match the setup,"
+                " or fix the setup to match the question — not both."
+            )
+
+        # Figure-vision mismatch — attached figure doesn't match
+        # the question. Two valid fixes: rewrite the question to match
+        # the figure, OR pick a different figure from the catalog.
+        if ISSUE_FIGURE_MISMATCH in (validation.issues or []):
+            mismatch = (meta.get('figure_mismatch_reason') or '').strip()
+            summary = (meta.get('figure_summary') or '').strip()
+            parts.append(
+                "FIGURE_MISMATCH was flagged: the figure you attached"
+                " (|||MEDIA:N|||) does NOT match the question you"
+                " posed."
+                + (f"\n  What the figure actually shows: {summary}"
+                   if summary else "")
+                + (f"\n  Mismatch reason: {mismatch}"
+                   if mismatch else "")
+                + " Two valid fixes:"
+                "\n  (a) Rewrite the question so it matches what the"
+                " figure depicts."
+                "\n  (b) Pick a different |||MEDIA:N||| from"
+                " <media_catalog> that actually shows what your"
+                " question describes — or drop the figure entirely"
+                " and remove any \"in the diagram\" reference."
+            )
+
         parts.append(
             "Edit the previous response to fix these violations. Keep"
             " whatever was good (greeting, framing, conceptual scaffold)."
@@ -5822,16 +5886,80 @@ Follow the current step; this concept will be covered in sequence."""
     }
     _STEP_HARD_CAP_DEFAULT = 10
 
+    # Conceptual non-answers — student inputs that aren't math attempts
+    # and shouldn't trigger an answer_correct verdict. Production
+    # transcripts (Samanthi / Trent / Francis pilot, 2026-05-06) showed
+    # Sonnet returning bogus true/false on these one-word inputs even
+    # though the judge prompt says "null". Programmatic guard.
+    _NON_ANSWER_INPUTS: frozenset = frozenset({
+        "yes", "yes.", "yeah", "yep", "y",
+        "no", "no.", "nope", "n",
+        "ok", "ok.", "okay", "okay.", "k",
+        "help", "?", "??", "huh", "hmm",
+        "i don't know", "idk", "i dont know", "dunno",
+        "not sure", "no idea",
+    })
+
+    def _is_non_answer_input(self, student_input: str) -> bool:
+        """Return True for student inputs that aren't math attempts."""
+        text = (student_input or "").strip().lower()
+        if not text:
+            return True
+        # Exact match against the conceptual-non-answer set.
+        if text in self._NON_ANSWER_INPUTS:
+            return True
+        # Very short non-numeric inputs ("yes please", "ok then") also
+        # qualify if they contain only non-answer phrases.
+        if len(text) <= 20:
+            for phrase in self._NON_ANSWER_INPUTS:
+                if text == phrase or text.startswith(phrase + " "):
+                    return True
+        return False
+
+    @staticmethod
+    def _extract_last_question(text: str) -> str:
+        """Best-effort: return the last question-like sentence from a tutor
+        message — sentences ending in `?` or fill-in markers like
+        `___°.` / `___.`. Used by `_build_step_eval_context` as a
+        fallback when `step.teacher_script` is empty so the step_eval
+        judge always has the actual posed question to anchor on,
+        instead of guessing from the tutor's CURRENT response (which
+        may contain a freshly-authored next question).
+        Returns "" when no question found.
+        """
+        if not text:
+            return ""
+        import re as _re_q
+        sentences = _re_q.split(r'(?<=[\.\!\?])\s+|\n+', text.strip())
+        for sent in reversed(sentences):
+            s = (sent or "").strip()
+            if not s:
+                continue
+            if (
+                s.endswith("?")
+                or s.endswith("___°.") or s.endswith("___°")
+                or s.endswith("___.") or s.endswith("___")
+            ):
+                return s[:400]
+        return ""
+
     def _build_step_eval_context(
         self, student_input: str, tutor_response: str,
+        math_check: Optional[MathCheckResult] = None,
     ) -> Optional[dict]:
         """Build the step_context payload for combined_judge CHECK 4.
 
-        Returns None when step eval should be skipped (no step in
-        flight, exit-ticket phase, or below the min-exchange floor for
-        the current step type). When None, the judge sees an empty
-        step_context and reports answer_correct=null,
-        step_complete=false (skipping the eval).
+        Returns None when step eval should be skipped:
+          - no step in flight / exit-ticket phase / below min-exchange floor
+          - the current step has NO expected_answer (engage/teach/summary
+            steps without an expected — Sonnet can't evaluate against
+            nothing and ends up vibes-grading)
+          - the student's input is a conceptual non-answer ("yes",
+            "help", "ok") — these aren't math attempts, no verdict
+            should be issued
+
+        When None, the judge sees an empty step_context and reports
+        answer_correct=null, step_complete=false (skipping the eval).
         """
         if self.session_state != SessionState.TUTORING:
             return None
@@ -5846,6 +5974,28 @@ Follow the current step; this concept will be covered in sequence."""
                 "exchanges=%d < floor=%d",
                 self.current_topic_index, step_type,
                 self.step_exchange_count, floor,
+            )
+            return None
+
+        # No expected_answer → the judge has nothing to compare against.
+        # Production showed Sonnet hallucinating true/false on engage /
+        # teach steps where expected_answer was empty.
+        expected = (step.expected_answer or '').strip()
+        if not expected:
+            logger.info(
+                "[CombinedJudge] step_eval: SKIPPED step=%d type=%s "
+                "no expected_answer — verdict=null",
+                self.current_topic_index, step_type,
+            )
+            return None
+
+        # Conceptual non-answers ("yes", "help", "ok") aren't math
+        # attempts; force null verdict.
+        if self._is_non_answer_input(student_input):
+            logger.info(
+                "[CombinedJudge] step_eval: SKIPPED step=%d "
+                "non-answer input=%r — verdict=null",
+                self.current_topic_index, (student_input or '')[:40],
             )
             return None
 
@@ -5906,6 +6056,51 @@ Follow the current step; this concept will be covered in sequence."""
         elif atype == 'free_text':
             format_hint = "Answer format: free_text. Compare conceptually; accept paraphrases that capture key points."
 
+        # First-layer deterministic verdict — feeds into the LLM's
+        # judgment so it anchors on arithmetic / MCQ ground truth.
+        # Edward, 2026-05-07: "deterministic eval [is] the first
+        # layer ... LLM is always executed, but it can use the
+        # deterministic eval as the first layer of eval to avoid
+        # arithmetic errors."
+        deterministic_verdict: Optional[bool] = None
+        deterministic_source: str = ''
+        if math_check is not None and math_check.is_correct is not None:
+            deterministic_verdict = bool(math_check.is_correct)
+            deterministic_source = 'numeric'
+        elif atype == 'multiple_choice' and expected:
+            text = (student_input or '').strip()
+            import re as _re_mcq
+            m = _re_mcq.match(
+                r'^[\(\[]?\s*([A-D])\s*[\)\]\.]*\s*$', text, _re_mcq.IGNORECASE,
+            )
+            if m:
+                student_letter = m.group(1).upper()
+                expected_letter = expected.upper()
+                if expected_letter in ('A', 'B', 'C', 'D'):
+                    deterministic_verdict = (student_letter == expected_letter)
+                    deterministic_source = 'mcq_letter'
+
+        # The QUESTION the student was actually answering. Without this
+        # explicit anchor, step_eval has been observed to read the
+        # CURRENT tutor_response (which may contain a freshly-authored
+        # next question) and grade the student's answer against the
+        # WRONG question. Production transcript example: tutor asked
+        # "find missing angle if one is 65°", student said "subtract
+        # 65 from 180", tutor's next response posed a new 50° question
+        # — judge graded the answer against the 50° question. With
+        # posed_question explicitly carried, the judge anchors on
+        # what the student was actually asked.
+        prior_tutor_text = ""
+        for m in reversed(self.conversation[:-1] if self.conversation else []):
+            if m.get('role') == 'assistant':
+                prior_tutor_text = (m.get('content') or '').strip()
+                break
+        posed_question = (
+            (step.teacher_script or '').strip()
+            or self._extract_last_question(prior_tutor_text)
+            or (step.question or '').strip()
+        )[:400]
+
         return {
             "step_type": step_type,
             "step_index": self.current_topic_index,
@@ -5913,8 +6108,15 @@ Follow the current step; this concept will be covered in sequence."""
             "completion_criteria": criteria_map.get(step_type, criteria_map['teach']),
             "expected_answer": (step.expected_answer or '')[:300],
             "teacher_script_excerpt": (step.teacher_script or '')[:400],
+            "posed_question": posed_question,
             "format_hint": format_hint,
             "recent_conversation": recent_text[:1500],
+            # First-layer deterministic check. The judge anchors here
+            # for arithmetic / MCQ; only override on equivalent forms,
+            # working-with-typo, or when the deterministic check
+            # missed context the broader LLM judgment can see.
+            "deterministic_verdict": deterministic_verdict,
+            "deterministic_source": deterministic_source,
         }
 
     def _evaluate_step(self, student_input: str, tutor_response: str) -> Optional[StepEvaluationResult]:
@@ -6299,10 +6501,31 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         eval_reasoning = None
         step_eval_result = None
         is_correct: Optional[bool] = None
-        if math_check is not None:
-            is_correct = math_check.is_correct
-            eval_layer = 'deterministic_numeric'
-            eval_reasoning = math_check.reasoning
+
+        # Belt-and-braces against the production bug where Sonnet
+        # returns true/false on conceptual non-answers ("yes", "help",
+        # "ok"). _build_step_eval_context already returns None on
+        # these inputs so the judge skips them — but if a verdict
+        # somehow lands, force null here too.
+        non_answer = self._is_non_answer_input(student_input)
+        if non_answer:
+            logger.info(
+                "[Eval] forcing is_correct=None — non-answer input=%r",
+                (student_input or '')[:40],
+            )
+
+        # Edward, 2026-05-07: deterministic check is a FIRST LAYER, not
+        # a replacement. We always let the LLM eval run — the
+        # deterministic verdict is fed into combined_judge as
+        # `deterministic_verdict` and the judge anchors on it for the
+        # arithmetic/MCQ axis while still applying broader judgment
+        # (equivalent forms, working-with-typo, partial credit). Final
+        # is_correct comes from the judge.
+        if non_answer:
+            # No verdict — student wasn't answering a math question.
+            is_correct = None
+            eval_layer = 'non_answer_skip'
+            eval_reasoning = 'student input is a conceptual non-answer'
         elif combined_judge_result is not None and not getattr(
             combined_judge_result, 'step_eval_skipped', False,
         ):
@@ -6320,7 +6543,15 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
                 reasoning=reasoning[:280],
             )
             is_correct = ac
-            eval_layer = 'combined_judge'
+            # Source label — when the step_eval judge short-circuited via
+            # deterministic verdict (numeric / MCQ), surface that as the
+            # eval_layer so telemetry + tests can distinguish deterministic
+            # outcomes from LLM verdicts.
+            src = getattr(combined_judge_result, 'step_eval_source', '') or ''
+            if src.startswith('deterministic'):
+                eval_layer = src  # 'deterministic_numeric' | 'deterministic_mcq' | 'deterministic'
+            else:
+                eval_layer = 'combined_judge'
             eval_reasoning = reasoning
         else:
             if step_type in ('practice', 'quiz', 'teach', 'worked_example') and self.instructor_client:
@@ -8247,6 +8478,14 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
                 "is_correct": metadata.get('is_correct'),
                 "bare_answer": bool(metadata.get('bare_answer')),
                 "praise_stripped": bool(metadata.get('praise_stripped')),
+                # Verdict source diagnostics (A.0 — Edward's pilot)
+                "expected_answer_present": bool(
+                    step and (getattr(step, 'expected_answer', '') or '').strip()
+                ),
+                "answer_type": (getattr(step, 'answer_type', '') or '') if step else '',
+                "non_answer_input": bool(
+                    self._is_non_answer_input(metadata.get('student_input_excerpt', ''))
+                ) if metadata.get('student_input_excerpt') else False,
                 # Bank + tool state
                 "bank_pool_size": len(pool_ids) if pool_ids is not None else None,
                 "bank_offered": bool(id_map),

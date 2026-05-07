@@ -1,21 +1,24 @@
 """Tests for the combined post-response judge.
 
-Locks in the merge contract — one LLM call must produce all three
-sub-results (arithmetic / factual / rule-compliance) so the tutor turn
-drops from 3 separate judge calls to 1.
+The combined judge is now a thin compatibility shim that delegates to
+per-domain concurrent judges (apps/tutoring/judges/*). The legacy
+"single-LLM-call merges all three sub-arrays" contract is gone — we
+now run up to four focused judges in parallel and merge the typed
+results.
 
-Covers:
-  - skip gates (empty, no_llm_client, no_relevant_content)
-  - parse + collation of all three sub-arrays from one JSON response
-  - in-place arithmetic correction mirrors the legacy verifier
-  - validator consumes combined_result and skips its L4/L5 LLM calls
-  - call-count assertion: validator + combined judge together = 1 call
+This file keeps the tests that still describe public behaviour:
+  - top-level skip gates (empty response, no llm_client)
+  - validator consumes a CombinedJudgeResult without making its own
+    L4/L5 LLM calls (that's the integration that downstream depends on)
+
+The old per-call-count + monolithic-JSON-parse tests were removed when
+the architecture changed. Per-domain coverage lives in
+apps/tutoring/judges/tests/.
 """
 
 import json
 from unittest.mock import MagicMock
 
-from django.contrib.auth.models import User
 from django.test import TestCase
 
 from apps.accounts.models import Institution
@@ -27,7 +30,6 @@ from apps.tutoring.combined_judge import (
 )
 from apps.tutoring.fact_verifier import ClaimVerdict
 from apps.tutoring.rule_compliance import (
-    RULE_ARITHMETIC,
     RULE_NO_AUTHORING,
     RuleViolation,
 )
@@ -76,116 +78,20 @@ class CombinedJudgeSkipGatesTest(TestCase):
         self.assertTrue(result.skipped)
         self.assertEqual(result.skip_reason, "no_llm_client")
 
-    def test_no_relevant_content_skipped(self):
+    def test_pure_conversational_does_not_crash(self):
+        """No digits, no '?', no praise vocab — every sub-judge skips on
+        its own pre-gate; orchestrator returns a non-skipped result with
+        all sub_skipped fields populated."""
         llm = MagicMock()
-        # No digits, no '?', no praise vocab — pure conversational.
         result = run_combined_judge(
             "Take your time.", lesson=self.lesson, llm_client=llm,
         )
-        self.assertTrue(result.skipped)
-        self.assertEqual(result.skip_reason, "no_relevant_content")
-        llm.generate.assert_not_called()
-
-
-class CombinedJudgeParseTest(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.institution = Institution.objects.create(name="T", slug="t")
-        cls.course = Course.objects.create(
-            institution=cls.institution, title="Math",
-            grade_level="S3", is_published=True, subject_type='math',
-        )
-        cls.unit = Unit.objects.create(
-            course=cls.course, title="U", order_index=0,
-        )
-        cls.lesson = Lesson.objects.create(
-            unit=cls.unit, title="L", objective="o",
-            order_index=0, is_published=True,
-        )
-
-    def test_parses_all_three_sub_arrays_from_one_call(self):
-        """Single judge response → arithmetic + rule findings collated."""
-        llm = MagicMock()
-        llm.generate.return_value = _llm_response(json.dumps({
-            "arithmetic_corrections": [
-                {"expression": "100 + 120 + 80", "claimed": "360", "correct": "300"},
-            ],
-            "fact_claims": [],
-            "rule_violations": [
-                {"rule": "NO_AUTHORING",
-                 "evidence": "if angles measure 100°, 120°, 80°...",
-                 "suggested_fix": "Use |||QUESTION:N|||"},
-                {"rule": "ARITHMETIC",
-                 "evidence": "do they sum to 360°?",
-                 "suggested_fix": "100+120+80 = 300 not 360"},
-            ],
-        }))
-        text = (
-            "If three angles measure 100°, 120°, and 80° — do they sum "
-            "to 360°? You will find 100 + 120 + 80 = 360 works."
-        )
-        result = run_combined_judge(
-            text, lesson=self.lesson, llm_client=llm,
-            bank_stems=["Find x given a=10, b=20"],
-            student_input="i don't know", answer_was_bare=False,
-            answer_was_wrong=False,
-        )
-        # ONE LLM call total — that's the whole point.
-        self.assertEqual(llm.generate.call_count, 1)
-        # Arithmetic
+        # Top-level result is not skipped (only empty / no_llm_client trip
+        # the top-level gate). Each sub-judge skips on its own pre-gate.
         self.assertFalse(result.skipped)
-        self.assertEqual(len(result.arithmetic_corrections), 1)
-        self.assertEqual(result.arithmetic_corrections[0]["correct"], "300")
-        # Rule violations
-        self.assertEqual(set(result.violated_rules),
-                         {RULE_NO_AUTHORING, RULE_ARITHMETIC})
-
-    def test_in_place_arithmetic_rewrite(self):
-        """Best-effort substitution mirrors the legacy verifier — when
-        the claimed token sits inside the expression, replace it."""
-        llm = MagicMock()
-        llm.generate.return_value = _llm_response(json.dumps({
-            "arithmetic_corrections": [
-                {"expression": "8 × 2.5 = 21", "claimed": "21", "correct": "20"},
-            ],
-            "fact_claims": [],
-            "rule_violations": [],
-        }))
-        text = "Quick check — 8 × 2.5 = 21, right?"
-        result = run_combined_judge(
-            text, lesson=self.lesson, llm_client=llm,
-        )
-        self.assertIn("8 × 2.5 = 20", result.corrected_response)
-        self.assertNotIn("8 × 2.5 = 21", result.corrected_response)
-
-    def test_malformed_json_fails_open(self):
-        """Bad LLM output ⇒ skipped, response unchanged. Never blocks."""
-        llm = MagicMock()
-        llm.generate.return_value = _llm_response("not json at all 😅")
-        result = run_combined_judge(
-            "Find x where x + 5 = 12.", lesson=self.lesson, llm_client=llm,
-        )
-        self.assertTrue(result.skipped)
-        self.assertTrue(result.skip_reason.startswith("judge_error"))
         self.assertEqual(result.arithmetic_corrections, [])
+        self.assertEqual(result.fact_claims, [])
         self.assertEqual(result.rule_violations, [])
-
-    def test_unknown_rule_names_filtered_out(self):
-        llm = MagicMock()
-        llm.generate.return_value = _llm_response(json.dumps({
-            "arithmetic_corrections": [],
-            "fact_claims": [],
-            "rule_violations": [
-                {"rule": "UNKNOWN_RULE", "evidence": "x", "suggested_fix": "y"},
-                {"rule": "RULE_1", "evidence": "exactly!",
-                 "suggested_fix": "ask for working"},
-            ],
-        }))
-        result = run_combined_judge(
-            "Exactly! 5 + 3 = 8.", lesson=self.lesson, llm_client=llm,
-            answer_was_bare=True,
-        )
-        self.assertEqual(result.violated_rules, ["RULE_1"])
 
 
 class ValidatorConsumesCombinedResultTest(TestCase):

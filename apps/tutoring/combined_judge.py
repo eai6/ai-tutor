@@ -64,10 +64,28 @@ class CombinedJudgeResult:
     # answer_correct: True/False/None tri-state for the student's reply
     # step_complete: should the engine advance to the next step
     # step_eval_reasoning: short rationale for telemetry / teacher review
+    # step_eval_source: "deterministic" | "llm" | "skipped" — lets the
+    #   engine label the eval_layer correctly (deterministic_numeric /
+    #   deterministic_mcq vs combined_judge LLM verdict).
     answer_correct: Optional[bool] = None
     step_complete: bool = False
     step_eval_reasoning: str = ""
     step_eval_skipped: bool = False
+    step_eval_source: str = ""
+    # Coherence — self-contradictions inside the same tutor response ------
+    coherence_violations: List[str] = field(default_factory=list)
+    # Figure-reference — tutor referenced "the diagram" but no figure
+    # was actually attached this turn. `figure_ref_in_question` is True
+    # when the missing-figure reference is embedded in a question (more
+    # critical: the student literally cannot answer).
+    figure_ref_issues: List[str] = field(default_factory=list)
+    figure_ref_in_question: bool = False
+    # Figure-vision — when a figure WAS attached and the response posed
+    # a figure-dependent question, the vision judge checks alignment.
+    # `figure_aligned` is True / False / None (None = skipped or unsure).
+    figure_aligned: Optional[bool] = None
+    figure_mismatch_reason: str = ""
+    figure_summary: str = ""
     # Bookkeeping ----------------------------------------------------------
     skipped: bool = False
     skip_reason: str = ""
@@ -202,6 +220,10 @@ _JUDGE_SYSTEM = (
     "  - completion_criteria (what marks the step as complete)\n"
     "  - expected_answer (when applicable)\n"
     "  - recent_conversation (last few turns of context)\n"
+    "  - deterministic_verdict (true/false/null) — a FIRST-LAYER\n"
+    "    arithmetic or MCQ check that already ran. When non-null,\n"
+    "    treat it as ground truth for the arithmetic / MCQ axis.\n"
+    "    deterministic_source tells you which check produced it.\n"
     "Decide TWO things based on the student's last input + tutor's reply:\n"
     "  answer_correct (true/false/null tri-state):\n"
     "    - true: the student gave a clear, demonstrably correct answer to "
@@ -213,6 +235,22 @@ _JUDGE_SYSTEM = (
     "sharing tangential thoughts, or there was no expected answer to "
     "compare against. Default to null when uncertain — never penalize a "
     "student for engaging conversationally.\n"
+    "  ANCHOR ON THE DETERMINISTIC VERDICT WHEN IT'S PROVIDED:\n"
+    "    - deterministic_verdict=true → return answer_correct=true\n"
+    "      unless you can clearly see the student showed wrong\n"
+    "      working that happened to land on the right number.\n"
+    "    - deterministic_verdict=false → return answer_correct=false\n"
+    "      UNLESS the student wrote an equivalent form (e.g., 5 1/4\n"
+    "      vs 21/4 vs 5.25), a typo with otherwise correct working,\n"
+    "      or the deterministic check was matching against the wrong\n"
+    "      expected_answer. In those cases override to true with a\n"
+    "      note in step_eval_reasoning.\n"
+    "    - deterministic_verdict=null → judge from scratch using your\n"
+    "      own reading of the response.\n"
+    "    The deterministic layer protects against arithmetic errors;\n"
+    "    your job is to add broader judgment (equivalent forms,\n"
+    "    partial credit, working quality) — not to second-guess\n"
+    "    correct arithmetic.\n"
     "  step_complete (boolean):\n"
     "    - Apply the completion_criteria. A step is NOT complete just "
     "because the student is engaged; it is complete when the criteria "
@@ -312,6 +350,57 @@ def run_combined_judge(
     *,
     lesson,
     llm_client=None,
+    vision_client=None,
+    image_reader=None,
+    attached_media: Optional[List[dict]] = None,
+    bank_stems: Optional[List[str]] = None,
+    student_input: str = "",
+    answer_was_bare: bool = False,
+    answer_was_wrong: bool = False,
+    step_context: Optional[dict] = None,
+    subject_is_math: bool = True,
+    bank_offered: bool = True,
+    max_claims: int = 5,
+    max_arithmetic_corrections: int = 8,
+    max_violations: int = 5,
+) -> CombinedJudgeResult:
+    """Compatibility shim — delegates to the per-domain concurrent
+    judges in apps.tutoring.judges.
+
+    The monolithic single-call combined judge was split 2026-05-07
+    because Sonnet cross-polluted verdicts across CHECK 1-4 (rule
+    violations flipping answer_correct, etc.). The new orchestrator
+    runs focused judges concurrently with smaller prompts and merges
+    deterministically. This shim preserves the public API so existing
+    callers + tests don't move.
+
+    New (2026-05-08): forwards `vision_client`, `image_reader`,
+    `attached_media` for the coherence / figure_ref / figure_vision
+    judges. All optional — judges skip gracefully when missing.
+    """
+    from apps.tutoring.judges import run_all_judges
+    return run_all_judges(
+        response_text,
+        lesson=lesson,
+        llm_client=llm_client,
+        vision_client=vision_client,
+        image_reader=image_reader,
+        attached_media=attached_media,
+        bank_stems=bank_stems,
+        student_input=student_input,
+        answer_was_bare=answer_was_bare,
+        answer_was_wrong=answer_was_wrong,
+        step_context=step_context,
+        subject_is_math=subject_is_math,
+        bank_offered=bank_offered,
+    )
+
+
+def _run_combined_judge_legacy_monolithic(
+    response_text: str,
+    *,
+    lesson,
+    llm_client=None,
     bank_stems: Optional[List[str]] = None,
     student_input: str = "",
     answer_was_bare: bool = False,
@@ -322,25 +411,9 @@ def run_combined_judge(
     max_arithmetic_corrections: int = 8,
     max_violations: int = 5,
 ) -> CombinedJudgeResult:
-    """Run all four post-response checks in a single LLM call.
-
-    Args:
-      response_text: tutor's clean response (after media/question parsing).
-      lesson: Lesson model — required for KB evidence retrieval.
-      llm_client: BaseLLMClient. When None the call is skipped (fail-open).
-      bank_stems: list of allowed-question stems for NO_AUTHORING context.
-      student_input: student's last message — needed for RULE_1 context.
-      answer_was_bare / answer_was_wrong: signal for RULE_1.
-      step_context: dict with step_type / completion_criteria /
-        expected_answer / recent_conversation. When provided, the
-        judge also returns answer_correct + step_complete (CHECK 4),
-        replacing the former instructor _evaluate_step call. Pass
-        None or {} to skip step evaluation (e.g. when the caller
-        will handle it elsewhere).
-
-    Returns CombinedJudgeResult. The original response text is preserved
-    on `corrected_response` if no corrections apply.
-    """
+    """OLD monolithic single-call implementation. Kept for reference /
+    rollback but no longer reachable from production. Delete once the
+    split judges have proven out in pilot."""
     result = CombinedJudgeResult(corrected_response=response_text or "")
     if not response_text or not response_text.strip():
         result.skipped = True

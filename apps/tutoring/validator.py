@@ -44,6 +44,15 @@ ISSUE_RULE1_VIOLATION = "rule1_violation"
 # without the visual. Soft issue for now — surfaced in [TurnSummary]
 # so we can see frequency before deciding whether to escalate to regen.
 ISSUE_FIGURE_REF_WITHOUT_SIGNAL = "figure_ref_without_signal"
+# Tutor self-contradicted within the same response. Source: coherence
+# judge. Production example (Savy Eva, 2026-05-04): "let's explore
+# three angles" then immediately posed a TWO-angle question; student
+# replied "YOU SAID 3 ANGLES".
+ISSUE_TUTOR_INCOHERENT = "tutor_incoherent"
+# Tutor attached a figure that doesn't match the question being asked.
+# Source: figure_vision judge (LLM vision call). Catches mid-conversation
+# figure misalignment that the deterministic figure_ref check can't see.
+ISSUE_FIGURE_MISMATCH = "figure_mismatch"
 
 # Deictic figure references — phrases that strongly imply "I am
 # pointing at a visual right now". Used by the figure-ref-without-signal
@@ -87,6 +96,13 @@ class ValidationResult:
         # student sees the deictic reference without the visual.
         # Regen with explicit instruction to either signal or rephrase.
         ISSUE_FIGURE_REF_WITHOUT_SIGNAL,
+        # Tutor self-contradicted within the same turn — needs a clean
+        # rewrite, not a patch.
+        ISSUE_TUTOR_INCOHERENT,
+        # Attached figure doesn't match the question — regen with
+        # instruction to either fix the question or pick a different
+        # figure from the catalog.
+        ISSUE_FIGURE_MISMATCH,
     })
 
     @property
@@ -244,6 +260,32 @@ def validate_tutor_response(
                 issues.append(ISSUE_ARITHMETIC_VIOLATION)
             if RULE_RULE_1 in combined_result.violated_rules:
                 issues.append(ISSUE_RULE1_VIOLATION)
+        # Coherence judge findings (2026-05-08).
+        if getattr(combined_result, "coherence_violations", None):
+            issues.append(ISSUE_TUTOR_INCOHERENT)
+            extra_meta["coherence_violations"] = list(
+                combined_result.coherence_violations
+            )
+        # Figure-reference judge: tutor said "the diagram" with no
+        # figure attached. The existing programmatic `_FIGURE_DEICTIC_RE`
+        # check below already raises ISSUE_FIGURE_REF_WITHOUT_SIGNAL —
+        # this judge gives a structured list of phrases for the regen
+        # prompt. Surface the issues into metadata; the existing
+        # ISSUE_FIGURE_REF_WITHOUT_SIGNAL flag continues to drive regen.
+        if getattr(combined_result, "figure_ref_issues", None):
+            extra_meta["figure_ref_issues"] = list(
+                combined_result.figure_ref_issues
+            )
+            extra_meta["figure_ref_in_question"] = bool(
+                getattr(combined_result, "figure_ref_in_question", False)
+            )
+        # Figure-vision judge: attached figure mismatched the question.
+        if getattr(combined_result, "figure_aligned", None) is False:
+            issues.append(ISSUE_FIGURE_MISMATCH)
+            extra_meta["figure_mismatch_reason"] = (
+                combined_result.figure_mismatch_reason
+            )
+            extra_meta["figure_summary"] = combined_result.figure_summary
     else:
         if fact_check and lesson is not None and llm_client is not None:
             layers_run.append("fact_check")
