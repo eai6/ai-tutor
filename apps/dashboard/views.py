@@ -1685,7 +1685,17 @@ def class_detail(request, grade):
 
     # Courses generated for this grade. Course.grade_level is comma-
     # separated; empty means grade-agnostic (still shown).
-    courses_qs = filter_by_institution(Course.objects.all(), institution)
+    # Include platform-wide courses (institution=None) alongside
+    # the teacher's school-specific courses — global content should
+    # be visible to every school. Competency stats below are still
+    # filtered to the teacher's institution roster, so the numbers
+    # show how THEIR students are doing on the global course.
+    if institution is not None:
+        courses_qs = Course.objects.filter(
+            Q(institution=institution) | Q(institution__isnull=True)
+        )
+    else:
+        courses_qs = Course.objects.all()
     course_stats = []
     for course in courses_qs.order_by('title'):
         course_grades = {
