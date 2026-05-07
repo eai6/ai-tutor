@@ -604,15 +604,18 @@ def student_detail(request, student_id):
         'in_progress_lessons': progress_list.filter(mastery_level='in_progress').count(),
     }
     
-    # Get total published lessons per course for true denominator
+    # Get total lessons per course (published + draft) for the
+    # denominator. Edward, 2026-05-07: show the full course
+    # structure so teachers see how far through the course a
+    # student is even when later lessons aren't published yet.
     course_lesson_counts = {}
     courses_qs = filter_by_institution(
-        Course.objects.filter(is_published=True), institution
+        Course.objects.all(), institution
     ).prefetch_related('units__lessons')
     for course in courses_qs:
         count = 0
         for unit in course.units.all():
-            count += unit.lessons.filter(is_published=True).count()
+            count += unit.lessons.count()
         if count > 0:
             course_lesson_counts[course.id] = {'course': course, 'count': count}
 
@@ -626,13 +629,12 @@ def student_detail(request, student_id):
             # courses scoped to the teacher's institution — if the
             # course is platform-wide / owned by another institution
             # (a global course the student worked through), we need
-            # to count its published lessons directly so we don't
-            # render "1/0 lessons". Fixed 2026-05-07.
+            # to count its lessons directly so we don't render
+            # "1/0 lessons". Fixed 2026-05-07.
             total_in_course = course_lesson_counts.get(course.id, {}).get('count')
             if not total_in_course:
                 total_in_course = sum(
-                    u.lessons.filter(is_published=True).count()
-                    for u in course.units.all()
+                    u.lessons.count() for u in course.units.all()
                 )
             courses_progress[course.id] = {
                 'course': course,
@@ -1703,8 +1705,11 @@ def class_detail(request, grade):
         }
         if course_grades and grade not in course_grades:
             continue
+        # Count ALL lessons (published + draft) so the class page
+        # shows the full course structure regardless of publish state.
+        # Edward, 2026-05-07.
         lesson_ids = list(
-            Lesson.objects.filter(unit__course=course, is_published=True)
+            Lesson.objects.filter(unit__course=course)
             .values_list('id', flat=True)
         )
         total_lessons = len(lesson_ids)
@@ -6310,17 +6315,19 @@ def class_competency(request, course_id):
 
     matrix = class_competency_matrix(course, students=roster_ids)
 
-    # Class readiness score — average of "% of class mastered (latest ≥70)"
-    # across every objective, expressed 0-100. Falls back to 0 if no data.
+    # Class readiness score — simple average of the per-lesson
+    # "Average competency" column shown in the matrix
+    # (avg_latest_pct = class average of each student's most recent
+    # exit-ticket score on that lesson). Edward, 2026-05-07:
+    # changed from a mastery-rate metric to this raw-average reading
+    # because it matches what teachers literally see in the table.
+    # Lessons with no attempts (avg_latest_pct=None) are excluded
+    # from the average — they appear as "—" in the column and
+    # don't have a value to fold in.
     objectives = matrix['objectives']
     total_students = matrix['total_students']
-    if objectives and total_students:
-        readiness = sum(
-            (r['mastered_latest'] / total_students) * 100 for r in objectives
-        ) / len(objectives)
-    else:
-        readiness = 0
-    readiness = round(readiness)
+    pcts = [r['avg_latest_pct'] for r in objectives if r.get('avg_latest_pct') is not None]
+    readiness = round(sum(pcts) / len(pcts)) if pcts else 0
 
     # Struggling objectives = where avg_latest < 50% (or no class signal yet)
     struggling = [

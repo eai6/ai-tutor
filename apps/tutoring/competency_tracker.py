@@ -206,17 +206,16 @@ def class_competency_matrix(course, *, students=None, objectives=None) -> dict:
         }
     """
     # Build the canonical objective list from the curriculum: ONE row
-    # per published lesson, sourced from lesson.objective (the
-    # singular teaching objective per the parser's 1:1 contract).
-    # Fixed 2026-05-07 — was using combined_objectives_for_lesson
-    # which UNIONS unit terminal_objectives + lesson enabling_objectives,
-    # producing 394 rows for a 4-lesson Math S3 course. Now matches
-    # the EO-deprecation direction: 1 lesson = 1 teaching objective.
+    # per lesson (published OR draft), sourced from lesson.objective
+    # (the singular teaching objective per the parser's 1:1 contract).
+    # All lessons surface in the matrix so teachers see the full
+    # course structure including curriculum that hasn't been published
+    # yet. Edward, 2026-05-07.
     if objectives is None:
         seen = set()
         canonical = []
         for unit in course.units.prefetch_related('lessons').order_by('order_index'):
-            for lesson in unit.lessons.filter(is_published=True).order_by('order_index'):
+            for lesson in unit.lessons.order_by('order_index'):
                 obj = (lesson.objective or '').strip() or (lesson.title or '').strip()
                 if not obj:
                     continue
