@@ -248,10 +248,32 @@ def dashboard_home(request):
         Lesson.objects.filter(is_published=True), institution, field='unit__course__institution'
     ).count()
 
+    # "X% students mastered" — % of ATTEMPTING students who mastered
+    # at least one lesson. Edward, 2026-05-08: was previously
+    # `mastered_cells / (students × lessons) × 100`, which read 7%
+    # when 7 student-lesson cells were mastered out of 80 (20 students
+    # × 4 lessons), even though most students hadn't started most
+    # lessons yet. The cell-coverage definition didn't match what
+    # the "students mastered" label implied. Now the metric counts
+    # students who have crossed the mastery threshold on at least
+    # ONE lesson, divided by students who have attempted any lesson.
     avg_mastery = 0
-    denominator = total_available_lessons * max(total_students, 1)
-    if denominator > 0:
-        avg_mastery = round((progress_stats['mastered'] / denominator) * 100)
+    students_with_progress = (
+        filter_by_institution(
+            StudentLessonProgress.objects.exclude(best_score__isnull=True),
+            institution,
+        )
+        .values('student_id').distinct().count()
+    )
+    students_who_mastered = (
+        filter_by_institution(
+            StudentLessonProgress.objects.filter(mastery_level='mastered'),
+            institution,
+        )
+        .values('student_id').distinct().count()
+    )
+    if students_with_progress > 0:
+        avg_mastery = round((students_who_mastered / students_with_progress) * 100)
 
     # avg_competency (C4): average best_score across all populated progress rows,
     # as a percentage. Source of truth = exit ticket attempts via StudentLessonProgress.
