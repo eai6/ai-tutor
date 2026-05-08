@@ -261,3 +261,107 @@ where the sum violates the rule.
   human support.
 - **Don't repeat the user's question back at them.** Be terse: 2–4
   sentences plus a clear next step.
+
+---
+
+## Recent platform shifts (2026-05) — overrides any older claim
+
+These are the "what changed" notes the assistant should treat as
+authoritative. If an older section of this doc disagrees with one
+of these, this section wins.
+
+### Teachers locked out of editing
+Lessons are read-only for teachers. Edit / Generate / Regenerate /
+Approve / Publish / Add prerequisite / Edit step / Edit-or-delete
+exit-ticket question / Edit figure → all hidden for non-superuser.
+Super-admins still see and use them. If a teacher needs a change,
+direct them to ask a platform admin.
+
+### Judge architecture (post-response review)
+The monolithic combined_judge was split into per-domain LLM judges
+running concurrently after every tutor turn:
+- **arithmetic** — flags wrong arithmetic in tutor prose
+- **factual** — verifies named/numeric claims against the curriculum KB
+- **rule** — NO_AUTHORING + RULE_1
+- **step_eval** — answer_correct + step_complete (anchored on the
+  posed_question, with deterministic short-circuit for numeric / MCQ)
+- **coherence** — within-response self-contradiction
+- **figure_ref** — "looking at the diagram" with no figure attached
+- **figure_vision** — when a figure IS attached, vision-checks
+  alignment with the question
+- **safety** — harmful / inappropriate / manipulation
+
+Findings flow into the validator, which decides regen.
+
+### Regen ensemble
+When the validator decides regen, a focused ~1KB rewrite prompt is
+sent to N concurrent `Purpose.REGEN` ModelConfigs. Each candidate
+runs through the full judge orchestrator; score_candidate ranks
+them. Loop with temperature decay (0.20 → 0.15 → 0.10) until clean
+or cycle cap (3). Stock fallback if exhausted. Configurable via
+admin: 1 model = single-model regen with focused prompt; 2-3 models
+= concurrent diversity.
+
+### Safety judge (child protection)
+Two contexts:
+- **Tutor output** (concurrent in run_all_judges) — warning/critical
+  → ISSUE_TUTOR_UNSAFE → triggers regen → unsafe text never reaches
+  the student.
+- **Student input** (separate call from views.respond) — warning/critical
+  → SessionTurn.is_flagged + SafetyAuditLog → surfaces at
+  /dashboard/flagged/.
+
+Categories: harmful, inappropriate, manipulation. OFF_TOPIC was
+explicitly dropped — pilot focus is child protection, not classroom
+on-topic policing.
+
+### Flagged dashboard scoped to safety
+/dashboard/flagged/ shows only safety judge findings on STUDENT
+messages. Validator findings (curriculum-contradicted etc.) and
+AI-output flags are no longer surfaced there.
+
+### Class competency map: 1 row per lesson
+Per the "1 lesson = 1 teaching objective" model, the matrix shows
+one row per published-or-draft lesson, sourced from `lesson.objective`.
+Was reading `combined_objectives_for_lesson` which UNIONS terminal
+objectives + enabling objectives → 394-row matrix for a 4-lesson
+course. Class Readiness = simple average of the Average Competency
+column across lessons that have attempts.
+
+### EO surface area being deprecated
+Enabling-objective chrome is being progressively removed from
+teacher-facing UI:
+- Session report: per-EO "Competency by Objective" table dropped.
+- Lesson detail: EO sidebar + per-step EO chips + per-bank-question
+  EO chips dropped.
+- Live monitor chat history: "Enabling Objectives" tags dropped.
+- Student detail: per-course Competency Breakdown widget dropped.
+- Class competency: 1 row per lesson, not per EO.
+
+Schema migration to drop the underlying columns is post-pilot.
+Until then, EOs still exist in the data model but the assistant
+should ALWAYS frame answers in terms of the lesson's teaching
+objective, never enabling objectives.
+
+### Image regen edits the existing image
+When a teacher / super-admin clicks Edit Figure on an exit-ticket
+question that already has an image, the OpenAI gpt-image-2 path
+uses `images.edit` (not `images.generate`), passing the prior
+figure as input. The model preserves what was good, only changes
+what the new prompt describes. Same for Gemini via inline_data.
+
+### Help button moved into chat header
+On the chat tutor page, the Help / report-issue button is in the
+chat header next to the audio toggle (and in the mobile overflow
+menu). The floating bottom-right button is hidden on the chat
+page so it doesn't overlap the input. Other pages still use the
+floating button.
+
+### Auto-generated changelog
+`docs/recent_updates.md` is regenerated on every container boot
+from git history. Always cite that file when answering "what
+changed recently" / "is X still a thing" / "did Y get fixed".
+
+### Auto-scaling
+Container app: min=1, max=4, HTTP-concurrency rule scales out at
+12 in-flight requests per replica.

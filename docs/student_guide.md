@@ -115,11 +115,21 @@ can see growth over time.
 
 ## Help / Feedback
 
-The "Help / Feedback" button (bottom-right of every page) opens
-a chat with the platform's AI help assistant. Ask anything — how
-do I, where is, why did I get this wrong. If the AI can't help,
-there's a "Send to support" tab that forwards your message + an
-optional screenshot to platform admins.
+There's a Help button you can use anywhere on the platform.
+
+- **In a lesson chat** → tap the `?` icon in the **chat header**
+  (next to the speaker / audio icon). On phones, find it in the
+  three-dot overflow menu under "Help / report an issue".
+- **On any other page** → the floating Help / Feedback button
+  bottom-right.
+
+Both open the same modal with two tabs:
+
+- **💬 Ask the AI** — a chatbot trained on the platform docs.
+  Ask "how do I…", "where is…", "why did I get this wrong". It
+  knows you're a student and won't suggest teacher-only steps.
+- **📩 Send to support** — text + optional screenshot capture
+  forwarded to platform admins.
 
 ## Email verification
 
@@ -139,8 +149,11 @@ Sessions last 2 weeks. If you're being kicked out sooner, your
 school may have stricter cookie settings — let us know.
 
 ### "The tutor said something wrong"
-Click the flag icon under the message. Your teacher will see it
-in the Flagged Chats list.
+The platform now runs an LLM-based safety judge on every tutor
+message. If it catches something inappropriate, the message is
+rewritten before you see it. For tutoring mistakes (wrong math,
+confusing explanation), tap the Help button → "Send to support"
+and describe what happened. Your teacher will be notified.
 
 ### "Voice / audio doesn't play"
 Some browsers block autoplay audio. Tap the speaker icon to start

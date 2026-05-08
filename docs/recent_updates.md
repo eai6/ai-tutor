@@ -6,6 +6,7 @@ The help assistant indexes this file so it knows what shipped recently. If a doc
 
 ## 2026 · week 18
 
+- **2026-05-08** · `7d13bfc` — Help assistant: sharpen audience prompt + page directory + auto-generated recent-updates
 - **2026-05-08** · `5838317` — Align Exchanges metric across pages + drop redundant Exit Quiz column
 - **2026-05-07** · `c0e2496` — Class readiness = avg of avg competency + show all lessons (not just published)
 - **2026-05-07** · `37900e5` — Pulumi: enable HTTP-concurrency autoscaling on the Container App
@@ -88,5 +89,4 @@ The help assistant indexes this file so it knows what shipped recently. If a doc
 - **2026-05-02** · `725b651` — P4 + P5: EO-driven remediation walkthrough + re-quiz with weighted sampling
 - **2026-05-02** · `02e0244` — P3: deterministic grading for ALL bank-pulled questions
 - **2026-05-02** · `986109d` — P2d + P2e: typed templates wired into content-gen + math prompt
-- **2026-05-02** · `e259fc5` — P2c: validate_template_typed for typed parametric templates
 

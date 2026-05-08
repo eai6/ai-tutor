@@ -4,6 +4,34 @@ Comprehensive, action-oriented walkthrough for teachers and admins
 using the AI Tutor dashboard. The help-assistant indexer reads this
 file, so every common "how do I..." should be answerable here.
 
+> **Recent shifts (2026-05).** Several teacher-facing features moved
+> to **super-admin only** to lock down the pilot:
+>
+> - Lesson editing (publish, unpublish, regenerate, edit step,
+>   add/remove prerequisites) — super-admin only.
+> - Exit-ticket question editing (edit, delete, regenerate figures)
+>   — super-admin only.
+> - Curriculum upload + generate-all-content — super-admin only.
+>
+> Teachers still see all the same pages **read-only** — you can
+> review every step, every exit-ticket question, every figure.
+> If you need to change something, ask a platform admin.
+>
+> Other recent changes that affect what you see day-to-day:
+>
+> - **Flagged dashboard** is now safety-only. Curriculum-contradicted
+>   claims (validator hard-fails) no longer pollute the list.
+> - **Class competency map** shows one row per lesson (was: per
+>   enabling-objective). Class Readiness = average of the Average
+>   Competency column across lessons that have attempts.
+> - **Summative review page** now has a per-student score table
+>   (best / latest / attempts / status) below the bank.
+> - **Student detail** dropped the "Completed Sessions" stat (it
+>   diverged from "Lessons Mastered" in confusing ways) and the
+>   per-EO Competency Breakdown widget.
+> - **Help button** is in the chat header instead of floating
+>   bottom-right (it was overlapping the chat input on phones).
+
 ## Creating a course
 
 **There is no "New Course" button.** Courses on this platform are
@@ -89,8 +117,11 @@ Two paths:
 
 ## Generating lesson content
 
-The course detail page has three buttons that run the LLM content
-pipeline:
+**Super-admin only as of 2026-05-07.** Teachers see lessons as
+read-only — the ⚡ Generate / 🔁 Regenerate buttons are hidden.
+
+If you're a platform admin, the course detail page has three
+content-pipeline buttons:
 
 - **⚡ on a single lesson row** — wipe and regenerate just that
   lesson's steps. Exit-ticket questions are preserved.
@@ -106,6 +137,9 @@ Lesson regeneration preserves: exit-ticket questions and attempt
 history, student mastery levels, SM-2 skill mastery state, all
 session transcripts, and the permanent competency transcript.
 What gets replaced: lesson steps (the 5E content + figures + hints).
+
+If you're a teacher and need a lesson regenerated, message a
+platform admin.
 
 ## Setting default lesson duration
 
@@ -131,15 +165,21 @@ Duration → step count mapping:
 
 ## Editing exit-ticket questions
 
+**Super-admin only as of 2026-05-07.** Teachers can review every
+question in the bank but the Edit / Delete / Edit-figure buttons
+are hidden.
+
+If you're a platform admin:
 1. Open a lesson detail page.
-2. Scroll to the exit-ticket question list (35 questions across
-   5 formats: MCQ, fill-in-blank, matching, short-answer, data-
+2. Scroll to the exit-ticket question list (~32 questions across
+   formats: MCQ, fill-in-blank, matching, short-answer, data-
    interpretation).
-3. Click any question to open the editor — change wording, options,
-   accepted alternatives, explanation, embedded chart, or figure.
-4. Data-interpretation questions render server-side from a
-   structured spec (figure_spec / chart) — you edit the spec, not
-   the rendered image.
+3. Click Edit to change wording, options, accepted alternatives,
+   explanation, embedded chart, or figure.
+4. Edit-figure regenerates the figure via gpt-image-2 — when an
+   image already exists, the model now uses `images.edit` and
+   takes the prior figure as vision context, so it edits the
+   figure rather than re-generating from scratch.
 
 ## Generating + reviewing the summative exam
 
@@ -218,10 +258,28 @@ class competency map's roster.
 
 ## Flagged chats / safety
 
-Students can flag tutor messages they find inappropriate. Flagged
-chats appear under **Safety → Flagged Chats**. Each entry shows
-the offending message, a snippet of context, and a link to the
-full transcript. Mark resolved when reviewed.
+The platform runs an LLM-based **safety judge** on every student
+message and every tutor response (post-2026-05-07). Three
+categories are tracked:
+
+- **harmful** — violence, self-harm, weapons, abuse, threats
+- **inappropriate** — sexual content, severe profanity, drug /
+  alcohol / gambling promotion
+- **manipulation** — student attempts to jailbreak the tutor
+  ("ignore your instructions", "pretend you're not an AI")
+
+When a STUDENT message trips the judge → the chat is flagged and
+surfaces on `/dashboard/flagged/`. When a TUTOR response trips
+the judge → the regen ensemble rewrites it before the student
+ever sees it, so unsafe tutor text doesn't reach students.
+
+The flagged dashboard is **safety-only** — curriculum-contradicted
+claims and other validator findings don't surface here. Stats at
+the top: Safety Flags, Unreviewed.
+
+For each flagged session: Student, Lesson, Flag Reason, Flagged
+At, Status. Click View to read the full transcript with the
+flagged turns highlighted, then "Mark reviewed" when done.
 
 ## In-app help + AI assistant
 
