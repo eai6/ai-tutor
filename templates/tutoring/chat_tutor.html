@@ -1138,6 +1138,43 @@ body {
     box-shadow: 0 0 0 2px #10b981, 0 0 12px rgba(16, 185, 129, 0.2);
     transition: box-shadow 0.3s ease;
 }
+
+/* Per-correct encouragement: small floating pill with a star + a
+   rotating cheerful word. Sits inline with the chat (not absolute
+   positioned) so the page flow stays sane. Same animation as
+   .streak-celebration so the visual language is consistent. */
+.correct-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.95rem;
+    margin: 0.3rem auto 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #047857;
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    border-radius: 999px;
+    border: 1px solid #6ee7b7;
+    animation: celebrationPop 0.4s ease, starShimmer 1.2s ease-out;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    align-self: center;
+}
+.correct-pill.fade-out { opacity: 0; transform: translateY(-8px); }
+.correct-pill .star {
+    font-size: 1.05rem;
+    display: inline-block;
+    animation: starSpin 0.6s ease-out;
+}
+
+@keyframes starSpin {
+    0%   { transform: scale(0.4) rotate(-180deg); opacity: 0; }
+    60%  { transform: scale(1.25) rotate(20deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes starShimmer {
+    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+    100% { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0); }
+}
 .streak-celebration {
     display: flex;
     align-items: center;
@@ -2354,6 +2391,58 @@ function showDifficultyFeedback(label, signal) {
 }
 
 // ── In-Conversation Gamification ──
+//
+// Per-correct encouragement: green-glow on the tutor bubble + a
+// floating "⭐ Nice!" pill + a soft chime (Web Audio API tone, no
+// asset load). Streak/milestone banners on top of that for runs.
+//
+// Sound respects the existing audio toggle (`audioEnabled`). When
+// audio is muted by the student / teacher, no chime — visual only.
+
+const CORRECT_WORDS = [
+    'Nice!', 'Great!', 'Exactly!', 'Sweet!', 'Yes!', 'Perfect!',
+    'Spot on!', 'Brilliant!', 'You got it!', 'Awesome!', 'Solid!',
+    'Right on!', 'Boom!',
+];
+const CORRECT_STARS = ['⭐', '🌟', '✨', '💫', '🎯'];
+
+let _audioCtx = null;
+function _getAudioCtx() {
+    if (_audioCtx) return _audioCtx;
+    try {
+        _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+        _audioCtx = null;
+    }
+    return _audioCtx;
+}
+
+function playCorrectChime() {
+    // Skip when the audio toggle is off — same UX as the audio
+    // toggle that mutes TTS.
+    if (typeof audioEnabled !== 'undefined' && audioEnabled === false) return;
+    const ctx = _getAudioCtx();
+    if (!ctx) return;
+    try {
+        // Two-note pleasant chord: C6 → E6 (rising third). Short
+        // attack, gentle decay, low gain so it doesn't startle.
+        const now = ctx.currentTime;
+        const notes = [{ f: 1046.5, t: 0 }, { f: 1318.5, t: 0.08 }];
+        notes.forEach(({ f, t }) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = f;
+            gain.gain.setValueAtTime(0.0001, now + t);
+            gain.gain.exponentialRampToValueAtTime(0.18, now + t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.32);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(now + t);
+            osc.stop(now + t + 0.34);
+        });
+    } catch (e) { /* ignore audio errors */ }
+}
+
 function showCorrectFeedback(streakCount) {
     const bubbles = document.querySelectorAll('.message.tutor .bubble');
     const lastBubble = bubbles[bubbles.length - 1];
@@ -2361,6 +2450,24 @@ function showCorrectFeedback(streakCount) {
         lastBubble.classList.add('correct-glow');
         setTimeout(() => lastBubble.classList.remove('correct-glow'), 2000);
     }
+
+    // Per-correct star pill — fires on EVERY correct answer, not
+    // just streak >= 3. Picks a random word + star so it doesn't
+    // feel scripted.
+    const word = CORRECT_WORDS[Math.floor(Math.random() * CORRECT_WORDS.length)];
+    const star = CORRECT_STARS[Math.floor(Math.random() * CORRECT_STARS.length)];
+    const pill = document.createElement('div');
+    pill.className = 'correct-pill';
+    pill.innerHTML = `<span class="star">${star}</span><span>${word}</span>`;
+    chatMessages.insertBefore(pill, typing);
+    scrollToBottom();
+    setTimeout(() => pill.classList.add('fade-out'), 1800);
+    setTimeout(() => pill.remove(), 2400);
+
+    // Soft chime.
+    playCorrectChime();
+
+    // Existing streak banner stacks on top for runs.
     if (streakCount >= 3) {
         const div = document.createElement('div');
         div.className = 'streak-celebration';
