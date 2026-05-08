@@ -2060,6 +2060,20 @@ Keep it to 2-3 sentences."""
             clean_response, turn_metadata,
         )
 
+        # Persist any attached figure URL on turn_metadata so the
+        # teacher chat-history template can render the image inline
+        # under the tutor bubble. Same shape the frontend uses:
+        # {url, alt, caption, description}.
+        if media:
+            turn_metadata['attached_media'] = [
+                {
+                    'url': m.get('url') or '',
+                    'alt': m.get('alt') or m.get('caption') or m.get('description') or '',
+                    'caption': m.get('caption') or m.get('description') or '',
+                }
+                for m in media if m and m.get('url')
+            ]
+
         # Save state
         self._save_state()
 
@@ -3933,6 +3947,14 @@ Follow the current step; this concept will be covered in sequence."""
         # only verified questions, never author its own. See
         # memory/tutor_no_authoring_plan.md.
         system_prompt += self._build_question_bank_block()
+
+        # A.4 — walkthrough hint guidance. When the student is in
+        # remediation walkthrough and has just answered a question
+        # WRONG, the tutor MUST give a hint or short explanation
+        # (not the answer) and ask them to try again. This block
+        # forces that behaviour and is the prompt-side counterpart
+        # to the retry-counter cap in _maybe_advance_walkthrough.
+        system_prompt += self._build_walkthrough_hint_block()
 
         # Regeneration constraint (V3) — appended when retrying after a
         # validator hard-fail. Highest-priority block.
@@ -8379,8 +8401,47 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
 
         if phase == 'walkthrough':
             queue = list(state.get('remediation_walkthrough_queue') or [])
-            idx = state.get('remediation_walkthrough_index', 0) + 1
+            current_idx = state.get('remediation_walkthrough_index', 0)
+            attempts = int(state.get('walkthrough_attempts_on_current', 0)) + 1
+
+            # A.4 (2026-05-08): retry-then-advance with a cap.
+            # Per Edward's spec: tutor must NOT give the answer
+            # directly. On wrong, give a hint and let the student
+            # retry — up to MAX_RETRIES times per question. After
+            # the cap, log the question for later review and move on
+            # without revealing the answer.
+            MAX_RETRIES = 10
+            if not bank_grade.is_correct and attempts < MAX_RETRIES:
+                # Stay on the same question — increment retry count
+                # and let the tutor LLM (with hint guidance from the
+                # system prompt block built in _build_walkthrough_hint_block)
+                # ask the student to try again.
+                state['walkthrough_attempts_on_current'] = attempts
+                self.session.engine_state = state
+                self._save_state()
+                return clean_response
+
+            # Either correct OR cap exhausted → advance.
+            if not bank_grade.is_correct and attempts >= MAX_RETRIES:
+                # Cap hit without success — log for teacher review.
+                unresolved = state.setdefault(
+                    'walkthrough_unresolved_question_ids', [],
+                )
+                if 0 <= current_idx < len(queue):
+                    qid = queue[current_idx].get('id')
+                    if qid is not None and qid not in unresolved:
+                        unresolved.append(qid)
+                logger.info(
+                    "[Walkthrough] cap reached on q=%s after %d attempts; advancing",
+                    queue[current_idx].get('id') if 0 <= current_idx < len(queue) else '?',
+                    attempts,
+                )
+
+            # Advance to next question + reset retry counter.
+            idx = current_idx + 1
             state['remediation_walkthrough_index'] = idx
+            state['walkthrough_attempts_on_current'] = 0
+
             if idx >= len(queue):
                 # Walkthrough complete — start the re-quiz.
                 return self._begin_requiz(state, clean_response, turn_metadata)
@@ -8398,6 +8459,43 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
         return self._pose_next_remediation_question(
             state, queue, idx, label='Re-quiz',
             clean_response=clean_response, turn_metadata=turn_metadata,
+        )
+
+    def _build_walkthrough_hint_block(self) -> str:
+        """A.4 (2026-05-08): when the student is mid-walkthrough and
+        just answered the active question wrong, force the tutor LLM
+        to give a HINT (not the answer) and invite a retry. Returns
+        empty string when not in walkthrough or when the previous
+        turn wasn't a wrong answer."""
+        if not getattr(self, 'is_remediation', False):
+            return ''
+        state = self.session.engine_state or {}
+        if state.get('remediation_phase') != 'walkthrough':
+            return ''
+        attempts = int(state.get('walkthrough_attempts_on_current', 0) or 0)
+        if attempts <= 0:
+            # First attempt on this question, or just advanced —
+            # no hint context to inject.
+            return ''
+        # The retry counter is incremented in _maybe_advance_walkthrough
+        # AFTER this turn is generated. So `attempts` here = number
+        # of wrong attempts already made on the active question.
+        return (
+            "\n\n<walkthrough_hint_required>\n"
+            "The student is in REMEDIATION WALKTHROUGH on a previously-"
+            f"failed exit-ticket question. They have answered wrong "
+            f"{attempts} time(s) so far. Hard rules for this turn:\n"
+            "  - You MUST NOT give the answer directly.\n"
+            "  - You MUST NOT reveal the correct option letter (A/B/C/D)\n"
+            "    or the correct numeric answer.\n"
+            "  - Give a SHORT (1-2 sentences) explanation of why their\n"
+            "    answer was wrong and ONE targeted hint that guides them\n"
+            "    toward the correct reasoning.\n"
+            "  - End by asking them to try again.\n"
+            "  - Be encouraging — this is review, not a test.\n"
+            "  - Do NOT pose a NEW question; the platform re-poses the\n"
+            "    same one automatically. Just respond with the hint.\n"
+            "</walkthrough_hint_required>\n"
         )
 
     def _pose_next_remediation_question(

@@ -246,6 +246,20 @@ memory/pilot_session_plan.md).
         <div class="bubble-wrapper left">
             <div class="bubble-role">Tutor</div>
             <div class="chat-bubble bubble-tutor">{{ turn.content }}</div>
+            {# A.4 (2026-05-08): show attached figures inline so
+               teachers can see what the student saw on this turn. #}
+            {% for m in turn.metadata.attached_media %}
+                {% if m.url %}
+                <div style="margin-top:0.4rem;max-width:340px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff;">
+                    <img src="{{ m.url }}" alt="{{ m.alt }}" style="display:block;width:100%;height:auto;">
+                    {% if m.caption %}
+                    <div style="font-size:0.7rem;color:#71717a;padding:0.35rem 0.5rem;border-top:1px solid #f4f4f5;background:#fafafa;">
+                        {{ m.caption|truncatechars:160 }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% endfor %}
             {% comment %}
               Internal verdict / judge-tag chips ("via combined_judge",
               "authoring_violation", validator_issues, eval_reasoning)
