@@ -380,34 +380,35 @@ competency.
         <strong>Instruction:</strong> {{ group.instruction }}
     </div>
 
-    <!-- Student List -->
+    <!-- Student List — Exit Quiz column dropped since the competency
+         % is derived from the exit-ticket score anyway (Edward,
+         2026-05-07). Time-on-quiz is a useful detail though, so
+         we keep it inline as small text under the student name. -->
     <table class="obj-table" style="box-shadow:none;border-radius:0;margin-bottom:0;">
         <thead>
             <tr>
                 <th>Student</th>
                 <th>Competency</th>
-                <th>Exit Quiz</th>
             </tr>
         </thead>
         <tbody>
             {% for s in group.students %}
             <tr>
-                <td class="cell-title"><span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span></td>
+                <td class="cell-title">
+                    <span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span>
+                    {% if s.exit_passed != None %}
+                        <div style="font-size:0.6875rem;color:#a1a1aa;margin-top:2px;">
+                            Exit ticket: {{ s.exit_score }} · {{ s.exit_time }}
+                        </div>
+                    {% else %}
+                        <div style="font-size:0.6875rem;color:#a1a1aa;margin-top:2px;">Not taken</div>
+                    {% endif %}
+                </td>
                 <td data-label="Competency">
                     {% if s.has_exit_attempt %}
                         <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">{{ s.pct }}%</span>
                     {% else %}
                         <span style="color:#a1a1aa;font-size:0.8125rem;">—</span>
-                    {% endif %}
-                </td>
-                <td data-label="Exit Quiz">
-                    {% if s.exit_passed != None %}
-                        <span>
-                            <span class="exit-badge {% if s.exit_passed %}passed{% else %}failed{% endif %}">{{ s.exit_score }}</span>
-                            <span style="color:#a1a1aa;font-size:0.6875rem;margin-left:4px;">{{ s.exit_time }}</span>
-                        </span>
-                    {% else %}
-                        <span style="color:#a1a1aa;font-size:0.8125rem;">Not taken</span>
                     {% endif %}
                 </td>
             </tr>

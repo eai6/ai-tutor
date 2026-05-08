@@ -5490,6 +5490,13 @@ def session_chat_history(request, session_id):
         'student_name': session.student.get_full_name() or session.student.username,
         'cognitive_load': state.get('cognitive_load', 0.5),
         'duration_minutes': duration_minutes,
+        # Exchange count = engine-tracked counter, same source the
+        # live monitor uses. Fall back to len(student turns) when
+        # state is empty (legacy sessions).
+        'exchange_count': state.get(
+            'exchange_count',
+            sum(1 for t in turns if t.role == 'student'),
+        ),
         'exit_score': state.get('exit_ticket_score'),
         'exit_total': state.get('exit_ticket_total'),
         'covered_eos': state.get('covered_enabling_objectives', []),
