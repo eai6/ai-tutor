@@ -138,10 +138,6 @@
         </div>
         {% if membership %}
         <div class="read-only-row">
-            <span class="ro-label">School</span>
-            <span class="ro-value">{{ membership.institution.name }}</span>
-        </div>
-        <div class="read-only-row">
             <span class="ro-label">Role</span>
             <span class="ro-value" style="text-transform: capitalize;">{{ membership.role }}</span>
         </div>
@@ -165,10 +161,25 @@
                 <input type="email" id="email" name="email" value="{{ user_obj.email }}" autocomplete="email" placeholder="you@example.com">
                 <p class="helptext">Used for password reset.</p>
             </div>
-            {% if student_profile %}
+            {% if school_choices %}
+            <div class="field">
+                <label for="school">School</label>
+                <select id="school" name="school">
+                    {% for inst in school_choices %}
+                    <option value="{{ inst.id }}" {% if membership and membership.institution_id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            {% if student_profile and not is_staff_user %}
             <div class="field">
                 <label for="grade_level">Grade level</label>
-                <input type="text" id="grade_level" name="grade_level" value="{{ student_profile.grade_level|default:'' }}" placeholder="e.g. S3">
+                <select id="grade_level" name="grade_level">
+                    <option value="" {% if not student_profile.grade_level %}selected{% endif %}>—</option>
+                    {% for g in grade_choices %}
+                    <option value="{{ g }}" {% if student_profile.grade_level == g %}selected{% endif %}>{{ g }}</option>
+                    {% endfor %}
+                </select>
             </div>
             {% endif %}
             <button type="submit" class="btn btn-primary">Save profile</button>

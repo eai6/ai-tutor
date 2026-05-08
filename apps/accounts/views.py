@@ -692,11 +692,15 @@ def delete_account(request):
 
 @login_required
 def settings(request):
-    """Student-facing settings page — profile info + password change +
-    delete-account entry point.
+    """Settings page for both teachers and students — profile info +
+    password change + delete-account entry point.
 
     Form actions are POSTed back to this same URL with a ?action= param
     so we don't need separate routes for each subform.
+
+    Both audiences can update: first name, last name, email, school
+    (institution), and (students only) grade level. School / grade
+    are dropdowns sourced from PlatformConfig.
     """
     from django.contrib.auth import update_session_auth_hash
     from django.contrib.auth.forms import PasswordChangeForm
@@ -704,6 +708,7 @@ def settings(request):
     user = request.user
     student_profile = StudentProfile.objects.filter(user=user).first()
     membership = user.memberships.filter(is_active=True).first()
+    is_staff_user = user.is_staff or user.is_superuser
 
     password_form = PasswordChangeForm(user)
 
@@ -717,11 +722,29 @@ def settings(request):
             if email and '@' in email:
                 user.email = email
             user.save()
-            if student_profile:
+
+            # School (institution) — both teachers and students can
+            # update. Re-points the active membership to the new
+            # institution. New value comes from a select that lists
+            # active institutions; we accept either an id or a slug
+            # for backwards compat.
+            school = (request.POST.get('school') or '').strip()
+            if school and membership:
+                new_inst = (
+                    Institution.objects.filter(id=school, is_active=True).first()
+                    or Institution.objects.filter(slug=school, is_active=True).first()
+                )
+                if new_inst and new_inst.id != membership.institution_id:
+                    membership.institution = new_inst
+                    membership.save(update_fields=['institution'])
+
+            # Grade level — students only.
+            if student_profile and not is_staff_user:
                 grade = (request.POST.get('grade_level') or '').strip()
                 if grade:
                     student_profile.grade_level = grade
                     student_profile.save()
+
             messages.success(request, 'Profile updated.')
             return redirect('accounts:settings')
 
@@ -734,11 +757,20 @@ def settings(request):
                 return redirect('accounts:settings')
             # else: fall through to render with form errors
 
+    # Dropdown choices for the form.
+    school_choices = list(
+        Institution.objects.filter(is_active=True).order_by('name').values('id', 'name')
+    )
+    grade_choices = ['S1', 'S2', 'S3', 'S4', 'S5']
+
     return render(request, 'accounts/settings.html', {
         'user_obj': user,
         'student_profile': student_profile,
         'membership': membership,
         'password_form': password_form,
+        'is_staff_user': is_staff_user,
+        'school_choices': school_choices,
+        'grade_choices': grade_choices,
     })
 
 

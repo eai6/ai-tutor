@@ -66,6 +66,16 @@
                         <label class="form-label" for="email">Email</label>
                         <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
                     </div>
+                    {% if user_school_choices %}
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="school">School</label>
+                        <select class="form-control" id="school" name="school">
+                            {% for inst in user_school_choices %}
+                            <option value="{{ inst.id }}" {% if membership and membership.institution_id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
                     <div>
                         <div style="font-size: 0.875rem; color: var(--gray-500);">Role</div>
                         <div style="font-weight: 500; margin-top: 0.25rem;">{% if user.is_staff %}Super Admin{% elif membership %}{{ membership.get_role_display }}{% endif %}</div>

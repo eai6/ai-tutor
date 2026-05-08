@@ -2782,6 +2782,7 @@ def settings_page(request):
             first_name = request.POST.get('first_name', '').strip()
             last_name = request.POST.get('last_name', '').strip()
             email = request.POST.get('email', '').strip()
+            new_school = (request.POST.get('school') or '').strip()
             if not email:
                 messages.error(request, "Email is required.")
             elif User.objects.filter(email=email).exclude(pk=request.user.pk).exists():
@@ -2791,6 +2792,19 @@ def settings_page(request):
                 request.user.last_name = last_name
                 request.user.email = email
                 request.user.save()
+
+                # School (institution) update — re-points the active
+                # membership. New value comes from the school dropdown
+                # populated from active institutions.
+                if new_school and membership:
+                    new_inst = (
+                        Institution.objects.filter(id=new_school, is_active=True).first()
+                        or Institution.objects.filter(slug=new_school, is_active=True).first()
+                    )
+                    if new_inst and new_inst.id != membership.institution_id:
+                        membership.institution = new_inst
+                        membership.save(update_fields=['institution'])
+
                 messages.success(request, "Profile updated.")
 
         elif action == 'password':
@@ -3181,6 +3195,15 @@ def settings_page(request):
 
     all_timezones = sorted(zoneinfo.available_timezones())
     all_schools = Institution.objects.exclude(slug=Institution.GLOBAL_SLUG).order_by('name') if is_superadmin else []
+    # Active schools list for the user's own profile-school dropdown
+    # (every staff member can change their own school regardless of
+    # whether they're a superadmin).
+    user_school_choices = list(
+        Institution.objects.filter(is_active=True)
+        .exclude(slug=Institution.GLOBAL_SLUG)
+        .order_by('name')
+        .values('id', 'name')
+    )
     all_users = (
         User.objects.exclude(id=request.user.id)
         .filter(
@@ -3200,6 +3223,7 @@ def settings_page(request):
         'platform_config': platform_config,
         'all_timezones': all_timezones,
         'all_schools': all_schools,
+        'user_school_choices': user_school_choices,
         'all_users': all_users,
         'tutor_provider': tutor_provider,
         'tutor_model': tutor_model,
