@@ -33,7 +33,12 @@ def _build_session_history(session):
     """Build a list of {role, content, media?} dicts from SessionTurn records.
 
     Skips system turns and strips media signal tags from content.
-    Attaches media from engine_state turn_media map for artifact panel on resume.
+
+    Media resolution prefers the per-turn `attached_media` field on
+    SessionTurn.metadata (the authoritative source set by
+    ConversationalTutor since 2026-05-08). Falls back to the legacy
+    `engine_state.turn_media` map indexed by visible-turn position
+    so older sessions still restore their figures on reload.
     """
     turns = SessionTurn.objects.filter(session=session).order_by('created_at')
     engine_state = session.engine_state or {}
@@ -47,9 +52,16 @@ def _build_session_history(session):
         content = _MEDIA_TAG_RE.sub('', turn.content).strip()
         if content:
             entry = {'role': turn.role, 'content': content}
-            media = turn_media.get(str(idx))
-            if media:
-                entry['media'] = [media]
+            # Prefer per-turn metadata media (authoritative since
+            # 2026-05-08); fall back to engine_state.turn_media for
+            # sessions that started before that change.
+            md_media = (turn.metadata or {}).get('attached_media') or []
+            if md_media:
+                entry['media'] = list(md_media)
+            else:
+                legacy = turn_media.get(str(idx))
+                if legacy:
+                    entry['media'] = [legacy]
             history.append(entry)
         idx += 1
     return history
@@ -593,10 +605,17 @@ def chat_tutor_interface(request, lesson_id):
     # teacher via Course.allow_student_duration_override. When False,
     # the chat page hides the picker entirely and the session uses the
     # teacher-configured lesson.estimated_minutes.
+    #
+    # Also: skip the picker when the student already has an active
+    # OR completed session for this lesson (i.e. they're reloading
+    # mid-session, not starting fresh). Otherwise reloading would
+    # block the chat-history restore behind another duration click.
     allow_duration_picker = (
         lesson.unit.course.allow_student_duration_override
         if lesson.unit and lesson.unit.course else True
     )
+    if has_session:
+        allow_duration_picker = False
 
     return render(request, 'tutoring/chat_tutor.html', {
         "lesson": lesson,
