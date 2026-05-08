@@ -267,6 +267,133 @@ def open_lesson_detail(user, *, lesson_query: str) -> Dict:
     }
 
 
+def open_course_detail(user, *, course_query: str) -> Dict:
+    """Course detail page — units, lessons, weekly assignments,
+    summative link, regenerate buttons (super-admin only)."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    candidates = _fuzzy_course_lookup(course_query, user)
+    if not candidates:
+        return {'ok': False, 'human_msg': f'No course matching "{course_query}".'}
+    if len(candidates) > 1:
+        return {'ok': False, 'candidates': [
+            {'id': c.id, 'title': c.title} for c in candidates
+        ], 'human_msg': 'Which course?'}
+    c = candidates[0]
+    return {
+        'ok': True,
+        'url': f'/dashboard/curriculum/course/{c.id}/',
+        'label': f"{c.title} — Course Detail",
+    }
+
+
+def open_lesson_monitor(user, *, lesson_query: str) -> Dict:
+    """Live monitor for a specific lesson — see active student
+    sessions, exchange counts, idle states, exit-ticket scores."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    candidates = _fuzzy_lesson_lookup(lesson_query, user)
+    if not candidates:
+        return {'ok': False, 'human_msg': f'No lesson matching "{lesson_query}".'}
+    if len(candidates) > 1:
+        return {'ok': False, 'candidates': [
+            {'id': l.id, 'title': l.title, 'course': l.unit.course.title}
+            for l in candidates
+        ], 'human_msg': 'Which lesson?'}
+    l = candidates[0]
+    return {
+        'ok': True,
+        'url': f'/dashboard/lesson/{l.id}/monitor/',
+        'label': f"{l.title} — Live Monitor",
+    }
+
+
+def open_lesson_session_report(user, *, lesson_query: str) -> Dict:
+    """Class snapshot for one lesson — students bucketed by
+    competency category, who needs help, who exceeded."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    candidates = _fuzzy_lesson_lookup(lesson_query, user)
+    if not candidates:
+        return {'ok': False, 'human_msg': f'No lesson matching "{lesson_query}".'}
+    if len(candidates) > 1:
+        return {'ok': False, 'candidates': [
+            {'id': l.id, 'title': l.title, 'course': l.unit.course.title}
+            for l in candidates
+        ], 'human_msg': 'Which lesson?'}
+    l = candidates[0]
+    return {
+        'ok': True,
+        'url': f'/dashboard/lesson/{l.id}/report/',
+        'label': f"{l.title} — Session Report",
+    }
+
+
+def open_class_detail(user, *, grade: str) -> Dict:
+    """Per-grade class page — roster, courses for that grade,
+    Recent Activity widget. `grade` is S1 / S2 / S3 / S4 / S5."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    g = (grade or '').strip().upper()
+    if g not in {'S1', 'S2', 'S3', 'S4', 'S5'}:
+        return {'ok': False, 'human_msg': 'Grade must be one of S1, S2, S3, S4, S5.'}
+    return {
+        'ok': True,
+        'url': f'/dashboard/classes/{g}/',
+        'label': f"Class {g}",
+    }
+
+
+def open_flagged_sessions(user) -> Dict:
+    """Safety-flagged student messages dashboard."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    return {
+        'ok': True,
+        'url': '/dashboard/flagged/',
+        'label': 'Flagged Chats',
+    }
+
+
+def open_student_detail(user, *, student_query: str) -> Dict:
+    """Per-student detail page — Course Progress, Recent Sessions,
+    promote/demote, account actions."""
+    if not _is_staff(user):
+        return {'ok': False, 'human_msg': 'Teacher access required.'}
+    candidates = _fuzzy_student_lookup(student_query, user)
+    if not candidates:
+        return {'ok': False, 'human_msg': f'No student matching "{student_query}".'}
+    if len(candidates) > 1:
+        return {'ok': False, 'candidates': [
+            {'id': s.id, 'name': s.get_full_name() or s.username, 'username': s.username}
+            for s in candidates
+        ], 'human_msg': 'Which student?'}
+    s = candidates[0]
+    return {
+        'ok': True,
+        'url': f'/dashboard/students/{s.id}/',
+        'label': f"{s.get_full_name() or s.username} — Detail",
+    }
+
+
+def open_settings(user) -> Dict:
+    """Account settings page — profile, password, school, logout."""
+    if _is_staff(user):
+        return {'ok': True, 'url': '/dashboard/settings/', 'label': 'Settings'}
+    return {'ok': True, 'url': '/accounts/settings/', 'label': 'Settings'}
+
+
+def open_curriculum_upload(user) -> Dict:
+    """Upload a syllabus PDF to create a new course (super-admin only)."""
+    if not (user and (user.is_superuser or user.is_staff)):
+        return {'ok': False, 'human_msg': 'Super-admin access required.'}
+    return {
+        'ok': True,
+        'url': '/dashboard/curriculum/upload/',
+        'label': 'Upload Curriculum',
+    }
+
+
 def open_student_chat_history(user, *, student_query: str) -> Dict:
     if not _is_staff(user):
         return {'ok': False, 'human_msg': 'Teacher access required.'}
@@ -338,8 +465,20 @@ _CATALOG = [
         'handler': take_baseline,
     },
     {
+        'name': 'open_course_detail',
+        'description': "Get a link to the course detail page — units, lessons, weekly assignments, summative link, regenerate buttons. Use this when a teacher wants to 'open' / 'go to' / 'see' a course, or to assign weekly lessons.",
+        'input_schema': {
+            'type': 'object',
+            'properties': {'course_query': {'type': 'string', 'description': 'Course title or fragment, e.g. "Mathematics S3".'}},
+            'required': ['course_query'],
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': open_course_detail,
+    },
+    {
         'name': 'open_class_competency_map',
-        'description': "Get a link to a course's class competency map (per-objective progress matrix).",
+        'description': "Get a link to a course's class competency map (per-lesson progress matrix with average competency + mastered counts).",
         'input_schema': {
             'type': 'object',
             'properties': {'course_query': {'type': 'string'}},
@@ -348,6 +487,78 @@ _CATALOG = [
         'audience': 'staff',
         'requires_confirmation': False,
         'handler': open_class_competency_map,
+    },
+    {
+        'name': 'open_lesson_monitor',
+        'description': "Get a link to the live monitor for a lesson — see active student sessions, exchanges, idle states, exit-ticket scores in real time.",
+        'input_schema': {
+            'type': 'object',
+            'properties': {'lesson_query': {'type': 'string'}},
+            'required': ['lesson_query'],
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': open_lesson_monitor,
+    },
+    {
+        'name': 'open_lesson_session_report',
+        'description': "Get a link to the session report for a lesson — class snapshot bucketed by competency category (UN/BE/AE/ME/EE).",
+        'input_schema': {
+            'type': 'object',
+            'properties': {'lesson_query': {'type': 'string'}},
+            'required': ['lesson_query'],
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': open_lesson_session_report,
+    },
+    {
+        'name': 'open_class_detail',
+        'description': "Get a link to a per-grade class page (S1-S5) — roster, courses for that grade, recent activity widget. Use when a teacher asks to see 'class S3' or 'the S4 students'.",
+        'input_schema': {
+            'type': 'object',
+            'properties': {'grade': {'type': 'string', 'description': 'Grade level: S1 / S2 / S3 / S4 / S5.'}},
+            'required': ['grade'],
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': open_class_detail,
+    },
+    {
+        'name': 'open_flagged_sessions',
+        'description': "Get a link to the flagged chats dashboard — student messages caught by the safety judge (harmful / inappropriate / manipulation).",
+        'input_schema': {'type': 'object', 'properties': {}},
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': open_flagged_sessions,
+    },
+    {
+        'name': 'open_student_detail',
+        'description': "Get a link to a student's detail page — Course Progress, Recent Sessions, promote/demote, account actions.",
+        'input_schema': {
+            'type': 'object',
+            'properties': {'student_query': {'type': 'string'}},
+            'required': ['student_query'],
+        },
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': open_student_detail,
+    },
+    {
+        'name': 'open_settings',
+        'description': "Get a link to the account settings page (profile, password, school, logout).",
+        'input_schema': {'type': 'object', 'properties': {}},
+        'audience': 'all',
+        'requires_confirmation': False,
+        'handler': open_settings,
+    },
+    {
+        'name': 'open_curriculum_upload',
+        'description': "Get a link to the curriculum upload page (super-admin only) — upload a syllabus PDF to create a new course.",
+        'input_schema': {'type': 'object', 'properties': {}},
+        'audience': 'staff',
+        'requires_confirmation': False,
+        'handler': open_curriculum_upload,
     },
     {
         'name': 'open_class_readiness',
