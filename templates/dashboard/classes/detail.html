@@ -50,6 +50,54 @@
     </div>
 </div>
 
+{% if recent_activity %}
+<!-- Recent activity — what's the class working on this week -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <h2 class="card-title">📅 Recent activity (last 7 days)</h2>
+        <span style="font-size:0.78rem;color:var(--gray-500);">most recent first · quick links to monitor + report</span>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+            <thead style="background:#f9fafb;">
+                <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
+                    <th style="padding:0.55rem 1rem;">Lesson</th>
+                    <th style="padding:0.55rem 1rem;">Course</th>
+                    <th style="padding:0.55rem 1rem;">Students</th>
+                    <th style="padding:0.55rem 1rem;">Sessions</th>
+                    <th style="padding:0.55rem 1rem;">Last started</th>
+                    <th style="padding:0.55rem 1rem;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recent_activity %}
+                <tr style="border-top:1px solid var(--gray-100);">
+                    <td style="padding:0.55rem 1rem;font-weight:500;">
+                        <a href="{% url 'dashboard:lesson_detail' r.lesson.id %}" style="color:var(--gray-900);text-decoration:none;">{{ r.lesson.title }}</a>
+                    </td>
+                    <td style="padding:0.55rem 1rem;color:var(--gray-500);font-size:0.82rem;">{{ r.course.title }}</td>
+                    <td style="padding:0.55rem 1rem;">
+                        {{ r.unique_students }} student{{ r.unique_students|pluralize }}
+                        {% if r.completed_count %}<div style="font-size:0.72rem;color:#059669;">{{ r.completed_count }} completed</div>{% endif %}
+                    </td>
+                    <td style="padding:0.55rem 1rem;color:var(--gray-500);">{{ r.session_count }}</td>
+                    <td style="padding:0.55rem 1rem;color:var(--gray-500);font-size:0.82rem;">
+                        {{ r.most_recent|timesince }} ago
+                    </td>
+                    <td style="padding:0.55rem 1rem;">
+                        <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                            <a href="{% url 'dashboard:lesson_monitor' r.lesson.id %}" class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">Monitor</a>
+                            <a href="{% url 'dashboard:lesson_session_report' r.lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">Report</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <!-- Students in this class -->
 <div class="card">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">

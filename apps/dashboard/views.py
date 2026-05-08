@@ -1754,6 +1754,49 @@ def class_detail(request, grade):
         prev_grade = ''
         prev_action = ''
 
+    # Recent activity — top 5 lessons across all courses for this
+    # grade where students have actually started a session this
+    # week. Gives teachers a one-glance "what's the class working on"
+    # widget with quick links to monitor / report. Sorted by most
+    # recent activity first.
+    from django.utils import timezone
+    from datetime import timedelta
+    recent_activity = []
+    if student_ids:
+        week_ago = timezone.now() - timedelta(days=7)
+        # Pull recent non-abandoned sessions for these students,
+        # group by lesson, take the top 5 by most-recent activity.
+        recent_sessions = (
+            TutorSession.objects
+            .filter(student_id__in=student_ids, started_at__gte=week_ago)
+            .exclude(status='abandoned')
+            .select_related('lesson', 'lesson__unit', 'lesson__unit__course')
+            .order_by('-started_at')
+        )
+        per_lesson: dict = {}
+        for s in recent_sessions:
+            lid = s.lesson_id
+            entry = per_lesson.setdefault(lid, {
+                'lesson': s.lesson,
+                'course': s.lesson.unit.course,
+                'session_count': 0,
+                'unique_students': set(),
+                'completed_count': 0,
+                'most_recent': s.started_at,
+            })
+            entry['session_count'] += 1
+            entry['unique_students'].add(s.student_id)
+            if s.status == 'completed':
+                entry['completed_count'] += 1
+            if s.started_at and s.started_at > entry['most_recent']:
+                entry['most_recent'] = s.started_at
+        recent_activity = sorted(
+            per_lesson.values(), key=lambda e: e['most_recent'], reverse=True,
+        )[:5]
+        # Convert sets to counts for the template.
+        for e in recent_activity:
+            e['unique_students'] = len(e['unique_students'])
+
     context = {
         **request.staff_ctx,
         'grade': grade,
@@ -1764,6 +1807,7 @@ def class_detail(request, grade):
         'next_action': next_action,
         'prev_grade': prev_grade,
         'prev_action': prev_action,
+        'recent_activity': recent_activity,
     }
     return render(request, 'dashboard/classes/detail.html', context)
 
@@ -5219,14 +5263,30 @@ def lesson_live_monitor(request, lesson_id):
     else:
         lesson = get_object_or_404(Lesson, id=lesson_id)
 
-    sessions = (
+    # Exclude abandoned sessions from the live monitor — they're
+    # noise (a student who started, bounced, then started fresh
+    # appears 5× otherwise) and the live monitor's purpose is "what
+    # is happening now or just completed". Teachers who specifically
+    # want abandoned chats can find them via the student detail page.
+    # Also dedupe by student: keep only the most recent session per
+    # student (handles edge cases where a student has multiple
+    # active or completed rows for the same lesson).
+    raw_sessions = (
         TutorSession.objects
         .filter(lesson=lesson)
+        .exclude(status='abandoned')
         .select_related('student')
         .prefetch_related('turns')
         .annotate(last_turn_at=Max('turns__created_at'))
         .order_by('-started_at')
     )
+    seen_students = set()
+    sessions = []
+    for s in raw_sessions:
+        if s.student_id in seen_students:
+            continue
+        seen_students.add(s.student_id)
+        sessions.append(s)
 
     # Latest exit-ticket attempt per session — the engine only writes
     # exit_ticket_score to engine_state when the student passes, so pulling
