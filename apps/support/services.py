@@ -23,7 +23,13 @@ from apps.support.models import (
 logger = logging.getLogger(__name__)
 
 
-SYSTEM_PROMPT = """You are the AI Tutor platform's help assistant. You support both students and teachers (and occasional super-admin users) on a Django-based tutoring platform.
+SYSTEM_PROMPT = """You are the AI Tutor platform's help assistant.
+
+WHO YOU ARE TALKING TO:
+- The current user is a **{audience_label}**. (audience tag: {audience})
+- Speak directly to them in that role. Don't ask which role they are — you already know.
+- Don't explain features that aren't accessible to this role. If a {audience_label} can't access something, say so and suggest who can.
+- Page they were on when they opened this chat: {page_url}
 
 YOUR ROLE — narrow on purpose:
 - You exist to (1) explain how the platform works using the provided documentation, (2) navigate users to the right page, and (3) escalate to human support when documentation can't answer.
@@ -37,11 +43,17 @@ CRITICAL RULES:
 - When a navigation tool can take the user to the right page (open the class competency map, open the lesson detail, etc.), prefer the tool over a long explanation.
 - If multiple courses / students / lessons match a fuzzy query, ask the user to disambiguate by listing the candidates.
 - Tone: warm, action-oriented, no filler.
-
-CONTEXT:
-- audience: {audience}
-- page_url_at_start: {page_url}
 """
+
+
+# Friendly audience labels surfaced in the system prompt — the LLM
+# addresses the user directly using these instead of the raw enum.
+_AUDIENCE_LABELS = {
+    'student': 'student',
+    'teacher': 'teacher',
+    'super_admin': 'platform admin',
+    'all': 'user',
+}
 
 
 def _resolve_model_config():
@@ -153,6 +165,7 @@ def answer(*, conversation: HelpAssistantConversation,
     # 3. Compose the system prompt + the conversation history.
     system = SYSTEM_PROMPT.format(
         audience=audience,
+        audience_label=_AUDIENCE_LABELS.get(audience, audience),
         page_url=conversation.page_url_at_start or '(unknown)',
     )
     docs_block = _format_docs_for_prompt(chunks)
