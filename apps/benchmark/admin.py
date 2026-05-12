@@ -6,7 +6,11 @@ not the auto-generated admin.
 """
 from django.contrib import admin
 
-from apps.benchmark.models import BenchmarkItem, BenchmarkAnnotation
+from apps.benchmark.models import (
+    BenchmarkAnnotation,
+    BenchmarkItem,
+    BenchmarkRun,
+)
 
 
 @admin.register(BenchmarkItem)
@@ -66,3 +70,17 @@ class BenchmarkAnnotationAdmin(admin.ModelAdmin):
     @admin.display(description='Extra labels')
     def extra_labels_display(self, obj):
         return ', '.join(obj.extra_labels) or '—'
+
+
+@admin.register(BenchmarkRun)
+class BenchmarkRunAdmin(admin.ModelAdmin):
+    list_display = ('id', 'system_variant', 'annotator_role',
+                    'passed', 'total_items', 'pass_rate_display',
+                    'created_at')
+    list_filter = ('system_variant', 'annotator_role', 'created_at')
+    readonly_fields = ('created_at', 'metrics')
+    ordering = ('-created_at',)
+
+    @admin.display(description='Pass rate')
+    def pass_rate_display(self, obj):
+        return f"{obj.pass_rate:.3f}"

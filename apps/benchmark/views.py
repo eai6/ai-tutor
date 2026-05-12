@@ -25,7 +25,11 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.benchmark import labels as L
-from apps.benchmark.models import BenchmarkAnnotation, BenchmarkItem
+from apps.benchmark.models import (
+    BenchmarkAnnotation,
+    BenchmarkItem,
+    BenchmarkRun,
+)
 
 
 # Issue labels grouped by source so the form can render sections.
@@ -220,4 +224,47 @@ def benchmark_annotate(request, item_id: str):
         'prefill_safety': prefill_safety,
         'prefill_claim': prefill_claim,
         'existing': existing,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Scores dashboard (Phase 2.3)
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def benchmark_runs_list(request):
+    """List all BenchmarkRuns, newest first."""
+    runs = list(BenchmarkRun.objects.all().order_by('-created_at')[:200])
+    return render(request, 'benchmark/runs_list.html', {
+        'runs': runs,
+        'total': len(runs),
+    })
+
+
+@staff_member_required
+def benchmark_run_detail(request, run_id: int):
+    """Render the full metrics breakdown for one BenchmarkRun."""
+    run = get_object_or_404(BenchmarkRun, id=run_id)
+    metrics = run.metrics or {}
+
+    # Reshape slices for the template (sorted buckets per slice).
+    slices = []
+    for slice_name, buckets in (metrics.get('slices') or {}).items():
+        rows = [
+            {'bucket': name, **stats}
+            for name, stats in sorted(buckets.items())
+        ]
+        slices.append({'name': slice_name, 'rows': rows})
+
+    failure_categories = list(
+        (metrics.get('failure_categories') or {}).items()
+    )
+
+    return render(request, 'benchmark/run_detail.html', {
+        'run': run,
+        'metrics': metrics,
+        'overall': metrics.get('overall') or {},
+        'slices': slices,
+        'failure_categories': failure_categories,
+        'agreement': metrics.get('agreement'),
     })

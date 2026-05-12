@@ -1,0 +1,104 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Benchmark Runs{% endblock %}
+{% block page_title %}Benchmark Runs{% endblock %}
+
+{% block content %}
+<style>
+    .runs-summary {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.85rem 1.1rem; margin-bottom:1rem; font-size:0.9rem;
+        color:#374151;
+    }
+    .runs-summary code {
+        font-size:0.78rem; background:#f3f4f6; padding:0.1rem 0.4rem;
+        border-radius:4px;
+    }
+    .runs-table {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        overflow:hidden;
+    }
+    .runs-table table { width:100%; border-collapse:collapse; }
+    .runs-table th, .runs-table td {
+        padding:0.6rem 0.85rem; text-align:left; font-size:0.85rem;
+        vertical-align:top;
+    }
+    .runs-table thead th {
+        background:#f9fafb; color:#6b7280; font-weight:600;
+        font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em;
+        border-bottom:1px solid #e5e7eb;
+    }
+    .runs-table tbody tr { border-bottom:1px solid #f3f4f6; }
+    .runs-table tbody tr:hover { background:#fafafa; }
+    .runs-table td a { color:#5b21b6; text-decoration:none; font-weight:500; }
+    .runs-table td a:hover { text-decoration:underline; }
+
+    .pill {
+        display:inline-block; padding:0.1rem 0.55rem; border-radius:999px;
+        font-size:0.7rem; font-weight:600;
+    }
+    .pill-variant { background:#eff6ff; color:#1e40af; }
+    .pill-role-human { background:#ecfdf5; color:#065f46; }
+    .pill-role-llm { background:#ede9fe; color:#5b21b6; }
+    .rate { font-weight:600; color:#111; font-variant-numeric: tabular-nums; }
+    .rate-bar { display:inline-block; width:80px; height:6px; background:#f3f4f6; border-radius:3px; vertical-align:middle; overflow:hidden; margin-left:0.4rem; }
+    .rate-bar-fill { height:100%; background:#8b5cf6; }
+    .empty { padding:3rem 1rem; text-align:center; color:#6b7280; }
+    .back-link { color:#6b7280; font-size:0.85rem; text-decoration:none; margin-bottom:1rem; display:inline-block; }
+    .back-link:hover { color:#5b21b6; }
+</style>
+
+<a href="{% url 'dashboard:benchmark:list' %}" class="back-link">← Benchmark items</a>
+
+<div class="runs-summary">
+    {{ total }} run{{ total|pluralize }}. Each row is one scoring computation.
+    Re-run via <code>python manage.py score_benchmark --notes "..."</code> after a pipeline change to compare pass rate against prior runs.
+</div>
+
+{% if runs %}
+<div class="runs-table">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>When</th>
+                <th>Variant</th>
+                <th>Annotator</th>
+                <th>Total</th>
+                <th>Pass rate</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in runs %}
+            <tr>
+                <td><a href="{% url 'dashboard:benchmark:run_detail' run.id %}">#{{ run.id }}</a></td>
+                <td>{{ run.created_at|date:"M j, H:i" }}</td>
+                <td><span class="pill pill-variant">{{ run.get_system_variant_display }}</span></td>
+                <td>
+                    {% if run.annotator_role == 'human' %}
+                        <span class="pill pill-role-human">human</span>
+                    {% else %}
+                        <span class="pill pill-role-llm">{{ run.annotator_role }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ run.passed }}/{{ run.total_items }}</td>
+                <td>
+                    <span class="rate">{{ run.pass_rate|floatformat:3 }}</span>
+                    <span class="rate-bar"><span class="rate-bar-fill" style="width:{% widthratio run.passed run.total_items 100 %}%;"></span></span>
+                </td>
+                <td style="max-width:280px;color:#6b7280;">{{ run.notes|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="runs-table">
+    <div class="empty">
+        <h3 style="color:#374151;margin-bottom:0.5rem;">No runs yet.</h3>
+        <p>Run <code>python manage.py score_benchmark</code> after annotating items.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

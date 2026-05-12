@@ -230,3 +230,72 @@ class BenchmarkAnnotation(models.Model):
         if self.safety_concern:
             return False
         return self.actual_set == self.expected_set
+
+
+class BenchmarkRun(models.Model):
+    """One scoring computation over a slice of ``BenchmarkAnnotation`` rows.
+
+    Versioned so we can compare runs across iterations of the tutor
+    pipeline. Each prompt or judge change → re-run scoring → compare
+    pass rate against the prior run. The ``metrics`` JSONField stores
+    the full per-slice breakdown (subject, eval_layer, failure_category,
+    history-aware vs not, etc.) — kept here rather than in normalized
+    rows because the slice dimensions evolve with the rubric.
+
+    See ``apps/benchmark/scoring.py::compute_metrics`` for the schema.
+    """
+
+    system_variant = models.CharField(
+        max_length=40,
+        choices=BenchmarkAnnotation.SystemVariant.choices,
+        default=BenchmarkAnnotation.SystemVariant.PRODUCTION_V1,
+        help_text="Which tutor system's annotations were scored.",
+    )
+    annotator_role = models.CharField(
+        max_length=20,
+        choices=BenchmarkAnnotation.Annotator.choices,
+        default=BenchmarkAnnotation.Annotator.HUMAN,
+        help_text="Whose annotations were scored: human or LLM-judge.",
+    )
+
+    total_items = models.PositiveIntegerField(default=0)
+    passed = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    metrics = models.JSONField(
+        default=dict,
+        help_text="Full per-slice breakdown. See "
+                  "apps/benchmark/scoring.py::compute_metrics for the schema.",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='benchmark_runs',
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Free-form context for this run (e.g. \"after coherence "
+                  "judge history window shipped\").",
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Benchmark Run"
+        indexes = [
+            models.Index(fields=['system_variant', '-created_at']),
+            models.Index(fields=['annotator_role']),
+        ]
+
+    def __str__(self):
+        return (
+            f"Run #{self.id} ({self.system_variant}/{self.annotator_role}) "
+            f"{self.passed}/{self.total_items}"
+        )
+
+    @property
+    def pass_rate(self) -> float:
+        if not self.total_items:
+            return 0.0
+        return self.passed / self.total_items

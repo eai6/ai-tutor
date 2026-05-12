@@ -1,0 +1,175 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Run #{{ run.id }}{% endblock %}
+{% block page_title %}Benchmark Run #{{ run.id }}{% endblock %}
+
+{% block content %}
+<style>
+    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.85rem; color:#374151; margin-bottom:1rem; }
+    .meta-row span { display:inline-flex; gap:0.3rem; align-items:baseline; }
+    .meta-row strong { color:#111; font-weight:600; }
+    .pill { display:inline-block; padding:0.1rem 0.55rem; border-radius:999px; font-size:0.7rem; font-weight:600; }
+    .pill-variant { background:#eff6ff; color:#1e40af; }
+    .pill-role-human { background:#ecfdf5; color:#065f46; }
+    .pill-role-llm { background:#ede9fe; color:#5b21b6; }
+
+    .summary-grid {
+        display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap:0.85rem; margin-bottom:1.2rem;
+    }
+    .card {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.85rem 1.1rem;
+    }
+    .card .label { font-size:0.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; }
+    .card .value { font-size:1.6rem; font-weight:700; color:#111; line-height:1.1; margin-top:0.15rem; }
+    .card .sub { font-size:0.75rem; color:#6b7280; margin-top:0.2rem; }
+    .card-success .value { color:#065f46; }
+    .card-warn    .value { color:#92400e; }
+
+    .section {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:1rem 1.1rem; margin-bottom:1rem;
+    }
+    .section h3 {
+        font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
+        color:#6b7280; margin:0 0 0.6rem; font-weight:600;
+    }
+
+    .slice-grid {
+        display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap:1rem;
+    }
+    .slice-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+    .slice-table th, .slice-table td { padding:0.4rem 0.55rem; text-align:left; }
+    .slice-table thead th { background:#f9fafb; color:#6b7280; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; }
+    .slice-table tbody tr { border-top:1px solid #f3f4f6; }
+    .slice-table .bucket { color:#111; font-weight:500; }
+    .rate { font-variant-numeric: tabular-nums; font-weight:600; color:#111; }
+    .bar { display:inline-block; width:60px; height:5px; background:#f3f4f6; border-radius:3px; vertical-align:middle; margin-left:0.4rem; overflow:hidden; }
+    .bar-fill { height:100%; background:#8b5cf6; }
+
+    .cat-list { font-size:0.85rem; }
+    .cat-list div { padding:0.25rem 0; border-bottom:1px dashed #f3f4f6; display:flex; justify-content:space-between; }
+    .cat-list strong { color:#111; font-weight:600; }
+    .cat-count { font-variant-numeric: tabular-nums; color:#b91c1c; font-weight:600; }
+
+    .disagree-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+    .disagree-table th, .disagree-table td { padding:0.4rem 0.55rem; text-align:left; vertical-align:top; border-bottom:1px solid #f3f4f6; }
+    .disagree-table thead th { background:#f9fafb; color:#6b7280; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; }
+    .disagree-table code { font-size:0.72rem; background:#f3f4f6; padding:0.1rem 0.35rem; border-radius:3px; }
+    .verdict-pass { color:#065f46; font-weight:600; }
+    .verdict-fail { color:#991b1b; font-weight:600; }
+
+    .back-link { color:#6b7280; font-size:0.85rem; text-decoration:none; margin-bottom:1rem; display:inline-block; }
+    .back-link:hover { color:#5b21b6; }
+</style>
+
+<a href="{% url 'dashboard:benchmark:runs_list' %}" class="back-link">← All runs</a>
+
+<div class="meta-row">
+    <span><strong>When</strong> {{ run.created_at|date:"M j, Y H:i" }}</span>
+    <span><strong>Variant</strong> <span class="pill pill-variant">{{ run.get_system_variant_display }}</span></span>
+    <span><strong>Annotator</strong>
+        {% if run.annotator_role == 'human' %}
+            <span class="pill pill-role-human">human</span>
+        {% else %}
+            <span class="pill pill-role-llm">{{ run.annotator_role }}</span>
+        {% endif %}
+    </span>
+    {% if run.notes %}<span style="flex-basis:100%;color:#6b7280;"><strong>Notes</strong> {{ run.notes }}</span>{% endif %}
+</div>
+
+<div class="summary-grid">
+    <div class="card {% if overall.pass_rate >= 0.7 %}card-success{% elif overall.pass_rate < 0.4 %}card-warn{% endif %}">
+        <div class="label">Pass rate</div>
+        <div class="value">{{ overall.pass_rate|floatformat:3 }}</div>
+        <div class="sub">{{ overall.passed }}/{{ overall.total }} items passed</div>
+    </div>
+    <div class="card">
+        <div class="label">Passed</div>
+        <div class="value">{{ overall.passed }}</div>
+    </div>
+    <div class="card">
+        <div class="label">Failed</div>
+        <div class="value">{{ overall.failed }}</div>
+    </div>
+    {% if agreement %}
+    <div class="card">
+        <div class="label">Agreement (vs cross-check)</div>
+        <div class="value">{{ agreement.agreement_rate|floatformat:3 }}</div>
+        <div class="sub">{{ agreement.agree }}/{{ agreement.overlap_items }} items match</div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h3>Slices</h3>
+    <div class="slice-grid">
+        {% for slice in slices %}
+        <div>
+            <div style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:0.4rem;">{{ slice.name }}</div>
+            <table class="slice-table">
+                <thead>
+                    <tr><th>Bucket</th><th>Pass</th><th>Total</th><th>Rate</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in slice.rows %}
+                    <tr>
+                        <td class="bucket">{{ row.bucket }}</td>
+                        <td>{{ row.passed }}</td>
+                        <td>{{ row.total }}</td>
+                        <td>
+                            <span class="rate">{{ row.pass_rate|floatformat:2 }}</span>
+                            <span class="bar"><span class="bar-fill" style="width:{% widthratio row.passed row.total 100 %}%;"></span></span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if failure_categories %}
+<div class="section">
+    <h3>Failure categories</h3>
+    <div class="cat-list">
+        {% for cat, count in failure_categories %}
+        <div><strong>{{ cat }}</strong><span class="cat-count">{{ count }}</span></div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if agreement and agreement.disagreements %}
+<div class="section">
+    <h3>Disagreements ({{ agreement.disagree }} of {{ agreement.overlap_items }})</h3>
+    <table class="disagree-table">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Human</th>
+                <th>LLM judge</th>
+                <th>Expected</th>
+                <th>Human actual</th>
+                <th>LLM actual</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in agreement.disagreements %}
+            <tr>
+                <td><a href="{% url 'dashboard:benchmark:annotate' d.item_id %}">{{ d.item_id }}</a></td>
+                <td>{% if d.human_passes %}<span class="verdict-pass">pass</span>{% else %}<span class="verdict-fail">fail</span>{% endif %}</td>
+                <td>{% if d.llm_passes %}<span class="verdict-pass">pass</span>{% else %}<span class="verdict-fail">fail</span>{% endif %}</td>
+                <td>{% for l in d.expected %}<code>{{ l }}</code> {% endfor %}</td>
+                <td>{% for l in d.human_actual %}<code>{{ l }}</code> {% endfor %}</td>
+                <td>{% for l in d.llm_actual %}<code>{{ l }}</code> {% endfor %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
