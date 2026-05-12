@@ -622,14 +622,59 @@ class ConversationalTutor:
                         except (TypeError, ValueError):
                             continue
 
+                # Tutoring/exit-ticket mutual exclusivity: exclude the
+                # full per-session tutoring bank pool (posed AND unposed)
+                # so the exit ticket genuinely tests transfer rather
+                # than memory of the specific questions practiced this
+                # session. The pool is stored in engine_state when the
+                # tutoring bank was first sampled (see
+                # apps/tutoring/question_bank.py::sample_session_pool).
+                tutoring_pool_ids = set(
+                    (self.session.engine_state or {})
+                    .get('question_pool_ids') or []
+                )
+
                 base_qs = ExitTicketQuestion.objects.filter(
                     exit_ticket=exit_ticket,
                 ).exclude(question_type='data_interpretation')
                 if served_diag_ids:
                     base_qs = base_qs.exclude(id__in=served_diag_ids)
+                if tutoring_pool_ids:
+                    base_qs = base_qs.exclude(id__in=tutoring_pool_ids)
                 all_questions = list(base_qs.order_by('order_index'))
 
-                # Fallback: if exclusion left fewer than 10, allow the
+                # Fallback chain — preserve quality before relaxing.
+                # 1. If exclusion of BOTH diagnostic + tutoring pool
+                #    left <10 questions, relax tutoring-pool first
+                #    (cosmetic — the diagnostic-overlap rule is older
+                #    and stricter than the new no-overlap-with-tutoring
+                #    constraint). Log so we know the lesson's bank is
+                #    under-sized for strict separation.
+                if len(all_questions) < 10 and tutoring_pool_ids:
+                    logger.warning(
+                        "[ExitTicket] lesson=%s bank too small for "
+                        "strict tutoring/exit-ticket separation — "
+                        "relaxing tutoring-pool exclusion "
+                        "(bank=%d after diag-only exclude). Consider "
+                        "expanding the published exit-ticket bank.",
+                        self.lesson.id,
+                        ExitTicketQuestion.objects.filter(
+                            exit_ticket=exit_ticket,
+                        ).exclude(question_type='data_interpretation')
+                        .exclude(id__in=served_diag_ids).count()
+                        if served_diag_ids else
+                        ExitTicketQuestion.objects.filter(
+                            exit_ticket=exit_ticket,
+                        ).exclude(question_type='data_interpretation').count(),
+                    )
+                    relaxed = ExitTicketQuestion.objects.filter(
+                        exit_ticket=exit_ticket,
+                    ).exclude(question_type='data_interpretation')
+                    if served_diag_ids:
+                        relaxed = relaxed.exclude(id__in=served_diag_ids)
+                    all_questions = list(relaxed.order_by('order_index'))
+
+                # 2. Existing final fallback: if STILL <10, allow the
                 # diagnostic IDs back in so we don't ship a tiny test.
                 if len(all_questions) < 10 and served_diag_ids:
                     all_questions = list(
