@@ -6684,10 +6684,23 @@ Follow the current step; this concept will be covered in sequence."""
             if m.get('role') == 'assistant':
                 prior_tutor_text = (m.get('content') or '').strip()
                 break
+        # Priority: the immediately-prior tutor turn's last question
+        # is what the student actually answered. Anchor here FIRST.
+        # teacher_script is often a walkthrough narrative (for
+        # worked_example) or a setup directive (for practice/quiz)
+        # — neither is the specific sub-question that prompted the
+        # student's reply. Previously we anchored on teacher_script,
+        # which made step_eval mis-grade replies in guided steps:
+        # production session 255 (2026-05-12) — tutor asked "How
+        # many groups of 25 can you make from 200?", student said
+        # "8", step_eval anchored on the long worked-example
+        # narrative, fell through to the NEW tutor_response (which
+        # had pivoted to "5y = 70") and marked "8" wrong.
+        prior_q = self._extract_last_question(prior_tutor_text)
         posed_question = (
-            (step.teacher_script or '').strip()
-            or self._extract_last_question(prior_tutor_text)
+            prior_q
             or (step.question or '').strip()
+            or (step.teacher_script or '').strip()
         )[:400]
 
         # Surface MCQ option CONTENT when a bank question is in flight,
