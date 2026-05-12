@@ -2,7 +2,7 @@
 Dashboard URL Configuration
 """
 
-from django.urls import path
+from django.urls import include, path
 from . import views
 
 app_name = 'dashboard'
@@ -135,4 +135,7 @@ urlpatterns = [
 
     # Admin utilities
     path('admin/seed-demo/', views.seed_demo_school, name='seed_demo'),
+
+    # Benchmark annotation UI (super-admin only)
+    path('benchmark/', include('apps.benchmark.urls')),
 ]

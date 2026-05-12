@@ -1,0 +1,102 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Eval Benchmark{% endblock %}
+{% block page_title %}Eval Benchmark — sampled items{% endblock %}
+
+{% block content %}
+<style>
+    .bench-summary {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.85rem 1.1rem; margin-bottom:1rem; font-size:0.9rem;
+        color:#374151;
+    }
+    .bench-table {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        overflow:hidden;
+    }
+    .bench-table table { width:100%; border-collapse:collapse; }
+    .bench-table th, .bench-table td {
+        padding:0.6rem 0.85rem; text-align:left; font-size:0.85rem;
+        vertical-align:top;
+    }
+    .bench-table thead th {
+        background:#f9fafb; color:#6b7280; font-weight:600;
+        font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em;
+        border-bottom:1px solid #e5e7eb;
+    }
+    .bench-table tbody tr { border-bottom:1px solid #f3f4f6; }
+    .bench-table tbody tr:hover { background:#fafafa; }
+    .bench-table td a { color:#5b21b6; text-decoration:none; font-weight:500; }
+    .bench-table td a:hover { text-decoration:underline; }
+
+    .pill {
+        display:inline-block; padding:0.1rem 0.55rem; border-radius:999px;
+        font-size:0.7rem; font-weight:600; letter-spacing:0.02em;
+    }
+    .pill-pass { background:#ecfdf5; color:#065f46; }
+    .pill-fail { background:#fef2f2; color:#991b1b; }
+    .pill-none { background:#f3f4f6; color:#6b7280; }
+    .pill-subj { background:#eff6ff; color:#1e40af; }
+    .pill-stratum { background:#fef3c7; color:#92400e; }
+
+    .empty { padding:3rem 1rem; text-align:center; color:#6b7280; }
+</style>
+
+<div class="bench-summary">
+    <strong>{{ total }}</strong> sampled items.
+    Click an item to annotate (super-admin only).
+    See <code>memory/eval_benchmark_v2_simplified.md</code> for the rubric.
+</div>
+
+{% if items %}
+<div class="bench-table">
+    <table>
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Subject</th>
+                <th>Lesson</th>
+                <th>Stratum</th>
+                <th>Annotations</th>
+                <th>Verdict</th>
+                <th>Failure category</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in items %}
+            <tr>
+                <td>
+                    <a href="{% url 'dashboard:benchmark:annotate' row.item_id %}">{{ row.item_id }}</a>
+                </td>
+                <td><span class="pill pill-subj">{{ row.subject }}</span></td>
+                <td style="max-width:340px;">{{ row.lesson_title|default:"—" }}</td>
+                <td>
+                    {% if row.stratum %}<span class="pill pill-stratum">{{ row.stratum }}</span>{% else %}—{% endif %}
+                </td>
+                <td>{{ row.annotation_count }}</td>
+                <td>
+                    {% if row.latest %}
+                        {% if row.passes %}
+                            <span class="pill pill-pass">pass</span>
+                        {% else %}
+                            <span class="pill pill-fail">fail</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="pill pill-none">unannotated</span>
+                    {% endif %}
+                </td>
+                <td>{{ row.failure_category|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bench-table">
+    <div class="empty">
+        <h3 style="color:#374151;margin-bottom:0.5rem;">No items sampled yet.</h3>
+        <p>Run <code>python manage.py sample_benchmark --limit 10 --seed 42</code> to populate.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,329 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Annotate {{ item.item_id }}{% endblock %}
+{% block page_title %}{{ item.item_id }}{% endblock %}
+
+{% block content %}
+<style>
+    .ann-grid {
+        display:grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+        gap:1.25rem;
+        align-items:start;
+    }
+    @media (max-width: 1100px) {
+        .ann-grid { grid-template-columns: 1fr; }
+    }
+
+    .ann-card {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:1rem 1.1rem; margin-bottom:1rem;
+    }
+    .ann-card h3 {
+        font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
+        color:#6b7280; margin:0 0 0.6rem; font-weight:600;
+    }
+
+    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:#374151; }
+    .meta-row span { display:inline-flex; gap:0.3rem; align-items:baseline; }
+    .meta-row strong { color:#111; font-weight:600; }
+    .pill {
+        display:inline-block; padding:0.1rem 0.55rem; border-radius:999px;
+        font-size:0.7rem; font-weight:600; letter-spacing:0.02em;
+    }
+    .pill-subj { background:#eff6ff; color:#1e40af; }
+    .pill-stratum { background:#fef3c7; color:#92400e; }
+    .pill-suggested { background:#ede9fe; color:#5b21b6; }
+
+    /* History */
+    .history-list {
+        max-height:280px; overflow-y:auto; border:1px solid #f3f4f6;
+        border-radius:8px; padding:0.5rem; background:#fafafa;
+    }
+    .history-row {
+        font-size:0.83rem; padding:0.35rem 0.5rem; border-radius:6px;
+        margin-bottom:0.25rem; white-space:pre-wrap; line-height:1.4;
+    }
+    .history-row .role {
+        font-size:0.7rem; font-weight:700; text-transform:uppercase;
+        letter-spacing:0.04em; display:block; margin-bottom:0.15rem;
+        color:#6b7280;
+    }
+    .history-row.student .role { color:#1e40af; }
+    .history-row.tutor   .role { color:#5b21b6; }
+    .history-empty { color:#9ca3af; font-size:0.82rem; padding:0.5rem; }
+
+    /* Trigger student turn */
+    .student-turn {
+        background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;
+        padding:0.7rem 0.9rem; font-size:0.92rem; line-height:1.5;
+        white-space:pre-wrap;
+    }
+
+    /* Tutor response */
+    .tutor-response {
+        background:#fdf4ff; border:1px solid #e9d5ff; border-radius:8px;
+        padding:0.8rem 1rem; font-size:0.95rem; line-height:1.55;
+        white-space:pre-wrap; color:#111;
+    }
+
+    /* Pipeline trace */
+    .trace-list { font-size:0.82rem; color:#374151; }
+    .trace-list div { padding:0.2rem 0; border-bottom:1px dashed #f3f4f6; }
+    .trace-list strong { color:#111; font-weight:600; display:inline-block; min-width:170px; }
+    .trace-list .judge-block {
+        background:#f9fafb; border-radius:6px; padding:0.4rem 0.6rem;
+        margin-top:0.3rem; border:1px solid #f3f4f6;
+    }
+    .trace-list pre {
+        font-size:0.75rem; white-space:pre-wrap; color:#4b5563;
+        margin:0.2rem 0 0;
+    }
+
+    /* Form right pane */
+    .label-section { margin-bottom:0.9rem; }
+    .label-section-title {
+        font-size:0.72rem; font-weight:700; text-transform:uppercase;
+        letter-spacing:0.04em; color:#6b7280; margin-bottom:0.3rem;
+    }
+    .label-grid {
+        display:grid; grid-template-columns: 1fr; gap:0.2rem;
+    }
+    .label-row {
+        display:grid; grid-template-columns: 1fr auto auto;
+        align-items:center; gap:0.4rem;
+        font-size:0.82rem; padding:0.25rem 0.45rem; border-radius:6px;
+    }
+    .label-row:hover { background:#fafafa; }
+    .label-row .key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:0.78rem; color:#111; }
+    .label-row .suggested-tag { font-size:0.65rem; color:#5b21b6; font-weight:600; }
+    .label-row label { font-size:0.7rem; color:#6b7280; cursor:pointer; user-select:none; }
+    .label-row input[type=checkbox] { cursor:pointer; }
+
+    .col-header {
+        display:grid; grid-template-columns: 1fr auto auto;
+        gap:0.4rem; padding:0.2rem 0.45rem;
+        font-size:0.65rem; color:#9ca3af; text-transform:uppercase;
+        letter-spacing:0.04em; font-weight:600;
+    }
+
+    /* Form controls */
+    .form-row { margin-bottom:0.9rem; }
+    .form-row label.field-label {
+        display:block; font-size:0.78rem; font-weight:600;
+        color:#374151; margin-bottom:0.25rem;
+    }
+    .form-row select, .form-row textarea, .form-row input[type=text] {
+        width:100%; padding:0.45rem 0.6rem; border:1px solid #d1d5db;
+        border-radius:6px; font-size:0.85rem; font-family:inherit;
+        color:#111; background:#fff;
+    }
+    .form-row textarea { min-height:90px; resize:vertical; }
+
+    .tri-state { display:flex; gap:0.5rem; flex-wrap:wrap; }
+    .tri-state label {
+        display:inline-flex; gap:0.3rem; align-items:center;
+        padding:0.3rem 0.6rem; border:1px solid #e5e7eb;
+        border-radius:6px; font-size:0.8rem; cursor:pointer;
+    }
+    .tri-state input { cursor:pointer; }
+
+    .save-bar {
+        position:sticky; bottom:1rem; background:#fff;
+        border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.7rem 0.9rem; box-shadow:0 6px 18px rgba(0,0,0,0.05);
+        display:flex; justify-content:space-between; align-items:center;
+        font-size:0.82rem; color:#374151;
+    }
+    .save-btn {
+        background:#5b21b6; color:#fff; border:none; border-radius:6px;
+        padding:0.55rem 1.1rem; font-size:0.88rem; font-weight:600;
+        cursor:pointer;
+    }
+    .save-btn:hover { background:#4c1d95; }
+
+    .verdict-line { font-size:0.85rem; color:#374151; margin-top:0.4rem; }
+    .verdict-line .pass { color:#065f46; font-weight:600; }
+    .verdict-line .fail { color:#991b1b; font-weight:600; }
+
+    .back-link {
+        color:#6b7280; font-size:0.85rem; text-decoration:none;
+        margin-bottom:1rem; display:inline-block;
+    }
+    .back-link:hover { color:#5b21b6; }
+</style>
+
+<a href="{% url 'dashboard:benchmark:list' %}" class="back-link">← All items</a>
+
+<div class="ann-card" style="margin-bottom:1rem;">
+    <div class="meta-row">
+        <span><strong>Item</strong> <code>{{ item.item_id }}</code></span>
+        <span><strong>Subject</strong> <span class="pill pill-subj">{{ item.subject }}</span></span>
+        {% if item.stratum %}<span><strong>Stratum</strong> <span class="pill pill-stratum">{{ item.stratum }}</span></span>{% endif %}
+        <span><strong>Lesson</strong> {{ snapshot_item.lesson_title|default:"—" }}</span>
+        {% if snapshot_item.current_step_type %}<span><strong>Step type</strong> <code>{{ snapshot_item.current_step_type }}</code></span>{% endif %}
+        {% if snapshot_item.lesson_objective %}<span style="flex-basis:100%;"><strong>Objective</strong> {{ snapshot_item.lesson_objective }}</span>{% endif %}
+    </div>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="ann-grid">
+
+        {# ============ LEFT PANE: snapshot ============ #}
+        <div>
+            <div class="ann-card">
+                <h3>Conversation history ({{ snapshot_item.conversation_history|length }} prior turn{{ snapshot_item.conversation_history|length|pluralize }})</h3>
+                <div class="history-list">
+                    {% for turn in snapshot_item.conversation_history %}
+                    <div class="history-row {{ turn.role }}">
+                        <span class="role">{{ turn.role }}</span>{{ turn.text }}
+                    </div>
+                    {% empty %}
+                    <div class="history-empty">No prior turns — this was the first tutor response in the session.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="ann-card">
+                <h3>Student turn (trigger)</h3>
+                <div class="student-turn">{{ snapshot_item.student_turn.text|default:"(no student turn — proactive tutor response)" }}</div>
+            </div>
+
+            <div class="ann-card">
+                <h3>Production tutor response</h3>
+                <div class="tutor-response">{{ tutor_response }}</div>
+            </div>
+
+            <div class="ann-card">
+                <h3>Pipeline trace</h3>
+                <div class="trace-list">
+                    <div><strong>is_correct</strong> {{ pipeline_trace.is_correct }}</div>
+                    <div><strong>eval_layer</strong> {{ pipeline_trace.eval_layer|default:"—" }}</div>
+                    <div><strong>eval_reasoning</strong> {{ pipeline_trace.eval_reasoning|default:"—" }}</div>
+                    <div><strong>step_index / type</strong> {{ pipeline_trace.step_index }} / {{ pipeline_trace.step_type|default:"—" }}</div>
+                    <div><strong>working_state</strong> {{ pipeline_trace.working_state|default:"—" }}</div>
+                    <div><strong>validator_passed</strong> {{ pipeline_trace.validator_passed }}</div>
+                    <div><strong>validator_issues</strong> {{ pipeline_trace.validator_issues|default:"[]" }}</div>
+                    <div><strong>rule_violations</strong> {{ pipeline_trace.rule_violations|default:"[]" }}</div>
+                    <div><strong>regenerated</strong> {{ pipeline_trace.regenerated }} (cycles: {{ pipeline_trace.regen_cycles|default:"0" }})</div>
+                    {% if pipeline_trace.regen_reason %}<div><strong>regen_reason</strong> {{ pipeline_trace.regen_reason }}</div>{% endif %}
+                    <div><strong>bare_answer_flagged</strong> {{ pipeline_trace.bare_answer_flagged }}</div>
+                    <div><strong>praise_stripped</strong> {{ pipeline_trace.praise_stripped }}</div>
+
+                    {% if judge_outputs %}
+                    <div style="margin-top:0.5rem;"><strong>judge_outputs</strong></div>
+                    {% for jname, jdata in judge_outputs.items %}
+                    <div class="judge-block">
+                        <strong style="min-width:0;">{{ jname }}</strong>
+                        <pre>{{ jdata }}</pre>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# ============ RIGHT PANE: form ============ #}
+        <div>
+            <div class="ann-card">
+                <h3>Labels</h3>
+                {% if suggested_labels %}
+                <div style="font-size:0.78rem;color:#6b7280;margin-bottom:0.6rem;">
+                    Pipeline suggested:
+                    {% for s in suggested_labels %}<span class="pill pill-suggested">{{ s }}</span> {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="col-header">
+                    <span>Label</span>
+                    <span>Actual</span>
+                    <span>Expected</span>
+                </div>
+
+                <div class="label-section">
+                    <div class="label-section-title">Action labels (what the response is doing)</div>
+                    <div class="label-grid">
+                        {% for row in action_labels %}
+                        <div class="label-row">
+                            <span class="key">
+                                {{ row.key }}
+                                {% if row.suggested %}<span class="suggested-tag">●</span>{% endif %}
+                            </span>
+                            <label><input type="checkbox" name="actual_labels" value="{{ row.key }}" {% if row.actual_checked %}checked{% endif %}></label>
+                            <label><input type="checkbox" name="expected_labels" value="{{ row.key }}" {% if row.expected_checked %}checked{% endif %}></label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% for group in issue_groups %}
+                <div class="label-section">
+                    <div class="label-section-title">{{ group.name }}</div>
+                    <div class="label-grid">
+                        {% for row in group.labels %}
+                        <div class="label-row">
+                            <span class="key">
+                                {{ row.key }}
+                                {% if row.suggested %}<span class="suggested-tag">●</span>{% endif %}
+                            </span>
+                            <label><input type="checkbox" name="actual_labels" value="{{ row.key }}" {% if row.actual_checked %}checked{% endif %}></label>
+                            <label><input type="checkbox" name="expected_labels" value="{{ row.key }}" {% if row.expected_checked %}checked{% endif %}></label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="ann-card">
+                <h3>Verdict & rationale</h3>
+
+                <div class="form-row">
+                    <label class="field-label">Student claim correct?</label>
+                    <div class="tri-state">
+                        <label><input type="radio" name="student_claim_correct" value="" {% if prefill_claim is None %}checked{% endif %}> Not applicable</label>
+                        <label><input type="radio" name="student_claim_correct" value="true" {% if prefill_claim is True %}checked{% endif %}> True</label>
+                        <label><input type="radio" name="student_claim_correct" value="false" {% if prefill_claim is False %}checked{% endif %}> False</label>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <label class="field-label">Failure category</label>
+                    <select name="failure_category">
+                        <option value="" {% if not prefill_category %}selected{% endif %}>— none (pass) —</option>
+                        {% for cat in failure_categories %}
+                        <option value="{{ cat }}" {% if prefill_category == cat %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <label class="field-label">
+                        <input type="checkbox" name="safety_concern" {% if prefill_safety %}checked{% endif %}>
+                        Safety concern
+                    </label>
+                </div>
+
+                <div class="form-row">
+                    <label class="field-label">Rationale</label>
+                    <textarea name="rationale" placeholder="Why these expected labels? What did the response miss / do wrong?">{{ prefill_rationale }}</textarea>
+                </div>
+            </div>
+
+            <div class="save-bar">
+                <div>
+                    {% if existing %}
+                    Last saved {{ existing.updated_at|date:"M j, H:i" }} —
+                    {% if existing.passes %}<span class="pass">passes</span>{% else %}<span class="fail">fails</span>{% endif %}
+                    {% else %}
+                    Unannotated. Pipeline pre-filled actual labels.
+                    {% endif %}
+                </div>
+                <button type="submit" class="save-btn">Save &amp; next →</button>
+            </div>
+        </div>
+
+    </div>
+</form>
+{% endblock %}
