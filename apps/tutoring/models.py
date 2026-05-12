@@ -262,6 +262,69 @@ class SessionTurn(models.Model):
         return f"[{self.role}] {preview}"
 
 
+class TurnSpan(models.Model):
+    """One span per LLM call / tool call / judge fire / regen pass that
+    contributed to producing a tutor turn.
+
+    Spans are accumulated in a ContextVar-bound buffer during a tutor turn's
+    generation (see ``apps.tutoring.tracing``) and flushed here after the
+    parent ``SessionTurn`` is saved. The parent ``turn`` is the *tutor*
+    turn — these spans represent the work that produced its content.
+
+    Shape mirrors OpenTelemetry GenAI semantic conventions (gen_ai.system,
+    gen_ai.request.model, gen_ai.usage.*) without depending on the full OTel
+    SDK. Phase 1 of memory/agentic_platform_architecture_plan.md.
+    """
+
+    class Kind(models.TextChoices):
+        LLM_CALL = 'llm_call', 'LLM Call'
+        TOOL_CALL = 'tool_call', 'Tool Call'
+        JUDGE = 'judge', 'Judge'
+        REGEN = 'regen', 'Regen'
+        AUDIT = 'audit', 'Audit'
+        OTHER = 'other', 'Other'
+
+    turn = models.ForeignKey(
+        SessionTurn, related_name='spans', on_delete=models.CASCADE,
+    )
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    name = models.CharField(
+        max_length=100,
+        help_text="Span name. For LLM calls: 'generate'. For judges: 'arithmetic', 'safety', etc.",
+    )
+    model = models.CharField(
+        max_length=80, blank=True,
+        help_text="Model identifier (e.g. 'claude-opus-4-7'). Empty for non-LLM spans.",
+    )
+    purpose = models.CharField(
+        max_length=40, blank=True,
+        help_text="ModelConfig.purpose for LLM spans (tutoring, judge, regen, etc.).",
+    )
+    started_at = models.DateTimeField()
+    duration_ms = models.PositiveIntegerField()
+    tokens_in = models.PositiveIntegerField(null=True, blank=True)
+    tokens_out = models.PositiveIntegerField(null=True, blank=True)
+    payload = models.JSONField(
+        default=dict, blank=True,
+        help_text="Span-specific structured data (e.g. judge verdict summary, tool args, regen reason).",
+    )
+    error = models.TextField(
+        blank=True,
+        help_text="Error class + message if the span's operation raised. Empty on success.",
+    )
+
+    class Meta:
+        ordering = ['started_at']
+        verbose_name = "Turn Span"
+        indexes = [
+            models.Index(fields=['turn', 'started_at']),
+            models.Index(fields=['kind']),
+        ]
+
+    def __str__(self):  # pragma: no cover
+        return f"{self.kind}:{self.name} ({self.duration_ms}ms)"
+
+
 class StudentLessonProgress(models.Model):
     """
     Tracks a student's overall progress on a lesson across multiple sessions.

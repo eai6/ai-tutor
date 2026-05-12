@@ -36,35 +36,60 @@ class LLMResponse:
 
 
 class BaseLLMClient(ABC):
-    """Abstract base class for LLM clients."""
-    
+    """Abstract base class for LLM clients.
+
+    Subclasses implement ``_generate_impl()``. The public ``generate()`` is
+    concrete here — it wraps the impl in a tracing span (see
+    ``apps.tutoring.tracing``). When no span buffer is active (e.g.,
+    curriculum generation, background tasks), span emission is a no-op and
+    the call is unchanged.
+    """
+
     def __init__(self, config: ModelConfig):
         self.config = config
         self.api_key = self._get_api_key()
-    
+
     def _get_api_key(self) -> str:
         """Get API key via ModelConfig (encrypted DB key → env var fallback)."""
         return self.config.get_api_key()
-    
-    @abstractmethod
+
     def generate(
         self,
         messages: list[dict],
         system_prompt: str,
         max_tokens: int | None = None,
     ) -> LLMResponse:
+        """Generate a response from the LLM.
+
+        Wraps the subclass implementation in a tracing span. The span records
+        model, purpose, duration, tokens. Span is dropped (no-op) when no
+        buffer is active. See ``apps.tutoring.tracing``.
         """
-        Generate a response from the LLM.
-        
-        Args:
-            messages: List of {"role": "user"|"assistant", "content": "..."}
-            system_prompt: The system prompt to use
-            
-        Returns:
-            LLMResponse with content and token usage
+        # Import inside to avoid a circular import at module load:
+        # apps.llm imports → apps.tutoring → apps.llm.
+        from apps.tutoring.tracing import emit_span
+        purpose = getattr(self.config, 'purpose', '') or ''
+        with emit_span('llm_call', 'generate',
+                       model=self.config.model_name,
+                       purpose=purpose) as span:
+            response = self._generate_impl(messages, system_prompt, max_tokens)
+            if span is not None:
+                span['tokens_in'] = response.tokens_in
+                span['tokens_out'] = response.tokens_out
+            return response
+
+    @abstractmethod
+    def _generate_impl(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        max_tokens: int | None = None,
+    ) -> LLMResponse:
+        """Subclass implementation. Same shape as ``generate()`` but without
+        the tracing wrapper. Subclasses MUST override.
         """
         pass
-    
+
     def generate_stream(
         self,
         messages: list[dict],
@@ -141,7 +166,7 @@ class AnthropicClient(BaseLLMClient):
             kwargs["temperature"] = self.config.temperature
         return kwargs
 
-    def generate(
+    def _generate_impl(
         self,
         messages: list[dict],
         system_prompt: str,
@@ -307,7 +332,7 @@ class OllamaClient(BaseLLMClient):
         """Ollama doesn't need an API key."""
         return ""
     
-    def generate(
+    def _generate_impl(
         self,
         messages: list[dict],
         system_prompt: str,
@@ -374,7 +399,7 @@ class OpenAIClient(BaseLLMClient):
         except ImportError:
             raise ImportError("openai package not installed. Run: pip install openai")
 
-    def generate(
+    def _generate_impl(
         self,
         messages: list[dict],
         system_prompt: str,
@@ -539,7 +564,7 @@ class GeminiClient(BaseLLMClient):
             logger.warning(f"Could not create search grounding tool: {e}")
             return None
 
-    def generate(
+    def _generate_impl(
         self,
         messages: list[dict],
         system_prompt: str,
@@ -693,7 +718,7 @@ class MockLLMClient(BaseLLMClient):
     def _get_api_key(self) -> str:
         return "mock-key"
     
-    def generate(
+    def _generate_impl(
         self,
         messages: list[dict],
         system_prompt: str,

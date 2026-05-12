@@ -120,23 +120,35 @@ def run_all_judges(
     # gracefully if the model can't process images.
     vc = vision_client if vision_client is not None else llm_client
 
+    # Capture the current context so judge worker threads see the same
+    # ContextVars as the orchestrator — specifically the tracing span
+    # buffer. Without this, spans emitted from judge LLM calls would
+    # not reach the buffer set up in ConversationalTutor.respond().
+    # See apps.tutoring.tracing + Phase 1 of
+    # memory/agentic_platform_architecture_plan.md.
+    import contextvars
+    ctx = contextvars.copy_context()
+
     # Run all judges concurrently. Each has its own pre-gate so
     # submitting them all is cheap — most short-circuit without an
     # LLM call.
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
         f_arith = ex.submit(
+            ctx.run,
             run_arithmetic_judge,
             response_text,
             llm_client=llm_client,
             subject_is_math=subject_is_math,
         )
         f_fact = ex.submit(
+            ctx.run,
             run_factual_judge,
             response_text,
             lesson=lesson,
             llm_client=llm_client,
         )
         f_rule = ex.submit(
+            ctx.run,
             run_rule_judge,
             response_text,
             bank_stems=bank_stems,
@@ -148,6 +160,7 @@ def run_all_judges(
             llm_client=llm_client,
         )
         f_step = ex.submit(
+            ctx.run,
             run_step_eval_judge,
             student_input=student_input,
             tutor_response=response_text,
@@ -155,6 +168,7 @@ def run_all_judges(
             llm_client=llm_client,
         )
         f_coh = ex.submit(
+            ctx.run,
             run_coherence_judge,
             response_text,
             llm_client=llm_client,
@@ -162,6 +176,7 @@ def run_all_judges(
         # figure_ref is deterministic — submit anyway so it runs in
         # the same dispatch loop and we collect its result the same way.
         f_figref = ex.submit(
+            ctx.run,
             run_figure_ref_judge,
             response_text,
             attached_media_count=len(attached_media),
@@ -170,6 +185,7 @@ def run_all_judges(
         # check AND a question that depends on it; otherwise it
         # short-circuits without the (expensive) vision call.
         f_figvis = ex.submit(
+            ctx.run,
             run_figure_vision_judge,
             response_text,
             attached_media=attached_media,
@@ -180,6 +196,7 @@ def run_all_judges(
         # protection is non-negotiable. role='tutor' so the judge
         # ignores MANIPULATION (student-only category).
         f_safety = ex.submit(
+            ctx.run,
             run_safety_judge,
             response_text,
             role="tutor",

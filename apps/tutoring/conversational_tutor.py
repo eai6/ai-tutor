@@ -1589,8 +1589,27 @@ Keep it to 2-3 sentences."""
         return self._generate_response(prompt)
 
     def respond(self, student_input: str) -> TutorMessage:
+        """Generate a response to student input.
+
+        Thin wrapper that opens a tracing span buffer for the duration of
+        the turn, then delegates to ``_respond_impl`` which holds the
+        actual generation logic. The buffer is reset in a finally block so
+        partial failures still emit a clean trace.
+
+        Spans accumulated during generation are flushed in ``_save_turn``
+        once the tutor turn's SessionTurn ID is known. See
+        ``apps.tutoring.tracing`` and Phase 1 of
+        ``memory/agentic_platform_architecture_plan.md``.
         """
-        Generate a response to student input.
+        from apps.tutoring.tracing import start_span_buffer, reset_span_buffer
+        token = start_span_buffer()
+        try:
+            return self._respond_impl(student_input)
+        finally:
+            reset_span_buffer(token)
+
+    def _respond_impl(self, student_input: str) -> TutorMessage:
+        """Actual response generation. Wrapped by ``respond()`` for tracing.
 
         This is the main conversation loop.
         Media selection: LLM signals via |||MEDIA:N||| tail-line, parsed before saving.
@@ -8691,7 +8710,7 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
         """
         md = dict(metadata) if metadata else {}
         judge_outputs = md.pop('_judge_outputs', None) or {}
-        SessionTurn.objects.create(
+        turn = SessionTurn.objects.create(
             session=self.session,
             role=role,
             content=content,
@@ -8706,7 +8725,13 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
         # student turns keeps the log volume halved without losing
         # the verdict-side information.
         if role == "tutor":
+            # Flush accumulated tracing spans to this tutor turn — see
+            # apps.tutoring.tracing and Phase 1 of
+            # memory/agentic_platform_architecture_plan.md.
+            from apps.tutoring.tracing import flush_spans
+            flush_spans(turn.id)
             self._emit_turn_summary_log(content, md)
+        return turn
 
     def _emit_turn_summary_log(self, content: str, metadata: Dict) -> None:
         """Emit one [TurnSummary] structured log line per tutor turn.
