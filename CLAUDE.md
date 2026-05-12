@@ -44,15 +44,38 @@ Azure commands require `az account set --subscription "Pixel Design Labs LLC"` f
 
 **Stuck content generation.** Lessons with `content_status='generating'` from failed runs must be manually reset to `pending`. Background threads may not log via `logger.info` in dev server — use `print("[ContentGen] ...", flush=True)` for visibility.
 
+## Architecture — apply when designing or extending
+
+This codebase has good bones to mirror: pluggable `BaseLLMClient` factory (`apps/llm/client.py:38`), fail-soft concurrent `judges/` orchestration (`apps/tutoring/judges/`), purpose-based `ModelConfig` dispatch (`apps/llm/models.py:225`), priority-ordered curriculum hierarchy, `Lesson.content_status` state machine. **Mirror these patterns; don't reinvent.**
+
+**Conservative bias — applied to every architectural proposal:**
+- **Rule of Three.** Don't abstract until duplication appears three times. The multi-tenancy `Q(institution=inst) | Q(institution__isnull=True)` pattern is past threshold — extract a manager method when next touched.
+- **Simplest first.** Single-prompt + post-hoc judges is the current pattern. **Don't introduce multi-agent decomposition without measured bottleneck on the benchmark** (`memory/eval_benchmark_v2_simplified.md`). Cemri et al. 2025 found 17× error amplification in unstructured multi-agent setups.
+- **Modular monolith.** No service extraction. Everything in this Django app; use in-process boundaries.
+- **Mirror existing patterns.** New pluggable component → `BaseLLMClient` shape (ABC + factory). New evaluator → `judges/` shape (one file, fail-soft, structured result with `skipped` + `skip_reason`).
+- **Instrument before splitting.** Trace logging before any agent decomposition.
+
+**Don't propagate these inconsistencies:**
+- Untyped JSON state — document the schema near the writer, or use Pydantic.
+- `metadata` / `judge_outputs` overlap on `SessionTurn` — new judge fields go to `judge_outputs` only.
+- Silent-skip on missing dependencies — log a warning, never silently no-op.
+- Backward-compat heuristics (e.g., `Course.is_math` MATH_KEYWORDS fallback) — backfill old data instead.
+
+**Consult the architecture skills:**
+- `codebase-architecture-expert` — adding/refactoring abstractions in THIS codebase.
+- `architecture-patterns-expert` — debating module boundaries, when to extract, schema modeling, modular monolith vs services.
+- `agent-orchestration-expert` — before any multi-agent or evaluator-loop work; covers when NOT to use multi-agent.
+
+**Active architecture plan**: `memory/agentic_platform_architecture_plan.md` — read before proposing structural changes. Phased path: trace logging → benchmark infra → typed state + dedup → lesson graph → risk routing; multi-agent decomposition deferred until benchmark evidence demands it.
+
 ## Project-local planning
 
-`memory/` in the repo root contains multi-phase plans currently being implemented. Read the relevant plan BEFORE starting work in that area:
+`memory/` in the repo root contains active multi-phase plans. Read the relevant plan BEFORE starting work in that area:
 
-- `memory/mobile_rn_plan.md` — React Native mobile app (Expo + TS + llama.rn on-device LLM)
-- `memory/offline_mobile_architecture.md` — mobile architecture decisions (framework-agnostic)
-- `memory/group_lessons_plan.md` — multi-student same-device sessions
-- `memory/lesson_competency_plan.md` — switch competency to exit-ticket-driven
-- `memory/platform_brief_tanzania.md` — Tanzania pilot context
+- `memory/eval_benchmark_v2_simplified.md` — tutor evaluation benchmark (30 labels, 19 failure categories); pairs with `SessionTurn.judge_outputs` persistence shipped 2026-05-11.
+- `memory/agentic_platform_architecture_plan.md` — architecture evolution plan; read before proposing structural changes.
+
+Archived plans live in `memory/archives/` (gitignored) — historical reference for completed or paused work (mobile RN, group lessons, lesson competency, Tanzania pilot brief, offline mobile architecture, Martin session fix, judge disagreements audit, etc.).
 
 Auto-memory at `~/.claude/projects/-Users-edwardamoah-Documents-GitHub-ai-tutor/memory/` covers deployment history, resolved incidents, and cross-session learnings — loaded automatically; don't duplicate here.
 
