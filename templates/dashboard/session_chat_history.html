@@ -246,8 +246,10 @@ memory/pilot_session_plan.md).
         <div class="bubble-wrapper left">
             <div class="bubble-role">Tutor</div>
             <div class="chat-bubble bubble-tutor">{{ turn.content }}</div>
-            {# A.4 (2026-05-08): show attached figures inline so
-               teachers can see what the student saw on this turn. #}
+            {% comment %}
+            A.4 (2026-05-08): show attached figures inline so
+            teachers can see what the student saw on this turn.
+            {% endcomment %}
             {% for m in turn.metadata.attached_media %}
                 {% if m.url %}
                 <div style="margin-top:0.4rem;max-width:340px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff;">

@@ -177,9 +177,11 @@
 </div>
 
 {% if items %}
-{# Standalone bulk-delete form — checkboxes + bulk button reference
-   this via the HTML5 form= attribute so we don't nest forms inside
-   the table. #}
+{% comment %}
+Standalone bulk-delete form — checkboxes + bulk button reference
+this via the HTML5 form= attribute so we don't nest forms inside
+the table.
+{% endcomment %}
 <form method="post" action="{% url 'dashboard:benchmark:bulk_delete' %}" id="bulk-form"
       onsubmit="return confirm('Delete the selected items? Their annotations are deleted too. The source SessionTurns are not touched.');">
     {% csrf_token %}
@@ -238,8 +240,10 @@
                 </td>
                 <td>{{ row.failure_category|default:"—" }}</td>
                 <td>
-                    {# Per-item delete is its own form, not nested in the
-                       bulk form, because it POSTs to a different URL. #}
+                    {% comment %}
+                    Per-item delete is its own form, not nested in the
+                    bulk form, because it POSTs to a different URL.
+                    {% endcomment %}
                     <form method="post"
                           action="{% url 'dashboard:benchmark:item_delete' row.item_id %}"
                           onsubmit="return confirm('Delete {{ row.item_id }}? Its annotations go too.');"
