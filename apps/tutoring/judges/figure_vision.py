@@ -22,6 +22,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import List, Optional
+from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,7 @@ def _has_figure_question(text: str) -> bool:
     return any(r in low for r in fig_refs)
 
 
+@traced_judge('figure_vision')
 def run_figure_vision_judge(
     response_text: str,
     *,

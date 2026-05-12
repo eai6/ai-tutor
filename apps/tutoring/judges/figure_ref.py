@@ -23,6 +23,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import List
+from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,7 @@ def _is_in_question_context(response_text: str, match_pos: int) -> bool:
     return False
 
 
+@traced_judge('figure_ref')
 def run_figure_ref_judge(
     response_text: str,
     *,

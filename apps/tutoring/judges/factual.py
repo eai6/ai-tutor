@@ -21,6 +21,7 @@ from apps.tutoring.fact_verifier import (
     _retrieve_evidence,
     extract_claims,
 )
+from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ _SYSTEM = (
 )
 
 
+@traced_judge('factual')
 def run_factual_judge(
     response_text: str,
     *,

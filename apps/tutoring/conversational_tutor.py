@@ -36,6 +36,7 @@ from apps.tutoring.models import TutorSession, SessionTurn, StudentLessonProgres
 from apps.tutoring.grader import check_math_answer, MathCheckResult
 from apps.tutoring.praise_filter import strip_praise_if_wrong
 from apps.tutoring.validator import validate_tutor_response
+from apps.tutoring.tracing import emit_span
 
 logger = logging.getLogger(__name__)
 
@@ -1913,25 +1914,31 @@ Keep it to 2-3 sentences."""
             if self.current_topic_index < len(self.steps)
             else None
         )
-        validation = validate_tutor_response(
-            clean_response,
-            is_correct=turn_metadata.get('is_correct'),
-            bare_answer=turn_bare_answer,
-            step_type=(current_step.step_type if current_step else None),
-            lesson=self.lesson,
-            llm_client=self.judge_client,  # judge runs on Sonnet, not Opus
-            student_input=student_input,
-            bank_stems=self._current_bank_stems(),
-            arithmetic_corrections=arithmetic_corrections,
-            bank_signal_used=bool(getattr(self, '_bank_signal_used_this_turn', False)),
-            combined_result=combined_judge_result,
-            # Combined judge already covered fact + rule. Skip the
-            # legacy L4/L5 LLM calls so they don't run twice.
-            fact_check=(combined_judge_result is None),
-            rule_check=(combined_judge_result is None),
-            # Used by the figure-ref-without-signal check.
-            media_attached=bool(media),
-        )
+        with emit_span('audit', 'validator') as _audit_span:
+            validation = validate_tutor_response(
+                clean_response,
+                is_correct=turn_metadata.get('is_correct'),
+                bare_answer=turn_bare_answer,
+                step_type=(current_step.step_type if current_step else None),
+                lesson=self.lesson,
+                llm_client=self.judge_client,  # judge runs on Sonnet, not Opus
+                student_input=student_input,
+                bank_stems=self._current_bank_stems(),
+                arithmetic_corrections=arithmetic_corrections,
+                bank_signal_used=bool(getattr(self, '_bank_signal_used_this_turn', False)),
+                combined_result=combined_judge_result,
+                # Combined judge already covered fact + rule. Skip the
+                # legacy L4/L5 LLM calls so they don't run twice.
+                fact_check=(combined_judge_result is None),
+                rule_check=(combined_judge_result is None),
+                # Used by the figure-ref-without-signal check.
+                media_attached=bool(media),
+            )
+            if _audit_span is not None:
+                _audit_span['payload'] = {
+                    'passed': bool(getattr(validation, 'passed', True)),
+                    'issues': list(getattr(validation, 'issues', []) or [])[:20],
+                }
         if validation.content != clean_response:
             clean_response = validation.content
         if validation.issues:
@@ -1984,30 +1991,38 @@ Keep it to 2-3 sentences."""
             validation.metadata = dict(validation.metadata or {})
             validation.metadata.setdefault('session_id', self.session.id)
 
-            ensemble_result = run_regen_ensemble(
-                previous_response=clean_response,
-                validation=validation,
-                lesson=self.lesson,
-                step_context=self._build_step_eval_context(
-                    student_input, clean_response,
-                    math_check=turn_math_check,
-                ),
-                bank_stems=self._current_bank_stems(),
-                media_catalog_text=getattr(self, '_last_media_catalog_text', '') or '',
-                attached_media=attached_media_list,
-                regen_clients=self.regen_clients,
-                judge_client=self.judge_client,
-                vision_client=self.judge_client,
-                image_reader=self._read_image_for_vision,
-                subject_is_math=subject_is_math,
-                bank_offered=bool(getattr(self, '_question_id_map', None)),
-                student_input=student_input,
-                answer_was_bare=turn_bare_answer,
-                answer_was_wrong=(
-                    turn_math_check is not None
-                    and turn_math_check.is_correct is False
-                ),
-            )
+            with emit_span('regen', 'ensemble') as _regen_span:
+                ensemble_result = run_regen_ensemble(
+                    previous_response=clean_response,
+                    validation=validation,
+                    lesson=self.lesson,
+                    step_context=self._build_step_eval_context(
+                        student_input, clean_response,
+                        math_check=turn_math_check,
+                    ),
+                    bank_stems=self._current_bank_stems(),
+                    media_catalog_text=getattr(self, '_last_media_catalog_text', '') or '',
+                    attached_media=attached_media_list,
+                    regen_clients=self.regen_clients,
+                    judge_client=self.judge_client,
+                    vision_client=self.judge_client,
+                    image_reader=self._read_image_for_vision,
+                    subject_is_math=subject_is_math,
+                    bank_offered=bool(getattr(self, '_question_id_map', None)),
+                    student_input=student_input,
+                    answer_was_bare=turn_bare_answer,
+                    answer_was_wrong=(
+                        turn_math_check is not None
+                        and turn_math_check.is_correct is False
+                    ),
+                )
+                if _regen_span is not None:
+                    _regen_span['payload'] = {
+                        'picked_model': str(getattr(ensemble_result, 'picked_model', '') or '')[:80],
+                        'cycles': int(getattr(ensemble_result, 'cycles', 0) or 0),
+                        'clean': bool(getattr(ensemble_result, 'clean', False)),
+                        'fallback_used': bool(getattr(ensemble_result, 'fallback_used', False)),
+                    }
 
             # Re-parse a possible |||MEDIA:N||| in the chosen candidate.
             regen_clean, regen_media = self._parse_media_signal(ensemble_result.text)
@@ -2278,17 +2293,23 @@ Keep it to 2-3 sentences."""
             if self.current_topic_index < len(self.steps)
             else None
         )
-        validation = validate_tutor_response(
-            clean_content,
-            is_correct=turn_metadata.get('is_correct'),
-            bare_answer=turn_bare_answer,
-            step_type=(current_step.step_type if current_step else None),
-            lesson=self.lesson,
-            llm_client=self.llm_client,
-            student_input=student_input,
-            bank_stems=self._current_bank_stems(),
-            media_attached=bool(media),
-        )
+        with emit_span('audit', 'validator') as _audit_span:
+            validation = validate_tutor_response(
+                clean_content,
+                is_correct=turn_metadata.get('is_correct'),
+                bare_answer=turn_bare_answer,
+                step_type=(current_step.step_type if current_step else None),
+                lesson=self.lesson,
+                llm_client=self.llm_client,
+                student_input=student_input,
+                bank_stems=self._current_bank_stems(),
+                media_attached=bool(media),
+            )
+            if _audit_span is not None:
+                _audit_span['payload'] = {
+                    'passed': bool(getattr(validation, 'passed', True)),
+                    'issues': list(getattr(validation, 'issues', []) or [])[:20],
+                }
         if validation.content != clean_content:
             clean_content = validation.content
         if validation.issues:

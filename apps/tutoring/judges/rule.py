@@ -25,6 +25,7 @@ from apps.tutoring.rule_compliance import (
     RuleViolation,
     _has_relevant_content,
 )
+from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,7 @@ _SYSTEM = (
 )
 
 
+@traced_judge('rule')
 def run_rule_judge(
     response_text: str,
     *,

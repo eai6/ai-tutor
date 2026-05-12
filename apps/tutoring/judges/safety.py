@@ -44,6 +44,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import List, Literal, Optional
+from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,7 @@ _VALID_CATEGORIES = frozenset({"harmful", "inappropriate", "manipulation"})
 _VALID_SEVERITIES = frozenset({"safe", "warning", "critical"})
 
 
+@traced_judge('safety')
 def run_safety_judge(
     text: str,
     *,

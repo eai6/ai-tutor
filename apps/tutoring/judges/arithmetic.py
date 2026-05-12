@@ -22,6 +22,7 @@ from apps.tutoring.llm_arithmetic_verifier import (
     _HAS_NUMBER_RE,
     verify_arithmetic_claims,
 )
+from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ class ArithmeticResult:
     skip_reason: str = ""
 
 
+@traced_judge('arithmetic')
 def run_arithmetic_judge(
     response_text: str,
     *,

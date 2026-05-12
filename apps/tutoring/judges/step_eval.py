@@ -22,6 +22,7 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
+from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,7 @@ _SYSTEM = (
 )
 
 
+@traced_judge('step_eval')
 def run_step_eval_judge(
     *,
     student_input: str,

@@ -25,6 +25,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import List
+from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,7 @@ def _has_enough_content(text: str) -> bool:
     return len(text.strip()) >= 200 and sentence_count >= 2
 
 
+@traced_judge('coherence')
 def run_coherence_judge(
     response_text: str,
     *,

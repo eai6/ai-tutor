@@ -103,6 +103,44 @@ def flush_spans(turn_id: int) -> int:
     return len(rows)
 
 
+def traced_judge(judge_name: str):
+    """Decorator: wrap a judge function in a ``kind='judge'`` span.
+
+    Usage::
+
+        @traced_judge('arithmetic')
+        def run_arithmetic_judge(...): ...
+
+    The span captures total judge duration (including pre-gates and any
+    LLM calls inside). LLM calls inside still emit their own
+    ``kind='llm_call'`` spans via ``BaseLLMClient.generate()``, giving a
+    two-level trace: judge → underlying LLM call. No parent-child
+    relationship is recorded in v1; both spans share the same parent
+    turn and ordering by ``started_at``.
+
+    If the judge returns an object with a ``skipped`` attribute, it's
+    recorded in the span payload along with ``skip_reason`` when present.
+    """
+    import functools
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            with emit_span('judge', judge_name) as span:
+                result = fn(*args, **kwargs)
+                if span is not None:
+                    payload: Dict[str, Any] = {}
+                    if hasattr(result, 'skipped'):
+                        payload['skipped'] = bool(getattr(result, 'skipped', False))
+                    if hasattr(result, 'skip_reason'):
+                        payload['skip_reason'] = str(getattr(result, 'skip_reason', '') or '')[:200]
+                    if payload:
+                        span['payload'] = payload
+                return result
+        return wrapper
+    return decorator
+
+
 @contextmanager
 def emit_span(kind: str, name: str, *,
               model: str = '', purpose: str = '',
