@@ -199,6 +199,12 @@ def run_regen_ensemble(
         bank_stems=bank_stems or [],
         media_catalog_text=media_catalog_text or "",
         student_input=student_input,
+        # Phase 2.x: regen now gets the same conversation history the
+        # tutor and judges see, so it can fix cross-turn coherence
+        # violations (e.g. "you switched the equation without
+        # explanation"). Without this, regen was blind to prior turns
+        # and converged identically across cycles.
+        conversation_history=conversation_history,
     )
 
     logger.info(

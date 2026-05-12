@@ -60,6 +60,8 @@ def build_regen_prompt(
     bank_stems: List[str],
     media_catalog_text: str = "",
     student_input: str = "",
+    conversation_history: list = None,
+    history_turns: int = 6,
 ) -> Tuple[str, str]:
     """Return (user_prompt, system_prompt) for the rewrite-LLM.
 
@@ -74,8 +76,33 @@ def build_regen_prompt(
         means no figures available.
       student_input: the student's last message (so the rewrite has
         the same conversational context the tutor saw)
+      conversation_history: list of prior {role, content} turns —
+        same shape the engine maintains. The last ``history_turns``
+        are formatted into a CONVERSATION_HISTORY block so the
+        rewrite-LLM can fix cross-turn coherence violations (e.g.
+        "you switched the equation from 5x+20=35 to 3x+20=80
+        without explanation"). Without history, regen was blind to
+        the prior tutor turn and converged to the same dirty
+        candidate cycle after cycle.
+      history_turns: how many trailing messages to include. Default 6
+        (~3 student + 3 tutor exchanges before the current pair) —
+        wider than the judges' window (4) since regen specifically
+        needs to AVOID contradicting earlier turns.
     """
     parts: List[str] = []
+
+    # Prior context — formatted same way the judges see history (see
+    # apps/tutoring/judges/history.py). Placed up top so the LLM sees
+    # what was already said BEFORE reading the response to repair.
+    if conversation_history:
+        from apps.tutoring.judges.history import format_history_window
+        prior = format_history_window(
+            conversation_history, turns=history_turns,
+        )
+        if prior:
+            parts.append("## CONVERSATION_HISTORY (recent turns; do NOT contradict these)")
+            parts.append(prior)
+            parts.append("")
 
     parts.append("## STUDENT_LAST_MESSAGE")
     parts.append((student_input or "(none)").strip()[:400])
