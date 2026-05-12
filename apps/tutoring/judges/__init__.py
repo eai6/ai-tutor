@@ -148,30 +148,41 @@ def run_all_judges(
     # not reach the buffer set up in ConversationalTutor.respond().
     # See apps.tutoring.tracing + Phase 1 of
     # memory/agentic_platform_architecture_plan.md.
+    #
+    # IMPORTANT: a single contextvars.Context CANNOT be entered
+    # concurrently by multiple threads — the second entry raises
+    # RuntimeError("cannot enter context: ... is already entered").
+    # Each submission therefore takes its OWN copy of the parent
+    # context. The copies share initial ContextVar values (so spans
+    # still reach the orchestrator's buffer) but each can be entered
+    # independently in its own worker thread.
     import contextvars
-    ctx = contextvars.copy_context()
+
+    def _submit(fn, *args, **kwargs):
+        # New context copy per submission so parallel ctx.run() calls
+        # don't trip the "already entered" RuntimeError.
+        return ex.submit(
+            contextvars.copy_context().run, fn, *args, **kwargs,
+        )
 
     # Run all judges concurrently. Each has its own pre-gate so
     # submitting them all is cheap — most short-circuit without an
     # LLM call.
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
-        f_arith = ex.submit(
-            ctx.run,
+        f_arith = _submit(
             run_arithmetic_judge,
             response_text,
             llm_client=llm_client,
             subject_is_math=subject_is_math,
         )
-        f_fact = ex.submit(
-            ctx.run,
+        f_fact = _submit(
             run_factual_judge,
             response_text,
             lesson=lesson,
             llm_client=llm_client,
             prior_exchanges=prior_exchanges,
         )
-        f_rule = ex.submit(
-            ctx.run,
+        f_rule = _submit(
             run_rule_judge,
             response_text,
             bank_stems=bank_stems,
@@ -183,16 +194,14 @@ def run_all_judges(
             llm_client=llm_client,
             prior_exchanges=prior_exchanges,
         )
-        f_step = ex.submit(
-            ctx.run,
+        f_step = _submit(
             run_step_eval_judge,
             student_input=student_input,
             tutor_response=response_text,
             step_context=step_context or {},
             llm_client=llm_client,
         )
-        f_coh = ex.submit(
-            ctx.run,
+        f_coh = _submit(
             run_coherence_judge,
             response_text,
             llm_client=llm_client,
@@ -200,8 +209,7 @@ def run_all_judges(
         )
         # figure_ref is deterministic — submit anyway so it runs in
         # the same dispatch loop and we collect its result the same way.
-        f_figref = ex.submit(
-            ctx.run,
+        f_figref = _submit(
             run_figure_ref_judge,
             response_text,
             attached_media_count=len(attached_media),
@@ -209,8 +217,7 @@ def run_all_judges(
         # figure_vision only fires when there's actually a figure to
         # check AND a question that depends on it; otherwise it
         # short-circuits without the (expensive) vision call.
-        f_figvis = ex.submit(
-            ctx.run,
+        f_figvis = _submit(
             run_figure_vision_judge,
             response_text,
             attached_media=attached_media,
@@ -220,8 +227,7 @@ def run_all_judges(
         # Safety — runs on EVERY tutor turn (no gating). Child
         # protection is non-negotiable. role='tutor' so the judge
         # ignores MANIPULATION (student-only category).
-        f_safety = ex.submit(
-            ctx.run,
+        f_safety = _submit(
             run_safety_judge,
             response_text,
             role="tutor",
@@ -315,12 +321,23 @@ def run_all_judges(
 
 def _safe_result(future, name: str, default_cls):
     """Return the future's result, or a skipped default on error.
-    Keeps one judge's failure from poisoning the others."""
+    Keeps one judge's failure from poisoning the others.
+
+    When the future raises, the exception class name + truncated
+    message is preserved in ``skip_reason`` so per-judge breakdowns
+    in SessionTurn.judge_outputs carry enough signal to root-cause
+    a failure without diffing logs by hand.
+    """
     try:
         return future.result()
     except Exception as e:
-        logger.warning("[Judges] %s judge raised: %s", name, e)
+        # Full traceback to logs for forensic detail.
+        logger.warning("[Judges] %s judge raised", name, exc_info=True)
         instance = default_cls()
         instance.skipped = True
-        instance.skip_reason = f"exception: {type(e).__name__}"
+        msg = str(e).strip().replace("\n", " ")[:200]
+        instance.skip_reason = (
+            f"exception: {type(e).__name__}: {msg}"
+            if msg else f"exception: {type(e).__name__}"
+        )
         return instance
