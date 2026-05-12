@@ -5395,6 +5395,22 @@ def lesson_live_monitor(request, lesson_id):
         # (covers teacher overrides that bumped a student to passing).
         is_completed = session.status == 'completed' or bool(exit_passed)
 
+        # Group info — surface "this session has N students sharing
+        # the device" so teachers watching live know it's a group
+        # session, not solo. The participants list lives on the
+        # session via SessionParticipant rows.
+        try:
+            participant_users = list(session.active_students)
+        except Exception:
+            participant_users = []
+        is_group_session = len(participant_users) > 1
+        if is_group_session:
+            participant_names = [
+                (u.get_full_name() or u.username) for u in participant_users
+            ]
+        else:
+            participant_names = []
+
         session_data.append({
             'session': session,
             'student_name': session.student.get_full_name() or session.student.username,
@@ -5415,6 +5431,9 @@ def lesson_live_monitor(request, lesson_id):
             'is_completed': is_completed,
             'covered_eos': state.get('covered_enabling_objectives', []),
             'failed_eos': state.get('exit_ticket_failed_eos', []),
+            'is_group': is_group_session,
+            'participant_count': len(participant_users) or 1,
+            'participant_names': participant_names,
         })
 
     # Monitor AI: auto-issue guidance to tutors for struggling students,
@@ -6240,25 +6259,37 @@ def summative_review(request, course_id):
         # populates best/latest/count for everyone.
         attempts_qs = ExitTicketAttempt.objects.filter(
             exit_ticket=summative, completed_at__isnull=False,
-        ).select_related('student').order_by('student_id', 'completed_at')
+        ).select_related('student', 'session').order_by('student_id', 'completed_at')
 
-        per_student = {}  # user_id → {best, best_pct, latest, latest_pct, attempts, last_at, passed}
+        per_student = {}  # user_id → {best, best_pct, latest, latest_pct, attempts, last_at, passed, *_was_group}
         for a in attempts_qs:
             uid = a.student_id
             pct = (a.score / questions_per_attempt * 100) if questions_per_attempt else 0
+            # Was this attempt's session a group session? Cheap property
+            # (one count() per attempt, fine at roster scale).
+            try:
+                was_group = bool(a.session and a.session.is_group)
+            except Exception:
+                was_group = False
             entry = per_student.setdefault(uid, {
                 'best_score': 0, 'best_pct': 0,
                 'latest_score': 0, 'latest_pct': 0,
                 'attempts': 0, 'last_at': None, 'passed_best': False,
+                'best_was_group': False, 'latest_was_group': False,
+                'group_attempts': 0,
             })
             entry['attempts'] += 1
             entry['latest_score'] = a.score
             entry['latest_pct'] = round(pct)
             entry['last_at'] = a.completed_at
+            entry['latest_was_group'] = was_group
+            if was_group:
+                entry['group_attempts'] += 1
             if pct > entry['best_pct']:
                 entry['best_score'] = a.score
                 entry['best_pct'] = round(pct)
                 entry['passed_best'] = (a.score >= (passing_pct / 100.0) * questions_per_attempt)
+                entry['best_was_group'] = was_group
 
         # Build the student rows (include not-attempted students so
         # teachers see who hasn't started). Sort: attempted first by
@@ -6277,6 +6308,9 @@ def summative_review(request, course_id):
                     'attempts': entry['attempts'],
                     'last_at': entry['last_at'],
                     'passed': entry['passed_best'],
+                    'best_was_group': entry['best_was_group'],
+                    'latest_was_group': entry['latest_was_group'],
+                    'group_attempts': entry['group_attempts'],
                 })
             else:
                 student_scores.append({
@@ -6286,6 +6320,8 @@ def summative_review(request, course_id):
                     'latest_score': None, 'latest_pct': None,
                     'attempts': 0, 'last_at': None,
                     'passed': False,
+                    'best_was_group': False, 'latest_was_group': False,
+                    'group_attempts': 0,
                 })
         student_scores.sort(key=lambda r: (
             0 if r['has_attempt'] else 1,

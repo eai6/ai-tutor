@@ -263,7 +263,13 @@
     <tbody>
         {% for s in sessions %}
         <tr>
-            <td class="cell-student" style="font-weight:600;">{{ s.student_name }}</td>
+            <td class="cell-student" style="font-weight:600;">
+                {{ s.student_name }}
+                {% if s.is_group %}
+                <span title="Group session — {{ s.participant_names|join:', ' }}"
+                      style="display:inline-block;margin-left:0.35rem;padding:0.05rem 0.4rem;border-radius:999px;background:#ede9fe;color:#5b21b6;font-size:0.65rem;font-weight:700;cursor:help;">👥 +{{ s.participant_count|add:'-1' }}</span>
+                {% endif %}
+            </td>
             <td data-label="Status">
                 <span>
                     <span class="badge badge-{{ s.status }}">{{ s.status }}</span>

@@ -97,8 +97,25 @@ def collect_objective_signals_for_course(course, students=None) -> dict:
     attempts_qs = attempts_qs.select_related(
         'exit_ticket', 'exit_ticket__lesson',
         'exit_ticket__lesson__unit', 'exit_ticket__lesson__unit__course',
-        'student',
+        'student', 'session',
     ).order_by('student_id', 'completed_at')
+
+    # Precompute which sessions are group sessions (have >1 active
+    # participant). One bulk query rather than O(attempts) is_group
+    # property hits. 2026-05-08.
+    from apps.tutoring.models import SessionParticipant
+    from django.db.models import Count
+    session_ids_in_play = {a.session_id for a in attempts_qs if a.session_id}
+    group_session_ids = set()
+    if session_ids_in_play:
+        group_session_ids = set(
+            SessionParticipant.objects
+            .filter(session_id__in=session_ids_in_play, is_active=True)
+            .values('session_id')
+            .annotate(n=Count('id'))
+            .filter(n__gt=1)
+            .values_list('session_id', flat=True)
+        )
 
     # Per-lesson ET attempts: roll the per-question concept_tag up to
     # the lesson's TEACHING objective (lesson.objective) at read time.
@@ -152,6 +169,10 @@ def collect_objective_signals_for_course(course, students=None) -> dict:
                 'practice': [], 'all_attempts': 0,
             })
             bucket['all_attempts'] += 1
+            is_group_attempt = (
+                attempt.session_id in group_session_ids
+                if attempt.session_id else False
+            )
             row = {
                 'correct': per_obj_correct[tag],
                 'total': total,
@@ -159,6 +180,7 @@ def collect_objective_signals_for_course(course, students=None) -> dict:
                 'completed_at': attempt.completed_at,
                 'is_summative': bool(attempt.exit_ticket.course_id),
                 'purpose': purpose,
+                'is_group': is_group_attempt,
             }
             # Exit-ticket-only semantics (2026-04-29):
             #   baseline = the student's FIRST attempt on this objective
@@ -251,6 +273,9 @@ def class_competency_matrix(course, *, students=None, objectives=None) -> dict:
         students_with_final = set()
         students_with_any = set()
         mastered_latest = 0
+        group_attempts = 0
+        total_attempts = 0
+        students_with_group_attempt = set()
 
         for sid in (students or []):
             bucket = signals.get((sid, tag))
@@ -275,6 +300,11 @@ def class_competency_matrix(course, *, students=None, objectives=None) -> dict:
                 b = (bucket['baseline']['correct'] / bucket['baseline']['total']) * 100
                 f = (bucket['final']['correct'] / bucket['final']['total']) * 100
                 deltas.append(f - b)
+            for prow in bucket.get('practice', []):
+                total_attempts += 1
+                if prow.get('is_group'):
+                    group_attempts += 1
+                    students_with_group_attempt.add(sid)
 
         rows.append({
             'tag': obj,
@@ -286,6 +316,9 @@ def class_competency_matrix(course, *, students=None, objectives=None) -> dict:
             'avg_final_pct': (sum(final_pcts) / len(final_pcts)) if final_pcts else None,
             'delta_pct': (sum(deltas) / len(deltas)) if deltas else None,
             'mastered_latest': mastered_latest,
+            'group_attempts': group_attempts,
+            'total_attempts': total_attempts,
+            'students_with_group_attempt': len(students_with_group_attempt),
         })
 
     return {

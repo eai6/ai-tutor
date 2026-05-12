@@ -84,10 +84,11 @@
     <table>
         <thead>
             <tr>
-                <th style="width:55%;">Teaching objective</th>
+                <th style="width:50%;">Teaching objective</th>
                 <th>Students</th>
                 <th>Average competency</th>
                 <th>Mastered ≥70%</th>
+                <th title="Attempts taken in a group session vs solo">Group attempts</th>
             </tr>
         </thead>
         <tbody>
@@ -104,6 +105,18 @@
                 <td>
                     <span class="pct">{{ r.mastered_latest }}</span>
                     <span class="pct-faint"> / {{ matrix.total_students }}</span>
+                </td>
+                <td>
+                    {% if r.total_attempts %}
+                        {% if r.group_attempts %}
+                            <span class="pct" title="{{ r.group_attempts }} group attempt{{ r.group_attempts|pluralize }} from {{ r.students_with_group_attempt }} student{{ r.students_with_group_attempt|pluralize }}">👥 {{ r.group_attempts }}</span>
+                            <span class="pct-faint"> / {{ r.total_attempts }}</span>
+                        {% else %}
+                            <span class="pct-faint" title="All {{ r.total_attempts }} attempt{{ r.total_attempts|pluralize }} solo">— / {{ r.total_attempts }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="pct-faint">—</span>
+                    {% endif %}
                 </td>
             </tr>
         {% endfor %}

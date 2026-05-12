@@ -139,16 +139,21 @@
                         {% if r.has_attempt %}
                             <strong>{{ r.best_score }} / {{ questions_per_attempt }}</strong>
                             <span style="color:var(--gray-500);font-size:0.78rem;">· {{ r.best_pct }}%</span>
+                            {% if r.best_was_group %}<span title="Best score earned in a group session" style="margin-left:0.25rem;font-size:0.7rem;cursor:help;">👥</span>{% endif %}
                         {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;">
                         {% if r.has_attempt %}
                             {{ r.latest_score }} / {{ questions_per_attempt }}
                             <span style="color:var(--gray-500);font-size:0.78rem;">· {{ r.latest_pct }}%</span>
+                            {% if r.latest_was_group %}<span title="Latest attempt was a group session" style="margin-left:0.25rem;font-size:0.7rem;cursor:help;">👥</span>{% endif %}
                         {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;">
-                        {% if r.has_attempt %}{{ r.attempts }}{% else %}<span style="color:var(--gray-400);">0</span>{% endif %}
+                        {% if r.has_attempt %}
+                            {{ r.attempts }}
+                            {% if r.group_attempts %}<span title="{{ r.group_attempts }} of {{ r.attempts }} attempt{{ r.attempts|pluralize }} in a group session" style="margin-left:0.2rem;font-size:0.7rem;color:#7c3aed;cursor:help;">({{ r.group_attempts }} 👥)</span>{% endif %}
+                        {% else %}<span style="color:var(--gray-400);">0</span>{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;font-size:0.82rem;color:var(--gray-500);">
                         {% if r.last_at %}{{ r.last_at|timesince }} ago{% else %}—{% endif %}
