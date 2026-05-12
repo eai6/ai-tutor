@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'apps.dashboard',
     'apps.api',
     'apps.support',
+    'apps.benchmark',
 ]
 
 MIDDLEWARE = [
