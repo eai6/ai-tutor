@@ -47,6 +47,53 @@ class ArithmeticCorrection:
 _HAS_NUMBER_RE = re.compile(r"\d|[½¼¾⅓⅔⅛⅜⅝⅞]")
 
 
+# Equation-with-unknown detector — drops expressions like "3x + 20 = 80"
+# since those are equations to SOLVE, not closed arithmetic to verify.
+# Matches three signatures of algebra:
+#   1. digit IMMEDIATELY adjacent to letter (no space): "3x", "5y", "10n"
+#   2. isolated letter on LHS of equals: "x = 8", "y = 14"
+#   3. isolated letter followed by + / -: "x + 15", "y - 3", "a + b"
+# Multi-letter units (kg, km, cm, etc.) and digit-with-space-letter
+# patterns ("5 km", "3 m", "10 SCR") do NOT match.
+_ALGEBRAIC_VAR_RE = re.compile(
+    r'\d[a-z]\b'                    # 3x, 5y, 10n — digit-touching-letter
+    r'|\b[a-z]\b\s*=\s*\d'          # x = 8, y = 14
+    r'|\b[a-z]\b\s*[+\-]',          # x + 15, y - 3, a + b
+    re.IGNORECASE,
+)
+
+
+def _is_real_correction(claimed: str, correct: str, expression: str) -> bool:
+    """Filter LLM-emitted corrections that aren't actually corrections.
+
+    Two failure modes seen in production (session 255, 2026-05-12):
+
+    1. ``claimed == correct``: the LLM emits a "correction" where the
+       value the response stated and the value it should be are
+       identical. No-op corrections trigger regen for nothing.
+    2. The expression is an EQUATION with variables (``3x + 20 = 80``,
+       ``5y = 70``) — that's algebra to solve, not arithmetic to
+       verify. The verifier shouldn't try to "compute" it.
+
+    Returns True only when (claimed != correct numerically) AND the
+    expression contains no single-letter algebraic variables.
+    """
+    if not claimed or not correct:
+        return False
+    if claimed.strip() == correct.strip():
+        return False
+    # Numeric equivalence (handles "20" vs "20.0", "8" vs "8.00")
+    try:
+        if float(claimed) == float(correct):
+            return False
+    except (ValueError, TypeError):
+        pass
+    # Equations with unknowns aren't arithmetic to check
+    if _ALGEBRAIC_VAR_RE.search(expression):
+        return False
+    return True
+
+
 _VERIFIER_SYSTEM = (
     "You are a math fact-checker for a tutor. Find every arithmetic claim "
     "in the response and verify the math. A claim is anything where the "
@@ -132,6 +179,8 @@ def verify_arithmetic_claims(
         return text, []
 
     corrections: List[dict] = []
+    dropped_noop = 0
+    dropped_algebraic = 0
     corrected = text
     for item in items[:max_corrections]:
         if not isinstance(item, dict):
@@ -140,6 +189,17 @@ def verify_arithmetic_claims(
         claimed = str(item.get("claimed") or "").strip()[:60]
         correct = str(item.get("correct") or "").strip()[:60]
         if not (expression and correct):
+            continue
+        # Sanity filter — drop no-op corrections (claimed == correct)
+        # and equations-with-variables. Both were observed as false
+        # positives in prod session 255 (2026-05-12), flooding the
+        # validator with phantom violations + triggering regen on
+        # responses that had nothing wrong.
+        if not _is_real_correction(claimed, correct, expression):
+            if _ALGEBRAIC_VAR_RE.search(expression):
+                dropped_algebraic += 1
+            else:
+                dropped_noop += 1
             continue
         corrections.append({
             "expression": expression,
@@ -169,5 +229,11 @@ def verify_arithmetic_claims(
         logger.info(
             "[LLMArithVerifier] flagged %d arithmetic correction(s)",
             len(corrections),
+        )
+    if dropped_noop or dropped_algebraic:
+        logger.info(
+            "[LLMArithVerifier] sanity filter dropped %d no-op + %d "
+            "algebraic-equation correction(s)",
+            dropped_noop, dropped_algebraic,
         )
     return corrected, corrections
