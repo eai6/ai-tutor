@@ -240,6 +240,48 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if regen_audit.cycles %}
+            <div class="ann-card">
+                <h3>Regen audit — {{ regen_audit.cycles|length }} cycle{{ regen_audit.cycles|length|pluralize }}
+                    {% if regen_audit.clean %}<span style="color:#065f46;font-weight:600;">(picked clean)</span>{% else %}<span style="color:#b91c1c;font-weight:600;">(shipped dirty)</span>{% endif %}
+                </h3>
+                <div style="font-size:0.78rem;color:#6b7280;margin-bottom:0.6rem;">
+                    Picked: <code>{{ regen_audit.picked_model|default:"—" }}</code>
+                    {% if regen_audit.fallback_used %} • <strong style="color:#b91c1c;">stock fallback used</strong>{% endif %}
+                </div>
+                {% for cyc in regen_audit.cycles %}
+                <details {% if forloop.first %}open{% endif %} style="margin-bottom:0.6rem;border:1px solid #f3f4f6;border-radius:6px;padding:0.5rem 0.65rem;background:#fafafa;">
+                    <summary style="cursor:pointer;font-size:0.85rem;font-weight:600;color:#374151;">
+                        Cycle {{ cyc.cycle }} — temp={{ cyc.temperature|floatformat:2 }}
+                        ({{ cyc.candidates|length }} candidate{{ cyc.candidates|length|pluralize }})
+                    </summary>
+                    {% for cand in cyc.candidates %}
+                    <div style="margin-top:0.55rem;padding:0.5rem 0.65rem;background:#fff;border:1px solid #f3f4f6;border-radius:6px;">
+                        <div style="font-size:0.75rem;color:#6b7280;margin-bottom:0.35rem;">
+                            <code>{{ cand.model }}</code> • score={{ cand.score|floatformat:2 }} •
+                            {% if cand.clean %}<span style="color:#065f46;font-weight:600;">clean</span>{% else %}<span style="color:#b91c1c;font-weight:600;">dirty</span>{% endif %}
+                            {% if cand.error %} • <span style="color:#b91c1c;">error: {{ cand.error }}</span>{% endif %}
+                        </div>
+                        {% if cand.text_preview %}
+                        <div style="font-size:0.82rem;line-height:1.5;white-space:pre-wrap;background:#fdf4ff;padding:0.45rem 0.6rem;border-radius:4px;border:1px solid #e9d5ff;color:#111;margin-bottom:0.4rem;">{{ cand.text_preview }}</div>
+                        {% endif %}
+                        {% if cand.judge_outputs %}
+                        {% for jname, jdata in cand.judge_outputs.items %}
+                        {% if jdata and jname != 'skipped' and jname != 'skip_reason' and jname != 'sub_skipped' %}
+                        <div style="font-size:0.75rem;padding:0.2rem 0.4rem;color:#374151;">
+                            <strong style="color:#111;">{{ jname }}</strong>:
+                            <code style="font-size:0.72rem;color:#6b7280;">{{ jdata }}</code>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </details>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
 
         {# ============ RIGHT PANE: form ============ #}

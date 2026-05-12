@@ -2095,6 +2095,18 @@ Keep it to 2-3 sentences."""
             turn_metadata['regen_elapsed_seconds'] = round(
                 ensemble_result.elapsed_seconds, 2,
             )
+            # Per-cycle audit trail (Phase 2.x) — every candidate's
+            # text preview + judge breakdown so annotators can see
+            # what each regen attempt looked like. Without this the
+            # ensemble's per-cycle judge_result objects are dropped
+            # once respond() returns.
+            try:
+                from apps.tutoring.regen import summarise_regen_cycles
+                turn_metadata['regen_audit'] = summarise_regen_cycles(
+                    ensemble_result,
+                )
+            except Exception as exc:
+                logger.warning("[Regen] audit capture failed: %s", exc)
 
             if not ensemble_result.clean:
                 # Add an explicit issue so the [TurnSummary] log line

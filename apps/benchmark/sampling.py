@@ -139,6 +139,11 @@ def build_item_snapshot(tutor_turn: SessionTurn) -> Dict:
         # legacy turns). Lets the benchmark slice agreement by
         # history-aware vs not.
         'judge_history_turns': metadata.get('judge_history_turns', 0),
+        # Per-cycle regen audit (Phase 2.x). When regenerated=True,
+        # carries one entry per cycle with per-candidate text preview
+        # + judge_outputs so the annotation UI can show what each
+        # regen attempt looked like. {} on turns that didn't regen.
+        'regen_audit': metadata.get('regen_audit', {}),
         # Full per-judge breakdown — for benchmark scoring + auto-population
         'judge_outputs': judge_outputs,
     }

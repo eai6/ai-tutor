@@ -127,6 +127,10 @@ class RegenResult:
     cycles_run: int = 0
     fallback_used: bool = False
     candidates_per_cycle: List[List[RegenCandidate]] = field(default_factory=list)
+    # Exact temperature used per cycle (parallel to candidates_per_cycle).
+    # Captured rather than re-computed so summarise_regen_cycles is correct
+    # when callers override temperature_start / temperature_decay.
+    temperatures: List[float] = field(default_factory=list)
     elapsed_seconds: float = 0.0
 
 
@@ -212,6 +216,7 @@ def run_regen_ensemble(
 
     for cycle in range(1, max_cycles + 1):
         temperature = max(0.0, temperature_start - (cycle - 1) * temperature_decay)
+        result.temperatures.append(temperature)
         candidates = _run_one_cycle(
             cycle=cycle,
             temperature=temperature,
@@ -448,6 +453,93 @@ def _generate_one_candidate(
         logger.warning("[Regen] model=%s call failed: %s", model_name, e)
         cand.error = f"llm_error: {type(e).__name__}"
     return cand
+
+
+def summarise_regen_cycles(result: RegenResult,
+                           *, text_preview_chars: int = 400) -> dict:
+    """JSON-safe per-cycle / per-candidate audit of a regen ensemble run.
+
+    Persisted on SessionTurn.metadata['regen_audit'] (and surfaced in
+    BenchmarkItem.snapshot) so annotators can answer "what did the
+    first attempt look like, and why did each judge flag it?" — the
+    in-memory candidates_per_cycle is dropped once respond() returns,
+    so without this summary the audit trail is gone.
+
+    Shape:
+        {
+          'picked_model', 'cycles_run', 'fallback_used', 'clean': bool,
+          'cycles': [
+            {
+              'cycle': 1, 'temperature': 0.20,
+              'candidates': [
+                {
+                  'model', 'score', 'clean', 'error',
+                  'text_preview': str (first ~400 chars),
+                  'judge_outputs': dict (per-judge breakdown, same
+                      shape as SessionTurn.judge_outputs — empty when
+                      the judge_result is None or the candidate errored)
+                },
+                ...
+              ]
+            },
+            ...
+          ]
+        }
+
+    Pure function — no DB access. Safe to call from any context.
+    """
+    if result is None:
+        return {}
+
+    cycles_out = []
+    for idx, cycle_candidates in enumerate(result.candidates_per_cycle or []):
+        # Temperatures list is parallel to candidates_per_cycle; fall
+        # back to None if (legacy) result wasn't built with temps.
+        temps = result.temperatures or []
+        temperature = temps[idx] if idx < len(temps) else None
+
+        candidates_out = []
+        for cand in cycle_candidates or []:
+            text = (cand.text or '')[:text_preview_chars]
+            ellipsis = (
+                '…' if cand.text and len(cand.text) > text_preview_chars
+                else ''
+            )
+            jr = cand.judge_result
+            if jr is not None and hasattr(jr, 'to_judge_outputs'):
+                try:
+                    judge_outputs = jr.to_judge_outputs()
+                except Exception as e:
+                    logger.warning(
+                        "[Regen] summary: to_judge_outputs failed for "
+                        "model=%s: %s", cand.model_name, e,
+                    )
+                    judge_outputs = {}
+            else:
+                judge_outputs = {}
+
+            candidates_out.append({
+                'model': cand.model_name or '',
+                'score': float(cand.score or 0.0),
+                'clean': bool(cand.clean),
+                'error': cand.error or '',
+                'text_preview': text + ellipsis,
+                'judge_outputs': judge_outputs,
+            })
+
+        cycles_out.append({
+            'cycle': idx + 1,
+            'temperature': temperature,
+            'candidates': candidates_out,
+        })
+
+    return {
+        'picked_model': result.picked_model or '',
+        'cycles_run': int(result.cycles_run or 0),
+        'fallback_used': bool(result.fallback_used),
+        'clean': bool(result.clean),
+        'cycles': cycles_out,
+    }
 
 
 def _judge_issue_summary(jr: Optional[CombinedJudgeResult]) -> str:
