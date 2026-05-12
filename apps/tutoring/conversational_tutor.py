@@ -1794,6 +1794,14 @@ Keep it to 2-3 sentences."""
         # parsed_media is a single dict or None; the orchestrator
         # accepts a list (multiple figures per turn possible in future).
         attached_media_list = [parsed_media] if parsed_media else []
+        # Phase 2.2.5: pass the conversation BEFORE the current
+        # student_input (which is already appended at this point) so
+        # the history-aware judges (coherence / factual / rule) can
+        # reason about cross-turn signals. JUDGE_HISTORY_TURNS bounds
+        # the window — see apps/tutoring/judges/history.py.
+        prior_conversation = (
+            self.conversation[:-1] if self.conversation else []
+        )
         combined_judge_result = run_combined_judge(
             clean_response,
             lesson=self.lesson,
@@ -1814,6 +1822,7 @@ Keep it to 2-3 sentences."""
             ),
             subject_is_math=subject_is_math,
             bank_offered=bool(getattr(self, '_question_id_map', None)),
+            conversation_history=prior_conversation,
         )
         if combined_judge_result.corrected_response:
             clean_response = combined_judge_result.corrected_response
@@ -1952,6 +1961,9 @@ Keep it to 2-3 sentences."""
             'fact_check_skip_reason',
             'rule_check_skipped', 'rule_check_skip_reason',
             'rule_violations',
+            # Phase 2.2.5 — bounded history window the judges saw.
+            # Zero on legacy traces / when no history was passed.
+            'judge_history_turns',
         ):
             if k in validation.metadata:
                 turn_metadata[k] = validation.metadata[k]
@@ -2015,6 +2027,7 @@ Keep it to 2-3 sentences."""
                         turn_math_check is not None
                         and turn_math_check.is_correct is False
                     ),
+                    conversation_history=prior_conversation,
                 )
                 if _regen_span is not None:
                     _regen_span['payload'] = {
@@ -2321,6 +2334,9 @@ Keep it to 2-3 sentences."""
             'fact_check_skip_reason',
             'rule_check_skipped', 'rule_check_skip_reason',
             'rule_violations',
+            # Phase 2.2.5 — bounded history window the judges saw.
+            # Zero on legacy traces / when no history was passed.
+            'judge_history_turns',
         ):
             if k in validation.metadata:
                 turn_metadata[k] = validation.metadata[k]

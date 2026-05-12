@@ -201,6 +201,15 @@ ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY', '')
 ELEVENLABS_VOICE_ID = os.getenv('ELEVENLABS_VOICE_ID', '2vbhUP8zyKg4dEZaTWGn')
 ELEVENLABS_MODEL_ID = os.getenv('ELEVENLABS_MODEL_ID', 'eleven_multilingual_v2')
 
+# Judge history window (Phase 2.2.5). The number of trailing
+# conversation turns passed to history-sensitive judges (coherence /
+# factual / rule). 0 disables (legacy behaviour). 4 = ~2 student + 2
+# tutor exchanges before the current pair. Each turn is internally
+# capped at 400 chars so prompt size is predictable.
+# Recorded on SessionTurn.metadata['judge_history_turns'] so the
+# benchmark can slice agreement by history-aware vs not.
+JUDGE_HISTORY_TURNS = int(os.getenv('JUDGE_HISTORY_TURNS', '4'))
+
 # Auth settings
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/tutor/'

@@ -63,6 +63,7 @@ def run_factual_judge(
     lesson,
     llm_client=None,
     max_claims: int = 5,
+    prior_exchanges: str = "",
 ) -> FactualResult:
     """Single-task factual-claim verification."""
     result = FactualResult()
@@ -89,13 +90,18 @@ def run_factual_judge(
 
     payload = {
         "tutor_response": response_text[:2000],
+        "prior_exchanges": (prior_exchanges or "")[:1600] or "(none)",
         "factual_claims": factual_claims,
         "evidence": (evidence or "(no evidence retrieved)")[:3000],
     }
     user_prompt = (
-        "Verify the factual claims below. Reply with ONLY the JSON object "
-        "specified.\n\n"
-        f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
+        f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}\n\n"
+        "Verify the factual claims listed in input.factual_claims. "
+        "Consult input.prior_exchanges to resolve references like "
+        "\"as we said\" or \"the value from before\" against earlier "
+        "tutor statements — a claim that matches the prior tutor turn "
+        "is internally consistent, even if input.evidence doesn't "
+        "address it directly. Reply with ONLY the JSON object specified."
     )
 
     try:

@@ -83,6 +83,7 @@ def run_rule_judge(
     bank_offered: bool = True,
     llm_client=None,
     max_violations: int = 5,
+    prior_exchanges: str = "",
 ) -> RuleResult:
     """Single-task rule-compliance check."""
     result = RuleResult()
@@ -106,6 +107,7 @@ def run_rule_judge(
     payload = {
         "tutor_response": response_text[:2000],
         "student_last_input": (student_input or "").strip()[:200] or "(none)",
+        "prior_exchanges": (prior_exchanges or "")[:1600] or "(none)",
         "student_answer_was_bare": answer_was_bare,
         "student_answer_was_wrong": answer_was_wrong,
         "verified_question_bank": bank_block,
@@ -113,9 +115,14 @@ def run_rule_judge(
         "bank_offered": bool(bank_offered),
     }
     user_prompt = (
-        "Review the tutor response for rule violations. Reply with ONLY "
-        "the JSON object specified.\n\n"
-        f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
+        f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}\n\n"
+        "Review the tutor response for rule violations. Use "
+        "input.prior_exchanges to calibrate RULE_1: praise such as "
+        "\"great work\" can be valid when the most recent prior STUDENT "
+        "turn in prior_exchanges showed correct working, even when "
+        "input.student_last_input is itself a non-answer "
+        "(acknowledgement, follow-up question). Reply with ONLY the "
+        "JSON object specified."
     )
 
     try:

@@ -38,10 +38,15 @@ class CoherenceResult:
 
 
 _SYSTEM = (
-    "You are a focused coherence reviewer for a single tutoring response. "
-    "Read the tutor's reply and flag SELF-CONTRADICTIONS within that "
-    "single response — places where the tutor says one thing then "
-    "immediately contradicts it.\n"
+    "You are a focused coherence reviewer for a tutoring response. "
+    "Flag SELF-CONTRADICTIONS — places where the tutor says one thing "
+    "then contradicts it. Two scopes count:\n"
+    "  - WITHIN tutor_response (single-response contradiction)\n"
+    "  - BETWEEN tutor_response and the most recent TUTOR turn in "
+    "prior_exchanges (cross-turn flip — the tutor reversed a stance, "
+    "setup, or numerical value across consecutive turns)\n"
+    "When prior_exchanges is empty / not provided, only the within-"
+    "response scope applies.\n"
     "\n"
     "Examples that ARE coherence violations:\n"
     "  - introduces a setup with N items, then poses a question with M "
@@ -89,6 +94,7 @@ def run_coherence_judge(
     *,
     llm_client=None,
     max_violations: int = 4,
+    prior_exchanges: str = "",
 ) -> CoherenceResult:
     """Single-task coherence check.
 
@@ -110,10 +116,21 @@ def run_coherence_judge(
         result.skip_reason = "too_short_for_contradiction"
         return result
 
+    # Documents-first / instructions-last: prior_exchanges + the
+    # response go up top; the task line sits at the bottom where the
+    # model reads it most strongly.
+    prior_block = (
+        f"PRIOR_EXCHANGES (last turns, for cross-turn check):\n"
+        f"{prior_exchanges}\n\n"
+        if prior_exchanges else ""
+    )
     user_prompt = (
-        "Review the tutor response below for self-contradictions. "
-        "Reply with ONLY the JSON object specified.\n\n"
-        f"TUTOR_RESPONSE:\n{response_text[:2500]}"
+        f"{prior_block}"
+        f"TUTOR_RESPONSE (the one to review):\n{response_text[:2500]}\n\n"
+        "Flag self-contradictions inside TUTOR_RESPONSE, and any "
+        "contradiction between TUTOR_RESPONSE and the most recent "
+        "TUTOR turn in PRIOR_EXCHANGES. Reply with ONLY the JSON "
+        "object specified."
     )
 
     try:

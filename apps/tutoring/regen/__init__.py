@@ -152,6 +152,8 @@ def run_regen_ensemble(
     student_input: str = "",
     answer_was_bare: bool = False,
     answer_was_wrong: bool = False,
+    conversation_history: Optional[List[dict]] = None,
+    history_turns: Optional[int] = None,
     max_cycles: int = DEFAULT_MAX_CYCLES,
     temperature_start: float = DEFAULT_TEMPERATURE_START,
     temperature_decay: float = DEFAULT_TEMPERATURE_DECAY,
@@ -227,6 +229,8 @@ def run_regen_ensemble(
             step_context=step_context,
             subject_is_math=subject_is_math,
             bank_offered=bank_offered,
+            conversation_history=conversation_history,
+            history_turns=history_turns,
             lesson=lesson,
             max_workers=max_workers,
         )
@@ -320,6 +324,8 @@ def _run_one_cycle(
     step_context,
     subject_is_math: bool,
     bank_offered: bool,
+    conversation_history: Optional[List[dict]],
+    history_turns: Optional[int],
     lesson,
     max_workers: int,
 ) -> List[RegenCandidate]:
@@ -362,6 +368,8 @@ def _run_one_cycle(
                 step_context=step_context,
                 subject_is_math=subject_is_math,
                 bank_offered=bank_offered,
+                conversation_history=conversation_history,
+                history_turns=history_turns,
             ))
 
         for cand, jf in zip(raw_results, judge_futures):

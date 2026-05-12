@@ -135,6 +135,10 @@ def build_item_snapshot(tutor_turn: SessionTurn) -> Dict:
         'regen_cycles': metadata.get('regen_cycles'),
         'bare_answer_flagged': metadata.get('bare_answer_flagged'),
         'praise_stripped': metadata.get('praise_stripped'),
+        # Phase 2.2.5 — bounded history window the judges saw (0 on
+        # legacy turns). Lets the benchmark slice agreement by
+        # history-aware vs not.
+        'judge_history_turns': metadata.get('judge_history_turns', 0),
         # Full per-judge breakdown — for benchmark scoring + auto-population
         'judge_outputs': judge_outputs,
     }

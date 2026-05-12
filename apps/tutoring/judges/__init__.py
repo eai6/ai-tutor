@@ -37,6 +37,7 @@ from apps.tutoring.judges.arithmetic import (
     ArithmeticResult,
     run_arithmetic_judge,
 )
+from apps.tutoring.judges.history import format_history_window
 from apps.tutoring.judges.coherence import (
     CoherenceResult,
     run_coherence_judge,
@@ -85,6 +86,8 @@ def run_all_judges(
     step_context: Optional[dict] = None,
     subject_is_math: bool = True,
     bank_offered: bool = True,
+    conversation_history: Optional[List[dict]] = None,
+    history_turns: Optional[int] = None,
     max_workers: int = 8,
 ) -> CombinedJudgeResult:
     """Run all domain judges concurrently and merge into a
@@ -120,6 +123,25 @@ def run_all_judges(
     # gracefully if the model can't process images.
     vc = vision_client if vision_client is not None else llm_client
 
+    # Resolve history window. settings.JUDGE_HISTORY_TURNS is the
+    # default; callers can override per-call (e.g. tests). The actual
+    # turn count used is recorded on the result so the benchmark can
+    # slice agreement by history-aware vs not.
+    if history_turns is None:
+        try:
+            from django.conf import settings
+            history_turns = int(getattr(settings, 'JUDGE_HISTORY_TURNS', 4))
+        except Exception:
+            history_turns = 4
+    prior_exchanges = format_history_window(
+        conversation_history, turns=history_turns,
+    )
+    # Record the EFFECTIVE turn count — zero when history was empty
+    # or the formatter produced nothing (e.g. all turns were blank).
+    result.history_turns_used = (
+        history_turns if prior_exchanges else 0
+    )
+
     # Capture the current context so judge worker threads see the same
     # ContextVars as the orchestrator — specifically the tracing span
     # buffer. Without this, spans emitted from judge LLM calls would
@@ -146,6 +168,7 @@ def run_all_judges(
             response_text,
             lesson=lesson,
             llm_client=llm_client,
+            prior_exchanges=prior_exchanges,
         )
         f_rule = ex.submit(
             ctx.run,
@@ -158,6 +181,7 @@ def run_all_judges(
             subject_is_math=subject_is_math,
             bank_offered=bank_offered,
             llm_client=llm_client,
+            prior_exchanges=prior_exchanges,
         )
         f_step = ex.submit(
             ctx.run,
@@ -172,6 +196,7 @@ def run_all_judges(
             run_coherence_judge,
             response_text,
             llm_client=llm_client,
+            prior_exchanges=prior_exchanges,
         )
         # figure_ref is deterministic — submit anyway so it runs in
         # the same dispatch loop and we collect its result the same way.

@@ -98,6 +98,11 @@ class CombinedJudgeResult:
     skipped: bool = False
     skip_reason: str = ""
     sub_skipped: Dict[str, str] = field(default_factory=dict)
+    # Phase 2.2.5: bounded conversation-history window passed to the
+    # history-sensitive judges (coherence, factual, rule). Zero when no
+    # history was provided or the window was empty. Recorded so the
+    # benchmark can slice agreement by history-aware vs not.
+    history_turns_used: int = 0
 
     @property
     def has_arithmetic_corrections(self) -> bool:
@@ -158,6 +163,10 @@ class CombinedJudgeResult:
             # Combined-judge specific
             "combined_judge_used": not self.skipped,
             "combined_judge_skip_reason": self.skip_reason,
+            # Phase 2.2.5 observability — number of history turns the
+            # judges saw. Zero means the judges ran with no prior
+            # conversation context (legacy behaviour).
+            "judge_history_turns": self.history_turns_used,
         }
 
     def to_judge_outputs(self) -> dict:
@@ -215,6 +224,7 @@ class CombinedJudgeResult:
                 "categories": list(self.safety_categories),
                 "reasoning": self.safety_reasoning,
             },
+            "history_turns_used": self.history_turns_used,
             "skipped": self.skipped,
             "skip_reason": self.skip_reason,
             "sub_skipped": dict(self.sub_skipped),
@@ -428,6 +438,8 @@ def run_combined_judge(
     step_context: Optional[dict] = None,
     subject_is_math: bool = True,
     bank_offered: bool = True,
+    conversation_history: Optional[List[dict]] = None,
+    history_turns: Optional[int] = None,
     max_claims: int = 5,
     max_arithmetic_corrections: int = 8,
     max_violations: int = 5,
@@ -461,6 +473,8 @@ def run_combined_judge(
         step_context=step_context,
         subject_is_math=subject_is_math,
         bank_offered=bank_offered,
+        conversation_history=conversation_history,
+        history_turns=history_turns,
     )
 
 
