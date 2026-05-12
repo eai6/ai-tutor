@@ -66,6 +66,12 @@ This codebase has good bones to mirror: pluggable `BaseLLMClient` factory (`apps
 - `architecture-patterns-expert` — debating module boundaries, when to extract, schema modeling, modular monolith vs services.
 - `agent-orchestration-expert` — before any multi-agent or evaluator-loop work; covers when NOT to use multi-agent.
 
+**Consult the prompting skills when writing or tuning prompts:**
+- `prompting-fundamentals-expert` — universal principles (CoT, few-shot, eval-driven iteration, output formatting, injection defense). Read this first.
+- `claude-prompting-expert` — Claude API: XML tags, prompt caching, adaptive thinking, structured outputs, Claude 4.x anti-patterns.
+- `openai-prompting-expert` — OpenAI API: developer role, Structured Outputs, o-series reasoning models (strip CoT scaffolding!), automatic prompt caching, Agents SDK.
+- `gemini-prompting-expert` — Gemini API: `system_instruction` parameter, native multimodal, 1M context with query-at-end, Google Search grounding, Gemini 3's literal-task style.
+
 **Active architecture plan**: `memory/agentic_platform_architecture_plan.md` — read before proposing structural changes. Phased path: trace logging → benchmark infra → typed state + dedup → lesson graph → risk routing; multi-agent decomposition deferred until benchmark evidence demands it.
 
 ## Project-local planning
