@@ -1891,7 +1891,7 @@ function addMessage(role, content, media = [], artifactHtml = null, probe = null
     div.innerHTML = `
         <div class="avatar">${avatar}</div>
         <div class="bubble-wrapper">
-            <div class="bubble">${marked.parse(sanitizeContent(content))}${mediaHtml}${artifactBlock}</div>
+            <div class="bubble">${marked.parse(sanitizeContent(content), { breaks: true, gfm: true })}${mediaHtml}${artifactBlock}</div>
             ${replayBtn}
         </div>
     `;
@@ -2525,7 +2525,7 @@ function updateStreamingMessage(div, content, media = []) {
         }
         mediaHtml += '</div>';
     }
-    div.querySelector('.bubble').innerHTML = marked.parse(sanitizeContent(content)) + mediaHtml;
+    div.querySelector('.bubble').innerHTML = marked.parse(sanitizeContent(content), { breaks: true, gfm: true }) + mediaHtml;
     // Render LaTeX math (KaTeX, math lessons only)
     renderMath(div.querySelector('.bubble'));
     // Bind click handlers for inline thumbnails
