@@ -26,7 +26,7 @@ Expert on CI/CD for this project. Production deploys via GitHub Actions to Azure
 6. **Update Container App** to new image tag: `az containerapp update --image ...`
 7. **Wait for healthy revision** (optional but recommended)
 
-Deploy time: ~4-6 minutes. No tests run in CI currently (opportunity for improvement).
+Deploy time: ~9-10 minutes. No tests run in CI currently (opportunity for improvement).
 
 ## Pipeline patterns used in this project
 
