@@ -98,6 +98,7 @@ Auto-memory at `~/.claude/projects/-Users-edwardamoah-Documents-GitHub-ai-tutor/
 - Tests: pytest, `tests/test_<feature>.py` per feature. Factory fixtures in `apps/<app>/tests/factories.py` when they exist.
 - Commits: descriptive subject, body for the "why". Don't reference tasks/issues in code comments — they rot.
 - `README.md` is 780 lines and maintained deliberately — don't edit as part of routine feature work.
+- **UI testing**: `chrome-devtools-mcp` is installed for this project (`~/.claude.json` local scope). Provides `mcp__chrome-devtools__*` tools (navigate, click, screenshot, evaluate JS, inspect DOM). Use it to verify dashboard / annotation UI changes — drive the running dev server, don't speculate about rendered output. Requires Claude Code restart after install for tools to appear.
 
 ## Before risky actions
 
