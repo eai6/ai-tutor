@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.db import models
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -62,7 +63,24 @@ ISSUE_LABEL_GROUPS = [
 
 @staff_member_required
 def benchmark_list(request):
+    # Filter query params — empty/missing means "no filter".
+    f_subject = (request.GET.get('subject') or '').strip()
+    f_stratum = (request.GET.get('stratum') or '').strip()
+    f_status = (request.GET.get('status') or '').strip()  # annotated|unannotated
+
     items_qs = BenchmarkItem.objects.all().order_by('-created_at')
+    if f_subject:
+        items_qs = items_qs.filter(subject=f_subject)
+    if f_stratum:
+        items_qs = items_qs.filter(stratum=f_stratum)
+    if f_status == 'annotated':
+        items_qs = items_qs.annotate(
+            _ann_count=models.Count('annotations'),
+        ).filter(_ann_count__gt=0)
+    elif f_status == 'unannotated':
+        items_qs = items_qs.annotate(
+            _ann_count=models.Count('annotations'),
+        ).filter(_ann_count=0)
 
     items = []
     for item in items_qs:
@@ -78,6 +96,16 @@ def benchmark_list(request):
             'failure_category': latest.failure_category if latest else '',
         })
 
+    # Filter dropdown values — show only what's actually present in
+    # the data so the dropdowns don't list dead options.
+    distinct_subjects = sorted(set(
+        BenchmarkItem.objects.values_list('subject', flat=True)
+    ))
+    distinct_strata = sorted(set(
+        s for s in BenchmarkItem.objects.values_list('stratum', flat=True)
+        if s
+    ))
+
     # Count tutor turns currently eligible for sampling (post-2.2.5
     # instrumentation, not yet sampled). Drives the "X more available"
     # hint on the sample form. Cheap COUNT(*) — fine to do per request.
@@ -89,7 +117,66 @@ def benchmark_list(request):
         'items': items,
         'total': len(items),
         'eligible_new': eligible_new,
+        'filters': {
+            'subject': f_subject,
+            'stratum': f_stratum,
+            'status': f_status,
+        },
+        'distinct_subjects': distinct_subjects,
+        'distinct_strata': distinct_strata,
     })
+
+
+@staff_member_required
+@require_POST
+def benchmark_item_delete(request, item_id: str):
+    """Delete one BenchmarkItem (cascades its annotations).
+
+    POST-only with CSRF; the underlying SessionTurn is NOT touched —
+    only the snapshot row. The source turn becomes eligible for
+    re-sampling automatically (the sampler excludes items by
+    source_turn_id, which now no longer references this row).
+    """
+    item = get_object_or_404(BenchmarkItem, item_id=item_id)
+    ann_count = item.annotations.count()
+    item.delete()
+    if ann_count:
+        messages.success(
+            request,
+            f"Deleted {item_id} (and {ann_count} annotation"
+            f"{'s' if ann_count != 1 else ''}).",
+        )
+    else:
+        messages.success(request, f"Deleted {item_id}.")
+    return redirect('dashboard:benchmark:list')
+
+
+@staff_member_required
+@require_POST
+def benchmark_items_bulk_delete(request):
+    """Delete a user-selected set of BenchmarkItems.
+
+    Form fields:
+        item_ids: list of item_id values (checkboxes from list page).
+
+    Cascades each item's annotations. The underlying SessionTurns
+    are NOT touched — they become eligible for re-sampling.
+    """
+    item_ids = request.POST.getlist('item_ids')
+    if not item_ids:
+        messages.info(request, "Nothing selected.")
+        return redirect('dashboard:benchmark:list')
+    qs = BenchmarkItem.objects.filter(item_id__in=item_ids)
+    count = qs.count()
+    if count == 0:
+        messages.warning(request, "No matching items found.")
+    else:
+        qs.delete()
+        messages.success(
+            request,
+            f"Deleted {count} item{'s' if count != 1 else ''}.",
+        )
+    return redirect('dashboard:benchmark:list')
 
 
 @staff_member_required

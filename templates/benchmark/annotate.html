@@ -163,6 +163,18 @@
         <span><strong>Lesson</strong> {{ snapshot_item.lesson_title|default:"—" }}</span>
         {% if snapshot_item.current_step_type %}<span><strong>Step type</strong> <code>{{ snapshot_item.current_step_type }}</code></span>{% endif %}
         {% if snapshot_item.lesson_objective %}<span style="flex-basis:100%;"><strong>Objective</strong> {{ snapshot_item.lesson_objective }}</span>{% endif %}
+        <span style="margin-left:auto;">
+            <form method="post"
+                  action="{% url 'dashboard:benchmark:item_delete' item.item_id %}"
+                  onsubmit="return confirm('Delete {{ item.item_id }}? Its annotations go too.');"
+                  style="display:inline;">
+                {% csrf_token %}
+                <button type="submit"
+                        style="background:transparent;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;padding:0.3rem 0.65rem;font-size:0.75rem;font-weight:600;cursor:pointer;">
+                    Delete item
+                </button>
+            </form>
+        </span>
     </div>
 </div>
 

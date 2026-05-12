@@ -66,6 +66,53 @@
     }
     .sample-btn:hover { background:#4c1d95; }
     .sample-btn:disabled { background:#c4b5fd; cursor:not-allowed; }
+
+    /* Filter + bulk action bar */
+    .filter-bar {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.7rem 0.9rem; margin-bottom:1rem;
+        display:flex; gap:0.8rem; align-items:center; flex-wrap:wrap;
+        font-size:0.85rem;
+    }
+    .filter-bar label { font-size:0.75rem; color:#6b7280; font-weight:600; }
+    .filter-bar select {
+        padding:0.35rem 0.5rem; border:1px solid #d1d5db; border-radius:6px;
+        font-size:0.85rem; background:#fff;
+    }
+    .filter-bar .filter-actions { display:flex; gap:0.4rem; align-items:center; }
+    .filter-apply {
+        background:#5b21b6; color:#fff; border:none; border-radius:6px;
+        padding:0.35rem 0.8rem; font-size:0.82rem; font-weight:500;
+        cursor:pointer;
+    }
+    .filter-apply:hover { background:#4c1d95; }
+    .filter-clear {
+        background:transparent; color:#6b7280; border:none;
+        text-decoration:underline; font-size:0.78rem; cursor:pointer;
+        padding:0.35rem 0.4rem;
+    }
+    .filter-clear:hover { color:#111; }
+
+    .bulk-bar {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.55rem 0.85rem; margin-bottom:0.6rem;
+        display:flex; gap:0.6rem; align-items:center; font-size:0.85rem;
+    }
+    .bulk-bar .selected-count { color:#374151; font-weight:500; }
+    .danger-btn {
+        background:#dc2626; color:#fff; border:none; border-radius:6px;
+        padding:0.35rem 0.8rem; font-size:0.82rem; font-weight:500;
+        cursor:pointer;
+    }
+    .danger-btn:hover { background:#991b1b; }
+    .danger-btn:disabled { background:#fca5a5; cursor:not-allowed; }
+    .delete-link {
+        color:#b91c1c; font-size:0.78rem; text-decoration:none;
+        font-weight:500;
+    }
+    .delete-link:hover { color:#7f1d1d; text-decoration:underline; }
+    .check-col { width:28px; }
+    .check-col input[type=checkbox] { cursor:pointer; }
 </style>
 
 <div class="sample-card">
@@ -89,17 +136,69 @@
     </form>
 </div>
 
+{# Filter bar — GET form so filters land in the URL and can be bookmarked / shared. #}
+<form method="get" class="filter-bar" id="filter-form">
+    <span style="color:#6b7280;font-weight:600;text-transform:uppercase;font-size:0.7rem;letter-spacing:0.04em;">Filter</span>
+
+    <label for="f-subject">Subject</label>
+    <select name="subject" id="f-subject">
+        <option value="">all</option>
+        {% for s in distinct_subjects %}
+        <option value="{{ s }}" {% if filters.subject == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="f-stratum">Stratum</label>
+    <select name="stratum" id="f-stratum">
+        <option value="">all</option>
+        {% for s in distinct_strata %}
+        <option value="{{ s }}" {% if filters.stratum == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="f-status">Status</label>
+    <select name="status" id="f-status">
+        <option value="">all</option>
+        <option value="unannotated" {% if filters.status == 'unannotated' %}selected{% endif %}>unannotated</option>
+        <option value="annotated" {% if filters.status == 'annotated' %}selected{% endif %}>annotated</option>
+    </select>
+
+    <span class="filter-actions">
+        <button type="submit" class="filter-apply">Apply</button>
+        {% if filters.subject or filters.stratum or filters.status %}
+        <a href="{% url 'dashboard:benchmark:list' %}" class="filter-clear">clear</a>
+        {% endif %}
+    </span>
+</form>
+
 <div class="bench-summary">
-    <strong>{{ total }}</strong> sampled items.
-    Click an item to annotate (super-admin only).
-    See <code>memory/eval_benchmark_v2_simplified.md</code> for the rubric.
+    <strong>{{ total }}</strong> item{{ total|pluralize }} match{{ total|pluralize:"es," }} the current filter.
+    Tick rows to select; click an item to annotate.
 </div>
 
 {% if items %}
+{# Standalone bulk-delete form — checkboxes + bulk button reference
+   this via the HTML5 form= attribute so we don't nest forms inside
+   the table. #}
+<form method="post" action="{% url 'dashboard:benchmark:bulk_delete' %}" id="bulk-form"
+      onsubmit="return confirm('Delete the selected items? Their annotations are deleted too. The source SessionTurns are not touched.');">
+    {% csrf_token %}
+</form>
+
+<div class="bulk-bar">
+    <label style="display:flex;gap:0.4rem;align-items:center;">
+        <input type="checkbox" id="select-all" form="bulk-form"> Select all
+    </label>
+    <span class="selected-count" id="selected-count">0 selected</span>
+    <span style="flex:1;"></span>
+    <button type="submit" form="bulk-form" class="danger-btn" id="bulk-delete-btn" disabled>Delete selected</button>
+</div>
+
 <div class="bench-table">
     <table>
         <thead>
             <tr>
+                <th class="check-col"></th>
                 <th>Item</th>
                 <th>Subject</th>
                 <th>Lesson</th>
@@ -107,11 +206,16 @@
                 <th>Annotations</th>
                 <th>Verdict</th>
                 <th>Failure category</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
             {% for row in items %}
             <tr>
+                <td class="check-col">
+                    <input type="checkbox" name="item_ids" value="{{ row.item_id }}"
+                           form="bulk-form" class="row-check">
+                </td>
                 <td>
                     <a href="{% url 'dashboard:benchmark:annotate' row.item_id %}">{{ row.item_id }}</a>
                 </td>
@@ -133,16 +237,66 @@
                     {% endif %}
                 </td>
                 <td>{{ row.failure_category|default:"—" }}</td>
+                <td>
+                    {# Per-item delete is its own form, not nested in the
+                       bulk form, because it POSTs to a different URL. #}
+                    <form method="post"
+                          action="{% url 'dashboard:benchmark:item_delete' row.item_id %}"
+                          onsubmit="return confirm('Delete {{ row.item_id }}? Its annotations go too.');"
+                          style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="delete-link"
+                                style="background:transparent;border:none;cursor:pointer;">
+                            Delete
+                        </button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<script>
+    (function () {
+        const selectAll = document.getElementById('select-all');
+        const rowChecks = document.querySelectorAll('input.row-check');
+        const counter = document.getElementById('selected-count');
+        const btn = document.getElementById('bulk-delete-btn');
+
+        function refresh() {
+            const checked = document.querySelectorAll('input.row-check:checked').length;
+            counter.textContent = checked + ' selected';
+            btn.disabled = checked === 0;
+            if (selectAll) {
+                selectAll.checked = checked > 0 && checked === rowChecks.length;
+            }
+        }
+        if (selectAll) {
+            selectAll.addEventListener('change', () => {
+                rowChecks.forEach(cb => { cb.checked = selectAll.checked; });
+                refresh();
+            });
+        }
+        rowChecks.forEach(cb => cb.addEventListener('change', refresh));
+        refresh();
+    })();
+</script>
 {% else %}
 <div class="bench-table">
     <div class="empty">
-        <h3 style="color:#374151;margin-bottom:0.5rem;">No items sampled yet.</h3>
-        <p>Run <code>python manage.py sample_benchmark --limit 10 --seed 42</code> to populate.</p>
+        <h3 style="color:#374151;margin-bottom:0.5rem;">
+            {% if filters.subject or filters.stratum or filters.status %}
+                No items match the current filter.
+            {% else %}
+                No items sampled yet.
+            {% endif %}
+        </h3>
+        {% if filters.subject or filters.stratum or filters.status %}
+        <p><a href="{% url 'dashboard:benchmark:list' %}">Clear filter</a> or sample more above.</p>
+        {% else %}
+        <p>Use the "Sample more" button above or run <code>python manage.py sample_benchmark</code>.</p>
+        {% endif %}
     </div>
 </div>
 {% endif %}
