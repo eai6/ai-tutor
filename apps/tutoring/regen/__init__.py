@@ -68,9 +68,17 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------
 
 # Hard cap on regen cycles. Each cycle = N concurrent model calls + N
-# judge runs. With 3 models and 3 cycles worst case = 9 LLM calls + 9
-# judge orchestrator calls. Caps wall-clock to ~30s in worst case.
-DEFAULT_MAX_CYCLES = 3
+# judge runs. With N models and 4 cycles worst case = 4N LLM calls + 4N
+# judge orchestrator calls. Caps wall-clock to ~40s worst case.
+#
+# Spec (CLAUDE.md Architecture / Temperature controls):
+# - max cycles = 4
+# - temperature_start = 0.20, decay = 0.05 per cycle
+# - cycle 1 → 0.20, cycle 2 → 0.15, cycle 3 → 0.10, cycle 4 → 0.05
+# - early-exit as soon as any candidate is judge-clean (within a cycle)
+# - after cycle 4 without a clean candidate, send the best-scoring
+#   "least bad" candidate (or the stock fallback if nothing scored)
+DEFAULT_MAX_CYCLES = 4
 
 # Starting temperature for cycle 1. Each subsequent cycle drops by
 # DEFAULT_TEMPERATURE_DECAY (so the model becomes more deterministic).

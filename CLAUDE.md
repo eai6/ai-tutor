@@ -40,6 +40,12 @@ Azure commands require `az account set --subscription "Pixel Design Labs LLC"` f
 
 **Math tutoring.** For math lessons, the tutor must NOT evaluate a bare numeric answer. Teach via named subskills + named tips; use a rung-based complexity ladder. If touching `conversational_tutor.py` math paths, read `~/.claude/projects/-Users-edwardamoah-Documents-GitHub-ai-tutor/memory/feedback_math_tutoring.md` first.
 
+**Temperature controls (runtime invariants).** Enforced by `ModelConfig.effective_temperature` and the resolved `temperature` parameter on `BaseLLMClient.generate()`. Do not bypass.
+- **JUDGE** purpose: always **0** for evaluation consistency. The stored DB value is ignored at runtime.
+- **TUTORING** purpose: clamped to **[0.1, 0.3]**. Stored values outside this range are clamped at the API call site.
+- **REGEN** ensemble: starts at 0.20, decays 0.05 per cycle. Hard cap **4 cycles** (`DEFAULT_MAX_CYCLES`). Cycle temps: 0.20 → 0.15 → 0.10 → 0.05. Early-exit on any judge-clean candidate.
+- **All other purposes** (GENERATION, EXIT_TICKETS, REGEN per-call override, etc.) use the raw stored value or the explicit `temperature` kwarg.
+
 **Exit ticket = lesson competency (in progress).** `ExitTicket.passing_score` is the mastery threshold. Dead fields — do not add new references to: `Lesson.mastery_rule`, `StudentLessonProgress.{correct_streak, total_attempts, total_correct}`. See `memory/lesson_competency_plan.md` for the migration in flight.
 
 **Stuck content generation.** Lessons with `content_status='generating'` from failed runs must be manually reset to `pending`. Background threads may not log via `logger.info` in dev server — use `print("[ContentGen] ...", flush=True)` for visibility.

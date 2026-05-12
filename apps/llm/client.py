@@ -58,21 +58,36 @@ class BaseLLMClient(ABC):
         messages: list[dict],
         system_prompt: str,
         max_tokens: int | None = None,
+        *,
+        temperature: float | None = None,
     ) -> LLMResponse:
         """Generate a response from the LLM.
 
-        Wraps the subclass implementation in a tracing span. The span records
-        model, purpose, duration, tokens. Span is dropped (no-op) when no
-        buffer is active. See ``apps.tutoring.tracing``.
+        Wraps the subclass implementation in a tracing span. Applies
+        purpose-based temperature constraints (judges → 0, tutoring →
+        [0.1, 0.3]) via ``ModelConfig.effective_temperature``. Callers
+        may override with an explicit ``temperature`` kwarg — used by
+        the regen ensemble for per-cycle decay.
+
+        Span records model, purpose, duration, tokens. No-op when no
+        span buffer is active. See ``apps.tutoring.tracing``.
         """
         # Import inside to avoid a circular import at module load:
         # apps.llm imports → apps.tutoring → apps.llm.
         from apps.tutoring.tracing import emit_span
         purpose = getattr(self.config, 'purpose', '') or ''
+        # Resolve temperature: explicit kwarg wins; otherwise pull the
+        # purpose-clamped value (judges → 0, tutoring → [0.1, 0.3]).
+        if temperature is None:
+            temperature = getattr(self.config, 'effective_temperature', None)
+            if temperature is None:
+                temperature = self.config.temperature
         with emit_span('llm_call', 'generate',
                        model=self.config.model_name,
                        purpose=purpose) as span:
-            response = self._generate_impl(messages, system_prompt, max_tokens)
+            response = self._generate_impl(
+                messages, system_prompt, max_tokens, temperature=temperature,
+            )
             if span is not None:
                 span['tokens_in'] = response.tokens_in
                 span['tokens_out'] = response.tokens_out
@@ -84,9 +99,12 @@ class BaseLLMClient(ABC):
         messages: list[dict],
         system_prompt: str,
         max_tokens: int | None = None,
+        *,
+        temperature: float | None = None,
     ) -> LLMResponse:
         """Subclass implementation. Same shape as ``generate()`` but without
-        the tracing wrapper. Subclasses MUST override.
+        the tracing wrapper. Subclasses MUST override and use the resolved
+        ``temperature`` (never read ``self.config.temperature`` directly).
         """
         pass
 
@@ -155,7 +173,8 @@ class AnthropicClient(BaseLLMClient):
             return False
         return True
 
-    def _stream_kwargs(self, max_tokens: int, system_prompt: str, messages: list[dict]) -> dict:
+    def _stream_kwargs(self, max_tokens: int, system_prompt: str, messages: list[dict],
+                       temperature: float | None = None) -> dict:
         kwargs = dict(
             model=self.config.model_name,
             max_tokens=max_tokens,
@@ -163,7 +182,9 @@ class AnthropicClient(BaseLLMClient):
             messages=messages,
         )
         if self._supports_temperature():
-            kwargs["temperature"] = self.config.temperature
+            # Use the resolved temperature passed in by _generate_impl;
+            # fall back to config.temperature for legacy in-class callers.
+            kwargs["temperature"] = temperature if temperature is not None else self.config.temperature
         return kwargs
 
     def _generate_impl(
@@ -171,11 +192,15 @@ class AnthropicClient(BaseLLMClient):
         messages: list[dict],
         system_prompt: str,
         max_tokens: int | None = None,
+        *,
+        temperature: float | None = None,
     ) -> LLMResponse:
         """Call Claude API using streaming to avoid 10-minute timeout.
 
         Retries with exponential backoff on rate limit (429) and
-        overloaded (529) errors.
+        overloaded (529) errors. ``temperature`` is the resolved value
+        from ``BaseLLMClient.generate()`` (purpose-clamped or explicitly
+        overridden by the regen ensemble).
         """
         resolved_max_tokens = self._clamp_max_tokens(max_tokens or self.config.max_tokens)
 
@@ -185,6 +210,7 @@ class AnthropicClient(BaseLLMClient):
                 with self.client.messages.stream(
                     **self._stream_kwargs(
                         resolved_max_tokens, system_prompt, messages,
+                        temperature=temperature,
                     )
                 ) as stream:
                     for text in stream.text_stream:
@@ -337,6 +363,8 @@ class OllamaClient(BaseLLMClient):
         messages: list[dict],
         system_prompt: str,
         max_tokens: int | None = None,
+        *,
+        temperature: float | None = None,
     ) -> LLMResponse:
         """Call local Ollama API and return standardized response."""
         import requests
@@ -349,6 +377,8 @@ class OllamaClient(BaseLLMClient):
         api_base = self.config.api_base or "http://localhost:11434"
         url = f"{api_base}/api/chat"
 
+        resolved_temp = temperature if temperature is not None else self.config.temperature
+
         try:
             response = requests.post(
                 url,
@@ -357,7 +387,7 @@ class OllamaClient(BaseLLMClient):
                     "messages": ollama_messages,
                     "stream": False,
                     "options": {
-                        "temperature": self.config.temperature,
+                        "temperature": resolved_temp,
                         "num_predict": max_tokens or self.config.max_tokens,
                     }
                 },
@@ -404,6 +434,8 @@ class OpenAIClient(BaseLLMClient):
         messages: list[dict],
         system_prompt: str,
         max_tokens: int | None = None,
+        *,
+        temperature: float | None = None,
     ) -> LLMResponse:
         """Call OpenAI API and return standardized response."""
 
@@ -411,10 +443,12 @@ class OpenAIClient(BaseLLMClient):
         openai_messages = [{"role": "system", "content": system_prompt}]
         openai_messages.extend(messages)
 
+        resolved_temp = temperature if temperature is not None else self.config.temperature
+
         response = self.client.chat.completions.create(
             model=self.config.model_name,
             max_tokens=max_tokens or self.config.max_tokens,
-            temperature=self.config.temperature,
+            temperature=resolved_temp,
             messages=openai_messages,
         )
         
@@ -569,6 +603,8 @@ class GeminiClient(BaseLLMClient):
         messages: list[dict],
         system_prompt: str,
         max_tokens: int | None = None,
+        *,
+        temperature: float | None = None,
     ) -> LLMResponse:
         """Call Gemini API with Google Search grounding."""
         from google.genai import types
@@ -576,10 +612,12 @@ class GeminiClient(BaseLLMClient):
         gemini_contents = self._build_contents(messages)
         tools = self._search_tools()
 
+        resolved_temp = temperature if temperature is not None else self.config.temperature
+
         config_kwargs = dict(
             system_instruction=system_prompt,
             max_output_tokens=max_tokens or self.config.max_tokens,
-            temperature=self.config.temperature,
+            temperature=resolved_temp,
         )
         if tools:
             config_kwargs['tools'] = tools
@@ -723,6 +761,8 @@ class MockLLMClient(BaseLLMClient):
         messages: list[dict],
         system_prompt: str,
         max_tokens: int | None = None,
+        *,
+        temperature: float | None = None,
     ) -> LLMResponse:
         # Simple mock: echo back a response based on last message
         last_msg = messages[-1]["content"] if messages else ""

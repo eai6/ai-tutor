@@ -176,6 +176,14 @@ class ModelConfig(models.Model):
     max_tokens = models.PositiveIntegerField(default=1024)
     temperature = models.FloatField(default=0.7)
 
+    # Purpose-based temperature constraints — see effective_temperature
+    # property. JUDGE is forced to 0 for evaluation consistency; TUTORING
+    # is clamped to [0.1, 0.3] for controlled variability. Stored value
+    # may differ; runtime always uses effective_temperature.
+    TUTORING_TEMP_MIN = 0.1
+    TUTORING_TEMP_MAX = 0.3
+    JUDGE_TEMP = 0.0
+
     purpose = models.CharField(
         max_length=20,
         choices=Purpose.choices,
@@ -193,6 +201,31 @@ class ModelConfig(models.Model):
     def __str__(self):
         scope = self.institution.slug if self.institution else 'platform'
         return f"{self.name} - {self.model_name} ({scope})"
+
+    @property
+    def effective_temperature(self) -> float:
+        """Temperature to send to the API, applying purpose-based constraints.
+
+        Hard runtime invariants (see CLAUDE.md, agentic_platform_architecture_plan.md):
+
+        - **JUDGE**: always 0 — high consistency for evaluation. Even if the
+          stored ``temperature`` field is non-zero, the runtime clamps it.
+        - **TUTORING**: clamped to [0.1, 0.3] — controlled variability.
+        - **Other purposes** (GENERATION, REGEN, EXIT_TICKETS, etc.): uses
+          the raw stored value. REGEN is dynamically overridden per-cycle
+          by ``apps.tutoring.regen`` via the explicit ``temperature``
+          kwarg on ``BaseLLMClient.generate()``.
+
+        Explicit ``temperature`` kwargs passed to ``generate()`` bypass
+        this property entirely — that's the regen path.
+        """
+        purpose = (self.purpose or '').lower()
+        temp = self.temperature if self.temperature is not None else 1.0
+        if purpose == self.Purpose.JUDGE.value:
+            return self.JUDGE_TEMP
+        if purpose == self.Purpose.TUTORING.value:
+            return max(self.TUTORING_TEMP_MIN, min(self.TUTORING_TEMP_MAX, temp))
+        return temp
 
     @staticmethod
     def _get_fernet() -> Fernet:
