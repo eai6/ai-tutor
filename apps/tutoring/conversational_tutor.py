@@ -502,6 +502,69 @@ _THINKING_LEAK_RE = re.compile(
 
 
 # =============================================================================
+# Module helpers
+# =============================================================================
+
+
+# Numeric setup patterns the LLM uses when authoring a question (digits
+# followed by units / equation operators). Catches "48 km", "75 SCR",
+# "180°", "3x + 20 = 80", "5 kg", etc. without false-positiving on
+# transitional phrases like "Try this one:".
+_LEAD_IN_NUMERIC_SETUP_RE = re.compile(
+    r'\d+\s*(km|kg|m\b|cm|°|deg|SCR|\$|%|/|×|x\s*=|=|\+|-\s*\d)',
+    re.IGNORECASE,
+)
+# Verb phrases that indicate the lead_in is asking the student to do
+# something (i.e. carrying a question, not a transition).
+_LEAD_IN_QUESTION_VERB_RE = re.compile(
+    r'\b(solve|find\s+(x|the|what)|write\s+(the\s+)?equation|what\s+is\s+the|'
+    r'calculate|how\s+(many|much|do|does)|determine)\b',
+    re.IGNORECASE,
+)
+
+
+def _looks_like_authored_question(lead_in: str) -> bool:
+    """Heuristic: does the lead_in carry an authored question / numeric
+    setup the LLM should have left to the BANK slot?
+
+    Multiple weak signals OR one strong signal → True. Designed to
+    drop authored boat-problem-style lead_ins while leaving benign
+    transitions ("Try this:", "Now apply that.", "Here's one more.")
+    untouched.
+
+    Strong signals (any one triggers a drop):
+      - ends with '?'  (lead_in IS a question)
+      - contains numeric setup pattern (digits + unit / operator)
+      - contains a question verb phrase ("solve", "find x", etc.)
+
+    Weak signal:
+      - length > 120 chars (transitions don't need that much text)
+        — only triggers when combined with another signal so genuine
+        long transitions like "Now that you understand the rule, let's
+        apply it to a slightly trickier case." stay.
+    """
+    if not lead_in:
+        return False
+    text = lead_in.strip()
+    if not text:
+        return False
+
+    ends_with_q = text.endswith('?')
+    has_numeric_setup = bool(_LEAD_IN_NUMERIC_SETUP_RE.search(text))
+    has_question_verb = bool(_LEAD_IN_QUESTION_VERB_RE.search(text))
+    too_long = len(text) > 120
+
+    # Strong signals
+    if ends_with_q or has_numeric_setup or has_question_verb:
+        return True
+    # Weak signal must combine with another (none here besides length,
+    # so this is effectively a "very long, possibly authored" guard).
+    if too_long:
+        return True
+    return False
+
+
+# =============================================================================
 # CONVERSATIONAL TUTOR ENGINE
 # =============================================================================
 
@@ -4909,10 +4972,28 @@ Follow the current step; this concept will be covered in sequence."""
                     "lead_in": {
                         "type": "string",
                         "description": (
-                            "Optional one-sentence framing displayed "
-                            "before the question (e.g. \"Right — let's "
-                            "apply that. Try this:\"). Do NOT include a "
-                            "question yourself."
+                            "Optional SHORT TRANSITION shown before the "
+                            "bank question. This is a CONNECTOR, NOT a "
+                            "question.\n"
+                            "Hard constraints:\n"
+                            "  - At most ONE short sentence (≤80 chars).\n"
+                            "  - MUST NOT end with '?'.\n"
+                            "  - MUST NOT contain any numerical setup "
+                            "('48 km', 'three equal legs', 'x km', "
+                            "'75 SCR per kg', etc.).\n"
+                            "  - MUST NOT contain question prompts "
+                            "('solve', 'find x', 'write the equation', "
+                            "'what is the').\n"
+                            "GOOD lead_ins: \"Try this:\", "
+                            "\"Now apply that.\", \"Here's another:\", "
+                            "\"Let's check your understanding.\".\n"
+                            "BAD lead_ins: \"A boat travels 48 km in 3 "
+                            "legs — write the equation.\" (that's a "
+                            "question; put the question in the BANK slot "
+                            "instead). \"Solve for x.\" (instruction → "
+                            "let the bank question carry the verb).\n"
+                            "If unsure, leave empty — the bank question "
+                            "stands alone."
                         ),
                     },
                 },
@@ -5032,6 +5113,24 @@ Follow the current step; this concept will be covered in sequence."""
                 tool_input = getattr(block, 'input', {}) or {}
                 slot = tool_input.get('slot')
                 lead_in = (tool_input.get('lead_in') or '').strip()
+                # Server-side defense: the tool schema tells the LLM
+                # "lead_in is a transition, not a question" but in
+                # practice the LLM still drops an authored question
+                # in here (production session 252, 2026-05-12 — boat
+                # word problem in lead_in + MCQ from bank → two
+                # questions to the student). Detect + drop the bad
+                # lead_in so the rendered turn carries only the bank
+                # question.
+                if lead_in and _looks_like_authored_question(lead_in):
+                    logger.warning(
+                        "[QuestionTool] lead_in: DROPPED (looks like authored "
+                        "question) chars=%d preview=%r",
+                        len(lead_in), lead_in[:120],
+                    )
+                    turn_metadata.setdefault('dropped_lead_ins', []).append(
+                        lead_in[:200],
+                    )
+                    lead_in = ''
                 logger.info(
                     "[QuestionTool] tool_call: slot=%s lead_in=%r",
                     slot, lead_in[:80],
