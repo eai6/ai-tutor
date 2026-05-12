@@ -4095,11 +4095,17 @@ Follow the current step; this concept will be covered in sequence."""
             bare_count = self.bare_answer_counts_by_step.get(
                 self.current_topic_index, 0,
             )
+            current_step_type = ''
+            if self.current_topic_index < len(self.steps):
+                current_step_type = (
+                    self.steps[self.current_topic_index].step_type or ''
+                )
             system_prompt += self._build_math_eval_signal_block(
                 pending_check,
                 student_input,
                 bare_answer=bare,
                 bare_answer_count_for_step=bare_count,
+                step_type=current_step_type,
             )
 
         # P3 — bank grading verdict. When the previous turn rendered a
@@ -5976,40 +5982,110 @@ Follow the current step; this concept will be covered in sequence."""
         student_input: str,
         bare_answer: bool = False,
         bare_answer_count_for_step: int = 0,
+        step_type: str = '',
     ) -> str:
         """Render the <evaluation_signal> block appended to the system prompt
-        when a deterministic math check produced a definite result."""
+        when a deterministic math check produced a definite result.
+
+        ``step_type`` and ``bare_answer_count_for_step`` together scope
+        how aggressively the bare-answer "show working" rule is applied:
+
+        - Guided steps (teach / worked_example / summary): elementary
+          sub-questions like "what is 200 ÷ 25?" don't deserve a
+          show-working interrogation. The tutor is walking the student
+          through the steps; a one-number answer to a one-operation
+          prompt is the working. Use light-touch guidance.
+
+        - Independent practice (practice / quiz): enforce show-working
+          on the FIRST bare answer per step (matches the principle's
+          "ask ONCE"). On the second+ bare answer in the same step,
+          accept the value and continue — repeated probing is
+          interrogation, not teaching.
+        """
         verdict = "CORRECT" if check.is_correct else "INCORRECT"
+        guided_step = (step_type or '').strip().lower() in (
+            'teach', 'worked_example', 'summary',
+        )
         if bare_answer:
-            # Regardless of correctness, a bare answer must not be confirmed
-            # without working (math_teaching Rule 1). The signal therefore
-            # forces the tutor to ask for working FIRST.
-            guidance = (
-                "The student submitted a BARE numeric answer with no working"
-                " shown. Per math_teaching Rule 1, you MUST NOT say 'correct',"
-                " 'right', 'brilliant', 'you got it', or equivalent praise,"
-                " even if the answer happens to match.\n"
-                f"Echo the student's answer back verbatim ('You said"
-                f" {student_input.strip()[:80]}'), then ask them to walk you"
-                " through each step they took. Only after you see the working"
-                " should you confirm correctness or diagnose a subskill gap."
-            )
-            if bare_answer_count_for_step >= 2:
-                guidance += (
-                    "\nNOTE: This is the third+ bare answer on this step. Be"
-                    " patient — gently model what 'showing working' looks like"
-                    " by writing out one example step yourself, then invite"
-                    " them to try the next step that way."
+            if guided_step:
+                # Guided sub-question — the calculation IS the working.
+                if check.is_correct:
+                    guidance = (
+                        "This is a sub-step inside a guided walkthrough"
+                        f" (step_type={step_type}). The student's elementary"
+                        " calculation is correct. Confirm briefly (one"
+                        " short phrase, no over-praise) and move to the"
+                        " NEXT conceptual question. DO NOT ask them to"
+                        " 'show working' for a single-operation answer —"
+                        " the calculation IS the working at this scale."
+                    )
+                else:
+                    guidance = (
+                        "This is a sub-step inside a guided walkthrough"
+                        f" (step_type={step_type}). The student's"
+                        " calculation is incorrect. Point at the specific"
+                        " arithmetic error, give a short hint, and let"
+                        " them retry the same sub-step. Don't escalate to"
+                        " 'walk me through your working' for a one-"
+                        "operation calculation."
+                    )
+            elif bare_answer_count_for_step >= 1:
+                # Practice/quiz, but the bare-answer probe already
+                # fired on an earlier turn in this step. Don't repeat
+                # the interrogation — accept and continue.
+                if check.is_correct:
+                    guidance = (
+                        "Bare answer on practice step, but the show-"
+                        "working probe already fired earlier in this"
+                        " step. Confirm correctness briefly and advance"
+                        " — repeated probing is interrogation, not"
+                        " teaching."
+                    )
+                else:
+                    guidance = (
+                        "Bare answer on practice step, but the show-"
+                        "working probe already fired earlier in this"
+                        " step. Name the specific arithmetic that's"
+                        " wrong and give a short hint. Don't re-ask"
+                        " 'walk me through your working' for the third"
+                        " time."
+                    )
+            else:
+                # Practice/quiz, first bare answer in this step: ask
+                # ONCE for working (math_teaching Rule 1).
+                guidance = (
+                    "The student submitted a BARE numeric answer with no"
+                    " working shown on a practice/quiz step. Per"
+                    " math_teaching Rule 1, you MUST NOT say 'correct',"
+                    " 'right', 'brilliant', 'you got it', or equivalent"
+                    " praise, even if the answer happens to match.\n"
+                    f"Echo the student's answer back verbatim ('You said"
+                    f" {student_input.strip()[:80]}'), then ask them to"
+                    " walk you through each step they took. This is the"
+                    " ONLY turn this step where you ask for working —"
+                    " if they answer briefly again later in this step,"
+                    " accept it and continue."
                 )
         elif check.is_correct:
-            guidance = (
-                "The student's numeric answer matches the expected answer.\n"
-                "You may confirm correctness, but STILL follow Rule 1 of the"
-                " math_teaching block — if the student has not shown their"
-                " working, ask them to walk you through their steps before"
-                " moving on. Do not skip to the next concept without"
-                " verifying the working matches the answer."
-            )
+            if guided_step:
+                guidance = (
+                    "The student's answer matches. This is a guided"
+                    f" walkthrough step (step_type={step_type}) — confirm"
+                    " briefly and move to the next sub-question or"
+                    " concept. Don't demand additional working for a"
+                    " correct answer on a guided step."
+                )
+            else:
+                guidance = (
+                    "The student's numeric answer matches the expected"
+                    " answer.\n"
+                    "You may confirm correctness, but STILL follow Rule"
+                    " 1 of the math_teaching block — if the student has"
+                    " not shown their working, ask them to walk you"
+                    " through their steps before moving on. Do not skip"
+                    " to the next concept without verifying the working"
+                    " matches the answer."
+                )
         else:
             guidance = (
                 "The student's numeric answer does NOT match the expected"
