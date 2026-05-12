@@ -6386,6 +6386,50 @@ Follow the current step; this concept will be covered in sequence."""
             or (step.question or '').strip()
         )[:400]
 
+        # Surface MCQ option CONTENT when a bank question is in flight,
+        # so step_eval can recognize equivalence between a free-text
+        # student answer ("x = 8", "8") and the correct option's text
+        # ("C) 8"). Without this, the deterministic letter check fails
+        # any free-text answer and the engine never advances. See
+        # production transcript on 2026-05-12 — session 251.
+        mcq_options = None
+        correct_option_text = ''
+        bank_q = getattr(self, '_pending_bank_question', None)
+        if bank_q is not None:
+            # ExitTicketQuestion path
+            if hasattr(bank_q, 'option_a'):
+                opts = {
+                    'A': (bank_q.option_a or '').strip(),
+                    'B': (bank_q.option_b or '').strip(),
+                    'C': (bank_q.option_c or '').strip(),
+                    'D': (bank_q.option_d or '').strip(),
+                }
+                if any(opts.values()):
+                    mcq_options = opts
+                    correct_letter = (
+                        getattr(bank_q, 'correct_answer', '') or ''
+                    ).upper()
+                    correct_option_text = opts.get(correct_letter, '')
+            # LessonStep path — MCQ choices stored as a list
+            elif hasattr(bank_q, 'choices') and getattr(bank_q, 'choices', None):
+                choices = list(bank_q.choices)[:4]
+                if choices:
+                    mcq_options = {
+                        chr(ord('A') + i): str(c).strip()
+                        for i, c in enumerate(choices)
+                        if str(c).strip()
+                    }
+                    # For LessonStep, expected_answer carries either the
+                    # letter or the content. Try letter resolution first.
+                    expected_raw = (
+                        getattr(bank_q, 'expected_answer', '') or ''
+                    ).strip()
+                    if (expected_raw.upper() in mcq_options
+                            and len(expected_raw) == 1):
+                        correct_option_text = mcq_options[expected_raw.upper()]
+                    else:
+                        correct_option_text = expected_raw
+
         return {
             "step_type": step_type,
             "step_index": self.current_topic_index,
@@ -6402,6 +6446,10 @@ Follow the current step; this concept will be covered in sequence."""
             # missed context the broader LLM judgment can see.
             "deterministic_verdict": deterministic_verdict,
             "deterministic_source": deterministic_source,
+            # MCQ equivalence context (2026-05-12). None when the in-
+            # flight bank question isn't MCQ or has no options.
+            "mcq_options": mcq_options,
+            "correct_option_text": correct_option_text or None,
         }
 
     def _evaluate_step(self, student_input: str, tutor_response: str) -> Optional[StepEvaluationResult]:
