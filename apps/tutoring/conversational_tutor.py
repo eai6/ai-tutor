@@ -1930,6 +1930,16 @@ Keep it to 2-3 sentences."""
             if k in validation.metadata:
                 turn_metadata[k] = validation.metadata[k]
 
+        # Per-judge breakdown for benchmark eval — see
+        # memory/eval_benchmark_v2_simplified.md. Stored on a private
+        # key here; _save_turn pops it into SessionTurn.judge_outputs so
+        # the persisted metadata dict stays clean.
+        if combined_judge_result is not None and not combined_judge_result.skipped:
+            try:
+                turn_metadata['_judge_outputs'] = combined_judge_result.to_judge_outputs()
+            except Exception as exc:  # belt-and-braces — never block a tutor turn
+                logger.warning("[JudgeOutputs] failed to capture: %s", exc)
+
         # V3 — regen ensemble. Production logs (2026-05-07) showed the
         # previous single-call regen (which appended a constraint
         # block to the 30KB tutor system prompt) was being IGNORED by
@@ -8673,12 +8683,20 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
         answer-evaluation results on tutor turns so the teacher dashboard
         and regression queries can see why the tutor judged a given
         student answer.
+
+        Per-judge breakdown — when present under the private key
+        ``_judge_outputs`` — is pulled out and persisted on the
+        SessionTurn.judge_outputs column so it doesn't get duplicated
+        inside metadata. See memory/eval_benchmark_v2_simplified.md.
         """
+        md = dict(metadata) if metadata else {}
+        judge_outputs = md.pop('_judge_outputs', None) or {}
         SessionTurn.objects.create(
             session=self.session,
             role=role,
             content=content,
-            metadata=metadata or {},
+            metadata=md,
+            judge_outputs=judge_outputs,
         )
         # Structured per-turn log line for offline analysis (Phase 5 of
         # memory/martin_session_fix_plan.md). Single line covers the
@@ -8688,7 +8706,7 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
         # student turns keeps the log volume halved without losing
         # the verdict-side information.
         if role == "tutor":
-            self._emit_turn_summary_log(content, metadata or {})
+            self._emit_turn_summary_log(content, md)
 
     def _emit_turn_summary_log(self, content: str, metadata: Dict) -> None:
         """Emit one [TurnSummary] structured log line per tutor turn.

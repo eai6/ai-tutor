@@ -160,6 +160,66 @@ class CombinedJudgeResult:
             "combined_judge_skip_reason": self.skip_reason,
         }
 
+    def to_judge_outputs(self) -> dict:
+        """Per-judge breakdown for the benchmark evaluation tooling.
+
+        Distinct from to_metadata() (which flattens for legacy dashboard
+        compatibility). Emits a structured per-judge dict persisted on
+        SessionTurn.judge_outputs so the benchmark can auto-populate
+        labels (AUTHORED_QUESTION, INCOHERENT, FIGURE_MISMATCH, etc.)
+        at export time without re-running judges.
+
+        See memory/eval_benchmark_v2_simplified.md.
+        """
+        return {
+            "step_eval": {
+                "answer_correct": self.answer_correct,
+                "step_complete": self.step_complete,
+                "reasoning": self.step_eval_reasoning,
+                "skipped": self.step_eval_skipped,
+                "source": self.step_eval_source,
+            },
+            "arithmetic": {
+                "corrections": list(self.arithmetic_corrections),
+            },
+            "factual": {
+                "claims_checked": len(self.fact_claims),
+                "supported": [c.claim for c in self.fact_claims if c.status == "supported"],
+                "contradicted": [c.claim for c in self.fact_claims if c.status == "contradicted"],
+                "unverified": [c.claim for c in self.fact_claims if c.status == "unverified"],
+            },
+            "rule": {
+                "violations": [
+                    {
+                        "rule": v.rule,
+                        "evidence": v.evidence,
+                        "suggested_fix": v.suggested_fix,
+                    }
+                    for v in self.rule_violations
+                ],
+            },
+            "coherence": {
+                "violations": list(self.coherence_violations),
+            },
+            "figure_ref": {
+                "issues": list(self.figure_ref_issues),
+                "in_question": self.figure_ref_in_question,
+            },
+            "figure_vision": {
+                "aligned": self.figure_aligned,
+                "mismatch_reason": self.figure_mismatch_reason,
+                "summary": self.figure_summary,
+            },
+            "safety": {
+                "severity": self.safety_severity,
+                "categories": list(self.safety_categories),
+                "reasoning": self.safety_reasoning,
+            },
+            "skipped": self.skipped,
+            "skip_reason": self.skip_reason,
+            "sub_skipped": dict(self.sub_skipped),
+        }
+
 
 _JUDGE_SYSTEM = (
     "You are a strict reviewer for a tutor's most recent response. "
