@@ -146,15 +146,16 @@ def run_all_judges(
     }
 
     # Resolve history window. settings.JUDGE_HISTORY_TURNS is the
-    # default; callers can override per-call (e.g. tests). The actual
-    # turn count used is recorded on the result so the benchmark can
-    # slice agreement by history-aware vs not.
+    # default (currently 12 — ~6 student + 6 tutor exchanges before
+    # the current pair); callers can override per-call (e.g. tests).
+    # The actual turn count used is recorded on the result so the
+    # benchmark can slice agreement by history-aware vs not.
     if history_turns is None:
         try:
             from django.conf import settings
-            history_turns = int(getattr(settings, 'JUDGE_HISTORY_TURNS', 4))
+            history_turns = int(getattr(settings, 'JUDGE_HISTORY_TURNS', 12))
         except Exception:
-            history_turns = 4
+            history_turns = 12
     prior_exchanges = format_history_window(
         conversation_history, turns=history_turns,
     )

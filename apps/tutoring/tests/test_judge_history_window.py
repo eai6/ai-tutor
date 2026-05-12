@@ -182,3 +182,19 @@ class RunAllJudgesHistoryForwardingTest(SimpleTestCase):
             )
         self.assertEqual(result.history_turns_used, 0)
         self.assertEqual(result.to_metadata()["judge_history_turns"], 0)
+
+
+class JudgeHistoryDefaultWindowTest(SimpleTestCase):
+    """The default JUDGE_HISTORY_TURNS was bumped from 4 to 12 on
+    2026-05-12 to catch cross-turn coherence violations on longer
+    sessions. Pin the default so accidental shrinks get caught."""
+
+    def test_default_is_12_when_setting_omitted(self):
+        from django.conf import settings as dj_settings
+        self.assertEqual(
+            int(getattr(dj_settings, 'JUDGE_HISTORY_TURNS', 0)),
+            12,
+            "JUDGE_HISTORY_TURNS default must be 12 (post-2026-05-12). "
+            "If you intend to shrink it, update this test and the "
+            "settings.py comment together.",
+        )

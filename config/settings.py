@@ -201,14 +201,23 @@ ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY', '')
 ELEVENLABS_VOICE_ID = os.getenv('ELEVENLABS_VOICE_ID', '2vbhUP8zyKg4dEZaTWGn')
 ELEVENLABS_MODEL_ID = os.getenv('ELEVENLABS_MODEL_ID', 'eleven_multilingual_v2')
 
-# Judge history window (Phase 2.2.5). The number of trailing
-# conversation turns passed to history-sensitive judges (coherence /
-# factual / rule). 0 disables (legacy behaviour). 4 = ~2 student + 2
-# tutor exchanges before the current pair. Each turn is internally
-# capped at 400 chars so prompt size is predictable.
+# Judge history window. The number of trailing conversation turns
+# passed to history-sensitive judges (coherence / factual / rule).
+# 0 disables (legacy behaviour, pre-Phase-2.2.5).
+#
+# Default bumped from 4 → 12 on 2026-05-12 per pilot feedback: a
+# 4-turn window missed cross-turn coherence violations where the
+# tutor contradicted something said 5-8 turns ago. 12 turns ≈
+# ~6 student + 6 tutor exchanges before the current pair, capped
+# at 400 chars per turn → ~4800 chars total. Predictable budget,
+# meaningful coverage. Going wider (whole session) would blow up
+# token cost on long sessions and recalibrate all judge prompts
+# at once; we'll only widen further if the benchmark shows the
+# 12-turn window still misses real failures.
+#
 # Recorded on SessionTurn.metadata['judge_history_turns'] so the
 # benchmark can slice agreement by history-aware vs not.
-JUDGE_HISTORY_TURNS = int(os.getenv('JUDGE_HISTORY_TURNS', '4'))
+JUDGE_HISTORY_TURNS = int(os.getenv('JUDGE_HISTORY_TURNS', '12'))
 
 # Auth settings
 LOGIN_URL = '/accounts/login/'
