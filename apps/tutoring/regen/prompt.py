@@ -214,6 +214,30 @@ def _violation_line(issue: str, meta: Dict) -> str:
         violations = meta.get("coherence_violations") or []
         if violations:
             joined = "; ".join(str(v)[:140] for v in violations[:3])
+            # Distinguish parallel-questions case so the LLM sees a
+            # focused fix pattern. Heuristic: the coherence violation
+            # mentions "two", "parallel", or "questions".
+            is_dual_question = any(
+                kw in str(joined).lower()
+                for kw in ("two parallel", "two distinct", "parallel question")
+            )
+            if is_dual_question:
+                return (
+                    "- TUTOR_INCOHERENT (parallel questions): the "
+                    "response asked TWO distinct questions in one "
+                    f"turn. Specifically: {joined}.\n"
+                    "  Fix: pick ONE question — the one that moves "
+                    "the student forward at THIS step. Drop the "
+                    "other. A focused turn has ONE acknowledgment "
+                    "(at most) + ONE question.\n"
+                    "  Example: BEFORE: \"You're thinking about the "
+                    "operations. What was the first thing you "
+                    "noticed? [MCQ: If x + 15 = 40, what is x?]\" "
+                    "AFTER: \"You're thinking about the operations — "
+                    "good. [MCQ: If x + 15 = 40, what is x?]\" "
+                    "(acknowledgment kept, conceptual probe dropped, "
+                    "MCQ stands alone)"
+                )
             return (
                 "- TUTOR_INCOHERENT: the response contradicted itself "
                 "OR contradicted a prior turn.\n"

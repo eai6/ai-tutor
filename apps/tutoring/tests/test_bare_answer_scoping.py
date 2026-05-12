@@ -101,10 +101,15 @@ class PracticeStepBareAnswerCountedTest(SimpleTestCase):
             step_type='practice',
         )
         self.assertIn("BARE numeric answer", block)
-        self.assertIn("walk you through each step", block)
         self.assertIn("MUST NOT say 'correct'", block)
         # The "ask once" guarantee
         self.assertIn("ONLY turn this step where you ask for working", block)
+        # Step-level probe guidance — explicit GOOD vs BAD probes
+        self.assertIn("STEP-LEVEL probe", block)
+        self.assertIn("GOOD probes", block)
+        self.assertIn("BAD probes", block)
+        # Specifically calls out the value-level interrogation pattern
+        self.assertIn("calculate 50 / 10", block)
 
     def test_practice_subsequent_bare_answer_does_not_re_ask(self):
         tutor = _bind_tutor()

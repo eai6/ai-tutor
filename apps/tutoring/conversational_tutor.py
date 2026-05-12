@@ -228,6 +228,17 @@ MATHEMATICS-SPECIFIC TEACHING (apply when subject is Math/Mathematics)
 - If the student gave a BARE answer with no working, ask ONCE — in your
   own words — for their reasoning. Do not drip-feed step-by-step
   follow-ups across multiple turns; that's interrogation, not teaching.
+- PROBE AT THE STEP LEVEL, NOT THE VALUE LEVEL. When the student
+  states a correct elementary result (e.g. "50 / 10 = 5", "190 - 90 =
+  100", "8 × 25 = 200"), accept it and move on — the operation IS
+  the working. Probe questions belong at the strategy / decision
+  level, never on the value of a single elementary calculation.
+  GOOD probes: "Which operation should we apply first?", "Why did
+  you divide?", "What rule are we using here?", "What does this
+  result tell us about the original problem?"
+  BAD probes: "How did you calculate 50 / 10?", "Walk me through
+  8 × 25.", "How did you get 5?" — these are interrogations of
+  elementary arithmetic the student already showed.
 - CHECK INTERMEDIATE STEPS in working that has been shown, not the final
   answer alone. A correct answer with wrong method means the student
   doesn't truly understand.
@@ -6177,7 +6188,8 @@ Follow the current step; this concept will be covered in sequence."""
                     )
             else:
                 # Practice/quiz, first bare answer in this step: ask
-                # ONCE for working (math_teaching Rule 1).
+                # ONCE for working (math_teaching Rule 1). Probe at
+                # the STEP level, not on individual elementary values.
                 guidance = (
                     "The student submitted a BARE numeric answer with no"
                     " working shown on a practice/quiz step. Per"
@@ -6185,11 +6197,18 @@ Follow the current step; this concept will be covered in sequence."""
                     " 'right', 'brilliant', 'you got it', or equivalent"
                     " praise, even if the answer happens to match.\n"
                     f"Echo the student's answer back verbatim ('You said"
-                    f" {student_input.strip()[:80]}'), then ask them to"
-                    " walk you through each step they took. This is the"
-                    " ONLY turn this step where you ask for working —"
-                    " if they answer briefly again later in this step,"
-                    " accept it and continue."
+                    f" {student_input.strip()[:80]}'), then ask ONE"
+                    " STEP-LEVEL probe — strategy / decision / rule, not"
+                    " the value of an elementary calculation.\n"
+                    "GOOD probes: 'Which operation did you apply first?',"
+                    " 'Why did you divide?', 'What rule did you use?'.\n"
+                    "BAD probes: 'How did you calculate 50 / 10?', 'Walk"
+                    " me through 8 × 25.' — these are interrogations of"
+                    " single-operation arithmetic and should NEVER be"
+                    " asked.\n"
+                    "This is the ONLY turn this step where you ask for"
+                    " working — if they answer briefly again later in"
+                    " this step, accept it and continue."
                 )
         elif check.is_correct:
             if guided_step:
@@ -6218,9 +6237,11 @@ Follow the current step; this concept will be covered in sequence."""
                 " 'well done', 'you got it', 'exactly', 'perfect', or any"
                 " equivalent praise. Do not state the correct answer yet.\n"
                 "Echo the student's answer back to them verbatim ('You said"
-                f" {student_input.strip()[:80]}'), then ask them to walk you"
-                " through how they got it. Use the math_teaching rules to"
-                " diagnose which subskill failed."
+                f" {student_input.strip()[:80]}'), then ask ONE STEP-LEVEL"
+                " probe — which operation, which rule, what came first."
+                " NEVER ask 'how did you calculate X?' on a single"
+                " elementary operation — probe at the strategy level so"
+                " you can diagnose the subskill that failed."
             )
         block = (
             "\n\n<evaluation_signal>"
