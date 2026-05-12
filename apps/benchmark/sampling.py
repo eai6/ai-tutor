@@ -144,6 +144,12 @@ def build_item_snapshot(tutor_turn: SessionTurn) -> Dict:
         # + judge_outputs so the annotation UI can show what each
         # regen attempt looked like. {} on turns that didn't regen.
         'regen_audit': metadata.get('regen_audit', {}),
+        # Prompt-pack fingerprints (Phase 2.x) — tutor system prompt
+        # hash + per-judge prompt hashes. Lets the annotation UI show
+        # WHICH prompt revisions produced a given response/verdict so
+        # behaviour shifts can be attributed to specific changes.
+        # {} on legacy turns predating the prompt_pack capture.
+        'prompt_pack': metadata.get('prompt_pack', {}),
         # Full per-judge breakdown — for benchmark scoring + auto-population
         'judge_outputs': judge_outputs,
     }

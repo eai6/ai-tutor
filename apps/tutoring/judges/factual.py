@@ -55,6 +55,9 @@ _SYSTEM = (
     "If input.factual_claims is empty, return {\"fact_claims\": []}.\n"
 )
 
+from apps.tutoring.judges._prompt_meta import prompt_fingerprint
+PROMPT_HASH, PROMPT_CHARS = prompt_fingerprint(_SYSTEM)
+
 
 @traced_judge('factual')
 def run_factual_judge(

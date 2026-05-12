@@ -2023,6 +2023,25 @@ Keep it to 2-3 sentences."""
             except Exception as exc:  # belt-and-braces — never block a tutor turn
                 logger.warning("[JudgeOutputs] failed to capture: %s", exc)
 
+        # Prompt-pack fingerprints — tutor system prompt hash + per-judge
+        # prompt hashes, combined for the benchmark snapshot. Lets the
+        # annotation UI display which prompt revision produced a given
+        # response/verdict so prompt iterations are auditable.
+        try:
+            tutor_meta = getattr(self, '_last_tutor_prompt_meta', None) or {}
+            judges_meta = {}
+            if combined_judge_result is not None:
+                judges_meta = dict(
+                    getattr(combined_judge_result, 'prompt_versions', {}) or {}
+                )
+            if tutor_meta or judges_meta:
+                turn_metadata['prompt_pack'] = {
+                    'tutor_system': tutor_meta,
+                    'judges': judges_meta,
+                }
+        except Exception as exc:
+            logger.warning("[PromptPack] failed to capture: %s", exc)
+
         # V3 — regen ensemble. Production logs (2026-05-07) showed the
         # previous single-call regen (which appended a constraint
         # block to the 30KB tutor system prompt) was being IGNORED by
@@ -3748,6 +3767,13 @@ Follow the current step; this concept will be covered in sequence."""
                 + (prompt or "").strip()
                 + "\n</turn_directive>"
             )
+            # Fingerprint the EXACT prompt the LLM will see, so the
+            # benchmark can record WHICH prompt revision produced a
+            # given response. Stashed for the surrounding respond()
+            # to pick up into turn_metadata['prompt_pack'].
+            from apps.tutoring.judges._prompt_meta import prompt_fingerprint
+            _ph, _pc = prompt_fingerprint(system_prompt)
+            self._last_tutor_prompt_meta = {'hash': _ph, 'chars': _pc}
 
             is_math = False
             try:

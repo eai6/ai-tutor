@@ -123,6 +123,28 @@ def run_all_judges(
     # gracefully if the model can't process images.
     vc = vision_client if vision_client is not None else llm_client
 
+    # Populate prompt fingerprints — one entry per LLM-using judge,
+    # plus '(deterministic)' markers for the two pure-Python judges.
+    # SessionTurn.metadata['prompt_pack'] will pick this up via
+    # CombinedJudgeResult.prompt_versions → to_judge_outputs(). Lets
+    # the benchmark correlate behaviour shifts with specific prompt
+    # revisions when prompts evolve.
+    from apps.tutoring.judges import (
+        coherence as _coh_mod, factual as _fact_mod,
+        rule as _rule_mod, step_eval as _step_mod, safety as _safe_mod,
+        figure_vision as _figvis_mod,
+    )
+    result.prompt_versions = {
+        'arithmetic':    {'hash': '(deterministic)', 'chars': 0},
+        'coherence':     {'hash': _coh_mod.PROMPT_HASH,    'chars': _coh_mod.PROMPT_CHARS},
+        'factual':       {'hash': _fact_mod.PROMPT_HASH,   'chars': _fact_mod.PROMPT_CHARS},
+        'rule':          {'hash': _rule_mod.PROMPT_HASH,   'chars': _rule_mod.PROMPT_CHARS},
+        'step_eval':     {'hash': _step_mod.PROMPT_HASH,   'chars': _step_mod.PROMPT_CHARS},
+        'safety':        {'hash': _safe_mod.PROMPT_HASH,   'chars': _safe_mod.PROMPT_CHARS},
+        'figure_ref':    {'hash': '(deterministic)', 'chars': 0},
+        'figure_vision': {'hash': _figvis_mod.PROMPT_HASH, 'chars': _figvis_mod.PROMPT_CHARS},
+    }
+
     # Resolve history window. settings.JUDGE_HISTORY_TURNS is the
     # default; callers can override per-call (e.g. tests). The actual
     # turn count used is recorded on the result so the benchmark can

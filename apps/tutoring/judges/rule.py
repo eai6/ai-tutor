@@ -70,6 +70,9 @@ _SYSTEM = (
     "Empty array when nothing to flag.\n"
 )
 
+from apps.tutoring.judges._prompt_meta import prompt_fingerprint
+PROMPT_HASH, PROMPT_CHARS = prompt_fingerprint(_SYSTEM)
+
 
 @traced_judge('rule')
 def run_rule_judge(

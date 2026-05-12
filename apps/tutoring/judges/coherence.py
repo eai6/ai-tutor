@@ -76,6 +76,9 @@ _SYSTEM = (
     "Empty array when nothing to flag.\n"
 )
 
+from apps.tutoring.judges._prompt_meta import prompt_fingerprint
+PROMPT_HASH, PROMPT_CHARS = prompt_fingerprint(_SYSTEM)
+
 
 # Cheap pre-gate: skip the LLM when the response is too short to
 # plausibly contradict itself, OR is clearly conversational filler.

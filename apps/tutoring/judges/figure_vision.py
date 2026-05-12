@@ -87,6 +87,10 @@ def _has_figure_question(text: str) -> bool:
     return any(r in low for r in fig_refs)
 
 
+from apps.tutoring.judges._prompt_meta import prompt_fingerprint
+PROMPT_HASH, PROMPT_CHARS = prompt_fingerprint(_SYSTEM)
+
+
 @traced_judge('figure_vision')
 def run_figure_vision_judge(
     response_text: str,

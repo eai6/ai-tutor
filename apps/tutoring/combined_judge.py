@@ -103,6 +103,13 @@ class CombinedJudgeResult:
     # history was provided or the window was empty. Recorded so the
     # benchmark can slice agreement by history-aware vs not.
     history_turns_used: int = 0
+    # Prompt-pack fingerprints — per-judge sha1(first 10) + char count.
+    # Set by run_all_judges. Surfaces through to_judge_outputs() and
+    # to_metadata() so SessionTurn.metadata['prompt_pack']['judges']
+    # records WHICH prompt revision produced this verdict. Empty when
+    # the judges weren't run via run_all_judges (e.g. legacy direct
+    # calls in tests).
+    prompt_versions: Dict[str, dict] = field(default_factory=dict)
 
     @property
     def has_arithmetic_corrections(self) -> bool:
@@ -225,6 +232,7 @@ class CombinedJudgeResult:
                 "reasoning": self.safety_reasoning,
             },
             "history_turns_used": self.history_turns_used,
+            "prompt_versions": dict(self.prompt_versions or {}),
             "skipped": self.skipped,
             "skip_reason": self.skip_reason,
             "sub_skipped": dict(self.sub_skipped),
