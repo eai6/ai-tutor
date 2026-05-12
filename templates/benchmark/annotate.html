@@ -193,6 +193,24 @@
             <div class="ann-card">
                 <h3>Production tutor response</h3>
                 <div class="tutor-response">{{ tutor_response }}</div>
+                {% if attached_media %}
+                <div style="margin-top:0.75rem;padding:0.75rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;">
+                    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;color:#6b7280;font-weight:600;margin-bottom:0.5rem;">
+                        Attached figure ({{ attached_media|length }}) — what the student saw
+                    </div>
+                    {% for m in attached_media %}
+                    <div style="margin-bottom:0.75rem;">
+                        {% if m.url %}
+                        <img src="{{ m.url }}" alt="{{ m.alt|default:'' }}"
+                             style="max-width:100%;max-height:340px;border-radius:6px;display:block;background:#fff;"
+                             loading="lazy" decoding="async">
+                        {% endif %}
+                        {% if m.caption %}<div style="font-size:0.78rem;color:#6b7280;margin-top:0.3rem;">{{ m.caption }}</div>{% endif %}
+                        {% if m.title %}<div style="font-size:0.75rem;color:#9ca3af;margin-top:0.2rem;font-family:ui-monospace,Menlo,monospace;">{{ m.title }}</div>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
 
             <div class="ann-card">

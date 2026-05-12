@@ -8792,6 +8792,22 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
         """
         md = dict(metadata) if metadata else {}
         judge_outputs = md.pop('_judge_outputs', None) or {}
+
+        # Attach the figure the LLM signalled this turn (|||MEDIA:N|||
+        # parser stores it on self._turn_media keyed by conversation
+        # index). Persisted on SessionTurn.metadata so the benchmark
+        # snapshot can render the figure in the annotation UI — needed
+        # to validate FIGURE_MISMATCH labels.
+        # Conversation hasn't been appended yet at _save_turn time, so
+        # the upcoming index for THIS turn equals len(self.conversation).
+        if role == 'tutor' and 'attached_media' not in md:
+            turn_idx = len(getattr(self, 'conversation', []) or [])
+            media_for_turn = (
+                getattr(self, '_turn_media', {}) or {}
+            ).get(str(turn_idx))
+            if media_for_turn:
+                md['attached_media'] = [media_for_turn]
+
         turn = SessionTurn.objects.create(
             session=self.session,
             role=role,

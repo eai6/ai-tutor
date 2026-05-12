@@ -168,9 +168,16 @@ def build_item_snapshot(tutor_turn: SessionTurn) -> Dict:
         },
     }
 
+    # Attached figure for this turn (Phase 2.4.x) — picked up from
+    # SessionTurn.metadata['attached_media'], itself populated centrally
+    # in ConversationalTutor._save_turn. Lets the annotation UI render
+    # the figure when validating FIGURE_MISMATCH labels.
+    attached_media = list(metadata.get('attached_media') or [])
+
     production = {
         'tutor_response': anonymize(tutor_turn.content or ''),
         'pipeline_trace': pipeline_trace,
+        'attached_media': attached_media,
         'suggested_labels': suggested_labels,
     }
 

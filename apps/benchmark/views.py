@@ -284,6 +284,7 @@ def benchmark_annotate(request, item_id: str):
         'item': item,
         'snapshot_item': item_block,
         'tutor_response': production.get('tutor_response', ''),
+        'attached_media': production.get('attached_media') or [],
         'pipeline_trace': pipeline_trace,
         'judge_outputs': pipeline_trace.get('judge_outputs', {}),
         'suggested_labels': suggested,
