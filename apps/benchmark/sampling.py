@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional
 
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 
 from apps.benchmark.autopopulate import derive_suggested_labels
 from apps.tutoring.models import SessionTurn
@@ -189,7 +189,8 @@ def make_item_id(course_subject_type: str, course_title: str,
 # ---------------------------------------------------------------------------
 
 def candidate_tutor_turns(*, subject: Optional[str] = None,
-                          exclude_sampled: bool = True) -> QuerySet:
+                          exclude_sampled: bool = True,
+                          require_full_tracking: bool = True) -> QuerySet:
     """Tutor turns eligible for sampling.
 
     Filters:
@@ -198,6 +199,18 @@ def candidate_tutor_turns(*, subject: Optional[str] = None,
     - session has a lesson + course (filters out test/incomplete sessions)
     - optionally restricted to a subject
     - optionally excludes turns already in the benchmark
+    - by default, excludes legacy turns missing Phase 2.2.5 instrumentation
+      (see ``require_full_tracking``)
+
+    Args:
+        require_full_tracking: when True (default), only return turns
+            that have both ``judge_outputs`` populated (per-judge
+            breakdown, shipped 2026-05-11) AND ``metadata`` carrying
+            the ``judge_history_turns`` key (history-aware judges,
+            shipped 2026-05-12). This is the cohort with complete
+            quality-tracking data; pre-Phase-2.2.5 turns are skipped.
+            Pass False to include legacy traces (useful as a control
+            cohort or for backfilling historical baselines).
     """
     from apps.benchmark.models import BenchmarkItem
 
@@ -217,6 +230,16 @@ def candidate_tutor_turns(*, subject: Optional[str] = None,
             qs = qs.filter(session__lesson__unit__course__subject_type__in=['humanities', 'geography'])
         elif subject == 'science':
             qs = qs.filter(session__lesson__unit__course__subject_type='science')
+
+    if require_full_tracking:
+        # Two-part filter — both must hold:
+        # 1. judge_outputs is non-empty (Phase 2.0+ per-judge breakdown)
+        # 2. metadata carries judge_history_turns key (Phase 2.2.5
+        #    history-aware judges; key present even when value is 0
+        #    on the first turn of a session)
+        qs = qs.exclude(
+            Q(judge_outputs__isnull=True) | Q(judge_outputs={})
+        ).filter(metadata__has_key='judge_history_turns')
 
     if exclude_sampled:
         already = BenchmarkItem.objects.values_list('source_turn_id', flat=True)
@@ -257,6 +280,75 @@ def stratify(qs: QuerySet) -> Dict[str, List[SessionTurn]]:
         'wrong_answer': wrong,
         'validator_flagged': flagged,
         'random': random_bucket,
+    }
+
+
+def create_benchmark_items(
+    *,
+    limit: int,
+    subject: Optional[str] = None,
+    require_full_tracking: bool = True,
+    seed: Optional[int] = None,
+    created_by=None,
+) -> Dict:
+    """One-call helper for sampling N items and persisting them.
+
+    Shared between the management command and the dashboard UI. Returns
+    a dict summarising what happened — caller picks how to render it
+    (CLI prints; UI flashes).
+
+    Returns:
+        ``{
+            'created': int,                 # rows newly inserted
+            'skipped': int,                 # rows already existed (idempotent)
+            'eligible': int,                # candidate pool size before sampling
+            'sampled': int,                 # items returned by sample_proportional
+            'stratum_breakdown': {name: count},  # of newly created items
+        }``
+    """
+    from apps.benchmark.models import BenchmarkItem
+
+    candidates = candidate_tutor_turns(
+        subject=subject,
+        require_full_tracking=require_full_tracking,
+    )
+    eligible = candidates.count()
+    strata = stratify(candidates)
+    picks = sample_proportional(strata, limit=limit, seed=seed)
+
+    created = 0
+    skipped = 0
+    stratum_breakdown: Dict[str, int] = {}
+    for stratum_name, turn in picks:
+        snapshot = build_item_snapshot(turn)
+        defaults = {
+            'source_turn': turn,
+            'subject': snapshot['item']['subject'],
+            'lesson_id': snapshot['item']['lesson_id'],
+            'snapshot': snapshot,
+            'stratum': stratum_name,
+        }
+        if created_by is not None:
+            defaults['created_by'] = created_by
+
+        _obj, was_created = BenchmarkItem.objects.update_or_create(
+            item_id=snapshot['item']['item_id'],
+            defaults=defaults,
+        )
+        if was_created:
+            created += 1
+            stratum_breakdown[stratum_name] = (
+                stratum_breakdown.get(stratum_name, 0) + 1
+            )
+        else:
+            skipped += 1
+
+    return {
+        'created': created,
+        'skipped': skipped,
+        'eligible': eligible,
+        'sampled': len(picks),
+        'stratum_breakdown': stratum_breakdown,
     }
 
 

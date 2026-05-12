@@ -40,7 +40,54 @@
     .pill-stratum { background:#fef3c7; color:#92400e; }
 
     .empty { padding:3rem 1rem; text-align:center; color:#6b7280; }
+
+    /* Sample-on-demand form */
+    .sample-card {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.85rem 1.1rem; margin-bottom:1rem;
+        display:flex; gap:1rem; align-items:center; flex-wrap:wrap;
+    }
+    .sample-card .left { flex:1; min-width:240px; }
+    .sample-card .label-row { font-size:0.78rem; color:#6b7280; }
+    .sample-card .count { font-size:1.3rem; font-weight:700; color:#111; line-height:1.1; }
+    .sample-card form { display:flex; gap:0.5rem; align-items:center; }
+    .sample-card input[type=number] {
+        width:80px; padding:0.4rem 0.55rem; border:1px solid #d1d5db;
+        border-radius:6px; font-size:0.9rem; font-family:inherit;
+    }
+    .sample-card .legacy-toggle {
+        display:flex; gap:0.3rem; align-items:center;
+        font-size:0.78rem; color:#6b7280;
+    }
+    .sample-btn {
+        background:#5b21b6; color:#fff; border:none; border-radius:6px;
+        padding:0.45rem 0.95rem; font-size:0.88rem; font-weight:600;
+        cursor:pointer;
+    }
+    .sample-btn:hover { background:#4c1d95; }
+    .sample-btn:disabled { background:#c4b5fd; cursor:not-allowed; }
 </style>
+
+<div class="sample-card">
+    <div class="left">
+        <div class="label-row">Eligible new tutor turns available</div>
+        <div class="count">{{ eligible_new }}</div>
+        <div class="label-row" style="margin-top:0.2rem;">
+            Drawn from sessions with full quality-tracking
+            (<code>judge_outputs</code> + <code>judge_history_turns</code>).
+            Already-sampled turns excluded.
+        </div>
+    </div>
+    <form method="post" action="{% url 'dashboard:benchmark:sample_create' %}">
+        {% csrf_token %}
+        <label for="sample-count" style="font-size:0.85rem;color:#374151;">Sample</label>
+        <input type="number" id="sample-count" name="count" value="10" min="1" max="50">
+        <button type="submit" class="sample-btn">more →</button>
+        <label class="legacy-toggle" title="Include pre-Phase-2.2.5 traces that lack judge_history_turns.">
+            <input type="checkbox" name="include_legacy"> legacy
+        </label>
+    </form>
+</div>
 
 <div class="bench-summary">
     <strong>{{ total }}</strong> sampled items.

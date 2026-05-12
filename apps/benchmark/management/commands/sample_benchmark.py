@@ -69,14 +69,26 @@ class Command(BaseCommand):
             '--seed', type=int, default=None,
             help='Random seed for reproducible sampling.',
         )
+        parser.add_argument(
+            '--include-legacy', action='store_true',
+            help='Include pre-Phase-2.2.5 tutor turns that lack the '
+                 'full quality-tracking shape (judge_outputs + '
+                 'judge_history_turns metadata). Default: only sample '
+                 'from new sessions with complete instrumentation.',
+        )
 
-    def handle(self, *args, limit, subject, dry_run, seed, **options):
+    def handle(self, *args, limit, subject, dry_run, seed, include_legacy,
+               **options):
         self.stdout.write(self.style.NOTICE(
             f"[sample_benchmark] limit={limit} subject={subject or 'all'} "
-            f"dry_run={dry_run} seed={seed}"
+            f"dry_run={dry_run} seed={seed} "
+            f"include_legacy={include_legacy}"
         ))
 
-        candidates = candidate_tutor_turns(subject=subject)
+        candidates = candidate_tutor_turns(
+            subject=subject,
+            require_full_tracking=not include_legacy,
+        )
         candidate_count = candidates.count()
         self.stdout.write(f"  {candidate_count} eligible tutor turns (excluding already-sampled)")
 

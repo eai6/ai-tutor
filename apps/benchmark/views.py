@@ -23,12 +23,17 @@ from __future__ import annotations
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.benchmark import labels as L
 from apps.benchmark.models import (
     BenchmarkAnnotation,
     BenchmarkItem,
     BenchmarkRun,
+)
+from apps.benchmark.sampling import (
+    candidate_tutor_turns,
+    create_benchmark_items,
 )
 
 
@@ -73,10 +78,76 @@ def benchmark_list(request):
             'failure_category': latest.failure_category if latest else '',
         })
 
+    # Count tutor turns currently eligible for sampling (post-2.2.5
+    # instrumentation, not yet sampled). Drives the "X more available"
+    # hint on the sample form. Cheap COUNT(*) — fine to do per request.
+    eligible_new = candidate_tutor_turns(
+        require_full_tracking=True,
+    ).count()
+
     return render(request, 'benchmark/list.html', {
         'items': items,
         'total': len(items),
+        'eligible_new': eligible_new,
     })
+
+
+@staff_member_required
+@require_POST
+def benchmark_sample_create(request):
+    """POST endpoint: sample N new BenchmarkItems on demand.
+
+    Form fields:
+        count (int, 1-50): how many items to add.
+        include_legacy ('on' | absent): opt into pre-2.2.5 traces.
+
+    Idempotent against the existing pool — already-sampled turns are
+    excluded automatically. Sets ``created_by`` to the requesting user.
+    """
+    try:
+        count = int(request.POST.get('count') or 10)
+    except ValueError:
+        count = 10
+    count = max(1, min(count, 50))
+    include_legacy = bool(request.POST.get('include_legacy'))
+
+    result = create_benchmark_items(
+        limit=count,
+        require_full_tracking=not include_legacy,
+        created_by=request.user,
+    )
+
+    created = result['created']
+    eligible = result['eligible']
+    if created == 0 and eligible == 0:
+        cohort_msg = (
+            "no legacy turns to fall back to"
+            if include_legacy
+            else "run a few new tutor sessions first, then try again"
+        )
+        messages.warning(
+            request,
+            f"Sampled 0 items — no eligible new tutor turns available ({cohort_msg}).",
+        )
+    elif created == 0:
+        messages.warning(
+            request,
+            f"Sampled 0 new items. {eligible} eligible turns remain — try a "
+            "smaller count or `--include-legacy` to widen the pool.",
+        )
+    else:
+        breakdown = ", ".join(
+            f"{n} {name}"
+            for name, n in sorted(result['stratum_breakdown'].items())
+        )
+        messages.success(
+            request,
+            f"Sampled {created} new item{'s' if created != 1 else ''} "
+            f"({breakdown}). {eligible - created} eligible turns still "
+            "in the pool.",
+        )
+
+    return redirect('dashboard:benchmark:list')
 
 
 # ---------------------------------------------------------------------------
