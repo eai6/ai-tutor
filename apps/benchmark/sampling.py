@@ -207,6 +207,9 @@ def make_item_id(course_subject_type: str, course_title: str,
 # ---------------------------------------------------------------------------
 
 def candidate_tutor_turns(*, subject: Optional[str] = None,
+                          lesson_id: Optional[int] = None,
+                          since=None,
+                          until=None,
                           exclude_sampled: bool = True,
                           require_full_tracking: bool = True,
                           include_synthetic: bool = False) -> QuerySet:
@@ -216,13 +219,24 @@ def candidate_tutor_turns(*, subject: Optional[str] = None,
     - role='tutor'
     - has non-empty content
     - session has a lesson + course (filters out test/incomplete sessions)
-    - optionally restricted to a subject
+    - optionally restricted to a subject, a specific lesson, and/or a
+      created_at time window
     - optionally excludes turns already in the benchmark
     - by default, excludes legacy turns missing Phase 2.2.5 instrumentation
       (see ``require_full_tracking``)
     - by default, excludes synthetic-student sessions (see ``include_synthetic``)
 
     Args:
+        subject: 'math' / 'geography' / 'science' — maps back to
+            Course.subject_type. None = all subjects.
+        lesson_id: limit to one Lesson PK. Useful for prompt-iteration
+            workflows that re-sample the same lesson before/after a
+            change.
+        since: datetime — only include tutor turns created AT or AFTER
+            this timestamp. Use to focus on traffic produced after a
+            specific commit / pipeline change.
+        until: datetime — only include tutor turns created STRICTLY
+            BEFORE this timestamp. Pair with ``since`` for a window.
         require_full_tracking: when True (default), only return turns
             that have both ``judge_outputs`` populated (per-judge
             breakdown, shipped 2026-05-11) AND ``metadata`` carrying
@@ -261,6 +275,14 @@ def candidate_tutor_turns(*, subject: Optional[str] = None,
             qs = qs.filter(session__lesson__unit__course__subject_type__in=['humanities', 'geography'])
         elif subject == 'science':
             qs = qs.filter(session__lesson__unit__course__subject_type='science')
+
+    if lesson_id is not None:
+        qs = qs.filter(session__lesson_id=lesson_id)
+
+    if since is not None:
+        qs = qs.filter(created_at__gte=since)
+    if until is not None:
+        qs = qs.filter(created_at__lt=until)
 
     if require_full_tracking:
         # Two-part filter — both must hold:
@@ -332,6 +354,9 @@ def create_benchmark_items(
     *,
     limit: int,
     subject: Optional[str] = None,
+    lesson_id: Optional[int] = None,
+    since=None,
+    until=None,
     require_full_tracking: bool = True,
     include_synthetic: bool = False,
     seed: Optional[int] = None,
@@ -362,6 +387,9 @@ def create_benchmark_items(
 
     candidates = candidate_tutor_turns(
         subject=subject,
+        lesson_id=lesson_id,
+        since=since,
+        until=until,
         require_full_tracking=require_full_tracking,
         include_synthetic=include_synthetic,
     )

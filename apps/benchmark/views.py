@@ -190,10 +190,19 @@ def benchmark_sample_create(request):
         include_legacy ('on' | absent): opt into pre-2.2.5 traces.
         include_synthetic ('on' | absent): opt into simulator-generated
             sessions (default: real-student only).
+        subject (str, optional): 'math' / 'geography' / 'science' filter.
+        lesson_id (int, optional): restrict to one Lesson PK.
+        since (date or datetime ISO string, optional): only sample
+            from tutor turns created on/after this timestamp.
+        until (date or datetime ISO string, optional): only sample
+            from tutor turns created strictly before this timestamp.
 
     Idempotent against the existing pool — already-sampled turns are
     excluded automatically. Sets ``created_by`` to the requesting user.
     """
+    from datetime import datetime, time
+    from django.utils import timezone as _tz
+
     try:
         count = int(request.POST.get('count') or 10)
     except ValueError:
@@ -202,8 +211,44 @@ def benchmark_sample_create(request):
     include_legacy = bool(request.POST.get('include_legacy'))
     include_synthetic = bool(request.POST.get('include_synthetic'))
 
+    subject = (request.POST.get('subject') or '').strip() or None
+    if subject not in (None, 'math', 'geography', 'science'):
+        subject = None
+
+    lesson_id_raw = (request.POST.get('lesson_id') or '').strip()
+    try:
+        lesson_id = int(lesson_id_raw) if lesson_id_raw else None
+    except ValueError:
+        lesson_id = None
+
+    def _parse_dt(raw: str, end_of_day: bool = False):
+        """Accept YYYY-MM-DD or full ISO; return a tz-aware datetime."""
+        s = (raw or '').strip()
+        if not s:
+            return None
+        try:
+            dt = datetime.fromisoformat(s)
+        except ValueError:
+            return None
+        # Date-only string: snap to start (since) or end (until) of day.
+        if dt.time() == time(0, 0) and len(s) == 10:
+            if end_of_day:
+                # `until` is exclusive — bump to next-day midnight.
+                from datetime import timedelta
+                dt = dt + timedelta(days=1)
+        if _tz.is_naive(dt):
+            dt = _tz.make_aware(dt, _tz.get_current_timezone())
+        return dt
+
+    since = _parse_dt(request.POST.get('since', ''), end_of_day=False)
+    until = _parse_dt(request.POST.get('until', ''), end_of_day=True)
+
     result = create_benchmark_items(
         limit=count,
+        subject=subject,
+        lesson_id=lesson_id,
+        since=since,
+        until=until,
         require_full_tracking=not include_legacy,
         include_synthetic=include_synthetic,
         created_by=request.user,

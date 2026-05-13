@@ -125,17 +125,48 @@
             Already-sampled turns excluded.
         </div>
     </div>
-    <form method="post" action="{% url 'dashboard:benchmark:sample_create' %}">
+    <form method="post" action="{% url 'dashboard:benchmark:sample_create' %}"
+          style="display:flex;flex-direction:column;gap:0.5rem;">
         {% csrf_token %}
-        <label for="sample-count" style="font-size:0.85rem;color:#374151;">Sample</label>
-        <input type="number" id="sample-count" name="count" value="10" min="1" max="50">
-        <button type="submit" class="sample-btn">more →</button>
-        <label class="legacy-toggle" title="Include pre-Phase-2.2.5 traces that lack judge_history_turns.">
-            <input type="checkbox" name="include_legacy"> legacy
-        </label>
-        <label class="legacy-toggle" title="Include synthetic-student simulator sessions.">
-            <input type="checkbox" name="include_synthetic"> synthetic
-        </label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+            <label for="sample-count" style="font-size:0.85rem;color:#374151;">Sample</label>
+            <input type="number" id="sample-count" name="count" value="10" min="1" max="50">
+            <button type="submit" class="sample-btn">more →</button>
+            <label class="legacy-toggle" title="Include pre-Phase-2.2.5 traces that lack judge_history_turns.">
+                <input type="checkbox" name="include_legacy"> legacy
+            </label>
+            <label class="legacy-toggle" title="Include synthetic-student simulator sessions.">
+                <input type="checkbox" name="include_synthetic"> synthetic
+            </label>
+        </div>
+        {# Narrowing filters — applied to the candidate pool BEFORE       #}
+        {# stratified sampling. Leaving them blank = no filter.           #}
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem 0.6rem;align-items:center;font-size:0.78rem;color:#6b7280;">
+            <span style="font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#9ca3af;">
+                narrow to:
+            </span>
+            <label>subject
+                <select name="subject" style="font-size:0.78rem;padding:0.18rem 0.35rem;">
+                    <option value="">any</option>
+                    <option value="math">math</option>
+                    <option value="geography">geography</option>
+                    <option value="science">science</option>
+                </select>
+            </label>
+            <label>lesson id
+                <input type="number" name="lesson_id" placeholder="e.g. 638"
+                       style="width:90px;font-size:0.78rem;padding:0.18rem 0.35rem;"
+                       min="1">
+            </label>
+            <label>since
+                <input type="date" name="since"
+                       style="font-size:0.78rem;padding:0.18rem 0.35rem;">
+            </label>
+            <label>until
+                <input type="date" name="until"
+                       style="font-size:0.78rem;padding:0.18rem 0.35rem;">
+            </label>
+        </div>
     </form>
 </div>
 

@@ -83,11 +83,49 @@ class Command(BaseCommand):
                  'real-student sessions only. Synthetic turns are '
                  'stratified into synthetic_<persona> buckets.',
         )
+        parser.add_argument(
+            '--lesson-id', type=int, default=None,
+            help='Restrict to a single Lesson PK. Useful when iterating '
+                 'on a specific lesson before/after a prompt change.',
+        )
+        parser.add_argument(
+            '--since', default=None,
+            help='Only sample tutor turns created AT or AFTER this '
+                 'date/datetime (ISO 8601). E.g. "2026-05-13" or '
+                 '"2026-05-13T10:00:00".',
+        )
+        parser.add_argument(
+            '--until', default=None,
+            help='Only sample tutor turns created STRICTLY BEFORE this '
+                 'date/datetime (ISO 8601). Date-only is treated as '
+                 'end-of-day (next-day midnight, exclusive).',
+        )
 
     def handle(self, *args, limit, subject, dry_run, seed, include_legacy,
-               include_synthetic, **options):
+               include_synthetic, lesson_id, since, until, **options):
+        from datetime import datetime, time, timedelta
+        from django.utils import timezone as _tz
+
+        def _parse(s, end_of_day=False):
+            if not s:
+                return None
+            try:
+                dt = datetime.fromisoformat(s)
+            except ValueError:
+                raise CommandError(f"Could not parse datetime: {s!r}")
+            if dt.time() == time(0, 0) and len(s) == 10 and end_of_day:
+                dt = dt + timedelta(days=1)
+            if _tz.is_naive(dt):
+                dt = _tz.make_aware(dt, _tz.get_current_timezone())
+            return dt
+
+        since_dt = _parse(since, end_of_day=False)
+        until_dt = _parse(until, end_of_day=True)
+
         self.stdout.write(self.style.NOTICE(
             f"[sample_benchmark] limit={limit} subject={subject or 'all'} "
+            f"lesson_id={lesson_id or 'any'} "
+            f"since={since_dt} until={until_dt} "
             f"dry_run={dry_run} seed={seed} "
             f"include_legacy={include_legacy} "
             f"include_synthetic={include_synthetic}"
@@ -95,6 +133,9 @@ class Command(BaseCommand):
 
         candidates = candidate_tutor_turns(
             subject=subject,
+            lesson_id=lesson_id,
+            since=since_dt,
+            until=until_dt,
             require_full_tracking=not include_legacy,
             include_synthetic=include_synthetic,
         )
