@@ -1,0 +1,61 @@
+# Annotator-agent runner: Python + chromium + node + chrome-devtools-mcp.
+#
+# Spawned by ops/annotator_agent/docker-compose.yml AFTER the django
+# service is healthy. Runs ops/annotator_agent/orchestrator.py against
+# the django container.
+#
+# This image is what we'll port to GitHub Actions in the next phase.
+# Today it's exercised purely via `docker compose up`.
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /agent
+
+# 1) System deps for headless chromium + node.
+#    chromium-driver is needed by some MCP server modes; install both
+#    to keep optionality. xvfb is included as a fallback for cases
+#    where --headless=new doesn't satisfy chromium.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        chromium \
+        chromium-driver \
+        xvfb \
+        ca-certificates \
+        curl \
+        gnupg \
+        fonts-liberation \
+        libnss3 \
+        libatk-bridge2.0-0 \
+        libgtk-3-0 \
+        libxss1 \
+        libasound2 \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2) Pre-warm the chrome-devtools-mcp npm package so the agent doesn't
+#    pay the install cost on first run.
+RUN npx -y chrome-devtools-mcp@latest --help > /dev/null 2>&1 || true
+
+# 3) Python deps for the orchestrator. Minimal subset — no Django.
+RUN pip install --no-cache-dir \
+        anthropic==0.79.0 \
+        mcp \
+        python-dotenv
+
+# 4) Tell chrome-devtools-mcp which chromium binary to use; the npm
+#    package's auto-detect picks /usr/bin/google-chrome which we don't
+#    have. The --executablePath flag overrides it.
+ENV CHROME_PATH=/usr/bin/chromium
+
+# 5) Copy the orchestrator + prompt. We only need this small surface;
+#    the wider repo isn't on PYTHONPATH for the agent.
+COPY ops/annotator_agent/__init__.py /agent/ops/annotator_agent/__init__.py
+COPY ops/annotator_agent/orchestrator.py /agent/ops/annotator_agent/orchestrator.py
+COPY ops/annotator_agent/agent_prompt.md /agent/ops/annotator_agent/agent_prompt.md
+COPY ops/__init__.py /agent/ops/__init__.py
+
+# 6) Default entrypoint — overridden by docker-compose for arg passing.
+WORKDIR /agent
+CMD ["python", "-m", "ops.annotator_agent.orchestrator", "--help"]

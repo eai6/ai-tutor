@@ -1,0 +1,66 @@
+# Annotator-agent local stack — proves the container shape before
+# porting to GitHub Actions. From the repo root:
+#
+#     # First time / after Dockerfile changes:
+#     docker compose -f ops/annotator_agent/docker-compose.yml build
+#
+#     # Run a 1-item agent loop against the local SQLite copy:
+#     ANTHROPIC_API_KEY=sk-... docker compose \
+#         -f ops/annotator_agent/docker-compose.yml \
+#         run --rm agent \
+#         python -m ops.annotator_agent.orchestrator \
+#             --base-url http://django:8000 \
+#             --persona struggler \
+#             --max-items 1 \
+#             --max-steps 60
+#
+# The django service mounts ./db.sqlite3 from the host, so the
+# annotations the agent creates land in the same database the host's
+# dev runserver reads from. To run a clean run with throwaway data,
+# point DB_VOLUME at a different file.
+services:
+  django:
+    build:
+      context: ../..               # repo root, so it can COPY .
+      dockerfile: ops/annotator_agent/Dockerfile.django
+    image: ai-tutor-django-agent:latest
+    ports:
+      - "8000:8000"                 # exposed so you can also hit it from host
+    environment:
+      DEBUG: "true"
+      DJANGO_SETTINGS_MODULE: config.settings
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      # Live-mount the SQLite DB so the agent's annotations show up in
+      # the host's runserver UI. Comment this out for ephemeral runs.
+      - ../../db.sqlite3:/app/db.sqlite3
+      - ../../media:/app/media:ro   # read-only — agent shouldn't write media
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/admin/login/')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  agent:
+    build:
+      context: ../..
+      dockerfile: ops/annotator_agent/Dockerfile.agent
+    image: ai-tutor-annotator-agent:latest
+    depends_on:
+      django:
+        condition: service_healthy
+    environment:
+      # The orchestrator validates ANTHROPIC_API_KEY at runtime; we use
+      # an empty-default here so `docker compose build` works without
+      # the secret in env (the build doesn't need it).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      # Persist transcripts back to host for inspection.
+      - ../../ops/annotator_agent/transcripts:/agent/ops/annotator_agent/transcripts
+    # Default command: dump the orchestrator help so `docker compose up`
+    # doesn't spend money. Override via `docker compose run agent <cmd>`.
+    command: ["python", "-m", "ops.annotator_agent.orchestrator", "--help"]
