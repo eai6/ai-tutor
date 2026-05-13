@@ -562,9 +562,39 @@ def benchmark_score_now(request):
 
 @staff_member_required
 def benchmark_run_detail(request, run_id: int):
-    """Render the full metrics breakdown for one BenchmarkRun."""
+    """Render the metrics breakdown for one BenchmarkRun.
+
+    By default shows the run's stored metrics blob (frozen at score
+    time). When `?subject=math|geography|science` is set, recomputes
+    metrics live against the subset of annotations whose item belongs
+    to that subject — useful for drilling into per-subject failure
+    patterns without re-scoring.
+    """
+    from apps.benchmark.scoring import compute_metrics
+
     run = get_object_or_404(BenchmarkRun, id=run_id)
-    metrics = run.metrics or {}
+
+    # ?subject= filter. Empty / unknown values fall back to "all".
+    SUBJECT_OPTIONS = ('math', 'geography', 'science')
+    subject_filter = (request.GET.get('subject') or '').strip().lower()
+    if subject_filter not in SUBJECT_OPTIONS:
+        subject_filter = ''
+
+    if subject_filter:
+        # Live recompute on the narrowed cohort. Same variant + role
+        # the run was originally scored under; just narrow by item
+        # subject. select_related('item') because compute_metrics
+        # reads ann.item.subject + ann.item.snapshot.
+        narrowed = list(
+            BenchmarkAnnotation.objects.filter(
+                system_variant=run.system_variant,
+                annotator_role=run.annotator_role,
+                item__subject=subject_filter,
+            ).select_related('item')
+        )
+        metrics = compute_metrics(narrowed)
+    else:
+        metrics = run.metrics or {}
 
     # Reshape slices for the template (sorted buckets per slice).
     # Only by_subject is surfaced in the UI by default — by_stratum,
@@ -598,6 +628,15 @@ def benchmark_run_detail(request, run_id: int):
     failed_total = (metrics.get('overall') or {}).get('failed', 0)
     category_tag_total = sum(c for _, c in failure_categories)
 
+    # Subjects available in this run — drives the filter pills. Pull
+    # from the stored metrics (always reflects the full run, even when
+    # a subject narrow is active so the user can still see other
+    # options).
+    full_metrics = run.metrics or {}
+    available_subjects = sorted(
+        ((full_metrics.get('slices') or {}).get('by_subject') or {}).keys()
+    )
+
     return render(request, 'benchmark/run_detail.html', {
         'run': run,
         'metrics': metrics,
@@ -607,4 +646,6 @@ def benchmark_run_detail(request, run_id: int):
         'failed_total': failed_total,
         'category_tag_total': category_tag_total,
         'agreement': metrics.get('agreement'),
+        'subject_filter': subject_filter,
+        'available_subjects': available_subjects,
     })

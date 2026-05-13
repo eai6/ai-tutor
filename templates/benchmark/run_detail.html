@@ -67,6 +67,34 @@
 
 <a href="{% url 'dashboard:benchmark:runs_list' %}" class="back-link">← All runs</a>
 
+{# Subject filter pills — recompute the panels live for one subject. #}
+{% if available_subjects %}
+<div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;
+            margin:0 0 0.85rem 0;font-size:0.8rem;">
+    <span style="color:#6b7280;font-weight:600;text-transform:uppercase;
+                 font-size:0.7rem;letter-spacing:0.04em;">Filter by subject:</span>
+    <a href="{% url 'dashboard:benchmark:run_detail' run.id %}"
+       style="padding:0.2rem 0.7rem;border-radius:999px;text-decoration:none;
+              border:1px solid {% if not subject_filter %}#5b21b6{% else %}#e5e7eb{% endif %};
+              color:{% if not subject_filter %}#5b21b6{% else %}#6b7280{% endif %};
+              font-weight:{% if not subject_filter %}600{% else %}500{% endif %};
+              background:{% if not subject_filter %}#f5f3ff{% else %}#fff{% endif %};">all</a>
+    {% for subj in available_subjects %}
+    <a href="{% url 'dashboard:benchmark:run_detail' run.id %}?subject={{ subj }}"
+       style="padding:0.2rem 0.7rem;border-radius:999px;text-decoration:none;
+              border:1px solid {% if subject_filter == subj %}#5b21b6{% else %}#e5e7eb{% endif %};
+              color:{% if subject_filter == subj %}#5b21b6{% else %}#6b7280{% endif %};
+              font-weight:{% if subject_filter == subj %}600{% else %}500{% endif %};
+              background:{% if subject_filter == subj %}#f5f3ff{% else %}#fff{% endif %};">{{ subj }}</a>
+    {% endfor %}
+    {% if subject_filter %}
+    <span style="color:#9ca3af;font-size:0.75rem;margin-left:0.4rem;">
+        (recomputed live for `{{ subject_filter }}` only)
+    </span>
+    {% endif %}
+</div>
+{% endif %}
+
 <div class="meta-row">
     <span><strong>When</strong> {{ run.created_at|date:"M j, Y H:i" }}</span>
     <span><strong>Variant</strong> <span class="pill pill-variant">{{ run.get_system_variant_display }}</span></span>
