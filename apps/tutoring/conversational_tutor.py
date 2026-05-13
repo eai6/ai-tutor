@@ -260,27 +260,50 @@ MATHEMATICS-SPECIFIC TEACHING (apply when subject is Math/Mathematics)
 </principle>
 
 <principle id="probe_frequency">
-PROBE SPARINGLY — TEACHING IS NOT INTERROGATION
-- The default response to a correct, on-topic student answer is to
-  CONFIRM (warmly, briefly) and ADVANCE. Not to ask follow-up
-  reasoning probes on every turn.
-- Probe ONLY when one of these is true:
-  - The student gave a BARE numeric answer (no working) on an
-    INDEPENDENT practice/quiz problem — ask ONCE for reasoning
-    (math_specific Rule 1).
-  - The student's working shows a specific error you want to surface.
-  - You're about to advance to a new concept and want to check a
-    prerequisite.
-- Do NOT probe when:
-  - The student showed correct working — read it, confirm, advance.
-  - The student answered a guided sub-question correctly (within
-    a worked example / teach step) — that's just a step in the
-    walkthrough.
-  - You asked a similar probe last turn (across turns) — that's
-    interrogation. Move on.
-- If you find yourself asking "How did you decide…?" or "What was
-  your reasoning?" on three consecutive turns, you are interrogating.
-  Confirm and continue instead.
+NO PROBING ON CORRECT ANSWERS — ADVANCE.
+
+The default and ONLY response to a correct, on-topic student answer
+is to CONFIRM (briefly, warmly) and ADVANCE to the next step. Never
+ask the student to explain how they got there, what their reasoning
+was, what made them choose a particular operation, or to walk
+through their working. Even when their answer is bare ("8"), even
+when you're curious about their process, even when you've been
+explicitly told it's a learning moment — DO NOT PROBE.
+
+Examples of banned probes (do NOT ask any of these on a correct
+answer):
+  - "How did you get there?"
+  - "What was your reasoning?"
+  - "Walk me through your steps."
+  - "What made you identify X?"
+  - "How did you decide to divide?"
+  - "What's your reasoning for choosing that?"
+  - "Can you explain how you arrived at the equation?"
+
+ALSO BANNED: probing on the value of an elementary operation. If
+the student stated a correct single-operation result, the
+calculation IS the working. Do not ask them to re-justify it.
+  - "How did you calculate 200 ÷ 25 to get 8?" — banned
+  - "Can you show me 8 × 25?" — banned
+  - "Walk me through 50 - 5." — banned
+  - "What is 5 + 3?" (when the next step doesn't need it) — banned
+
+When the answer is WRONG, you may diagnose the specific error in
+one sentence — but that's diagnosis, not probing. Don't ask the
+student to explain their wrong working; tell them what went wrong
+and ask them to retry.
+
+When the answer is partial (e.g. only the math, missing the
+context), you may ASK FOR THE MISSING PIECE explicitly — that's a
+completion request, not a probe. Example: student writes "50 - 5 =
+45" on a word problem; you may ask "What does 45 represent here?"
+That's asking for the final answer, not the reasoning.
+
+Why this rule exists: pilot feedback (2026-05-12) showed the
+tutor probing on every single correct answer — student felt
+interrogated, conversation lost momentum. The pedagogical value of
+probing is real but small compared to the cost of breaking flow.
+We default to no probing; we do not currently make exceptions.
 </principle>
 
 <principle id="encouragement_calibration">
@@ -678,8 +701,11 @@ class ConversationalTutor:
         # (debug, teacher review); `self.steps` is the filtered
         # session-active set.
         self.all_steps = all_steps
+        # Use the TUTORING budget (full target minus the exit-ticket
+        # reserve). If the user picks 15 minutes, tutoring fits into
+        # ~10 minutes; the last 5 are held back for the exit ticket.
         self.steps = self._select_steps_for_duration(
-            all_steps, self._target_minutes_for_session()
+            all_steps, self._tutoring_minutes_budget()
         )
         
         # Load exit ticket concepts (CRITICAL for ensuring coverage)
@@ -907,8 +933,13 @@ class ConversationalTutor:
         random.shuffle(selected)
         return selected[:count]
     
+    # Minutes reserved at the end of the session for the exit ticket.
+    # The tutoring portion gets (target_minutes - EXIT_TICKET_RESERVE).
+    EXIT_TICKET_RESERVE_MINUTES = 5
+
     def _target_minutes_for_session(self) -> int:
-        """Return the target session duration in minutes.
+        """Return the target session duration in minutes (FULL budget
+        — tutoring + exit ticket).
 
         Resolution order:
           1. session.engine_state['target_minutes_override'] — set
@@ -924,6 +955,80 @@ class ConversationalTutor:
         except Exception:
             pass
         return self.lesson.estimated_minutes or 20
+
+    def _tutoring_minutes_budget(self) -> int:
+        """Tutoring portion of the budget — total minus the exit-ticket
+        reserve. If the user picks 15 min, tutoring gets 10. Floor at
+        5 so a 5-min session still has SOMETHING for tutoring."""
+        target = self._target_minutes_for_session()
+        return max(5, target - self.EXIT_TICKET_RESERVE_MINUTES)
+
+    def _minutes_elapsed(self) -> float:
+        """Minutes since the lesson started. Returns 0.0 when the
+        session hasn't begun yet."""
+        started = getattr(self.session, 'started_lesson_at', None)
+        if not started:
+            return 0.0
+        try:
+            delta = timezone.now() - started
+            return max(0.0, delta.total_seconds() / 60.0)
+        except Exception:
+            return 0.0
+
+    def _build_time_awareness_block(self) -> str:
+        """Render the <time_awareness> block injected into the system
+        prompt per turn. Tells the tutor how much tutoring time
+        remains and prescribes a pace adjustment.
+
+        Pace bands (steps_left = remaining steps to advance through):
+          - remaining_per_step >= 3 min → "on track, normal pace"
+          - remaining_per_step in [1.5, 3) → "getting tight, trim
+            explanations, accept correct answers fast"
+          - remaining_per_step < 1.5 → "behind schedule, advance
+            aggressively; one-line confirms, no optional concepts"
+        Exit-ticket buffer of EXIT_TICKET_RESERVE_MINUTES is held back
+        from the budget so the tutor never burns it.
+        """
+        budget = self._tutoring_minutes_budget()
+        elapsed = self._minutes_elapsed()
+        remaining = max(0.0, budget - elapsed)
+        steps_left = max(0, len(self.steps) - self.current_topic_index)
+        per_step = remaining / steps_left if steps_left > 0 else remaining
+
+        if steps_left == 0 or per_step >= 3.0:
+            pace = (
+                "On track. Normal pace — explain, ask, advance as usual."
+            )
+        elif per_step >= 1.5:
+            pace = (
+                "Getting tight. Trim explanations to one short paragraph,"
+                " accept correct answers in one line, skip optional"
+                " concepts on this step."
+            )
+        else:
+            pace = (
+                "BEHIND SCHEDULE. Advance aggressively: one-line confirms"
+                " on correct answers, no optional sub-questions, skip to"
+                " the step's CORE concept and move on. The student needs"
+                " to reach the exit ticket with "
+                f"{self.EXIT_TICKET_RESERVE_MINUTES} min spare."
+            )
+
+        avg_line = (
+            f"\nAvg time per remaining step: {per_step:.1f}m."
+            if steps_left else "\n(no remaining steps)"
+        )
+        return (
+            "\n\n<time_awareness>"
+            f"\nSession budget: {budget}m tutoring + "
+            f"{self.EXIT_TICKET_RESERVE_MINUTES}m exit-ticket reserve."
+            f"\nElapsed: {elapsed:.1f}m."
+            f"\nRemaining tutoring time: {remaining:.1f}m."
+            f"\nSteps left in this session: {steps_left}."
+            + avg_line
+            + f"\nPace directive: {pace}"
+            + "\n</time_awareness>"
+        )
 
     def _select_steps_for_duration(self, all_steps: List, target_minutes: int) -> List:
         """Pick the subset of steps that fits the target duration.
@@ -4093,12 +4198,12 @@ Follow the current step; this concept will be covered in sequence."""
             "\n1. NEVER praise an answer until you've seen the student's reasoning."
             "\n   Words like 'brilliant', 'perfect', 'exactly right', 'you got it',"
             "\n   'great job', 'spot on', 'well done', 'excellent' are forbidden when"
-            "\n   the student gave a one-line answer with no explanation. If the"
-            "\n   student already SHOWED their reasoning (working, an explanation,"
-            "\n   a derivation), evaluate it directly — do not ask them to repeat"
-            "\n   it. If they gave only a bare answer, ask once for their reasoning"
-            "\n   in your own words; do NOT use stock phrases or repeat the request"
-            "\n   across turns."
+            "\n   the student gave a one-line answer with no explanation. Use a"
+            "\n   neutral, specific acknowledgment (e.g. \"yes — 8 is right.\")"
+            "\n   and ADVANCE to the next step. Do NOT ask for reasoning, working,"
+            "\n   or 'how did you get there' on a correct answer — bare or"
+            "\n   otherwise. Probing on every correct reply reads as interrogation,"
+            "\n   not teaching."
             "\n"
             "\n2. ALWAYS END WITH A QUESTION. The tutor leads the session —"
             "\n   you are not waiting for the student to drive the next move."
@@ -4155,27 +4260,21 @@ Follow the current step; this concept will be covered in sequence."""
                 "lesson's rule (e.g. \"angles around a point sum to 360°\" → "
                 "any \"around a point\" list you state MUST sum to 360°)."
                 "\n"
-                "\n=== R2: EVALUATE THE WORKING THAT'S ALREADY THERE ==="
-                "\nIf the student's reply contains working — chained "
-                "arithmetic, an equation rearrangement, multiple steps "
-                "(e.g. 'x-28+x=180, 2x=208, x=104, so 76 and 104'), "
-                "ANY operator-and-digit pattern beyond a single number — "
-                "then EVALUATE those steps directly. Do NOT ask the "
-                "student to walk you through their working again; they "
-                "already did. Confirm the steps that are right, point "
-                "specifically at the first incorrect step (if any), and "
-                "advance."
-                "\nOnly when the reply is a BARE answer — a single "
-                "number / fraction / 'x=88' assignment with no operations "
-                "shown — may you ask for working. When you do, ask for "
-                "the FULL working ONCE in a single question (\"How did "
-                "you arrive at that?\"). Do NOT drip-feed step-by-step "
-                "follow-ups (\"show me your working for that second "
-                "step\", \"now what does that tell you?\") — that's "
-                "interrogation, not teaching. Phrase it naturally and "
-                "vary the wording across turns; do NOT use stock "
-                "phrases like 'Before I check that — show me your "
-                "working' or 'walk me through your steps'."
+                "\n=== R2: ADVANCE ON CORRECT ANSWERS — NEVER PROBE ==="
+                "\nWhen the student's answer is CORRECT (with OR without "
+                "working shown), CONFIRM briefly + ADVANCE to the next "
+                "step or sub-question. Do NOT ask 'how did you get "
+                "there?', 'what was your reasoning?', 'walk me through "
+                "your working', 'what made you identify X?', or any "
+                "other reasoning probe. This applies whether the answer "
+                "is bare (\"8\") or has working (\"25 × 8 = 200\"). "
+                "Probing on a correct answer is interrogation, not "
+                "teaching — kill it.\n"
+                "When the student's answer is INCORRECT and the reply "
+                "contains working, name the specific wrong step in one "
+                "sentence and give a short hint. Do not ask 'walk me "
+                "through your steps' — they already did. Diagnose, "
+                "don't interrogate."
                 "\n"
                 "\nMCQ value-form acceptance: when the bank pulled an "
                 "MCQ question and the student answered with the correct "
@@ -4277,6 +4376,15 @@ Follow the current step; this concept will be covered in sequence."""
                 bare_answer_count_for_step=bare_count,
                 step_type=current_step_type,
             )
+
+        # Time-awareness block — per-turn, tells the tutor how much
+        # tutoring time remains and prescribes a pace adjustment.
+        # The exit-ticket reserve is held back so the tutor never
+        # burns the final ~5 minutes that belong to the exit ticket.
+        try:
+            system_prompt += self._build_time_awareness_block()
+        except Exception as e:
+            logger.warning("[TimeAwareness] block failed: %s", e)
 
         # P3 — bank grading verdict. When the previous turn rendered a
         # bank question, the deterministic grader has already judged
@@ -6235,83 +6343,56 @@ Follow the current step; this concept will be covered in sequence."""
                         " 'walk me through your working' for a one-"
                         "operation calculation."
                     )
-            elif bare_answer_count_for_step >= 1:
-                # Practice/quiz, but the bare-answer probe already
-                # fired on an earlier turn in this step. Don't repeat
-                # the interrogation — accept and continue.
+            else:
+                # All bare-answer branches now collapse to "confirm or
+                # diagnose, then advance" — never probe. Pilot feedback
+                # 2026-05-12: probing on every bare answer (even with
+                # the "ask once" caps) was reading as interrogation.
+                # Per-pilot directive: "the system should just move on
+                # when a correct answer is provided."
                 if check.is_correct:
                     guidance = (
-                        "Bare answer on practice step, but the show-"
-                        "working probe already fired earlier in this"
-                        " step. Confirm correctness briefly and advance"
-                        " — repeated probing is interrogation, not"
-                        " teaching."
+                        "The student's bare answer matches the expected"
+                        " value. Per math_teaching Rule 1, do NOT use"
+                        " 'correct', 'right', 'brilliant', 'you got it',"
+                        " 'exactly', or 'perfect' on a bare answer.\n"
+                        "Acknowledge the value briefly (one short"
+                        f" specific line — e.g. \"yes — {check.student_parsed}"
+                        " is right.\") and ADVANCE to the next step or"
+                        " sub-question. The probe_frequency principle"
+                        " applies — no reasoning probes on correct"
+                        " answers."
                     )
                 else:
                     guidance = (
-                        "Bare answer on practice step, but the show-"
-                        "working probe already fired earlier in this"
-                        " step. Name the specific arithmetic that's"
-                        " wrong and give a short hint. Don't re-ask"
-                        " 'walk me through your working' for the third"
-                        " time."
+                        "The student's bare answer does NOT match. Name"
+                        " the specific error in one short sentence and"
+                        " give a brief hint, then let them retry. Do"
+                        " NOT ask 'walk me through your working' or"
+                        " 'how did you get there' — diagnose, don't"
+                        " interrogate.\n"
+                        "Example: BEFORE \"How did you arrive at 95?\""
+                        " AFTER \"95 isn't quite right — check the sum"
+                        " of the three angles. What do you get?\""
                     )
-            else:
-                # Practice/quiz, first bare answer in this step: ask
-                # ONCE for working (math_teaching Rule 1). Probe at
-                # the STEP level, not on individual elementary values.
-                guidance = (
-                    "The student submitted a BARE numeric answer with no"
-                    " working shown on a practice/quiz step. Per"
-                    " math_teaching Rule 1, you MUST NOT say 'correct',"
-                    " 'right', 'brilliant', 'you got it', or equivalent"
-                    " praise, even if the answer happens to match.\n"
-                    f"Echo the student's answer back verbatim ('You said"
-                    f" {student_input.strip()[:80]}'), then ask ONE"
-                    " STEP-LEVEL probe — strategy / decision / rule, not"
-                    " the value of an elementary calculation.\n"
-                    "GOOD probes: 'Which operation did you apply first?',"
-                    " 'Why did you divide?', 'What rule did you use?'.\n"
-                    "BAD probes: 'How did you calculate 50 / 10?', 'Walk"
-                    " me through 8 × 25.' — these are interrogations of"
-                    " single-operation arithmetic and should NEVER be"
-                    " asked.\n"
-                    "This is the ONLY turn this step where you ask for"
-                    " working — if they answer briefly again later in"
-                    " this step, accept it and continue."
-                )
         elif check.is_correct:
-            if guided_step:
-                guidance = (
-                    "The student's answer matches. This is a guided"
-                    f" walkthrough step (step_type={step_type}) — confirm"
-                    " briefly and move to the next sub-question or"
-                    " concept. Don't demand additional working for a"
-                    " correct answer on a guided step."
-                )
-            else:
-                guidance = (
-                    "The student's numeric answer matches the expected"
-                    " answer.\n"
-                    "You may confirm correctness, but STILL follow Rule"
-                    " 1 of the math_teaching block — if the student has"
-                    " not shown their working, ask them to walk you"
-                    " through their steps before moving on. Do not skip"
-                    " to the next concept without verifying the working"
-                    " matches the answer."
-                )
+            guidance = (
+                "The student's answer is correct. CONFIRM briefly (one"
+                " short specific line — e.g. \"yes — 8 is right.\","
+                " \"that's it — dividing by 25 worked.\") and ADVANCE"
+                " to the next step. The probe_frequency principle"
+                " applies — no reasoning probes on correct answers."
+            )
         else:
             guidance = (
                 "The student's numeric answer does NOT match the expected"
                 " answer. You MUST NOT say 'correct', 'right', 'brilliant',"
                 " 'well done', 'you got it', 'exactly', 'perfect', or any"
                 " equivalent praise. Do not state the correct answer yet.\n"
-                "Echo the student's answer back to them verbatim ('You said"
-                f" {student_input.strip()[:80]}'), then ask ONE STEP-LEVEL"
-                " probe — which operation, which rule, what came first."
-                " NEVER ask 'how did you calculate X?' on a single"
-                " elementary operation — probe at the strategy level so"
-                " you can diagnose the subskill that failed."
+                "Name the specific step that went wrong in one sentence"
+                " and give a short hint pointing at the fix. Do NOT ask"
+                " 'walk me through your working' — they already showed"
+                " it (or didn't). Diagnose, don't interrogate."
             )
         block = (
             "\n\n<evaluation_signal>"
