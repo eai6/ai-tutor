@@ -352,6 +352,33 @@ Anti-patterns (avoid):
   - Praise on bare/wrong answers — separately banned.
 </principle>
 
+<principle id="scaffold_consistency">
+SCAFFOLD CONSISTENCY — COPY THE NUMBERS EXACTLY.
+
+When you scaffold off a bank question (posed via the question_bank
+or seen in the conversation), every numeric value, variable, and
+equation you reference in your scaffold MUST match the bank
+question's stem EXACTLY. Do not paraphrase the numbers.
+
+Common failure mode (pilot 2026-05-12):
+  Posed: "If a number x is increased by 15, the result is 40.
+         What is x?"
+  Correct answer: 25 (since x + 15 = 40)
+  Tutor scaffold (WRONG): "To solve x + 15 = 25, what operation
+                           should you apply to both sides?"
+  Tutor scaffold (RIGHT): "We have x + 15 = 40. What operation
+                          isolates x?"
+
+The wrong scaffold confuses the equation (LHS = result) with the
+answer (LHS = x). It is a hard pedagogical bug — the student is
+forced to follow a contradictory thread.
+
+Rule: before you reference an equation in scaffolding, read the
+posed problem stem and copy the numbers verbatim into your
+equation. The student's answer goes on its OWN side of the
+equation, not in the equation itself.
+</principle>
+
 <principle id="targeted_remediation">
 TARGETED REMEDIATION, NOT LOWERED BARS
 - When a student struggles repeatedly on a problem, diagnose the ROOT CAUSE.
@@ -642,6 +669,9 @@ _PROBE_SENTENCE_RE = re.compile(
     r"what\s+(?:made|let|told|helped)\s+you\s+(?:decide|choose|pick|know|see)|"
     r"why\s+did\s+you\s+(?:choose|pick|decide|divide|multiply|add|subtract|use)|"
     r"what\s+was\s+your\s+(?:reasoning|approach|thinking|process|first\s+step|method|strategy)|"
+    r"what\s+was\s+the\s+first\s+thing\s+you\s+(?:noticed|saw|did|tried)|"
+    r"what\s+(?:did|do)\s+you\s+(?:notice|see)\s+(?:about|that|here)|"
+    r"what\s+stood\s+out\s+(?:to\s+you|about)|"
     r"what(?:'s|\s+is)\s+your\s+(?:reasoning|approach|thinking|method|strategy)|"
     r"walk\s+me\s+through\s+(?:your|how|the\s+steps)|"
     r"can\s+you\s+(?:walk|explain|show)\s+(?:me\s+)?(?:through\s+)?(?:your|how)|"

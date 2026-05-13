@@ -108,3 +108,34 @@ class StripProbeSentencesTest(SimpleTestCase):
         out, n = _strip_probe_sentences(text)
         self.assertEqual(n, 1)
         self.assertNotIn("Why did you divide", out)
+
+    def test_strips_first_thing_you_noticed(self):
+        # Direct from 2026-05-12 pilot transcript.
+        text = "What was the first thing you noticed about how to solve this type of equation?"
+        out, n = _strip_probe_sentences(text)
+        self.assertEqual(n, 1)
+        self.assertNotIn("first thing you noticed", out)
+
+    def test_strips_what_did_you_notice(self):
+        text = "Right. What did you notice about the pattern here?"
+        out, n = _strip_probe_sentences(text)
+        self.assertEqual(n, 1)
+        self.assertNotIn("What did you notice", out)
+
+
+class ScaffoldConsistencyPrincipleTest(SimpleTestCase):
+    """Pilot 2026-05-12: tutor scaffolded with "x + 15 = 25" when the
+    posed problem said the result was 40. The tutor system prompt
+    must carry an explicit principle that scaffolds copy numbers
+    verbatim from the posed problem."""
+
+    def test_principle_present_in_system_prompt(self):
+        import inspect
+        from apps.tutoring import conversational_tutor as mod
+        source = inspect.getsource(mod)
+        self.assertIn('id="scaffold_consistency"', source)
+        self.assertIn("SCAFFOLD CONSISTENCY", source)
+        # Both the wrong + right shapes are illustrated so the LLM
+        # has a concrete contrast to learn from.
+        self.assertIn("x + 15 = 25", source)
+        self.assertIn("x + 15 = 40", source)

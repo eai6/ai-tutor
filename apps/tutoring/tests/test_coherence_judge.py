@@ -172,3 +172,19 @@ class CoherenceJudgeFailSoftTest(SimpleTestCase):
         # Doesn't crash; just no violations recorded.
         self.assertFalse(result.skipped)
         self.assertEqual(result.violations, [])
+
+
+class CoherenceJudgePromptContractTest(SimpleTestCase):
+    """Pilot 2026-05-12: tutor authored "To solve x + 15 = 25, what
+    operation..." when the posed problem said the RESULT was 40. The
+    coherence judge prompt must explicitly list this scaffold-vs-posed
+    mismatch as a violation pattern so the judge has a chance of
+    catching it on real traffic."""
+
+    def test_prompt_names_scaffold_mismatch_pattern(self):
+        from apps.tutoring.judges.coherence import _SYSTEM
+        self.assertIn("SCAFFOLD-vs-POSED MISMATCH", _SYSTEM)
+        # The illustrative example uses the same numbers from the
+        # pilot transcript so the judge has a concrete shape to match.
+        self.assertIn("x + 15 = 40", _SYSTEM)
+        self.assertIn("x + 15 = 25", _SYSTEM)
