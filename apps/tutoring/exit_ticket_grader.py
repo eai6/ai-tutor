@@ -56,13 +56,27 @@ class BatchGradeItem:
     # other q_types.
     expected_blanks: List[str] = field(default_factory=list)
     student_blanks: List[str] = field(default_factory=list)
+    # For matching: per-pair arrays. Each entry is {"left": "...",
+    # "right": "..."}. expected_pairs is the canonical pairing from
+    # the question's answer_data; student_pairs is what the student
+    # actually submitted (left_label → chosen_right). Same purpose as
+    # the blank lists above: gives the grader the structure it needs
+    # to emit per-pair verdicts.
+    expected_pairs: List[dict] = field(default_factory=list)
+    student_pairs: List[dict] = field(default_factory=list)
 
 
 @dataclass
-class BlankVerdict:
-    """Per-blank verdict for a fill_in_blank item."""
+class PartVerdict:
+    """Per-element verdict (one blank for fill_in_blank, one pair for
+    matching). Same shape regardless of element type so the prompt
+    schema can stay uniform."""
     is_correct: bool
     reasoning: str = ""
+
+
+# Backwards-compat alias — earlier code imported BlankVerdict directly.
+BlankVerdict = PartVerdict
 
 
 @dataclass
@@ -71,10 +85,16 @@ class BatchGradeResult:
     index: int
     correct: bool
     reasoning: str = ""
-    # For fill_in_blank: one BlankVerdict per blank, in input order.
-    # Empty for other q_types (or when the grader didn't return per-blank
-    # info — caller falls back to the question-level `correct` flag).
-    blanks: List[BlankVerdict] = field(default_factory=list)
+    # For fill_in_blank: one PartVerdict per blank, in input order.
+    # For matching: one PartVerdict per pair, in expected_pairs order.
+    # Empty for other q_types or when the grader skipped per-element
+    # detail — caller falls back to the question-level `correct` flag.
+    parts: List[PartVerdict] = field(default_factory=list)
+
+    @property
+    def blanks(self) -> List[PartVerdict]:
+        """Legacy alias — early callers expected `.blanks`. Use `.parts`."""
+        return self.parts
 
 
 _GRADE_SYSTEM = (
@@ -89,14 +109,20 @@ _GRADE_SYSTEM = (
     "  - For SHORT_ANSWER / DATA_INTERPRETATION: accept paraphrases that "
     "demonstrate understanding of the key concepts AND match the model "
     "answer's main numerical or conceptual claim.\n"
-    "  - For FILL_IN_BLANK: be GENEROUS with synonyms and semantic "
-    "equivalents. 'equal' = 'even' = 'fair' = 'equitable'. 'poverty' = "
-    "'inequality' = 'low income'. 'rapid' = 'fast' = 'quick'. Accept "
-    "minor spelling differences (one or two transposed/missing letters) "
-    "that don't change meaning. Reject only if the student wrote "
-    "something genuinely wrong, not just phrased differently.\n"
-    "  - For MATCHING: accept if the MAJORITY of pairs are correctly "
-    "matched (>50%).\n"
+    "  - For FILL_IN_BLANK: judge the WHOLE FILLED-IN SENTENCE, not "
+    "individual blank words in isolation. The input gives you "
+    "expected_blanks and student_blanks; mentally substitute each into "
+    "the sentence template and ask 'does the student's completed "
+    "sentence read correctly and convey the same meaning as the "
+    "expected one?' Be GENEROUS with synonyms ('equal' = 'even' = "
+    "'fair', 'poverty' = 'inequality' = 'low income', 'variety' = "
+    "'wider range' = 'more options') and minor spelling slips. Reject "
+    "only when a substituted word makes the sentence WRONG or "
+    "MEANINGFULLY different — not when it's just phrased differently.\n"
+    "  - For MATCHING: judge each pair's correctness based on the "
+    "expected pairing. Be generous with semantic equivalents on the "
+    "right-side value (e.g. 'tea and coffee' ≈ 'coffee and tea'). The "
+    "overall question is correct only when EVERY pair is correct.\n"
     "  - When in doubt and the student is in the right ballpark, "
     "favour CORRECT — students shouldn't be penalised for phrasing.\n"
     "\n"
@@ -107,18 +133,20 @@ _GRADE_SYSTEM = (
     '"reasoning": "<short why, <=120 chars>"}\n'
     "]\n"
     "\n"
-    "FOR FILL_IN_BLANK items, ALSO include a per-blank breakdown so "
-    "the frontend can colour each blank individually:\n"
+    "FOR FILL_IN_BLANK and MATCHING items, ALSO include a per-element "
+    "breakdown so the frontend can colour each blank/pair "
+    "individually. Use the `parts` field — same shape regardless of "
+    "element type:\n"
     "[\n"
-    '  {"index": 0, "correct": false, "reasoning": "blank 2 wrong",\n'
-    '   "blanks": [\n'
+    '  {"index": 0, "correct": false, "reasoning": "1 of 2 wrong",\n'
+    '   "parts": [\n'
     '     {"is_correct": true, "reasoning": "even ≈ equal"},\n'
-    '     {"is_correct": false, "reasoning": "expected poverty"}\n'
+    '     {"is_correct": false, "reasoning": "expected poverty, got X"}\n'
     '   ]}\n'
     "]\n"
-    "The overall `correct` flag for fill_in_blank is true ONLY when "
-    "every blank is correct. Length of `blanks` MUST equal the number "
-    "of expected_blanks in the input."
+    "Length of `parts` MUST equal the number of expected_blanks "
+    "(fill_in_blank) or expected_pairs (matching) in the input. "
+    "Order matches the input order."
 )
 
 
@@ -134,15 +162,26 @@ def _build_user_prompt(items: List[BatchGradeItem]) -> str:
             "student_answer": (it.student_answer or "")[:400],
             "is_math": bool(it.is_math),
         }
-        # Surface per-blank arrays for fill_in_blank so the grader can
-        # evaluate each blank independently. Capped to keep the prompt
-        # compact even on long-blank questions.
+        # Surface per-element arrays so the grader can evaluate each
+        # blank / pair independently. Capped to keep the prompt
+        # compact even on long-element questions.
         if it.q_type == 'fill_in_blank' and it.expected_blanks:
             entry["expected_blanks"] = [
                 str(b)[:120] for b in it.expected_blanks
             ]
             entry["student_blanks"] = [
                 str(b)[:120] for b in (it.student_blanks or [])
+            ]
+        if it.q_type == 'matching' and it.expected_pairs:
+            entry["expected_pairs"] = [
+                {"left": str(p.get("left", ""))[:80],
+                 "right": str(p.get("right", ""))[:120]}
+                for p in it.expected_pairs
+            ]
+            entry["student_pairs"] = [
+                {"left": str(p.get("left", ""))[:80],
+                 "right": str(p.get("right", ""))[:120]}
+                for p in (it.student_pairs or [])
             ]
         payload.append(entry)
     return (
@@ -204,22 +243,24 @@ def grade_written_responses_batch(
             continue
         correct = bool(entry.get("correct", False))
         reasoning = str(entry.get("reasoning") or "")[:200]
-        # Optional per-blank breakdown. The grader is INSTRUCTED to
-        # include this for fill_in_blank items, but if it's missing or
-        # malformed we fall back to the question-level verdict (caller
-        # checks `len(blanks) > 0` to decide).
-        blanks_raw = entry.get("blanks")
-        blanks: List[BlankVerdict] = []
-        if isinstance(blanks_raw, list):
-            for b in blanks_raw:
+        # Optional per-element breakdown. The grader is INSTRUCTED to
+        # emit this for fill_in_blank AND matching items under the
+        # `parts` key; tolerate the legacy `blanks` key for the same
+        # shape so an in-flight prompt change doesn't break parsing.
+        parts_raw = entry.get("parts")
+        if not isinstance(parts_raw, list):
+            parts_raw = entry.get("blanks")  # legacy
+        parts: List[PartVerdict] = []
+        if isinstance(parts_raw, list):
+            for b in parts_raw:
                 if not isinstance(b, dict):
                     continue
-                blanks.append(BlankVerdict(
+                parts.append(PartVerdict(
                     is_correct=bool(b.get("is_correct", False)),
                     reasoning=str(b.get("reasoning") or "")[:200],
                 ))
         by_index[idx] = BatchGradeResult(
-            index=idx, correct=correct, reasoning=reasoning, blanks=blanks,
+            index=idx, correct=correct, reasoning=reasoning, parts=parts,
         )
 
     out: List[BatchGradeResult] = []

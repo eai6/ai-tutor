@@ -8161,6 +8161,24 @@ Which concept numbers were meaningfully covered?"""
             student_str = "; ".join(
                 f"{k} → {v}" for k, v in student_map.items()
             )
+            # Pass per-pair arrays so the grader emits one verdict per
+            # pair and the frontend can colour each select individually.
+            extra_kwargs = {
+                'expected_pairs': [
+                    {'left': str(p.get('left', '')), 'right': str(p.get('right', ''))}
+                    for p in pairs
+                ],
+                # Ordered by expected pairs so the verdict array lines
+                # up with the rendered selects (which are also
+                # ordered by `pairs`).
+                'student_pairs': [
+                    {
+                        'left': str(p.get('left', '')),
+                        'right': str(student_map.get(str(p.get('left', '')), '')),
+                    }
+                    for p in pairs
+                ],
+            }
         else:  # short_answer / data_interpretation
             expected = str(data.get('model_answer', '') or '')
             student_str = str(student_answer or '')
@@ -8476,17 +8494,27 @@ Which concept numbers were meaningfully covered?"""
             eo_tag = getattr(q, 'concept_tag', '') or ''
             sub_eo = getattr(q, 'enabling_objective', '') or ''
 
-            # For fill_in_blank, pull per-blank verdicts out of the
-            # batch cache so we can both (a) colour each input
-            # individually in the frontend and (b) tell the tutor
-            # exactly which blank failed during remediation.
+            # Pull per-element verdicts out of the batch cache so the
+            # frontend can colour each blank/pair individually AND the
+            # tutor's remediation directive can target the specific
+            # element that failed (not re-explain the whole question).
+            # Same shape works for fill_in_blank (per blank) and
+            # matching (per pair); we expose with q_type-specific
+            # payload keys for clarity downstream.
             blanks_correct: list = []
             blanks_reasoning: list = []
+            pairs_correct: list = []
+            pairs_reasoning: list = []
             cached = (self._exit_ticket_batch_cache or {}).get(q.id)
-            cached_blanks = getattr(cached, 'blanks', []) if cached else []
-            if cached_blanks:
-                blanks_correct = [bool(b.is_correct) for b in cached_blanks]
-                blanks_reasoning = [str(b.reasoning) for b in cached_blanks]
+            cached_parts = getattr(cached, 'parts', []) if cached else []
+            if cached_parts:
+                q_type_now = getattr(q, 'question_type', 'mcq') or 'mcq'
+                if q_type_now == 'fill_in_blank':
+                    blanks_correct = [bool(b.is_correct) for b in cached_parts]
+                    blanks_reasoning = [str(b.reasoning) for b in cached_parts]
+                elif q_type_now == 'matching':
+                    pairs_correct = [bool(b.is_correct) for b in cached_parts]
+                    pairs_reasoning = [str(b.reasoning) for b in cached_parts]
 
             if is_correct:
                 correct += 1
@@ -8505,6 +8533,9 @@ Which concept numbers were meaningfully covered?"""
                     # fill_in_blank only — empty list otherwise.
                     'blanks_correct': blanks_correct,
                     'blanks_reasoning': blanks_reasoning,
+                    # matching only — empty list otherwise.
+                    'pairs_correct': pairs_correct,
+                    'pairs_reasoning': pairs_reasoning,
                 })
 
             results.append({
@@ -8518,10 +8549,12 @@ Which concept numbers were meaningfully covered?"""
                 'is_correct': is_correct,
                 'explanation': q.explanation,
                 # Surfaced to the frontend so the exit-ticket review
-                # modal can colour each blank individually instead of
-                # painting all blanks the same colour as the question.
+                # modal can colour each blank/pair individually instead
+                # of painting them all the same colour as the question.
                 'blanks_correct': blanks_correct,
                 'blanks_reasoning': blanks_reasoning,
+                'pairs_correct': pairs_correct,
+                'pairs_reasoning': pairs_reasoning,
             })
 
         # Use the lesson's configured passing_score (no longer hardcoded

@@ -680,8 +680,18 @@ function showExitResults(results) {
                 }
             });
         } else if (qType === 'matching') {
-            qDiv.querySelectorAll('.matching-select').forEach(sel => {
-                if (r.is_correct) {
+            // Mirror the per-blank logic: prefer per-pair verdicts
+            // (r.pairs_correct, aligned with the rendered selects in
+            // expected_pairs order) so each select is coloured by its
+            // own pair's verdict instead of all-green/all-red. Falls
+            // back to the question-level verdict if per-pair info is
+            // missing (older clients, batch grader skipped, etc.).
+            const perPair = Array.isArray(r.pairs_correct) ? r.pairs_correct : null;
+            qDiv.querySelectorAll('.matching-select').forEach((sel, idx) => {
+                const ok = perPair && idx < perPair.length
+                    ? !!perPair[idx]
+                    : r.is_correct;
+                if (ok) {
                     sel.style.borderColor = '#10b981';
                     sel.style.background = '#d1fae5';
                 } else {
