@@ -170,11 +170,13 @@ class BenchmarkAnnotation(models.Model):
         blank=True,
         help_text="Free-text justification for the expected_labels choice.",
     )
-    failure_category = models.CharField(
-        max_length=60, blank=True,
-        help_text="Predefined failure cluster (see "
-                  "apps.benchmark.labels.FAILURE_CATEGORIES). Empty when "
-                  "the item passes.",
+    failure_categories = models.JSONField(
+        default=list, blank=True,
+        help_text="List of cluster tags from "
+                  "apps.benchmark.labels.FAILURE_CATEGORIES. Multiple may "
+                  "apply to one failure (e.g. an item with both "
+                  "arithmetic_in_tutor AND incoherent_setup). Empty list "
+                  "when the item passes.",
     )
 
     # Provenance + audit
@@ -195,7 +197,6 @@ class BenchmarkAnnotation(models.Model):
         ]
         indexes = [
             models.Index(fields=['system_variant', 'annotator_role']),
-            models.Index(fields=['failure_category']),
         ]
 
     def __str__(self):

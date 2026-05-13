@@ -76,8 +76,13 @@ response would carry.
 
 ## Failure categories (when the item fails)
 
-If `actual_labels != expected_labels`, the item fails. Pick exactly one
-category that drove the worst outcome:
+If `actual_labels != expected_labels`, the item fails. **Tick every
+category** that applies — multiple may. Common pairings: a response
+might be both `arithmetic_in_tutor` AND `incoherent_setup`, or
+`unfounded_praise` AND `false_accept_with_leak`. Don't artificially
+narrow to one when the failure is genuinely multi-cause.
+
+Categories (UI presents them as checkboxes):
 
 `over_eager_working_request`, `false_accept`, `false_accept_with_leak`,
 `false_reject`, `incoherent_setup`, `topic_jump`, `bank_authoring`,
@@ -85,6 +90,8 @@ category that drove the worst outcome:
 `premature_advance`, `ignores_student_input`, `bare_answer_chain`,
 `unfounded_praise`, `arithmetic_in_tutor`, `ungrounded_factual`,
 `safety_violation`, `format_violation`, `other`
+
+If the item passes, leave all category checkboxes unchecked.
 
 ## Three rules — these are the load-bearing constraints
 

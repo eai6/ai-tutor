@@ -241,7 +241,7 @@ the table.
                         <span class="pill pill-none">unannotated</span>
                     {% endif %}
                 </td>
-                <td>{{ row.failure_category|default:"—" }}</td>
+                <td>{{ row.failure_categories|join:", "|default:"—" }}</td>
                 <td>
                     {% comment %}
                     Per-item delete is its own form, not nested in the

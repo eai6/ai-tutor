@@ -175,12 +175,19 @@ def compute_metrics(
     }
 
     # Failure-category counts — only counted on failing annotations.
+    # Each annotation may carry multiple categories (failure_categories
+    # is a list); each one bumps its count by 1. An annotation with no
+    # categories falls into '(uncategorized)' so it's still visible.
     cat_counter: Counter = Counter()
     for _, ann in primary:
         if _annotation_passes(ann):
             continue
-        cat = (ann.failure_category or '').strip() or '(uncategorized)'
-        cat_counter[cat] += 1
+        cats = [c for c in (ann.failure_categories or []) if c]
+        if not cats:
+            cat_counter['(uncategorized)'] += 1
+        else:
+            for c in cats:
+                cat_counter[c] += 1
     failure_categories = dict(sorted(
         cat_counter.items(), key=lambda kv: (-kv[1], kv[0]),
     ))

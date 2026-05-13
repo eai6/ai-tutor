@@ -32,7 +32,14 @@ def _make_annotation(item: BenchmarkItem, *,
                      actual=None, expected=None,
                      role='human', model='', user=None,
                      variant='production_v1',
-                     failure_category='', safety=False):
+                     failure_categories=None, safety=False,
+                     # Backwards-compat shim: tests still passing the
+                     # singular form get auto-promoted to a list.
+                     failure_category=None):
+    if failure_categories is None:
+        failure_categories = (
+            [failure_category] if failure_category else []
+        )
     return BenchmarkAnnotation.objects.create(
         item=item,
         annotator_role=role,
@@ -41,7 +48,7 @@ def _make_annotation(item: BenchmarkItem, *,
         system_variant=variant,
         actual_labels=actual or [],
         expected_labels=expected or [],
-        failure_category=failure_category,
+        failure_categories=failure_categories,
         safety_concern=safety,
     )
 

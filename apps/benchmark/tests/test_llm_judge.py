@@ -16,7 +16,7 @@ from apps.benchmark.llm_judge import (
     DEFAULT_JUDGE_MODEL,
     _build_user_prompt,
     _parse_judge_output,
-    _sanitize_category,
+    _sanitize_categories,
     _sanitize_labels,
     run_llm_judge_on_items,
 )
@@ -80,13 +80,21 @@ class SanitiseTest(TestCase):
         self.assertEqual(_sanitize_labels(None), [])
         self.assertEqual(_sanitize_labels('PROBE'), [])
 
-    def test_failure_category_validated(self):
+    def test_failure_categories_validated(self):
+        # Single string promoted to list.
         self.assertEqual(
-            _sanitize_category('arithmetic_in_tutor'),
-            'arithmetic_in_tutor',
+            _sanitize_categories('arithmetic_in_tutor'),
+            ['arithmetic_in_tutor'],
         )
-        self.assertEqual(_sanitize_category('not_in_list'), '')
-        self.assertEqual(_sanitize_category(''), '')
+        # Multi-value list with one bad entry — bad one dropped silently.
+        self.assertEqual(
+            _sanitize_categories(['arithmetic_in_tutor', 'not_in_list',
+                                  'incoherent_setup']),
+            ['arithmetic_in_tutor', 'incoherent_setup'],
+        )
+        self.assertEqual(_sanitize_categories('not_in_list'), [])
+        self.assertEqual(_sanitize_categories(''), [])
+        self.assertEqual(_sanitize_categories(None), [])
 
 
 class BuildPromptTest(TestCase):
@@ -159,7 +167,9 @@ class RunLLMJudgeTest(TestCase):
         self.assertEqual(
             sorted(b_ann.actual_labels), ['ADVANCE', 'UNFOUNDED_PRAISE'],
         )
-        self.assertEqual(b_ann.failure_category, 'bare_answer_chain')
+        # Legacy single-value `failure_category` JSON gets promoted to
+        # a one-element list by the sanitizer.
+        self.assertEqual(b_ann.failure_categories, ['bare_answer_chain'])
         self.assertFalse(b_ann.passes)
 
     @patch('apps.benchmark.llm_judge._make_gemini_client')
@@ -243,4 +253,4 @@ class RunLLMJudgeTest(TestCase):
             item=item, annotator_role='llm_judge',
         )
         self.assertEqual(ann.actual_labels, ['PROBE'])  # MADE_UP_LABEL dropped
-        self.assertEqual(ann.failure_category, '')  # fake_cat rejected
+        self.assertEqual(ann.failure_categories, [])  # fake_cat rejected

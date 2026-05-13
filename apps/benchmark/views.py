@@ -12,7 +12,7 @@ Two views:
 v1 scope (per memory/handoff_phase_2_2.md + 2026-05-12 conversation):
 - Single system variant: ``production_v1`` (hardcoded).
 - Single annotator role: ``human`` (request.user).
-- failure_category dropdown locked to ``FAILURE_CATEGORIES`` (no free text).
+- failure_categories multi-select locked to ``FAILURE_CATEGORIES`` (no free text).
 - No pagination (~50 items expected).
 
 Super-admin only. Multi-tenancy: benchmark items aren't institution-
@@ -94,7 +94,7 @@ def benchmark_list(request):
             'annotation_count': item.annotations.count(),
             'latest': latest,
             'passes': latest.passes if latest else None,
-            'failure_category': latest.failure_category if latest else '',
+            'failure_categories': latest.failure_categories if latest else [],
         })
 
     # Filter dropdown values — show only what's actually present in
@@ -289,7 +289,12 @@ def benchmark_annotate(request, item_id: str):
         actual_labels = sorted(set(request.POST.getlist('actual_labels')))
         expected_labels = sorted(set(request.POST.getlist('expected_labels')))
         rationale = (request.POST.get('rationale') or '').strip()
-        failure_category = (request.POST.get('failure_category') or '').strip()
+        # Multi-select: each checkbox/option submits a separate value.
+        # getlist tolerates the legacy single-value form too.
+        failure_categories = sorted(set(
+            (c or '').strip() for c in request.POST.getlist('failure_categories')
+            if (c or '').strip()
+        ))
         safety_concern = request.POST.get('safety_concern') == 'on'
 
         claim_raw = request.POST.get('student_claim_correct', '')
@@ -303,8 +308,10 @@ def benchmark_annotate(request, item_id: str):
         # Validate labels are in the known vocab — silently drop unknowns.
         actual_labels = [l for l in actual_labels if L.is_valid_label(l)]
         expected_labels = [l for l in expected_labels if L.is_valid_label(l)]
-        if failure_category and not L.is_valid_failure_category(failure_category):
-            failure_category = ''
+        # Drop unknown categories silently, matching the label-validation pattern.
+        failure_categories = [
+            c for c in failure_categories if L.is_valid_failure_category(c)
+        ]
 
         ann, _created = BenchmarkAnnotation.objects.update_or_create(
             item=item,
@@ -318,7 +325,7 @@ def benchmark_annotate(request, item_id: str):
                 'expected_labels': expected_labels,
                 'safety_concern': safety_concern,
                 'rationale': rationale,
-                'failure_category': failure_category,
+                'failure_categories': failure_categories,
             },
         )
 
@@ -362,14 +369,14 @@ def benchmark_annotate(request, item_id: str):
         prefill_actual = existing.actual_labels or []
         prefill_expected = existing.expected_labels or []
         prefill_rationale = existing.rationale
-        prefill_category = existing.failure_category
+        prefill_categories = list(existing.failure_categories or [])
         prefill_safety = existing.safety_concern
         prefill_claim = existing.student_claim_correct
     else:
         prefill_actual = list(suggested)
         prefill_expected = []
         prefill_rationale = ''
-        prefill_category = ''
+        prefill_categories = []
         prefill_safety = False
         prefill_claim = None
 
@@ -415,9 +422,12 @@ def benchmark_annotate(request, item_id: str):
         'suggested_labels': suggested,
         'action_labels': action_labels,
         'issue_groups': issue_groups,
-        'failure_categories': L.FAILURE_CATEGORIES,
+        'failure_category_options': [
+            {'key': c, 'checked': c in prefill_categories}
+            for c in L.FAILURE_CATEGORIES
+        ],
         'prefill_rationale': prefill_rationale,
-        'prefill_category': prefill_category,
+        'prefill_categories': prefill_categories,
         'prefill_safety': prefill_safety,
         'prefill_claim': prefill_claim,
         'existing': existing,

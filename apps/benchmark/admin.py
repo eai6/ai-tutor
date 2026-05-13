@@ -31,10 +31,9 @@ class BenchmarkItemAdmin(admin.ModelAdmin):
 @admin.register(BenchmarkAnnotation)
 class BenchmarkAnnotationAdmin(admin.ModelAdmin):
     list_display = ('item', 'system_variant', 'annotator_role',
-                    'passes_display', 'failure_category', 'updated_at')
-    list_filter = ('system_variant', 'annotator_role', 'failure_category',
-                   'safety_concern')
-    search_fields = ('item__item_id', 'rationale', 'failure_category')
+                    'passes_display', 'failure_categories', 'updated_at')
+    list_filter = ('system_variant', 'annotator_role', 'safety_concern')
+    search_fields = ('item__item_id', 'rationale')
     readonly_fields = ('created_at', 'updated_at',
                        'missing_labels_display', 'extra_labels_display',
                        'passes_display')
@@ -47,7 +46,7 @@ class BenchmarkAnnotationAdmin(admin.ModelAdmin):
         ('Annotation', {
             'fields': ('student_claim_correct', 'actual_labels',
                        'expected_labels', 'safety_concern', 'rationale',
-                       'failure_category'),
+                       'failure_categories'),
         }),
         ('Computed verdict', {
             'fields': ('missing_labels_display', 'extra_labels_display',

@@ -395,13 +395,21 @@
                 </div>
 
                 <div class="form-row">
-                    <label class="field-label">Failure category</label>
-                    <select name="failure_category">
-                        <option value="" {% if not prefill_category %}selected{% endif %}>— none (pass) —</option>
-                        {% for cat in failure_categories %}
-                        <option value="{{ cat }}" {% if prefill_category == cat %}selected{% endif %}>{{ cat }}</option>
+                    <label class="field-label">Failure categories
+                        <span style="color:#9ca3af;font-weight:400;font-size:0.78rem;">
+                            (multi-select — leave all unchecked for a pass)
+                        </span>
+                    </label>
+                    <div class="failure-categories" style="display:flex;flex-wrap:wrap;gap:0.4rem 0.85rem;">
+                        {% for opt in failure_category_options %}
+                        <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.85rem;color:#374151;">
+                            <input type="checkbox" name="failure_categories"
+                                   value="{{ opt.key }}"
+                                   {% if opt.checked %}checked{% endif %}>
+                            <code style="font-size:0.78rem;">{{ opt.key }}</code>
+                        </label>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
 
                 <div class="form-row">

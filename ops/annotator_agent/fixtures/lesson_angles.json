@@ -1,0 +1,3976 @@
+[
+  {
+    "model": "accounts.institution",
+    "pk": 13,
+    "fields": {
+      "name": "Layer S Demo School",
+      "slug": "layer-s-demo-school",
+      "timezone": "UTC",
+      "is_active": true,
+      "session_mode": "shared_device",
+      "created_at": "2026-05-01T01:00:07.783Z",
+      "updated_at": "2026-05-01T01:00:07.783Z"
+    }
+  },
+  {
+    "model": "curriculum.course",
+    "pk": 9,
+    "fields": {
+      "institution": 13,
+      "curriculum_upload": null,
+      "title": "Layer S Demo \u2014 Math S3 (angles around a point)",
+      "description": "",
+      "grade_level": "S3",
+      "is_published": true,
+      "subject_type": "",
+      "allow_student_duration_override": true,
+      "created_at": "2026-05-01T01:00:07.786Z",
+      "updated_at": "2026-05-01T01:00:07.786Z"
+    }
+  },
+  {
+    "model": "curriculum.unit",
+    "pk": 64,
+    "fields": {
+      "course": 9,
+      "title": "Geometry \u2014 angles",
+      "description": "",
+      "order_index": 0,
+      "grade_level": "",
+      "terminal_objectives": [],
+      "enabling_objectives": []
+    }
+  },
+  {
+    "model": "curriculum.lesson",
+    "pk": 638,
+    "fields": {
+      "unit": 64,
+      "title": "Angles around a point",
+      "objective": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "estimated_minutes": 20,
+      "order_index": 0,
+      "is_published": true,
+      "content_status": "ready",
+      "enabling_objectives": [
+        "Identify that the sum of all angles meeting at a single point is exactly 360\u00b0",
+        "Identify a right angle denoted by a square symbol as exactly 90\u00b0 within a diagram of angles",
+        "Calculate the sum of two or more known numerical angles around a point",
+        "Calculate the value of a single missing numerical angle by subtracting the sum of known angles from 360\u00b0",
+        "Construct an algebraic equation setting the sum of given angle expressions around a point equal to 360\u00b0",
+        "Solve a linear equation to find the value of a variable x representing an unknown angle around a point"
+      ],
+      "content_quality": "tier_4",
+      "teacher_approved": false,
+      "teacher_approved_at": null,
+      "teacher_approved_by": null,
+      "metadata": {
+        "verification_audit": {
+          "generated_at": "2026-05-06T00:00:10.258186+00:00",
+          "math_check_run": true,
+          "step_corrections": [],
+          "exit_ticket_corrections": [
+            {
+              "question_index": 13,
+              "field": "explanation",
+              "auto_corrected": true,
+              "corrections": [
+                {
+                  "expression": "360 - 90 - 100",
+                  "claimed": "90",
+                  "correct": "170"
+                }
+              ]
+            }
+          ],
+          "retry_count": 0,
+          "step_enabling_objective_validation": {
+            "exact": 0,
+            "snapped": 0,
+            "dropped": 8,
+            "empty": 2,
+            "dropped_examples": [
+              {
+                "order_index": 1,
+                "step_type": "teach",
+                "rejected_eo": "Find a missing angle x given that all angles sum to 360\u00b0."
+              },
+              {
+                "order_index": 2,
+                "step_type": "worked_example",
+                "rejected_eo": "Find a missing angle x given that all angles sum to 360\u00b0."
+              },
+              {
+                "order_index": 3,
+                "step_type": "practice",
+                "rejected_eo": "Find a missing angle x given that all angles sum to 360\u00b0."
+              },
+              {
+                "order_index": 4,
+                "step_type": "practice",
+                "rejected_eo": "Find a missing angle x given that all angles sum to 360\u00b0."
+              },
+              {
+                "order_index": 5,
+                "step_type": "teach",
+                "rejected_eo": "Find a missing angle x given that all angles sum to 360\u00b0."
+              }
+            ]
+          },
+          "layer4_rejections": [
+            {
+              "question_index": 7,
+              "reason": "distractor_collision",
+              "message": "distractor 2 ('a + b') equals correct answer 180.0 for params {'a': 90, 'b': 90}",
+              "sample_params": {
+                "a": 90,
+                "b": 90
+              },
+              "question_text": "Three angles around a point are {a}\u00b0, {b}\u00b0, and x\u00b0. What is x?"
+            },
+            {
+              "question_index": 8,
+              "reason": "distractor_collision",
+              "message": "distractor 0 ('90 + 90') equals correct answer 180.0 for params {'a': 120}",
+              "sample_params": {
+                "a": 120
+              },
+              "question_text": "Around a point there are two right angles (90\u00b0 each) and angle x\u00b0. What is x?"
+            },
+            {
+              "question_index": 10,
+              "reason": "distractor_collision",
+              "message": "two distractors yielded the same value ([120.0, 170.0, 170.0]) for params {'a': 100, 'b': 70, 'c': 70}",
+              "sample_params": {
+                "a": 100,
+                "b": 70,
+                "c": 70
+              },
+              "question_text": "A fisherman divides his catch area into sectors of {a}\u00b0, {b}\u00b0, and {c}\u00b0. What is the total of these three sectors?"
+            },
+            {
+              "question_index": 11,
+              "reason": "distractor_collision",
+              "message": "distractor 2 ('360 - a') equals correct answer 180.0 for params {'a': 180}",
+              "sample_params": {
+                "a": 180
+              },
+              "question_text": "Angles around a point are 2x\u00b0, x\u00b0, and {a}\u00b0. Which equation represents this situation?"
+            },
+            {
+              "question_index": 13,
+              "reason": "distractor_collision",
+              "message": "two distractors yielded the same value ([230.0, 50.0, 50.0]) for params {'a': 50, 'b': 80, 'c': 100}",
+              "sample_params": {
+                "a": 50,
+                "b": 80,
+                "c": 100
+              },
+              "question_text": "A boat's radar shows sectors of {a}\u00b0, {b}\u00b0, {c}\u00b0, and x\u00b0. If x represents the remaining sector, what is x?"
+            },
+            {
+              "question_index": 14,
+              "reason": "distractor_collision",
+              "message": "two distractors yielded the same value ([45.0, 180.0, 180.0]) for params {'n': 4}",
+              "sample_params": {
+                "n": 4
+              },
+              "question_text": "Four equal angles of x\u00b0 each meet at a point. What is x?"
+            },
+            {
+              "question_index": 16,
+              "reason": "distractor_collision",
+              "message": "two distractors yielded the same value ([150.0, 150.0, 240.0]) for params {'a': 70, 'b': 80, 'c': 60}",
+              "sample_params": {
+                "a": 70,
+                "b": 80,
+                "c": 60
+              },
+              "question_text": "A lighthouse beam sweeps through angles of {a}\u00b0, {b}\u00b0, and {c}\u00b0. What is the sum of these angles?"
+            },
+            {
+              "question_index": 18,
+              "reason": "distractor_collision",
+              "message": "two distractors yielded the same value ([245.0, 65.0, 245.0]) for params {'a': 60, 'b': 55, 'c': 80, 'd': 50}",
+              "sample_params": {
+                "a": 60,
+                "b": 55,
+                "c": 80,
+                "d": 50
+              },
+              "question_text": "A wind turbine's blades create sectors of {a}\u00b0, {b}\u00b0, {c}\u00b0, {d}\u00b0, and x\u00b0. What is x?"
+            },
+            {
+              "question_index": 19,
+              "reason": "distractor_collision",
+              "message": "two distractors yielded the same value ([30.0, 120.0, 120.0]) for params {'n': 6}",
+              "sample_params": {
+                "n": 6
+              },
+              "question_text": "Six equal angles of x\u00b0 each meet at a point. What is x?"
+            },
+            {
+              "question_index": 32,
+              "reason": "matching_pair_collision",
+              "message": "render_matching produced fewer than 4 distinct pairs \u2014 parameter space too narrow",
+              "sample_params": null,
+              "question_text": "Match each description to the correct angle sum."
+            },
+            {
+              "question_index": 37,
+              "reason": "distractor_collision_after_retry",
+              "message": "distractor 1 ('a + b') equals correct answer 180.0 for params {'a': 100, 'b': 80}",
+              "question_text": "Three angles around a point are {a}\u00b0, {b}\u00b0, and x\u00b0. What is x?"
+            },
+            {
+              "question_index": 42,
+              "reason": "distractor_collision_after_retry",
+              "message": "distractor 1 ('a + b + c') equals correct answer 180.0 for params {'a': 50, 'b': 70, 'c': 60}",
+              "question_text": "Four angles around a point are {a}\u00b0, {b}\u00b0, {c}\u00b0, and x\u00b0. What is x?"
+            },
+            {
+              "question_index": 45,
+              "reason": "distractor_collision_after_retry",
+              "message": "two distractors yielded the same value ([150.0, 150.0, 300.0]) for params {'a': 120}",
+              "question_text": "Around a point, there are two right angles and one angle of {a}\u00b0. The fourth angle is:"
+            }
+          ],
+          "layer4_retry_count": 1,
+          "layer4_unresolved": false,
+          "exit_ticket_questions_created": 35,
+          "exit_ticket_enabling_objective_validation": {
+            "exact": 0,
+            "snapped": 4,
+            "dropped": 31,
+            "empty": 0,
+            "dropped_examples": [
+              {
+                "question": "Three angles around a point are 85\u00b0, 120\u00b0, and x\u00b0. Find x.",
+                "rejected_eo": "EO4: Calculate the value of a single missing numerical angle by subtracting the sum of known angles from 360\u00b0"
+              },
+              {
+                "question": "Four angles around a point are 75\u00b0, 60\u00b0, 65\u00b0, and x\u00b0. Find x.",
+                "rejected_eo": "EO6: Solve a linear equation to find the value of a variable x representing an unknown angle around a point"
+              },
+              {
+                "question": "Five angles around a point are 45\u00b0, 60\u00b0, 75\u00b0, 90\u00b0, and x\u00b0. Find x.",
+                "rejected_eo": "EO4: Calculate the value of a single missing numerical angle by subtracting the sum of known angles from 360\u00b0"
+              },
+              {
+                "question": "Two equal angles of x\u00b0 each and one angle of 130\u00b0 meet at a point. Find x.",
+                "rejected_eo": "EO6: Solve a linear equation to find the value of a variable x representing an unknown angle around a point"
+              },
+              {
+                "question": "4 equal angles meet at a point. Each angle measures how many degrees?",
+                "rejected_eo": "EO1: Identify that the sum of all angles meeting at a single point is exactly 360\u00b0"
+              }
+            ]
+          }
+        }
+      },
+      "allow_group_mode": true,
+      "max_group_size": 4,
+      "group_requires_approval": false,
+      "created_at": "2026-05-01T01:00:07.787Z",
+      "updated_at": "2026-05-06T00:08:48.806Z"
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1519,
+    "fields": {
+      "lesson": 638,
+      "order_index": 0,
+      "step_type": "teach",
+      "priority": 1,
+      "teacher_script": "Look at the schematic map of a roundabout in Victoria \u2014 you can see multiple roads meeting at a single central point. If you drive completely around the roundabout, you make a full circular turn. Today we will learn how to find a missing angle when lines or roads meet at a central point like this.",
+      "question": "",
+      "answer_type": "none",
+      "choices": null,
+      "expected_answer": "",
+      "rubric": "",
+      "hint_1": "",
+      "hint_2": "",
+      "hint_3": "",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {
+        "key_vocabulary": null,
+        "key_points": null,
+        "seychelles_context": "The Bicentennial Monument in Victoria sits at a roundabout where multiple roads converge.",
+        "worked_example": null,
+        "common_mistakes": null
+      },
+      "curriculum_context": null,
+      "phase": "engage",
+      "concept_tag": "",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1520,
+    "fields": {
+      "lesson": 638,
+      "order_index": 1,
+      "step_type": "teach",
+      "priority": 1,
+      "teacher_script": "Look at the diagram showing three distinct angles meeting at a single central vertex. Think of a clock hand sweeping all the way around the dial, returning exactly to where it started. A full turn like this is always 360\u00b0. Because these angles fit perfectly together to make a complete circle without overlapping, their sum must be 360\u00b0. If we know all but one angle, we add the known angles and subtract that total from 360\u00b0 to find the missing part.",
+      "question": "",
+      "answer_type": "none",
+      "choices": null,
+      "expected_answer": "",
+      "rubric": "",
+      "hint_1": "",
+      "hint_2": "",
+      "hint_3": "",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {
+        "key_vocabulary": null,
+        "key_points": [
+          "A full turn is 360 degrees.",
+          "Angles that meet at a central point complete a full turn.",
+          "The sum of all angles meeting at a point is 360\u00b0."
+        ],
+        "seychelles_context": null,
+        "worked_example": null,
+        "common_mistakes": null
+      },
+      "curriculum_context": null,
+      "phase": "explore",
+      "concept_tag": "angles_around_point",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1521,
+    "fields": {
+      "lesson": 638,
+      "order_index": 2,
+      "step_type": "worked_example",
+      "priority": 2,
+      "teacher_script": "Look at the diagram showing three angles around a point: 150\u00b0, 80\u00b0, and an unknown angle x. Let's calculate the missing angle step-by-step.",
+      "question": "",
+      "answer_type": "none",
+      "choices": null,
+      "expected_answer": "",
+      "rubric": "",
+      "hint_1": "",
+      "hint_2": "",
+      "hint_3": "",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {
+        "key_vocabulary": null,
+        "key_points": null,
+        "seychelles_context": null,
+        "worked_example": {
+          "problem": "Find the missing angle x when three angles meet at a point: 150\u00b0, 80\u00b0, and x.",
+          "steps": [
+            {
+              "step": 1,
+              "action": "Identify the geometry rule",
+              "explanation": "The angles meet at a single point, forming a complete circle. Therefore, they sum to 360\u00b0."
+            },
+            {
+              "step": 2,
+              "action": "Add the known angles",
+              "explanation": "150\u00b0 + 80\u00b0 = 230\u00b0."
+            },
+            {
+              "step": 3,
+              "action": "Subtract the sum from 360\u00b0",
+              "explanation": "360\u00b0 - 230\u00b0 = 130\u00b0."
+            }
+          ],
+          "final_answer": "130\u00b0"
+        },
+        "common_mistakes": null
+      },
+      "curriculum_context": null,
+      "phase": "explain",
+      "concept_tag": "angles_around_point",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1522,
+    "fields": {
+      "lesson": 638,
+      "order_index": 3,
+      "step_type": "practice",
+      "priority": 1,
+      "teacher_script": "Look at the diagram where four angles meet at a central point. The given angles are 90\u00b0, 110\u00b0, and 60\u00b0, along with a missing angle y. Calculate the value of y.",
+      "question": "Find the value of y in degrees.",
+      "answer_type": "short_numeric",
+      "choices": null,
+      "expected_answer": "100",
+      "rubric": "",
+      "hint_1": "What is the total sum of all angles around a single point?",
+      "hint_2": "First, add the known angles together: 90\u00b0 + 110\u00b0 + 60\u00b0.",
+      "hint_3": "Subtract that total (260\u00b0) from 360\u00b0 to find y.",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {},
+      "curriculum_context": null,
+      "phase": "practice",
+      "concept_tag": "angles_around_point",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1523,
+    "fields": {
+      "lesson": 638,
+      "order_index": 4,
+      "step_type": "practice",
+      "priority": 2,
+      "teacher_script": "Look at the diagram of a circular pie chart showing three sections meeting at the centre. Two sections have angles of 135\u00b0 and 145\u00b0. Find the angle of the third section, labelled z.",
+      "question": "Which of the following is the value of the missing angle z?",
+      "answer_type": "multiple_choice",
+      "choices": [
+        "A) 70\u00b0",
+        "B) 80\u00b0",
+        "C) 90\u00b0",
+        "D) 280\u00b0"
+      ],
+      "expected_answer": "B",
+      "rubric": "",
+      "hint_1": "The whole pie chart forms a complete circle, which is a full turn of 360\u00b0.",
+      "hint_2": "First, add the two known angles: 135 + 145.",
+      "hint_3": "Subtract the total (280) from 360 to find angle z.",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {},
+      "curriculum_context": null,
+      "phase": "practice",
+      "concept_tag": "angles_around_point",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1524,
+    "fields": {
+      "lesson": 638,
+      "order_index": 5,
+      "step_type": "teach",
+      "priority": 3,
+      "teacher_script": "Look at the diagram where three angles meet at a point, crossed by a straight horizontal line. A common mistake is to confuse \"angles on a straight line\" (which sum to 180\u00b0) with \"angles around a point\" (which sum to 360\u00b0). If the angles wrap completely around the central vertex, you must use 360\u00b0, even if a straight line is visible inside the figure. Always check if the angles form a full circle or just a half-circle.",
+      "question": "",
+      "answer_type": "none",
+      "choices": null,
+      "expected_answer": "",
+      "rubric": "",
+      "hint_1": "",
+      "hint_2": "",
+      "hint_3": "",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {
+        "key_vocabulary": null,
+        "key_points": null,
+        "seychelles_context": null,
+        "worked_example": null,
+        "common_mistakes": [
+          "Subtracting the known angles from 180\u00b0 instead of 360\u00b0, even when the angles wrap completely around the point."
+        ]
+      },
+      "curriculum_context": null,
+      "phase": "explain",
+      "concept_tag": "angles_around_point",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1525,
+    "fields": {
+      "lesson": 638,
+      "order_index": 6,
+      "step_type": "practice",
+      "priority": 3,
+      "teacher_script": "Look at the diagram showing a property boundary in Mah\u00e9 that meets at a specific corner peg. The total area is divided by four fences meeting at one central point. Note the right angle symbol.",
+      "question": "Given the angles shown in the diagram, what is the value of angle w in degrees?",
+      "answer_type": "short_numeric",
+      "choices": null,
+      "expected_answer": "80",
+      "rubric": "",
+      "hint_1": "The small square symbol indicates a right angle, which is 90\u00b0.",
+      "hint_2": "Add the known angles together: 85\u00b0 + 90\u00b0 + 105\u00b0.",
+      "hint_3": "Subtract the sum (280\u00b0) from 360\u00b0 to find w.",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {
+        "key_vocabulary": null,
+        "key_points": null,
+        "seychelles_context": "A property boundary corner in Mah\u00e9.",
+        "worked_example": null,
+        "common_mistakes": null
+      },
+      "curriculum_context": null,
+      "phase": "practice",
+      "concept_tag": "angles_around_point",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1526,
+    "fields": {
+      "lesson": 638,
+      "order_index": 7,
+      "step_type": "practice",
+      "priority": 3,
+      "teacher_script": "Look at the diagram showing a circle divided completely into 3 identical equal sectors, each labelled x. Consider what the size of each angle must be.",
+      "question": "The statement is: \"If three identical angles meet around a single point with no gaps, each angle must measure exactly 120\u00b0.\" Is this statement true or false?",
+      "answer_type": "true_false",
+      "choices": null,
+      "expected_answer": "True",
+      "rubric": "",
+      "hint_1": "How many total degrees are in a full turn around a point?",
+      "hint_2": "If three equal angles make up exactly 360\u00b0, you must divide 360\u00b0 by 3.",
+      "hint_3": "360 \u00f7 3 = 120, meaning each angle is 120\u00b0. Therefore, the statement is correct.",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {},
+      "curriculum_context": null,
+      "phase": "practice",
+      "concept_tag": "angles_around_point",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1527,
+    "fields": {
+      "lesson": 638,
+      "order_index": 8,
+      "step_type": "practice",
+      "priority": 2,
+      "teacher_script": "You've practiced finding missing angles by subtracting the sum of known angles from 360\u00b0. Now it is time to explain the reasoning behind this rule.",
+      "question": "In your own words, explain why we subtract the sum of known angles from 360\u00b0 to find a missing angle around a point.",
+      "answer_type": "free_text",
+      "choices": null,
+      "expected_answer": "Because all the angles combined complete a full circle or full turn, which is exactly 360 degrees.",
+      "rubric": "",
+      "hint_1": "Think about what geometric shape the angles form when they all meet together at the centre.",
+      "hint_2": "How many degrees are in a full circle?",
+      "hint_3": "Mention \"360 degrees\" and \"full turn\" in your explanation.",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {},
+      "curriculum_context": null,
+      "phase": "evaluate",
+      "concept_tag": "angles_around_point",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "curriculum.lessonstep",
+    "pk": 1528,
+    "fields": {
+      "lesson": 638,
+      "order_index": 9,
+      "step_type": "quiz",
+      "priority": 1,
+      "teacher_script": "Let's test what you've learned about angles around a point. Look at the diagram showing four angles meeting: 122\u00b0, 78\u00b0, 55\u00b0, and an unknown angle x.",
+      "question": "What is the correct mathematical calculation to find the missing angle x?",
+      "answer_type": "multiple_choice",
+      "choices": [
+        "A) 180\u00b0 - (122\u00b0 + 78\u00b0 + 55\u00b0)",
+        "B) 360\u00b0 - (122\u00b0 + 78\u00b0 + 55\u00b0)",
+        "C) 360\u00b0 + (122\u00b0 + 78\u00b0 + 55\u00b0)",
+        "D) 180\u00b0 + (122\u00b0 + 78\u00b0 + 55\u00b0)"
+      ],
+      "expected_answer": "B",
+      "rubric": "",
+      "hint_1": "Angles making a full turn around a point always sum to 360\u00b0.",
+      "hint_2": "We need to find what's left over after taking away the sum of the known angles.",
+      "hint_3": "The correct mathematical expression involves subtracting the sum of the known angles from 360\u00b0.",
+      "max_attempts": 3,
+      "media": null,
+      "educational_content": {},
+      "curriculum_context": null,
+      "phase": "evaluate",
+      "concept_tag": "",
+      "enabling_objective": ""
+    }
+  },
+  {
+    "model": "tutoring.exitticket",
+    "pk": 100,
+    "fields": {
+      "assessment_type": "exit_ticket",
+      "lesson": 638,
+      "course": null,
+      "passing_score": 8,
+      "time_limit_minutes": 15,
+      "question_bank_size": 30,
+      "questions_per_attempt": 10,
+      "is_published": false,
+      "instructions": "Answer 10 questions about Angles around a point. You need 8 correct to pass.",
+      "created_at": "2026-05-06T00:03:38.872Z",
+      "updated_at": "2026-05-06T00:03:38.872Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3327,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Three angles around a point are 85\u00b0, 120\u00b0, and x\u00b0. Find x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 155.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 100,
+          "b": 105
+        },
+        "model_answer": "155\u00b0",
+        "keywords": [
+          "155"
+        ]
+      },
+      "explanation": "Angles around a point sum to 360\u00b0. x = 360\u00b0 - 100\u00b0 - 105\u00b0 = 155\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 0,
+      "image": "",
+      "template_data": {
+        "template_text": "Three angles around a point are 85\u00b0, 120\u00b0, and x\u00b0. Find x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 60.0,
+            "max": 120.0,
+            "step": 5.0
+          },
+          "b": {
+            "type": "int",
+            "min": 80.0,
+            "max": 140.0,
+            "step": 5.0
+          }
+        },
+        "answer_formula": "360 - a - b",
+        "answer_unit": "\u00b0",
+        "explanation_template": "Angles around a point sum to 360\u00b0. x = 360\u00b0 - {a}\u00b0 - {b}\u00b0 = {answer}.",
+        "constraints": [
+          "a + b < 350",
+          "a > 0",
+          "b > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.770Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3328,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Two angles around a point measure 90\u00b0 and 65\u00b0. What is their sum?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 155.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 90,
+          "b": 65
+        },
+        "model_answer": "155\u00b0",
+        "keywords": [
+          "155"
+        ]
+      },
+      "explanation": "Sum = 90\u00b0 + 65\u00b0 = 155\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "Calculate the sum of two or more known numerical angles around a point",
+      "difficulty": "easy",
+      "order_index": 1,
+      "image": "",
+      "template_data": {
+        "template_text": "Two angles around a point measure {a}\u00b0 and {b}\u00b0. What is their sum?",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 45.0,
+            "max": 90.0,
+            "step": 5.0
+          },
+          "b": {
+            "type": "int",
+            "min": 60.0,
+            "max": 100.0,
+            "step": 5.0
+          }
+        },
+        "answer_formula": "a + b",
+        "answer_unit": "\u00b0",
+        "explanation_template": "Sum = {a}\u00b0 + {b}\u00b0 = {answer}.",
+        "constraints": [
+          "a > 0",
+          "b > 0",
+          "a + b < 200"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.773Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3329,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Four angles around a point are 75\u00b0, 60\u00b0, 65\u00b0, and x\u00b0. Find x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 160.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 75,
+          "b": 60,
+          "c": 65
+        },
+        "model_answer": "160\u00b0",
+        "keywords": [
+          "160"
+        ]
+      },
+      "explanation": "x = 360\u00b0 - 75\u00b0 - 60\u00b0 - 65\u00b0 = 160\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 2,
+      "image": "",
+      "template_data": {
+        "template_text": "Four angles around a point are {a}\u00b0, {b}\u00b0, {c}\u00b0, and x\u00b0. Find x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 30.0,
+            "max": 80.0,
+            "step": 5.0
+          },
+          "b": {
+            "type": "int",
+            "min": 40.0,
+            "max": 90.0,
+            "step": 5.0
+          },
+          "c": {
+            "type": "int",
+            "min": 50.0,
+            "max": 100.0,
+            "step": 5.0
+          }
+        },
+        "answer_formula": "360 - a - b - c",
+        "answer_unit": "\u00b0",
+        "explanation_template": "x = 360\u00b0 - {a}\u00b0 - {b}\u00b0 - {c}\u00b0 = {answer}.",
+        "constraints": [
+          "a + b + c < 340",
+          "a > 0",
+          "b > 0",
+          "c > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.774Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3330,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Around a point there is a right angle (90\u00b0), an angle of 160\u00b0, and angle x\u00b0. Find x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 110.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 160
+        },
+        "model_answer": "110\u00b0",
+        "keywords": [
+          "110"
+        ]
+      },
+      "explanation": "x = 360\u00b0 - 90\u00b0 - 160\u00b0 = 110\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "Identify a right angle denoted by a square symbol as exactly 90\u00b0 within a diagram of angles",
+      "difficulty": "easy",
+      "order_index": 3,
+      "image": "",
+      "template_data": {
+        "template_text": "Around a point there is a right angle (90\u00b0), an angle of {a}\u00b0, and angle x\u00b0. Find x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 100.0,
+            "max": 200.0,
+            "step": 10.0
+          }
+        },
+        "answer_formula": "360 - 90 - a",
+        "answer_unit": "\u00b0",
+        "explanation_template": "x = 360\u00b0 - 90\u00b0 - {a}\u00b0 = {answer}.",
+        "constraints": [
+          "a > 90",
+          "a < 250"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.774Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3331,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Five angles around a point are 45\u00b0, 60\u00b0, 75\u00b0, 90\u00b0, and x\u00b0. Find x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 65.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 70,
+          "b": 65,
+          "c": 70
+        },
+        "model_answer": "65\u00b0",
+        "keywords": [
+          "65"
+        ]
+      },
+      "explanation": "x = 360\u00b0 - 70\u00b0 - 65\u00b0 - 70\u00b0 - 90\u00b0 = 65\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 4,
+      "image": "",
+      "template_data": {
+        "template_text": "Five angles around a point are 45\u00b0, 60\u00b0, 75\u00b0, 90\u00b0, and x\u00b0. Find x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 40.0,
+            "max": 70.0,
+            "step": 5.0
+          },
+          "b": {
+            "type": "int",
+            "min": 50.0,
+            "max": 80.0,
+            "step": 5.0
+          },
+          "c": {
+            "type": "int",
+            "min": 60.0,
+            "max": 90.0,
+            "step": 5.0
+          }
+        },
+        "answer_formula": "360 - a - b - c - 90",
+        "answer_unit": "\u00b0",
+        "explanation_template": "x = 360\u00b0 - {a}\u00b0 - {b}\u00b0 - {c}\u00b0 - 90\u00b0 = {answer}.",
+        "constraints": [
+          "a + b + c < 250",
+          "a > 0",
+          "b > 0",
+          "c > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.774Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3332,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Two equal angles of x\u00b0 each and one angle of 130\u00b0 meet at a point. Find x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 115.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 130
+        },
+        "model_answer": "115\u00b0",
+        "keywords": [
+          "115"
+        ]
+      },
+      "explanation": "2x + 130 = 360, so x = (360 - 130) / 2 = 115\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 5,
+      "image": "",
+      "template_data": {
+        "template_text": "Two equal angles of x\u00b0 each and one angle of {a}\u00b0 meet at a point. Find x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 60.0,
+            "max": 180.0,
+            "step": 10.0
+          }
+        },
+        "answer_formula": "(360 - a) / 2",
+        "answer_unit": "\u00b0",
+        "explanation_template": "2x + {a} = 360, so x = (360 - {a}) / 2 = {answer}.",
+        "constraints": [
+          "a > 0",
+          "a < 300",
+          "(360 - a) % 2 == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.775Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3333,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "4 equal angles meet at a point. Each angle measures how many degrees?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 90.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "n": 4
+        },
+        "model_answer": "90\u00b0",
+        "keywords": [
+          "90"
+        ]
+      },
+      "explanation": "Each angle = 360\u00b0 \u00f7 4 = 90\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 6,
+      "image": "",
+      "template_data": {
+        "template_text": "{n} equal angles meet at a point. Each angle measures how many degrees?",
+        "parameters": {
+          "n": {
+            "type": "int",
+            "min": 3.0,
+            "max": 12.0,
+            "step": null
+          }
+        },
+        "answer_formula": "360 / n",
+        "answer_unit": "\u00b0",
+        "explanation_template": "Each angle = 360\u00b0 \u00f7 {n} = {answer}.",
+        "constraints": [
+          "360 % n == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.775Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3334,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "mcq",
+      "question_text": "Three equal angles of x\u00b0 each meet at a point. What is x?",
+      "option_a": "90\u00b0",
+      "option_b": "60\u00b0",
+      "option_c": "120\u00b0",
+      "option_d": "180\u00b0",
+      "correct_answer": "C",
+      "answer_data": {
+        "computed": 120.0,
+        "correct_letter": "C",
+        "unit": "\u00b0",
+        "parameters": {
+          "n": 5
+        }
+      },
+      "explanation": "3x = 360\u00b0, so x = 360\u00b0 \u00f7 3 = 120\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 7,
+      "image": "",
+      "template_data": {
+        "template_text": "Three equal angles of x\u00b0 each meet at a point. What is x?",
+        "parameters": {
+          "n": {
+            "type": "int",
+            "min": 3.0,
+            "max": 6.0,
+            "step": null
+          }
+        },
+        "correct_formula": "360 / 3",
+        "distractor_formulas": [
+          "180 / 3",
+          "360 / 2",
+          "90"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "3x = 360\u00b0, so x = 360\u00b0 \u00f7 3 = {answer}.",
+        "constraints": [
+          "360 % 3 == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.775Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3335,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "mcq",
+      "question_text": "What is the sum of all angles that meet at a single point?",
+      "option_a": "180\u00b0",
+      "option_b": "270\u00b0",
+      "option_c": "360\u00b0",
+      "option_d": "90\u00b0",
+      "correct_answer": "C",
+      "answer_data": {
+        "computed": 360.0,
+        "correct_letter": "C",
+        "unit": "\u00b0",
+        "parameters": {
+          "dummy": 1
+        }
+      },
+      "explanation": "Angles around a point always sum to 360\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 8,
+      "image": "",
+      "template_data": {
+        "template_text": "What is the sum of all angles that meet at a single point?",
+        "parameters": {
+          "dummy": {
+            "type": "int",
+            "min": 1.0,
+            "max": 1.0,
+            "step": null
+          }
+        },
+        "correct_formula": "360",
+        "distractor_formulas": [
+          "180",
+          "270",
+          "90"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "Angles around a point always sum to {answer}.",
+        "constraints": [
+          "dummy > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.775Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3336,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "mcq",
+      "question_text": "Around a point there is a right angle (90\u00b0), an angle of 60\u00b0, and two equal angles of x\u00b0 each. What is x?",
+      "option_a": "60\u00b0",
+      "option_b": "30\u00b0",
+      "option_c": "210\u00b0",
+      "option_d": "105\u00b0",
+      "correct_answer": "D",
+      "answer_data": {
+        "computed": 105.0,
+        "correct_letter": "D",
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 60
+        }
+      },
+      "explanation": "x = (360\u00b0 - 90\u00b0 - 60\u00b0) \u00f7 2 = 105\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 9,
+      "image": "",
+      "template_data": {
+        "template_text": "Around a point there is a right angle (90\u00b0), an angle of {a}\u00b0, and two equal angles of x\u00b0 each. What is x?",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 60.0,
+            "max": 120.0,
+            "step": 10.0
+          }
+        },
+        "correct_formula": "(360 - 90 - a) / 2",
+        "distractor_formulas": [
+          "360 - 90 - a",
+          "(180 - a) / 2",
+          "90 - a"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "x = (360\u00b0 - 90\u00b0 - {a}\u00b0) \u00f7 2 = {answer}.",
+        "constraints": [
+          "a > 0",
+          "a < 250",
+          "(360 - 90 - a) % 2 == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.776Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3337,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "mcq",
+      "question_text": "Angles around a point are 3x\u00b0, 2x\u00b0, and 150\u00b0. What is the value of x?",
+      "option_a": "210\u00b0",
+      "option_b": "102\u00b0",
+      "option_c": "42\u00b0",
+      "option_d": "72\u00b0",
+      "correct_answer": "C",
+      "answer_data": {
+        "computed": 42.0,
+        "correct_letter": "C",
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 150
+        }
+      },
+      "explanation": "3x + 2x + 150 = 360, so 5x = 360 - 150, x = 42\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "hard",
+      "order_index": 10,
+      "image": "",
+      "template_data": {
+        "template_text": "Angles around a point are 3x\u00b0, 2x\u00b0, and {a}\u00b0. What is the value of x?",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 60.0,
+            "max": 150.0,
+            "step": 15.0
+          }
+        },
+        "correct_formula": "(360 - a) / 5",
+        "distractor_formulas": [
+          "360 - a",
+          "(360 + a) / 5",
+          "360 / 5"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "3x + 2x + {a} = 360, so 5x = 360 - {a}, x = {answer}.",
+        "constraints": [
+          "a > 0",
+          "a < 300",
+          "(360 - a) % 5 == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.776Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3338,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "fill_in_blank",
+      "question_text": "All angles around a point sum to ___\u00b0.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "text_template": "All angles around a point sum to ___\u00b0.",
+        "blanks": [
+          "360\u00b0"
+        ],
+        "computed": [
+          360.0
+        ],
+        "accept_alternatives": [
+          []
+        ],
+        "parameters": {
+          "dummy": 1
+        }
+      },
+      "explanation": "Angles around a point always sum to 360\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "Identify that the sum of all angles meeting at a single point is exactly 360\u00b0",
+      "difficulty": "easy",
+      "order_index": 11,
+      "image": "",
+      "template_data": {
+        "template_text": "All angles around a point sum to ___\u00b0.",
+        "parameters": {
+          "dummy": {
+            "type": "int",
+            "min": 1.0,
+            "max": 1.0,
+            "step": null
+          }
+        },
+        "blank_formulas": [
+          "360"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "Angles around a point always sum to {answer}.",
+        "constraints": [
+          "dummy > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.776Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3339,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "fill_in_blank",
+      "question_text": "Two angles around a point are 70\u00b0 and 70\u00b0. The third angle is ___\u00b0 and the sum of all three angles is ___\u00b0.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "text_template": "Two angles around a point are 70\u00b0 and 70\u00b0. The third angle is ___\u00b0 and the sum of all three angles is ___\u00b0.",
+        "blanks": [
+          "220\u00b0",
+          "360\u00b0"
+        ],
+        "computed": [
+          220.0,
+          360.0
+        ],
+        "accept_alternatives": [
+          [],
+          []
+        ],
+        "parameters": {
+          "a": 70,
+          "b": 70
+        }
+      },
+      "explanation": "Third angle = 360\u00b0 - 70\u00b0 - 70\u00b0 = 220\u00b0 / 360\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 12,
+      "image": "",
+      "template_data": {
+        "template_text": "Two angles around a point are {a}\u00b0 and {b}\u00b0. The third angle is ___\u00b0 and the sum of all three angles is ___\u00b0.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 60.0,
+            "max": 120.0,
+            "step": 10.0
+          },
+          "b": {
+            "type": "int",
+            "min": 70.0,
+            "max": 130.0,
+            "step": 10.0
+          }
+        },
+        "blank_formulas": [
+          "360 - a - b",
+          "360"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "Third angle = 360\u00b0 - {a}\u00b0 - {b}\u00b0 = {answer}.",
+        "constraints": [
+          "a + b < 320",
+          "a > 0",
+          "b > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.776Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3340,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "fill_in_blank",
+      "question_text": "Around a point there is a right angle (___\u00b0) and two other angles of 100\u00b0 and x\u00b0. The value of x is ___\u00b0.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "text_template": "Around a point there is a right angle (___\u00b0) and two other angles of 100\u00b0 and x\u00b0. The value of x is ___\u00b0.",
+        "blanks": [
+          "90\u00b0",
+          "170\u00b0"
+        ],
+        "computed": [
+          90.0,
+          170.0
+        ],
+        "accept_alternatives": [
+          [],
+          []
+        ],
+        "parameters": {
+          "a": 100
+        }
+      },
+      "explanation": "A right angle is 90\u00b0. x = 360\u00b0 - 90\u00b0 - 100\u00b0 = 170\u00b0 / 170\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 13,
+      "image": "",
+      "template_data": {
+        "template_text": "Around a point there is a right angle (___\u00b0) and two other angles of {a}\u00b0 and x\u00b0. The value of x is ___\u00b0.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 100.0,
+            "max": 180.0,
+            "step": 10.0
+          }
+        },
+        "blank_formulas": [
+          "90",
+          "360 - 90 - a"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "A right angle is 90\u00b0. x = 360\u00b0 - 90\u00b0 - {a}\u00b0 = {answer}.",
+        "constraints": [
+          "a > 0",
+          "a < 250"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.777Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3341,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "fill_in_blank",
+      "question_text": "A ship's sonar detects objects at angles 60\u00b0, 85\u00b0, and 95\u00b0. The sum of these three angles is ___\u00b0.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "text_template": "A ship's sonar detects objects at angles 60\u00b0, 85\u00b0, and 95\u00b0. The sum of these three angles is ___\u00b0.",
+        "blanks": [
+          "240\u00b0"
+        ],
+        "computed": [
+          240.0
+        ],
+        "accept_alternatives": [
+          []
+        ],
+        "parameters": {
+          "a": 60,
+          "b": 85,
+          "c": 95
+        }
+      },
+      "explanation": "Sum = 60\u00b0 + 85\u00b0 + 95\u00b0 = 240\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 14,
+      "image": "",
+      "template_data": {
+        "template_text": "A ship's sonar detects objects at angles {a}\u00b0, {b}\u00b0, and {c}\u00b0. The sum of these three angles is ___\u00b0.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 45.0,
+            "max": 75.0,
+            "step": 5.0
+          },
+          "b": {
+            "type": "int",
+            "min": 55.0,
+            "max": 85.0,
+            "step": 5.0
+          },
+          "c": {
+            "type": "int",
+            "min": 65.0,
+            "max": 95.0,
+            "step": 5.0
+          }
+        },
+        "blank_formulas": [
+          "a + b + c"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "Sum = {a}\u00b0 + {b}\u00b0 + {c}\u00b0 = {answer}.",
+        "constraints": [
+          "a > 0",
+          "b > 0",
+          "c > 0",
+          "a + b + c < 250"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.777Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3342,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "fill_in_blank",
+      "question_text": "Five equal angles of x\u00b0 each meet at a point. Each angle measures ___\u00b0.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "text_template": "Five equal angles of x\u00b0 each meet at a point. Each angle measures ___\u00b0.",
+        "blanks": [
+          "72\u00b0"
+        ],
+        "computed": [
+          72.0
+        ],
+        "accept_alternatives": [
+          []
+        ],
+        "parameters": {
+          "n": 5
+        }
+      },
+      "explanation": "Each angle = 360\u00b0 \u00f7 5 = 72\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 15,
+      "image": "",
+      "template_data": {
+        "template_text": "Five equal angles of x\u00b0 each meet at a point. Each angle measures ___\u00b0.",
+        "parameters": {
+          "n": {
+            "type": "int",
+            "min": 5.0,
+            "max": 5.0,
+            "step": null
+          }
+        },
+        "blank_formulas": [
+          "360 / 5"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "Each angle = 360\u00b0 \u00f7 5 = {answer}.",
+        "constraints": [
+          "360 % 5 == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.777Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3343,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "fill_in_blank",
+      "question_text": "Angles around a point are x\u00b0, 2x\u00b0, and 165\u00b0. The equation is x + 2x + 165 = ___. The value of x is ___\u00b0.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "text_template": "Angles around a point are x\u00b0, 2x\u00b0, and 165\u00b0. The equation is x + 2x + 165 = ___. The value of x is ___\u00b0.",
+        "blanks": [
+          "360\u00b0",
+          "65\u00b0"
+        ],
+        "computed": [
+          360.0,
+          65.0
+        ],
+        "accept_alternatives": [
+          [],
+          []
+        ],
+        "parameters": {
+          "a": 165
+        }
+      },
+      "explanation": "The equation is x + 2x + 165 = 360. Solving: 3x = 360 - 165, so x = 360\u00b0 / 65\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "hard",
+      "order_index": 16,
+      "image": "",
+      "template_data": {
+        "template_text": "Angles around a point are x\u00b0, 2x\u00b0, and {a}\u00b0. The equation is x + 2x + {a} = ___. The value of x is ___\u00b0.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 90.0,
+            "max": 180.0,
+            "step": 15.0
+          }
+        },
+        "blank_formulas": [
+          "360",
+          "(360 - a) / 3"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "The equation is x + 2x + {a} = 360. Solving: 3x = 360 - {a}, so x = {answer}.",
+        "constraints": [
+          "a > 0",
+          "a < 300",
+          "(360 - a) % 3 == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.778Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3344,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "fill_in_blank",
+      "question_text": "A fishing boat's net divides the water into sectors: 70\u00b0, 65\u00b0, 110\u00b0, and x\u00b0. The missing angle x = ___\u00b0.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "text_template": "A fishing boat's net divides the water into sectors: 70\u00b0, 65\u00b0, 110\u00b0, and x\u00b0. The missing angle x = ___\u00b0.",
+        "blanks": [
+          "115\u00b0"
+        ],
+        "computed": [
+          115.0
+        ],
+        "accept_alternatives": [
+          []
+        ],
+        "parameters": {
+          "a": 70,
+          "b": 65,
+          "c": 110
+        }
+      },
+      "explanation": "x = 360\u00b0 - 70\u00b0 - 65\u00b0 - 110\u00b0 = 115\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "hard",
+      "order_index": 17,
+      "image": "",
+      "template_data": {
+        "template_text": "A fishing boat's net divides the water into sectors: {a}\u00b0, {b}\u00b0, {c}\u00b0, and x\u00b0. The missing angle x = ___\u00b0.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 50.0,
+            "max": 90.0,
+            "step": 5.0
+          },
+          "b": {
+            "type": "int",
+            "min": 60.0,
+            "max": 100.0,
+            "step": 5.0
+          },
+          "c": {
+            "type": "int",
+            "min": 70.0,
+            "max": 110.0,
+            "step": 5.0
+          }
+        },
+        "blank_formulas": [
+          "360 - a - b - c"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "x = 360\u00b0 - {a}\u00b0 - {b}\u00b0 - {c}\u00b0 = {answer}.",
+        "constraints": [
+          "a + b + c < 330",
+          "a > 0",
+          "b > 0",
+          "c > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.778Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3345,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "matching",
+      "question_text": "Match each pair of angles to their sum.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "pairs": [
+          {
+            "left": "30\u00b0 + 70\u00b0",
+            "right": "100\u00b0"
+          },
+          {
+            "left": "65\u00b0 + 50\u00b0",
+            "right": "115\u00b0"
+          },
+          {
+            "left": "30\u00b0 + 80\u00b0",
+            "right": "110\u00b0"
+          },
+          {
+            "left": "45\u00b0 + 75\u00b0",
+            "right": "120\u00b0"
+          }
+        ],
+        "distractor_rights": [
+          "105\u00b0",
+          "130\u00b0"
+        ]
+      },
+      "explanation": "Each right side is the sum of the two angles on its left.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 18,
+      "image": "",
+      "template_data": {
+        "framing_text": "Match each pair of angles to their sum.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 30.0,
+            "max": 80.0,
+            "step": 5.0
+          },
+          "b": {
+            "type": "int",
+            "min": 40.0,
+            "max": 90.0,
+            "step": 5.0
+          }
+        },
+        "pair_count": 4,
+        "left_formula": "{a}\u00b0 + {b}\u00b0",
+        "right_formula": "a + b",
+        "distractor_count": 2,
+        "answer_unit": "\u00b0",
+        "explanation_template": "Each right side is the sum of the two angles on its left.",
+        "constraints": null
+      },
+      "created_at": "2026-05-06T00:08:48.779Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3346,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "matching",
+      "question_text": "Match each set of known angles to the missing angle x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "pairs": [
+          {
+            "left": "80\u00b0, 90\u00b0, x\u00b0",
+            "right": "190\u00b0"
+          },
+          {
+            "left": "70\u00b0, 90\u00b0, x\u00b0",
+            "right": "200\u00b0"
+          },
+          {
+            "left": "110\u00b0, 100\u00b0, x\u00b0",
+            "right": "150\u00b0"
+          },
+          {
+            "left": "100\u00b0, 80\u00b0, x\u00b0",
+            "right": "180\u00b0"
+          }
+        ],
+        "distractor_rights": [
+          "140\u00b0",
+          "130\u00b0"
+        ]
+      },
+      "explanation": "Each missing angle x = 360\u00b0 minus the sum of known angles.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 19,
+      "image": "",
+      "template_data": {
+        "framing_text": "Match each set of known angles to the missing angle x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 60.0,
+            "max": 120.0,
+            "step": 10.0
+          },
+          "b": {
+            "type": "int",
+            "min": 70.0,
+            "max": 130.0,
+            "step": 10.0
+          }
+        },
+        "pair_count": 4,
+        "left_formula": "{a}\u00b0, {b}\u00b0, x\u00b0",
+        "right_formula": "360 - a - b",
+        "distractor_count": 2,
+        "answer_unit": "\u00b0",
+        "explanation_template": "Each missing angle x = 360\u00b0 minus the sum of known angles.",
+        "constraints": null
+      },
+      "created_at": "2026-05-06T00:08:48.779Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3347,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "matching",
+      "question_text": "Match each scenario to the value of x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "pairs": [
+          {
+            "left": "8 equal angles of x\u00b0",
+            "right": "45\u00b0"
+          },
+          {
+            "left": "6 equal angles of x\u00b0",
+            "right": "60\u00b0"
+          },
+          {
+            "left": "3 equal angles of x\u00b0",
+            "right": "120\u00b0"
+          },
+          {
+            "left": "5 equal angles of x\u00b0",
+            "right": "72\u00b0"
+          }
+        ],
+        "distractor_rights": [
+          "90\u00b0",
+          "51.4286\u00b0"
+        ]
+      },
+      "explanation": "For n equal angles around a point, each angle = 360\u00b0 \u00f7 n.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 20,
+      "image": "",
+      "template_data": {
+        "framing_text": "Match each scenario to the value of x.",
+        "parameters": {
+          "n": {
+            "type": "int",
+            "min": 3.0,
+            "max": 8.0,
+            "step": null
+          }
+        },
+        "pair_count": 4,
+        "left_formula": "{n} equal angles of x\u00b0",
+        "right_formula": "360 / n",
+        "distractor_count": 2,
+        "answer_unit": "\u00b0",
+        "explanation_template": "For n equal angles around a point, each angle = 360\u00b0 \u00f7 n.",
+        "constraints": null
+      },
+      "created_at": "2026-05-06T00:08:48.780Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3348,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "matching",
+      "question_text": "Match each scenario with a right angle to the missing angle x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "pairs": [
+          {
+            "left": "90\u00b0, 130\u00b0, x\u00b0",
+            "right": "140\u00b0"
+          },
+          {
+            "left": "90\u00b0, 150\u00b0, x\u00b0",
+            "right": "120\u00b0"
+          },
+          {
+            "left": "90\u00b0, 90\u00b0, x\u00b0",
+            "right": "180\u00b0"
+          },
+          {
+            "left": "90\u00b0, 140\u00b0, x\u00b0",
+            "right": "130\u00b0"
+          }
+        ],
+        "distractor_rights": [
+          "170\u00b0",
+          "190\u00b0"
+        ]
+      },
+      "explanation": "With a right angle (90\u00b0), x = 360\u00b0 - 90\u00b0 - known angle.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "hard",
+      "order_index": 21,
+      "image": "",
+      "template_data": {
+        "framing_text": "Match each scenario with a right angle to the missing angle x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 80.0,
+            "max": 150.0,
+            "step": 10.0
+          }
+        },
+        "pair_count": 4,
+        "left_formula": "90\u00b0, {a}\u00b0, x\u00b0",
+        "right_formula": "360 - 90 - a",
+        "distractor_count": 2,
+        "answer_unit": "\u00b0",
+        "explanation_template": "With a right angle (90\u00b0), x = 360\u00b0 - 90\u00b0 - known angle.",
+        "constraints": null
+      },
+      "created_at": "2026-05-06T00:08:48.780Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3349,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "matching",
+      "question_text": "Match each algebraic scenario to the value of x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "pairs": [
+          {
+            "left": "2x\u00b0, x\u00b0, 120\u00b0",
+            "right": "80\u00b0"
+          },
+          {
+            "left": "2x\u00b0, x\u00b0, 90\u00b0",
+            "right": "90\u00b0"
+          },
+          {
+            "left": "2x\u00b0, x\u00b0, 75\u00b0",
+            "right": "95\u00b0"
+          },
+          {
+            "left": "2x\u00b0, x\u00b0, 60\u00b0",
+            "right": "100\u00b0"
+          }
+        ],
+        "distractor_rights": [
+          "85\u00b0"
+        ]
+      },
+      "explanation": "For 2x + x + constant = 360, solve 3x = 360 - constant.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "hard",
+      "order_index": 22,
+      "image": "",
+      "template_data": {
+        "framing_text": "Match each algebraic scenario to the value of x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 60.0,
+            "max": 120.0,
+            "step": 15.0
+          }
+        },
+        "pair_count": 4,
+        "left_formula": "2x\u00b0, x\u00b0, {a}\u00b0",
+        "right_formula": "(360 - a) / 3",
+        "distractor_count": 2,
+        "answer_unit": "\u00b0",
+        "explanation_template": "For 2x + x + constant = 360, solve 3x = 360 - constant.",
+        "constraints": null
+      },
+      "created_at": "2026-05-06T00:08:48.782Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3350,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Three angles around a point are 100\u00b0, 50\u00b0, and x\u00b0. Find x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 210.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 100,
+          "b": 50
+        },
+        "model_answer": "210\u00b0",
+        "keywords": [
+          "210"
+        ]
+      },
+      "explanation": "Angles around a point sum to 360\u00b0. x = 360\u00b0 - 100\u00b0 - 50\u00b0 = 210\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 23,
+      "image": "",
+      "template_data": {
+        "template_text": "Three angles around a point are {a}\u00b0, {b}\u00b0, and x\u00b0. Find x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 30.0,
+            "max": 120.0,
+            "step": 10.0
+          },
+          "b": {
+            "type": "int",
+            "min": 30.0,
+            "max": 120.0,
+            "step": 10.0
+          }
+        },
+        "answer_formula": "360 - a - b",
+        "answer_unit": "\u00b0",
+        "explanation_template": "Angles around a point sum to 360\u00b0. x = 360\u00b0 - {a}\u00b0 - {b}\u00b0 = {answer}.",
+        "constraints": [
+          "a + b < 300",
+          "a > 0",
+          "b > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.783Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3351,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Two angles around a point measure 95\u00b0 and 75\u00b0. What is their sum?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 170.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 95,
+          "b": 75
+        },
+        "model_answer": "170\u00b0",
+        "keywords": [
+          "170"
+        ]
+      },
+      "explanation": "Sum = 95\u00b0 + 75\u00b0 = 170\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 24,
+      "image": "",
+      "template_data": {
+        "template_text": "Two angles around a point measure {a}\u00b0 and {b}\u00b0. What is their sum?",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 40.0,
+            "max": 100.0,
+            "step": 5.0
+          },
+          "b": {
+            "type": "int",
+            "min": 40.0,
+            "max": 100.0,
+            "step": 5.0
+          }
+        },
+        "answer_formula": "a + b",
+        "answer_unit": "\u00b0",
+        "explanation_template": "Sum = {a}\u00b0 + {b}\u00b0 = {answer}.",
+        "constraints": [
+          "a + b < 250"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.783Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3352,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Four angles around a point are 20\u00b0, 50\u00b0, 80\u00b0, and x\u00b0. Find x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 210.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 20,
+          "b": 50,
+          "c": 80
+        },
+        "model_answer": "210\u00b0",
+        "keywords": [
+          "210"
+        ]
+      },
+      "explanation": "x = 360\u00b0 - 20\u00b0 - 50\u00b0 - 80\u00b0 = 210\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 25,
+      "image": "",
+      "template_data": {
+        "template_text": "Four angles around a point are {a}\u00b0, {b}\u00b0, {c}\u00b0, and x\u00b0. Find x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 20.0,
+            "max": 80.0,
+            "step": 5.0
+          },
+          "b": {
+            "type": "int",
+            "min": 20.0,
+            "max": 80.0,
+            "step": 5.0
+          },
+          "c": {
+            "type": "int",
+            "min": 20.0,
+            "max": 80.0,
+            "step": 5.0
+          }
+        },
+        "answer_formula": "360 - a - b - c",
+        "answer_unit": "\u00b0",
+        "explanation_template": "x = 360\u00b0 - {a}\u00b0 - {b}\u00b0 - {c}\u00b0 = {answer}.",
+        "constraints": [
+          "a + b + c < 320",
+          "a > 0",
+          "b > 0",
+          "c > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.784Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3353,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Around a point, one angle is a right angle (90\u00b0) and another is 170\u00b0. Find the third angle x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 100.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 170
+        },
+        "model_answer": "100\u00b0",
+        "keywords": [
+          "100"
+        ]
+      },
+      "explanation": "x = 360\u00b0 - 90\u00b0 - 170\u00b0 = 100\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "Identify a right angle denoted by a square symbol as exactly 90\u00b0 within a diagram of angles",
+      "difficulty": "easy",
+      "order_index": 26,
+      "image": "",
+      "template_data": {
+        "template_text": "Around a point, one angle is a right angle (90\u00b0) and another is {a}\u00b0. Find the third angle x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 50.0,
+            "max": 200.0,
+            "step": 10.0
+          }
+        },
+        "answer_formula": "360 - 90 - a",
+        "answer_unit": "\u00b0",
+        "explanation_template": "x = 360\u00b0 - 90\u00b0 - {a}\u00b0 = {answer}.",
+        "constraints": [
+          "a < 270",
+          "a > 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.784Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3354,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "6 equal angles are arranged around a point. Find the measure of each angle.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 60.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "n": 6
+        },
+        "model_answer": "60\u00b0",
+        "keywords": [
+          "60"
+        ]
+      },
+      "explanation": "Each angle = 360\u00b0 \u00f7 6 = 60\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 27,
+      "image": "",
+      "template_data": {
+        "template_text": "{n} equal angles are arranged around a point. Find the measure of each angle.",
+        "parameters": {
+          "n": {
+            "type": "int",
+            "min": 2.0,
+            "max": 8.0,
+            "step": null
+          }
+        },
+        "answer_formula": "360 / n",
+        "answer_unit": "\u00b0",
+        "explanation_template": "Each angle = 360\u00b0 \u00f7 {n} = {answer}.",
+        "constraints": [
+          "360 % n == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.784Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3355,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "Three angles around a point are 180\u00b0, 3x\u00b0, and 6x\u00b0. Find x.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 20.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 180,
+          "b": 3,
+          "c": 6
+        },
+        "model_answer": "20\u00b0",
+        "keywords": [
+          "20"
+        ]
+      },
+      "explanation": "180 + 3x + 6x = 360, so (3 + 6)x = 360 - 180, thus x = 20\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 28,
+      "image": "",
+      "template_data": {
+        "template_text": "Three angles around a point are {a}\u00b0, {b}x\u00b0, and {c}x\u00b0. Find x.",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 60.0,
+            "max": 180.0,
+            "step": 20.0
+          },
+          "b": {
+            "type": "int",
+            "min": 2.0,
+            "max": 6.0,
+            "step": null
+          },
+          "c": {
+            "type": "int",
+            "min": 2.0,
+            "max": 6.0,
+            "step": null
+          }
+        },
+        "answer_formula": "(360 - a) / (b + c)",
+        "answer_unit": "\u00b0",
+        "explanation_template": "{a} + {b}x + {c}x = 360, so ({b} + {c})x = 360 - {a}, thus x = {answer}.",
+        "constraints": [
+          "a < 300",
+          "(360 - a) % (b + c) == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.785Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3356,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "short_numeric",
+      "question_text": "A fisherman marks 3 equal sectors on his compass. Each sector measures how many degrees?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_answer": "",
+      "answer_data": {
+        "computed": 120.0,
+        "unit": "\u00b0",
+        "parameters": {
+          "n": 3
+        },
+        "model_answer": "120\u00b0",
+        "keywords": [
+          "120"
+        ]
+      },
+      "explanation": "Each sector = 360\u00b0 \u00f7 3 = 120\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 29,
+      "image": "",
+      "template_data": {
+        "template_text": "A fisherman marks {n} equal sectors on his compass. Each sector measures how many degrees?",
+        "parameters": {
+          "n": {
+            "type": "int",
+            "min": 3.0,
+            "max": 12.0,
+            "step": null
+          }
+        },
+        "answer_formula": "360 / n",
+        "answer_unit": "\u00b0",
+        "explanation_template": "Each sector = 360\u00b0 \u00f7 {n} = {answer}.",
+        "constraints": [
+          "360 % n == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.785Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3357,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "mcq",
+      "question_text": "What is the sum of all angles around a single point?",
+      "option_a": "180\u00b0",
+      "option_b": "270\u00b0",
+      "option_c": "90\u00b0",
+      "option_d": "360\u00b0",
+      "correct_answer": "D",
+      "answer_data": {
+        "computed": 360.0,
+        "correct_letter": "D",
+        "unit": "\u00b0",
+        "parameters": {
+          "dummy": 1
+        }
+      },
+      "explanation": "Angles around a point always sum to 360\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 30,
+      "image": "",
+      "template_data": {
+        "template_text": "What is the sum of all angles around a single point?",
+        "parameters": {
+          "dummy": {
+            "type": "int",
+            "min": 1.0,
+            "max": 1.0,
+            "step": null
+          }
+        },
+        "correct_formula": "360",
+        "distractor_formulas": [
+          "180",
+          "270",
+          "90"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "Angles around a point always sum to {answer}.",
+        "constraints": []
+      },
+      "created_at": "2026-05-06T00:08:48.785Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3358,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "mcq",
+      "question_text": "A right angle measures exactly how many degrees?",
+      "option_a": "90\u00b0",
+      "option_b": "45\u00b0",
+      "option_c": "360\u00b0",
+      "option_d": "180\u00b0",
+      "correct_answer": "A",
+      "answer_data": {
+        "computed": 90.0,
+        "correct_letter": "A",
+        "unit": "\u00b0",
+        "parameters": {
+          "dummy": 1
+        }
+      },
+      "explanation": "A right angle always measures 90\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "easy",
+      "order_index": 31,
+      "image": "",
+      "template_data": {
+        "template_text": "A right angle measures exactly how many degrees?",
+        "parameters": {
+          "dummy": {
+            "type": "int",
+            "min": 1.0,
+            "max": 1.0,
+            "step": null
+          }
+        },
+        "correct_formula": "90",
+        "distractor_formulas": [
+          "45",
+          "180",
+          "360"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "A right angle always measures {answer}.",
+        "constraints": []
+      },
+      "created_at": "2026-05-06T00:08:48.786Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3359,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "mcq",
+      "question_text": "5 equal angles are arranged around a point. Each angle measures:",
+      "option_a": "900\u00b0",
+      "option_b": "36\u00b0",
+      "option_c": "1800\u00b0",
+      "option_d": "72\u00b0",
+      "correct_answer": "D",
+      "answer_data": {
+        "computed": 72.0,
+        "correct_letter": "D",
+        "unit": "\u00b0",
+        "parameters": {
+          "n": 5
+        }
+      },
+      "explanation": "Each angle = 360\u00b0 \u00f7 5 = 72\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 32,
+      "image": "",
+      "template_data": {
+        "template_text": "{n} equal angles are arranged around a point. Each angle measures:",
+        "parameters": {
+          "n": {
+            "type": "int",
+            "min": 3.0,
+            "max": 9.0,
+            "step": null
+          }
+        },
+        "correct_formula": "360 / n",
+        "distractor_formulas": [
+          "180 / n",
+          "360 * n",
+          "180 * n"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "Each angle = 360\u00b0 \u00f7 {n} = {answer}.",
+        "constraints": [
+          "360 % n == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.786Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3360,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "mcq",
+      "question_text": "Three angles around a point are 160\u00b0, 2x\u00b0, and 3x\u00b0. What is x?",
+      "option_a": "104\u00b0",
+      "option_b": "72\u00b0",
+      "option_c": "40\u00b0",
+      "option_d": "195\u00b0",
+      "correct_answer": "C",
+      "answer_data": {
+        "computed": 40.0,
+        "correct_letter": "C",
+        "unit": "\u00b0",
+        "parameters": {
+          "a": 160,
+          "b": 2,
+          "c": 3
+        }
+      },
+      "explanation": "160 + 2x + 3x = 360, so x = (360 - 160) \u00f7 (2 + 3) = 40\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 33,
+      "image": "",
+      "template_data": {
+        "template_text": "Three angles around a point are {a}\u00b0, {b}x\u00b0, and {c}x\u00b0. What is x?",
+        "parameters": {
+          "a": {
+            "type": "int",
+            "min": 80.0,
+            "max": 200.0,
+            "step": 20.0
+          },
+          "b": {
+            "type": "int",
+            "min": 2.0,
+            "max": 5.0,
+            "step": null
+          },
+          "c": {
+            "type": "int",
+            "min": 2.0,
+            "max": 5.0,
+            "step": null
+          }
+        },
+        "correct_formula": "(360 - a) / (b + c)",
+        "distractor_formulas": [
+          "360 / (b + c)",
+          "(360 + a) / (b + c)",
+          "360 - a - b - c"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "{a} + {b}x + {c}x = 360, so x = (360 - {a}) \u00f7 ({b} + {c}) = {answer}.",
+        "constraints": [
+          "a < 280",
+          "(360 - a) % (b + c) == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.786Z"
+    }
+  },
+  {
+    "model": "tutoring.exitticketquestion",
+    "pk": 3361,
+    "fields": {
+      "exit_ticket": 100,
+      "question_type": "mcq",
+      "question_text": "A Seychelles boat captain divides his compass into 5 equal sectors. Each sector measures:",
+      "option_a": "36\u00b0",
+      "option_b": "72\u00b0",
+      "option_c": "450\u00b0",
+      "option_d": "355\u00b0",
+      "correct_answer": "B",
+      "answer_data": {
+        "computed": 72.0,
+        "correct_letter": "B",
+        "unit": "\u00b0",
+        "parameters": {
+          "n": 5
+        }
+      },
+      "explanation": "Each sector = 360\u00b0 \u00f7 5 = 72\u00b0.",
+      "concept_tag": "Find a missing angle x given that all angles sum to 360\u00b0.",
+      "enabling_objective": "",
+      "difficulty": "medium",
+      "order_index": 34,
+      "image": "",
+      "template_data": {
+        "template_text": "A Seychelles boat captain divides his compass into {n} equal sectors. Each sector measures:",
+        "parameters": {
+          "n": {
+            "type": "int",
+            "min": 4.0,
+            "max": 10.0,
+            "step": null
+          }
+        },
+        "correct_formula": "360 / n",
+        "distractor_formulas": [
+          "180 / n",
+          "360 - n",
+          "n * 90"
+        ],
+        "answer_unit": "\u00b0",
+        "explanation_template": "Each sector = 360\u00b0 \u00f7 {n} = {answer}.",
+        "constraints": [
+          "360 % n == 0"
+        ]
+      },
+      "created_at": "2026-05-06T00:08:48.786Z"
+    }
+  },
+  {
+    "model": "auth.user",
+    "fields": {
+      "password": "!feQIr6cBO0Jly9PVTjMhSuQdpbo57tfnhEpT7XbX",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "simulator-bot-layer-s-demo-school",
+      "first_name": "Simulator",
+      "last_name": "Bot",
+      "email": "simulator-bot-layer-s-demo-school@simulator.local",
+      "is_staff": false,
+      "is_active": false,
+      "date_joined": "2026-05-13T03:59:48.398Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "tutoring.tutorsession",
+    "pk": 20,
+    "fields": {
+      "institution": 13,
+      "student": [
+        "simulator-bot-layer-s-demo-school"
+      ],
+      "lesson": 638,
+      "prompt_pack": null,
+      "model_config": null,
+      "current_step_index": 0,
+      "status": "active",
+      "mastery_achieved": false,
+      "engine_state": {
+        "session_state": "tutoring",
+        "display_phase": "evaluate",
+        "exchange_count": 15,
+        "concepts_covered": [],
+        "student_struggles": [
+          "Look at the schematic map of a roundabout in Victo",
+          "Let's test what you've learned about angles around"
+        ],
+        "student_strengths": [
+          "Look at the schematic map of a roundabout in Victo",
+          "Look at the diagram showing three distinct angles "
+        ],
+        "current_topic_index": 2,
+        "practice_correct": 2,
+        "practice_total": 0,
+        "covered_concept_ids": [
+          3345,
+          3352,
+          3338,
+          3329,
+          3337,
+          3354,
+          3336,
+          3343,
+          3355
+        ],
+        "selected_exit_ticket_ids": [
+          3345,
+          3352,
+          3349,
+          3338,
+          3329,
+          3337,
+          3354,
+          3336,
+          3343,
+          3355
+        ],
+        "is_remediation": false,
+        "remediation_attempt": 0,
+        "failed_exit_questions": [],
+        "failed_eos": [],
+        "last_practice_correct": true,
+        "is_review": false,
+        "shown_media_urls": [],
+        "concept_boundary_attempts": 0,
+        "step_exchange_count": 3,
+        "turn_media": {},
+        "shown_worked_example_indices": [],
+        "covered_enabling_objectives": [],
+        "difficulty_level": -1,
+        "pretest_diagnostic": null,
+        "correct_streak": 2,
+        "cognitive_load": 0.75,
+        "consecutive_wrong": 0,
+        "consecutive_correct_streak": 2,
+        "bare_answer_counts_by_step": {
+          "0": 1
+        },
+        "shown_question_ids": [
+          3333,
+          3351,
+          3354,
+          3357,
+          3358,
+          3359
+        ],
+        "covered_objectives": []
+      },
+      "started_at": "2026-05-13T03:59:48.405Z",
+      "ended_at": null,
+      "started_lesson_at": "2026-05-13T04:00:01.186Z",
+      "completed_lesson_at": null,
+      "summary": "",
+      "is_flagged": false,
+      "flag_reason": "",
+      "flagged_at": null,
+      "flag_reviewed": false,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "group_approval_status": "not_required",
+      "group_approval_decided_by": null,
+      "group_approval_decided_at": null,
+      "is_synthetic": true,
+      "sim_persona": "struggler"
+    }
+  },
+  {
+    "model": "tutoring.sessionturn",
+    "pk": 478,
+    "fields": {
+      "session": 20,
+      "role": "student",
+      "content": "ummm... subtract?",
+      "created_at": "2026-05-13T04:01:47.341Z",
+      "step": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "metadata": {},
+      "judge_outputs": {},
+      "generated_offline": false,
+      "offline_model_id": "",
+      "client_generated_at": null,
+      "is_flagged": false,
+      "flag_type": ""
+    }
+  },
+  {
+    "model": "tutoring.sessionturn",
+    "pk": 479,
+    "fields": {
+      "session": 20,
+      "role": "tutor",
+      "content": "Exactly right! We subtract the known angles from 360\u00b0 to find the missing angle.\n\nSo if we have angles of 95\u00b0 and 75\u00b0 around a point (which sum to 170\u00b0), the missing angle would be 360\u00b0 - 170\u00b0 = 190\u00b0.\n\nWhat is the sum of all angles around a single point?",
+      "created_at": "2026-05-13T04:02:04.545Z",
+      "step": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "metadata": {
+        "is_correct": false,
+        "eval_layer": "llm_evaluator",
+        "eval_reasoning": "The tutor asked a comprehension check question but the student hasn't responded yet, so we cannot evaluate answer correctness and the step is not complete until the student answers correctly.",
+        "step_index": 0,
+        "step_type": "teach",
+        "working_state": "no_working",
+        "working_steps_count": 0,
+        "working_first_error_idx": null,
+        "working_propagated_idxs": [],
+        "bank_question_ref": {
+          "kind": "exit_ticket_question",
+          "id": 3357,
+          "question_type": "mcq"
+        },
+        "tool_use_count": 1,
+        "bank_rendered": true,
+        "validator_issues": [
+          "tutor_incoherent",
+          "regen_did_not_clean",
+          "info_dump_warning",
+          "authoring_violation"
+        ],
+        "validator_passed": false,
+        "factual_claims_checked": 0,
+        "factual_claims_unverified": [],
+        "factual_claims_contradicted": [],
+        "fact_check_skipped": true,
+        "fact_check_skip_reason": "no_claims_detected",
+        "rule_check_skipped": false,
+        "rule_check_skip_reason": "",
+        "rule_violations": [
+          {
+            "rule": "NO_AUTHORING",
+            "evidence": "So if we have angles of 95\u00b0 and 75\u00b0 around a point (which sum to 170\u00b0), the missing angle would be 360\u00b0 - 170\u00b0 = 190\u00b0.",
+            "suggested_fix": "Remove the specific numerical example and focus on the conceptual explanation of subtracting known angles from 360\u00b0."
+          }
+        ],
+        "judge_history_turns": 12,
+        "prompt_pack": {
+          "tutor_system": {
+            "hash": "faeab045e1",
+            "chars": 43196
+          },
+          "judges": {
+            "arithmetic": {
+              "hash": "(deterministic)",
+              "chars": 0
+            },
+            "coherence": {
+              "hash": "7bf4e7feaa",
+              "chars": 2934
+            },
+            "factual": {
+              "hash": "1c435e7229",
+              "chars": 856
+            },
+            "rule": {
+              "hash": "650b1dd730",
+              "chars": 1460
+            },
+            "step_eval": {
+              "hash": "f75ea71925",
+              "chars": 3506
+            },
+            "safety": {
+              "hash": "ea7fa2e4fb",
+              "chars": 1895
+            },
+            "figure_ref": {
+              "hash": "(deterministic)",
+              "chars": 0
+            },
+            "figure_vision": {
+              "hash": "8fc4015389",
+              "chars": 1400
+            }
+          }
+        },
+        "regenerated": true,
+        "regeneration_reason": [
+          "info_dump_warning",
+          "authoring_violation",
+          "tutor_incoherent"
+        ],
+        "regen_cycles": 2,
+        "regen_picked_model": "claude-sonnet-4-20250514",
+        "regen_clean": false,
+        "regen_fallback_used": false,
+        "regen_elapsed_seconds": 7.52,
+        "regen_audit": {
+          "picked_model": "claude-sonnet-4-20250514",
+          "cycles_run": 2,
+          "fallback_used": false,
+          "clean": false,
+          "cycles": [
+            {
+              "cycle": 1,
+              "temperature": 0.2,
+              "candidates": [
+                {
+                  "model": "claude-sonnet-4-20250514",
+                  "score": -10.0,
+                  "clean": false,
+                  "error": "",
+                  "text_preview": "Exactly right! We subtract the known angles from 360\u00b0 to find the missing angle.\n\nSo if we have angles of 95\u00b0 and 75\u00b0 around a point (which sum to 170\u00b0), the missing angle would be 360\u00b0 - 170\u00b0 = 190\u00b0.\n\nWhat is the sum of all angles around a single point?",
+                  "judge_outputs": {
+                    "step_eval": {
+                      "answer_correct": null,
+                      "step_complete": false,
+                      "reasoning": "",
+                      "skipped": true,
+                      "source": ""
+                    },
+                    "arithmetic": {
+                      "corrections": []
+                    },
+                    "factual": {
+                      "claims_checked": 0,
+                      "supported": [],
+                      "contradicted": [],
+                      "unverified": []
+                    },
+                    "rule": {
+                      "violations": [
+                        {
+                          "rule": "NO_AUTHORING",
+                          "evidence": "So if we have angles of 95\u00b0 and 75\u00b0 around a point (which sum to 170\u00b0), the missing angle would be 360\u00b0 - 170\u00b0 = 190\u00b0.",
+                          "suggested_fix": "Use the angles from the verified question bank or avoid introducing new numerical examples."
+                        }
+                      ]
+                    },
+                    "coherence": {
+                      "violations": [
+                        "asks 'What is the sum of all angles around a single point?' after student already correctly stated this rule and tutor confirmed it"
+                      ]
+                    },
+                    "figure_ref": {
+                      "issues": [],
+                      "in_question": false
+                    },
+                    "figure_vision": {
+                      "aligned": null,
+                      "mismatch_reason": "",
+                      "summary": ""
+                    },
+                    "safety": {
+                      "severity": "safe",
+                      "categories": [],
+                      "reasoning": ""
+                    },
+                    "history_turns_used": 12,
+                    "prompt_versions": {
+                      "arithmetic": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "coherence": {
+                        "hash": "7bf4e7feaa",
+                        "chars": 2934
+                      },
+                      "factual": {
+                        "hash": "1c435e7229",
+                        "chars": 856
+                      },
+                      "rule": {
+                        "hash": "650b1dd730",
+                        "chars": 1460
+                      },
+                      "step_eval": {
+                        "hash": "f75ea71925",
+                        "chars": 3506
+                      },
+                      "safety": {
+                        "hash": "ea7fa2e4fb",
+                        "chars": 1895
+                      },
+                      "figure_ref": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "figure_vision": {
+                        "hash": "8fc4015389",
+                        "chars": 1400
+                      }
+                    },
+                    "skipped": false,
+                    "skip_reason": "",
+                    "sub_skipped": {
+                      "fact_check": "no_claims_detected",
+                      "step_eval": "empty_step_context",
+                      "figure_ref": "no_figure_reference",
+                      "figure_vision": "no_attached_media"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "cycle": 2,
+              "temperature": 0.15000000000000002,
+              "candidates": [
+                {
+                  "model": "claude-sonnet-4-20250514",
+                  "score": -10.0,
+                  "clean": false,
+                  "error": "",
+                  "text_preview": "Exactly right! We subtract the known angles from 360\u00b0 to find the missing angle.\n\nSo if we have angles of 95\u00b0 and 75\u00b0 around a point (which sum to 170\u00b0), the missing angle would be 360\u00b0 - 170\u00b0 = 190\u00b0.\n\nWhat is the sum of all angles around a single point?",
+                  "judge_outputs": {
+                    "step_eval": {
+                      "answer_correct": null,
+                      "step_complete": false,
+                      "reasoning": "",
+                      "skipped": true,
+                      "source": ""
+                    },
+                    "arithmetic": {
+                      "corrections": []
+                    },
+                    "factual": {
+                      "claims_checked": 0,
+                      "supported": [],
+                      "contradicted": [],
+                      "unverified": []
+                    },
+                    "rule": {
+                      "violations": [
+                        {
+                          "rule": "NO_AUTHORING",
+                          "evidence": "So if we have angles of 95\u00b0 and 75\u00b0 around a point (which sum to 170\u00b0), the missing angle would be 360\u00b0 - 170\u00b0 = 190\u00b0.",
+                          "suggested_fix": "Remove the specific numerical example and focus on the conceptual explanation of subtracting known angles from 360\u00b0."
+                        }
+                      ]
+                    },
+                    "coherence": {
+                      "violations": [
+                        "asks 'What is the sum of all angles around a single point?' after student already correctly stated this rule and tutor confirmed it"
+                      ]
+                    },
+                    "figure_ref": {
+                      "issues": [],
+                      "in_question": false
+                    },
+                    "figure_vision": {
+                      "aligned": null,
+                      "mismatch_reason": "",
+                      "summary": ""
+                    },
+                    "safety": {
+                      "severity": "safe",
+                      "categories": [],
+                      "reasoning": ""
+                    },
+                    "history_turns_used": 12,
+                    "prompt_versions": {
+                      "arithmetic": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "coherence": {
+                        "hash": "7bf4e7feaa",
+                        "chars": 2934
+                      },
+                      "factual": {
+                        "hash": "1c435e7229",
+                        "chars": 856
+                      },
+                      "rule": {
+                        "hash": "650b1dd730",
+                        "chars": 1460
+                      },
+                      "step_eval": {
+                        "hash": "f75ea71925",
+                        "chars": 3506
+                      },
+                      "safety": {
+                        "hash": "ea7fa2e4fb",
+                        "chars": 1895
+                      },
+                      "figure_ref": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "figure_vision": {
+                        "hash": "8fc4015389",
+                        "chars": 1400
+                      }
+                    },
+                    "skipped": false,
+                    "skip_reason": "",
+                    "sub_skipped": {
+                      "fact_check": "no_claims_detected",
+                      "step_eval": "empty_step_context",
+                      "figure_ref": "no_figure_reference",
+                      "figure_vision": "no_attached_media"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "judge_outputs": {
+        "step_eval": {
+          "answer_correct": null,
+          "step_complete": false,
+          "reasoning": "",
+          "skipped": true,
+          "source": ""
+        },
+        "arithmetic": {
+          "corrections": []
+        },
+        "factual": {
+          "claims_checked": 0,
+          "supported": [],
+          "contradicted": [],
+          "unverified": []
+        },
+        "rule": {
+          "violations": [
+            {
+              "rule": "NO_AUTHORING",
+              "evidence": "So if we have angles of 95\u00b0 and 75\u00b0 around a point (which sum to 170\u00b0), the missing angle would be 360\u00b0 - 170\u00b0 = 190\u00b0.",
+              "suggested_fix": "Remove the specific numerical example and focus on the conceptual explanation of subtracting known angles from 360\u00b0."
+            }
+          ]
+        },
+        "coherence": {
+          "violations": [
+            "two parallel questions: explains missing angle calculation; poses multiple choice question about angle sum rule"
+          ]
+        },
+        "figure_ref": {
+          "issues": [],
+          "in_question": false
+        },
+        "figure_vision": {
+          "aligned": null,
+          "mismatch_reason": "",
+          "summary": ""
+        },
+        "safety": {
+          "severity": "safe",
+          "categories": [],
+          "reasoning": ""
+        },
+        "history_turns_used": 12,
+        "prompt_versions": {
+          "arithmetic": {
+            "hash": "(deterministic)",
+            "chars": 0
+          },
+          "coherence": {
+            "hash": "7bf4e7feaa",
+            "chars": 2934
+          },
+          "factual": {
+            "hash": "1c435e7229",
+            "chars": 856
+          },
+          "rule": {
+            "hash": "650b1dd730",
+            "chars": 1460
+          },
+          "step_eval": {
+            "hash": "f75ea71925",
+            "chars": 3506
+          },
+          "safety": {
+            "hash": "ea7fa2e4fb",
+            "chars": 1895
+          },
+          "figure_ref": {
+            "hash": "(deterministic)",
+            "chars": 0
+          },
+          "figure_vision": {
+            "hash": "8fc4015389",
+            "chars": 1400
+          }
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "sub_skipped": {
+          "fact_check": "no_claims_detected",
+          "step_eval": "empty_step_context",
+          "figure_ref": "no_figure_reference",
+          "figure_vision": "no_attached_media"
+        }
+      },
+      "generated_offline": false,
+      "offline_model_id": "",
+      "client_generated_at": null,
+      "is_flagged": false,
+      "flag_type": ""
+    }
+  },
+  {
+    "model": "tutoring.sessionturn",
+    "pk": 480,
+    "fields": {
+      "session": 20,
+      "role": "student",
+      "content": "360 degrees.",
+      "created_at": "2026-05-13T04:02:06.715Z",
+      "step": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "metadata": {},
+      "judge_outputs": {},
+      "generated_offline": false,
+      "offline_model_id": "",
+      "client_generated_at": null,
+      "is_flagged": false,
+      "flag_type": ""
+    }
+  },
+  {
+    "model": "tutoring.sessionturn",
+    "pk": 481,
+    "fields": {
+      "session": 20,
+      "role": "tutor",
+      "content": "Perfect! You've got the key rule.\n\n5 equal angles are arranged around a point. Each angle measures:\n\n  A) 900\u00b0\n  B) 36\u00b0\n  C) 1800\u00b0\n  D) 72\u00b0",
+      "created_at": "2026-05-13T04:02:28.189Z",
+      "step": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "metadata": {
+        "is_correct": false,
+        "eval_layer": "llm_evaluator",
+        "eval_reasoning": "The tutor presented a new multiple choice question but the student hasn't answered it yet, so no comprehension check has been completed.",
+        "step_index": 0,
+        "step_type": "teach",
+        "working_state": "no_working",
+        "working_steps_count": 0,
+        "working_first_error_idx": null,
+        "working_propagated_idxs": [],
+        "bare_answer": true,
+        "bare_answer_count_for_step": 1,
+        "bank_question_ref": {
+          "kind": "exit_ticket_question",
+          "id": 3359,
+          "question_type": "mcq"
+        },
+        "tool_use_count": 1,
+        "bank_rendered": true,
+        "validator_issues": [
+          "numeric_claim_unverified",
+          "info_dump_warning",
+          "tutor_incoherent",
+          "authoring_violation",
+          "regen_did_not_clean"
+        ],
+        "validator_passed": false,
+        "factual_claims_checked": 1,
+        "factual_claims_unverified": [
+          "360 degrees"
+        ],
+        "factual_claims_contradicted": [],
+        "fact_check_skipped": false,
+        "fact_check_skip_reason": "",
+        "rule_check_skipped": false,
+        "rule_check_skip_reason": "",
+        "rule_violations": [
+          {
+            "rule": "NO_AUTHORING",
+            "evidence": "5 equal angles are arranged around a point. Each angle measures:\n\n  A) 900\u00b0\n  B) 36\u00b0\n  C) 1800\u00b0\n  D) 72\u00b0",
+            "suggested_fix": "Use the exact stem from the question bank without adding specific numerical answer choices."
+          }
+        ],
+        "judge_history_turns": 12,
+        "prompt_pack": {
+          "tutor_system": {
+            "hash": "811abda9bf",
+            "chars": 45178
+          },
+          "judges": {
+            "arithmetic": {
+              "hash": "(deterministic)",
+              "chars": 0
+            },
+            "coherence": {
+              "hash": "7bf4e7feaa",
+              "chars": 2934
+            },
+            "factual": {
+              "hash": "1c435e7229",
+              "chars": 856
+            },
+            "rule": {
+              "hash": "650b1dd730",
+              "chars": 1460
+            },
+            "step_eval": {
+              "hash": "f75ea71925",
+              "chars": 3506
+            },
+            "safety": {
+              "hash": "ea7fa2e4fb",
+              "chars": 1895
+            },
+            "figure_ref": {
+              "hash": "(deterministic)",
+              "chars": 0
+            },
+            "figure_vision": {
+              "hash": "8fc4015389",
+              "chars": 1400
+            }
+          }
+        },
+        "regenerated": true,
+        "regeneration_reason": [
+          "info_dump_warning",
+          "numeric_claim_unverified",
+          "authoring_violation",
+          "tutor_incoherent"
+        ],
+        "regen_cycles": 2,
+        "regen_picked_model": "claude-sonnet-4-20250514",
+        "regen_clean": false,
+        "regen_fallback_used": false,
+        "regen_elapsed_seconds": 9.15,
+        "regen_audit": {
+          "picked_model": "claude-sonnet-4-20250514",
+          "cycles_run": 2,
+          "fallback_used": false,
+          "clean": false,
+          "cycles": [
+            {
+              "cycle": 1,
+              "temperature": 0.2,
+              "candidates": [
+                {
+                  "model": "claude-sonnet-4-20250514",
+                  "score": -10.0,
+                  "clean": false,
+                  "error": "",
+                  "text_preview": "Perfect! You've got the key rule.\n\n5 equal angles are arranged around a point. Each angle measures:\n\n  A) 900\u00b0\n  B) 36\u00b0\n  C) 1800\u00b0\n  D) 72\u00b0",
+                  "judge_outputs": {
+                    "step_eval": {
+                      "answer_correct": null,
+                      "step_complete": false,
+                      "reasoning": "",
+                      "skipped": true,
+                      "source": ""
+                    },
+                    "arithmetic": {
+                      "corrections": []
+                    },
+                    "factual": {
+                      "claims_checked": 0,
+                      "supported": [],
+                      "contradicted": [],
+                      "unverified": []
+                    },
+                    "rule": {
+                      "violations": [
+                        {
+                          "rule": "RULE_1",
+                          "evidence": "Perfect! You've got the key rule.",
+                          "suggested_fix": "Can you walk through how you would apply that rule to find each angle measure?"
+                        },
+                        {
+                          "rule": "NO_AUTHORING",
+                          "evidence": "5 equal angles are arranged around a point. Each angle measures:\n\n  A) 900\u00b0\n  B) 36\u00b0\n  C) 1800\u00b0\n  D) 72\u00b0",
+                          "suggested_fix": "Use the verified question from the bank about 5 equal angles without adding specific answer choices."
+                        }
+                      ]
+                    },
+                    "coherence": {
+                      "violations": []
+                    },
+                    "figure_ref": {
+                      "issues": [],
+                      "in_question": false
+                    },
+                    "figure_vision": {
+                      "aligned": null,
+                      "mismatch_reason": "",
+                      "summary": ""
+                    },
+                    "safety": {
+                      "severity": "safe",
+                      "categories": [],
+                      "reasoning": ""
+                    },
+                    "history_turns_used": 12,
+                    "prompt_versions": {
+                      "arithmetic": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "coherence": {
+                        "hash": "7bf4e7feaa",
+                        "chars": 2934
+                      },
+                      "factual": {
+                        "hash": "1c435e7229",
+                        "chars": 856
+                      },
+                      "rule": {
+                        "hash": "650b1dd730",
+                        "chars": 1460
+                      },
+                      "step_eval": {
+                        "hash": "f75ea71925",
+                        "chars": 3506
+                      },
+                      "safety": {
+                        "hash": "ea7fa2e4fb",
+                        "chars": 1895
+                      },
+                      "figure_ref": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "figure_vision": {
+                        "hash": "8fc4015389",
+                        "chars": 1400
+                      }
+                    },
+                    "skipped": false,
+                    "skip_reason": "",
+                    "sub_skipped": {
+                      "fact_check": "no_claims_detected",
+                      "step_eval": "empty_step_context",
+                      "coherence": "too_short_for_contradiction",
+                      "figure_ref": "no_figure_reference",
+                      "figure_vision": "no_attached_media"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "cycle": 2,
+              "temperature": 0.15000000000000002,
+              "candidates": [
+                {
+                  "model": "claude-sonnet-4-20250514",
+                  "score": -10.0,
+                  "clean": false,
+                  "error": "",
+                  "text_preview": "Perfect! You've got the key rule down.\n\n5 equal angles are arranged around a point. Each angle measures:\n\n  A) 900\u00b0\n  B) 36\u00b0\n  C) 1800\u00b0\n  D) 72\u00b0",
+                  "judge_outputs": {
+                    "step_eval": {
+                      "answer_correct": null,
+                      "step_complete": false,
+                      "reasoning": "",
+                      "skipped": true,
+                      "source": ""
+                    },
+                    "arithmetic": {
+                      "corrections": []
+                    },
+                    "factual": {
+                      "claims_checked": 0,
+                      "supported": [],
+                      "contradicted": [],
+                      "unverified": []
+                    },
+                    "rule": {
+                      "violations": [
+                        {
+                          "rule": "RULE_1",
+                          "evidence": "Perfect! You've got the key rule down.",
+                          "suggested_fix": "Can you walk through how you would solve this problem step by step?"
+                        },
+                        {
+                          "rule": "NO_AUTHORING",
+                          "evidence": "5 equal angles are arranged around a point. Each angle measures:\n\n  A) 900\u00b0\n  B) 36\u00b0\n  C) 1800\u00b0\n  D) 72\u00b0",
+                          "suggested_fix": "Use the exact stem from the question bank without adding specific answer choices."
+                        }
+                      ]
+                    },
+                    "coherence": {
+                      "violations": []
+                    },
+                    "figure_ref": {
+                      "issues": [],
+                      "in_question": false
+                    },
+                    "figure_vision": {
+                      "aligned": null,
+                      "mismatch_reason": "",
+                      "summary": ""
+                    },
+                    "safety": {
+                      "severity": "safe",
+                      "categories": [],
+                      "reasoning": ""
+                    },
+                    "history_turns_used": 12,
+                    "prompt_versions": {
+                      "arithmetic": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "coherence": {
+                        "hash": "7bf4e7feaa",
+                        "chars": 2934
+                      },
+                      "factual": {
+                        "hash": "1c435e7229",
+                        "chars": 856
+                      },
+                      "rule": {
+                        "hash": "650b1dd730",
+                        "chars": 1460
+                      },
+                      "step_eval": {
+                        "hash": "f75ea71925",
+                        "chars": 3506
+                      },
+                      "safety": {
+                        "hash": "ea7fa2e4fb",
+                        "chars": 1895
+                      },
+                      "figure_ref": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "figure_vision": {
+                        "hash": "8fc4015389",
+                        "chars": 1400
+                      }
+                    },
+                    "skipped": false,
+                    "skip_reason": "",
+                    "sub_skipped": {
+                      "fact_check": "no_claims_detected",
+                      "step_eval": "empty_step_context",
+                      "coherence": "too_short_for_contradiction",
+                      "figure_ref": "no_figure_reference",
+                      "figure_vision": "no_attached_media"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "judge_outputs": {
+        "step_eval": {
+          "answer_correct": null,
+          "step_complete": false,
+          "reasoning": "",
+          "skipped": true,
+          "source": ""
+        },
+        "arithmetic": {
+          "corrections": []
+        },
+        "factual": {
+          "claims_checked": 1,
+          "supported": [],
+          "contradicted": [],
+          "unverified": [
+            "360 degrees"
+          ]
+        },
+        "rule": {
+          "violations": [
+            {
+              "rule": "NO_AUTHORING",
+              "evidence": "5 equal angles are arranged around a point. Each angle measures:\n\n  A) 900\u00b0\n  B) 36\u00b0\n  C) 1800\u00b0\n  D) 72\u00b0",
+              "suggested_fix": "Use the exact stem from the question bank without adding specific numerical answer choices."
+            }
+          ]
+        },
+        "coherence": {
+          "violations": [
+            "two parallel questions: 'What is the sum of all angles around a single point?' and the multiple choice problem about 5 equal angles"
+          ]
+        },
+        "figure_ref": {
+          "issues": [],
+          "in_question": false
+        },
+        "figure_vision": {
+          "aligned": null,
+          "mismatch_reason": "",
+          "summary": ""
+        },
+        "safety": {
+          "severity": "safe",
+          "categories": [],
+          "reasoning": ""
+        },
+        "history_turns_used": 12,
+        "prompt_versions": {
+          "arithmetic": {
+            "hash": "(deterministic)",
+            "chars": 0
+          },
+          "coherence": {
+            "hash": "7bf4e7feaa",
+            "chars": 2934
+          },
+          "factual": {
+            "hash": "1c435e7229",
+            "chars": 856
+          },
+          "rule": {
+            "hash": "650b1dd730",
+            "chars": 1460
+          },
+          "step_eval": {
+            "hash": "f75ea71925",
+            "chars": 3506
+          },
+          "safety": {
+            "hash": "ea7fa2e4fb",
+            "chars": 1895
+          },
+          "figure_ref": {
+            "hash": "(deterministic)",
+            "chars": 0
+          },
+          "figure_vision": {
+            "hash": "8fc4015389",
+            "chars": 1400
+          }
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "sub_skipped": {
+          "step_eval": "empty_step_context",
+          "figure_ref": "no_figure_reference",
+          "figure_vision": "no_attached_media"
+        }
+      },
+      "generated_offline": false,
+      "offline_model_id": "",
+      "client_generated_at": null,
+      "is_flagged": false,
+      "flag_type": ""
+    }
+  },
+  {
+    "model": "tutoring.sessionturn",
+    "pk": 482,
+    "fields": {
+      "session": 20,
+      "role": "student",
+      "content": "D) 72\u00b0",
+      "created_at": "2026-05-13T04:02:29.209Z",
+      "step": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "metadata": {},
+      "judge_outputs": {},
+      "generated_offline": false,
+      "offline_model_id": "",
+      "client_generated_at": null,
+      "is_flagged": false,
+      "flag_type": ""
+    }
+  },
+  {
+    "model": "tutoring.sessionturn",
+    "pk": 483,
+    "fields": {
+      "session": 20,
+      "role": "tutor",
+      "content": "Not quite - let's think through this step by step.\n\nYou know that all angles around a point sum to 360\u00b0, and you've already shown you can divide when angles are equal.\n\nWhat rule applies when several equal angles meet at a single point?",
+      "created_at": "2026-05-13T04:02:39.523Z",
+      "step": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "metadata": {
+        "is_correct": false,
+        "eval_layer": "llm_evaluator",
+        "eval_reasoning": "Student incorrectly answered 72\u00b0 instead of the correct 72\u00b0 calculation (360\u00b0 \u00f7 5 = 72\u00b0), but actually gave the right answer choice - this appears to be a calculation error that needs correction before completing the comprehension check.",
+        "step_index": 0,
+        "step_type": "teach",
+        "working_state": "no_working",
+        "working_steps_count": 0,
+        "working_first_error_idx": null,
+        "working_propagated_idxs": [],
+        "tool_use_count": 0,
+        "bank_rendered": false,
+        "validator_issues": [
+          "authoring_violation"
+        ],
+        "validator_passed": false,
+        "factual_claims_checked": 0,
+        "factual_claims_unverified": [],
+        "factual_claims_contradicted": [],
+        "fact_check_skipped": true,
+        "fact_check_skip_reason": "no_claims_detected",
+        "rule_check_skipped": false,
+        "rule_check_skip_reason": "",
+        "rule_violations": [
+          {
+            "rule": "NO_AUTHORING",
+            "evidence": "For 5 equal angles: 360\u00b0 \u00f7 5 = ?",
+            "suggested_fix": "Ask the student to set up the division problem themselves using the rule they know."
+          }
+        ],
+        "judge_history_turns": 12,
+        "prompt_pack": {
+          "tutor_system": {
+            "hash": "2e1d691699",
+            "chars": 44383
+          },
+          "judges": {
+            "arithmetic": {
+              "hash": "(deterministic)",
+              "chars": 0
+            },
+            "coherence": {
+              "hash": "7bf4e7feaa",
+              "chars": 2934
+            },
+            "factual": {
+              "hash": "1c435e7229",
+              "chars": 856
+            },
+            "rule": {
+              "hash": "650b1dd730",
+              "chars": 1460
+            },
+            "step_eval": {
+              "hash": "f75ea71925",
+              "chars": 3506
+            },
+            "safety": {
+              "hash": "ea7fa2e4fb",
+              "chars": 1895
+            },
+            "figure_ref": {
+              "hash": "(deterministic)",
+              "chars": 0
+            },
+            "figure_vision": {
+              "hash": "8fc4015389",
+              "chars": 1400
+            }
+          }
+        },
+        "regenerated": true,
+        "regeneration_reason": [
+          "authoring_violation"
+        ],
+        "regen_cycles": 1,
+        "regen_picked_model": "claude-sonnet-4-20250514",
+        "regen_clean": true,
+        "regen_fallback_used": false,
+        "regen_elapsed_seconds": 2.33,
+        "regen_audit": {
+          "picked_model": "claude-sonnet-4-20250514",
+          "cycles_run": 1,
+          "fallback_used": false,
+          "clean": true,
+          "cycles": [
+            {
+              "cycle": 1,
+              "temperature": 0.2,
+              "candidates": [
+                {
+                  "model": "claude-sonnet-4-20250514",
+                  "score": 0.0,
+                  "clean": true,
+                  "error": "",
+                  "text_preview": "Not quite - let's think through this step by step.\n\nYou know that all angles around a point sum to 360\u00b0, and you've already shown you can divide when angles are equal.\n\nWhat rule applies when several equal angles meet at a single point?",
+                  "judge_outputs": {
+                    "step_eval": {
+                      "answer_correct": null,
+                      "step_complete": false,
+                      "reasoning": "",
+                      "skipped": true,
+                      "source": ""
+                    },
+                    "arithmetic": {
+                      "corrections": []
+                    },
+                    "factual": {
+                      "claims_checked": 0,
+                      "supported": [],
+                      "contradicted": [],
+                      "unverified": []
+                    },
+                    "rule": {
+                      "violations": []
+                    },
+                    "coherence": {
+                      "violations": []
+                    },
+                    "figure_ref": {
+                      "issues": [],
+                      "in_question": false
+                    },
+                    "figure_vision": {
+                      "aligned": null,
+                      "mismatch_reason": "",
+                      "summary": ""
+                    },
+                    "safety": {
+                      "severity": "safe",
+                      "categories": [],
+                      "reasoning": ""
+                    },
+                    "history_turns_used": 12,
+                    "prompt_versions": {
+                      "arithmetic": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "coherence": {
+                        "hash": "7bf4e7feaa",
+                        "chars": 2934
+                      },
+                      "factual": {
+                        "hash": "1c435e7229",
+                        "chars": 856
+                      },
+                      "rule": {
+                        "hash": "650b1dd730",
+                        "chars": 1460
+                      },
+                      "step_eval": {
+                        "hash": "f75ea71925",
+                        "chars": 3506
+                      },
+                      "safety": {
+                        "hash": "ea7fa2e4fb",
+                        "chars": 1895
+                      },
+                      "figure_ref": {
+                        "hash": "(deterministic)",
+                        "chars": 0
+                      },
+                      "figure_vision": {
+                        "hash": "8fc4015389",
+                        "chars": 1400
+                      }
+                    },
+                    "skipped": false,
+                    "skip_reason": "",
+                    "sub_skipped": {
+                      "fact_check": "no_claims_detected",
+                      "step_eval": "empty_step_context",
+                      "figure_ref": "no_figure_reference",
+                      "figure_vision": "no_attached_media"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "judge_outputs": {
+        "step_eval": {
+          "answer_correct": null,
+          "step_complete": false,
+          "reasoning": "",
+          "skipped": true,
+          "source": ""
+        },
+        "arithmetic": {
+          "corrections": []
+        },
+        "factual": {
+          "claims_checked": 0,
+          "supported": [],
+          "contradicted": [],
+          "unverified": []
+        },
+        "rule": {
+          "violations": [
+            {
+              "rule": "NO_AUTHORING",
+              "evidence": "For 5 equal angles: 360\u00b0 \u00f7 5 = ?",
+              "suggested_fix": "Ask the student to set up the division problem themselves using the rule they know."
+            }
+          ]
+        },
+        "coherence": {
+          "violations": []
+        },
+        "figure_ref": {
+          "issues": [],
+          "in_question": false
+        },
+        "figure_vision": {
+          "aligned": null,
+          "mismatch_reason": "",
+          "summary": ""
+        },
+        "safety": {
+          "severity": "safe",
+          "categories": [],
+          "reasoning": ""
+        },
+        "history_turns_used": 12,
+        "prompt_versions": {
+          "arithmetic": {
+            "hash": "(deterministic)",
+            "chars": 0
+          },
+          "coherence": {
+            "hash": "7bf4e7feaa",
+            "chars": 2934
+          },
+          "factual": {
+            "hash": "1c435e7229",
+            "chars": 856
+          },
+          "rule": {
+            "hash": "650b1dd730",
+            "chars": 1460
+          },
+          "step_eval": {
+            "hash": "f75ea71925",
+            "chars": 3506
+          },
+          "safety": {
+            "hash": "ea7fa2e4fb",
+            "chars": 1895
+          },
+          "figure_ref": {
+            "hash": "(deterministic)",
+            "chars": 0
+          },
+          "figure_vision": {
+            "hash": "8fc4015389",
+            "chars": 1400
+          }
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "sub_skipped": {
+          "fact_check": "no_claims_detected",
+          "step_eval": "empty_step_context",
+          "figure_ref": "no_figure_reference",
+          "figure_vision": "no_attached_media"
+        }
+      },
+      "generated_offline": false,
+      "offline_model_id": "",
+      "client_generated_at": null,
+      "is_flagged": false,
+      "flag_type": ""
+    }
+  },
+  {
+    "model": "tutoring.sessionturn",
+    "pk": 484,
+    "fields": {
+      "session": 20,
+      "role": "student",
+      "content": "we divide 360 by the number of angles.",
+      "created_at": "2026-05-13T04:02:40.488Z",
+      "step": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "metadata": {},
+      "judge_outputs": {},
+      "generated_offline": false,
+      "offline_model_id": "",
+      "client_generated_at": null,
+      "is_flagged": false,
+      "flag_type": ""
+    }
+  }
+]
