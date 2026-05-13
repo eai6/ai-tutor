@@ -495,7 +495,9 @@ container_app = app.ContainerApp(
             ),
         ],
     ),
-    opts=pulumi.ResourceOptions(depends_on=[env_storage, pg_firewall] + ([managed_cert] if managed_cert else [])),
+    opts=pulumi.ResourceOptions(
+        depends_on=[env_storage, pg_firewall] + list(managed_certs.values()),
+    ),
 )
 
 # ── Exports ─────────────────────────────────────────────────────────────────
