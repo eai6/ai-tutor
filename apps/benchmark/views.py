@@ -396,10 +396,77 @@ def benchmark_annotate(request, item_id: str):
 def benchmark_runs_list(request):
     """List all BenchmarkRuns, newest first."""
     runs = list(BenchmarkRun.objects.all().order_by('-created_at')[:200])
+    # Show pending-annotation counts so the user can see whether there
+    # is enough labelled data to score against.
+    human_count = BenchmarkAnnotation.objects.filter(
+        annotator_role=BenchmarkAnnotation.Annotator.HUMAN,
+        system_variant=BenchmarkAnnotation.SystemVariant.PRODUCTION_V1,
+    ).count()
+    llm_count = BenchmarkAnnotation.objects.filter(
+        annotator_role=BenchmarkAnnotation.Annotator.LLM_JUDGE,
+        system_variant=BenchmarkAnnotation.SystemVariant.PRODUCTION_V1,
+    ).count()
     return render(request, 'benchmark/runs_list.html', {
         'runs': runs,
         'total': len(runs),
+        'human_annotation_count': human_count,
+        'llm_annotation_count': llm_count,
     })
+
+
+@staff_member_required
+@require_POST
+def benchmark_score_now(request):
+    """Compute a BenchmarkRun on demand from existing annotations.
+
+    Mirrors `python manage.py score_benchmark` but lets the user kick
+    off scoring from the UI after annotating items. Defaults to the
+    human-annotated production_v1 set — the CLI is still available for
+    custom variants / LLM-judge runs.
+    """
+    from apps.benchmark.scoring import compute_metrics
+
+    annotator_role = request.POST.get(
+        'annotator_role',
+        BenchmarkAnnotation.Annotator.HUMAN,
+    )
+    system_variant = request.POST.get(
+        'system_variant',
+        BenchmarkAnnotation.SystemVariant.PRODUCTION_V1,
+    )
+    notes = (request.POST.get('notes') or '').strip()[:500]
+
+    primary = list(
+        BenchmarkAnnotation.objects.filter(
+            system_variant=system_variant,
+            annotator_role=annotator_role,
+        ).select_related('item')
+    )
+    if not primary:
+        messages.error(
+            request,
+            f"No {annotator_role} annotations for {system_variant} yet. "
+            "Annotate at least one item before scoring.",
+        )
+        return redirect('dashboard:benchmark:runs_list')
+
+    metrics = compute_metrics(primary)
+    overall = metrics['overall']
+    run = BenchmarkRun.objects.create(
+        system_variant=system_variant,
+        annotator_role=annotator_role,
+        total_items=overall['total'],
+        passed=overall['passed'],
+        failed=overall['failed'],
+        metrics=metrics,
+        notes=notes,
+    )
+    messages.success(
+        request,
+        f"Scored {overall['passed']}/{overall['total']} "
+        f"({overall['pass_rate'] * 100:.1f}%) — run #{run.id}",
+    )
+    return redirect('dashboard:benchmark:run_detail', run_id=run.id)
 
 
 @staff_member_required

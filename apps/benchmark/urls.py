@@ -17,6 +17,7 @@ urlpatterns = [
          name='bulk_delete'),
     # Scoring dashboard (Phase 2.3).
     path('scores/', views.benchmark_runs_list, name='runs_list'),
+    path('scores/run-now/', views.benchmark_score_now, name='score_now'),
     path('scores/<int:run_id>/', views.benchmark_run_detail,
          name='run_detail'),
     path('<str:item_id>/', views.benchmark_annotate, name='annotate'),
