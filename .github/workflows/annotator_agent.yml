@@ -58,6 +58,12 @@ concurrency:
   group: annotator-agent-${{ github.ref }}
   cancel-in-progress: false
 
+# `contents: write` lets the workflow push to the metrics-history
+# branch (separate from main, so deploy.yml doesn't fire). The default
+# GITHUB_TOKEN is read-only otherwise.
+permissions:
+  contents: write
+
 jobs:
   agent:
     runs-on: ubuntu-latest
@@ -65,6 +71,8 @@ jobs:
 
     env:
       COMPOSE_FILE: ops/annotator_agent/docker-compose.yml
+      METRICS_BRANCH: metrics-history
+      METRICS_FILE: metrics_history.jsonl
 
     steps:
       - name: Checkout
@@ -172,13 +180,180 @@ jobs:
               --max-items "${{ inputs.max_items }}" \
               --max-steps "${{ inputs.max_steps }}"
 
-      - name: Upload transcripts (full mode)
+      # ----- Extract metrics from the ephemeral DB -------------------
+      # The agent has clicked Score now → BenchmarkRun row exists in
+      # the django container's SQLite. Pull it out as JSON so we can
+      # both (a) attach to the artifact and (b) append to the
+      # metrics-history branch.
+      - name: FULL — extract metrics from ephemeral DB
+        if: ${{ inputs.mode == 'full' }}
+        run: |
+          set -e
+          mkdir -p ops/annotator_agent/transcripts
+          docker compose -f "$COMPOSE_FILE" exec -T django \
+            python manage.py shell -c '
+          import json, sys
+          from apps.benchmark.models import BenchmarkRun
+          run = BenchmarkRun.objects.order_by("-id").first()
+          if run is None:
+              sys.exit("No BenchmarkRun found — agent never clicked Score now")
+          payload = {
+              "run_id": run.id,
+              "system_variant": run.system_variant,
+              "annotator_role": run.annotator_role,
+              "total_items": run.total_items,
+              "passed": run.passed,
+              "failed": run.failed,
+              "metrics": run.metrics,
+              "notes": run.notes,
+              "created_at": run.created_at.isoformat(),
+          }
+          print(json.dumps(payload, default=str))
+          ' > ops/annotator_agent/transcripts/run_metrics.json
+          echo '--- run_metrics.json ---'
+          cat ops/annotator_agent/transcripts/run_metrics.json
+
+      - name: Upload transcripts + screenshot + metrics
         if: ${{ inputs.mode == 'full' && always() }}
         uses: actions/upload-artifact@v4
         with:
           name: annotator-transcripts
           path: ops/annotator_agent/transcripts/
           if-no-files-found: warn
+
+      # Render the headline metrics inline in the workflow run page
+      # so a human can read pass-rate + categories without downloading
+      # the artifact.
+      - name: FULL — render run summary
+        if: ${{ inputs.mode == 'full' && success() }}
+        run: |
+          python <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          src = pathlib.Path("ops/annotator_agent/transcripts/run_metrics.json")
+          if not src.exists():
+              print("_No run_metrics.json — agent never produced a run._")
+              raise SystemExit(0)
+          data = json.loads(src.read_text())
+          metrics = data.get("metrics") or {}
+          overall = metrics.get("overall") or {}
+          slices = metrics.get("slices") or {}
+          fc = metrics.get("failure_categories") or {}
+
+          def fmt(n):
+              return "—" if n is None else f"{n:.3f}"
+
+          print("# Annotator agent run")
+          print()
+          print(f"**Run #{data['run_id']}** — variant `{data['system_variant']}`, "
+                f"annotator `{data['annotator_role']}`")
+          print()
+          print(f"- **Pass rate**: `{fmt(overall.get('pass_rate'))}` "
+                f"({data['passed']}/{data['total_items']})")
+          print(f"- **Failed**: {data['failed']}")
+          print()
+          if fc:
+              print("## Failure categories")
+              print()
+              print("| Category | Count |")
+              print("|---|---|")
+              for cat, n in sorted(fc.items(), key=lambda kv: -kv[1]):
+                  print(f"| `{cat}` | {n} |")
+              print()
+          for slice_name, buckets in slices.items():
+              if not buckets:
+                  continue
+              print(f"## Slice — {slice_name}")
+              print()
+              print("| Bucket | Pass | Total | Rate |")
+              print("|---|---|---|---|")
+              for name, stats in sorted(buckets.items()):
+                  print(f"| `{name}` | {stats.get('passed', 0)} | "
+                        f"{stats.get('total', 0)} | "
+                        f"{fmt(stats.get('pass_rate'))} |")
+              print()
+          screenshot = pathlib.Path("ops/annotator_agent/transcripts/run-detail.png")
+          if screenshot.exists():
+              size_kb = screenshot.stat().st_size // 1024
+              print(f"📸 Screenshot of run-detail page captured "
+                    f"({size_kb} KB) — see the **annotator-transcripts** "
+                    f"artifact below.")
+          else:
+              print("_Screenshot not captured (agent didn't take one)._")
+          PY
+
+      # ----- Trend tracking via git history --------------------------
+      # Append a JSONL line to a separate `metrics-history` branch so
+      # successive runs build a queryable history without touching main
+      # (no Azure deploy fires from this push).
+      #
+      # On first run, the branch doesn't exist yet — we create it as an
+      # orphan with just the metrics file in it.
+      - name: FULL — append to metrics-history branch
+        if: ${{ inputs.mode == 'full' && success() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          # Compose the JSONL line from the extracted run_metrics.json
+          # plus contextual fields the workflow knows about.
+          python <<'PY' > /tmp/metrics_line.json
+          import json, os, datetime, pathlib
+          src = pathlib.Path("ops/annotator_agent/transcripts/run_metrics.json")
+          data = json.loads(src.read_text())
+          metrics = data.get("metrics") or {}
+          line = {
+              "ts": datetime.datetime.utcnow().isoformat() + "Z",
+              "sha": os.environ.get("GITHUB_SHA", "")[:12],
+              "workflow_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+              "trigger_actor": os.environ.get("GITHUB_TRIGGERING_ACTOR", ""),
+              "persona": os.environ.get("PERSONA", ""),
+              "max_items": int(os.environ.get("MAX_ITEMS", "0") or 0),
+              "annotator_role": data.get("annotator_role"),
+              "total": data.get("total_items"),
+              "passed": data.get("passed"),
+              "failed": data.get("failed"),
+              "pass_rate": (metrics.get("overall") or {}).get("pass_rate"),
+              "by_subject": (metrics.get("slices") or {}).get("by_subject"),
+              "by_stratum": (metrics.get("slices") or {}).get("by_stratum"),
+              "by_eval_layer": (metrics.get("slices") or {}).get("by_eval_layer"),
+              "failure_categories": metrics.get("failure_categories"),
+          }
+          print(json.dumps(line, default=str))
+          PY
+          echo '--- metrics line ---'
+          cat /tmp/metrics_line.json
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Try to fetch existing metrics-history branch; create as
+          # orphan on first run.
+          if git ls-remote --exit-code --heads origin "$METRICS_BRANCH" >/dev/null 2>&1; then
+            echo "Branch $METRICS_BRANCH exists — fetching"
+            git fetch origin "$METRICS_BRANCH"
+            git switch "$METRICS_BRANCH"
+          else
+            echo "Branch $METRICS_BRANCH not found — creating orphan"
+            git switch --orphan "$METRICS_BRANCH"
+            # Wipe inherited tree so the branch is metrics-only.
+            git rm -rf . > /dev/null 2>&1 || true
+            cat > README.md <<'EOF'
+          # Annotator agent metrics history
+
+          One JSONL line per workflow run. See `metrics_history.jsonl`.
+          Auto-populated by `.github/workflows/annotator_agent.yml`.
+          EOF
+            git add README.md
+          fi
+
+          touch "$METRICS_FILE"
+          cat /tmp/metrics_line.json >> "$METRICS_FILE"
+          git add "$METRICS_FILE"
+          git commit -m "metrics: run ${GITHUB_RUN_ID} (sha ${GITHUB_SHA:0:12}, persona ${PERSONA})"
+          git push origin "$METRICS_BRANCH"
+        env:
+          PERSONA: ${{ inputs.persona }}
+          MAX_ITEMS: ${{ inputs.max_items }}
 
       - name: Tear down
         if: ${{ always() }}

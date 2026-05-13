@@ -125,11 +125,18 @@ honours this as a query string and tags your annotation under the \
 `{ANNOTATOR_ROLE}` cohort instead of the human cohort. The save-and-\
 next redirect carries the override forward automatically.
 
-When you finish annotating (or hit the cap), navigate to \
-{base_url}/dashboard/benchmark/scores/, set the notes field to \
-something like 'agent run @ <commit>', click 'Score now', and read \
-the pass rate from the next page. End your run by reporting that \
-number to the user."""
+When you finish annotating (or hit the cap):
+  1. Navigate to {base_url}/dashboard/benchmark/scores/
+  2. Set the notes field to 'agent run' (or include a commit SHA if \
+provided)
+  3. Click 'Score now'
+  4. The page redirects to the run-detail view — wait for it to load.
+  5. **Take a full-page screenshot** by calling the `take_screenshot` \
+tool with `filePath='/agent/ops/annotator_agent/transcripts/run-detail.png'` \
+and `fullPage=true`. This screenshot is attached to the workflow run \
+report so a human can eyeball the rendered metrics.
+  6. Read the pass rate + failure-category counts off the rendered \
+page and report them as your final message."""
     return static + runtime
 
 
