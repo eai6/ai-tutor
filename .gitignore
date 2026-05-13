@@ -23,3 +23,5 @@ design/LOCAL_TESTING_GUIDE.md
 
 # Local research / external datasets (kept out of git)
 research/
+# Annotator-agent run transcripts — large JSONL audit trails, regenerable
+ops/annotator_agent/transcripts/
