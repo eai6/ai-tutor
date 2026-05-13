@@ -1,12 +1,13 @@
-"""Tests for P5 — EO-aware bank sampling + remediation re-quiz queue.
+"""Tests for P5 — EO-aware bank sampling.
 
 Covers:
   - compute_student_eo_competency: latest attempt wins per EO,
     mastered/failed/unattempted classification
   - sample_session_pool with student=...: biases the draw toward
     failed > unattempted > mastered EOs
-  - build_remediation_requiz_queue: 2 fresh questions per failed EO,
-    excludes walked questions, falls back when fresh pool empty
+
+The remediation re-quiz (build_remediation_requiz_queue) was removed
+2026-05-12 — walkthrough hands off straight to a fresh exit ticket.
 """
 
 from django.test import TestCase
@@ -16,7 +17,6 @@ from apps.tutoring.question_bank import (
     EO_WEIGHT_FAILED,
     EO_WEIGHT_MASTERED,
     EO_WEIGHT_UNATTEMPTED,
-    build_remediation_requiz_queue,
     compute_student_eo_competency,
     sample_session_pool,
 )
@@ -182,102 +182,6 @@ class SampleSessionPoolWeightingTest(BaseTutoringTestCase):
         ).count()
         self.assertEqual(len(big_pool), bank_count)
 
-
-class BuildRemediationRequizQueueTest(BaseTutoringTestCase):
-    """The re-quiz queue is what closes the loop — it must give every
-    failed EO a fresh shot at promotion. Locked decision: 2 questions
-    per EO, drawn with VARIETY so retakes see different items."""
-
-    def setUp(self):
-        super().setUp()
-        self.exit_ticket.is_published = True
-        self.exit_ticket.save()
-        # 4 published questions for EO A, 4 for EO B
-        self.eo_a_qs = [
-            ExitTicketQuestion.objects.create(
-                exit_ticket=self.exit_ticket,
-                question_text=f'A Q{i}',
-                enabling_objective='EO A',
-                correct_answer='A',
-                order_index=200 + i,
-            ) for i in range(4)
-        ]
-        self.eo_b_qs = [
-            ExitTicketQuestion.objects.create(
-                exit_ticket=self.exit_ticket,
-                question_text=f'B Q{i}',
-                enabling_objective='EO B',
-                correct_answer='A',
-                order_index=210 + i,
-            ) for i in range(4)
-        ]
-
-    def test_two_per_eo_default(self):
-        queue = build_remediation_requiz_queue(
-            self.lesson, failed_eos=['EO A', 'EO B'],
-            seed=1,
-        )
-        self.assertEqual(len(queue), 4)  # 2 per EO * 2 EOs
-        eos = [(q.enabling_objective or '') for q in queue]
-        # Order: all EO A first, then EO B (caller passes lesson order)
-        self.assertEqual(eos, ['EO A', 'EO A', 'EO B', 'EO B'])
-
-    def test_excludes_walked_questions(self):
-        """Walked questions must NOT reappear in re-quiz when fresh
-        ones are available — the user explicitly asked for variety."""
-        walked = [self.eo_a_qs[0].id, self.eo_a_qs[1].id]
-        queue = build_remediation_requiz_queue(
-            self.lesson, failed_eos=['EO A'],
-            walkthrough_question_ids=walked, seed=1,
-        )
-        chosen_ids = {q.id for q in queue}
-        self.assertEqual(chosen_ids & set(walked), set())
-
-    def test_falls_back_to_walked_when_no_fresh_left(self):
-        """Two walked, two fresh — but if we ask for 3, the fallback
-        SHOULD pull the walked ones rather than dropping the EO. Failed
-        EO coverage matters more than freshness (per locked decision)."""
-        walked = [q.id for q in self.eo_a_qs]  # all 4 walked
-        queue = build_remediation_requiz_queue(
-            self.lesson, failed_eos=['EO A'],
-            walkthrough_question_ids=walked, seed=1, per_eo=2,
-        )
-        self.assertEqual(len(queue), 2)  # falls back to walked
-
-    def test_variety_across_seeds(self):
-        """Different seeds → different picks. Verifies the random.sample
-        actually shuffles — the user wants variety across retakes."""
-        s1 = build_remediation_requiz_queue(
-            self.lesson, failed_eos=['EO A'], seed=1, per_eo=2,
-        )
-        s2 = build_remediation_requiz_queue(
-            self.lesson, failed_eos=['EO A'], seed=999, per_eo=2,
-        )
-        # Possible (but unlikely) for two seeds to coincide on the same
-        # 2-of-4 pick. Run a third to make the test robust.
-        s3 = build_remediation_requiz_queue(
-            self.lesson, failed_eos=['EO A'], seed=12345, per_eo=2,
-        )
-        ids1 = tuple(sorted(q.id for q in s1))
-        ids2 = tuple(sorted(q.id for q in s2))
-        ids3 = tuple(sorted(q.id for q in s3))
-        self.assertGreaterEqual(len({ids1, ids2, ids3}), 2)
-
-    def test_empty_failed_eos_returns_empty(self):
-        queue = build_remediation_requiz_queue(
-            self.lesson, failed_eos=[], seed=1,
-        )
-        self.assertEqual(queue, [])
-
-    def test_unknown_eo_skipped(self):
-        """An EO with no published bank questions just gets skipped —
-        it doesn't crash, doesn't pollute other EOs' picks."""
-        queue = build_remediation_requiz_queue(
-            self.lesson, failed_eos=['EO A', 'No-Such-EO'],
-            seed=1,
-        )
-        self.assertEqual(len(queue), 2)  # only EO A contributes
-        self.assertTrue(all(q.enabling_objective == 'EO A' for q in queue))
 
 
 class WeightConstantsTest(TestCase):

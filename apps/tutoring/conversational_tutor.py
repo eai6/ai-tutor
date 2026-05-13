@@ -627,6 +627,61 @@ _LEAD_IN_QUESTION_VERB_RE = re.compile(
 )
 
 
+# Probe patterns — sentences that ask the student to explain HOW they
+# got a correct answer. These are banned on correct-answer turns per
+# pilot directive 2026-05-12 ("the system should just move on when a
+# correct answer is provided"). Server-side backstop: even if the
+# system prompt + eval-signal block fail to keep the LLM in line, we
+# strip these sentences out before the response reaches the student.
+_PROBE_SENTENCE_RE = re.compile(
+    r"(?:^|(?<=[.\n!?]))\s*"
+    r"(?:"
+    r"how\s+did\s+you\s+(?:get|approach|solve|work|figure|arrive|find|decide|know|choose|pick|determine|set\s+up|come\s+up)|"
+    r"how\s+do\s+you\s+(?:know|see|think\s+about|approach|decide|choose|determine|set\s+up)|"
+    r"what\s+(?:equation|method|approach|strategy|operation|step)\s+did\s+you|"
+    r"what\s+(?:made|let|told|helped)\s+you\s+(?:decide|choose|pick|know|see)|"
+    r"why\s+did\s+you\s+(?:choose|pick|decide|divide|multiply|add|subtract|use)|"
+    r"what\s+was\s+your\s+(?:reasoning|approach|thinking|process|first\s+step|method|strategy)|"
+    r"what(?:'s|\s+is)\s+your\s+(?:reasoning|approach|thinking|method|strategy)|"
+    r"walk\s+me\s+through\s+(?:your|how|the\s+steps)|"
+    r"can\s+you\s+(?:walk|explain|show)\s+(?:me\s+)?(?:through\s+)?(?:your|how)|"
+    r"talk\s+me\s+through|"
+    r"explain\s+(?:your|how\s+you)\s+(?:reasoning|thinking|got|approached|solved|decided)|"
+    r"tell\s+me\s+(?:how|why|your\s+reasoning)"
+    r")"
+    # Consume up to the sentence-ending punctuation but NOT the
+    # trailing whitespace — otherwise the next sentence's lookbehind
+    # sees a space instead of the prior `.` / `!` / `?` and a second
+    # consecutive probe is missed. Whitespace is normalized in the
+    # post-pass below.
+    r"[^.!?\n]*[.!?]",
+    re.IGNORECASE,
+)
+
+
+def _strip_probe_sentences(content: str) -> Tuple[str, int]:
+    """Remove reasoning-probe sentences from a tutor response.
+
+    Returns ``(stripped_content, n_removed)``. Used only when the
+    student's last answer was CORRECT — probing on correct answers
+    is banned (pilot directive 2026-05-12).
+    """
+    if not content:
+        return content, 0
+    n = 0
+
+    def _sub(_m):
+        nonlocal n
+        n += 1
+        return ' '
+    new_content = _PROBE_SENTENCE_RE.sub(_sub, content)
+    # Collapse the double spaces / orphan blank lines the substitution leaves.
+    new_content = re.sub(r'[ \t]{2,}', ' ', new_content)
+    new_content = re.sub(r'\n[ \t]+', '\n', new_content)
+    new_content = re.sub(r'\n{3,}', '\n\n', new_content)
+    return new_content.strip(), n
+
+
 def _looks_like_authored_question(lead_in: str) -> bool:
     """Heuristic: does the lead_in carry an authored question / numeric
     setup the LLM should have left to the BANK slot?
@@ -2247,6 +2302,29 @@ Keep it to 2-3 sentences."""
         if validation.issues:
             turn_metadata['validator_issues'] = list(validation.issues)
             turn_metadata['validator_passed'] = validation.passed
+
+        # Probe-strip on correct answers (pilot directive 2026-05-12):
+        # never probe ("how did you solve…") when the student got the
+        # question right. System prompt + eval-signal try to prevent
+        # this at generation time; this is the server-side backstop.
+        bank_grade = getattr(self, '_pending_bank_grade', None)
+        bank_correct = bank_grade is not None and bank_grade.is_correct is True
+        math_correct = (
+            turn_math_check is not None
+            and turn_math_check.is_correct is True
+        )
+        if bank_correct or math_correct:
+            stripped, n_probes = _strip_probe_sentences(clean_response)
+            if n_probes > 0:
+                clean_response = stripped
+                turn_metadata['probe_stripped_count'] = n_probes
+                logger.info(
+                    "[ProbeStrip] removed %d probe sentence(s) on correct "
+                    "answer session=%s step=%s source=%s",
+                    n_probes, self.session.id, self.current_topic_index,
+                    'bank' if bank_correct else 'math',
+                )
+
         # Always attach fact-check + rule-check metadata so the teacher
         # dashboard can show it even on clean turns.
         for k in (
@@ -2441,6 +2519,15 @@ Keep it to 2-3 sentences."""
         clean_response = self._maybe_advance_walkthrough(
             clean_response, turn_metadata,
         )
+        # If the walkthrough just finished, _finish_remediation flipped
+        # session_state → EXIT_TICKET. Hand off to a FRESH exit ticket
+        # on this same turn (requiz phase was removed 2026-05-12).
+        if (self.session_state == SessionState.EXIT_TICKET
+                and not getattr(self, 'is_remediation', False)):
+            self._save_state()
+            self._save_turn("tutor", clean_response, metadata=turn_metadata)
+            self.conversation.append({"role": "assistant", "content": clean_response})
+            return self._handle_exit_ticket()
 
         # Persist any attached figure URL on turn_metadata so the
         # teacher chat-history template can render the image inline
@@ -2653,6 +2740,29 @@ Keep it to 2-3 sentences."""
         if validation.issues:
             turn_metadata['validator_issues'] = list(validation.issues)
             turn_metadata['validator_passed'] = validation.passed
+
+        # Probe-strip on correct answers (pilot directive 2026-05-12):
+        # the system must NOT probe ("how did you solve…") when the
+        # student answered correctly. The eval-signal block + system
+        # prompt principles try to suppress this at generation time;
+        # this is the server-side backstop for when the LLM slips.
+        bank_grade = getattr(self, '_pending_bank_grade', None)
+        bank_correct = bank_grade is not None and bank_grade.is_correct is True
+        math_correct = (
+            turn_math_check is not None
+            and turn_math_check.is_correct is True
+        )
+        if bank_correct or math_correct:
+            stripped, n_probes = _strip_probe_sentences(clean_content)
+            if n_probes > 0:
+                clean_content = stripped
+                turn_metadata['probe_stripped_count'] = n_probes
+                logger.info(
+                    "[ProbeStrip] removed %d probe sentence(s) on correct "
+                    "answer session=%s step=%s source=%s",
+                    n_probes, self.session.id, self.current_topic_index,
+                    'bank' if bank_correct else 'math',
+                )
         for k in (
             'factual_claims_checked', 'factual_claims_unverified',
             'factual_claims_contradicted', 'fact_check_skipped',
@@ -8930,19 +9040,12 @@ Which concept numbers were meaningfully covered?"""
     def _maybe_advance_walkthrough(
         self, clean_response: str, turn_metadata: Dict,
     ) -> str:
-        """Drive the EO-driven remediation flow forward (P4 + P5).
+        """Drive the remediation walkthrough forward.
 
-        Two phases live here:
-          - ``walkthrough`` — replay every failed exit-ticket question.
-          - ``requiz`` — fresh questions per failed EO drawn by
-            weighted sampling, used to PROMOTE EOs back to mastered.
-
-        Each call: if the student just answered the previously-posed
-        bank question (``_pending_bank_grade`` was set this turn),
-        advance the active queue. When the walkthrough ends we build
-        the re-quiz queue and pose its first question. When the re-quiz
-        ends we promote any EO that scored 100% on its re-quiz, then
-        append a closing summary.
+        On each turn: if the student just answered the previously-posed
+        bank question (``_pending_bank_grade`` is set), advance the
+        walkthrough queue. When the walkthrough ends, hand off to a
+        FRESH exit ticket (requiz phase was removed 2026-05-12).
 
         ``turn_metadata['bank_question_ref']`` is set whenever a new
         question is posed so the next student turn grades against it.
@@ -8951,16 +9054,18 @@ Which concept numbers were meaningfully covered?"""
             return clean_response
         state = self.session.engine_state or {}
         phase = state.get('remediation_phase')
+        # 'walkthrough' is the only active phase. 'requiz' may appear
+        # on legacy in-flight sessions from before the requiz removal
+        # — drain them straight through _finish_remediation.
         if phase not in ('walkthrough', 'requiz'):
             return clean_response
         bank_grade = getattr(self, '_pending_bank_grade', None)
         if bank_grade is None or bank_grade.is_correct is None:
             return clean_response
 
-        # If we're in re-quiz, record the per-EO outcome BEFORE advancing
-        # so a later "promote to mastered" check has the data.
         if phase == 'requiz':
-            self._record_requiz_result(state, bank_grade.is_correct)
+            # Legacy session: drop straight to the fresh exit ticket.
+            return self._finish_remediation(state, clean_response)
 
         if phase == 'walkthrough':
             queue = list(state.get('remediation_walkthrough_queue') or [])
@@ -9006,23 +9111,21 @@ Which concept numbers were meaningfully covered?"""
             state['walkthrough_attempts_on_current'] = 0
 
             if idx >= len(queue):
-                # Walkthrough complete — start the re-quiz.
-                return self._begin_requiz(state, clean_response, turn_metadata)
+                # Walkthrough complete — hand off straight to a FRESH
+                # exit ticket. The requiz phase was removed per pilot
+                # 2026-05-12 ("remove the requiz from the remediation.
+                # It is actually too long, so let us just focus on what
+                # the students got wrong and go back to the exit ticket
+                # after the questions have been walked through").
+                return self._finish_remediation(state, clean_response)
             return self._pose_next_remediation_question(
                 state, queue, idx, label='Question',
                 clean_response=clean_response, turn_metadata=turn_metadata,
             )
 
-        # phase == 'requiz'
-        queue = list(state.get('remediation_requiz_queue') or [])
-        idx = state.get('remediation_requiz_index', 0) + 1
-        state['remediation_requiz_index'] = idx
-        if idx >= len(queue):
-            return self._finish_remediation(state, clean_response)
-        return self._pose_next_remediation_question(
-            state, queue, idx, label='Re-quiz',
-            clean_response=clean_response, turn_metadata=turn_metadata,
-        )
+        # Defensive: legacy sessions may have phase == 'requiz' from
+        # before the requiz removal (2026-05-12). Treat as done.
+        return self._finish_remediation(state, clean_response)
 
     def _build_walkthrough_hint_block(self) -> str:
         """A.4 (2026-05-08): when the student is mid-walkthrough and
@@ -9095,134 +9198,52 @@ Which concept numbers were meaningfully covered?"""
             + rendered
         )
 
-    def _record_requiz_result(self, state: Dict, is_correct: bool) -> None:
-        """Tally the previous re-quiz question's verdict per EO so the
-        end-of-requiz pass can promote EOs that scored 100%."""
-        idx = state.get('remediation_requiz_index', 0)
-        queue = list(state.get('remediation_requiz_queue') or [])
-        if not (0 <= idx < len(queue)):
-            return
-        eo = (queue[idx].get('eo') or '').strip()
-        if not eo:
-            return
-        results = state.setdefault('remediation_requiz_results', {})
-        bucket = results.setdefault(eo, {'asked': 0, 'correct': 0})
-        bucket['asked'] += 1
-        if is_correct:
-            bucket['correct'] += 1
-
-    def _begin_requiz(
-        self,
-        state: Dict,
-        clean_response: str,
-        turn_metadata: Dict,
-    ) -> str:
-        """Walkthrough finished — build the re-quiz queue (item 4
-        weighted sampling, 2 fresh questions per failed EO) and pose
-        the first one. Falls through to _finish_remediation when no
-        failed EOs need re-quizzing."""
-        from apps.tutoring.question_bank import build_remediation_requiz_queue
-        eo_competency = state.get('remediation_eo_competency') or {}
-        # Lesson-EO order so the re-quiz follows the same sequence as
-        # the walkthrough did. EOs not in the lesson list (drift) get
-        # appended at the end.
-        lesson_eos = list(self.lesson.enabling_objectives or [])
-        failed_eos = [
-            eo for eo in lesson_eos
-            if eo in eo_competency and not eo_competency[eo].get('is_mastered')
-        ]
-        for eo, b in eo_competency.items():
-            if eo not in failed_eos and not b.get('is_mastered'):
-                failed_eos.append(eo)
-
-        walked_ids = [
-            q.get('id') for q in
-            (state.get('remediation_walkthrough_queue') or [])
-            if q.get('id') is not None
-        ]
-        # Seed: session id + retry count → different sample each retake.
-        seed = (self.session.id or 0) + (
-            getattr(self, 'remediation_attempt', 0) * 1000
-        )
-        requiz_qs = build_remediation_requiz_queue(
-            self.lesson, failed_eos,
-            walkthrough_question_ids=walked_ids, seed=seed,
-        )
-        if not requiz_qs:
-            return self._finish_remediation(state, clean_response)
-
-        state['remediation_phase'] = 'requiz'
-        state['remediation_requiz_queue'] = [
-            {
-                'id': q.id,
-                'eo': (q.enabling_objective or q.concept_tag or '')[:200],
-            }
-            for q in requiz_qs
-        ]
-        state['remediation_requiz_index'] = 0
-        state['remediation_requiz_results'] = {}
-        self.session.engine_state = state
-
-        # Compose a hand-off message + first re-quiz question
-        intro = (
-            "\n\n**Walkthrough complete.** "
-            "Now let's see if those gaps are closed — I'll quiz you "
-            f"on {len(failed_eos)} weak objective"
-            f"{'s' if len(failed_eos) != 1 else ''} with fresh questions."
-        )
-        return self._pose_next_remediation_question(
-            state,
-            queue=state['remediation_requiz_queue'],
-            idx=0,
-            label='Re-quiz',
-            clean_response=clean_response.rstrip() + intro,
-            turn_metadata=turn_metadata,
-        )
-
     def _finish_remediation(self, state: Dict, clean_response: str) -> str:
-        """Re-quiz exhausted (or skipped) — promote EOs that scored
-        100% on re-quiz to mastered, transition phase=done, and
-        append a closing summary that names which EOs are now mastered
-        vs still need work."""
-        results = state.get('remediation_requiz_results') or {}
-        competency = state.get('remediation_eo_competency') or {}
-        promoted: List[str] = []
-        still_weak: List[str] = []
-        for eo, r in results.items():
-            asked = r.get('asked', 0)
-            correct = r.get('correct', 0)
-            if asked > 0 and correct == asked:
-                promoted.append(eo)
-                if eo in competency:
-                    competency[eo]['is_mastered'] = True
-            else:
-                still_weak.append(eo)
+        """Walkthrough done — hand off to a fresh exit ticket.
 
-        state['remediation_eo_competency'] = competency
+        Per pilot 2026-05-12, the requiz phase was removed. After the
+        student walks through every failed exit-ticket question, we go
+        straight back to the exit ticket with a FRESH question sample
+        (the sampler excludes any IDs already posed during tutoring +
+        the prior failed attempt) — the new attempt is the evaluation.
+
+        This method:
+          - Clears remediation engine_state keys
+          - Resamples the in-memory ``exit_ticket_concepts`` list
+          - Sets ``session_state = EXIT_TICKET`` + ``is_remediation = False``
+          - Returns a closing message + exit-ticket framing
+        """
+        # Clear remediation state.
         state['remediation_phase'] = 'done'
+        state.pop('remediation_walkthrough_queue', None)
+        state.pop('remediation_walkthrough_index', None)
+        state.pop('remediation_requiz_queue', None)
+        state.pop('remediation_requiz_index', None)
+        state.pop('remediation_requiz_results', None)
+        state.pop('walkthrough_attempts_on_current', None)
+        # Resample on retake: clear the previously-selected exit-ticket
+        # IDs + reset covered flags so the next attempt draws fresh
+        # questions from the bank.
+        state.pop('selected_exit_ticket_ids', None)
+        state['covered_concept_ids'] = []
         self.session.engine_state = state
+        # Rebuild the in-memory concept list from a fresh draw so
+        # the next _save_state() doesn't rewrite the stale IDs back
+        # into engine_state.
+        self.exit_ticket_concepts = self._load_exit_ticket_concepts()
+        # Transition out of remediation; caller picks up the EXIT_TICKET
+        # state and fires _handle_exit_ticket() on this same turn.
+        self.is_remediation = False
+        self.session_state = SessionState.EXIT_TICKET
 
-        lines = ["\n\n**Remediation complete.**"]
-        if promoted:
-            lines.append("Promoted to mastered:")
-            for eo in promoted:
-                lines.append(f"  ✓ {eo}")
-        if still_weak:
-            lines.append("Still needs work:")
-            for eo in still_weak:
-                lines.append(f"  ✗ {eo}")
-        if not promoted and not still_weak:
-            # Re-quiz was skipped (no failed EOs) — keep the wrap brief
-            lines = [
-                "\n\n**Walkthrough complete.** When you're ready, "
-                "take the exit ticket again."
-            ]
-        else:
-            lines.append(
-                "When you're ready, take the exit ticket again — "
-                "you'll see fresh questions on these same objectives."
-            )
-        return clean_response.rstrip() + "\n" + "\n".join(lines)
+        closing = (
+            "\n\n---\n"
+            "✅ **Review complete.** You've walked through every "
+            "question you missed.\n\n"
+            "📋 **Fresh exit ticket coming up** — these are NEW "
+            "questions on the same topics, so we can see what stuck."
+        )
+        return clean_response.rstrip() + closing
     
     # =========================================================================
     # HELPERS

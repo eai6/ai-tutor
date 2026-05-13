@@ -313,62 +313,6 @@ def pick_published_for_concept_tag(
     return matches
 
 
-def build_remediation_requiz_queue(
-    lesson,
-    failed_eos: List[str],
-    walkthrough_question_ids: Optional[List[int]] = None,
-    seed: int = 0,
-    per_eo: int = 2,
-) -> List:
-    """Build the post-walkthrough re-quiz queue (P5).
-
-    For each failed EO (in lesson-EO order — caller controls ordering),
-    pick ``per_eo`` fresh published-bank questions tagged to that EO,
-    excluding any the student has already walked through. Within each
-    EO, the pick is randomised by ``seed`` so retakes draw a different
-    sample each time — gives the student a VARIETY of questions per EO
-    across attempts (per the explicit user requirement).
-
-    Falls back to walked questions when no fresh ones exist for an EO,
-    rather than skipping the EO entirely. The re-quiz must consistently
-    cover every failed EO.
-
-    Returns a flat list of ``ExitTicketQuestion`` rows in EO-then-pick
-    order (all EO-1 picks, then all EO-2 picks, ...). Empty list when
-    no failed EOs supplied.
-    """
-    from django.db.models import Q
-    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
-    if not failed_eos:
-        return []
-    rng = random.Random(seed)
-    walked = set(walkthrough_question_ids or [])
-    queue: List = []
-    seen: set = set()
-    for eo in failed_eos:
-        eo_key = (eo or '').strip()
-        if not eo_key:
-            continue
-        base = ExitTicketQuestion.objects.filter(
-            exit_ticket__lesson=lesson,
-            exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
-        ).filter(
-            Q(enabling_objective=eo_key) | Q(concept_tag=eo_key),
-        )
-        fresh = [q for q in base if q.id not in walked and q.id not in seen]
-        if not fresh:
-            # Allow re-using walked questions before skipping the EO —
-            # consistent EO coverage matters more than freshness.
-            fresh = [q for q in base if q.id not in seen]
-        if not fresh:
-            continue
-        chosen = rng.sample(fresh, min(per_eo, len(fresh)))
-        for q in chosen:
-            queue.append(q)
-            seen.add(q.id)
-    return queue
-
-
 def render_bank_block(
     step,
     candidates: List,

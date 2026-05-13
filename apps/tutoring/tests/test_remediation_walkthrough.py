@@ -170,13 +170,16 @@ class RemediationOpeningMetadataTest(TestCase):
         )
         fake_q = MagicMock(id=42, question_type='mcq')
         fake_q.option_a = 'A'  # rendering hits real attrs
+        fake_q.question_text = 'Sample failed question'
+        # The new opener calls .filter(id__in=queue_ids) and iterates
+        # the result into a dict — mock filter to be iterable.
         with patch(
-            'apps.tutoring.models.ExitTicketQuestion.objects.filter'
-        ) as mock_filter, patch(
+            'apps.tutoring.models.ExitTicketQuestion.objects.filter',
+            return_value=[fake_q],
+        ), patch(
             'apps.tutoring.question_bank.render_question_to_prose',
             return_value='Q rendered text',
         ):
-            mock_filter.return_value.first.return_value = fake_q
             message, metadata = t._generate_remediation_opening(
                 score=3, total=10, failed_questions=[],
             )
@@ -196,89 +199,53 @@ class RemediationOpeningMetadataTest(TestCase):
 
 
 class FinishRemediationTest(TestCase):
-    """When the re-quiz exhausts, EOs that scored 100% must be
-    promoted to mastered in the engine_state competency map. Without
-    promotion, the next session would re-flag those EOs as 'failed'
-    and weight them 5x in sampling — defeats the whole point."""
+    """The requiz phase was removed 2026-05-12 (pilot directive: "remove
+    the requiz from the remediation… go back to the exit ticket after
+    the questions have been walked through"). _finish_remediation now
+    hands off to a FRESH exit ticket instead of promoting EOs from
+    requiz results. EO mastery promotion belongs to the new exit ticket
+    attempt, not to a redundant in-session requiz."""
 
-    def _stub_tutor(self, results, competency):
+    def _stub_tutor(self):
         t = ConversationalTutor.__new__(ConversationalTutor)
         t.lesson = _StubLesson([])
         t.session = MagicMock()
         t.session.engine_state = {
-            'remediation_eo_competency': competency,
-            'remediation_requiz_results': results,
-            'remediation_phase': 'requiz',
+            'remediation_phase': 'walkthrough',
+            'remediation_walkthrough_queue': [{'id': 1}],
+            'remediation_walkthrough_index': 1,
+            'selected_exit_ticket_ids': [10, 11],
         }
+        t.is_remediation = True
+        t.session_state = MagicMock()  # set by _finish_remediation
+        t._load_exit_ticket_concepts = MagicMock(return_value=[])
         return t
 
-    def test_promotes_eo_with_100_percent_correct(self):
-        t = self._stub_tutor(
-            results={'EO X': {'asked': 2, 'correct': 2}},
-            competency={'EO X': {'is_mastered': False, 'asked': 2, 'correct': 0}},
+    def test_clears_remediation_state(self):
+        t = self._stub_tutor()
+        t._finish_remediation(
+            t.session.engine_state, clean_response='OK.',
         )
+        state = t.session.engine_state
+        self.assertEqual(state['remediation_phase'], 'done')
+        self.assertNotIn('remediation_walkthrough_queue', state)
+        self.assertNotIn('selected_exit_ticket_ids', state)
+
+    def test_flips_to_exit_ticket_state(self):
+        from apps.tutoring.conversational_tutor import SessionState
+        t = self._stub_tutor()
+        t._finish_remediation(
+            t.session.engine_state, clean_response='OK.',
+        )
+        self.assertEqual(t.session_state, SessionState.EXIT_TICKET)
+        self.assertFalse(t.is_remediation)
+
+    def test_closing_message_signals_fresh_exit_ticket(self):
+        t = self._stub_tutor()
         out = t._finish_remediation(
             t.session.engine_state, clean_response='OK.',
         )
-        comp = t.session.engine_state['remediation_eo_competency']
-        self.assertTrue(comp['EO X']['is_mastered'])
-        self.assertIn('Promoted to mastered', out)
-        self.assertIn('EO X', out)
-
-    def test_does_not_promote_eo_with_partial_score(self):
-        t = self._stub_tutor(
-            results={'EO X': {'asked': 2, 'correct': 1}},
-            competency={'EO X': {'is_mastered': False, 'asked': 2, 'correct': 0}},
-        )
-        out = t._finish_remediation(
-            t.session.engine_state, clean_response='OK.',
-        )
-        comp = t.session.engine_state['remediation_eo_competency']
-        self.assertFalse(comp['EO X']['is_mastered'])
-        self.assertIn('Still needs work', out)
-
-    def test_no_results_emits_brief_wrap(self):
-        """Re-quiz skipped (no failed EOs) → brief wrap, no
-        promoted/still-weak headings."""
-        t = self._stub_tutor(results={}, competency={})
-        out = t._finish_remediation(
-            t.session.engine_state, clean_response='OK.',
-        )
-        self.assertIn('Walkthrough complete', out)
-        self.assertNotIn('Promoted to mastered', out)
-        self.assertNotIn('Still needs work', out)
-        self.assertEqual(t.session.engine_state['remediation_phase'], 'done')
+        self.assertIn('Review complete', out)
+        self.assertIn('Fresh exit ticket', out)
 
 
-class RecordRequizResultTest(TestCase):
-    """Per-question verdict accumulation drives _finish_remediation's
-    promote check. Off-by-one or mis-keyed EO → wrong promotion."""
-
-    def _stub_tutor(self, queue, idx):
-        t = ConversationalTutor.__new__(ConversationalTutor)
-        t.session = MagicMock()
-        t.session.engine_state = {
-            'remediation_requiz_queue': queue,
-            'remediation_requiz_index': idx,
-        }
-        return t
-
-    def test_increments_correct(self):
-        t = self._stub_tutor([{'id': 1, 'eo': 'EO A'}], idx=0)
-        t._record_requiz_result(t.session.engine_state, is_correct=True)
-        bucket = t.session.engine_state['remediation_requiz_results']['EO A']
-        self.assertEqual(bucket, {'asked': 1, 'correct': 1})
-
-    def test_increments_incorrect(self):
-        t = self._stub_tutor([{'id': 1, 'eo': 'EO A'}], idx=0)
-        t._record_requiz_result(t.session.engine_state, is_correct=False)
-        bucket = t.session.engine_state['remediation_requiz_results']['EO A']
-        self.assertEqual(bucket, {'asked': 1, 'correct': 0})
-
-    def test_skips_when_idx_out_of_bounds(self):
-        t = self._stub_tutor([{'id': 1, 'eo': 'EO A'}], idx=5)
-        t._record_requiz_result(t.session.engine_state, is_correct=True)
-        # Nothing recorded — guard clause prevents out-of-bounds writes
-        self.assertEqual(
-            t.session.engine_state.get('remediation_requiz_results', {}), {},
-        )
