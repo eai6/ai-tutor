@@ -1,0 +1,19 @@
+# Local-dev overlay for ops/annotator_agent/docker-compose.yml.
+#
+# Mounts the host's db.sqlite3 + media/ into the django container so
+# annotations the agent creates show up immediately in the host's
+# `manage.py runserver` UI. Do NOT use in CI — ephemeral state is
+# the right default there.
+#
+# Usage:
+#     docker compose \
+#         -f ops/annotator_agent/docker-compose.yml \
+#         -f ops/annotator_agent/docker-compose.dev.yml \
+#         run --rm agent \
+#         python -m ops.annotator_agent.orchestrator \
+#             --base-url http://django:8000 --persona struggler --max-items 1
+services:
+  django:
+    volumes:
+      - ../../db.sqlite3:/app/db.sqlite3
+      - ../../media:/app/media:ro

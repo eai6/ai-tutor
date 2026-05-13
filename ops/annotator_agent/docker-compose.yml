@@ -32,11 +32,13 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-    volumes:
-      # Live-mount the SQLite DB so the agent's annotations show up in
-      # the host's runserver UI. Comment this out for ephemeral runs.
-      - ../../db.sqlite3:/app/db.sqlite3
-      - ../../media:/app/media:ro   # read-only — agent shouldn't write media
+    # No volume mounts in the base file — keeps CI runs fully ephemeral
+    # (fresh SQLite per workflow run, no shared state with the host).
+    # For local dev that wants to share state with the host's runserver,
+    # use the docker-compose.dev.yml overlay:
+    #     docker compose -f ops/annotator_agent/docker-compose.yml \
+    #                    -f ops/annotator_agent/docker-compose.dev.yml \
+    #                    up
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/admin/login/')"]

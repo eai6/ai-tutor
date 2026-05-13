@@ -35,7 +35,14 @@ COPY --from=builder /usr/local /usr/local
 COPY . .
 
 EXPOSE 8000
-# No collectstatic, no migrations beyond what's already in the volume-
-# mounted db.sqlite3. The compose file mounts ./db.sqlite3 from the
-# host so we keep the same data the local dev server uses.
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Boot sequence:
+#   migrate  — apply schema; safe-to-run on existing SQLite (idempotent)
+#              and creates a fresh DB if none exists (CI / ephemeral).
+#   runserver — Django dev server; we don't need gunicorn for the
+#               annotator's read/write traffic.
+#
+# In local dev, docker-compose.dev.yml mounts the host's db.sqlite3 over
+# this image's copy so annotations land in the same DB the host's
+# runserver UI reads. In CI no overlay is applied — DB is ephemeral
+# per workflow run.
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"]

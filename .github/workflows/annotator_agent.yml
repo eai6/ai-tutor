@@ -1,0 +1,186 @@
+name: Annotator Agent (manual)
+
+# Manually-triggered workflow that runs the LLM annotator agent against
+# an ephemeral Django+chromium stack inside the runner. The runner IS
+# the server: same code as Azure (built from ./Dockerfile.django for
+# this purpose) but the lifetime is one workflow run.
+#
+# Two modes via the `mode` input — start with `smoke`, then escalate:
+#
+#   smoke     — Build images, boot Django, list chrome-devtools-mcp
+#               tools from inside the agent container. NO Anthropic
+#               API calls, NO data seeding. ~3 min, ~$0 spend.
+#               Validates the load-bearing assumption: chromium runs
+#               inside the runner's Linux container.
+#
+#   full      — Build, boot, seed (one synthetic session via the
+#               simulator + sample 1 BenchmarkItem), then run the
+#               annotator agent for one item, then click "Score now"
+#               and dump the run summary. ~6-8 min, ~$1-2 Anthropic
+#               spend. Validates the full closed-loop pipeline.
+#
+# Required GitHub secrets:
+#   - ANTHROPIC_API_KEY   (full mode only — smoke mode skips it)
+#   - GOOGLE_API_KEY      (full mode only — student simulator uses Gemini)
+#
+# See memory/automated_annotator_agent_plan.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode: 'smoke' (cheap, no API) or 'full' (real agent)"
+        type: choice
+        required: true
+        default: smoke
+        options:
+          - smoke
+          - full
+      persona:
+        description: "Student persona key for the simulator (full mode)."
+        type: string
+        required: false
+        default: struggler
+      max_items:
+        description: "How many BenchmarkItems the agent should annotate (full mode)."
+        type: string
+        required: false
+        default: "1"
+      max_steps:
+        description: "Hard cap on agent loop iterations (full mode)."
+        type: string
+        required: false
+        default: "60"
+
+concurrency:
+  # One run at a time per branch — prevents two agents racing each
+  # other on the same image cache.
+  group: annotator-agent-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      COMPOSE_FILE: ops/annotator_agent/docker-compose.yml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The hosted Ubuntu runner ships with the Android SDK pre-
+      # installed (~14 GB). Mirrors deploy.yml — gives us breathing
+      # room for the Docker build layers (chromium ~ 200 MB,
+      # Python deps ~500 MB, plus base images).
+      - name: Free Android-SDK disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          df -h /
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build BOTH services so the agent can boot immediately after
+      # django is healthy. Buildkit cache is automatic via Buildx.
+      - name: Build images
+        run: |
+          docker compose -f "$COMPOSE_FILE" build django agent
+        env:
+          # Empty defaults so compose interpolation doesn't error
+          # before we know which mode we're in.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || '' }}
+
+      # ----- Smoke mode: prove the container shape ----------------
+      # No django boot needed. Just verify chromium + node + mcp run.
+      - name: SMOKE — chromium + chrome-mcp inside agent image
+        if: ${{ inputs.mode == 'smoke' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || '' }}
+        run: |
+          set -e
+          echo '--- chromium ---'
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps agent \
+            chromium --version
+          echo '--- node ---'
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps agent \
+            node --version
+          echo '--- chrome-devtools-mcp --help (first 6 lines) ---'
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps agent \
+            sh -c 'npx -y chrome-devtools-mcp@latest --help 2>&1 | head -6'
+          echo '--- python orchestrator imports ---'
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps agent \
+            python -c 'from ops.annotator_agent.orchestrator import run_agent; print("orchestrator imports OK")'
+
+      # ----- Full mode: real annotation loop ----------------------
+      - name: FULL — boot django
+        if: ${{ inputs.mode == 'full' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          set -e
+          docker compose -f "$COMPOSE_FILE" up -d django
+          echo 'Waiting for django healthcheck...'
+          for i in $(seq 1 60); do
+            STATUS=$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose -f $COMPOSE_FILE ps -q django)" 2>/dev/null || echo unknown)
+            echo "  attempt $i: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              break
+            fi
+            sleep 5
+          done
+          if [ "$STATUS" != "healthy" ]; then
+            echo "Django never became healthy. Logs:"
+            docker compose -f "$COMPOSE_FILE" logs django
+            exit 1
+          fi
+
+      # The ephemeral SQLite is empty after migrate. We need:
+      #   1) An admin user the agent can log in as
+      #   2) ≥1 BenchmarkItem the agent can annotate
+      # `seed_ci_fixture` creates a minimal item with realistic
+      # judge_outputs — no LLM calls, ~instant.
+      - name: FULL — seed admin user + 1 BenchmarkItem
+        if: ${{ inputs.mode == 'full' }}
+        run: |
+          set -e
+          docker compose -f "$COMPOSE_FILE" exec -T django python manage.py shell -c '
+          from django.contrib.auth.models import User
+          if not User.objects.filter(username="admin").exists():
+              u = User.objects.create_superuser("admin", "admin@local", "benchmark-temp-2026")
+              print(f"Created admin user (id={u.id})")
+          else:
+              print("admin user already exists")
+          '
+          docker compose -f "$COMPOSE_FILE" exec -T django \
+            python manage.py seed_ci_fixture
+
+      - name: FULL — run annotator agent
+        if: ${{ inputs.mode == 'full' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -e
+          docker compose -f "$COMPOSE_FILE" run --rm \
+            -e ANTHROPIC_API_KEY \
+            agent \
+            python -m ops.annotator_agent.orchestrator \
+              --base-url http://django:8000 \
+              --persona "${{ inputs.persona }}" \
+              --max-items "${{ inputs.max_items }}" \
+              --max-steps "${{ inputs.max_steps }}"
+
+      - name: Upload transcripts (full mode)
+        if: ${{ inputs.mode == 'full' && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: annotator-transcripts
+          path: ops/annotator_agent/transcripts/
+          if-no-files-found: warn
+
+      - name: Tear down
+        if: ${{ always() }}
+        run: |
+          docker compose -f "$COMPOSE_FILE" down -v --remove-orphans || true
