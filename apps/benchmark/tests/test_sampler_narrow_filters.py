@@ -110,3 +110,37 @@ class TimeWindowFilterTest(TestCase):
             since=anchor + timedelta(hours=1),
         ).count()
         self.assertEqual(n, 1)
+
+
+class SubjectFilterTest(TestCase):
+    """Pin the subject mapping. The earlier `subject='math'` filter
+    included an empty-string subject_type catchall that turned the
+    filter into a no-op for any course missing an explicit
+    classification. Now the math filter requires either
+    subject_type='math' OR a title-keyword match on uncategorised
+    courses; geography requires humanities OR a title match."""
+
+    def test_math_subject_filter_excludes_unrelated_uncategorised(self):
+        # Two uncategorised courses: one has 'math' in the title, one
+        # is a pure geography course with empty subject_type.
+        math_l = _make_lesson('Algebra Basics', subject='')
+        geog_l = _make_lesson('Maps of Africa', subject='')
+        _build_session(lesson=math_l)
+        _build_session(lesson=geog_l)
+        eligible = candidate_tutor_turns()
+        self.assertEqual(eligible.count(), 2)
+        # Math filter pulls the algebra course (title-keyword fallback)
+        # but NOT the maps course.
+        n = candidate_tutor_turns(subject='math').count()
+        self.assertEqual(n, 1)
+
+    def test_geography_subject_filter_matches_humanities_or_title(self):
+        humanities_l = _make_lesson('Intro to Civics', subject='humanities')
+        geography_l = _make_lesson('Geography of East Africa', subject='')
+        unrelated_l = _make_lesson('Algebra', subject='math')
+        _build_session(lesson=humanities_l)
+        _build_session(lesson=geography_l)
+        _build_session(lesson=unrelated_l)
+        n = candidate_tutor_turns(subject='geography').count()
+        # humanities (canonical) + title-match (fallback) = 2
+        self.assertEqual(n, 2)

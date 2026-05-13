@@ -268,11 +268,31 @@ def candidate_tutor_turns(*, subject: Optional[str] = None,
         qs = qs.filter(session__is_synthetic=False)
 
     if subject:
-        # Map back from benchmark subject → possible Course.subject_type values
+        # Map benchmark subject → Course.subject_type. Canonical values
+        # in the SubjectType enum are: math, science, humanities,
+        # language, other (geography is part of humanities — there's no
+        # separate enum value for it). For math + geography we ALSO
+        # include courses whose subject_type is blank but whose title
+        # carries the relevant keyword — this matches Course.is_math's
+        # title-fallback behavior at apps/curriculum/models.py:96 and
+        # rescues legacy / un-classified courses.
+        from django.db.models import Q as _Q
         if subject == 'math':
-            qs = qs.filter(session__lesson__unit__course__subject_type__in=['math', 'mathematics', ''])
+            qs = qs.filter(
+                _Q(session__lesson__unit__course__subject_type='math')
+                | (_Q(session__lesson__unit__course__subject_type='')
+                   & (
+                       _Q(session__lesson__unit__course__title__icontains='math')
+                       | _Q(session__lesson__unit__course__title__icontains='algebra')
+                       | _Q(session__lesson__unit__course__title__icontains='geometry')
+                       | _Q(session__lesson__unit__course__title__icontains='calculus')
+                   ))
+            )
         elif subject == 'geography':
-            qs = qs.filter(session__lesson__unit__course__subject_type__in=['humanities', 'geography'])
+            qs = qs.filter(
+                _Q(session__lesson__unit__course__subject_type='humanities')
+                | _Q(session__lesson__unit__course__title__icontains='geography')
+            )
         elif subject == 'science':
             qs = qs.filter(session__lesson__unit__course__subject_type='science')
 

@@ -135,6 +135,12 @@
 {% if failure_categories %}
 <div class="section">
     <h3>Failure categories</h3>
+    <p style="color:#6b7280;font-size:0.78rem;margin:0 0 0.5rem 0;">
+        {{ category_tag_total }} tag{{ category_tag_total|pluralize }}
+        across {{ failed_total }} failed item{{ failed_total|pluralize }}
+        — items can carry multiple tags, so the counts may sum to more
+        than the failed total.
+    </p>
     <div class="cat-list">
         {% for cat, count in failure_categories %}
         <div><strong>{{ cat }}</strong><span class="cat-count">{{ count }}</span></div>

@@ -567,17 +567,36 @@ def benchmark_run_detail(request, run_id: int):
     metrics = run.metrics or {}
 
     # Reshape slices for the template (sorted buckets per slice).
+    # Only by_subject is surfaced in the UI by default — by_stratum,
+    # by_eval_layer and by_history are kept in metrics JSON for
+    # programmatic access but hidden because they're noisy / mostly-
+    # uniform on the current data shape.
+    VISIBLE_SLICES = ('by_subject',)
     slices = []
     for slice_name, buckets in (metrics.get('slices') or {}).items():
+        if slice_name not in VISIBLE_SLICES:
+            continue
         rows = [
             {'bucket': name, **stats}
             for name, stats in sorted(buckets.items())
         ]
         slices.append({'name': slice_name, 'rows': rows})
 
-    failure_categories = list(
+    # Failure-category counts. Note: an annotation can carry MULTIPLE
+    # categories (multi-select), so the counter sums to MORE than
+    # `failed`. We surface the totals on the page so the relationship
+    # is explicit. Filter out empty / non-positive counts defensively
+    # so a malformed entry can't render as a label-with-no-number.
+    raw_categories = list(
         (metrics.get('failure_categories') or {}).items()
     )
+    failure_categories = [
+        (cat, int(count))
+        for cat, count in raw_categories
+        if cat and isinstance(count, (int, float)) and count > 0
+    ]
+    failed_total = (metrics.get('overall') or {}).get('failed', 0)
+    category_tag_total = sum(c for _, c in failure_categories)
 
     return render(request, 'benchmark/run_detail.html', {
         'run': run,
@@ -585,5 +604,7 @@ def benchmark_run_detail(request, run_id: int):
         'overall': metrics.get('overall') or {},
         'slices': slices,
         'failure_categories': failure_categories,
+        'failed_total': failed_total,
+        'category_tag_total': category_tag_total,
         'agreement': metrics.get('agreement'),
     })
