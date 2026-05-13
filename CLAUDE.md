@@ -97,6 +97,12 @@ Auto-memory at `~/.claude/projects/-Users-edwardamoah-Documents-GitHub-ai-tutor/
 - Migrations: one logical change per file; descriptive names (`0014_add_session_participant.py`).
 - Tests: pytest, `tests/test_<feature>.py` per feature. Factory fixtures in `apps/<app>/tests/factories.py` when they exist.
 - Commits: descriptive subject, body for the "why". Don't reference tasks/issues in code comments — they rot.
+- **Memory ↔ commit cross-citations.** Git history and memory files are two persistence layers that work better when bidirectionally linked. Convention:
+  - **Commit body → memory**: end the body with `Refs:` listing every memory file the commit implements, responds to, or invalidates. Repo memory is `memory/<name>.md`; auto-memory is `auto-memory/<name>.md` (use that prefix even though the path resolves elsewhere — it's a stable label). Multiple files comma-separated.
+  - **Memory body → commit**: when writing/updating a memory file that ties to a single concrete change, end the body with `Commit: <sha>` so `git show <sha>` rehydrates the work.
+  - **Why**: git history is immutable, ordered, queryable; memory is semantic and cross-cutting. With bidirectional links, `git log --grep=feedback_probe_strip` finds every change tied to a learning, and any memory entry can jump to the introducing commit. Future Claude bootstraps faster.
+  - **Skip when**: trivial commits (typos, whitespace) need no `Refs`. Architectural plans and project briefs that span many commits skip `Commit:` — those are living docs, not change-bound.
+  - **Bootstrap recipe** (session start, when memory feels stale): `git log --oneline -20` for recent activity; `git log --grep=memory/` to surface commits that touched the memory layer; `git show <sha>` on any cited commit.
 - `README.md` is 780 lines and maintained deliberately — don't edit as part of routine feature work.
 - **UI testing**: `chrome-devtools-mcp` is installed for this project (`~/.claude.json` local scope). Provides `mcp__chrome-devtools__*` tools (navigate, click, screenshot, evaluate JS, inspect DOM). Use it to verify dashboard / annotation UI changes — drive the running dev server, don't speculate about rendered output. Requires Claude Code restart after install for tools to appear.
 
