@@ -30,12 +30,28 @@ config = Config("aitutor")
 az_config = Config("azure-native")
 stack = pulumi.get_stack()
 location = az_config.require("location")
-custom_domain = config.get("custom-domain")  # e.g. "ai-tutor.wbg.edwardamoah.com"
+
+# Custom domains bound to the Container App. Two config keys are
+# accepted for backwards compatibility:
+#   - `custom-domains` (list)  — preferred. JSON-encoded list of
+#     hostnames, e.g. '["ai-tutor.wbg.edwardamoah.com", "www.seselai.sc"]'
+#   - `custom-domain` (string) — legacy single-value form. Auto-promoted
+#     to a one-element list if the list form isn't set.
+# Both empty = no custom domain (Azure-generated URL only).
+custom_domains: list[str] = list(
+    config.get_object("custom-domains") or []
+)
+_legacy_single = config.get("custom-domain")
+if _legacy_single and _legacy_single not in custom_domains:
+    custom_domains.append(_legacy_single)
+# Order is meaningful: the first entry is the "primary" domain used to
+# derive the email subdomain default.
+primary_custom_domain = custom_domains[0] if custom_domains else None
 
 # Email custom domain — must be a subdomain you control DNS for.
-# Default: derived from custom-domain ("mail.<custom-domain>") if set.
+# Default: derived from the primary custom domain ("mail.<primary>") if set.
 email_domain = config.get("email-domain") or (
-    f"mail.{custom_domain}" if custom_domain else None
+    f"mail.{primary_custom_domain}" if primary_custom_domain else None
 )
 # Sender address (the From: of outgoing transactional mail).
 email_sender_username = config.get("email-sender-username") or "noreply"
@@ -114,17 +130,37 @@ env = app.ManagedEnvironment(
     ],
 )
 
-# ── 4b. Managed Certificate (for custom domain) ──────────────────────────
-managed_cert = None
-if custom_domain:
-    managed_cert = app.ManagedCertificate(
-        f"{custom_domain}-cert",
-        managed_certificate_name=f"{custom_domain}-aitutor--260302081454",
+# ── 4b. Managed Certificates (one per custom domain) ─────────────────────
+# Free auto-renewing certs from Azure. The Azure-resource-name (the
+# `managed_certificate_name` arg) needs to be unique within the
+# environment AND stable per-domain so Pulumi doesn't churn the cert
+# on every run. For the original single-domain setup we used a
+# timestamped suffix; preserving it here for that one domain so the
+# existing cert isn't recreated. New domains get a clean
+# `<sanitized-domain>-cert` name.
+_LEGACY_CERT_NAMES = {
+    "ai-tutor.wbg.edwardamoah.com": "ai-tutor.wbg.edwardamoah.com-aitutor--260302081454",
+}
+
+
+def _cert_name(domain: str) -> str:
+    if domain in _LEGACY_CERT_NAMES:
+        return _LEGACY_CERT_NAMES[domain]
+    # Azure resource names allow dots; using the raw domain keeps the
+    # name readable in the portal.
+    return f"{domain}-cert"
+
+
+managed_certs: dict[str, app.ManagedCertificate] = {}
+for domain in custom_domains:
+    managed_certs[domain] = app.ManagedCertificate(
+        f"{domain}-cert",
+        managed_certificate_name=_cert_name(domain),
         environment_name=env.name,
         resource_group_name=rg.name,
         location=rg.location,
         properties=app.ManagedCertificatePropertiesArgs(
-            subject_name=custom_domain,
+            subject_name=domain,
             domain_control_validation=app.ManagedCertificateDomainControlValidation.CNAME,
         ),
     )
@@ -313,11 +349,12 @@ container_app = app.ContainerApp(
             transport=app.IngressTransportMethod.AUTO,
             custom_domains=[
                 app.CustomDomainArgs(
-                    name=custom_domain,
-                    certificate_id=managed_cert.id,
+                    name=domain,
+                    certificate_id=managed_certs[domain].id,
                     binding_type=app.BindingType.SNI_ENABLED,
-                ),
-            ] if custom_domain and managed_cert else None,
+                )
+                for domain in custom_domains
+            ] if custom_domains else None,
         ),
         registries=[
             app.RegistryCredentialsArgs(
@@ -367,7 +404,7 @@ container_app = app.ContainerApp(
                         name="CSRF_TRUSTED_ORIGINS",
                         value=Output.concat(
                             "https://", container_app_name, ".", env.default_domain,
-                            f",https://{custom_domain}" if custom_domain else "",
+                            "".join(f",https://{d}" for d in custom_domains),
                         ),
                     ),
                     app.EnvironmentVarArgs(name="TTS_BACKEND", value="elevenlabs"),
@@ -467,6 +504,26 @@ pulumi.export("app_url", container_app.configuration.apply(
 ))
 pulumi.export("acr_login_server", acr.login_server)
 pulumi.export("resource_group", rg.name)
+
+# Custom-domain DNS bootstrap. To bind a new custom domain to the
+# Container App, you need TWO DNS records at the domain's authoritative
+# zone (BEFORE running `pulumi up` on the new domain):
+#
+#   1. CNAME  <domain>           → <container app default fqdn>
+#   2. TXT    asuid.<domain>    → <custom_domain_verification_id below>
+#
+# `pulumi up` then provisions the managed cert via DNS validation.
+# Without these records the cert never validates and the deploy stalls.
+pulumi.export(
+    "custom_domain_verification_id",
+    env.custom_domain_configuration.apply(
+        lambda c: (c.custom_domain_verification_id if c else "(env not provisioned)")
+    ),
+)
+pulumi.export("custom_domains_bound", custom_domains)
+pulumi.export("container_app_default_fqdn", container_app.configuration.apply(
+    lambda c: c.ingress.fqdn if c and c.ingress and c.ingress.fqdn else "pending"
+))
 
 # Email outputs — see DNS records the user must add at their registrar.
 for key, value in email_dns_outputs.items():

@@ -14,4 +14,11 @@ config:
     secure: v1:+GXti9A1tYEOgRjm:yLXnTL6UW3rmNDWQQyxAD95iWrQolFHMqTcCRLbjpIa/NFIXRPqt0gCiG5CK9h8xAyS0PXvXwQ==
   aitutor:elevenlabs-api-key:
     secure: v1:Ka2PrnsMS+3vT/fi:gVocY1bUSRB1O90kw0wPIQsiZaTmCh6Iicr/LAhIwDHjjeFs69OoigkdSPWn5uXxpe6jyIRCHE62YHcwbZOIICuVyg==
+  # Legacy single-value form is kept for safety; the `custom-domains`
+  # list below takes precedence and merges with this entry (de-duped
+  # in infra/__main__.py). Safe to remove the legacy line once you've
+  # confirmed the new list is being applied correctly.
   aitutor:custom-domain: ai-tutor.wbg.edwardamoah.com
+  aitutor:custom-domains:
+    - ai-tutor.wbg.edwardamoah.com
+    - www.seselai.sc
