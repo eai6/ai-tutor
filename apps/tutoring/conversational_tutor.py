@@ -7854,9 +7854,21 @@ Which concept numbers were meaningfully covered?"""
             'total': len(exit_questions),
             'passing_score': 8,
         }
-        
+        passing = self._exit_ticket_passing_score()
+        total = len(exit_questions)
+        # Explicit "this is the exit ticket" framing so the student
+        # knows the conversation has moved out of tutoring and into
+        # assessment. Soft "let's check your understanding" wasn't
+        # signalling the mode change clearly enough (pilot 2026-05-12).
+        content = (
+            "📋 **Exit Ticket** — time to check what you've learned.\n\n"
+            f"You'll see **{total} question{'s' if total != 1 else ''}** "
+            f"one at a time. You need **{passing}/{total}** correct to "
+            "pass. Take your time — there's no time pressure on the "
+            "ticket itself."
+        )
         return TutorMessage(
-            content="Great work on this lesson! Now let's check your understanding with a quick quiz. Answer all questions, then submit.",
+            content=content,
             phase="exit_ticket",
             show_exit_ticket=True,
             exit_ticket_data=exit_data,
@@ -8821,82 +8833,77 @@ Which concept numbers were meaningfully covered?"""
         total: int,
         failed_questions: List[Dict]
     ) -> Tuple[str, Dict]:
-        """Generate the EO-driven remediation opening (P4).
+        """Build the remediation opening + pose the first failed question.
 
-        Names which EOs the student GOT and which they MISSED, then
-        poses the FIRST failed question (verbatim from the bank) so
-        the walkthrough begins immediately. The walkthrough advances
-        question-by-question on subsequent turns — see
-        _maybe_advance_walkthrough.
+        DETERMINISTIC (no LLM call). Per pilot directive 2026-05-12:
+        "the remediation should start with a recap of the exit ticket.
+        It should state how many questions the student got correct
+        and got wrong and list the questions one after the other for
+        us to work on."
+
+        Structure:
+          1. Header: "Exit ticket review" + clear mode signal.
+          2. Score line: "X of Y correct. Z to work through together."
+          3. Numbered list of failed question stems (the "agenda").
+          4. First failed question rendered verbatim from the bank.
 
         Returns (message, turn_metadata). The metadata carries
         ``bank_question_ref`` for the first walkthrough question so
         the next student reply is graded against it by the bank
         grader (P3 plumbing).
         """
-        state = self.session.engine_state or {}
-        eo_competency = state.get('remediation_eo_competency') or {}
-        walkthrough_queue = state.get('remediation_walkthrough_queue') or []
-
-        # Build human-readable lists of got vs missed EOs
-        mastered_eos = [eo for eo, b in eo_competency.items() if b.get('is_mastered')]
-        missed_eos = [
-            (eo, b) for eo, b in eo_competency.items()
-            if not b.get('is_mastered')
-        ]
-
-        # Render lists for the prompt
-        if mastered_eos:
-            mastered_block = (
-                "EOs the student MASTERED:\n" +
-                "\n".join(f"  ✓ {eo}" for eo in mastered_eos[:6])
-            )
-        else:
-            mastered_block = "(no EOs fully mastered this attempt)"
-
-        if missed_eos:
-            missed_block = (
-                "EOs the student MISSED:\n" +
-                "\n".join(
-                    f"  ✗ {eo} ({b['correct']}/{b['asked']})"
-                    for eo, b in missed_eos[:6]
-                )
-            )
-        else:
-            missed_block = "(no EOs missed)"
-
-        # Fetch the first failed question for the walkthrough opener.
         from apps.tutoring.models import ExitTicketQuestion
         from apps.tutoring.question_bank import render_question_to_prose
 
-        first_question = None
-        if walkthrough_queue:
-            first_id = walkthrough_queue[0].get('id')
-            first_question = ExitTicketQuestion.objects.filter(id=first_id).first()
+        state = self.session.engine_state or {}
+        walkthrough_queue = state.get('remediation_walkthrough_queue') or []
 
-        prompt = f"""The student just completed the exit ticket but didn't pass.
-Score: {score}/{total} (needed {self._exit_ticket_passing_score()} to pass)
-Attempt number: {self.remediation_attempt}
+        # Resolve the actual question stems in queue order so we can
+        # show the student which problems we're about to work through.
+        queue_ids = [q.get('id') for q in walkthrough_queue if q.get('id')]
+        question_lookup = {
+            q.id: q for q in
+            ExitTicketQuestion.objects.filter(id__in=queue_ids)
+        }
+        n_failed = len(queue_ids)
+        n_correct = max(0, total - n_failed)
 
-{mastered_block}
+        # Build the recap header (deterministic, no LLM).
+        lines: List[str] = []
+        lines.append("📋 **Exit ticket review**")
+        lines.append("")
+        if n_failed == 0:
+            # Edge case — somehow we're in remediation with no failed
+            # queue. Fall back to a simple message.
+            lines.append(
+                f"You scored {score} out of {total}. Let's revisit "
+                "anything you'd like to lock in."
+            )
+            return "\n".join(lines), {}
 
-{missed_block}
+        lines.append(
+            f"You scored **{score} of {total}** "
+            f"({n_correct} right, **{n_failed} to revisit**). "
+            "We'll walk through each missed question one at a time — "
+            "this is the fastest way to fix the gap."
+        )
+        lines.append("")
+        lines.append(f"**Questions we'll work on ({n_failed}):**")
+        for idx, qid in enumerate(queue_ids[:10], start=1):
+            q = question_lookup.get(qid)
+            if not q:
+                continue
+            stem = (q.question_text or '').strip()
+            # One line per question: number + first 140 chars of stem
+            preview = stem[:140] + ('…' if len(stem) > 140 else '')
+            lines.append(f"{idx}. {preview}")
+        if n_failed > 10:
+            lines.append(f"…and {n_failed - 10} more.")
+        lines.append("")
+        lines.append("Let's start with question 1:")
 
-Generate a warm, encouraging opening message that:
-1. Acknowledges their effort and credits the EOs they MASTERED by name (use exact EO text from above).
-2. Names the EOs they MISSED by name and explains we'll walk through every question they got wrong, one at a time.
-3. Reassures them this is normal — re-doing missed questions is the fastest way to lock in the gap.
-4. Hands off to the walkthrough by saying something like "Let's start with the first question you missed:".
-
-DO NOT author a question yourself. The first failed exit-ticket question
-will be appended verbatim after your response so the walkthrough begins
-immediately. Just write the opening prose — 3-5 sentences — and stop.
-"""
-        opening_prose = self._generate_response(prompt)
-
-        # Append the first failed question verbatim from the bank.
-        # Record bank_question_ref on turn_metadata so the next student
-        # reply is graded against it (see _grade_against_last_bank_question).
+        # Pose the first failed question verbatim from the bank.
+        first_question = question_lookup.get(queue_ids[0]) if queue_ids else None
         turn_metadata: Dict = {}
         if first_question is not None:
             rendered = render_question_to_prose(first_question)
@@ -8906,13 +8913,12 @@ immediately. Just write the opening prose — 3-5 sentences — and stop.
                     'id': first_question.id,
                     'question_type': first_question.question_type or 'mcq',
                 }
-                opening_prose = (
-                    opening_prose.rstrip()
-                    + "\n\n**Question 1 of "
-                    + f"{len(walkthrough_queue)}:**\n\n"
-                    + rendered
-                )
-        return opening_prose, turn_metadata
+                lines.append("")
+                lines.append(f"**Question 1 of {n_failed}:**")
+                lines.append("")
+                lines.append(rendered)
+
+        return "\n".join(lines), turn_metadata
 
     def _exit_ticket_passing_score(self) -> int:
         """Lookup the lesson's exit-ticket passing score, with a
