@@ -76,18 +76,27 @@ class Command(BaseCommand):
                  'judge_history_turns metadata). Default: only sample '
                  'from new sessions with complete instrumentation.',
         )
+        parser.add_argument(
+            '--include-synthetic', action='store_true',
+            help='Include tutor turns from synthetic-student simulator '
+                 'sessions (TutorSession.is_synthetic=True). Default: '
+                 'real-student sessions only. Synthetic turns are '
+                 'stratified into synthetic_<persona> buckets.',
+        )
 
     def handle(self, *args, limit, subject, dry_run, seed, include_legacy,
-               **options):
+               include_synthetic, **options):
         self.stdout.write(self.style.NOTICE(
             f"[sample_benchmark] limit={limit} subject={subject or 'all'} "
             f"dry_run={dry_run} seed={seed} "
-            f"include_legacy={include_legacy}"
+            f"include_legacy={include_legacy} "
+            f"include_synthetic={include_synthetic}"
         ))
 
         candidates = candidate_tutor_turns(
             subject=subject,
             require_full_tracking=not include_legacy,
+            include_synthetic=include_synthetic,
         )
         candidate_count = candidates.count()
         self.stdout.write(f"  {candidate_count} eligible tutor turns (excluding already-sampled)")

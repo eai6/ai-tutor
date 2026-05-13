@@ -136,6 +136,12 @@ class ModelConfig(models.Model):
         # then score each candidate and the engine picks the best
         # clean one. See apps/tutoring/regen/.
         REGEN = 'regen', 'Tutor Response Regeneration'
+        # Synthetic student — drives end-to-end tutoring sessions for
+        # the simulator (apps/tutoring/student_sim/). Uses a cheap,
+        # fast model with higher temperature than tutoring (~0.7) to
+        # produce believable persona variation. See
+        # memory/llm_student_simulator_plan.md.
+        STUDENT_SIM = 'student_sim', 'Synthetic Student (Simulator)'
 
     institution = models.ForeignKey(
         Institution,

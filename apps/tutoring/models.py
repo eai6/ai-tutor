@@ -111,6 +111,20 @@ class TutorSession(models.Model):
     )
     group_approval_decided_at = models.DateTimeField(null=True, blank=True)
 
+    # Synthetic-student simulator tagging.
+    # See memory/llm_student_simulator_plan.md. Defaults are correct for
+    # real student sessions — no backfill needed.
+    is_synthetic = models.BooleanField(
+        default=False, db_index=True,
+        help_text="True if this session was driven by the LLM-as-student "
+                  "simulator rather than a real student.",
+    )
+    sim_persona = models.CharField(
+        max_length=40, blank=True,
+        help_text="Persona key from apps/tutoring/student_sim/personas.py "
+                  "(e.g. 'struggler'). Empty for real sessions.",
+    )
+
     @property
     def lesson_duration_minutes(self):
         """Time spent on the lesson in minutes."""

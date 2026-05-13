@@ -187,6 +187,8 @@ def benchmark_sample_create(request):
     Form fields:
         count (int, 1-50): how many items to add.
         include_legacy ('on' | absent): opt into pre-2.2.5 traces.
+        include_synthetic ('on' | absent): opt into simulator-generated
+            sessions (default: real-student only).
 
     Idempotent against the existing pool — already-sampled turns are
     excluded automatically. Sets ``created_by`` to the requesting user.
@@ -197,10 +199,12 @@ def benchmark_sample_create(request):
         count = 10
     count = max(1, min(count, 50))
     include_legacy = bool(request.POST.get('include_legacy'))
+    include_synthetic = bool(request.POST.get('include_synthetic'))
 
     result = create_benchmark_items(
         limit=count,
         require_full_tracking=not include_legacy,
+        include_synthetic=include_synthetic,
         created_by=request.user,
     )
 

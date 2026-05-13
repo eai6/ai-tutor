@@ -208,7 +208,8 @@ def make_item_id(course_subject_type: str, course_title: str,
 
 def candidate_tutor_turns(*, subject: Optional[str] = None,
                           exclude_sampled: bool = True,
-                          require_full_tracking: bool = True) -> QuerySet:
+                          require_full_tracking: bool = True,
+                          include_synthetic: bool = False) -> QuerySet:
     """Tutor turns eligible for sampling.
 
     Filters:
@@ -219,6 +220,7 @@ def candidate_tutor_turns(*, subject: Optional[str] = None,
     - optionally excludes turns already in the benchmark
     - by default, excludes legacy turns missing Phase 2.2.5 instrumentation
       (see ``require_full_tracking``)
+    - by default, excludes synthetic-student sessions (see ``include_synthetic``)
 
     Args:
         require_full_tracking: when True (default), only return turns
@@ -229,6 +231,14 @@ def candidate_tutor_turns(*, subject: Optional[str] = None,
             quality-tracking data; pre-Phase-2.2.5 turns are skipped.
             Pass False to include legacy traces (useful as a control
             cohort or for backfilling historical baselines).
+        include_synthetic: when False (default), excludes turns from
+            sessions tagged ``is_synthetic=True`` by the simulator
+            (apps/tutoring/student_sim/). Synthetic-distribution may
+            not match real-student distribution, so we don't dilute
+            the manual annotation queue by default. Pass True to
+            include them as a separate cohort — they're stratified
+            into ``synthetic_<persona>`` buckets in
+            :func:`stratify`. See memory/llm_student_simulator_plan.md.
     """
     from apps.benchmark.models import BenchmarkItem
 
@@ -239,6 +249,9 @@ def candidate_tutor_turns(*, subject: Optional[str] = None,
     ).select_related(
         'session__lesson__unit__course',
     )
+
+    if not include_synthetic:
+        qs = qs.filter(session__is_synthetic=False)
 
     if subject:
         # Map back from benchmark subject → possible Course.subject_type values
@@ -275,6 +288,10 @@ def stratify(qs: QuerySet) -> Dict[str, List[SessionTurn]]:
     - 'wrong_answer'      → metadata.is_correct is False
     - 'validator_flagged' → metadata.validator_passed=False OR regenerated=True
     - 'random'            → everything else
+    - 'synthetic_<persona>' → tutor turns from a synthetic-student
+      session (TutorSession.is_synthetic=True). Carved out so synthetic
+      and real cohorts can be analysed side-by-side without pooling.
+      Persona suffix matches `TutorSession.sim_persona`.
 
     Each turn goes into exactly one bucket (first-match wins so the
     target proportions are recoverable). v2 plan's 'step_transition'
@@ -283,8 +300,16 @@ def stratify(qs: QuerySet) -> Dict[str, List[SessionTurn]]:
     wrong: List[SessionTurn] = []
     flagged: List[SessionTurn] = []
     random_bucket: List[SessionTurn] = []
+    synthetic: Dict[str, List[SessionTurn]] = {}
 
     for turn in qs:
+        session = turn.session
+        if getattr(session, 'is_synthetic', False):
+            persona = (session.sim_persona or 'unknown').lower()
+            key = f'synthetic_{persona}'
+            synthetic.setdefault(key, []).append(turn)
+            continue
+
         meta = turn.metadata or {}
         if meta.get('is_correct') is False:
             wrong.append(turn)
@@ -294,11 +319,13 @@ def stratify(qs: QuerySet) -> Dict[str, List[SessionTurn]]:
         else:
             random_bucket.append(turn)
 
-    return {
+    out: Dict[str, List[SessionTurn]] = {
         'wrong_answer': wrong,
         'validator_flagged': flagged,
         'random': random_bucket,
     }
+    out.update(synthetic)
+    return out
 
 
 def create_benchmark_items(
@@ -306,6 +333,7 @@ def create_benchmark_items(
     limit: int,
     subject: Optional[str] = None,
     require_full_tracking: bool = True,
+    include_synthetic: bool = False,
     seed: Optional[int] = None,
     created_by=None,
 ) -> Dict:
@@ -314,6 +342,12 @@ def create_benchmark_items(
     Shared between the management command and the dashboard UI. Returns
     a dict summarising what happened — caller picks how to render it
     (CLI prints; UI flashes).
+
+    Args:
+        include_synthetic: when False (default), excludes synthetic-
+            student sessions from the candidate pool. Pass True to
+            include synthetic turns; they appear in the breakdown as
+            ``synthetic_<persona>`` strata.
 
     Returns:
         ``{
@@ -329,6 +363,7 @@ def create_benchmark_items(
     candidates = candidate_tutor_turns(
         subject=subject,
         require_full_tracking=require_full_tracking,
+        include_synthetic=include_synthetic,
     )
     eligible = candidates.count()
     strata = stratify(candidates)
@@ -396,27 +431,36 @@ def sample_proportional(strata: Dict[str, List[SessionTurn]],
 
     out: List[tuple[str, SessionTurn]] = []
     remaining = limit
-    leftover_pool: List[SessionTurn] = []
+    leftover_pool: List[tuple[str, SessionTurn]] = []
 
-    # First pass: take floor(share * limit) from each stratum
+    # First pass: take floor(share * limit) from each stratum named in mix.
     for name, share in mix.items():
         target = int(round(share * limit))
         pool = list(strata.get(name, []))
         rng.shuffle(pool)
         take = pool[:target]
-        leftover_pool.extend(pool[target:])
+        for extra in pool[target:]:
+            leftover_pool.append((name, extra))
         for t in take:
             out.append((name, t))
         remaining -= len(take)
 
-    # Second pass: fill any deficit from leftover_pool (random)
+    # Synthetic / persona buckets aren't in the default mix, so they
+    # never get picked in the first pass. Add their entire content to
+    # the leftover pool so the second pass can dip into them when the
+    # mix-defined strata can't fill the limit.
+    for name, pool in strata.items():
+        if name in mix:
+            continue
+        for t in pool:
+            leftover_pool.append((name, t))
+
+    # Second pass: fill any deficit from the leftover pool (random across
+    # all strata, including synthetic). Each entry already carries its
+    # source stratum name so we don't have to re-scan.
     if remaining > 0 and leftover_pool:
         rng.shuffle(leftover_pool)
-        for t in leftover_pool[:remaining]:
-            # Figure out which stratum t came from
-            for name, pool in strata.items():
-                if t in pool:
-                    out.append((name, t))
-                    break
+        for stratum_name, t in leftover_pool[:remaining]:
+            out.append((stratum_name, t))
 
     return out
