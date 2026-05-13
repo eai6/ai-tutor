@@ -24,6 +24,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import models
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.benchmark import labels as L
@@ -252,16 +253,36 @@ def benchmark_annotate(request, item_id: str):
     item_block = snapshot.get('item', {})
     production = snapshot.get('production', {})
 
-    # Locked v1 identity
     system_variant = BenchmarkAnnotation.SystemVariant.PRODUCTION_V1
-    annotator_role = BenchmarkAnnotation.Annotator.HUMAN
+
+    # Annotator role + model can be overridden via query string for the
+    # automated annotator agent (`?annotator_role=llm_judge&annotator_model=
+    # claude-sonnet-4-5`). Default is HUMAN so genuine teacher annotations
+    # are never accidentally re-tagged as agent-driven. The role override
+    # is honoured on both GET (for the existing-annotation lookup) and
+    # POST (for the saved row) so the form's prefill matches what the
+    # agent will write.
+    role_override = (
+        request.GET.get('annotator_role')
+        or request.POST.get('annotator_role')
+        or ''
+    ).strip().lower()
+    if role_override in BenchmarkAnnotation.Annotator.values:
+        annotator_role = role_override
+    else:
+        annotator_role = BenchmarkAnnotation.Annotator.HUMAN
+    annotator_model = (
+        request.GET.get('annotator_model')
+        or request.POST.get('annotator_model')
+        or ''
+    ).strip()[:80]
 
     existing = BenchmarkAnnotation.objects.filter(
         item=item,
         system_variant=system_variant,
         annotator_role=annotator_role,
         annotator_user=request.user,
-        annotator_model='',
+        annotator_model=annotator_model,
     ).first()
 
     if request.method == 'POST':
@@ -290,7 +311,7 @@ def benchmark_annotate(request, item_id: str):
             system_variant=system_variant,
             annotator_role=annotator_role,
             annotator_user=request.user,
-            annotator_model='',
+            annotator_model=annotator_model,
             defaults={
                 'student_claim_correct': student_claim_correct,
                 'actual_labels': actual_labels,
@@ -321,7 +342,18 @@ def benchmark_annotate(request, item_id: str):
             .first()
         )
         if next_item:
-            return redirect('dashboard:benchmark:annotate', item_id=next_item.item_id)
+            url = reverse('dashboard:benchmark:annotate',
+                          args=[next_item.item_id])
+            # Preserve role/model override across the save-and-next hop
+            # so the agent doesn't silently revert to HUMAN on item #2.
+            qs_parts = []
+            if annotator_role != BenchmarkAnnotation.Annotator.HUMAN:
+                qs_parts.append(f"annotator_role={annotator_role}")
+            if annotator_model:
+                qs_parts.append(f"annotator_model={annotator_model}")
+            if qs_parts:
+                url = f"{url}?{'&'.join(qs_parts)}"
+            return redirect(url)
         return redirect('dashboard:benchmark:list')
 
     # GET — prefill from existing annotation or from suggested_labels.

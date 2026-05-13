@@ -79,6 +79,13 @@ DEFAULT_LOGIN_PASS = 'benchmark-temp-2026'
 DEFAULT_MODEL = 'claude-sonnet-4-5'  # Sonnet 4.6 ID — see CLAUDE.md
 DEFAULT_MAX_TURNS_PER_ITEM = 50
 
+# Annotator-role override the agent appends to every annotation URL so
+# its annotations land in the llm_judge cohort, not the human one. The
+# benchmark_annotate view honours these as query-string params (and
+# carries them through the save-and-next redirect chain).
+ANNOTATOR_ROLE = 'llm_judge'
+ANNOTATOR_MODEL_TAG = 'claude-sonnet-4-5'
+
 THIS_DIR = pathlib.Path(__file__).parent
 TRANSCRIPT_DIR = THIS_DIR / 'transcripts'
 PROMPT_PATH = THIS_DIR / 'agent_prompt.md'
@@ -92,6 +99,10 @@ def load_system_prompt(base_url: str, login_user: str, login_pass: str,
     bits go after the cached section.
     """
     static = PROMPT_PATH.read_text()
+    role_qs = (
+        f"?annotator_role={ANNOTATOR_ROLE}"
+        f"&annotator_model={ANNOTATOR_MODEL_TAG}"
+    )
     runtime = f"""
 
 ---
@@ -106,12 +117,19 @@ def load_system_prompt(base_url: str, login_user: str, login_pass: str,
         f"only items with stratum=`synthetic_{persona}`"
         if persona else
         "no filter — take items in the order shown"
-    ) + """
+    ) + f"""
+- **Role tagging**: When you click into a benchmark item to annotate \
+it, append `{role_qs}` to the URL — e.g. \
+`{base_url}/dashboard/benchmark/MATH_S20_T481/{role_qs}`. The view \
+honours this as a query string and tags your annotation under the \
+`{ANNOTATOR_ROLE}` cohort instead of the human cohort. The save-and-\
+next redirect carries the override forward automatically.
 
 When you finish annotating (or hit the cap), navigate to \
-{base_url}/dashboard/benchmark/scores/, click 'Score now', and read \
+{base_url}/dashboard/benchmark/scores/, set the notes field to \
+something like 'agent run @ <commit>', click 'Score now', and read \
 the pass rate from the next page. End your run by reporting that \
-number to the user.""".replace('{base_url}', base_url)
+number to the user."""
     return static + runtime
 
 
