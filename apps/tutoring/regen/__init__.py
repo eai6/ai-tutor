@@ -78,7 +78,11 @@ logger = logging.getLogger(__name__)
 # - early-exit as soon as any candidate is judge-clean (within a cycle)
 # - after cycle 4 without a clean candidate, send the best-scoring
 #   "least bad" candidate (or the stock fallback if nothing scored)
-DEFAULT_MAX_CYCLES = 4
+# Regen cycle cap. Dropped 4 → 2 on 2026-05-12 per pilot directive:
+# "we should not need more than two regen in fact to fix something.
+# 3 is even too much." Production logs showed cycles 2/3/4 converging
+# identically — the marginal value of cycles 3-4 is near zero.
+DEFAULT_MAX_CYCLES = 2
 
 # Starting temperature for cycle 1. Each subsequent cycle drops by
 # DEFAULT_TEMPERATURE_DECAY (so the model becomes more deterministic).

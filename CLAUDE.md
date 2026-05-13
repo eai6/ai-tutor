@@ -43,7 +43,7 @@ Azure commands require `az account set --subscription "Pixel Design Labs LLC"` f
 **Temperature controls (runtime invariants).** Enforced by `ModelConfig.effective_temperature` and the resolved `temperature` parameter on `BaseLLMClient.generate()`. Do not bypass.
 - **JUDGE** purpose: always **0** for evaluation consistency. The stored DB value is ignored at runtime.
 - **TUTORING** purpose: clamped to **[0.1, 0.3]**. Stored values outside this range are clamped at the API call site.
-- **REGEN** ensemble: starts at 0.20, decays 0.05 per cycle. Hard cap **4 cycles** (`DEFAULT_MAX_CYCLES`). Cycle temps: 0.20 → 0.15 → 0.10 → 0.05. Early-exit on any judge-clean candidate.
+- **REGEN** ensemble: starts at 0.20, decays 0.05 per cycle. Hard cap **2 cycles** (`DEFAULT_MAX_CYCLES`, dropped 4→2 on 2026-05-12 — prod logs showed cycles 3/4 converging identically with cycle 2, marginal value near zero). Cycle temps: 0.20 → 0.15. Early-exit on any judge-clean candidate.
 - **All other purposes** (GENERATION, EXIT_TICKETS, REGEN per-call override, etc.) use the raw stored value or the explicit `temperature` kwarg.
 
 **Exit ticket = lesson competency (in progress).** `ExitTicket.passing_score` is the mastery threshold. Dead fields — do not add new references to: `Lesson.mastery_rule`, `StudentLessonProgress.{correct_streak, total_attempts, total_correct}`. See `memory/lesson_competency_plan.md` for the migration in flight.
