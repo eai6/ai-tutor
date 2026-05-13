@@ -644,8 +644,17 @@ function showExitResults(results) {
                 });
             }
         } else if (qType === 'fill_in_blank') {
-            qDiv.querySelectorAll('.exit-blank-input').forEach(inp => {
-                if (r.is_correct) {
+            // Prefer per-blank verdicts when the grader surfaced them
+            // (r.blanks_correct = [bool, bool, ...] aligned with the
+            // input order). Falls back to the question-level is_correct
+            // if per-blank info isn't available (older clients, MCQ-
+            // adjacent paths, batch grader skipped).
+            const perBlank = Array.isArray(r.blanks_correct) ? r.blanks_correct : null;
+            qDiv.querySelectorAll('.exit-blank-input').forEach((inp, idx) => {
+                const ok = perBlank && idx < perBlank.length
+                    ? !!perBlank[idx]
+                    : r.is_correct;
+                if (ok) {
                     inp.style.borderColor = '#10b981';
                     inp.style.background = '#d1fae5';
                 } else {

@@ -50,6 +50,19 @@ class BatchGradeItem:
     keywords: List[str] = field(default_factory=list)
     student_answer: str = ""  # caller pre-serialises lists/dicts to a readable string
     is_math: bool = False
+    # For fill_in_blank: per-blank arrays so the grader can evaluate
+    # each blank separately (synonyms, partial credit visibility) and
+    # the frontend can colour each blank individually. Empty lists for
+    # other q_types.
+    expected_blanks: List[str] = field(default_factory=list)
+    student_blanks: List[str] = field(default_factory=list)
+
+
+@dataclass
+class BlankVerdict:
+    """Per-blank verdict for a fill_in_blank item."""
+    is_correct: bool
+    reasoning: str = ""
 
 
 @dataclass
@@ -58,6 +71,10 @@ class BatchGradeResult:
     index: int
     correct: bool
     reasoning: str = ""
+    # For fill_in_blank: one BlankVerdict per blank, in input order.
+    # Empty for other q_types (or when the grader didn't return per-blank
+    # info — caller falls back to the question-level `correct` flag).
+    blanks: List[BlankVerdict] = field(default_factory=list)
 
 
 _GRADE_SYSTEM = (
@@ -72,26 +89,43 @@ _GRADE_SYSTEM = (
     "  - For SHORT_ANSWER / DATA_INTERPRETATION: accept paraphrases that "
     "demonstrate understanding of the key concepts AND match the model "
     "answer's main numerical or conceptual claim.\n"
-    "  - For FILL_IN_BLANK: accept correct meaning even with minor "
-    "spelling differences. Each blank should be approximately correct.\n"
+    "  - For FILL_IN_BLANK: be GENEROUS with synonyms and semantic "
+    "equivalents. 'equal' = 'even' = 'fair' = 'equitable'. 'poverty' = "
+    "'inequality' = 'low income'. 'rapid' = 'fast' = 'quick'. Accept "
+    "minor spelling differences (one or two transposed/missing letters) "
+    "that don't change meaning. Reject only if the student wrote "
+    "something genuinely wrong, not just phrased differently.\n"
     "  - For MATCHING: accept if the MAJORITY of pairs are correctly "
     "matched (>50%).\n"
     "  - When in doubt and the student is in the right ballpark, "
     "favour CORRECT — students shouldn't be penalised for phrasing.\n"
     "\n"
     "Output JSON ARRAY ONLY (no prose, no code fence) — one object per "
-    "input item, in the same order as input:\n"
+    "input item, in the same order as input. For most items:\n"
     "[\n"
     '  {"index": <int from input>, "correct": <true|false>, '
     '"reasoning": "<short why, <=120 chars>"}\n'
-    "]"
+    "]\n"
+    "\n"
+    "FOR FILL_IN_BLANK items, ALSO include a per-blank breakdown so "
+    "the frontend can colour each blank individually:\n"
+    "[\n"
+    '  {"index": 0, "correct": false, "reasoning": "blank 2 wrong",\n'
+    '   "blanks": [\n'
+    '     {"is_correct": true, "reasoning": "even ≈ equal"},\n'
+    '     {"is_correct": false, "reasoning": "expected poverty"}\n'
+    '   ]}\n'
+    "]\n"
+    "The overall `correct` flag for fill_in_blank is true ONLY when "
+    "every blank is correct. Length of `blanks` MUST equal the number "
+    "of expected_blanks in the input."
 )
 
 
 def _build_user_prompt(items: List[BatchGradeItem]) -> str:
     payload = []
     for it in items:
-        payload.append({
+        entry = {
             "index": it.index,
             "question": (it.question_text or "")[:500],
             "q_type": it.q_type,
@@ -99,7 +133,18 @@ def _build_user_prompt(items: List[BatchGradeItem]) -> str:
             "keywords": list(it.keywords or [])[:8],
             "student_answer": (it.student_answer or "")[:400],
             "is_math": bool(it.is_math),
-        })
+        }
+        # Surface per-blank arrays for fill_in_blank so the grader can
+        # evaluate each blank independently. Capped to keep the prompt
+        # compact even on long-blank questions.
+        if it.q_type == 'fill_in_blank' and it.expected_blanks:
+            entry["expected_blanks"] = [
+                str(b)[:120] for b in it.expected_blanks
+            ]
+            entry["student_blanks"] = [
+                str(b)[:120] for b in (it.student_blanks or [])
+            ]
+        payload.append(entry)
     return (
         "Grade each item below. Reply with ONLY the JSON array specified "
         "— no prose, no code fence.\n\n"
@@ -159,8 +204,22 @@ def grade_written_responses_batch(
             continue
         correct = bool(entry.get("correct", False))
         reasoning = str(entry.get("reasoning") or "")[:200]
+        # Optional per-blank breakdown. The grader is INSTRUCTED to
+        # include this for fill_in_blank items, but if it's missing or
+        # malformed we fall back to the question-level verdict (caller
+        # checks `len(blanks) > 0` to decide).
+        blanks_raw = entry.get("blanks")
+        blanks: List[BlankVerdict] = []
+        if isinstance(blanks_raw, list):
+            for b in blanks_raw:
+                if not isinstance(b, dict):
+                    continue
+                blanks.append(BlankVerdict(
+                    is_correct=bool(b.get("is_correct", False)),
+                    reasoning=str(b.get("reasoning") or "")[:200],
+                ))
         by_index[idx] = BatchGradeResult(
-            index=idx, correct=correct, reasoning=reasoning,
+            index=idx, correct=correct, reasoning=reasoning, blanks=blanks,
         )
 
     out: List[BatchGradeResult] = []

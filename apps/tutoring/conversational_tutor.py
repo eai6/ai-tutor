@@ -4042,15 +4042,43 @@ YOUR RESPONSE:"""
                 concept = uncovered_failed[0]
                 # Find the matching failed question for more context
                 failed_q = next((fq for fq in failed if fq['id'] == concept['id']), None)
-                
+
+                # For fill_in_blank failures, surface per-blank detail
+                # so the tutor can target the specific blank that
+                # failed instead of re-explaining the whole question.
+                # Empty for non-fill-in-blank or older failed-question
+                # records that predate per-blank tracking.
+                per_blank_block = ""
+                if failed_q:
+                    bc = failed_q.get('blanks_correct') or []
+                    br = failed_q.get('blanks_reasoning') or []
+                    sa = failed_q.get('student_answer')
+                    if bc and isinstance(sa, list):
+                        rows = []
+                        for idx, ok in enumerate(bc):
+                            student_v = sa[idx] if idx < len(sa) else ''
+                            reason = br[idx] if idx < len(br) else ''
+                            verdict = '✓ accepted' if ok else '✗ wrong'
+                            rows.append(
+                                f"  Blank {idx + 1}: \"{student_v}\" {verdict}"
+                                + (f" ({reason})" if reason else "")
+                            )
+                        per_blank_block = (
+                            "\n\nPer-blank verdict (from auto-grader):\n"
+                            + "\n".join(rows)
+                            + "\nFocus your remediation on the WRONG blanks "
+                            "only — don't re-teach the ones that were "
+                            "accepted."
+                        )
+
                 return f"""🎯 REMEDIATION FOCUS - This is a concept the student got WRONG on the exit ticket:
 
 Question they missed: "{concept['question']}"
 Their wrong answer was: "{failed_q.get('student_answer', '?') if failed_q else '?'}"
 Correct answer: "{concept['correct_text']}"
-Why it's correct: "{concept.get('explanation', 'This is the key concept to understand')}"
+Why it's correct: "{concept.get('explanation', 'This is the key concept to understand')}"{per_blank_block}
 
-IMPORTANT: The student already attempted this and got it wrong. 
+IMPORTANT: The student already attempted this and got it wrong.
 - Approach it from a different angle
 - Use a new example or analogy
 - Break it down into smaller steps
@@ -8107,11 +8135,22 @@ Which concept numbers were meaningfully covered?"""
         data = question.answer_data or {}
         is_math = self.lesson.unit.course.is_math if self.lesson.unit and self.lesson.unit.course else False
 
+        # extra_kwargs is populated below for q_types that carry per-
+        # blank or per-pair structured detail; currently only
+        # fill_in_blank uses it.
+        extra_kwargs: dict = {}
         if q_type == 'fill_in_blank':
             blanks = data.get('blanks', []) or []
             student_blanks = student_answer if isinstance(student_answer, list) else [student_answer]
             expected = "; ".join(str(b) for b in blanks)
             student_str = "; ".join(str(b) for b in student_blanks)
+            # Pass the per-blank arrays explicitly so the grader can
+            # evaluate each blank separately and the frontend can colour
+            # each input individually. See exit_ticket_grader.py.
+            extra_kwargs = {
+                'expected_blanks': [str(b) for b in blanks],
+                'student_blanks': [str(b) for b in student_blanks],
+            }
         elif q_type == 'matching':
             pairs = data.get('pairs', []) or []
             expected = "; ".join(
@@ -8135,6 +8174,7 @@ Which concept numbers were meaningfully covered?"""
             keywords=keywords,
             student_answer=student_str,
             is_math=is_math,
+            **extra_kwargs,
         )
 
     def _grade_exit_question(self, question, student_answer) -> bool:
@@ -8152,10 +8192,14 @@ Which concept numbers were meaningfully covered?"""
         Tests can still patch this method; the patch overrides every
         path including the cache.
         """
-        # 1. Batch cache check (set during exit-ticket submission)
+        # 1. Batch cache check (set during exit-ticket submission).
+        # Cache values are BatchGradeResult; pull the boolean verdict
+        # off `.correct`. Older code paths stored just the bool, so
+        # tolerate that shape too.
         cache = getattr(self, '_exit_ticket_batch_cache', None)
         if cache and getattr(question, 'id', None) in cache:
-            return bool(cache[question.id])
+            cached = cache[question.id]
+            return bool(getattr(cached, 'correct', cached))
 
         q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
         data = question.answer_data or {}
@@ -8383,12 +8427,15 @@ Which concept numbers were meaningfully covered?"""
                 continue  # numeric fast-path — handled in the loop
             batch_items.append(self._build_batch_grade_item(i, q, student_answer))
 
-        # Run the batch (if any items need it). Cache results by
-        # question.id keyed so the per-question call site can pick up
-        # the verdict.
-        self._exit_ticket_batch_cache: Dict[int, bool] = {}
+        # Run the batch (if any items need it). Cache the full
+        # BatchGradeResult per question.id so downstream callers can
+        # pull both the boolean verdict AND any per-blank breakdown
+        # (fill_in_blank items carry .blanks: List[BlankVerdict]).
+        from apps.tutoring.exit_ticket_grader import (
+            BatchGradeResult, grade_written_responses_batch,
+        )
+        self._exit_ticket_batch_cache: Dict[int, BatchGradeResult] = {}
         if batch_items:
-            from apps.tutoring.exit_ticket_grader import grade_written_responses_batch
             batch_results = grade_written_responses_batch(
                 batch_items, llm_client=self.judge_client,
             )
@@ -8397,7 +8444,7 @@ Which concept numbers were meaningfully covered?"""
                 # look it up by question identity.
                 qid = questions[r.index].id if 0 <= r.index < len(questions) else None
                 if qid is not None:
-                    self._exit_ticket_batch_cache[qid] = r.correct
+                    self._exit_ticket_batch_cache[qid] = r
 
         correct = 0
         results = []
@@ -8429,6 +8476,18 @@ Which concept numbers were meaningfully covered?"""
             eo_tag = getattr(q, 'concept_tag', '') or ''
             sub_eo = getattr(q, 'enabling_objective', '') or ''
 
+            # For fill_in_blank, pull per-blank verdicts out of the
+            # batch cache so we can both (a) colour each input
+            # individually in the frontend and (b) tell the tutor
+            # exactly which blank failed during remediation.
+            blanks_correct: list = []
+            blanks_reasoning: list = []
+            cached = (self._exit_ticket_batch_cache or {}).get(q.id)
+            cached_blanks = getattr(cached, 'blanks', []) if cached else []
+            if cached_blanks:
+                blanks_correct = [bool(b.is_correct) for b in cached_blanks]
+                blanks_reasoning = [str(b.reasoning) for b in cached_blanks]
+
             if is_correct:
                 correct += 1
             else:
@@ -8443,6 +8502,9 @@ Which concept numbers were meaningfully covered?"""
                     'correct_answer': q.correct_answer if q_type == 'mcq' else str(q.answer_data or {}),
                     'correct_text': getattr(q, f'option_{(q.correct_answer or "a").lower()}', '') if q_type == 'mcq' else '',
                     'explanation': q.explanation,
+                    # fill_in_blank only — empty list otherwise.
+                    'blanks_correct': blanks_correct,
+                    'blanks_reasoning': blanks_reasoning,
                 })
 
             results.append({
@@ -8455,6 +8517,11 @@ Which concept numbers were meaningfully covered?"""
                 'correct_answer': q.correct_answer if (getattr(q, 'question_type', 'mcq') or 'mcq') == 'mcq' else q.answer_data,
                 'is_correct': is_correct,
                 'explanation': q.explanation,
+                # Surfaced to the frontend so the exit-ticket review
+                # modal can colour each blank individually instead of
+                # painting all blanks the same colour as the question.
+                'blanks_correct': blanks_correct,
+                'blanks_reasoning': blanks_reasoning,
             })
 
         # Use the lesson's configured passing_score (no longer hardcoded
