@@ -315,7 +315,24 @@ function showExitTicket() {
     const cfg = window.EXIT_MODAL_CONFIG || {};
     if (cfg.title) document.getElementById('exit-modal-title').textContent = cfg.title;
     if (cfg.subtitle) document.getElementById('exit-modal-subtitle').textContent = cfg.subtitle;
-    if (cfg.submitButtonLabel) document.getElementById('submit-exit').textContent = cfg.submitButtonLabel;
+
+    // Reset the submit button each time the modal opens. After a prior
+    // submission submitExitTicket() set display='none' and rewrote the
+    // label to 'Grading…'; without this reset, a second invocation
+    // (e.g. the fresh exit-ticket sample after remediation walkthrough)
+    // would render the modal with no submit button until the user
+    // refreshed the page.
+    const submitBtn = document.getElementById('submit-exit');
+    if (submitBtn) {
+        submitBtn.style.display = '';
+        submitBtn.disabled = true;   // re-enabled by checkExitSubmitReady once all questions are answered
+        submitBtn.textContent = cfg.submitButtonLabel || 'Submit Quiz';
+    }
+    // Reset the per-attempt answer cache so prior fills don't leak
+    // into the new attempt's progress indicator.
+    if (typeof exitAnswers !== 'undefined') {
+        try { Object.keys(exitAnswers).forEach(k => delete exitAnswers[k]); } catch (e) {}
+    }
 
     // Hide chat input area when present (chat_tutor.html). Pretest page
     // doesn't have one, so the lookup falls through harmlessly.
