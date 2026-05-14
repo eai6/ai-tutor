@@ -23,6 +23,8 @@
                         <span class="badge badge-warning" style="font-size: 1rem; padding: 0.5rem 1rem;">Processing...</span>
                     {% elif upload.status == 'failed' %}
                         <span class="badge badge-danger" style="font-size: 1rem; padding: 0.5rem 1rem;">Failed</span>
+                    {% elif upload.status == 'pending_confirmation' %}
+                        <span class="badge badge-info" style="font-size: 1rem; padding: 0.5rem 1rem;">Awaiting confirmation</span>
                     {% else %}
                         <span class="badge badge-secondary" style="font-size: 1rem; padding: 0.5rem 1rem;">Pending</span>
                     {% endif %}
@@ -46,10 +48,69 @@
             </div>
             {% endif %}
 
+            {% if upload.status == 'pending_confirmation' %}
+            {% if cost_verdict_label == 'red' %}
+                {% with bgcolor='#FEE2E2' textcolor='#991B1B' bordercolor='#F87171' %}
+                <div style="background:{{ bgcolor }};border:1px solid {{ bordercolor }};border-radius:8px;padding:1.25rem;margin-top:1rem;color:{{ textcolor }};">
+                    <div style="font-size:1.1rem;font-weight:600;margin-bottom:0.5rem;">⛔ Cost over hard-block threshold</div>
+                    <div style="font-size:0.9rem;margin-bottom:0.75rem;">
+                        Processing this {{ cost_estimate.pages }}-page material would cost an estimated
+                        <strong>${{ cost_estimate.estimated_cost_usd }}</strong>
+                        — above the $50 hard-block. Only a super-admin can force-confirm.
+                    </div>
+                    {% if is_super_admin %}
+                    <form method="post" action="{% url 'dashboard:material_confirm_processing' upload.id %}" style="display:inline-block;">
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="rich">
+                        <input type="hidden" name="force" value="1">
+                        <button type="submit" class="btn btn-sm" style="background:#DC2626;color:white;border:none;" onclick="return confirm('Force-start a ${{ cost_estimate.estimated_cost_usd }} processing job?');">Force-start (Rich)</button>
+                    </form>
+                    <form method="post" action="{% url 'dashboard:material_confirm_processing' upload.id %}" style="display:inline-block;margin-left:0.5rem;">
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="fast">
+                        <button type="submit" class="btn btn-sm btn-secondary">Fast (free, text-only)</button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="{% url 'dashboard:material_confirm_processing' upload.id %}" style="display:inline-block;">
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="fast">
+                        <button type="submit" class="btn btn-sm btn-secondary">Fast (free, text-only)</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endwith %}
+            {% else %}
+                {% if cost_verdict_label == 'yellow' %}
+                    {% with bgcolor='#FEF3C7' textcolor='#92400E' bordercolor='#FBBF24' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
+                {% else %}
+                    {% with bgcolor='#ECFDF5' textcolor='#065F46' bordercolor='#34D399' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
+                {% endif %}
+            {% endif %}
+            {% endif %}
+
+            {% if upload.status == 'processing' and upload.pages_total > 0 %}
+            <div style="margin-top: 1rem;">
+                <div style="display:flex;justify-content:space-between;font-size:0.875rem;color:var(--gray-600);margin-bottom:0.4rem;">
+                    <span>Pages processed: {{ upload.pages_processed }} of {{ upload.pages_total }}</span>
+                    {% if upload.phase %}<span style="color:var(--gray-500);font-size:0.75rem;">{{ upload.phase }}</span>{% endif %}
+                </div>
+                <div style="height:8px;background:var(--gray-200);border-radius:4px;overflow:hidden;">
+                    <div style="height:100%;background:var(--primary);width:{% widthratio upload.pages_processed upload.pages_total 100 %}%;transition:width 0.3s;"></div>
+                </div>
+            </div>
+            {% endif %}
+
             {% if upload.error_message %}
+            {% if error_detail %}
+            <div style="background: #FEF2F2; border-radius: 8px; padding: 1rem; margin-top: 1rem; color: #991B1B;">
+                <strong>Failed:</strong> {{ error_detail.reason }}<br>
+                <span style="font-size:0.875rem;color:#7F1D1D;">{{ error_detail.detail|default:error_detail.message }}</span>
+            </div>
+            {% else %}
             <div style="background: #FEF2F2; border-radius: 8px; padding: 1rem; margin-top: 1rem; color: #991B1B;">
                 <strong>Error:</strong> {{ upload.error_message }}
             </div>
+            {% endif %}
             {% endif %}
         </div>
     </div>

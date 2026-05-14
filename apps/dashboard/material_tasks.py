@@ -7,10 +7,64 @@ Processes uploaded teaching materials (textbooks, references, worksheets):
 3. Update status and stats on the TeachingMaterialUpload record
 """
 
+import json
 import logging
 from django.utils import timezone
 
+from apps.curriculum.curriculum_parser import OCRFailure
+
 logger = logging.getLogger(__name__)
+
+
+def _make_progress_cb(upload):
+    """Build a progress callback that persists batch-level progress on the row.
+
+    Vision OCR invokes this after each batch completes — we write
+    pages_processed + phase so the materials list page can render a live
+    "47/272" indicator. Failures inside the callback are swallowed (logged
+    only) so a transient DB hiccup doesn't poison an in-flight extraction.
+    """
+    from django.utils import timezone
+
+    def _cb(pages_processed: int, pages_total: int, phase: str) -> None:
+        try:
+            upload.pages_processed = pages_processed
+            upload.pages_total = pages_total
+            upload.phase = phase[:64]
+            upload.updated_at = timezone.now()
+            upload.save(update_fields=['pages_processed', 'pages_total', 'phase', 'updated_at'])
+            print(f"[Material] progress {upload.id}: {pages_processed}/{pages_total} ({phase})", flush=True)
+        except Exception as cb_exc:
+            logger.warning(f"progress_cb persist failed for upload {upload.id}: {cb_exc}")
+
+    return _cb
+
+
+def _record_failure(upload, exc: Exception) -> None:
+    """Persist a structured failure on the upload row.
+
+    OCRFailure → JSON {reason, detail, error_class, message} so the UI can
+    render an actionable message instead of the generic "could not extract"
+    string. Other exceptions get the same envelope with reason='exception'.
+    """
+    if isinstance(exc, OCRFailure):
+        payload = {
+            'reason': exc.reason,
+            'detail': exc.detail,
+            'error_class': type(exc).__name__,
+            'message': str(exc),
+        }
+    else:
+        payload = {
+            'reason': 'exception',
+            'detail': str(exc)[:500],
+            'error_class': type(exc).__name__,
+            'message': str(exc)[:500],
+        }
+    upload.status = 'failed'
+    upload.error_message = json.dumps(payload)
+    upload.save(update_fields=['status', 'error_message'])
+    upload.add_log(f"FAILED ({payload['reason']}): {payload['detail'] or payload['message']}")
 
 
 def process_teaching_material(upload_id: int):
@@ -80,6 +134,8 @@ def process_teaching_material(upload_id: int):
             material_title=upload.title,
             material_type=upload.material_type,
             upload_id=upload.id,
+            extract_figures=True,   # Rich pipeline → run figure-vision pass
+            progress_cb=_make_progress_cb(upload),
         )
 
         # Update with results
@@ -118,13 +174,15 @@ def process_teaching_material(upload_id: int):
         )
         return result
 
+    except OCRFailure as exc:
+        print(f"[Material] OCR FAILED {upload.original_filename}: {exc.reason} — {exc.detail}", flush=True)
+        _record_failure(upload, exc)
+        logger.error(f"Teaching material OCR failed for upload {upload_id}: {exc}")
+        raise
     except Exception as e:
         print(f"[Material] FAILED {upload.original_filename}: {e}", flush=True)
         import traceback; traceback.print_exc()
-        upload.status = 'failed'
-        upload.error_message = str(e)[:500]
-        upload.save()
-        upload.add_log(f"FAILED: {e}")
+        _record_failure(upload, e)
         logger.error(f"Teaching material processing failed for upload {upload_id}: {e}")
         raise
 
@@ -164,6 +222,8 @@ def process_teaching_material_fast(upload_id: int):
             material_title=upload.title,
             material_type=upload.material_type,
             upload_id=upload.id,
+            extract_figures=False,   # Fast pipeline → text-only, no vision fan-out
+            progress_cb=_make_progress_cb(upload),
         )
 
         upload.extracted_text_length = result.get('text_length', 0)
@@ -180,12 +240,13 @@ def process_teaching_material_fast(upload_id: int):
         upload.add_log(f"Completed: {upload.chunks_created} chunks, {upload.figures_extracted} figures")
         return result
 
+    except OCRFailure as exc:
+        print(f"[MaterialFast] OCR FAILED {upload.original_filename}: {exc.reason} — {exc.detail}", flush=True)
+        _record_failure(upload, exc)
+        raise
     except Exception as e:
-        upload.status = 'failed'
-        upload.error_message = str(e)
-        upload.save()
         print(f"[MaterialFast] FAILED {upload.original_filename}: {e}", flush=True)
-        upload.add_log(f"FAILED: {e}")
+        _record_failure(upload, e)
         raise
 
 

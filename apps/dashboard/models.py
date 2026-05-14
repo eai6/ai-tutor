@@ -94,6 +94,7 @@ class TeachingMaterialUpload(models.Model):
     """Track teaching material uploads (textbooks, references, worksheets)."""
 
     class Status(models.TextChoices):
+        PENDING_CONFIRMATION = 'pending_confirmation', 'Awaiting confirmation'
         PENDING = 'pending', 'Pending'
         PROCESSING = 'processing', 'Processing'
         COMPLETED = 'completed', 'Completed'
@@ -158,6 +159,20 @@ class TeachingMaterialUpload(models.Model):
     chunks_created = models.IntegerField(default=0)
     figures_extracted = models.IntegerField(default=0, db_default=0)
     processing_log = models.TextField(blank=True)
+
+    # P2: progress tracking — written per-batch by the streaming OCR loop
+    # so the materials list page can show "47/272 pages" while a long
+    # extraction is in flight. Also load-bearing for P3 resume-from-Job-restart.
+    pages_total = models.IntegerField(default=0, db_default=0)
+    pages_processed = models.IntegerField(default=0, db_default=0)
+    phase = models.CharField(max_length=64, blank=True, db_default='')
+
+    # P3/P4: cost preview + Container Apps Job tracking
+    estimated_cost_usd = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    estimated_duration_seconds = models.IntegerField(null=True, blank=True)
+    job_execution_name = models.CharField(max_length=128, blank=True, db_default='')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

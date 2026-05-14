@@ -24,6 +24,7 @@ from pulumi_azure_native import (
     storage,
     dbforpostgresql,
     communication,
+    authorization,
 )
 
 config = Config("aitutor")
@@ -336,12 +337,100 @@ if email_domain:
 container_app_name = f"aitutor-{stack}-app"
 image = acr.login_server.apply(lambda s: f"{s}/aitutor:latest")
 
+# Shared secret + env config — used by BOTH the main Container App and the
+# material-processor Container Apps Job. Keeping the lists factored out
+# means a new env var or secret only has to be added once. Conditional
+# ACS-email blocks are appended inline at the call site (so we don't carry
+# a stale subset when ACS isn't configured).
+shared_secrets = [
+    app.SecretArgs(name="acr-password", value=acr_credentials.apply(lambda c: c.passwords[0].value)),
+    app.SecretArgs(name="database-url", value=database_url),
+    app.SecretArgs(name="django-secret-key", value=django_secret_key),
+    app.SecretArgs(name="anthropic-api-key", value=anthropic_api_key),
+    app.SecretArgs(name="openai-api-key", value=openai_api_key),
+    app.SecretArgs(name="google-api-key", value=google_api_key),
+    app.SecretArgs(name="elevenlabs-api-key", value=elevenlabs_api_key),
+] + ([
+    app.SecretArgs(name="acs-connection-string", value=acs_connection_string),
+] if acs_connection_string is not None else [])
+
+shared_registries = [
+    app.RegistryCredentialsArgs(
+        server=acr.login_server,
+        username=acr_credentials.apply(lambda c: c.username),
+        password_secret_ref="acr-password",
+    ),
+]
+
+
+def _build_app_env_vars(*, csrf_origins=None, include_job_dispatch_env=False):
+    """Return the env-var list shared between the main app and material job.
+
+    csrf_origins: only meaningful for the main app (the Job has no ingress).
+        Pass None for the Job and the var is omitted.
+    include_job_dispatch_env: only the main app needs Azure SDK env vars to
+        dispatch jobs (apps/dashboard/job_dispatch.py reads these).
+        The Job itself doesn't dispatch other jobs, so omit there.
+    """
+    env_vars = [
+        app.EnvironmentVarArgs(name="DATABASE_URL", secret_ref="database-url"),
+        app.EnvironmentVarArgs(name="SECRET_KEY", secret_ref="django-secret-key"),
+        app.EnvironmentVarArgs(name="ANTHROPIC_API_KEY", secret_ref="anthropic-api-key"),
+        app.EnvironmentVarArgs(name="OPENAI_API_KEY", secret_ref="openai-api-key"),
+        app.EnvironmentVarArgs(name="GOOGLE_API_KEY", secret_ref="google-api-key"),
+        app.EnvironmentVarArgs(name="DEBUG", value="False"),
+        app.EnvironmentVarArgs(name="EMBEDDING_BACKEND", value="local"),
+        app.EnvironmentVarArgs(name="VECTORDB_ROOT", value="/tmp/vectordb"),
+        app.EnvironmentVarArgs(name="ALLOWED_HOSTS", value="*"),
+        app.EnvironmentVarArgs(name="TTS_BACKEND", value="elevenlabs"),
+        app.EnvironmentVarArgs(name="STT_BACKEND", value="elevenlabs"),
+        app.EnvironmentVarArgs(name="ELEVENLABS_API_KEY", secret_ref="elevenlabs-api-key"),
+        app.EnvironmentVarArgs(name="POSTHOG_DISABLED", value="true"),
+        app.EnvironmentVarArgs(name="INSTRUCTOR_TELEMETRY", value="false"),
+    ]
+    if include_job_dispatch_env:
+        env_vars.extend([
+            app.EnvironmentVarArgs(name="AZURE_RESOURCE_GROUP", value=rg.name),
+            app.EnvironmentVarArgs(
+                name="AZURE_MATERIAL_JOB_NAME",
+                value=f"aitutor-{stack}-material-job",
+            ),
+            app.EnvironmentVarArgs(
+                name="AZURE_SUBSCRIPTION_ID",
+                value=az_config.require("subscriptionId"),
+            ),
+        ])
+    if csrf_origins is not None:
+        env_vars.append(app.EnvironmentVarArgs(name="CSRF_TRUSTED_ORIGINS", value=csrf_origins))
+    if acs_connection_string is not None:
+        env_vars.extend([
+            app.EnvironmentVarArgs(
+                name="AZURE_COMMUNICATION_CONNECTION_STRING",
+                secret_ref="acs-connection-string",
+            ),
+            app.EnvironmentVarArgs(
+                name="AZURE_COMMUNICATION_SENDER_ADDRESS",
+                value=acs_sender_address,
+            ),
+            app.EnvironmentVarArgs(
+                name="DEFAULT_FROM_EMAIL",
+                value=Output.concat(email_from_display_name, " <", acs_sender_address, ">"),
+            ),
+        ])
+    return env_vars
+
 container_app = app.ContainerApp(
     container_app_name,
     container_app_name=container_app_name,
     resource_group_name=rg.name,
     managed_environment_id=env.id,
     workload_profile_name="dedicated-d4",
+    # System-assigned managed identity — used by apps/dashboard/job_dispatch.py
+    # to call ARM and start material-processor Job executions. Role assignment
+    # below grants this identity the right to start the specific Job.
+    identity=app.ManagedServiceIdentityArgs(
+        type=app.ManagedServiceIdentityType.SYSTEM_ASSIGNED,
+    ),
     configuration=app.ConfigurationArgs(
         ingress=app.IngressArgs(
             external=True,
@@ -356,27 +445,8 @@ container_app = app.ContainerApp(
                 for domain in custom_domains
             ] if custom_domains else None,
         ),
-        registries=[
-            app.RegistryCredentialsArgs(
-                server=acr.login_server,
-                username=acr_credentials.apply(lambda c: c.username),
-                password_secret_ref="acr-password",
-            ),
-        ],
-        secrets=[
-            app.SecretArgs(name="acr-password", value=acr_credentials.apply(lambda c: c.passwords[0].value)),
-            app.SecretArgs(name="database-url", value=database_url),
-            app.SecretArgs(name="django-secret-key", value=django_secret_key),
-            app.SecretArgs(name="anthropic-api-key", value=anthropic_api_key),
-            app.SecretArgs(name="openai-api-key", value=openai_api_key),
-            app.SecretArgs(name="google-api-key", value=google_api_key),
-            app.SecretArgs(name="elevenlabs-api-key", value=elevenlabs_api_key),
-        ] + ([
-            app.SecretArgs(
-                name="acs-connection-string",
-                value=acs_connection_string,
-            ),
-        ] if acs_connection_string is not None else []),
+        registries=shared_registries,
+        secrets=shared_secrets,
     ),
     template=app.TemplateArgs(
         containers=[
@@ -387,45 +457,13 @@ container_app = app.ContainerApp(
                     cpu=4.0,
                     memory="8Gi",
                 ),
-                env=[
-                    app.EnvironmentVarArgs(name="DATABASE_URL", secret_ref="database-url"),
-                    app.EnvironmentVarArgs(name="SECRET_KEY", secret_ref="django-secret-key"),
-                    app.EnvironmentVarArgs(name="ANTHROPIC_API_KEY", secret_ref="anthropic-api-key"),
-                    app.EnvironmentVarArgs(name="OPENAI_API_KEY", secret_ref="openai-api-key"),
-                    app.EnvironmentVarArgs(name="GOOGLE_API_KEY", secret_ref="google-api-key"),
-                    app.EnvironmentVarArgs(name="DEBUG", value="False"),
-                    app.EnvironmentVarArgs(name="EMBEDDING_BACKEND", value="local"),
-                    app.EnvironmentVarArgs(name="VECTORDB_ROOT", value="/tmp/vectordb"),
-                    app.EnvironmentVarArgs(
-                        name="ALLOWED_HOSTS",
-                        value="*",
+                env=_build_app_env_vars(
+                    csrf_origins=Output.concat(
+                        "https://", container_app_name, ".", env.default_domain,
+                        "".join(f",https://{d}" for d in custom_domains),
                     ),
-                    app.EnvironmentVarArgs(
-                        name="CSRF_TRUSTED_ORIGINS",
-                        value=Output.concat(
-                            "https://", container_app_name, ".", env.default_domain,
-                            "".join(f",https://{d}" for d in custom_domains),
-                        ),
-                    ),
-                    app.EnvironmentVarArgs(name="TTS_BACKEND", value="elevenlabs"),
-                    app.EnvironmentVarArgs(name="STT_BACKEND", value="elevenlabs"),
-                    app.EnvironmentVarArgs(name="ELEVENLABS_API_KEY", secret_ref="elevenlabs-api-key"),
-                    app.EnvironmentVarArgs(name="POSTHOG_DISABLED", value="true"),
-                    app.EnvironmentVarArgs(name="INSTRUCTOR_TELEMETRY", value="false"),
-                ] + ([
-                    app.EnvironmentVarArgs(
-                        name="AZURE_COMMUNICATION_CONNECTION_STRING",
-                        secret_ref="acs-connection-string",
-                    ),
-                    app.EnvironmentVarArgs(
-                        name="AZURE_COMMUNICATION_SENDER_ADDRESS",
-                        value=acs_sender_address,
-                    ),
-                    app.EnvironmentVarArgs(
-                        name="DEFAULT_FROM_EMAIL",
-                        value=Output.concat(email_from_display_name, " <", acs_sender_address, ">"),
-                    ),
-                ] if acs_connection_string is not None else []),
+                    include_job_dispatch_env=True,
+                ),
                 volume_mounts=[
                     app.VolumeMountArgs(
                         volume_name="media-volume",
@@ -500,6 +538,98 @@ container_app = app.ContainerApp(
     ),
 )
 
+# ── 9. Container Apps Job — material processor ────────────────────────────
+# Runs `python manage.py process_material <upload_id>` for materials with
+# >=50 pages (the routing threshold lives in apps.dashboard.material_routing).
+# Same image as the main app — every code deploy automatically updates the
+# Job's image too, since both reference `aitutor:latest` in ACR. The
+# main web app dispatches via `az containerapp job start` (or the Azure
+# Management SDK from Python).
+#
+# Why a Job instead of a daemon thread inside gunicorn:
+#   - Survives main-app restarts AND code deploys mid-run
+#   - On-demand only — zero idle cost
+#   - 24 h replica timeout means we never have to bump the limit for a
+#     larger textbook or a temporary rate-limit slowdown
+material_job_name = f"aitutor-{stack}-material-job"
+material_job = app.Job(
+    material_job_name,
+    job_name=material_job_name,
+    resource_group_name=rg.name,
+    environment_id=env.id,
+    workload_profile_name="dedicated-d4",
+    configuration=app.JobConfigurationArgs(
+        replica_timeout=86400,         # 24 h hard ceiling — never revisit
+        replica_retry_limit=2,         # auto-retry on container restart
+        trigger_type=app.TriggerType.MANUAL,
+        manual_trigger_config=app.JobConfigurationManualTriggerConfigArgs(
+            parallelism=1,
+            replica_completion_count=1,
+        ),
+        registries=shared_registries,
+        secrets=shared_secrets,
+    ),
+    template=app.JobTemplateArgs(
+        containers=[
+            app.ContainerArgs(
+                name="material-processor",
+                image=image,
+                # Smaller than main app — vision LLM is mostly outbound HTTP
+                # wait, not compute. 2 CPU / 4 Gi is plenty for 5-way
+                # concurrent vision requests.
+                resources=app.ContainerResourcesArgs(cpu=2.0, memory="4Gi"),
+                # Default command. Per-execution `args` override (the upload
+                # id) is supplied by the dispatcher (`az containerapp job
+                # start --args ...` or SDK equivalent).
+                command=["python", "manage.py", "process_material"],
+                env=_build_app_env_vars(csrf_origins=None),
+                volume_mounts=[
+                    app.VolumeMountArgs(
+                        volume_name="media-volume",
+                        mount_path="/app/media",
+                    ),
+                ],
+            ),
+        ],
+        volumes=[
+            app.VolumeArgs(
+                name="media-volume",
+                storage_type=app.StorageType.AZURE_FILE,
+                storage_name="mediastorage",
+            ),
+        ],
+    ),
+    opts=pulumi.ResourceOptions(depends_on=[env_storage]),
+)
+
+# Grant the main Container App's managed identity permission to start
+# executions of this Job. "Container Apps Operator" role:
+#   roleDefinitionId = 358470bc-b998-42bd-ab17-a7e34c199c0f
+# Scope is the Job itself (least privilege — main app can only touch this
+# specific Job, not any other resource in the RG).
+material_job_role_assignment = authorization.RoleAssignment(
+    f"aitutor-{stack}-app-material-job-operator",
+    role_assignment_name=Output.all(container_app.id, material_job.id).apply(
+        # Stable UUID derived from (principal, scope) so re-runs find the
+        # same assignment instead of creating duplicates.
+        lambda args: __import__("uuid").uuid5(
+            __import__("uuid").NAMESPACE_URL,
+            f"{args[0]}:{args[1]}:operator",
+        ).hex
+    ),
+    scope=material_job.id,
+    principal_id=container_app.identity.apply(
+        lambda i: i.principal_id if i and i.principal_id else ""
+    ),
+    principal_type=authorization.PrincipalType.SERVICE_PRINCIPAL,
+    role_definition_id=Output.concat(
+        "/subscriptions/",
+        az_config.require("subscriptionId"),
+        "/providers/Microsoft.Authorization/roleDefinitions/"
+        "358470bc-b998-42bd-ab17-a7e34c199c0f",   # Container Apps Operator
+    ),
+)
+
 # ── Exports ─────────────────────────────────────────────────────────────────
 pulumi.export("app_url", container_app.configuration.apply(
     lambda c: f"https://{c.ingress.fqdn}" if c and c.ingress and c.ingress.fqdn else "pending"
@@ -526,6 +656,7 @@ pulumi.export("custom_domains_bound", custom_domains)
 pulumi.export("container_app_default_fqdn", container_app.configuration.apply(
     lambda c: c.ingress.fqdn if c and c.ingress and c.ingress.fqdn else "pending"
 ))
+pulumi.export("material_job_name", material_job.name)
 
 # Email outputs — see DNS records the user must add at their registrar.
 for key, value in email_dns_outputs.items():

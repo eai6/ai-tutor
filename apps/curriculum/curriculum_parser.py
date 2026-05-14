@@ -23,6 +23,37 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# TYPED EXCEPTIONS
+# =============================================================================
+
+class OCRFailure(Exception):
+    """Vision-OCR fallback failed in a classifiable way.
+
+    Carries a stable `reason` slug (used by the materials pipeline to render
+    actionable UI + drive routing), plus a free-text `detail` for the log.
+    """
+
+    REASONS = (
+        'no_config',         # No active ModelConfig for the generation purpose
+        'rate_limit',        # 429 / sustained backoff
+        'auth',              # 401 / API key invalid
+        'context_too_large', # 400 from provider — page batch exceeds context window
+        'timeout',           # connection / request timeout
+        'oversized_page',    # all pages still over MAX_IMAGE_BYTES after fallback
+        'no_pages',          # zero renderable pages
+        'empty_response',    # provider returned no text
+        'unknown',           # uncategorised — see detail
+    )
+
+    def __init__(self, reason: str, detail: str = ''):
+        if reason not in self.REASONS:
+            reason = 'unknown'
+        self.reason = reason
+        self.detail = detail
+        super().__init__(f"OCR failed ({reason}): {detail}" if detail else f"OCR failed ({reason})")
+
+
+# =============================================================================
 # STRUCTURED OUTPUT SCHEMAS
 # =============================================================================
 
@@ -65,24 +96,28 @@ class ParsedCurriculum:
 # TEXT EXTRACTION
 # ============================================================================
 
-def extract_text_from_file(file_path: str) -> Tuple[str, str]:
+def extract_text_from_file(file_path: str, progress_cb=None) -> Tuple[str, str]:
     """
     Extract text from curriculum file.
-    
+
     Returns: (text, file_type)
+
+    progress_cb is forwarded to extract_from_pdf for materials uploads that
+    want per-batch progress updates from the vision-OCR fallback. Other file
+    types ignore it (no streaming work to report on).
     """
     ext = os.path.splitext(file_path)[1].lower()
-    
+
     if ext in ['.txt', '.md']:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             text = f.read()
         return text, 'text'
-    
+
     elif ext == '.docx':
         return extract_from_docx(file_path), 'docx'
-    
+
     elif ext == '.pdf':
-        return extract_from_pdf(file_path), 'pdf'
+        return extract_from_pdf(file_path, progress_cb=progress_cb), 'pdf'
 
     elif ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif']:
         return extract_from_image(file_path), 'image'
@@ -120,8 +155,19 @@ def extract_from_docx(file_path: str) -> str:
             return f.read()
 
 
-def extract_from_pdf(file_path: str) -> str:
-    """Extract text from PDF, with multimodal LLM fallback for scanned docs."""
+def extract_from_pdf(file_path: str, progress_cb=None) -> str:
+    """Extract text from PDF, with multimodal LLM fallback for scanned docs.
+
+    OCRFailure (typed) propagates so the materials pipeline can record a
+    structured error. Generic exceptions are still swallowed → "" to
+    preserve historical behavior for other callers (curriculum upload).
+
+    Args:
+        file_path: PDF path
+        progress_cb: optional ``(pages_processed, pages_total, phase)`` callback
+            forwarded to ``_extract_pdf_with_vision`` so materials uploads can
+            update their `pages_processed` / `phase` fields per batch.
+    """
     try:
         import fitz
         doc = fitz.open(file_path)
@@ -138,14 +184,19 @@ def extract_from_pdf(file_path: str) -> str:
         # Multimodal LLM fallback
         logger.info(f"Low text ({len(text.strip())} chars), trying LLM vision: {file_path}")
         try:
-            llm_text = _extract_pdf_with_vision(doc)
+            llm_text = _extract_pdf_with_vision(doc, progress_cb=progress_cb)
+        except OCRFailure:
             doc.close()
-            return llm_text if len(llm_text.strip()) > len(text.strip()) else text
+            raise   # propagate typed failures so callers can render structured errors
         except Exception as e:
-            logger.warning(f"LLM vision extraction failed: {e}")
+            logger.warning(f"LLM vision extraction failed (uncategorised): {e}")
             doc.close()
             return text
+        doc.close()
+        return llm_text if len(llm_text.strip()) > len(text.strip()) else text
 
+    except OCRFailure:
+        raise
     except Exception as e:
         logger.error(f"PDF extraction failed: {e}")
         return ""
@@ -346,49 +397,97 @@ def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
     return results
 
 
-def _extract_pdf_with_vision(doc) -> str:
+def _classify_llm_error(exc: Exception) -> str:
+    """Map a provider exception to an OCRFailure.REASONS slug.
+
+    Pattern-matches by exception class name + message — avoids importing
+    every provider SDK at the top of the parser. Returns 'unknown' for
+    anything we haven't seen yet so the detail string can carry context.
+    """
+    name = type(exc).__name__
+    msg = str(exc).lower()
+    if 'ratelimit' in name.lower() or '429' in msg or 'rate limit' in msg:
+        return 'rate_limit'
+    if 'auth' in name.lower() or '401' in msg or 'invalid api key' in msg or 'unauthorized' in msg:
+        return 'auth'
+    if 'timeout' in name.lower() or 'timed out' in msg:
+        return 'timeout'
+    if 'context' in msg and ('length' in msg or 'window' in msg or 'limit' in msg):
+        return 'context_too_large'
+    if '400' in msg and 'too large' in msg:
+        return 'context_too_large'
+    return 'unknown'
+
+
+_VISION_MAX_IMAGE_BYTES = 4_500_000  # stay under Anthropic's 5MB image limit
+_VISION_BATCH_SIZE = 10              # pages per LLM call
+_VISION_MAX_WORKERS = 5              # concurrent in-flight batches
+
+
+def _render_page_for_vision(page) -> Optional[Tuple[str, str]]:
+    """Render one PyMuPDF page → (base64_str, media_type) or None if oversized.
+
+    Cascades 200-DPI PNG → 200-DPI JPEG → 120-DPI JPEG, dropping the page only
+    if even the smallest variant exceeds the 4.5 MB Anthropic image limit.
+    """
+    import base64
+    pix = page.get_pixmap(dpi=200)
+    img_bytes = pix.tobytes("png")
+    media_type = "image/png"
+    if len(img_bytes) > _VISION_MAX_IMAGE_BYTES:
+        img_bytes = pix.tobytes("jpeg", jpg_quality=80)
+        media_type = "image/jpeg"
+    if len(img_bytes) > _VISION_MAX_IMAGE_BYTES:
+        pix = page.get_pixmap(dpi=120)
+        img_bytes = pix.tobytes("jpeg", jpg_quality=80)
+    if len(img_bytes) > _VISION_MAX_IMAGE_BYTES:
+        return None
+    return base64.b64encode(img_bytes).decode("utf-8"), media_type
+
+
+def _extract_pdf_with_vision(
+    doc,
+    progress_cb=None,
+    start_page: int = 0,
+):
     """
     Render PDF pages to images and use multimodal LLM to extract content.
 
-    Processes pages in batches of 10 to stay within token limits.
-    Builds provider-appropriate multimodal message format.
+    Streams page rendering (one batch at a time) and dispatches batches
+    concurrently (up to _VISION_MAX_WORKERS in flight) so memory stays bounded
+    AND wall-clock drops ~5× vs the old sequential implementation.
+
+    Args:
+        doc: PyMuPDF document handle (caller owns close())
+        progress_cb: Optional callback ``(pages_processed, pages_total, phase)``
+            invoked after each batch completes. Used by the materials pipeline
+            to write `pages_processed` + `phase` on the upload row so the UI
+            can show a live progress indicator.
+        start_page: Resume hint (P3). Pages [0, start_page) are skipped — the
+            caller is expected to have already indexed those chunks.
+
+    Raises:
+        OCRFailure: classifiable failure (rate limit, timeout, etc.) — see
+            OCRFailure.REASONS. Detail includes the failing batch index.
     """
-    import base64
+    from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
 
     config = ModelConfig.get_for('generation')
     if not config:
-        raise RuntimeError("No active LLM model configured")
+        raise OCRFailure('no_config', "No active ModelConfig for purpose='generation'")
 
     client = get_llm_client(config)
-
-    # Render pages to images at 200 DPI, falling back to lower DPI or JPEG if too large
-    MAX_IMAGE_BYTES = 4_500_000  # stay under Anthropic's 5MB limit
-    page_images = []   # list of (base64_str, media_type)
-    for page in doc:
-        pix = page.get_pixmap(dpi=200)
-        img_bytes = pix.tobytes("png")
-        media_type = "image/png"
-
-        # If PNG too large, try JPEG (much smaller for scanned content)
-        if len(img_bytes) > MAX_IMAGE_BYTES:
-            img_bytes = pix.tobytes("jpeg", jpg_quality=80)
-            media_type = "image/jpeg"
-
-        # If still too large, re-render at lower DPI
-        if len(img_bytes) > MAX_IMAGE_BYTES:
-            pix = page.get_pixmap(dpi=120)
-            img_bytes = pix.tobytes("jpeg", jpg_quality=80)
-
-        # Skip pages that are still too large
-        if len(img_bytes) > MAX_IMAGE_BYTES:
-            logger.warning(f"Page image still too large ({len(img_bytes)} bytes) after compression, skipping")
-            continue
-
-        page_images.append((base64.b64encode(img_bytes).decode("utf-8"), media_type))
-
     is_anthropic = config.provider == ModelConfig.Provider.ANTHROPIC
+
+    pages_total = len(doc)
+    if pages_total == 0:
+        raise OCRFailure('no_pages', "PDF rendered zero pages.")
+
+    if start_page >= pages_total:
+        # Caller has already processed everything — nothing to do.
+        return ""
 
     system_prompt = (
         "You are a document text extraction assistant. "
@@ -401,40 +500,125 @@ def _extract_pdf_with_vision(doc) -> str:
         "(maps, diagrams, charts) from these document pages."
     )
 
-    # Process in batches of 10 pages
-    all_text_parts = []
-    batch_size = 10
+    # Build batch boundaries [start, end) over the unprocessed page range.
+    batches = [
+        (i, min(i + _VISION_BATCH_SIZE, pages_total))
+        for i in range(start_page, pages_total, _VISION_BATCH_SIZE)
+    ]
+    total_batches = len(batches)
+    results: List[Optional[str]] = [None] * total_batches
+    pages_done = start_page  # global counter, includes resumed pages
+    skipped_oversized_total = 0
 
-    for i in range(0, len(page_images), batch_size):
-        batch = page_images[i:i + batch_size]
+    def _llm_call(batch_idx: int, rendered: List[Tuple[str, str]]) -> str:
+        """LLM call only — runs in worker thread.
 
-        # Build multimodal content blocks
+        PyMuPDF docs aren't thread-safe for reads, so rendering happens in the
+        main thread before submit (see _render_batch). Workers only do the
+        outbound HTTP — vision calls are I/O wait.
+        """
+        if not rendered:
+            return ""   # entire batch was oversized; skip silently
         content_blocks = []
-        for img_b64, media_type in batch:
+        for img_b64, media_type in rendered:
             if is_anthropic:
                 content_blocks.append({
                     "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": media_type,
-                        "data": img_b64,
-                    },
+                    "source": {"type": "base64", "media_type": media_type, "data": img_b64},
                 })
             else:
                 content_blocks.append({
                     "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{media_type};base64,{img_b64}",
-                    },
+                    "image_url": {"url": f"data:{media_type};base64,{img_b64}"},
                 })
-
         content_blocks.append({"type": "text", "text": extraction_prompt})
-
         messages = [{"role": "user", "content": content_blocks}]
-        response = client.generate(messages=messages, system_prompt=system_prompt, max_tokens=4096)
-        all_text_parts.append(response.content)
+        try:
+            response = client.generate(
+                messages=messages, system_prompt=system_prompt, max_tokens=4096,
+            )
+        except Exception as exc:
+            reason = _classify_llm_error(exc)
+            detail = (
+                f"batch {batch_idx + 1}/{total_batches} "
+                f"(pages {batches[batch_idx][0] + 1}-{batches[batch_idx][1]}): "
+                f"{type(exc).__name__}: {str(exc)[:300]}"
+            )
+            raise OCRFailure(reason, detail) from exc
+        return response.content
 
-    return "\n\n".join(all_text_parts)
+    def _render_batch(batch_idx: int) -> Tuple[List[Tuple[str, str]], int]:
+        """Render pages for batch_idx in main thread. Returns (rendered, skipped_oversized)."""
+        start, end = batches[batch_idx]
+        rendered = []
+        skipped = 0
+        for page_idx in range(start, end):
+            r = _render_page_for_vision(doc[page_idx])
+            if r is None:
+                logger.warning(
+                    f"Page {page_idx + 1} oversized after fallback compression — skipping"
+                )
+                skipped += 1
+            else:
+                rendered.append(r)
+        return rendered, skipped
+
+    # Sliding window: keep at most _VISION_MAX_WORKERS batches in flight.
+    # Render the next batch in the main thread, submit to executor, wait for
+    # at least one to complete, then continue. Caps in-flight memory at
+    # ~5 × 10 pages × ~4 MB ≈ 200 MB.
+    with ThreadPoolExecutor(max_workers=_VISION_MAX_WORKERS) as executor:
+        in_flight: Dict[object, Tuple[int, int]] = {}  # future -> (batch_idx, batch_pages)
+        next_to_submit = 0
+
+        def _submit_next():
+            nonlocal next_to_submit, skipped_oversized_total
+            while next_to_submit < total_batches and len(in_flight) < _VISION_MAX_WORKERS:
+                bi = next_to_submit
+                rendered, skipped = _render_batch(bi)
+                skipped_oversized_total += skipped
+                start, end = batches[bi]
+                fut = executor.submit(_llm_call, bi, rendered)
+                in_flight[fut] = (bi, end - start)
+                next_to_submit += 1
+
+        _submit_next()
+
+        while in_flight:
+            done, _pending = wait(list(in_flight.keys()), return_when=FIRST_COMPLETED)
+            for done_fut in done:
+                bi, batch_pages = in_flight.pop(done_fut)
+                try:
+                    results[bi] = done_fut.result()
+                except OCRFailure:
+                    # Cancel the rest and re-raise. as_completed semantics
+                    # mean other in-flight calls keep running until cancel
+                    # propagates — that's acceptable.
+                    for f in in_flight:
+                        f.cancel()
+                    raise
+                pages_done += batch_pages
+                if progress_cb is not None:
+                    try:
+                        progress_cb(pages_done, pages_total, f"vision_ocr_p{pages_done}_of_{pages_total}")
+                    except Exception as cb_exc:
+                        logger.warning(f"progress_cb raised — ignoring: {cb_exc}")
+            _submit_next()
+
+    # Concatenate in batch order. Empty across all batches → empty_response.
+    if not any(r and r.strip() for r in results):
+        if skipped_oversized_total == sum(end - start for start, end in batches):
+            raise OCRFailure(
+                'oversized_page',
+                f"All {skipped_oversized_total} page(s) exceeded {_VISION_MAX_IMAGE_BYTES} bytes "
+                f"after fallback to 120 DPI JPEG."
+            )
+        raise OCRFailure(
+            'empty_response',
+            f"Vision LLM returned no text across {total_batches} batch(es).",
+        )
+
+    return "\n\n".join(r for r in results if r)
 
 
 def extract_curriculum_with_vision(file_path: str, subject: str, grade_level: str) -> Optional['ParsedCurriculum']:

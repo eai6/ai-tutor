@@ -164,3 +164,7 @@ drf-spectacular>=0.27.0
 # Azure Communication Services Email — transactional email backend
 # (password reset, etc). See apps/safety/email_backends.py.
 azure-communication-email>=1.0.0
+# Azure Container Apps Job dispatch — used by apps/dashboard/job_dispatch.py
+# to start material-processor Job executions for large textbook uploads.
+azure-identity>=1.16.0
+azure-mgmt-appcontainers>=3.0.0

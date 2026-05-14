@@ -612,7 +612,9 @@ class CurriculumKnowledgeBase:
         grade_level: str,
         material_title: str,
         material_type: str = 'textbook',
-        upload_id: int = None
+        upload_id: int = None,
+        extract_figures: bool = True,
+        progress_cb=None,
     ) -> Dict:
         """
         Parse a teaching material (textbook, reference, worksheet) and index it.
@@ -627,6 +629,13 @@ class CurriculumKnowledgeBase:
             material_title: Title of the material
             material_type: Type (textbook, reference, worksheet, notes, other)
             upload_id: Optional TeachingMaterialUpload ID
+            extract_figures: Run vision-LLM figure extraction (Rich pipeline only).
+                Fast pipeline passes False so the call stays text-only — fanning
+                out vision calls per figure-bearing page is the dominant cost
+                for figure-heavy textbooks.
+            progress_cb: Optional ``(pages_processed, pages_total, phase)``
+                callback forwarded to the vision-OCR fallback so the caller can
+                update per-batch progress on the upload row.
 
         Returns:
             Dict with indexing statistics
@@ -634,7 +643,7 @@ class CurriculumKnowledgeBase:
         from apps.curriculum.curriculum_parser import extract_text_from_file
 
         logger.info(f"Parsing teaching material: {file_path}")
-        text, file_type = extract_text_from_file(file_path)
+        text, file_type = extract_text_from_file(file_path, progress_cb=progress_cb)
 
         if not text or len(text) < 100:
             raise ValueError("Could not extract meaningful text from document")
@@ -667,9 +676,11 @@ class CurriculumKnowledgeBase:
         # Index into vector DB
         result = self._index_chunks(chunks)
 
-        # Extract and index figures from PDF (all material types)
+        # Extract and index figures from PDF (Rich-mode only).
+        # Fast mode passes extract_figures=False so it stays a true
+        # text-only path with no vision-LLM fan-out.
         figures_indexed = 0
-        if file_path.lower().endswith('.pdf'):
+        if extract_figures and file_path.lower().endswith('.pdf'):
             try:
                 from apps.curriculum.curriculum_parser import extract_figures_from_pdf
                 figures = extract_figures_from_pdf(file_path, institution_id=self.institution_id)

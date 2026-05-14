@@ -383,8 +383,19 @@
                                 <span class="badge badge-success">Completed</span>
                             {% elif m.status == 'processing' %}
                                 <span class="badge badge-warning">Processing</span>
+                                {% if m.pages_total > 0 %}
+                                <div style="font-size:0.7rem;color:var(--gray-600);margin-top:0.2rem;">
+                                    {{ m.pages_processed }} / {{ m.pages_total }} pages
+                                </div>
+                                <div style="height:3px;background:var(--gray-200);border-radius:2px;margin-top:0.2rem;overflow:hidden;">
+                                    <div style="height:100%;background:var(--primary);width:{% widthratio m.pages_processed m.pages_total 100 %}%;transition:width 0.3s;"></div>
+                                </div>
+                                {% endif %}
+                            {% elif m.status == 'pending_confirmation' %}
+                                <span class="badge" style="background:#FEF3C7;color:#92400E;">Confirm to start</span>
+                                <div style="font-size:0.7rem;color:var(--gray-600);margin-top:0.2rem;">{{ m.pages_total }} pages</div>
                             {% elif m.status == 'failed' %}
-                                <span class="badge badge-danger">Failed</span>
+                                <span class="badge badge-danger" title="{{ m.error_message|truncatechars:200 }}">Failed</span>
                             {% else %}
                                 <span class="badge badge-secondary">Pending</span>
                             {% endif %}

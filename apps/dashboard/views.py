@@ -2569,10 +2569,19 @@ def lesson_session_report(request, lesson_id):
 @teacher_required
 @require_POST
 def process_pending_materials(request, course_id):
-    """Process teaching materials — supports single, batch, or all pending."""
+    """Process teaching materials — supports single, batch, or all pending.
+
+    Routes per-material by page count (MATERIAL_JOB_PAGE_THRESHOLD = 50):
+      - Small (<50 pages): existing in-process daemon-thread pipeline.
+      - Large (>=50 pages): Container Apps Job dispatch. The row goes to
+        'pending' (not 'pending_confirmation') because the user is already
+        clicking a "Process now" button — confirmation already implicit.
+    """
     from apps.dashboard.models import TeachingMaterialUpload
     from apps.dashboard.material_tasks import process_teaching_material, process_teaching_material_fast
+    from apps.dashboard.material_routing import should_dispatch_to_job
     from apps.dashboard.background_tasks import run_async
+    from apps.dashboard.job_dispatch import dispatch_material_job
 
     institution = request.staff_ctx['institution']
     course = get_scoped_object_or_404(Course, institution, id=course_id)
@@ -2601,7 +2610,8 @@ def process_pending_materials(request, course_id):
         to_process = TeachingMaterialUpload.objects.filter(
             course=course,
         ).filter(
-            Q(status='pending') | Q(status='processing', chunks_created=0) | Q(status='failed')
+            Q(status='pending') | Q(status='pending_confirmation') |
+            Q(status='processing', chunks_created=0) | Q(status='failed')
         )
 
     count = to_process.count()
@@ -2609,30 +2619,59 @@ def process_pending_materials(request, course_id):
         messages.info(request, "No materials to process.")
         return redirect('dashboard:course_detail', course_id=course.id)
 
-    # Mark as processing and start background thread
-    material_ids = list(to_process.values_list('id', flat=True))
-    to_process.update(status='processing')
+    # Split by routing — same threshold (>=50 pages → Job).
+    in_process_ids = []
+    job_dispatched = 0
+    job_dispatch_errors = []
+    for material in to_process:
+        use_job, page_count = should_dispatch_to_job(material.file_path)
+        # Update page count on the row if missing (older uploads pre-P2)
+        if page_count and material.pages_total != page_count:
+            material.pages_total = page_count
+        material.status = 'pending'
+        material.error_message = ''
+        material.save(update_fields=['status', 'pages_total', 'error_message'])
+        if use_job:
+            try:
+                execution_name = dispatch_material_job(material.id, mode=mode)
+                material.job_execution_name = execution_name[:128]
+                material.save(update_fields=['job_execution_name'])
+                job_dispatched += 1
+            except Exception as exc:
+                logger.error(f"Job dispatch failed for material {material.id}: {exc}")
+                material.status = 'failed'
+                material.error_message = f"Job dispatch failed: {exc}"
+                material.save(update_fields=['status', 'error_message'])
+                job_dispatch_errors.append(material.title)
+        else:
+            in_process_ids.append(material.id)
 
     mode_label = "Rich (LLM Vision)" if mode == 'rich' else "Fast (Text Only)"
 
-    def _process_materials(ids, fn):
-        import django.db
-        django.db.connections.close_all()
-        for i, mid in enumerate(ids):
-            try:
-                print(f"[ProcessMaterials] {mode_label}: material {mid} ({i+1}/{len(ids)})", flush=True)
-                fn(mid)
-                print(f"[ProcessMaterials] Done {mid}", flush=True)
-            except Exception as e:
-                print(f"[ProcessMaterials] Material {mid} failed: {e}", flush=True)
+    if in_process_ids:
+        TeachingMaterialUpload.objects.filter(id__in=in_process_ids).update(status='processing')
+
+        def _process_materials(ids, fn):
+            import django.db
+            django.db.connections.close_all()
+            for i, mid in enumerate(ids):
                 try:
-                    TeachingMaterialUpload.objects.filter(id=mid).update(status='failed')
-                except Exception:
-                    pass
+                    print(f"[ProcessMaterials] {mode_label}: material {mid} ({i+1}/{len(ids)})", flush=True)
+                    fn(mid)
+                    print(f"[ProcessMaterials] Done {mid}", flush=True)
+                except Exception as e:
+                    print(f"[ProcessMaterials] Material {mid} failed: {e}", flush=True)
 
-    run_async(_process_materials, material_ids, process_fn)
+        run_async(_process_materials, in_process_ids, process_fn)
 
-    messages.success(request, f"Processing {count} material(s) in {mode_label} mode.")
+    parts = []
+    if in_process_ids:
+        parts.append(f"{len(in_process_ids)} small file(s) processing in-app ({mode_label})")
+    if job_dispatched:
+        parts.append(f"{job_dispatched} large file(s) dispatched to Container Apps Job")
+    if job_dispatch_errors:
+        parts.append(f"{len(job_dispatch_errors)} dispatch failures: {', '.join(job_dispatch_errors[:3])}")
+    messages.success(request, "; ".join(parts) if parts else f"Processing {count} material(s).")
     return redirect('dashboard:course_detail', course_id=course.id)
 
 
@@ -2665,10 +2704,44 @@ def material_process(request, upload_id):
         messages.success(request, "Material updated.")
         return redirect('dashboard:material_process', upload_id=upload.id)
 
+    # Decode structured failure JSON if present (P1 onwards). Older rows
+    # may carry plain-string error_message — leave error_detail=None and
+    # the template renders the raw string.
+    error_detail = None
+    if upload.error_message and upload.error_message.startswith('{'):
+        import json as _json
+        try:
+            error_detail = _json.loads(upload.error_message)
+        except (ValueError, TypeError):
+            error_detail = None
+
+    # Cost estimate + verdict — shown on the confirm screen for
+    # pending_confirmation rows so the user sees price BEFORE clicking confirm.
+    cost_estimate = None
+    cost_verdict_label = None
+    if upload.status == 'pending_confirmation':
+        from apps.dashboard.cost_estimator import (
+            estimate_material_cost, cost_verdict,
+            COST_WARN_THRESHOLD_USD, COST_HARD_BLOCK_USD,
+        )
+        try:
+            cost_estimate = estimate_material_cost(
+                upload.file_path,
+                mode='rich',
+                page_count=upload.pages_total or None,
+            )
+            cost_verdict_label = cost_verdict(cost_estimate['estimated_cost_usd'])
+        except Exception as exc:
+            logger.warning(f"cost estimate failed for upload {upload.id}: {exc}")
+
     context = {
         **request.staff_ctx,
         'upload': upload,
+        'error_detail': error_detail,
+        'cost_estimate': cost_estimate,
+        'cost_verdict_label': cost_verdict_label,
         'material_types': TeachingMaterialUpload.MaterialType.choices,
+        'is_super_admin': request.staff_ctx.get('role') == 'superadmin',
     }
     return render(request, 'dashboard/materials/process.html', context)
 
@@ -2681,7 +2754,10 @@ def course_upload_material(request, course_id):
     from django.conf import settings as django_settings
     from apps.dashboard.models import TeachingMaterialUpload
     from apps.dashboard.material_tasks import process_teaching_material, process_teaching_material_fast
+    from apps.dashboard.material_routing import should_dispatch_to_job, MATERIAL_JOB_PAGE_THRESHOLD
+    from apps.dashboard.cost_estimator import estimate_material_cost
     from apps.dashboard.background_tasks import run_async
+    from apps.dashboard.job_dispatch import dispatch_material_job
 
     institution = request.staff_ctx['institution']
     course = get_scoped_object_or_404(Course, institution, id=course_id)
@@ -2700,7 +2776,13 @@ def course_upload_material(request, course_id):
     upload_dir = os.path.join(django_settings.MEDIA_ROOT, 'material_uploads')
     os.makedirs(upload_dir, exist_ok=True)
 
-    material_ids = []
+    # Split uploads into in-process (small) and Job-bound (large) by page count.
+    # Same threshold (MATERIAL_JOB_PAGE_THRESHOLD = 50) regardless of material
+    # type. Job-bound rows are created with status='pending_confirmation' so the
+    # cost-confirm screen can intercept them; in-process rows go straight to
+    # 'pending' and dispatch to the existing background-thread pipeline.
+    in_process_ids = []
+    job_bound_ids = []
     for uploaded_file in uploaded_files:
         file_path = os.path.join(upload_dir, uploaded_file.name)
         with open(file_path, 'wb+') as dest:
@@ -2708,6 +2790,16 @@ def course_upload_material(request, course_id):
                 dest.write(chunk)
 
         file_title = f"{title} - {os.path.splitext(uploaded_file.name)[0]}" if len(uploaded_files) > 1 else title
+
+        use_job, page_count = should_dispatch_to_job(file_path)
+        # For Job-bound uploads compute the cost estimate up front so the
+        # confirm screen can render it without re-opening the PDF.
+        est_cost = None
+        est_duration = None
+        if use_job:
+            est = estimate_material_cost(file_path, mode=processing_mode, page_count=page_count)
+            est_cost = est['estimated_cost_usd']
+            est_duration = est['estimated_duration_seconds']
 
         material_record = TeachingMaterialUpload.objects.create(
             institution=course.institution,
@@ -2720,29 +2812,139 @@ def course_upload_material(request, course_id):
             material_type=material_type,
             description=description,
             course=course,
+            pages_total=page_count,
+            estimated_cost_usd=est_cost,
+            estimated_duration_seconds=est_duration,
+            status='pending_confirmation' if use_job else 'pending',
         )
-        material_ids.append(material_record.id)
+        if use_job:
+            job_bound_ids.append(material_record.id)
+        else:
+            in_process_ids.append(material_record.id)
 
-    # Process in background — sequentially to avoid resource issues
-    process_fn = process_teaching_material if processing_mode == 'rich' else process_teaching_material_fast
+    # In-process path — existing daemon-thread dispatch (no behavior change for small files).
+    if in_process_ids:
+        process_fn = process_teaching_material if processing_mode == 'rich' else process_teaching_material_fast
 
-    def _process_materials(ids, fn):
-        import django.db
-        django.db.connections.close_all()
-        for mid in ids:
-            try:
-                print(f"[UploadMaterial] Processing {mid} mode={processing_mode}", flush=True)
-                fn(mid)
-                print(f"[UploadMaterial] Done {mid}", flush=True)
-            except Exception as e:
-                print(f"[UploadMaterial] FAILED {mid}: {e}", flush=True)
-                import traceback; traceback.print_exc()
+        def _process_materials(ids, fn):
+            import django.db
+            django.db.connections.close_all()
+            for mid in ids:
+                try:
+                    print(f"[UploadMaterial] Processing {mid} mode={processing_mode}", flush=True)
+                    fn(mid)
+                    print(f"[UploadMaterial] Done {mid}", flush=True)
+                except Exception as e:
+                    print(f"[UploadMaterial] FAILED {mid}: {e}", flush=True)
+                    import traceback; traceback.print_exc()
 
-    run_async(_process_materials, material_ids, process_fn)
+        run_async(_process_materials, in_process_ids, process_fn)
 
     mode_label = "Rich (LLM Vision)" if processing_mode == 'rich' else "Fast (Text Only)"
-    messages.success(request, f"{len(material_ids)} file(s) uploaded! Processing in {mode_label} mode.")
+    parts = []
+    if in_process_ids:
+        parts.append(f"{len(in_process_ids)} small file(s) processing now in {mode_label} mode")
+    if job_bound_ids:
+        parts.append(
+            f"{len(job_bound_ids)} large file(s) (>={MATERIAL_JOB_PAGE_THRESHOLD} pages) "
+            "awaiting your confirmation — see materials list"
+        )
+    messages.success(request, "; ".join(parts) if parts else "Nothing uploaded.")
     return redirect('dashboard:course_detail', course_id=course.id)
+
+
+@teacher_required
+@require_POST
+def material_confirm_processing(request, upload_id):
+    """Confirm a Job-bound material upload and dispatch to Container Apps Job.
+
+    Flips status pending_confirmation → pending and starts the Job. Mode
+    (rich/fast) comes from POST body; defaults to rich. Cost guardrails:
+      - estimate <= $10 : auto-confirm
+      - $10 < estimate <= $50 : confirm but log warning
+      - estimate > $50 : hard-block unless ?force=1 AND user is super-admin
+    Persists the Job execution name on the upload row for debugging.
+    """
+    from apps.dashboard.models import TeachingMaterialUpload
+    from apps.dashboard.job_dispatch import dispatch_material_job
+    from apps.dashboard.cost_estimator import (
+        estimate_material_cost, cost_verdict,
+        COST_WARN_THRESHOLD_USD, COST_HARD_BLOCK_USD,
+    )
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        upload = get_object_or_404(
+            TeachingMaterialUpload,
+            Q(institution=institution) | Q(institution__isnull=True),
+            id=upload_id,
+        )
+    else:
+        upload = get_object_or_404(TeachingMaterialUpload, id=upload_id)
+
+    if upload.status not in ('pending_confirmation', 'failed', 'pending'):
+        messages.error(
+            request,
+            f"Upload {upload.title!r} is not awaiting confirmation (status={upload.status})."
+        )
+        return redirect('dashboard:material_process', upload_id=upload.id)
+
+    mode = request.POST.get('mode', 'rich')
+    if mode not in ('rich', 'fast'):
+        mode = 'rich'
+
+    # Re-estimate at confirm time so the guardrail uses the latest pricing
+    # / model config (estimate stored on the row may be stale if the model
+    # changed between upload and confirm).
+    est = estimate_material_cost(upload.file_path, mode=mode, page_count=upload.pages_total or None)
+    cost_usd = est['estimated_cost_usd']
+    upload.estimated_cost_usd = cost_usd
+    upload.estimated_duration_seconds = est['estimated_duration_seconds']
+
+    is_super_admin = request.staff_ctx.get('role') == 'superadmin'
+    force = request.POST.get('force') == '1'
+
+    verdict = cost_verdict(cost_usd)
+    if verdict == 'red' and not (is_super_admin and force):
+        messages.error(
+            request,
+            f"Estimated cost ${cost_usd} exceeds the hard-block threshold (${COST_HARD_BLOCK_USD}). "
+            "Contact a super-admin to force-confirm."
+        )
+        upload.save(update_fields=['estimated_cost_usd', 'estimated_duration_seconds'])
+        return redirect('dashboard:material_process', upload_id=upload.id)
+    if verdict == 'yellow':
+        messages.warning(
+            request,
+            f"Heads-up: estimated cost ${cost_usd} is above ${COST_WARN_THRESHOLD_USD} — proceeding anyway."
+        )
+
+    upload.status = 'pending'
+    upload.error_message = ''
+    upload.save(update_fields=['status', 'error_message', 'estimated_cost_usd', 'estimated_duration_seconds'])
+    upload.add_log(
+        f"Confirmed for {mode} processing (est. ${cost_usd}, "
+        f"{est['estimated_duration_seconds']}s) → dispatching Container Apps Job"
+    )
+
+    try:
+        execution_name = dispatch_material_job(upload.id, mode=mode)
+        upload.job_execution_name = execution_name[:128]
+        upload.save(update_fields=['job_execution_name'])
+        messages.success(
+            request,
+            f"Started processing {upload.title!r} (est. ${cost_usd}) → execution {execution_name}"
+        )
+    except Exception as exc:
+        # Dispatch failed → put it back in pending_confirmation so the user
+        # can retry. Don't mark 'failed' — the job didn't even start.
+        upload.status = 'pending_confirmation'
+        upload.error_message = f"Job dispatch failed: {exc}"
+        upload.save(update_fields=['status', 'error_message'])
+        upload.add_log(f"Dispatch failed: {exc}")
+        messages.error(request, f"Failed to start processing job: {exc}")
+
+    return redirect('dashboard:material_process', upload_id=upload.id)
 
 
 @teacher_required
