@@ -603,18 +603,31 @@ material_job = app.Job(
 )
 
 # Grant the main Container App's managed identity permission to start
-# executions of this Job. "Container Apps Operator" role:
-#   roleDefinitionId = 358470bc-b998-42bd-ab17-a7e34c199c0f
-# Scope is the Job itself (least privilege — main app can only touch this
-# specific Job, not any other resource in the RG).
+# executions of this Job. "Container Apps Jobs Operator" role:
+#   roleDefinitionId = b9a307c4-5aa3-4b52-ba60-2b17c136cd7b
+# Includes Microsoft.App/jobs/*/read and Microsoft.App/jobs/*/action — the
+# /action permission is what allows `jobs/start/action`. Least-privilege
+# alternative to "Container Apps Jobs Contributor" which also grants write
+# + delete on the Job itself.
+#
+# NOTE: do NOT use "Container Apps Contributor" (358470bc...) — that role
+# only covers `Microsoft.App/containerApps/*`, which is a DIFFERENT
+# resource type than `Microsoft.App/jobs/*`. We tripped this on the first
+# pulumi up (2026-05-14) — the AuthorizationFailed error told us exactly
+# which action wasn't permitted.
+#
+# Scope is the Job itself (the identity can only touch this specific Job,
+# not any other resource in the RG).
 material_job_role_assignment = authorization.RoleAssignment(
     f"aitutor-{stack}-app-material-job-operator",
     role_assignment_name=Output.all(container_app.id, material_job.id).apply(
-        # Stable UUID derived from (principal, scope) so re-runs find the
-        # same assignment instead of creating duplicates.
+        # Stable UUID derived from (principal, scope, role) so re-runs
+        # find the same assignment instead of creating duplicates. Bumping
+        # the role suffix on intentional role changes (e.g. operator →
+        # contributor) forces a new assignment.
         lambda args: __import__("uuid").uuid5(
             __import__("uuid").NAMESPACE_URL,
-            f"{args[0]}:{args[1]}:operator",
+            f"{args[0]}:{args[1]}:jobs-operator",
         ).hex
     ),
     scope=material_job.id,
@@ -626,7 +639,7 @@ material_job_role_assignment = authorization.RoleAssignment(
         "/subscriptions/",
         az_config.require("subscriptionId"),
         "/providers/Microsoft.Authorization/roleDefinitions/"
-        "358470bc-b998-42bd-ab17-a7e34c199c0f",   # Container Apps Operator
+        "b9a307c4-5aa3-4b52-ba60-2b17c136cd7b",   # Container Apps Jobs Operator
     ),
 )
 
