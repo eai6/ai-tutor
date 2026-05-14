@@ -77,10 +77,34 @@ def _dispatch_via_azure_sdk(
 
     client = ContainerAppsAPIClient(credential=credential, subscription_id=sub_id)
 
+    # Azure requires per-execution containers to specify the image even when
+    # we just want to override args. Look up the Job's current container
+    # template and reuse its image so a deploy that updates the Job image
+    # automatically updates dispatched executions too.
+    job = client.jobs.get(resource_group_name=resource_group, job_name=job_name)
+    base_containers = (
+        getattr(job.template, 'containers', None) or []
+    ) if getattr(job, 'template', None) else []
+    if not base_containers:
+        raise RuntimeError(
+            f"Container Apps Job {job_name!r} has no containers defined — "
+            "cannot dispatch."
+        )
+    base_container = base_containers[0]
+    base_image = getattr(base_container, 'image', None)
+    base_command = list(getattr(base_container, 'command', None) or [])
+    if not base_image:
+        raise RuntimeError(
+            f"Container Apps Job {job_name!r} container has no image — "
+            "cannot dispatch."
+        )
+
     template = JobExecutionTemplate(
         containers=[
             JobExecutionContainer(
-                name="material-processor",
+                name=getattr(base_container, 'name', 'material-processor'),
+                image=base_image,
+                command=base_command or ["python", "manage.py", "process_material"],
                 args=[str(upload_id), "--mode", mode],
             ),
         ],
