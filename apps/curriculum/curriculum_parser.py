@@ -111,25 +111,54 @@ def extract_text_from_file(file_path: str, progress_cb=None) -> Tuple[str, str]:
     if ext in ['.txt', '.md']:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             text = f.read()
-        return text, 'text'
+        return _strip_nul(text), 'text'
 
     elif ext == '.docx':
-        return extract_from_docx(file_path), 'docx'
+        return _strip_nul(extract_from_docx(file_path)), 'docx'
+
+    elif ext == '.doc':
+        # Legacy binary Word format (OLE2). python-docx only handles .docx
+        # (zip-based OOXML) — reading the binary as text scatters NUL bytes
+        # through the string and Postgres rejects it on insert. Fail fast
+        # with an actionable message rather than silently producing garbage.
+        raise ValueError(
+            "Legacy .doc files are not supported (this is the binary Word "
+            "format from Word 97-2003). Please convert to .docx or .pdf "
+            "and re-upload — most word processors offer 'Save As → PDF' "
+            "or 'Save As → Word Document (.docx)'."
+        )
 
     elif ext == '.pdf':
-        return extract_from_pdf(file_path, progress_cb=progress_cb), 'pdf'
+        return _strip_nul(extract_from_pdf(file_path, progress_cb=progress_cb)), 'pdf'
 
     elif ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif']:
-        return extract_from_image(file_path), 'image'
+        return _strip_nul(extract_from_image(file_path)), 'image'
 
     else:
         # Try reading as text anyway
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 text = f.read()
-            return text, 'text'
+            return _strip_nul(text), 'text'
         except:
             raise ValueError(f"Unsupported file type: {ext}")
+
+
+def _strip_nul(text: str) -> str:
+    """Strip NUL (0x00) bytes from extracted text.
+
+    PostgreSQL's `text` type forbids NUL bytes — they raise
+    ``ValueError: A string literal cannot contain NUL (0x00) characters``
+    on insert. Any text extracted from a binary file (legacy .doc, scanned
+    PDF with embedded binary streams, etc.) may contain NUL. Strip them
+    universally as a defense-in-depth measure even though specific
+    extractors should be doing the right thing — the cost is one
+    str.replace pass and the upside is that one missed extraction edge
+    case doesn't blow up the whole pipeline.
+    """
+    if not text:
+        return text
+    return text.replace('\x00', '')
 
 
 def extract_from_docx(file_path: str) -> str:
