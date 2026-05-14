@@ -15,6 +15,12 @@ urlpatterns = [
     path('bulk-delete/',
          views.benchmark_items_bulk_delete,
          name='bulk_delete'),
+    # CSV export — honors the same subject/stratum/status filters the
+    # list page accepts. GET so it can be linked from a button without
+    # needing a CSRF token.
+    path('export.csv',
+         views.benchmark_export_annotations,
+         name='export_annotations'),
     # Scoring dashboard (Phase 2.3).
     path('scores/', views.benchmark_runs_list, name='runs_list'),
     path('scores/run-now/', views.benchmark_score_now, name='score_now'),

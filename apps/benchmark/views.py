@@ -63,6 +63,132 @@ ISSUE_LABEL_GROUPS = [
 # ---------------------------------------------------------------------------
 
 @staff_member_required
+def benchmark_export_annotations(request):
+    """GET endpoint: stream a CSV of annotations matching the same
+    filters as the list page (`subject`, `stratum`, `status`). One row
+    per BenchmarkAnnotation; items with zero annotations are skipped.
+
+    Used to pull a working snapshot of evaluator labels for
+    paper-writing, external analysis, and inter-annotator-agreement
+    work. Mirrors the list view's filter semantics so the user can
+    "narrow the page to what I want, then download exactly that."
+    """
+    import csv
+    import json
+    from django.http import StreamingHttpResponse
+    from django.utils import timezone as _tz
+
+    f_subject = (request.GET.get('subject') or '').strip()
+    f_stratum = (request.GET.get('stratum') or '').strip()
+    f_status = (request.GET.get('status') or '').strip()
+
+    items_qs = BenchmarkItem.objects.all()
+    if f_subject:
+        items_qs = items_qs.filter(subject=f_subject)
+    if f_stratum:
+        items_qs = items_qs.filter(stratum=f_stratum)
+    if f_status == 'annotated':
+        items_qs = items_qs.annotate(
+            _ann_count=models.Count('annotations'),
+        ).filter(_ann_count__gt=0)
+    elif f_status == 'unannotated':
+        # Unannotated items have no annotations — short-circuit to an
+        # empty CSV (header only) so the user gets a downloadable
+        # artifact rather than a confusing redirect.
+        items_qs = items_qs.none()
+
+    annotations = (
+        BenchmarkAnnotation.objects
+        .filter(item__in=items_qs)
+        .select_related('item', 'annotator_user')
+        .order_by('item__subject', 'item__item_id', 'annotator_role')
+    )
+
+    headers = [
+        'item_id', 'subject', 'lesson_id', 'lesson_title',
+        'stratum',
+        'annotator_role', 'annotator_user', 'annotator_model',
+        'system_variant',
+        'student_claim_correct',
+        'actual_labels', 'expected_labels',
+        'failure_categories',
+        'safety_concern',
+        'rationale',
+        'passes',
+        'tutor_response_excerpt',
+        'student_turn',
+        'created_at', 'updated_at',
+    ]
+
+    class _Echo:
+        """File-like sink used by csv.writer in streaming mode — see
+        Django docs `https://docs.djangoproject.com/en/5.0/howto/outputting-csv/`."""
+        def write(self, value):
+            return value
+
+    writer = csv.writer(_Echo())
+
+    def _join_list(values):
+        if not values:
+            return ''
+        # Use ; rather than , so CSV parsers don't choke on label commas
+        return ';'.join(str(v) for v in values)
+
+    def _rows():
+        # Header row first
+        yield writer.writerow(headers)
+        for ann in annotations.iterator(chunk_size=200):
+            item = ann.item
+            snapshot = item.snapshot or {}
+            tutor_response = (
+                (snapshot.get('production') or {}).get('tutor_response') or ''
+            )[:500]
+            student_turn = (
+                (snapshot.get('item') or {}).get('student_turn') or ''
+            )
+            lesson_title = (snapshot.get('item') or {}).get('lesson_title', '')
+            yield writer.writerow([
+                item.item_id,
+                item.subject,
+                item.lesson_id,
+                lesson_title,
+                item.stratum,
+                ann.annotator_role,
+                ann.annotator_user.username if ann.annotator_user else '',
+                ann.annotator_model or '',
+                ann.system_variant,
+                '' if ann.student_claim_correct is None
+                    else ('true' if ann.student_claim_correct else 'false'),
+                _join_list(ann.actual_labels),
+                _join_list(ann.expected_labels),
+                _join_list(ann.failure_categories),
+                'true' if ann.safety_concern else 'false',
+                (ann.rationale or '').replace('\r', ' ').replace('\n', ' '),
+                'true' if ann.passes else 'false',
+                tutor_response.replace('\r', ' ').replace('\n', ' '),
+                str(student_turn).replace('\r', ' ').replace('\n', ' '),
+                ann.created_at.isoformat(),
+                ann.updated_at.isoformat(),
+            ])
+
+    # Filename includes filter context + timestamp so multiple downloads
+    # don't collide and the file's provenance is obvious from the name.
+    parts = ['annotations']
+    if f_subject:
+        parts.append(f_subject)
+    if f_stratum:
+        parts.append(f_stratum)
+    if f_status:
+        parts.append(f_status)
+    parts.append(_tz.now().strftime('%Y%m%d-%H%M%S'))
+    filename = '-'.join(parts) + '.csv'
+
+    response = StreamingHttpResponse(_rows(), content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@staff_member_required
 def benchmark_list(request):
     # Filter query params — empty/missing means "no filter".
     f_subject = (request.GET.get('subject') or '').strip()
