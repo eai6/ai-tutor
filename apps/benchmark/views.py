@@ -59,25 +59,15 @@ ISSUE_LABEL_GROUPS = [
 
 
 # ---------------------------------------------------------------------------
-# List view
+# Filter helpers — shared by CSV + JSONL exports
 # ---------------------------------------------------------------------------
 
-@staff_member_required
-def benchmark_export_annotations(request):
-    """GET endpoint: stream a CSV of annotations matching the same
-    filters as the list page (`subject`, `stratum`, `status`). One row
-    per BenchmarkAnnotation; items with zero annotations are skipped.
-
-    Used to pull a working snapshot of evaluator labels for
-    paper-writing, external analysis, and inter-annotator-agreement
-    work. Mirrors the list view's filter semantics so the user can
-    "narrow the page to what I want, then download exactly that."
+def _filtered_annotations(request):
+    """Return BenchmarkAnnotation queryset filtered by the same `subject`,
+    `stratum`, `status` query params the list page uses. Shared between
+    CSV (benchmark_export_annotations) and JSONL (benchmark_export_jsonl)
+    so the two exports always agree on what's included.
     """
-    import csv
-    import json
-    from django.http import StreamingHttpResponse
-    from django.utils import timezone as _tz
-
     f_subject = (request.GET.get('subject') or '').strip()
     f_stratum = (request.GET.get('stratum') or '').strip()
     f_status = (request.GET.get('status') or '').strip()
@@ -93,16 +83,55 @@ def benchmark_export_annotations(request):
         ).filter(_ann_count__gt=0)
     elif f_status == 'unannotated':
         # Unannotated items have no annotations — short-circuit to an
-        # empty CSV (header only) so the user gets a downloadable
-        # artifact rather than a confusing redirect.
+        # empty export so the user gets a downloadable artifact rather
+        # than a confusing redirect.
         items_qs = items_qs.none()
 
-    annotations = (
+    return (
         BenchmarkAnnotation.objects
         .filter(item__in=items_qs)
         .select_related('item', 'annotator_user')
         .order_by('item__subject', 'item__item_id', 'annotator_role')
     )
+
+
+def _build_export_filename(request, extension: str) -> str:
+    """`annotations-<subject>-<stratum>-<status>-YYYYMMDD-HHMMSS.<ext>`
+    with the filter context baked in so multiple downloads don't collide
+    and the file's provenance is obvious from the name.
+    """
+    from django.utils import timezone as _tz
+    parts = ['annotations']
+    for k in ('subject', 'stratum', 'status'):
+        v = (request.GET.get(k) or '').strip()
+        if v:
+            parts.append(v)
+    parts.append(_tz.now().strftime('%Y%m%d-%H%M%S'))
+    return '-'.join(parts) + '.' + extension
+
+
+# ---------------------------------------------------------------------------
+# CSV export
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def benchmark_export_annotations(request):
+    """GET endpoint: stream a CSV of annotations matching the same
+    filters as the list page (`subject`, `stratum`, `status`). One row
+    per BenchmarkAnnotation; items with zero annotations are skipped.
+
+    Used to pull a working snapshot of evaluator labels for
+    paper-writing, external analysis, and inter-annotator-agreement
+    work. Mirrors the list view's filter semantics so the user can
+    "narrow the page to what I want, then download exactly that."
+
+    For ML-pipeline / SIG-EDU compatibility, see ``benchmark_export_jsonl``
+    which emits BEA-2023/2025-shaped JSONL.
+    """
+    import csv
+    from django.http import StreamingHttpResponse
+
+    annotations = _filtered_annotations(request)
 
     headers = [
         'item_id', 'subject', 'lesson_id', 'lesson_title',
@@ -171,20 +200,127 @@ def benchmark_export_annotations(request):
                 ann.updated_at.isoformat(),
             ])
 
-    # Filename includes filter context + timestamp so multiple downloads
-    # don't collide and the file's provenance is obvious from the name.
-    parts = ['annotations']
-    if f_subject:
-        parts.append(f_subject)
-    if f_stratum:
-        parts.append(f_stratum)
-    if f_status:
-        parts.append(f_status)
-    parts.append(_tz.now().strftime('%Y%m%d-%H%M%S'))
-    filename = '-'.join(parts) + '.csv'
-
     response = StreamingHttpResponse(_rows(), content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Content-Disposition'] = (
+        f'attachment; filename="{_build_export_filename(request, "csv")}"'
+    )
+    return response
+
+
+# ---------------------------------------------------------------------------
+# JSONL export — BEA 2023 + 2025 compatible
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def benchmark_export_jsonl(request):
+    """GET endpoint: stream a JSON Lines file matching the same filters
+    as the list page (`subject`, `stratum`, `status`). One line per
+    BenchmarkAnnotation.
+
+    Each line co-presents BOTH BEA 2023 (`utterances` list) AND BEA 2025
+    (`conversation_history` string + `tutor_responses` dict) shapes, so
+    external SIG-EDU evaluators can consume it as a drop-in. Carries a
+    `lesson_context` block (lesson objective + step script + answer key)
+    that distinguishes our system's competency-based grounding from
+    bare-conversation benchmarks like MathDial / TutorBench.
+
+    See ``memory/benchmark_jsonl_export_plan.md`` for the schema.
+    """
+    import json
+    from django.http import StreamingHttpResponse
+
+    from apps.benchmark.bea_mapping import map_to_bea_2025
+    from apps.benchmark.hydration import (
+        hydrate_step_context,
+        utterances_from_history,
+        conversation_history_string,
+        normalise_speaker,
+    )
+
+    annotations = _filtered_annotations(request)
+
+    def _build_row(ann):
+        item = ann.item
+        snapshot = item.snapshot or {}
+        item_block = snapshot.get('item') or {}
+        production = snapshot.get('production') or {}
+
+        # Build utterances list. Snapshot history excludes the immediate
+        # student turn that triggered the response — append it so the
+        # exported conversation includes everything the tutor saw.
+        history = item_block.get('conversation_history') or []
+        utterances = utterances_from_history(history)
+        student_turn = item_block.get('student_turn') or {}
+        if student_turn.get('text'):
+            utterances.append({
+                'text': student_turn['text'],
+                'speaker': normalise_speaker('student'),
+            })
+
+        bea = map_to_bea_2025(ann.actual_labels, ann.expected_labels)
+
+        return {
+            'conversation_id': (
+                f"{item.item_id}:{ann.system_variant}:"
+                f"{ann.annotator_role}:{ann.id}"
+            ),
+            'item_id': item.item_id,
+            'subject': item.subject,
+            # BEA 2023 shape
+            'utterances': utterances,
+            # BEA 2025 shape (derived from utterances so they can't drift)
+            'conversation_history': conversation_history_string(utterances),
+            'tutor_responses': {
+                ann.system_variant: {
+                    'response': production.get('tutor_response', '') or '',
+                    'annotation': bea,
+                    'extra_annotation': {
+                        'actual_labels': ann.actual_labels or [],
+                        'expected_labels': ann.expected_labels or [],
+                        'failure_categories': ann.failure_categories or [],
+                        'safety_concern': ann.safety_concern,
+                        'rationale': ann.rationale or '',
+                        'passes': ann.passes,
+                        'student_claim_correct': ann.student_claim_correct,
+                        'annotator_role': ann.annotator_role,
+                        'annotator_user_id': ann.annotator_user_id,
+                        'annotator_user': (
+                            ann.annotator_user.username
+                            if ann.annotator_user else ''
+                        ),
+                        'annotator_model': ann.annotator_model or '',
+                        'system_variant': ann.system_variant,
+                        'stratum': item.stratum,
+                    },
+                },
+            },
+            # Our distinguishing context: lesson + step grounding
+            'lesson_context': {
+                'lesson_id': item.lesson_id,
+                'lesson_title': item_block.get('lesson_title', '') or '',
+                'lesson_objective': item_block.get('lesson_objective', '') or '',
+                'current_step': hydrate_step_context(item_block),
+            },
+            # Pipeline trace — supports the paper claim about post-hoc
+            # judges. Adds ~2KB per row, fine for streaming.
+            'pipeline_trace': production.get('pipeline_trace') or {},
+            'metadata': {
+                'session_id': item_block.get('session_id'),
+                'turn_id': item_block.get('turn_id'),
+                'created_at': ann.created_at.isoformat() if ann.created_at else None,
+                'updated_at': ann.updated_at.isoformat() if ann.updated_at else None,
+            },
+        }
+
+    def _emit():
+        for ann in annotations.iterator(chunk_size=100):
+            row = _build_row(ann)
+            yield (json.dumps(row, ensure_ascii=False) + '\n').encode('utf-8')
+
+    response = StreamingHttpResponse(_emit(), content_type='application/x-ndjson')
+    response['Content-Disposition'] = (
+        f'attachment; filename="{_build_export_filename(request, "jsonl")}"'
+    )
     return response
 
 

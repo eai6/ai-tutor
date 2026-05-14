@@ -204,7 +204,14 @@
            class="filter-apply"
            style="background:#fff;color:#5b21b6;border:1px solid #ddd6fe;text-decoration:none;"
            title="Download a CSV of annotations matching the filters above. One row per annotation. Filename includes filter context + timestamp.">
-            ⬇ download annotations (CSV)
+            ⬇ CSV
+        </a>
+        {# JSONL export — BEA 2023 + 2025 compatible, for ML eval pipelines #}
+        <a href="{% url 'dashboard:benchmark:export_jsonl' %}?subject={{ filters.subject }}&stratum={{ filters.stratum }}&status={{ filters.status }}"
+           class="filter-apply"
+           style="background:#fff;color:#5b21b6;border:1px solid #ddd6fe;text-decoration:none;"
+           title="Download JSONL (BEA 2023/2025 compatible) — full conversation, lesson context, step script + answer key, BEA 4-dim mapping. For ML eval pipelines.">
+            ⬇ JSONL (BEA)
         </a>
     </span>
 </form>

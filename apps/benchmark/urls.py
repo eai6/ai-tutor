@@ -21,6 +21,11 @@ urlpatterns = [
     path('export.csv',
          views.benchmark_export_annotations,
          name='export_annotations'),
+    # JSONL export — BEA 2023 + 2025 compatible, for ML eval pipelines /
+    # SIG-EDU shared-task submissions. Same filter semantics as CSV.
+    path('export.jsonl',
+         views.benchmark_export_jsonl,
+         name='export_jsonl'),
     # Scoring dashboard (Phase 2.3).
     path('scores/', views.benchmark_runs_list, name='runs_list'),
     path('scores/run-now/', views.benchmark_score_now, name='score_now'),
