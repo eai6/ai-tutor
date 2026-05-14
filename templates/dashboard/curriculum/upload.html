@@ -273,11 +273,28 @@
                     </div>
                 </div>
 
-                <!-- Subject Name -->
+                <!-- Subject (canonical dropdown — drives material inheritance match) -->
                 <div class="form-group">
-                    <label class="form-label" for="subject_name">Subject Name</label>
+                    <label class="form-label" for="subject_code">Subject <span style="color:var(--danger);">*</span></label>
+                    <select class="form-control" id="subject_code" name="subject_code" required>
+                        <option value="">— Select subject —</option>
+                        {% for code, label in subject_code_choices %}
+                        <option value="{{ code }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
+                        Canonical subject — used to match this course with platform-wide teaching materials for the same subject + grade.
+                    </div>
+                </div>
+
+                <!-- Optional display-name override -->
+                <div class="form-group">
+                    <label class="form-label" for="subject_name">Display name <span style="color:var(--gray-400);font-weight:normal;">(optional)</span></label>
                     <input type="text" class="form-control" id="subject_name" name="subject_name"
-                           placeholder="e.g., Geography, Mathematics, Biology" required>
+                           placeholder="auto-derived from subject above (e.g. 'Geography')">
+                    <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
+                        Leave blank to use the subject label. Course title becomes "<i>Display name</i> <i>Grade</i>" (e.g. "Geography S3").
+                    </div>
                 </div>
 
                 <!-- Grade Level — multi-select checkboxes -->

@@ -37,6 +37,21 @@ class CurriculumUpload(models.Model):
     original_filename = models.CharField(max_length=255, blank=True)
     subject_name = models.CharField(max_length=100)
     grade_level = models.CharField(max_length=20, blank=True)
+    # Canonical subject identifier — propagates to Course.subject_code at
+    # course-creation time so newly-created courses immediately benefit
+    # from the global-KB material-sharing match (R2.2). Blank for legacy
+    # uploads that predate this field; backfilled via Course backfill
+    # command if needed.
+    subject_code = models.CharField(
+        max_length=32,
+        blank=True,
+        default='',
+        help_text=(
+            "Canonical SubjectCode (geography, mathematics, ...) chosen "
+            "from the upload-form dropdown. Empty on uploads predating "
+            "the dropdown rollout."
+        ),
+    )
 
     status = models.CharField(
         max_length=20,

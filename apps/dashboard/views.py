@@ -1100,7 +1100,9 @@ def curriculum_upload(request):
         return redirect('dashboard:curriculum_list')
 
     if request.method == 'POST':
+        from apps.curriculum.models import Course
         uploaded_file = request.FILES.get('curriculum_file')
+        subject_code = request.POST.get('subject_code', '').strip()
         subject_name = request.POST.get('subject_name', '').strip()
         grade_levels = request.POST.getlist('grade_level')
         grade_level = ','.join(grade_levels) if grade_levels else ''
@@ -1109,8 +1111,23 @@ def curriculum_upload(request):
             messages.error(request, "Please upload a curriculum file.")
             return redirect('dashboard:curriculum_upload')
 
+        # Validate subject_code against the SubjectCode enum.
+        valid_subjects = {c[0] for c in Course.SubjectCode.choices}
+        subject_label = ''
+        if subject_code:
+            if subject_code not in valid_subjects:
+                messages.error(request, f"Invalid subject: {subject_code!r}.")
+                return redirect('dashboard:curriculum_upload')
+            subject_label = dict(Course.SubjectCode.choices).get(subject_code, '')
+
+        # subject_name (display) — auto-derive from the dropdown label when
+        # the optional override is blank. Either path satisfies the
+        # downstream "must have a subject_name" requirement.
         if not subject_name:
-            messages.error(request, "Please enter a subject name.")
+            subject_name = subject_label
+
+        if not subject_name:
+            messages.error(request, "Please select a subject.")
             return redirect('dashboard:curriculum_upload')
 
         if not grade_level:
@@ -1138,6 +1155,7 @@ def curriculum_upload(request):
             uploaded_by=request.user,
             file_path=file_path,
             subject_name=subject_name,
+            subject_code=subject_code,
             grade_level=grade_level,
             lesson_duration_minutes=lesson_duration,
             status='pending'
@@ -1199,11 +1217,13 @@ def curriculum_upload(request):
 
     # GET - show upload form
     from apps.dashboard.models import TeachingMaterialUpload
+    from apps.curriculum.models import Course
 
     context = {
         **request.staff_ctx,
         'grade_levels': PlatformConfig.get_grade_choices(),
         'material_types': TeachingMaterialUpload.MaterialType.choices,
+        'subject_code_choices': Course.SubjectCode.choices,
     }
 
     return render(request, 'dashboard/curriculum/upload.html', context)

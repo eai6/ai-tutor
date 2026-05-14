@@ -1285,15 +1285,28 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
             grade_units = units_by_grade[grade]
             course_title = f"{subject} {grade}"
 
+            # Propagate the upload's canonical subject_code + the per-grade
+            # grade_levels list onto the new Course so the global-KB material-
+            # sharing match (apps/curriculum/knowledge_base.py:_global_upload_ids_matching_course)
+            # works out of the box. Without these, new courses created from
+            # the upload would need manual editing or the backfill command
+            # before inheritance kicks in.
+            course_defaults = {
+                'description': f"{subject} curriculum for {grade}",
+                'grade_level': grade,
+                'is_published': False,
+                'curriculum_upload': upload,
+            }
+            if getattr(upload, 'subject_code', '') and upload.subject_code:
+                course_defaults['subject_code'] = upload.subject_code
+            # `grade` here is already canonical ('S1'..'S6'); wrap into the list field.
+            if grade:
+                course_defaults['grade_levels'] = [grade]
+
             course, created = Course.objects.update_or_create(
                 institution=upload.institution,
                 title=course_title,
-                defaults={
-                    'description': f"{subject} curriculum for {grade}",
-                    'grade_level': grade,
-                    'is_published': False,
-                    'curriculum_upload': upload,
-                }
+                defaults=course_defaults,
             )
 
             if not first_course:
