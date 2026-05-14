@@ -3006,6 +3006,15 @@ Keep it to 2-3 sentences."""
         """
         if self.current_topic_index >= len(self.steps):
             return None
+        # Per-course image gate — when disabled, don't attach the step
+        # figure to the multimodal context. Same gate as
+        # _build_media_catalog so the LLM has zero image affordance.
+        try:
+            if self.lesson and self.lesson.unit and self.lesson.unit.course:
+                if not self.lesson.unit.course.tutoring_images_enabled:
+                    return None
+        except Exception:
+            pass
         media = self._get_step_media()
         if not media:
             return None
@@ -4712,7 +4721,23 @@ Follow the current step; this concept will be covered in sequence."""
         Populates self._media_id_map = {int: media_dict} for O(1) lookup
         when parsing |||MEDIA:N||| signals from LLM output.
         Deduplicates by URL across both sources.
+
+        Per-course gate: when Course.tutoring_images_enabled is False,
+        return an empty catalog and clear the id_map so the LLM has
+        nothing to emit |||MEDIA:N||| against. This is the primary
+        choke point for the "disable images for this course" feature
+        — the system prompt sees no media block, so the model cannot
+        reference figures.
         """
+        # Per-course image gate
+        try:
+            if self.lesson and self.lesson.unit and self.lesson.unit.course:
+                if not self.lesson.unit.course.tutoring_images_enabled:
+                    self._media_id_map = {}
+                    return ""
+        except Exception:
+            pass   # If the chain fails, fall through to default behaviour
+
         from apps.llm.prompts import get_lesson_media
 
         seen_urls = {}  # url -> 1-indexed catalog position

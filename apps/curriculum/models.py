@@ -132,6 +132,22 @@ class Course(models.Model):
         ),
     )
 
+    # Per-course image policy. When False, the tutor:
+    #   - does NOT see the figure catalog in its system prompt
+    #   - cannot reference figures or emit |||MEDIA:N||| signals
+    #   - does NOT attach step images to its multimodal context
+    # Default True preserves the existing behaviour for every
+    # course; teachers opt OUT for courses where images aren't
+    # appropriate (e.g. text-only language drills, exam practice
+    # without diagrams).
+    tutoring_images_enabled = models.BooleanField(
+        default=True,
+        help_text=(
+            "Whether the AI tutor may show or reference images during "
+            "tutoring sessions. Off = pure text. Default on."
+        ),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

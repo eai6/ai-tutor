@@ -5154,6 +5154,15 @@ def course_edit(request, course_id):
     grade_level = request.POST.get('grade_level', '').strip()
     subject_code = request.POST.get('subject_code', '').strip()
     grade_levels_raw = request.POST.getlist('grade_levels')   # multi-select
+    # Per-course image policy. Checkbox: present in POST = on, absent = off.
+    # The reparse path doesn't include the checkbox in its hidden form,
+    # so we only update tutoring_images_enabled when the canonical edit
+    # form was submitted (action != 'reparse').
+    images_enabled_posted = (
+        request.POST.get('action') != 'reparse'
+        and 'subject_code' in request.POST  # canonical edit form marker
+    )
+    tutoring_images_enabled = bool(request.POST.get('tutoring_images_enabled'))
 
     if not title:
         messages.error(request, "Course title cannot be empty.")
@@ -5188,6 +5197,9 @@ def course_edit(request, course_id):
     if grade_levels or 'grade_levels' in request.POST:
         course.grade_levels = grade_levels
         update_fields.append('grade_levels')
+    if images_enabled_posted:
+        course.tutoring_images_enabled = tutoring_images_enabled
+        update_fields.append('tutoring_images_enabled')
 
     course.save(update_fields=update_fields)
 
