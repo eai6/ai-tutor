@@ -1231,21 +1231,32 @@ class CurriculumKnowledgeBase:
         n_results: int = 10,
         where_filter: Dict = None,
         institution_boost: float = 0.7,
+        course=None,
     ) -> List[Dict]:
         """
-        Query institution KB first, then fall back to global KB if results are insufficient.
+        Query institution KB AND global KB in parallel, merge results.
 
-        Uses lazy evaluation: global KB is only queried when institution KB returns
-        fewer than FALLBACK_THRESHOLD results. This means zero overhead in the common case.
+        Behavior change (R2.2 — memory/curriculum_material_sharing_plan.md):
+        Previously this method only queried global KB when the institution
+        result set was thin (< FALLBACK_THRESHOLD). That meant a school's
+        course with even ONE indexed material never benefited from the
+        platform-wide textbooks. New behavior: ALWAYS merge global results
+        when the calling KB is a school KB.
 
-        Institution results get a distance boost (multiplied by institution_boost < 1.0,
-        so lower distance = higher relevance) to prefer local content over global.
+        Method name kept for back-compat with the 6 existing call sites.
+        Per-batch behavior, distance ranking, source_tier labels — all
+        unchanged.
 
         Args:
             query_text: The search query
-            n_results: Total results desired
+            n_results: Total results desired (after merge + sort)
             where_filter: Optional metadata filter (applied to both tiers)
             institution_boost: Multiplier for institution distances (< 1.0 = prefer institution)
+            course: Optional Course context. When supplied AND course has
+                subject_code + grade_levels set, the global filter is
+                tightened to chunks belonging to platform-wide courses
+                with the SAME subject_code + overlapping grade_levels —
+                a robust replacement for free-text subject string matching.
 
         Returns:
             List of dicts with keys: content, metadata, distance, source_tier
@@ -1278,25 +1289,22 @@ class CurriculumKnowledgeBase:
                     "source_tier": "institution",
                 })
 
-        # --- Lazy fallback to global KB ---
-        if (self.institution_id != self.GLOBAL_INSTITUTION_ID
-                and len(merged) < self.FALLBACK_THRESHOLD):
+        # --- Always-merge global KB ---
+        # Skipped only when the caller IS the global KB (would double-count
+        # the same chunks). FALLBACK_THRESHOLD gate intentionally removed:
+        # platform-wide materials should be visible to every school course
+        # that matches by subject + grade.
+        if self.institution_id != self.GLOBAL_INSTITUTION_ID:
             try:
                 global_kb = CurriculumKnowledgeBase(institution_id=self.GLOBAL_INSTITUTION_ID)
                 global_collection = global_kb._get_collection()
 
-                # For global, relax institution-specific filters but keep subject filter
-                global_filter = None
-                if where_filter:
-                    # Extract just the subject filter if present
-                    if isinstance(where_filter, dict):
-                        if "subject" in where_filter:
-                            global_filter = where_filter
-                        elif "$and" in where_filter:
-                            for clause in where_filter["$and"]:
-                                if "subject" in clause:
-                                    global_filter = clause
-                                    break
+                # Build the global filter. Preferred path (when caller
+                # passed a Course with subject_code): look up matching
+                # platform-wide upload_ids and restrict the global query
+                # to chunks from those uploads. Fallback path: relax to
+                # subject-string filter (the legacy behavior).
+                global_filter = self._build_global_filter(where_filter, course)
 
                 global_results = global_collection.query(
                     query_texts=[query_text],
@@ -1306,7 +1314,13 @@ class CurriculumKnowledgeBase:
                 )
 
                 if global_results and global_results.get('documents') and global_results['documents'][0]:
+                    # Dedupe by content hash — institution and global may
+                    # carry the same uploaded material if a school re-
+                    # indexed it locally. Prefer the institution copy.
+                    seen_content = {row['content'] for row in merged}
                     for i, doc in enumerate(global_results['documents'][0]):
+                        if doc in seen_content:
+                            continue
                         raw_dist = global_results['distances'][0][i] if global_results.get('distances') else 1.0
                         merged.append({
                             "content": doc,
@@ -1315,12 +1329,86 @@ class CurriculumKnowledgeBase:
                             "raw_distance": raw_dist,
                             "source_tier": "global",
                         })
+                        seen_content.add(doc)
             except Exception as e:
-                logger.warning(f"Global KB fallback query failed: {e}")
+                logger.warning(f"Global KB merge query failed: {e}")
 
         # Sort by adjusted distance (lower = more relevant), take top N
         merged.sort(key=lambda x: x["distance"])
         return merged[:n_results]
+
+    # Alias under the new name so future callers can use the more accurate
+    # `query_with_global_merge` without changing every existing caller.
+    def query_with_global_merge(self, *args, **kwargs):
+        return self.query_with_global_fallback(*args, **kwargs)
+
+    def _build_global_filter(self, where_filter: Dict, course=None) -> Optional[Dict]:
+        """Build the where filter for the global KB query.
+
+        Preferred path: when ``course`` has subject_code + grade_levels set,
+        find all platform-wide upload_ids belonging to courses that match
+        (subject_code, grade_levels overlap). Restrict the global query to
+        chunks from those uploads. This gives a robust subject_code-based
+        match instead of fuzzy free-text subject matching.
+
+        Fallback path: relax to the subject-string filter (legacy behavior),
+        which still works when courses don't have subject_code populated.
+        """
+        # Try the canonical match first
+        if course is not None:
+            upload_ids = self._global_upload_ids_matching_course(course)
+            if upload_ids:
+                return {"upload_id": {"$in": list(upload_ids)}}
+
+        # Legacy fallback: extract subject filter from the supplied filter
+        if where_filter and isinstance(where_filter, dict):
+            if "subject" in where_filter:
+                return where_filter
+            if "$and" in where_filter:
+                for clause in where_filter["$and"]:
+                    if isinstance(clause, dict) and "subject" in clause:
+                        return clause
+        return None
+
+    def _global_upload_ids_matching_course(self, course) -> set:
+        """Return the set of TeachingMaterialUpload IDs from platform-wide
+        courses whose subject_code matches AND whose grade_levels overlap
+        with the supplied course. Empty set when course has no
+        subject_code, or no matching platform-wide course exists.
+        """
+        try:
+            subject_code = getattr(course, 'subject_code', '') or ''
+            course_grades = set(getattr(course, 'grade_levels', None) or [])
+            if not subject_code:
+                return set()
+        except Exception:
+            return set()
+
+        from apps.curriculum.models import Course as CourseModel
+        from apps.dashboard.models import TeachingMaterialUpload
+
+        # Platform-wide courses (institution=None) with same subject_code.
+        global_courses = CourseModel.objects.filter(
+            institution__isnull=True,
+            subject_code=subject_code,
+        ).only('id', 'grade_levels')
+
+        # Filter by grade_level overlap (any-of). When the school course
+        # has no grade_levels set, accept all global courses with the
+        # same subject_code (don't over-constrain).
+        matching_course_ids = []
+        for gc in global_courses:
+            gc_grades = set(gc.grade_levels or [])
+            if not course_grades or not gc_grades or (course_grades & gc_grades):
+                matching_course_ids.append(gc.id)
+
+        if not matching_course_ids:
+            return set()
+
+        upload_ids = set(TeachingMaterialUpload.objects.filter(
+            course_id__in=matching_course_ids,
+        ).values_list('id', flat=True))
+        return upload_ids
 
     def _convert_fallback_to_query_results(self, merged: List[Dict]) -> Dict:
         """Convert query_with_global_fallback() output to ChromaDB query() format

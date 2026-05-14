@@ -224,8 +224,32 @@
                         <input type="text" name="title" class="form-control" value="{{ course.title }}" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Grade Level</label>
-                        <input type="text" name="grade_level" class="form-control" value="{{ course.grade_level }}" placeholder="e.g., S1, S2">
+                        <label class="form-label">Subject <span style="color:var(--danger);">*</span></label>
+                        <select name="subject_code" class="form-control" required>
+                            <option value="" {% if not course.subject_code %}selected{% endif %}>— Select subject —</option>
+                            {% for code, label in subject_code_choices %}
+                            <option value="{{ code }}" {% if course.subject_code == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <small style="color:var(--gray-500);font-size:0.7rem;">Used to inherit platform-wide materials for this subject.</small>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Grade levels (multi-select)</label>
+                        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+                            {% for code, label in secondary_year_choices %}
+                            <label style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.25rem 0.5rem;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer;background:white;">
+                                <input type="checkbox" name="grade_levels" value="{{ code }}"
+                                       {% if code in course.grade_levels %}checked{% endif %}>
+                                {{ label }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                        <small style="color:var(--gray-500);font-size:0.7rem;">Tick all years this course covers. Used to match platform-wide courses for material inheritance.</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Grade label (display)</label>
+                        <input type="text" name="grade_level" class="form-control" value="{{ course.grade_level }}" placeholder="auto from grade levels">
+                        <small style="color:var(--gray-500);font-size:0.7rem;">Optional free-text label. Auto-derived from grade levels if blank.</small>
                     </div>
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Description</label>
@@ -298,6 +322,23 @@
         </div>
     </div>
 </div>
+
+{% if inherited_materials %}
+<!-- R2.3: inherited platform-wide materials badge -->
+<div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:0.85rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;color:#065F46;">
+    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+    </svg>
+    <div style="font-size:0.875rem;line-height:1.4;">
+        <strong>{{ inherited_materials.material_count }} platform-wide material{{ inherited_materials.material_count|pluralize }}</strong>
+        automatically available to this course (matched by subject + grade)
+        {% if inherited_materials.platform_courses %}
+        <span style="color:var(--gray-500);">— from
+            {% for pc in inherited_materials.platform_courses %}<em>{{ pc.title }}</em>{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 
 <!-- Teaching Materials -->
 <div class="card" style="margin-bottom: 1.5rem;">

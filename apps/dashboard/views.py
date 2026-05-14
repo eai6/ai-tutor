@@ -139,6 +139,51 @@ def _safety_flag_count(institution) -> int:
     return qs.count()
 
 
+def _inherited_materials_summary(course):
+    """For a school course, summarise platform-wide materials it inherits.
+
+    R2.3 (memory/curriculum_material_sharing_plan.md). Returns:
+        {
+            'platform_courses': [Course, Course, ...],   # matching platform-wide courses
+            'material_count': int,                         # total inherited TeachingMaterialUploads
+        }
+    or None when the course has no subject_code / grade_levels (legacy row).
+
+    Cheap query — no ChromaDB hit, just DB joins on (subject_code, grade_levels).
+    Same matching logic as CurriculumKnowledgeBase._global_upload_ids_matching_course
+    so the badge count matches what the engine actually sees.
+    """
+    if not course or not getattr(course, 'subject_code', ''):
+        return None
+    course_grades = set(course.grade_levels or [])
+
+    from apps.curriculum.models import Course as CourseModel
+    from apps.dashboard.models import TeachingMaterialUpload
+
+    platform_courses = list(CourseModel.objects.filter(
+        institution__isnull=True,
+        subject_code=course.subject_code,
+    ).only('id', 'title', 'grade_levels'))
+
+    matching = []
+    for pc in platform_courses:
+        pc_grades = set(pc.grade_levels or [])
+        if not course_grades or not pc_grades or (course_grades & pc_grades):
+            matching.append(pc)
+
+    if not matching:
+        return None
+
+    material_count = TeachingMaterialUpload.objects.filter(
+        course_id__in=[c.id for c in matching],
+    ).count()
+
+    return {
+        'platform_courses': matching,
+        'material_count': material_count,
+    }
+
+
 def filter_by_institution(queryset, institution, field='institution'):
     """Filter queryset by institution. If institution is None (aggregated), return all."""
     if institution is not None:
@@ -1013,6 +1058,14 @@ def course_detail(request, course_id):
             status='processing', updated_at__gte=stale_cutoff,
         ).exists(),
         'material_types': TeachingMaterialUpload.MaterialType.choices,
+        # R2 — subject + grade dropdowns for the course edit form
+        'subject_code_choices': Course.SubjectCode.choices,
+        'secondary_year_choices': Course.SecondaryYear.choices,
+        # R2.3 — inherited materials from platform-wide courses matching
+        # this course's subject_code + grade_levels. Surfaced as a badge
+        # so teachers see they're not orphaned when they didn't upload
+        # textbooks themselves. Computed only when not platform-wide.
+        'inherited_materials': _inherited_materials_summary(course) if not is_platform_wide else None,
         'is_platform_wide': is_platform_wide,
         'course_read_only': course_read_only,
         'course_tier_label': course_tier_label,
@@ -5068,7 +5121,7 @@ def lesson_create(request, unit_id):
 @teacher_required
 @require_POST
 def course_edit(request, course_id):
-    """Edit course title, description, and grade level."""
+    """Edit course title, description, subject, grade levels."""
     institution = request.staff_ctx['institution']
 
     if institution is not None:
@@ -5079,15 +5132,44 @@ def course_edit(request, course_id):
     title = request.POST.get('title', '').strip()
     description = request.POST.get('description', '').strip()
     grade_level = request.POST.get('grade_level', '').strip()
+    subject_code = request.POST.get('subject_code', '').strip()
+    grade_levels_raw = request.POST.getlist('grade_levels')   # multi-select
 
     if not title:
         messages.error(request, "Course title cannot be empty.")
         return redirect('dashboard:course_detail', course_id=course.id)
 
+    # Validate subject_code (allow empty for back-compat with reparse path
+    # that doesn't supply it; required only on the explicit edit form).
+    valid_subjects = {c[0] for c in Course.SubjectCode.choices}
+    if subject_code and subject_code not in valid_subjects:
+        messages.error(request, f"Invalid subject_code: {subject_code!r}.")
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    # Validate + normalise grade_levels
+    valid_years = {c[0] for c in Course.SecondaryYear.choices}
+    grade_levels = sorted({g for g in grade_levels_raw if g in valid_years})
+
+    # Auto-derive grade_level (CharField) from grade_levels list when blank
+    if not grade_level and grade_levels:
+        grade_level = ",".join(grade_levels)
+
     course.title = title
     course.description = description
     course.grade_level = grade_level
-    course.save(update_fields=['title', 'description', 'grade_level', 'updated_at'])
+    update_fields = ['title', 'description', 'grade_level', 'updated_at']
+
+    # Only overwrite subject_code/grade_levels when supplied — the
+    # reparse path doesn't include them in its POST and we don't want
+    # to wipe stored values.
+    if subject_code or 'subject_code' in request.POST:
+        course.subject_code = subject_code
+        update_fields.append('subject_code')
+    if grade_levels or 'grade_levels' in request.POST:
+        course.grade_levels = grade_levels
+        update_fields.append('grade_levels')
+
+    course.save(update_fields=update_fields)
 
     # Check if re-parse was requested
     if request.POST.get('action') == 'reparse':

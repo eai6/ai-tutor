@@ -64,6 +64,58 @@ class Course(models.Model):
         ),
     )
 
+    # Finer subject identifier for material-sharing matches. SubjectType
+    # is too coarse — both Geography and History collapse to HUMANITIES,
+    # which means the global-KB merge can't tell them apart. SubjectCode
+    # is the canonical "what subject is this course teaching" used to
+    # match platform-wide courses to per-school courses for material
+    # inheritance. See memory/curriculum_material_sharing_plan.md.
+    class SubjectCode(models.TextChoices):
+        MATHEMATICS = 'mathematics', 'Mathematics'
+        GEOGRAPHY = 'geography', 'Geography'
+        PHYSICS = 'physics', 'Physics'
+        CHEMISTRY = 'chemistry', 'Chemistry'
+        BIOLOGY = 'biology', 'Biology'
+        ENGLISH = 'english', 'English'
+        FRENCH = 'french', 'French'
+        HISTORY = 'history', 'History'
+        COMPUTER_SCIENCE = 'computer_science', 'Computer Science'
+        OTHER = 'other', 'Other'
+
+    subject_code = models.CharField(
+        max_length=32,
+        choices=SubjectCode.choices,
+        blank=True,
+        default='',
+        help_text=(
+            "Canonical subject for cross-institution material sharing. "
+            "Required for new courses; legacy rows backfilled via "
+            "`python manage.py backfill_course_subjects`."
+        ),
+    )
+
+    # Normalised grade list — multi-grade allowed. Drives the global-KB
+    # merge: a school's S3 course inherits chunks from any platform-wide
+    # course whose grade_levels include 'S3'. The legacy `grade_level`
+    # CharField stays for display + back-compat; backfill parses it once.
+    class SecondaryYear(models.TextChoices):
+        S1 = 'S1', 'S1'
+        S2 = 'S2', 'S2'
+        S3 = 'S3', 'S3'
+        S4 = 'S4', 'S4'
+        S5 = 'S5', 'S5'
+        S6 = 'S6', 'S6'
+
+    grade_levels = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Normalised list of secondary years (e.g. ['S3'] or "
+            "['S1','S2','S3','S4','S5']). Used for material-sharing "
+            "matches between school and platform-wide courses."
+        ),
+    )
+
     # Teacher policy: if False, students cannot pick their session
     # duration. The chat-page picker is hidden and any
     # `target_minutes` sent from the client is ignored — sessions
