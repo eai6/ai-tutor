@@ -91,67 +91,13 @@ class LessonContentResult(BaseModel):
 # STEP 1: PARSE
 # ============================================================================
 
-def extract_text_from_file(file_path: str) -> Tuple[str, str]:
-    """
-    Extract text from curriculum document.
-    
-    Supports: PDF, DOCX, TXT, MD
-    
-    Returns: (text, file_type)
-    """
-    ext = os.path.splitext(file_path)[1].lower()
-    
-    if ext in ['.txt', '.md']:
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            text = f.read()
-        return text, 'text'
-    
-    elif ext == '.docx':
-        return _extract_from_docx(file_path), 'docx'
-    
-    elif ext == '.pdf':
-        return _extract_from_pdf(file_path), 'pdf'
-
-    elif ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif']:
-        from apps.curriculum.curriculum_parser import extract_from_image
-        return extract_from_image(file_path), 'image'
-
-    else:
-        # Try reading as text
-        try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                text = f.read()
-            return text, 'text'
-        except:
-            raise ValueError(f"Unsupported file type: {ext}")
-
-
-def _extract_from_docx(file_path: str) -> str:
-    """Extract text from DOCX file."""
-    try:
-        from docx import Document
-        doc = Document(file_path)
-        
-        text_parts = []
-        for para in doc.paragraphs:
-            text_parts.append(para.text)
-        
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = " | ".join(cell.text for cell in row.cells)
-                text_parts.append(row_text)
-        
-        return "\n".join(text_parts)
-    except Exception as e:
-        logger.warning(f"python-docx failed: {e}, trying as text")
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            return f.read()
-
-
-def _extract_from_pdf(file_path: str) -> str:
-    """Extract text from PDF file (delegates to shared implementation with LLM vision fallback)."""
-    from apps.curriculum.curriculum_parser import extract_from_pdf
-    return extract_from_pdf(file_path)
+# NB: extract_text_from_file used to be re-implemented here (with subtly
+# different behaviour from the canonical version in curriculum_parser.py).
+# That duplicate shadowed the .doc rejection + NUL scrub fixes and let
+# binary content through to the pipeline. Now: import the canonical one.
+# Verified end-to-end via chrome-devtools-mcp (2026-05-14) that the .doc
+# rejection now fires at Step 1 instead of leaking through to vectorisation.
+from apps.curriculum.curriculum_parser import extract_text_from_file
 
 
 # ============================================================================

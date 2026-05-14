@@ -98,10 +98,24 @@ class CurriculumUpload(models.Model):
         return f"{self.subject_name} - {self.status} ({self.created_at.date()})"
     
     def add_log(self, message):
-        """Add a message to the processing log."""
+        """Add a message to the processing log.
+
+        Defensive NUL scrub: PostgreSQL's text type forbids 0x00 bytes
+        and we've seen them slip through from binary file extraction
+        (legacy .doc, OLE2 streams, etc.) even after the upstream
+        extractor was fixed. add_log is the choke point — every
+        progress message goes through it — so scrubbing here guarantees
+        processing_log can never explode the worker, no matter where
+        the message originated.
+        """
         from django.utils import timezone
         timestamp = timezone.now().strftime('%H:%M:%S')
-        self.processing_log += f"[{timestamp}] {message}\n"
+        clean = (message or '').replace('\x00', '')
+        self.processing_log += f"[{timestamp}] {clean}\n"
+        # Scrub NUL from the accumulated log too, in case earlier writes
+        # happened before this scrub was in place.
+        if '\x00' in self.processing_log:
+            self.processing_log = self.processing_log.replace('\x00', '')
         self.save(update_fields=['processing_log'])
 
 
@@ -200,10 +214,17 @@ class TeachingMaterialUpload(models.Model):
         return f"{self.title} ({self.material_type}) - {self.status}"
 
     def add_log(self, message):
-        """Add a message to the processing log."""
+        """Add a message to the processing log.
+
+        Defensive NUL scrub — see CurriculumUpload.add_log docstring for
+        rationale. Same choke-point treatment.
+        """
         from django.utils import timezone
         timestamp = timezone.now().strftime('%H:%M:%S')
-        self.processing_log += f"[{timestamp}] {message}\n"
+        clean = (message or '').replace('\x00', '')
+        self.processing_log += f"[{timestamp}] {clean}\n"
+        if '\x00' in self.processing_log:
+            self.processing_log = self.processing_log.replace('\x00', '')
         self.save(update_fields=['processing_log'])
 
 
