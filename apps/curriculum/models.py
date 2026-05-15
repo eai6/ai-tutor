@@ -685,3 +685,12 @@ class SeychellesContext(models.Model):
 
     def __str__(self):
         return f"[{self.get_category_display()}] {self.title}"
+
+
+# ─── Content-quality benchmark models (Q5) ─────────────────────────────
+# Lives in a separate module for clarity but imported here so Django
+# discovers it via the curriculum app's models package.
+from apps.curriculum.quality_models import (  # noqa: E402, F401
+    ContentEditEvent,
+    ContentEditTag,
+)

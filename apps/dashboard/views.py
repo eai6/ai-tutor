@@ -3736,6 +3736,14 @@ def exit_question_edit(request, question_id):
         question.delete()
         return JsonResponse({'success': True, 'deleted': True})
 
+    # Q5 capture — snapshot pre-edit state.
+    from apps.curriculum.quality_capture import (
+        record_content_edit_event, _question_payload,
+    )
+    from apps.curriculum.quality_models import ContentEditEvent
+    before_payload = _question_payload(question)
+    judge_outputs_snapshot = dict(question.judge_outputs or {})
+
     # Update fields
     for field in ['question_text', 'option_a', 'option_b', 'option_c', 'option_d',
                   'correct_answer', 'explanation', 'difficulty', 'concept_tag']:
@@ -3784,6 +3792,16 @@ def exit_question_edit(request, question_id):
         question.answer_data = ad
 
     question.save()
+
+    record_content_edit_event(
+        content_type=ContentEditEvent.ContentType.EXIT_QUESTION,
+        content_id=question.id, lesson=question.exit_ticket.lesson,
+        before_payload=before_payload,
+        after_payload=_question_payload(question),
+        judge_outputs=judge_outputs_snapshot,
+        source=ContentEditEvent.Source.MANUAL_EDIT,
+        edited_by=request.user,
+    )
     return JsonResponse({'success': True})
 
 
@@ -4885,6 +4903,14 @@ def exit_question_save_regen(request, question_id):
             'error': 'correct_answer must be A, B, C, or D',
         }, status=400)
 
+    # Q5 capture — snapshot pre-edit state.
+    from apps.curriculum.quality_capture import (
+        record_content_edit_event, _question_payload,
+    )
+    from apps.curriculum.quality_models import ContentEditEvent
+    before_payload = _question_payload(question)
+    judge_outputs_snapshot = dict(question.judge_outputs or {})
+
     question.question_text = qt[:1500]
     question.option_a = (request.POST.get('option_a') or '').strip()[:500]
     question.option_b = (request.POST.get('option_b') or '').strip()[:500]
@@ -4896,6 +4922,20 @@ def exit_question_save_regen(request, question_id):
         'question_text', 'option_a', 'option_b', 'option_c',
         'option_d', 'correct_answer', 'explanation',
     ])
+
+    record_content_edit_event(
+        content_type=ContentEditEvent.ContentType.EXIT_QUESTION,
+        content_id=question.id, lesson=question.exit_ticket.lesson,
+        before_payload=before_payload,
+        after_payload=_question_payload(question),
+        judge_outputs=judge_outputs_snapshot,
+        # Q3.2 mode field is not threaded through to save-regen; default
+        # to AI_REGEN_AUTO since the auto-fix path is the dominant
+        # use case. Manual edits go through exit_question_edit which
+        # has its own MANUAL_EDIT capture below.
+        source=ContentEditEvent.Source.AI_REGEN_AUTO,
+        edited_by=request.user,
+    )
 
     return JsonResponse({
         'ok': True,
@@ -5103,6 +5143,14 @@ def lesson_step_save_regen(request, step_id):
         except Exception:
             parsed_audit = None
 
+    # Q5 capture — snapshot pre-edit state for the benchmark.
+    from apps.curriculum.quality_capture import (
+        record_content_edit_event, _step_payload,
+    )
+    from apps.curriculum.quality_models import ContentEditEvent
+    before_payload = _step_payload(step)
+    judge_outputs_snapshot = dict(step.judge_outputs or {})
+
     step.teacher_script = candidate_text
     step.content_quality_status = LessonStep.ContentQualityStatus.HUMAN_EDITED
     outputs = dict(step.judge_outputs or {})
@@ -5114,6 +5162,22 @@ def lesson_step_save_regen(request, step_id):
     step.save(update_fields=[
         'teacher_script', 'content_quality_status', 'judge_outputs',
     ])
+
+    # Q5 capture — record the AI-regen save as a benchmark event.
+    record_content_edit_event(
+        content_type=ContentEditEvent.ContentType.STEP,
+        content_id=step.id, lesson=step.lesson,
+        before_payload=before_payload,
+        after_payload=_step_payload(step),
+        judge_outputs=judge_outputs_snapshot,
+        source=(
+            ContentEditEvent.Source.AI_REGEN_PROMPT
+            if (parsed_audit or {}).get('cycles_run') == 1
+               and not (parsed_audit or {}).get('cycles', [{}])[0].get('judge_passed')
+            else ContentEditEvent.Source.AI_REGEN_AUTO
+        ),
+        edited_by=request.user,
+    )
 
     return JsonResponse({
         'ok': True,
@@ -5187,6 +5251,12 @@ def step_edit(request, step_id):
                             lesson=lesson,
                             institution=lesson.unit.course.institution,
                         )
+                        # Q5 capture — snapshot pre-regen image state.
+                        from apps.curriculum.quality_capture import (
+                            record_content_edit_event, _image_payload,
+                        )
+                        from apps.curriculum.quality_models import ContentEditEvent
+                        before_payload = _image_payload(img)
                         result = service.get_or_generate_image(
                             prompt=description,
                             category=img.get('type', 'diagram'),
@@ -5200,6 +5270,22 @@ def step_edit(request, step_id):
                             if result.get('provider'):
                                 img['provider'] = result['provider']
                             step.save()
+                            # Capture only when the URL actually changed
+                            # (image_service may return the same URL when
+                            # editing an existing asset that's idempotent).
+                            after_payload = _image_payload(img)
+                            record_content_edit_event(
+                                content_type=ContentEditEvent.ContentType.IMAGE,
+                                # Use step.id as content_id since step.media
+                                # is a JSONField — no separate MediaAsset PK
+                                # is reliably retrievable here.
+                                content_id=step.id, lesson=step.lesson,
+                                before_payload=before_payload,
+                                after_payload=after_payload,
+                                judge_outputs=(result.get('judge_outputs') or {}),
+                                source=ContentEditEvent.Source.IMAGE_REGEN,
+                                edited_by=request.user,
+                            )
                             label = result.get('model') or 'image'
                             messages.success(request, f"Regenerated with {label}.")
                         else:
@@ -5330,6 +5416,14 @@ def step_edit(request, step_id):
             }
             return render(request, 'dashboard/curriculum/step_edit.html', context)
 
+        # Q5 capture — snapshot pre-edit state.
+        from apps.curriculum.quality_capture import (
+            record_content_edit_event, _step_payload,
+        )
+        from apps.curriculum.quality_models import ContentEditEvent
+        before_payload = _step_payload(step)
+        judge_outputs_snapshot = dict(step.judge_outputs or {})
+
         # Normal save — update step content
         step.phase = request.POST.get('phase', step.phase)
         step.step_type = request.POST.get('step_type', step.step_type)
@@ -5354,6 +5448,16 @@ def step_edit(request, step_id):
         step.hint_3 = parsed_hints[2] if len(parsed_hints) > 2 else ''
 
         step.save()
+
+        record_content_edit_event(
+            content_type=ContentEditEvent.ContentType.STEP,
+            content_id=step.id, lesson=step.lesson,
+            before_payload=before_payload,
+            after_payload=_step_payload(step),
+            judge_outputs=judge_outputs_snapshot,
+            source=ContentEditEvent.Source.MANUAL_EDIT,
+            edited_by=request.user,
+        )
 
         messages.success(request, "Step updated.")
         return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
