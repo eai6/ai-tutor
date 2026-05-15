@@ -644,6 +644,23 @@
                         {% endif %}
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        {% with fs=step.judge_outputs.factual_step %}
+                        {% if fs %}
+                            {% if fs.skipped %}
+                                <span title="Factual judge skipped: {{ fs.skip_reason }}"
+                                      style="font-size: 0.75rem; color: var(--gray-400);">⊘</span>
+                            {% elif not fs.passed %}
+                                <span title="{{ fs.recommended_fix|default:fs.reasoning }}"
+                                      style="font-size: 0.75rem; color: #b91c1c; font-weight: 600;">⚠ Factual</span>
+                            {% elif fs.violations %}
+                                <span title="{{ fs.recommended_fix|default:fs.reasoning }}"
+                                      style="font-size: 0.75rem; color: #b45309; font-weight: 500;">⚠ Review</span>
+                            {% else %}
+                                <span title="Factual judge passed via {{ fs.provider }}"
+                                      style="font-size: 0.75rem; color: var(--success);">✓ AI</span>
+                            {% endif %}
+                        {% endif %}
+                        {% endwith %}
                         {% if step.media %}
                         <span style="font-size: 0.75rem; color: var(--gray-500);">🖼️</span>
                         {% endif %}
@@ -654,6 +671,33 @@
                     </div>
                 </div>
                 <div class="step-body">
+                    {% with fs=step.judge_outputs.factual_step %}
+                    {% if fs and not fs.skipped %}
+                    <div class="step-content-section">
+                        {% if not fs.passed %}
+                            <h4 style="color: #b91c1c;">⚠ AI Review — Factual issues found</h4>
+                        {% elif fs.violations %}
+                            <h4 style="color: #b45309;">⚠ AI Review — Teacher review suggested</h4>
+                        {% else %}
+                            <h4 style="color: var(--success);">✓ AI Review — Factual check passed</h4>
+                        {% endif %}
+                        {% if fs.reasoning %}
+                        <div style="font-size: 0.875rem; color: var(--gray-700); margin-top: 0.25rem;">
+                            {{ fs.reasoning }}
+                        </div>
+                        {% endif %}
+                        {% if fs.recommended_fix %}
+                        <div style="font-size: 0.875rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem;
+                                    background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 0.25rem;
+                                    white-space: pre-line;">{{ fs.recommended_fix }}</div>
+                        {% endif %}
+                        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.5rem;">
+                            Reviewed by {{ fs.provider }}/{{ fs.model_name }}{% if fs.violations %} — codes: {{ fs.violations|join:", " }}{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+
                     {% if step.teacher_script %}
                     <div class="step-content-section">
                         <h4>📝 Tutor Script</h4>
