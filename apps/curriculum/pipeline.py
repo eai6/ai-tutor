@@ -302,7 +302,7 @@ def _normalize_objective_key(text: str) -> str:
 
 
 def _dedupe_parsed_curriculum(structure: Dict) -> Dict[str, int]:
-    """Within-lesson dedup + lesson-title-as-first-EO drop.
+    """Within-lesson dedup + lesson-title-as-first-EO drop + cross-lesson flag.
 
     Walks every lesson in the parsed structure and:
       1. Drops EO entries that match the lesson's title or singular
@@ -313,19 +313,27 @@ def _dedupe_parsed_curriculum(structure: Dict) -> Dict[str, int]:
          normalization (case + whitespace insensitive). Keeps first
          occurrence's original (non-normalized) text so capitalisation
          choices survive.
+      3. **L4** — Detects EOs that appear on >1 lesson within the same
+         unit. Doesn't auto-resolve — annotates each affected lesson
+         with a `_cross_lesson_dups` dict so the review UI can flag
+         them and the teacher can decide which lesson should keep it.
+         Cross-unit dups are intentional (similar concepts in different
+         contexts) and not flagged.
 
     Mutates structure in place. Returns counts so the caller can
-    surface "N duplicates removed" in the processing log + review UI.
-
-    Cross-lesson dedup + manual move are deferred to L4 (see
-    memory/lesson_objectives_management_plan.md).
+    surface "N duplicates removed / N flagged" in the processing log
+    + review UI.
     """
     counts = {
         'within_lesson_duplicates': 0,
         'title_duplicate_drops': 0,
+        'cross_lesson_duplicates': 0,
         'lessons_touched': 0,
     }
 
+    # ------------------------------------------------------------
+    # Pass 1 — within-lesson dedup + title/objective drops
+    # ------------------------------------------------------------
     for unit in structure.get('units', []) or []:
         for lesson in unit.get('lessons', []) or []:
             eos = lesson.get('enabling_objectives') or []
@@ -367,6 +375,40 @@ def _dedupe_parsed_curriculum(structure: Dict) -> Dict[str, int]:
             if removed_here:
                 counts['lessons_touched'] += 1
             lesson['enabling_objectives'] = cleaned
+
+    # ------------------------------------------------------------
+    # Pass 2 — cross-lesson dup detection (within unit, no auto-resolve)
+    # ------------------------------------------------------------
+    for unit in structure.get('units', []) or []:
+        # {normalized_key: [(lesson_dict, original_text), ...]}
+        index: Dict[str, list] = {}
+        lessons = unit.get('lessons', []) or []
+        for lesson in lessons:
+            for eo in lesson.get('enabling_objectives', []) or []:
+                if not isinstance(eo, str):
+                    continue
+                text = eo.strip()
+                if not text:
+                    continue
+                key = _normalize_objective_key(text)
+                index.setdefault(key, []).append((lesson, text))
+
+        for key, locations in index.items():
+            if len(locations) <= 1:
+                continue
+            # Same EO on multiple lessons in this unit. Flag each
+            # affected lesson with the duplicate text + the OTHER
+            # lessons it also appears on. Teacher resolves manually
+            # via the Move-to / ✕ affordances.
+            counts['cross_lesson_duplicates'] += 1
+            for lesson, original in locations:
+                other_titles = [
+                    other_lesson.get('title', '(untitled)')
+                    for other_lesson, _ in locations
+                    if other_lesson is not lesson
+                ]
+                if other_titles:
+                    lesson.setdefault('_cross_lesson_dups', {})[original] = other_titles
 
     return counts
 
@@ -1222,6 +1264,15 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
                         f"   🧹 Cleaned {total_dropped} redundant objective(s) "
                         f"across {dedup_counts['lessons_touched']} lesson(s) "
                         f"({', '.join(parts)})"
+                    )
+                # Cross-lesson dups are flagged but NOT auto-resolved
+                # — surface the count so the teacher knows to look for
+                # the warning badges on the review screen.
+                if dedup_counts['cross_lesson_duplicates']:
+                    upload.add_log(
+                        f"   ⚠ Flagged {dedup_counts['cross_lesson_duplicates']} "
+                        f"cross-lesson duplicate(s) — review the marked TOs "
+                        f"and decide which lesson should keep each one."
                     )
             except Exception as e:
                 upload.add_log(f"   ⚠ Objective dedup skipped: {e}")

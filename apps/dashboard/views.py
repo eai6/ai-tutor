@@ -3683,6 +3683,15 @@ def lesson_detail(request, lesson_id):
         lesson.content_status == 'generating' or just_kicked_regen
     )
 
+    # L4 — sibling lessons in the same unit, used by the Move-to dropdown
+    # on each Terminal Objective in the edit panel. Excludes self.
+    sibling_lessons = list(
+        lesson.unit.lessons
+        .exclude(id=lesson.id)
+        .order_by('order_index', 'id')
+        .values('id', 'title')
+    )
+
     context = {
         **request.staff_ctx,
         'lesson': lesson,
@@ -3700,6 +3709,7 @@ def lesson_detail(request, lesson_id):
         'teaching_steps': teaching_steps,
         'enabling_objectives': enabling_objectives,
         'unit_terminal_objectives': unit_terminal_objectives,
+        'sibling_lessons': sibling_lessons,
         'is_generating': is_generating,
     }
 
@@ -5205,6 +5215,80 @@ def lesson_edit_objectives(request, lesson_id):
     else:
         messages.success(request, f"Saved {len(cleaned)} TO(s).")
     return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
+
+@teacher_required
+@require_POST
+def lesson_move_objective(request, lesson_id):
+    """Move one Terminal Objective from this lesson to another lesson
+    in the same unit. L4 of memory/lesson_objectives_management_plan.md.
+
+    POST params:
+      - eo_text: the exact text of the objective to move
+      - target_lesson_id: the destination lesson (must be in the same unit)
+
+    Removes from source.enabling_objectives (case-insensitive match),
+    appends to target.enabling_objectives (deduped). Same-unit only —
+    cross-unit moves require manual edit (different lessons live in
+    different parsed contexts).
+    """
+    from apps.curriculum.models import Lesson
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        source = get_object_or_404(Lesson, id=lesson_id, unit__course__institution=institution)
+    else:
+        source = get_object_or_404(Lesson, id=lesson_id)
+
+    eo_text = (request.POST.get('eo_text') or '').strip()
+    target_id = (request.POST.get('target_lesson_id') or '').strip()
+    if not eo_text or not target_id:
+        messages.error(request, "Missing objective text or target lesson.")
+        return redirect('dashboard:lesson_detail', lesson_id=source.id)
+
+    try:
+        target = Lesson.objects.get(id=int(target_id), unit_id=source.unit_id)
+    except (Lesson.DoesNotExist, ValueError):
+        messages.error(request, "Target lesson must be in the same unit.")
+        return redirect('dashboard:lesson_detail', lesson_id=source.id)
+
+    if institution is not None and target.unit.course.institution_id != institution.id:
+        messages.error(request, "Target lesson is in a different institution.")
+        return redirect('dashboard:lesson_detail', lesson_id=source.id)
+
+    # Remove from source — case-insensitive whitespace-normalized match,
+    # so trivial reformatting doesn't strand the entry.
+    eo_key = ' '.join(eo_text.lower().split())
+    source_eos = list(source.enabling_objectives or [])
+    new_source = []
+    removed = False
+    for eo in source_eos:
+        if not isinstance(eo, str):
+            continue
+        if not removed and ' '.join(eo.lower().split()) == eo_key:
+            removed = True
+            continue
+        new_source.append(eo)
+    if not removed:
+        messages.warning(request, f"Objective not found on this lesson — already moved?")
+        return redirect('dashboard:lesson_detail', lesson_id=source.id)
+
+    # Append to target — dedup so we don't double-add an existing entry.
+    target_eos = list(target.enabling_objectives or [])
+    target_keys = {' '.join(e.lower().split()) for e in target_eos if isinstance(e, str)}
+    if eo_key not in target_keys:
+        target_eos.append(eo_text)
+
+    source.enabling_objectives = new_source
+    source.save(update_fields=['enabling_objectives'])
+    target.enabling_objectives = target_eos
+    target.save(update_fields=['enabling_objectives'])
+
+    messages.success(
+        request,
+        f"Moved \"{eo_text[:60]}{'…' if len(eo_text) > 60 else ''}\" "
+        f"from \"{source.title}\" to \"{target.title}\".",
+    )
+    return redirect('dashboard:lesson_detail', lesson_id=source.id)
 
 
 @teacher_required

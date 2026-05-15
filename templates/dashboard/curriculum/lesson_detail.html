@@ -381,7 +381,15 @@
                     {% for eo in lesson.enabling_objectives %}
                     <div class="lesson-eo-row" style="display:flex;align-items:flex-start;gap:0.375rem;">
                         <span style="background:#ddd6fe;color:#4338ca;padding:0.0625rem 0.375rem;border-radius:4px;font-size:0.6875rem;font-weight:600;flex-shrink:0;margin-top:4px;">TO</span>
-                        <textarea name="enabling_objectives" rows="1" style="flex:1;font-size:0.8125rem;border:1px solid #c7d2fe;border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;">{{ eo }}</textarea>
+                        <textarea name="enabling_objectives" rows="1" data-original-eo="{{ eo }}" style="flex:1;font-size:0.8125rem;border:1px solid #c7d2fe;border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;">{{ eo }}</textarea>
+                        {% if sibling_lessons %}
+                        <select onchange="moveLessonEo(this, {{ lesson.id }})" style="font-size:0.7rem;border:1px solid #c7d2fe;border-radius:4px;padding:2px 4px;background:#fff;color:#4338ca;flex-shrink:0;max-width:140px;" title="Move this TO to another lesson in the same unit">
+                            <option value="">Move to…</option>
+                            {% for sib in sibling_lessons %}
+                            <option value="{{ sib.id }}">→ {{ sib.title|truncatechars:32 }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
                         <button type="button" onclick="this.closest('.lesson-eo-row').remove()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" title="Remove">✕</button>
                     </div>
                     {% endfor %}
@@ -393,6 +401,14 @@
                     <button type="submit" style="font-size:0.75rem;background:#4338ca;color:#fff;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;">Save</button>
                 </div>
             </form>
+            {% if sibling_lessons %}
+            <!-- Hidden form used to POST a single Move action -->
+            <form id="lesson-eo-move-form" method="post" action="" style="display:none;">
+                {% csrf_token %}
+                <input type="hidden" name="eo_text" value="">
+                <input type="hidden" name="target_lesson_id" value="">
+            </form>
+            {% endif %}
             <script>
             (function(){
                 window.toggleLessonEoEdit = function() {
@@ -421,6 +437,32 @@
                     `;
                     rows.appendChild(row);
                     row.querySelector('textarea').focus();
+                };
+                // L4 — Move-to dropdown: posts a single EO move to the
+                // server. Reads the textarea's CURRENT value (so a
+                // teacher can edit the text and then move it). Confirms
+                // before posting because moves are immediate (no undo).
+                window.moveLessonEo = function(selectEl, sourceLessonId) {
+                    const targetId = selectEl.value;
+                    if (!targetId) return;
+                    const row = selectEl.closest('.lesson-eo-row');
+                    const textarea = row.querySelector('textarea[name="enabling_objectives"]');
+                    const eoText = (textarea.value || '').trim();
+                    if (!eoText) {
+                        alert('Cannot move an empty Terminal Objective.');
+                        selectEl.value = '';
+                        return;
+                    }
+                    const targetTitle = selectEl.options[selectEl.selectedIndex].text.replace(/^→ /, '');
+                    if (!confirm(`Move this TO to "${targetTitle}"?\n\n"${eoText.length > 100 ? eoText.slice(0, 100) + '…' : eoText}"`)) {
+                        selectEl.value = '';
+                        return;
+                    }
+                    const form = document.getElementById('lesson-eo-move-form');
+                    form.action = `/dashboard/curriculum/lesson/${sourceLessonId}/move-objective/`;
+                    form.querySelector('input[name="eo_text"]').value = eoText;
+                    form.querySelector('input[name="target_lesson_id"]').value = targetId;
+                    form.submit();
                 };
             })();
             </script>
