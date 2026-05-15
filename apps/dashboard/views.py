@@ -5485,6 +5485,110 @@ def course_edit(request, course_id):
 
 @teacher_required
 @require_POST
+def course_change_institution(request, course_id):
+    """Move a Course from one institution to another (incl. All Schools).
+
+    Super-admin only — moving courses across tenants is a platform-admin
+    operation. Guarded against courses with generated content because the
+    cascade would also need to migrate ChromaDB chunks (per-institution
+    collections) and student-facing data — out of scope for v1. The user
+    case is moving an empty just-created course to the right owner.
+
+    POST params:
+        target_institution_id: integer institution PK, or '' / 'platform'
+            for platform-wide (institution=None).
+
+    Allowed states:
+      - Every lesson in the course must have content_status='empty' AND
+        zero LessonStep rows. If any lesson has generated content, refuse.
+
+    Side effects:
+      - Course.institution updated
+      - TeachingMaterialUploads linked to this course are also re-tagged
+        (TeachingMaterialUpload.institution → new institution) so
+        material visibility moves with the course
+      - Returns to course detail; if the user's currently-selected
+        institution scope no longer covers the course, falls back to
+        the curriculum list
+    """
+    from apps.curriculum.models import Course, Lesson, LessonStep
+    from apps.accounts.models import Institution
+
+    if request.staff_ctx.get('role') != 'superadmin':
+        messages.error(request, "Only super-admins can move courses across institutions.")
+        return redirect('dashboard:course_detail', course_id=course_id)
+
+    course = get_object_or_404(Course, id=course_id)
+
+    # Guard: any lesson with non-empty content blocks the move.
+    blocking_lessons = Lesson.objects.filter(unit__course=course).exclude(content_status='empty')
+    blocking_count = blocking_lessons.count()
+    if blocking_count == 0:
+        # Belt + braces: also check for steps directly (in case a lesson
+        # has steps without flipping content_status — shouldn't happen
+        # but cheap to verify).
+        step_count = LessonStep.objects.filter(lesson__unit__course=course).count()
+        if step_count > 0:
+            blocking_count = step_count
+    if blocking_count:
+        messages.error(
+            request,
+            f"Cannot move course: {blocking_count} lesson(s) have generated content. "
+            f"Moving courses with content would orphan ChromaDB chunks "
+            f"(per-institution collections) and student session data. "
+            f"Delete the generated content (regenerate as empty) or use a "
+            f"separate migration for content-bearing moves."
+        )
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    raw = (request.POST.get('target_institution_id') or '').strip().lower()
+    if raw in ('', 'platform', 'platform-wide', 'none', '0'):
+        target = None
+        target_label = 'All Schools (platform-wide)'
+    else:
+        try:
+            target = Institution.objects.get(id=int(raw), is_active=True)
+            target_label = target.name
+        except (Institution.DoesNotExist, ValueError):
+            messages.error(request, f"Invalid target institution: {raw!r}.")
+            return redirect('dashboard:course_detail', course_id=course.id)
+
+    # Optional collision check — same title at the target institution.
+    collision = Course.objects.filter(institution=target, title=course.title).exclude(id=course.id).first()
+    if collision:
+        messages.warning(
+            request,
+            f"Heads-up: another course titled {course.title!r} already exists at "
+            f"{target_label}. Both will coexist; consider renaming one for clarity."
+        )
+
+    prior_label = course.institution.name if course.institution else 'All Schools (platform-wide)'
+
+    course.institution = target
+    course.save(update_fields=['institution', 'updated_at'])
+
+    # Re-tag any TeachingMaterialUploads tied to this course so material
+    # visibility moves with the course. Materials with course=None are
+    # left alone (they belong to a different scope).
+    from apps.dashboard.models import TeachingMaterialUpload
+    retagged = TeachingMaterialUpload.objects.filter(course=course).update(institution=target)
+
+    msg = f"Moved {course.title!r} from {prior_label} to {target_label}."
+    if retagged:
+        msg += f" Re-tagged {retagged} linked teaching material(s) to the new institution."
+    messages.success(request, msg)
+
+    # If the super-admin is currently scoped to a school that's not the
+    # new owner, redirect to curriculum list (course_detail would 404
+    # under the institution scope filter).
+    current = request.staff_ctx.get('institution')
+    if current is not None and current != target:
+        return redirect('dashboard:curriculum_list')
+    return redirect('dashboard:course_detail', course_id=course.id)
+
+
+@teacher_required
+@require_POST
 def course_delete(request, course_id):
     """Delete a course and all its units/lessons/steps."""
     institution = request.staff_ctx['institution']

@@ -299,20 +299,19 @@ def extract_material_with_vision(file_path: str, material_type: str, subject: st
     client = get_llm_client(config)
     is_anthropic = config.provider == 'anthropic'
 
-    # Render pages
-    MAX_IMAGE_BYTES = 4_500_000
+    # Adaptive resize via shared helper — guaranteed to fit Anthropic's
+    # 5 MiB base64 limit, with quality fallbacks for big pages instead
+    # of dropping them.
+    from apps.curriculum.curriculum_parser import _render_page_within_b64_limit
     page_images = []
     for page in doc:
-        pix = page.get_pixmap(dpi=150)
-        img_bytes = pix.tobytes("jpeg", jpg_quality=85)
-        if len(img_bytes) > MAX_IMAGE_BYTES:
-            pix = page.get_pixmap(dpi=100)
-            img_bytes = pix.tobytes("jpeg", jpg_quality=75)
-        if len(img_bytes) > MAX_IMAGE_BYTES:
-            continue
+        result = _render_page_within_b64_limit(page, initial_dpi=150)
+        if result is None:
+            continue   # truly unrenderable; very rare
+        img_bytes, media_type = result
         page_images.append({
             'b64': base64.b64encode(img_bytes).decode('utf-8'),
-            'media_type': 'image/jpeg',
+            'media_type': media_type,
         })
 
     if not page_images:
@@ -469,8 +468,18 @@ Return a JSON array.""",
 
 
 def _index_vision_data(upload, vision_data: list):
-    """Index vision-extracted structured data into the KB as enriched chunks."""
+    """Index vision-extracted structured data into the KB as enriched chunks.
+
+    ChromaDB metadata accepts ONLY scalar types (str / int / float / bool /
+    None) and lists. Nested dicts crash the upsert with:
+      "Expected metadata value to be a str, int, float, bool, SparseVector,
+       list, or None, got {...} which is a dict in upsert"
+    Each vision-extracted item is itself a structured dict — so we
+    JSON-serialize the whole thing into `extracted_data_json` (string),
+    keep a few high-value scalar fields surface-indexed for filtering.
+    """
     import hashlib
+    import json
     from apps.accounts.models import Institution
     from apps.curriculum.knowledge_base import CurriculumKnowledgeBase, CurriculumChunk
 
@@ -492,6 +501,12 @@ def _index_vision_data(upload, vision_data: list):
             f"{upload.id}:vision:{i}:{content[:80]}".encode()
         ).hexdigest()[:16]
 
+        # Promote a few high-value scalars for filtering, JSON-encode the
+        # rest. ChromaDB metadata is queryable only on scalars, so anything
+        # we want to slice on (item_type, title) gets a top-level key.
+        item_type = item.get('item_type') or item.get('type') or ''
+        item_title = item.get('title') or ''
+
         chunks.append(CurriculumChunk(
             id=chunk_id,
             content=content,
@@ -505,8 +520,12 @@ def _index_vision_data(upload, vision_data: list):
                 "institution_id": institution_id,
                 "material_type": upload.material_type,
                 "material_title": upload.title,
-                # Store the structured data for programmatic access
-                "extracted_data": item,
+                # Surface-indexed scalars for filtering
+                "item_type": str(item_type) if item_type else "",
+                "item_title": str(item_title) if item_title else "",
+                # Full structured data preserved as JSON string (ChromaDB
+                # metadata can't hold nested dicts).
+                "extracted_data_json": json.dumps(item, default=str, ensure_ascii=False),
             },
         ))
 

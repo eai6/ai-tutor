@@ -112,3 +112,17 @@ Auto-memory at `~/.claude/projects/-Users-edwardamoah-Documents-GitHub-ai-tutor/
 - **Pulumi destroy / Azure resource deletion**: confirm with user. Pulumi stack is `pixel`.
 - **Migrations against prod**: dry-run against a copy of the prod DB dump first. Backfill migrations especially.
 - **Editing `config/settings.py`, `Dockerfile`, `.github/workflows/`, `infra/__main__.py`**: confirm approach before changing. These are load-bearing for production.
+
+## Bug-fix workflow — test locally before deploy
+
+When fixing a user-reported production bug or shipping any new feature, **always** reproduce + verify locally before `git commit` / `git push`. Each deploy round-trip is ~10 min via GitHub Actions; shipping an unverified change that then fails in prod costs the user a 20-min wait before the next attempt.
+
+Required sequence:
+
+1. **Reproduce locally**. For UI/upload bugs, drive the local dev server with `mcp__chrome-devtools__*` tools using the same input file/path the user reported. For backend logic, write a one-off Django shell test (`python manage.py shell <<'PY' ... PY`) that exercises the exact code path with realistic inputs.
+2. **Confirm the fix works end-to-end** before committing. "Active revision shows the right image tag" is necessary but NOT sufficient — Python module caches, deferred startup work, or different code paths can mean the fix isn't actually firing in prod.
+3. **Visual check via screenshot for ANY UI change** — `mcp__chrome-devtools__take_screenshot` and actually look at the rendered output. DOM inspection via `evaluate_script` is necessary but NOT sufficient: styling bugs, broken layouts, mis-rendered flash messages, off-screen elements, and contrast issues all slip past programmatic checks. For interactive flows (forms, modals, multi-step wizards), capture screenshots at each step (panel-open, form-filled, post-submit success message, error state). See `auto-memory/feedback_visual_check_required.md`.
+4. **Surface the local test result to the user** ("I uploaded the file via chrome-devtools and it succeeded" / "Django shell confirms add_log scrubs NUL" / "screenshots show the panel renders + flash message displays") before pushing.
+5. If the user-reported file is sandbox-blocked (e.g. in `~/Downloads`), ask them to copy it into the project tree (`media/test_uploads/` or similar) so the bash sandbox can read it. Don't skip the local test just because the file is awkward to access.
+
+Compounds with: don't auto-commit during active iteration (`auto-memory/feedback_dev_collaboration.md`). Code → local test → visual check (if UI) → user confirmation → commit + push, in that order. Never skip a step.

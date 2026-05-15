@@ -282,31 +282,21 @@ def extract_figures_from_pdf(file_path: str, institution_id: int = None) -> List
         logger.error(f"Could not open PDF for figure extraction: {e}")
         return []
 
-    # Identify pages with meaningful figures
-    MAX_IMAGE_BYTES = 4_500_000  # Stay under Anthropic's 5MB limit
+    # Adaptive resize: shared helper produces a result that's guaranteed
+    # under Anthropic's 5 MiB base64 limit, with safe quality fallbacks
+    # for oversized pages instead of dropping them.
     pages_with_figures = []
     for page_num in range(len(doc)):
         page = doc[page_num]
         if _has_meaningful_figures(page):
-            # Render page at 100 DPI for vision analysis
-            pix = page.get_pixmap(dpi=100)
-            image_bytes = pix.tobytes("png")
-            media_type = 'image/png'
-
-            # If PNG exceeds size limit, fall back to JPEG
-            if len(image_bytes) > MAX_IMAGE_BYTES:
-                image_bytes = pix.tobytes("jpeg")
-                media_type = 'image/jpeg'
-
-            # If still too large, reduce DPI
-            if len(image_bytes) > MAX_IMAGE_BYTES:
-                pix = page.get_pixmap(dpi=72)
-                image_bytes = pix.tobytes("jpeg")
-                media_type = 'image/jpeg'
-
-            if len(image_bytes) > MAX_IMAGE_BYTES:
-                logger.warning(f"Page {page_num + 1} image still too large ({len(image_bytes)} bytes), skipping")
+            # Figure extraction prefers 100 DPI baseline — slightly lower
+            # than the OCR path (which uses 200) because figures need
+            # less fine detail than text recognition.
+            result = _render_page_within_b64_limit(page, initial_dpi=100)
+            if result is None:
+                logger.warning(f"Page {page_num + 1} could not fit base64 limit even at floor — skipping")
                 continue
+            image_bytes, media_type = result
 
             pages_with_figures.append({
                 'page_number': page_num + 1,
@@ -449,29 +439,94 @@ def _classify_llm_error(exc: Exception) -> str:
     return 'unknown'
 
 
-_VISION_MAX_IMAGE_BYTES = 4_500_000  # stay under Anthropic's 5MB image limit
-_VISION_BATCH_SIZE = 10              # pages per LLM call
-_VISION_MAX_WORKERS = 5              # concurrent in-flight batches
+# Anthropic's per-image limit is 5 MiB measured on the BASE64-ENCODED
+# payload, NOT the raw bytes. A 4.5 MB raw PNG becomes ~6 MB base64 →
+# over limit (we hit this in production: "5977936 bytes > 5242880 bytes"
+# was Anthropic rejecting a 4.49 MB raw image after base64 expansion).
+# Guard on the encoded size with a safety buffer under 5,242,880.
+_VISION_MAX_BASE64_BYTES = 5_000_000   # ~4.77 MiB base64 — under the 5 MiB ceiling
+_VISION_BATCH_SIZE = 10                # pages per LLM call
+_VISION_MAX_WORKERS = 5                # concurrent in-flight batches
+_VISION_MIN_DPI = 36                   # absolute floor — text barely readable
+_VISION_INITIAL_DPI = 200              # quality target for first attempt
+
+
+def _render_page_within_b64_limit(
+    page,
+    max_b64_bytes: int = _VISION_MAX_BASE64_BYTES,
+    initial_dpi: int = _VISION_INITIAL_DPI,
+) -> Optional[Tuple[bytes, str]]:
+    """Adaptively render a PDF page so the BASE64-encoded result fits
+    under ``max_b64_bytes``. Returns (raw_image_bytes, media_type)
+    or None only if the page can't fit even at the absolute floor.
+
+    Strategy:
+      1. Try 200 DPI PNG (highest quality).
+      2. If too big, JPEG q85 at the same DPI.
+      3. If still too big, compute an adaptive DPI from the size ratio
+         (bytes scale ~ DPI²) with a 0.85 safety factor.
+      4. If still too big, drop quality (q60 → q40 → q25).
+      5. Last resort: 36 DPI q20 — very low quality but gets SOME signal
+         through (better than dropping the page entirely).
+
+    The adaptive step is the key win — it picks the right size on the
+    second attempt instead of stepping through fixed DPI tiers blindly.
+    """
+    import base64
+    import math
+
+    def _b64_size(b: bytes) -> int:
+        return (len(b) * 4 + 2) // 3   # exact base64 length without encoding
+
+    # Tier 1 — 200 DPI PNG
+    pix = page.get_pixmap(dpi=initial_dpi)
+    img = pix.tobytes("png")
+    if _b64_size(img) <= max_b64_bytes:
+        return img, "image/png"
+
+    # Tier 2 — same DPI, JPEG q85
+    img = pix.tobytes("jpeg", jpg_quality=85)
+    if _b64_size(img) <= max_b64_bytes:
+        return img, "image/jpeg"
+
+    # Tier 3 — adaptive resize. JPEG bytes scale ~quadratically with
+    # DPI; pick a DPI that should land safely under the limit.
+    current_size = _b64_size(img)
+    ratio = max_b64_bytes / current_size
+    adaptive_dpi = max(_VISION_MIN_DPI, int(initial_dpi * math.sqrt(ratio) * 0.85))
+    pix = page.get_pixmap(dpi=adaptive_dpi)
+    img = pix.tobytes("jpeg", jpg_quality=80)
+    if _b64_size(img) <= max_b64_bytes:
+        return img, "image/jpeg"
+
+    # Tier 4 — drop JPEG quality at the adaptive DPI
+    for q in (60, 40, 25):
+        img = pix.tobytes("jpeg", jpg_quality=q)
+        if _b64_size(img) <= max_b64_bytes:
+            return img, "image/jpeg"
+
+    # Tier 5 — absolute floor (text barely readable but still OCRable)
+    pix = page.get_pixmap(dpi=_VISION_MIN_DPI)
+    img = pix.tobytes("jpeg", jpg_quality=20)
+    if _b64_size(img) <= max_b64_bytes:
+        return img, "image/jpeg"
+
+    # Truly impossible — should be unreachable for normal pages
+    return None
 
 
 def _render_page_for_vision(page) -> Optional[Tuple[str, str]]:
-    """Render one PyMuPDF page → (base64_str, media_type) or None if oversized.
+    """Render one PyMuPDF page → (base64_str, media_type) or None.
 
-    Cascades 200-DPI PNG → 200-DPI JPEG → 120-DPI JPEG, dropping the page only
-    if even the smallest variant exceeds the 4.5 MB Anthropic image limit.
+    Thin wrapper over `_render_page_within_b64_limit` that base64-encodes
+    the result. Kept for backward compatibility with callers that already
+    expect base64 strings.
     """
     import base64
-    pix = page.get_pixmap(dpi=200)
-    img_bytes = pix.tobytes("png")
-    media_type = "image/png"
-    if len(img_bytes) > _VISION_MAX_IMAGE_BYTES:
-        img_bytes = pix.tobytes("jpeg", jpg_quality=80)
-        media_type = "image/jpeg"
-    if len(img_bytes) > _VISION_MAX_IMAGE_BYTES:
-        pix = page.get_pixmap(dpi=120)
-        img_bytes = pix.tobytes("jpeg", jpg_quality=80)
-    if len(img_bytes) > _VISION_MAX_IMAGE_BYTES:
+    result = _render_page_within_b64_limit(page)
+    if result is None:
         return None
+    img_bytes, media_type = result
     return base64.b64encode(img_bytes).decode("utf-8"), media_type
 
 
@@ -656,7 +711,7 @@ def _extract_pdf_with_vision(
     if skipped_oversized_total == sum(end - start for start, end in batches):
         raise OCRFailure(
             'oversized_page',
-            f"All {skipped_oversized_total} page(s) exceeded {_VISION_MAX_IMAGE_BYTES} bytes "
+            f"All {skipped_oversized_total} page(s) exceeded {_VISION_MAX_BASE64_BYTES} bytes "
             f"after fallback to 120 DPI JPEG.",
         )
     if skipped_batches:
