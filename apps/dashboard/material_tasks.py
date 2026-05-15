@@ -107,6 +107,7 @@ def process_teaching_material(upload_id: int):
                     material_type=upload.material_type,
                     subject=upload.subject_name,
                     grade_level=upload.grade_level,
+                    progress_cb=_make_progress_cb(upload),
                 )
                 if vision_data:
                     upload.add_log(f"Vision extraction: {len(vision_data)} items extracted")
@@ -271,7 +272,13 @@ def _find_matching_course(upload):
     return Course.objects.filter(q).first()
 
 
-def extract_material_with_vision(file_path: str, material_type: str, subject: str, grade_level: str) -> list:
+def extract_material_with_vision(
+    file_path: str,
+    material_type: str,
+    subject: str,
+    grade_level: str,
+    progress_cb=None,
+) -> list:
     """
     Use LLM vision to extract structured data from a teaching material PDF.
 
@@ -280,6 +287,14 @@ def extract_material_with_vision(file_path: str, material_type: str, subject: st
     - Exam paper: questions with mark allocations, command words, source materials
     - Textbook: key concepts, definitions, worked examples
     - Notes: teaching sequences, emphasis areas, local examples
+
+    Args:
+        progress_cb: Optional ``(pages_processed, pages_total, phase)`` callback
+            invoked after each batch. Lets the caller (process_teaching_material)
+            tick the upload row's pages_processed/phase so the UI counter
+            ("47 / 380 pages") reflects Rich-mode progress, not just the OCR
+            fallback path. Without this, Rich extraction looks stuck at 0/N
+            for the entire run even though batches are completing fine.
     """
     import base64
     import fitz
@@ -417,6 +432,16 @@ Return a JSON array.""",
 
     all_items = []
     batch_size = 5  # Smaller batches for materials (often denser than curriculum)
+    pages_total = len(page_images)
+
+    # Initial tick — gets pages_total onto the upload row immediately so
+    # the UI shows "0 / 380 pages" with a real denominator instead of
+    # "0 / 0".
+    if progress_cb is not None and pages_total:
+        try:
+            progress_cb(0, pages_total, f"vision_extract_p0_of_{pages_total}")
+        except Exception as cb_exc:
+            logger.warning(f"progress_cb (vision init) failed: {cb_exc}")
 
     for batch_start in range(0, len(page_images), batch_size):
         batch = page_images[batch_start:batch_start + batch_size]
@@ -462,6 +487,20 @@ Return a JSON array.""",
                 if attempt == 0:
                     continue  # Retry once
                 break
+
+        # Tick after each batch (success or final-failure) so the UI
+        # counter reflects what we actually attempted. Counts pages
+        # processed regardless of LLM outcome — a skipped batch is still
+        # "we got past those pages."
+        pages_done = min(batch_start + batch_size, pages_total)
+        if progress_cb is not None:
+            try:
+                progress_cb(
+                    pages_done, pages_total,
+                    f"vision_extract_p{pages_done}_of_{pages_total}",
+                )
+            except Exception as cb_exc:
+                logger.warning(f"progress_cb (vision batch) failed: {cb_exc}")
 
     print(f"[MaterialVision] {material_type}: extracted {len(all_items)} items from {len(page_images)} pages", flush=True)
     return all_items
