@@ -144,7 +144,12 @@ def _run_content_judges_for_steps(lesson, steps):
                 # Don't auto_ok (we don't know it's clean) and don't
                 # auto_flag (we don't know it's bad).
                 pass
-            elif verdict.passed and not verdict.violations:
+            elif verdict.passed:
+                # Includes both clean (no violations) AND soft-warning
+                # cases (passed=True with STEP_FACT_UNSUPPORTED). Soft
+                # warnings surface as ⚠ Review badge in the UI but
+                # don't auto_flag the step — the judge says it's OK
+                # to ship, just worth a teacher glance.
                 new_status = LessonStep.ContentQualityStatus.AUTO_OK
             elif not verdict.passed and regen_enabled:
                 # Q2 regen — try to fix the step before flagging it.
@@ -905,7 +910,13 @@ class LessonContentGenerator:
         kb_str = ''
         if curriculum_context.get('related_content'):
             snippets = curriculum_context['related_content'][:3]
-            kb_str = "\n".join(f"  - {s.get('text', '')[:200]}" for s in snippets)
+            # Snippets may be either {'text': '...'} dicts (legacy
+            # KB query shape) or plain strings (current ChromaDB
+            # query shape). Handle both.
+            kb_str = "\n".join(
+                f"  - {(s.get('text') if isinstance(s, dict) else str(s))[:200]}"
+                for s in snippets
+            )
 
         existing_str = "\n".join(f"  - {eo}" for eo in existing) if existing else "  (none)"
         terminal_str = "\n".join(f"  - {to}" for to in terminal_objs) if terminal_objs else "  (none)"
