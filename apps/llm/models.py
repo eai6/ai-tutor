@@ -150,6 +150,7 @@ class ModelConfig(models.Model):
         # _providers.py. effective_temperature is forced to 0 (same as
         # JUDGE) for verdict consistency.
         CONTENT_JUDGE_IMAGE_PROMPT = 'content_judge_image_prompt', 'Content Judge — Image Prompt (PRE-gen)'
+        CONTENT_JUDGE_FACTUAL_STEP = 'content_judge_factual_step', 'Content Judge — Factual (Lesson Step)'
 
     institution = models.ForeignKey(
         Institution,
