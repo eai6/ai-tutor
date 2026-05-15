@@ -183,30 +183,43 @@ class ImageGenerationService:
                 prompt = judged_prompt
 
         if override == 'openai':
-            return self._generate_with_openai(
+            result = self._generate_with_openai(
                 prompt, category, textbook_context, include_bytes,
                 current_image_url=current_image_url,
             )
+            return self._post_gen_judge(
+                result, prompt=prompt, gen_provider='openai',
+                current_image_url=current_image_url,
+            )
         if override in ('gemini', 'google'):
-            return self._generate_with_gemini(
+            result = self._generate_with_gemini(
                 prompt, category, textbook_context, include_bytes,
+                current_image_url=current_image_url,
+            )
+            return self._post_gen_judge(
+                result, prompt=prompt, gen_provider='google',
                 current_image_url=current_image_url,
             )
 
         # No override — primary by config, with cross-provider fallback.
         primary = self._configured_provider()
         order = (
-            (self._generate_with_openai, self._generate_with_gemini)
+            ((self._generate_with_openai, 'openai'),
+             (self._generate_with_gemini, 'google'))
             if primary == 'openai'
-            else (self._generate_with_gemini, self._generate_with_openai)
+            else ((self._generate_with_gemini, 'google'),
+                  (self._generate_with_openai, 'openai'))
         )
-        for fn in order:
+        for fn, gen_provider in order:
             result = fn(
                 prompt, category, textbook_context, include_bytes,
                 current_image_url=current_image_url,
             )
             if result:
-                return result
+                return self._post_gen_judge(
+                    result, prompt=prompt, gen_provider=gen_provider,
+                    current_image_url=current_image_url,
+                )
 
         logger.warning("Both providers failed to generate image")
         return None
@@ -339,6 +352,154 @@ class ImageGenerationService:
             f"(orig_chars={len(prompt)} new_chars={len(verdict.recommended_fix)})"
         )
         return verdict.recommended_fix
+
+    # ─── Figure alignment judge (POST-gen) ──────────────────────────
+
+    def _post_gen_judge(
+        self,
+        result: Optional[Dict],
+        *,
+        prompt: str,
+        gen_provider: str,
+        current_image_url: Optional[str],
+    ) -> Optional[Dict]:
+        """Run the figure_alignment vision judge on the just-generated
+        image. Persists verdict to MediaAsset.judge_outputs and adds it
+        to the returned dict under `judge_outputs.figure_alignment`.
+
+        Returns the (possibly enriched) result dict unchanged on
+        infrastructure skip — the image pipeline never blocks on a
+        judge failure. When the judge REJECTS, the result still flows
+        through; today we only flag. The Q2 regen ensemble (when it
+        lands) will consume passed=False to drive a rewrite.
+
+        Skips:
+          - result is None (gen failed) — nothing to judge
+          - current_image_url is set — edits skip the judge same way
+            PRE-gen prompt review skips for edits
+          - settings.CONTENT_JUDGE_FIGURE_ALIGNMENT_ENABLED is False
+        """
+        if result is None:
+            return None
+        if current_image_url is not None:
+            return result
+        if not getattr(
+            settings, 'CONTENT_JUDGE_FIGURE_ALIGNMENT_ENABLED', True,
+        ):
+            return result
+
+        # Need bytes — prefer the in-memory copy if include_bytes was
+        # set, otherwise re-read from the saved URL on disk.
+        image_bytes = result.get('_raw_bytes')
+        url = result.get('url') or ''
+        if not image_bytes and url:
+            image_bytes = self._read_image_bytes(url)
+        if not image_bytes:
+            logger.info(
+                "[FigureAlignmentJudge] no bytes available for "
+                f"{url[-60:]} — skipping post-gen review"
+            )
+            return result
+
+        media_type = self._guess_mime(url) if url else 'image/png'
+
+        try:
+            from apps.curriculum.content_judges.figure_alignment import (
+                run_figure_alignment_judge,
+            )
+        except Exception as exc:
+            logger.warning(f"[FigureAlignmentJudge] import failed: {exc}")
+            return result
+
+        # Lesson context — same helper the PRE-gen judge uses.
+        ctx = self._lesson_context_for_judge()
+        # Step-level objective is harder to derive from this call site
+        # because image_service doesn't take a step argument. Fall back
+        # to lesson_objective; the caller can pass step context via
+        # textbook_context if it has it. Improvement opportunity:
+        # thread step_objective through get_or_generate_image kwargs.
+
+        try:
+            verdict = run_figure_alignment_judge(
+                image_bytes=image_bytes,
+                image_media_type=media_type,
+                image_prompt=prompt,
+                lesson_subject=ctx['subject'],
+                lesson_grade=ctx['grade'],
+                lesson_title=ctx['title'],
+                lesson_objective=ctx['objective'],
+                step_objective=ctx['objective'],
+                exclude_provider=gen_provider,
+            )
+        except Exception as exc:
+            logger.warning(f"[FigureAlignmentJudge] call raised: {exc}")
+            return result
+
+        verdict_dict = {
+            'passed': verdict.passed,
+            'violations': list(verdict.violations or []),
+            'reasoning': verdict.reasoning or '',
+            'recommended_fix': verdict.recommended_fix or '',
+            'provider': verdict.provider or '',
+            'model_name': verdict.model_name or '',
+            'skipped': verdict.skipped,
+            'skip_reason': verdict.skip_reason or '',
+        }
+
+        if verdict.skipped:
+            logger.info(
+                f"[FigureAlignmentJudge] skipped "
+                f"reason={verdict.skip_reason}"
+            )
+        elif verdict.passed:
+            logger.info(
+                f"[FigureAlignmentJudge] PASS via {verdict.provider}/"
+                f"{verdict.model_name}"
+            )
+        else:
+            logger.warning(
+                f"[FigureAlignmentJudge] REJECT via {verdict.provider}/"
+                f"{verdict.model_name} violations={verdict.violations} "
+                f"reasoning={verdict.reasoning[:120]!r}"
+            )
+
+        # Persist to MediaAsset.judge_outputs by file URL lookup.
+        # Best-effort — a missing asset just means the verdict only
+        # rides along on the result dict.
+        if url:
+            try:
+                from apps.media_library.models import MediaAsset
+                # MediaAsset.file URL ends with the saved filename;
+                # match by the relative path the URL contains.
+                from django.conf import settings as _s
+                rel = url
+                if rel.startswith('/media/'):
+                    rel = rel[len('/media/'):]
+                asset = MediaAsset.objects.filter(
+                    file=rel,
+                ).first()
+                if asset:
+                    outputs = dict(asset.judge_outputs or {})
+                    outputs['figure_alignment'] = verdict_dict
+                    asset.judge_outputs = outputs
+                    asset.save(update_fields=['judge_outputs', 'updated_at'])
+                    logger.debug(
+                        f"[FigureAlignmentJudge] persisted to MediaAsset "
+                        f"#{asset.id}"
+                    )
+            except Exception as exc:
+                logger.warning(
+                    f"[FigureAlignmentJudge] MediaAsset persist failed: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+        # Always ride the verdict back on the result dict so callers
+        # that don't query MediaAsset can still see it.
+        outputs = result.get('judge_outputs') or {}
+        outputs['figure_alignment'] = verdict_dict
+        result['judge_outputs'] = outputs
+
+        return result
 
     # ─── OpenAI gpt-image-2 ─────────────────────────────────────────
 

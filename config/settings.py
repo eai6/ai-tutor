@@ -171,6 +171,15 @@ CONTENT_JUDGE_FACTUAL_STEP_ENABLED = (
     not in ('0', 'false', 'no', 'off', '')
 )
 
+# POST-gen vision review of every newly-generated figure. Runs on the
+# bytes returned from image_service after a successful gen call.
+# Default True; flip off via env to bypass without a deploy if a vision
+# regression appears.
+CONTENT_JUDGE_FIGURE_ALIGNMENT_ENABLED = (
+    os.getenv('CONTENT_JUDGE_FIGURE_ALIGNMENT_ENABLED', '1').lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

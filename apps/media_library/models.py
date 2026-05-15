@@ -62,6 +62,15 @@ class MediaAsset(models.Model):
             "apps.curriculum.figure_facts_schema.FigureFacts."
         ),
     )
+    # Content-quality judge verdicts keyed by judge name
+    # (figure_alignment, ...). Mirrors LessonStep.judge_outputs.
+    # Populated by apps/curriculum/content_judges/figure_alignment.py
+    # POST-gen via apps/tutoring/image_service.py.
+    judge_outputs = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Content-judge verdicts keyed by judge name (figure_alignment, ...)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
