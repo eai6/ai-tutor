@@ -78,14 +78,24 @@ def _dispatch_via_azure_sdk(
 
     client = ContainerAppsAPIClient(credential=credential, subscription_id=sub_id)
 
-    # Azure requires per-execution containers to specify the image even when
-    # we just want to override args. Look up the Job's current container
-    # template and reuse its image so a deploy that updates the Job image
-    # automatically updates dispatched executions too.
+    # Azure's Container Apps Jobs API requires the per-execution template
+    # to specify EVERYTHING the container needs. Any field omitted gets
+    # silently defaulted (image: required → error; resources: 0.5 CPU /
+    # 1 Gi → OOM; env: empty → DATABASE_URL missing → SQLite fallback
+    # → "no such table" after 1.5h of work; volume_mounts: empty →
+    # /app/media not mounted → file-not-found at upload.file_path).
+    #
+    # We hit each of these in production one at a time. Lesson learned:
+    # don't try to pass a "minimal override" — copy EVERY relevant field
+    # from the Job's base template (which Pulumi controls). The only
+    # thing we genuinely need to override is `args` (the per-upload
+    # parameters). Everything else stays in sync with whatever Pulumi
+    # has deployed.
     job = client.jobs.get(resource_group_name=resource_group, job_name=job_name)
+    base_template = getattr(job, 'template', None)
     base_containers = (
-        getattr(job.template, 'containers', None) or []
-    ) if getattr(job, 'template', None) else []
+        getattr(base_template, 'containers', None) or []
+    ) if base_template else []
     if not base_containers:
         raise RuntimeError(
             f"Container Apps Job {job_name!r} has no containers defined — "
@@ -93,20 +103,14 @@ def _dispatch_via_azure_sdk(
         )
     base_container = base_containers[0]
     base_image = getattr(base_container, 'image', None)
-    base_command = list(getattr(base_container, 'command', None) or [])
-    base_resources = getattr(base_container, 'resources', None)
     if not base_image:
         raise RuntimeError(
             f"Container Apps Job {job_name!r} container has no image — "
             "cannot dispatch."
         )
 
-    # Carry CPU/memory from the Job's base template. Without this, the
-    # per-execution container defaults to Azure's 0.5 CPU / 1 Gi RAM
-    # which OOMs sentence-transformers + the curriculum parser. We
-    # learned this the hard way after the image fix (see commit
-    # 3ef5753) — each run failed silently with no detailedStatus, only
-    # a "Failed" status and zero output.
+    # Mirror resources (CPU / memory).
+    base_resources = getattr(base_container, 'resources', None)
     exec_resources = None
     if base_resources is not None:
         exec_resources = ContainerResources(
@@ -119,11 +123,25 @@ def _dispatch_via_azure_sdk(
             JobExecutionContainer(
                 name=getattr(base_container, 'name', 'material-processor'),
                 image=base_image,
-                command=base_command or ["python", "manage.py", "process_material"],
+                command=list(getattr(base_container, 'command', None) or []) or [
+                    "python", "manage.py", "process_material",
+                ],
                 args=[str(upload_id), "--mode", mode],
                 resources=exec_resources,
+                # Env is the choke point that bit us — without it the
+                # container starts but every Postgres-bound query fails
+                # because Django falls back to SQLite. Pass the entire
+                # env list through verbatim (secret_refs resolve against
+                # the Job's secrets list, which stays as-is).
+                env=getattr(base_container, 'env', None),
+                # Mount /app/media so process_material can read the
+                # uploaded file at upload.file_path.
+                volume_mounts=getattr(base_container, 'volume_mounts', None),
             ),
         ],
+        # Volumes have to be defined at the template level too, paired
+        # with the volume_mounts above.
+        volumes=getattr(base_template, 'volumes', None),
     )
 
     poller = client.jobs.begin_start(
