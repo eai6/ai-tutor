@@ -1057,12 +1057,17 @@ SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data)
             logger.warning(f"Failed to load Seychelles context: {e}")
 
         # MAX-DEPTH GENERATION (2026-04-29): always generate the
-        # deepest version of the lesson (10 steps). The tutoring
+        # deepest version of the lesson (5 steps). The tutoring
         # engine selects the right subset at session start based on
         # the target duration, using the per-step `priority` field —
         # so generation is duration-agnostic. See
         # memory/max_depth_lesson_steps_plan.md.
-        max_steps = 10
+        # Reduced from 10 → 5 on 2026-05-14 per user direction:
+        # 25-minute max session = 5 steps (3 core + 2 practice). The
+        # internal QUIZ step was dropped because the exit ticket
+        # (separate from lesson steps) already serves the assessment
+        # role. So 5 = 3 teach/explore + 2 practice.
+        max_steps = 5
         # 1 teaching objective per lesson, regardless of step count.
         max_eos = 1
         is_math = bool(lesson.unit and lesson.unit.course and lesson.unit.course.is_math)
@@ -1094,48 +1099,29 @@ TEACHING DEPTH RULES:
 - Each practice or quiz step: provide exactly {profile_rules['hint_count']} hints, scaffolding general → specific.
 """
 
-        # Build step structures for math vs non-math. The last step is
-        # ALWAYS a QUIZ — the rest fill the middle. Order:
-        #   Math:     ENGAGE → TEACH → WORKED_EXAMPLE → PRACTICE…+ → QUIZ
-        #   Non-math: ENGAGE → TEACH → EXPLORE → PRACTICE…+ → QUIZ
-        # For longer lessons we sprinkle a "common mistakes" or
-        # "extend" step in the middle.
+        # Build step structures for math vs non-math. 5-step lesson:
+        # 3 teach/explore steps (REQUIRED) + 2 practice steps (CORE +
+        # ENRICHMENT). No internal QUIZ — the exit ticket (separate
+        # state after all steps complete) is the graded assessment.
+        # Order:
+        #   Math:     ENGAGE → TEACH → WORKED_EXAMPLE → PRACTICE → PRACTICE
+        #   Non-math: ENGAGE → TEACH → EXPLORE       → PRACTICE → PRACTICE
         if is_math:
-            opening = [
+            chosen = [
                 "ENGAGE — real-world Seychelles hook + state today's question. 2 sentences.",
                 "TEACH — direct instruction of the concept. 4-6 sentences.",
                 "WORKED_EXAMPLE — solve a complete problem showing EVERY line of working.",
-            ]
-            middle_pool = [
                 "PRACTICE — DIFFERENT problem (not the same numbers); question + expected_answer + hints.",
-                "PRACTICE — slightly harder DIFFERENT problem; question + expected_answer + hints.",
-                "TEACH — call out one common mistake or misconception. 3-5 sentences.",
-                "PRACTICE — applied / multi-step problem; question + expected_answer + hints.",
-                "PRACTICE — reverse / inverse problem; question + expected_answer + hints.",
-                "SYNTHESIZE — student explains the rule in their own words.",
+                "PRACTICE — slightly harder, applied or multi-step problem; question + expected_answer + hints.",
             ]
         else:
-            opening = [
+            chosen = [
                 "ENGAGE — real-world Seychelles hook + the lesson question. 2-3 sentences.",
                 "TEACH — direct instruction. 4-6 sentences — minimum effective dose.",
                 "EXPLORE — student answers a guided question that surfaces the key idea.",
-            ]
-            middle_pool = [
                 "PRACTICE — student applies the idea to a fresh case; question + expected_answer + hints.",
-                "TEACH — extend or contextualise (link to prior learning). 4-6 sentences.",
-                "PRACTICE — varied scenario, same objective; question + expected_answer + hints.",
-                "SYNTHESIZE — student explains in their own words.",
-                "PRACTICE — applied / cross-context problem; question + expected_answer + hints.",
-                "EXTEND — connect to a real Seychelles situation.",
+                "PRACTICE — varied or cross-context scenario, same objective; question + expected_answer + hints.",
             ]
-        closer = "QUIZ — short evaluation that this objective is mastered."
-
-        # Total = opening (3) + middles + closer (1). The floor of
-        # max_steps=4 ensures chosen always has >= 4 items with the
-        # quiz at the end.
-        middle_count = max(0, max_steps - len(opening) - 1)
-        middle_count = min(middle_count, len(middle_pool))
-        chosen = opening + middle_pool[:middle_count] + [closer]
         structure = "\n".join(f"Step {i+1} {line}" for i, line in enumerate(chosen))
 
         # Prompt focuses on CONTENT, not FORMAT — instructor handles the schema
@@ -1150,18 +1136,17 @@ GRADE: {grade} (Seychelles secondary school)
 TEACHING STRATEGIES TO USE:
 {strategies_str}
 {kb_context_str}{figures_str}{enabling_obj_str}{teaching_steps_str}{seychelles_str}{profile_str}
-Create EXACTLY {max_steps} steps — the FULL DEPTH version of this lesson (~50 minutes if every step were used).
+Create EXACTLY {max_steps} steps — the FULL DEPTH version of this lesson (~25 minutes if every step were used).
 The tutoring engine will SELECT a subset of these steps at session start based on the student's available time, using the per-step `priority` field — so:
-  • A 15-minute session uses 3 steps (priority 1 only).
-  • A 20-minute session uses 4 steps.
-  • A 30-minute session uses 6 steps (priority 1 + 2).
-  • A 50-minute session uses all 10 steps.
-This means you should produce a coherent FULL lesson, but tag each step's priority so the engine can drop enrichment steps gracefully.
+  • A 15-minute session uses 3 steps (priority 1 only — the 3 teach/explore steps).
+  • A 20-minute session uses 4 steps (priority 1 + 1 core practice).
+  • A 25-minute session uses all 5 steps (priority 1 + core + enrichment practice).
+This means you should produce a coherent FULL lesson, but tag each step's priority so the engine can drop the enrichment practice gracefully on shorter sessions.
 
 PRIORITY ASSIGNMENT (mandatory per step):
-- priority 1 (REQUIRED) — must always run. Reserve for: the FIRST engage step, ONE primary teach step, ONE primary practice step, the FINAL quiz/evaluate step. Aim for ~4 priority-1 steps total.
-- priority 2 (CORE) — included by default; first to drop on tight time. Worked example, second practice, synthesise step. Aim for ~3 priority-2 steps total.
-- priority 3 (ENRICHMENT) — third+ practice variants, common-mistakes drill, "extend" / Seychelles-context bonus. Aim for ~3 priority-3 steps total.
+- priority 1 (REQUIRED) — must always run. Reserve for the FIRST 3 steps (ENGAGE + TEACH + WORKED_EXAMPLE/EXPLORE). Exactly 3 priority-1 steps total.
+- priority 2 (CORE) — included by default; first to drop on tight time. The first PRACTICE step. Exactly 1 priority-2 step.
+- priority 3 (ENRICHMENT) — last to drop. The second PRACTICE step (harder/applied/cross-context variant). Exactly 1 priority-3 step.
 
 Drilling ONE teaching objective intensely. Every step progresses up the DOK levels (recall → skill → strategic) for that ONE objective. DO NOT introduce additional objectives — depth, not breadth.
 
@@ -1173,8 +1158,8 @@ Drilling ONE teaching objective intensely. Every step progresses up the DOK leve
 enabling_objective RULES:
 - Set each step's enabling_objective field to the EXACT TEXT of the enabling objective it covers
 - ALL steps teaching/practicing the SAME EO share the SAME enabling_objective text
-- ENGAGE and QUIZ/EVALUATE steps use "" (empty string)
-- The flow MUST end with a practice or quiz step
+- ENGAGE steps use "" (empty string) for enabling_objective
+- The flow MUST end with a practice step (no internal QUIZ — exit ticket is separate)
 
 STEP TYPES:
 - teach: Direct instruction (tutor explains)

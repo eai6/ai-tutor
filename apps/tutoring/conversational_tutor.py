@@ -1115,49 +1115,70 @@ class ConversationalTutor:
             + "\n</time_awareness>"
         )
 
+    # Duration → step-count map. Reduced 2026-05-14 alongside the
+    # lesson-generation reduction (10 → 5 steps; see commit refs in
+    # content_generator.py max_steps comment). 25-min lesson is the
+    # max; older 10-step lessons are still supported but get clamped
+    # to 5 steps maximum.
+    DURATION_TO_STEP_COUNT = {
+        15: 3,
+        20: 4,
+        25: 5,
+    }
+    MAX_STEPS_PER_SESSION = 5
+
     def _select_steps_for_duration(self, all_steps: List, target_minutes: int) -> List:
         """Pick the subset of steps that fits the target duration.
 
         Algorithm:
-          - Compute target_count = max(3, min(10, target_minutes // 5)).
-            (~5 min per step in conversation including back-and-forth.)
+          - Look up target_count from DURATION_TO_STEP_COUNT (15/20/25
+            → 3/4/5). For unmapped durations, derive: 1 step per ~5
+            minutes, clamped to [3, MAX_STEPS_PER_SESSION].
           - If we have fewer steps than the target, return everything.
           - Otherwise:
             * Always include the FIRST step (the engage hook).
-            * Always include the LAST step (the quiz / evaluate).
-            * Fill the remaining slots from the middle by ascending
+            * Fill the remaining slots from the rest by ascending
               (priority, order_index) — required steps come in first,
               then core, then enrichment. Ties broken by natural
               lesson order so the 5E flow stays coherent.
           - Re-sort the picked set by order_index so the lesson
             progression is preserved.
 
+        Note: previously the LAST step was also always-included
+        because it was the QUIZ. Since the 5-step structure dropped
+        the internal QUIZ (exit ticket is separate now), we don't
+        force-include the last step anymore — priority does all the
+        work. Existing 10-step lessons still work: their last step
+        will be picked via priority if it's REQUIRED.
+
         See memory/max_depth_lesson_steps_plan.md.
         """
         if not all_steps:
             return []
 
-        target_count = max(3, min(10, target_minutes // 5))
+        target_count = self.DURATION_TO_STEP_COUNT.get(target_minutes)
+        if target_count is None:
+            target_count = max(3, min(self.MAX_STEPS_PER_SESSION, target_minutes // 5))
         if len(all_steps) <= target_count:
             return list(all_steps)
 
+        # Always include the engage hook (first step).
         first_idx = 0
-        last_idx = len(all_steps) - 1
-        must_include = {first_idx, last_idx}
+        must_include = {first_idx}
 
-        # Sort middle steps by (priority asc, order_index asc) so
-        # priority-1 steps come first; ties broken by lesson order.
-        middle = [
+        rest = [
             (i, s) for i, s in enumerate(all_steps) if i not in must_include
         ]
-        middle.sort(key=lambda pair: (
+        # Sort by (priority asc, order_index asc): priority-1 first,
+        # ties broken by lesson order.
+        rest.sort(key=lambda pair: (
             getattr(pair[1], 'priority', 1),
             pair[1].order_index,
         ))
 
         slots_to_fill = max(0, target_count - len(must_include))
         chosen_indices = set(must_include) | {
-            i for i, _ in middle[:slots_to_fill]
+            i for i, _ in rest[:slots_to_fill]
         }
         return [all_steps[i] for i in sorted(chosen_indices)]
 
