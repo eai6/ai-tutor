@@ -153,6 +153,8 @@ class ModelConfig(models.Model):
         CONTENT_JUDGE_FACTUAL_STEP = 'content_judge_factual_step', 'Content Judge — Factual (Lesson Step)'
         CONTENT_JUDGE_FIGURE_ALIGNMENT = 'content_judge_figure_alignment', 'Content Judge — Figure Alignment (POST-gen vision)'
         CONTENT_JUDGE_EXIT_QUESTION = 'content_judge_exit_question', 'Content Judge — Exit Ticket Question (MCQ)'
+        CONTENT_JUDGE_PEDAGOGY_STEP = 'content_judge_pedagogy_step', 'Content Judge — Pedagogical Soundness (Lesson Step)'
+        CONTENT_JUDGE_SAFETY_CONTENT = 'content_judge_safety_content', 'Content Judge — Safety + Cultural Fit (Content)'
 
     institution = models.ForeignKey(
         Institution,

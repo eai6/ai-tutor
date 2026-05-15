@@ -197,6 +197,21 @@ CONTENT_JUDGE_EXIT_QUESTION_ENABLED = (
     not in ('0', 'false', 'no', 'off', '')
 )
 
+# Q4 pedagogy_step content judge — runs POST-gen alongside factual_step
+# in the same per-step concurrent fan-out. Verdict on
+# step.judge_outputs.pedagogy_step.
+CONTENT_JUDGE_PEDAGOGY_STEP_ENABLED = (
+    os.getenv('CONTENT_JUDGE_PEDAGOGY_STEP_ENABLED', '1').lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
+# Q4 safety_content content judge — runs POST-gen alongside factual_step.
+# Verdict on step.judge_outputs.safety_content.
+CONTENT_JUDGE_SAFETY_CONTENT_ENABLED = (
+    os.getenv('CONTENT_JUDGE_SAFETY_CONTENT_ENABLED', '1').lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

@@ -35,9 +35,19 @@ def _run_content_judges_for_steps(lesson, steps):
         return
 
     import concurrent.futures
+    from django.conf import settings as _s
     from apps.curriculum.content_judges.factual_step import (
         run_factual_step_judge,
     )
+    from apps.curriculum.content_judges.pedagogy_step import (
+        run_pedagogy_step_judge,
+    )
+    from apps.curriculum.content_judges.safety_content import (
+        run_safety_content_judge,
+    )
+
+    pedagogy_enabled = getattr(_s, 'CONTENT_JUDGE_PEDAGOGY_STEP_ENABLED', True)
+    safety_enabled = getattr(_s, 'CONTENT_JUDGE_SAFETY_CONTENT_ENABLED', True)
 
     # Resolve the generator's provider so the judge chain excludes it
     # (cross-provider review — judge can't be the same vendor that
@@ -52,23 +62,47 @@ def _run_content_judges_for_steps(lesson, steps):
         pass
 
     def _judge_one(step):
-        # Use teacher_script as the primary review text — that's the
-        # narrative students actually read. Question text is judged
-        # separately by exit_question.py (Q4).
-        try:
-            verdict = run_factual_step_judge(
-                step.teacher_script or '',
-                lesson=lesson,
-                exclude_provider=exclude_provider,
-            )
-        except Exception as exc:
-            print(
-                f"[ContentGen] [{lesson.title}] step {step.order_index} "
-                f"factual_step judge raised: {type(exc).__name__}: {exc}",
-                flush=True,
-            )
-            return step, None
-        return step, verdict
+        # Run all enabled judges concurrently per step (they're
+        # independent). Each judge has its own pre-gate; non-applicable
+        # judges return skipped=True.
+        results = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pex:
+            futures = {
+                pex.submit(
+                    run_factual_step_judge,
+                    step.teacher_script or '',
+                    lesson=lesson, exclude_provider=exclude_provider,
+                ): 'factual_step',
+            }
+            if pedagogy_enabled:
+                futures[pex.submit(
+                    run_pedagogy_step_judge,
+                    step.teacher_script or '',
+                    lesson=lesson,
+                    step_objective=step.enabling_objective or '',
+                    step_concept_tag=step.concept_tag or '',
+                    exclude_provider=exclude_provider,
+                )] = 'pedagogy_step'
+            if safety_enabled:
+                futures[pex.submit(
+                    run_safety_content_judge,
+                    step.teacher_script or '',
+                    lesson=lesson,
+                    exclude_provider=exclude_provider,
+                )] = 'safety_content'
+
+            for fut in concurrent.futures.as_completed(futures):
+                judge_name = futures[fut]
+                try:
+                    results[judge_name] = fut.result()
+                except Exception as exc:
+                    print(
+                        f"[ContentGen] [{lesson.title}] step {step.order_index} "
+                        f"{judge_name} raised: {type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+                    results[judge_name] = None
+        return step, results
 
     from django.conf import settings
     from apps.curriculum.models import LessonStep
@@ -82,7 +116,8 @@ def _run_content_judges_for_steps(lesson, steps):
     ) as ex:
         futures = [ex.submit(_judge_one, s) for s in steps]
         for f in concurrent.futures.as_completed(futures):
-            step, verdict = f.result()
+            step, judge_results = f.result()
+            verdict = (judge_results or {}).get('factual_step')
             if verdict is None:
                 # Judge couldn't run for this step — leave the step in
                 # 'unreviewed' (default). Don't fabricate a verdict.
@@ -91,6 +126,11 @@ def _run_content_judges_for_steps(lesson, steps):
             verdict_dict = _serialize_factual_verdict(verdict)
             outputs = dict(step.judge_outputs or {})
             outputs['factual_step'] = verdict_dict
+            # Persist the other judges' verdicts (when they ran).
+            for judge_name in ('pedagogy_step', 'safety_content'):
+                jv = (judge_results or {}).get(judge_name)
+                if jv is not None:
+                    outputs[judge_name] = _serialize_factual_verdict(jv)
 
             # Default to whatever the judge said: passed → auto_ok,
             # skipped → keep unreviewed, failed → either regen or
