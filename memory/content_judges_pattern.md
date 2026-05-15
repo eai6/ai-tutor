@@ -138,4 +138,4 @@ Lesson 537 "What is Geography?" (S1-S3, humanities):
 - 241-char specific prompt → PASS; original preserved.
 - `exclude_provider='openai'` confirmed: judge ran on `google`.
 
-Commit: <to be filled in by next commit>
+Commit: 536f89c
