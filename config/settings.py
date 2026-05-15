@@ -180,6 +180,14 @@ CONTENT_JUDGE_FIGURE_ALIGNMENT_ENABLED = (
     not in ('0', 'false', 'no', 'off', '')
 )
 
+# Q2 bounded content regen — when factual_step judge rejects a
+# step, fire run_step_regen up to DEFAULT_MAX_CYCLES (=2) attempts.
+# Default True; flip off via env to disable rewriting and only flag.
+CONTENT_REGEN_ENABLED = (
+    os.getenv('CONTENT_REGEN_ENABLED', '1').lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

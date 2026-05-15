@@ -533,11 +533,41 @@ class LessonStep(models.Model):
     # passed / violations / reasoning / recommended_fix / provider /
     # model_name / skipped / skip_reason. Mirrors SessionTurn.judge_outputs.
     # Read by lesson detail UI to show quality badges; consumed by the
-    # Q2 regen ensemble (when it lands) to decide whether to rewrite.
+    # Q2 regen ensemble to decide whether to rewrite.
+    # Also stores `regen_audit` (when content_regen ran): list of cycle
+    # records with model_used, temperature, judge_violations, candidate
+    # text preview, picked. See apps/curriculum/content_regen/.
     judge_outputs = models.JSONField(
         default=dict,
         blank=True,
         help_text="Content-judge verdicts keyed by judge name (factual_step, ...)"
+    )
+
+    # Quality state machine driven by the Q2 content_regen flow.
+    # - unreviewed: judges haven't run (legacy / pre-Q1 steps)
+    # - auto_ok:    judges passed (possibly after regen)
+    # - auto_flagged: judges still failed after the regen cap was hit
+    #                 → step is saved BUT surfaces a "needs human review"
+    #                 badge so a teacher addresses it. NO SILENT FAILURE.
+    # - human_approved: teacher reviewed and accepted as-is (Q3)
+    # - human_edited:   teacher edited the content (Q3)
+    class ContentQualityStatus(models.TextChoices):
+        UNREVIEWED = 'unreviewed', 'Unreviewed'
+        AUTO_OK = 'auto_ok', 'Auto-approved by judges'
+        AUTO_FLAGGED = 'auto_flagged', 'Needs human review'
+        HUMAN_APPROVED = 'human_approved', 'Human-approved'
+        HUMAN_EDITED = 'human_edited', 'Human-edited'
+
+    content_quality_status = models.CharField(
+        max_length=20,
+        choices=ContentQualityStatus.choices,
+        default=ContentQualityStatus.UNREVIEWED,
+        help_text=(
+            "Quality gate state. 'auto_flagged' means judges + regen "
+            "couldn't fix the content — surfaces a 'Needs Human Review' "
+            "badge in the lesson detail UI. See "
+            "memory/content_quality_review_plan.md."
+        ),
     )
 
     class Meta:

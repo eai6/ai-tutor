@@ -644,21 +644,30 @@
                         {% endif %}
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        {% with fs=step.judge_outputs.factual_step %}
-                        {% if fs %}
-                            {% if fs.skipped %}
-                                <span title="Factual judge skipped: {{ fs.skip_reason }}"
-                                      style="font-size: 0.75rem; color: var(--gray-400);">⊘</span>
-                            {% elif not fs.passed %}
-                                <span title="{{ fs.recommended_fix|default:fs.reasoning }}"
-                                      style="font-size: 0.75rem; color: #b91c1c; font-weight: 600;">⚠ Factual</span>
-                            {% elif fs.violations %}
-                                <span title="{{ fs.recommended_fix|default:fs.reasoning }}"
-                                      style="font-size: 0.75rem; color: #b45309; font-weight: 500;">⚠ Review</span>
-                            {% else %}
-                                <span title="Factual judge passed via {{ fs.provider }}"
-                                      style="font-size: 0.75rem; color: var(--success);">✓ AI</span>
-                            {% endif %}
+                        {% with fs=step.judge_outputs.factual_step ra=step.judge_outputs.regen_audit %}
+                        {% if step.content_quality_status == 'auto_flagged' %}
+                            <span title="{{ fs.recommended_fix|default:fs.reasoning|default:'Judge flagged this step and the regen ensemble could not produce a clean rewrite' }}"
+                                  style="font-size: 0.75rem; color: white; background: #b91c1c;
+                                         padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">⚠ Needs Review</span>
+                        {% elif step.content_quality_status == 'auto_ok' and ra %}
+                            <span title="Original step had factual issues; regen produced a clean rewrite (cycle {{ ra.cycles_run }} of {{ ra.cycles|length }})"
+                                  style="font-size: 0.75rem; color: #047857; font-weight: 500;">✓ Auto-fixed</span>
+                        {% elif step.content_quality_status == 'auto_ok' and fs.violations %}
+                            <span title="{{ fs.recommended_fix|default:fs.reasoning }}"
+                                  style="font-size: 0.75rem; color: #b45309; font-weight: 500;">⚠ Review</span>
+                        {% elif step.content_quality_status == 'auto_ok' %}
+                            <span title="Factual judge passed via {{ fs.provider }}"
+                                  style="font-size: 0.75rem; color: var(--success);">✓ AI</span>
+                        {% elif step.content_quality_status == 'human_approved' %}
+                            <span title="Teacher reviewed and approved" style="font-size: 0.75rem; color: #1e40af;">👤 Approved</span>
+                        {% elif step.content_quality_status == 'human_edited' %}
+                            <span title="Teacher edited" style="font-size: 0.75rem; color: #1e40af;">✏ Edited</span>
+                        {% elif fs and fs.skipped %}
+                            <span title="Factual judge skipped: {{ fs.skip_reason }}"
+                                  style="font-size: 0.75rem; color: var(--gray-400);">⊘</span>
+                        {% elif fs and fs.violations %}
+                            <span title="{{ fs.recommended_fix|default:fs.reasoning }}"
+                                  style="font-size: 0.75rem; color: #b45309; font-weight: 500;">⚠ Review</span>
                         {% endif %}
                         {% endwith %}
                         {% if step.media %}
@@ -671,13 +680,17 @@
                     </div>
                 </div>
                 <div class="step-body">
-                    {% with fs=step.judge_outputs.factual_step %}
+                    {% with fs=step.judge_outputs.factual_step ra=step.judge_outputs.regen_audit %}
                     {% if fs and not fs.skipped %}
                     <div class="step-content-section">
-                        {% if not fs.passed %}
-                            <h4 style="color: #b91c1c;">⚠ AI Review — Factual issues found</h4>
-                        {% elif fs.violations %}
+                        {% if step.content_quality_status == 'auto_flagged' %}
+                            <h4 style="color: #b91c1c;">⚠ AI Review — Needs Human Review</h4>
+                        {% elif step.content_quality_status == 'auto_ok' and ra %}
+                            <h4 style="color: #047857;">✓ AI Review — Auto-fixed by regen</h4>
+                        {% elif fs.violations and fs.passed %}
                             <h4 style="color: #b45309;">⚠ AI Review — Teacher review suggested</h4>
+                        {% elif not fs.passed %}
+                            <h4 style="color: #b91c1c;">⚠ AI Review — Factual issues found</h4>
                         {% else %}
                             <h4 style="color: var(--success);">✓ AI Review — Factual check passed</h4>
                         {% endif %}
@@ -690,6 +703,20 @@
                         <div style="font-size: 0.875rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem;
                                     background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 0.25rem;
                                     white-space: pre-line;">{{ fs.recommended_fix }}</div>
+                        {% endif %}
+                        {% if ra %}
+                        <div style="font-size: 0.8125rem; margin-top: 0.625rem; padding: 0.5rem 0.75rem;
+                                    background: {% if step.content_quality_status == 'auto_flagged' %}#fef2f2{% else %}#ecfdf5{% endif %};
+                                    border-left: 3px solid {% if step.content_quality_status == 'auto_flagged' %}#b91c1c{% else %}#047857{% endif %};
+                                    border-radius: 0.25rem;">
+                            <strong>Regen audit:</strong>
+                            tried {{ ra.cycles_run }} cycle{{ ra.cycles_run|pluralize }},
+                            {% if ra.clean %}clean candidate adopted (model {{ ra.picked_model }}){% else %}no clean candidate found — flagged for human review{% endif %}.
+                            {% if ra.elapsed_seconds %}<span style="color: var(--gray-500);">{{ ra.elapsed_seconds }}s</span>{% endif %}
+                            {% if ra.final_violations %}
+                            <div style="margin-top: 0.25rem;">Remaining violations: {{ ra.final_violations|join:", " }}</div>
+                            {% endif %}
+                        </div>
                         {% endif %}
                         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.5rem;">
                             Reviewed by {{ fs.provider }}/{{ fs.model_name }}{% if fs.violations %} — codes: {{ fs.violations|join:", " }}{% endif %}
