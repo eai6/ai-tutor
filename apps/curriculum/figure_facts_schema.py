@@ -27,8 +27,19 @@ class LabelledFeature(BaseModel):
     """A single labelled element in the figure (a point, line, region)."""
     label: str = Field(
         ...,
-        description="The label text exactly as it appears in the figure (e.g. '1', 'A', 'l', 'x').",
-        max_length=40,
+        description=(
+            "The label text exactly as it appears in the figure. For "
+            "diagrams this is typically a short identifier (e.g. '1', "
+            "'A', 'l', 'x'). For textbook pages indexed as figures, "
+            "this may be a full caption, callout, or short text passage."
+        ),
+        # Was 40 — bumped 2026-05-15 because textbook-page assets pushed
+        # full captions into this field, triggering instructor-style
+        # validation-retry loops that burned 2-3 Anthropic round-trips
+        # per page in the production material-processor. 200 covers
+        # legitimate diagram labels AND realistic caption text without
+        # accepting paragraph-length content (use `extra_facts` for those).
+        max_length=200,
     )
     location: str = Field(
         ...,
