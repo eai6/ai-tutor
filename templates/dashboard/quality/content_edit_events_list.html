@@ -7,8 +7,8 @@
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
         <h1 style="margin: 0;">Content Edit Events <span style="font-weight: normal; color: var(--gray-500); font-size: 1rem;">({{ total }})</span></h1>
         <div style="display: flex; gap: 0.5rem;">
-            <a class="btn btn-sm" href="?{% for k,v in filters.items %}{% if v %}{{ k }}={{ v }}&{% endif %}{% endfor %}export=csv"
-               onclick="this.href = window.location.search ? window.location.pathname.replace(/\/$/, '') + '/export.csv' + window.location.search : 'export.csv';">⬇ CSV</a>
+            <a class="btn btn-sm" href="{% url 'dashboard:content_edit_dashboard' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" style="background: var(--primary, #7c3aed); color: white; border: none;">📊 Dashboard</a>
+            <a class="btn btn-sm" href="export.csv{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">⬇ CSV</a>
             <a class="btn btn-sm" href="export.jsonl{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">⬇ JSONL</a>
         </div>
     </div>
