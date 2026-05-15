@@ -525,6 +525,21 @@ class LessonStep(models.Model):
         help_text="The specific enabling objective this step addresses"
     )
 
+    # =========================================================================
+    # CONTENT-QUALITY JUDGE OUTPUTS
+    # =========================================================================
+    # Populated by apps/curriculum/content_judges/ after generation.
+    # Keyed by judge name (e.g. 'factual_step'); each value carries
+    # passed / violations / reasoning / recommended_fix / provider /
+    # model_name / skipped / skip_reason. Mirrors SessionTurn.judge_outputs.
+    # Read by lesson detail UI to show quality badges; consumed by the
+    # Q2 regen ensemble (when it lands) to decide whether to rewrite.
+    judge_outputs = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Content-judge verdicts keyed by judge name (factual_step, ...)"
+    )
+
     class Meta:
         ordering = ['order_index']
 

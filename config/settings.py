@@ -163,6 +163,14 @@ CONTENT_JUDGE_IMAGE_PROMPT_ENABLED = (
     not in ('0', 'false', 'no', 'off', '')
 )
 
+# POST-gen factual review of every newly-generated LessonStep. Runs
+# concurrently across all steps in a lesson. Default True; flip off
+# via env to bypass without a deploy if a judge regression appears.
+CONTENT_JUDGE_FACTUAL_STEP_ENABLED = (
+    os.getenv('CONTENT_JUDGE_FACTUAL_STEP_ENABLED', '1').lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

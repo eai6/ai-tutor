@@ -21,6 +21,93 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
+def _run_content_judges_for_steps(lesson, steps):
+    """Fan out the factual_step content judge across newly-persisted
+    LessonStep rows.
+
+    Concurrent (mirrors apps/tutoring/judges/__init__.py::run_all_judges)
+    so the total wall time is roughly one judge call, not N. Per-step
+    fail-soft: if a judge errors / skips for one step, the others still
+    persist their verdicts. Verdicts land on step.judge_outputs[<judge>]
+    via a single DB save per step.
+    """
+    if not steps:
+        return
+
+    import concurrent.futures
+    from apps.curriculum.content_judges.factual_step import (
+        run_factual_step_judge,
+    )
+
+    # Resolve the generator's provider so the judge chain excludes it
+    # (cross-provider review — judge can't be the same vendor that
+    # produced the artefact).
+    exclude_provider = None
+    try:
+        from apps.llm.models import ModelConfig
+        gen_config = ModelConfig.get_for('generation')
+        if gen_config:
+            exclude_provider = (gen_config.provider or '').lower() or None
+    except Exception:
+        pass
+
+    def _judge_one(step):
+        # Use teacher_script as the primary review text — that's the
+        # narrative students actually read. Question text is judged
+        # separately by exit_question.py (Q4).
+        try:
+            verdict = run_factual_step_judge(
+                step.teacher_script or '',
+                lesson=lesson,
+                exclude_provider=exclude_provider,
+            )
+        except Exception as exc:
+            print(
+                f"[ContentGen] [{lesson.title}] step {step.order_index} "
+                f"factual_step judge raised: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return step, None
+        return step, verdict
+
+    persisted = 0
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(8, len(steps))
+    ) as ex:
+        futures = [ex.submit(_judge_one, s) for s in steps]
+        for f in concurrent.futures.as_completed(futures):
+            step, verdict = f.result()
+            if verdict is None:
+                continue
+            outputs = dict(step.judge_outputs or {})
+            outputs['factual_step'] = {
+                'passed': verdict.passed,
+                'violations': list(verdict.violations or []),
+                'reasoning': verdict.reasoning or '',
+                'recommended_fix': verdict.recommended_fix or '',
+                'provider': verdict.provider or '',
+                'model_name': verdict.model_name or '',
+                'skipped': verdict.skipped,
+                'skip_reason': verdict.skip_reason or '',
+            }
+            step.judge_outputs = outputs
+            try:
+                step.save(update_fields=['judge_outputs'])
+                persisted += 1
+            except Exception as exc:
+                print(
+                    f"[ContentGen] [{lesson.title}] step {step.order_index} "
+                    f"judge_outputs save failed: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+    print(
+        f"[ContentGen] [{lesson.title}] factual_step judge: "
+        f"{persisted}/{len(steps)} verdicts persisted",
+        flush=True,
+    )
+
+
 def _normalize_enabling_objective(
     question_eo: str,
     canonical_eos: List[str],
@@ -1534,6 +1621,7 @@ CONTENT GUIDELINES:
             flush=True,
         )
 
+        persisted_steps = []
         for step_data in steps:
             step, created = LessonStep.objects.update_or_create(
                 lesson=lesson,
@@ -1565,6 +1653,7 @@ CONTENT GUIDELINES:
                 }
             )
 
+            persisted_steps.append(step)
             logger.debug(f"{'Created' if created else 'Updated'} step {step.order_index}: {step.step_type}")
 
         # Drop orphan tail steps from a previous (longer) generation —
@@ -1580,6 +1669,22 @@ CONTENT GUIDELINES:
                 f"[ContentGen] [{lesson.title}] Removing {orphan_count} orphan steps from prior generation"
             )
             orphan_qs.delete()
+
+        # Content-quality judges — POST-gen review of every persisted
+        # step. Fan out concurrently (mirrors apps/tutoring/judges/
+        # __init__.py::run_all_judges), fail-soft per step. Each judge
+        # verdict lands on step.judge_outputs[<judge_name>]; the Q2
+        # regen ensemble (when it lands) consumes those.
+        try:
+            from django.conf import settings
+            if getattr(settings, 'CONTENT_JUDGE_FACTUAL_STEP_ENABLED', True):
+                _run_content_judges_for_steps(lesson, persisted_steps)
+        except Exception as exc:
+            print(
+                f"[ContentGen] [{lesson.title}] content-judge fan-out raised "
+                f"(swallowed; never blocks generation): {type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
         # Layers 1 + 3 — persist the per-lesson verification audit
         # to lesson.metadata. Subsequent layers (A2 exit-ticket
