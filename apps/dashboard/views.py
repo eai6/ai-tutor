@@ -1413,11 +1413,32 @@ def curriculum_approve(request, upload_id):
                 if not lesson_title:
                     continue
                 
+                # enabling_objectives — per-lesson Terminal Objectives
+                # the teacher edited in the review UI. Validate as a list
+                # of strings, dedupe case-insensitively, drop empties.
+                raw_eos = lesson_data.get('enabling_objectives') or []
+                if not isinstance(raw_eos, list):
+                    raw_eos = []
+                seen = set()
+                lesson_eos = []
+                for eo in raw_eos:
+                    if not isinstance(eo, str):
+                        continue
+                    text = eo.strip()
+                    if not text:
+                        continue
+                    key = ' '.join(text.lower().split())
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    lesson_eos.append(text)
+
                 lesson, l_created = Lesson.objects.update_or_create(
                     unit=unit,
                     title=lesson_title,
                     defaults={
                         'objective': lesson_data.get('objective', ''),
+                        'enabling_objectives': lesson_eos,
                         'order_index': lesson_idx,
                         'estimated_minutes': 20,
                         'is_published': False,
