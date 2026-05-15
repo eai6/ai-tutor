@@ -154,6 +154,15 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # MEDIA_ROOT is on a slow Azure File Share (SMB) mount.
 VECTORDB_ROOT = os.getenv('VECTORDB_ROOT', os.path.join(MEDIA_ROOT, 'vectordb'))
 
+# Content quality judges (apps/curriculum/content_judges/). Kill-switch
+# in case a judge is misbehaving and we need to bypass without a deploy.
+# When False, image_service skips the PRE-gen prompt review and sends
+# the prompt straight to the gen model. Default True.
+CONTENT_JUDGE_IMAGE_PROMPT_ENABLED = (
+    os.getenv('CONTENT_JUDGE_IMAGE_PROMPT_ENABLED', '1').lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

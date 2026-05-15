@@ -142,6 +142,14 @@ class ModelConfig(models.Model):
         # produce believable persona variation. See
         # memory/llm_student_simulator_plan.md.
         STUDENT_SIM = 'student_sim', 'Synthetic Student (Simulator)'
+        # Content quality judges — review GENERATED content (lesson
+        # steps, exit-ticket items, image prompts, generated images)
+        # rather than live tutor turns. Defaults to Gemini per the
+        # locked plan in memory/content_quality_review_plan.md, with
+        # cross-provider fallback through apps/curriculum/content_judges/
+        # _providers.py. effective_temperature is forced to 0 (same as
+        # JUDGE) for verdict consistency.
+        CONTENT_JUDGE_IMAGE_PROMPT = 'content_judge_image_prompt', 'Content Judge — Image Prompt (PRE-gen)'
 
     institution = models.ForeignKey(
         Institution,
@@ -191,7 +199,7 @@ class ModelConfig(models.Model):
     JUDGE_TEMP = 0.0
 
     purpose = models.CharField(
-        max_length=20,
+        max_length=40,
         choices=Purpose.choices,
         default=Purpose.GENERATION,
     )
@@ -228,6 +236,12 @@ class ModelConfig(models.Model):
         purpose = (self.purpose or '').lower()
         temp = self.temperature if self.temperature is not None else 1.0
         if purpose == self.Purpose.JUDGE.value:
+            return self.JUDGE_TEMP
+        # Content judges (PRE/POST-gen reviewers in apps/curriculum/
+        # content_judges/) follow the same verdict-consistency invariant
+        # as the live JUDGE — temp must be 0. Match by purpose-prefix so
+        # future content_judge_* purposes inherit the rule automatically.
+        if purpose.startswith('content_judge'):
             return self.JUDGE_TEMP
         if purpose == self.Purpose.TUTORING.value:
             return max(self.TUTORING_TEMP_MIN, min(self.TUTORING_TEMP_MAX, temp))

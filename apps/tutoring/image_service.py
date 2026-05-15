@@ -20,6 +20,7 @@ import hashlib
 import mimetypes
 import base64
 from typing import Optional, Dict
+from django.conf import settings
 from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,26 @@ class ImageGenerationService:
 
         override = (model_override or '').lower().strip() or None
 
+        # ─── PRE-gen image-prompt judge ────────────────────────────
+        # Cheap text-LLM review of the candidate prompt BEFORE we pay
+        # ~$0.04 + 8-15s for an image gen call that's destined to
+        # produce garbage. The judge runs on a different provider than
+        # the gen model (cross-provider review). Editing existing
+        # images skips the judge — `current_image_url` means the prior
+        # image was already accepted and the prompt is an EDIT
+        # instruction, not a fresh generation prompt.
+        if (
+            current_image_url is None
+            and getattr(settings, 'CONTENT_JUDGE_IMAGE_PROMPT_ENABLED', True)
+        ):
+            judged_prompt = self._review_image_prompt(
+                prompt, category=category, textbook_context=textbook_context,
+                gen_provider=override or self._configured_provider(),
+            )
+            if judged_prompt is not None:
+                # Judge returned a revised prompt — use it.
+                prompt = judged_prompt
+
         if override == 'openai':
             return self._generate_with_openai(
                 prompt, category, textbook_context, include_bytes,
@@ -189,6 +210,135 @@ class ImageGenerationService:
 
         logger.warning("Both providers failed to generate image")
         return None
+
+    # ─── Image-prompt judge (PRE-gen) ───────────────────────────────
+
+    def _lesson_context_for_judge(self) -> Dict[str, str]:
+        """Pull the four lesson facts the judge consumes.
+
+        Returns blanks when self.lesson is None — judge degrades to
+        category + style-hint only review (still useful for catching
+        VAGUE / TEXT-IN-IMAGE / WRONG-VISUAL-TYPE).
+        """
+        lesson = self.lesson
+        if lesson is None:
+            return {"subject": "", "grade": "", "title": "", "objective": ""}
+        ctx = {
+            "title": str(getattr(lesson, 'title', '') or ''),
+            "objective": str(getattr(lesson, 'objective', '') or ''),
+            "subject": "",
+            "grade": "",
+        }
+        # Walk lesson → unit → course for subject + grade. Course has
+        # both legacy `grade_level` (str) and `grade_levels` (list);
+        # prefer the list when populated.
+        try:
+            unit = getattr(lesson, 'unit', None)
+            course = getattr(unit, 'course', None) if unit else None
+            if course is not None:
+                # Subject — prefer subject_type (canonical) over name.
+                subj_type = getattr(course, 'subject_type', '') or ''
+                course_name = getattr(course, 'name', '') or ''
+                ctx["subject"] = str(subj_type or course_name)
+                # Grade — prefer the list, fall back to scalar.
+                grades = getattr(course, 'grade_levels', None) or []
+                if isinstance(grades, list) and grades:
+                    ctx["grade"] = ", ".join(str(g) for g in grades[:3])
+                else:
+                    ctx["grade"] = str(getattr(course, 'grade_level', '') or '')
+        except Exception:
+            pass
+        return ctx
+
+    def _review_image_prompt(
+        self,
+        prompt: str,
+        *,
+        category: str,
+        textbook_context: str,
+        gen_provider: str,
+    ) -> Optional[str]:
+        """Run the PRE-gen judge. Return a REVISED prompt or None.
+
+        Returns:
+            None when the judge approved the prompt OR couldn't run
+            (no providers, judge errored, infrastructure failure). The
+            caller proceeds with the ORIGINAL prompt.
+            A revised prompt string when the judge rejected and offered
+            a usable rewrite. The caller swaps in the revision and
+            proceeds with image gen — single-shot revision, no loop.
+        """
+        try:
+            from apps.curriculum.content_judges.image_prompt import (
+                run_image_prompt_judge,
+            )
+        except Exception as exc:
+            logger.warning(f"[ImagePromptJudge] import failed: {exc}")
+            return None
+
+        # Map gen-side provider ('gemini' is the user-facing label, but
+        # ModelConfig stores the canonical 'google').
+        exclude = (gen_provider or '').lower().strip()
+        if exclude in ('gemini', 'google'):
+            exclude = 'google'
+        elif exclude == 'openai':
+            exclude = 'openai'
+        else:
+            exclude = None
+
+        ctx = self._lesson_context_for_judge()
+        try:
+            verdict = run_image_prompt_judge(
+                prompt,
+                category=category,
+                lesson_subject=ctx["subject"],
+                lesson_grade=ctx["grade"],
+                lesson_title=ctx["title"],
+                lesson_objective=ctx["objective"],
+                textbook_context=textbook_context,
+                exclude_provider=exclude,
+            )
+        except Exception as exc:
+            logger.warning(f"[ImagePromptJudge] call raised: {exc}")
+            return None
+
+        # Telemetry — always log a single line per judge call so the
+        # benchmark sampler can slice by skip_reason / violations.
+        if verdict.skipped:
+            logger.info(
+                f"[ImagePromptJudge] skipped reason={verdict.skip_reason} "
+                f"prompt_chars={len(prompt)}"
+            )
+            return None
+
+        if verdict.passed:
+            logger.info(
+                f"[ImagePromptJudge] PASS via {verdict.provider}/"
+                f"{verdict.model_name} prompt_chars={len(prompt)}"
+            )
+            return None
+
+        # Rejected. Log the violations and the fix decision.
+        logger.warning(
+            f"[ImagePromptJudge] REJECT via {verdict.provider}/"
+            f"{verdict.model_name} violations={verdict.violations} "
+            f"reasoning={verdict.reasoning[:120]!r}"
+        )
+        if not verdict.recommended_fix:
+            # Rejected with no rewrite — fall through with the original
+            # prompt. We don't block image gen on judge dissent today;
+            # the rejection is logged for benchmark mining.
+            logger.warning(
+                "[ImagePromptJudge] no recommended_fix supplied — "
+                "proceeding with original prompt"
+            )
+            return None
+
+        logger.info(
+            f"[ImagePromptJudge] applying revised prompt "
+            f"(orig_chars={len(prompt)} new_chars={len(verdict.recommended_fix)})"
+        )
+        return verdict.recommended_fix
 
     # ─── OpenAI gpt-image-2 ─────────────────────────────────────────
 

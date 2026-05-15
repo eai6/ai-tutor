@@ -72,11 +72,7 @@ This codebase has good bones to mirror: pluggable `BaseLLMClient` factory (`apps
 - `architecture-patterns-expert` — debating module boundaries, when to extract, schema modeling, modular monolith vs services.
 - `agent-orchestration-expert` — before any multi-agent or evaluator-loop work; covers when NOT to use multi-agent.
 
-**Consult the prompting skills when writing or tuning prompts:**
-- `prompting-fundamentals-expert` — universal principles (CoT, few-shot, eval-driven iteration, output formatting, injection defense). Read this first.
-- `claude-prompting-expert` — Claude API: XML tags, prompt caching, adaptive thinking, structured outputs, Claude 4.x anti-patterns.
-- `openai-prompting-expert` — OpenAI API: developer role, Structured Outputs, o-series reasoning models (strip CoT scaffolding!), automatic prompt caching, Agents SDK.
-- `gemini-prompting-expert` — Gemini API: `system_instruction` parameter, native multimodal, 1M context with query-at-end, Google Search grounding, Gemini 3's literal-task style.
+**Always consult the prompting skills before writing or tuning ANY LLM prompt** (system / user / judge / regen / image-gen / content-gen). Non-negotiable — see `~/.claude/projects/-Users-edwardamoah-Documents-GitHub-ai-tutor/memory/feedback_consult_prompting_skills.md`. Order: (1) `prompting-fundamentals-expert` first — universals (CoT-or-not, few-shot, output format, long-context query-last, injection defense). (2) Provider-specific to match the target model: `claude-prompting-expert` (XML tags, prompt caching, extended thinking), `openai-prompting-expert` (developer role, Structured Outputs, strip CoT on o-series, auto caching), `gemini-prompting-expert` (`system_instruction`, multimodal ordering, 1M context query-last, grounding, Gemini 3 anti-flowery rule). Skipping this step has cost a debug cycle every time.
 
 **Active architecture plan**: `memory/agentic_platform_architecture_plan.md` — read before proposing structural changes. Phased path: trace logging → benchmark infra → typed state + dedup → lesson graph → risk routing; multi-agent decomposition deferred until benchmark evidence demands it.
 
