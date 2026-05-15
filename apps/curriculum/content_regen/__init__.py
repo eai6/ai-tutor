@@ -523,12 +523,221 @@ def run_step_prompt_regen(
     return result
 
 
+@dataclass
+class ExitQuestionRegenResult:
+    """Outcome of a single MCQ exit-question rewrite. Distinct from
+    RegenResult because the candidate is structured (text + 4 options
+    + correct + explanation), not a flat string."""
+    question_text: str = ""
+    option_a: str = ""
+    option_b: str = ""
+    option_c: str = ""
+    option_d: str = ""
+    correct_answer: str = ""
+    explanation: str = ""
+    picked_model: str = ""
+    elapsed_seconds: float = 0.0
+    error: str = ""
+
+    def as_dict(self) -> Dict[str, str]:
+        return {
+            'question_text': self.question_text,
+            'option_a': self.option_a,
+            'option_b': self.option_b,
+            'option_c': self.option_c,
+            'option_d': self.option_d,
+            'correct_answer': self.correct_answer,
+            'explanation': self.explanation,
+        }
+
+
+def run_exit_question_prompt_regen(
+    *,
+    original_question: Dict[str, Any],
+    teacher_guidance: str,
+    lesson,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+    temperature: float = 0.30,
+) -> ExitQuestionRegenResult:
+    """Teacher-prompt-driven rewrite of a single MCQ exit-ticket
+    question. Single LLM call, no judge gating. Used by Q3.2 manual
+    regen UI's prompt mode.
+
+    Args:
+        original_question: Dict with question_text, option_a..d,
+            correct_answer (single letter), explanation. Missing keys
+            render as empty.
+        teacher_guidance: The teacher's free-form instruction
+            ("simpler wording / harder distractors / focus on the
+            scientific names").
+        lesson: Lesson instance for context derivation.
+        lesson_*/step_*: Context for the regen prompt. Auto-derived
+            from `lesson` when not supplied.
+        temperature: Generation temperature. Default 0.30.
+
+    Returns:
+        ExitQuestionRegenResult. On failure (no config / LLM error /
+        parse error), returns the original fields unchanged with
+        `error` populated. Caller decides whether to persist.
+    """
+    started = time.monotonic()
+    result = ExitQuestionRegenResult(
+        question_text=original_question.get('question_text') or '',
+        option_a=original_question.get('option_a') or '',
+        option_b=original_question.get('option_b') or '',
+        option_c=original_question.get('option_c') or '',
+        option_d=original_question.get('option_d') or '',
+        correct_answer=original_question.get('correct_answer') or '',
+        explanation=original_question.get('explanation') or '',
+    )
+
+    if not (teacher_guidance or '').strip():
+        result.error = 'empty_teacher_guidance'
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    try:
+        from apps.llm.models import ModelConfig
+        from apps.llm.client import get_llm_client
+        gen_config = ModelConfig.get_for('generation')
+    except Exception as exc:
+        result.error = f'config_lookup_failed: {exc}'
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    if gen_config is None:
+        result.error = 'no_generation_config'
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    try:
+        gen_client = get_llm_client(gen_config)
+    except Exception as exc:
+        result.error = f'client_construction_failed: {exc}'
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    if lesson is not None and not (lesson_subject and lesson_title):
+        try:
+            lesson_title = lesson_title or str(getattr(lesson, 'title', '') or '')
+            lesson_objective = lesson_objective or str(
+                getattr(lesson, 'objective', '') or ''
+            )
+            unit = getattr(lesson, 'unit', None)
+            course = getattr(unit, 'course', None) if unit else None
+            if course is not None and not lesson_subject:
+                subj_type = getattr(course, 'subject_type', '') or ''
+                course_name = getattr(course, 'name', '') or ''
+                lesson_subject = str(subj_type or course_name)
+            if course is not None and not lesson_grade:
+                grades = getattr(course, 'grade_levels', None) or []
+                if isinstance(grades, list) and grades:
+                    lesson_grade = ", ".join(str(g) for g in grades[:3])
+                else:
+                    lesson_grade = str(getattr(course, 'grade_level', '') or '')
+        except Exception:
+            pass
+
+    from apps.curriculum.content_regen.prompt import (
+        build_exit_q_prompt_regen_prompt,
+    )
+    prompt = build_exit_q_prompt_regen_prompt(
+        original_question=original_question,
+        teacher_guidance=teacher_guidance,
+        lesson_subject=lesson_subject,
+        lesson_grade=lesson_grade,
+        lesson_title=lesson_title,
+        lesson_objective=lesson_objective,
+        step_concept_tag=step_concept_tag,
+        enabling_objective=enabling_objective,
+    )
+
+    result.picked_model = gen_config.model_name or ''
+
+    try:
+        response = gen_client.generate(
+            messages=[{"role": "user", "content": prompt['user']}],
+            system_prompt=prompt['system'],
+            max_tokens=1500,
+            temperature=temperature,
+        )
+    except Exception as exc:
+        logger.warning(
+            f"[ContentRegen] exit-Q prompt regen gen call failed: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        result.error = f"gen_failed: {type(exc).__name__}"
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    raw = (response.content or '').strip()
+    if raw.startswith('```'):
+        import re
+        raw = re.sub(r"^```[a-z]*\s*|\s*```$", "", raw,
+                     flags=re.IGNORECASE).strip()
+
+    import json as _json
+    try:
+        parsed = _json.loads(raw)
+    except Exception:
+        # Best-effort: pull the first {...} block
+        import re
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not m:
+            result.error = 'unparseable_json'
+            result.elapsed_seconds = time.monotonic() - started
+            return result
+        try:
+            parsed = _json.loads(m.group(0))
+        except Exception:
+            result.error = 'unparseable_json'
+            result.elapsed_seconds = time.monotonic() - started
+            return result
+
+    if not isinstance(parsed, dict):
+        result.error = 'verdict_not_dict'
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    # Coerce + validate. Empty fields fall back to original.
+    def _str(key, default=''):
+        v = parsed.get(key)
+        return str(v).strip() if v is not None else default
+
+    result.question_text = _str('question_text', result.question_text)[:600]
+    result.option_a = _str('option_a', result.option_a)[:200]
+    result.option_b = _str('option_b', result.option_b)[:200]
+    result.option_c = _str('option_c', result.option_c)[:200]
+    result.option_d = _str('option_d', result.option_d)[:200]
+
+    raw_correct = _str('correct_answer', result.correct_answer)[:1].upper()
+    if raw_correct in ('A', 'B', 'C', 'D'):
+        result.correct_answer = raw_correct
+
+    result.explanation = _str('explanation', result.explanation)[:500]
+    result.elapsed_seconds = time.monotonic() - started
+
+    logger.info(
+        f"[ContentRegen] exit-Q prompt-regen via {result.picked_model} "
+        f"({len(result.question_text)} stem chars) "
+        f"elapsed={result.elapsed_seconds:.1f}s"
+    )
+    return result
+
+
 __all__ = [
     "DEFAULT_MAX_CYCLES",
     "DEFAULT_TEMPERATURE_START",
     "DEFAULT_TEMPERATURE_DECAY",
     "RegenCandidate",
     "RegenResult",
+    "ExitQuestionRegenResult",
     "run_step_regen",
     "run_step_prompt_regen",
+    "run_exit_question_prompt_regen",
 ]

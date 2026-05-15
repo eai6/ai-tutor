@@ -75,6 +75,8 @@ urlpatterns = [
     path('curriculum/step/<int:step_id>/regen/', views.lesson_step_regenerate, name='lesson_step_regenerate'),
     path('curriculum/step/<int:step_id>/save-regen/', views.lesson_step_save_regen, name='lesson_step_save_regen'),
     path('curriculum/exit-question/<int:question_id>/edit/', views.exit_question_edit, name='exit_question_edit'),
+    path('curriculum/exit-question/<int:question_id>/regen/', views.exit_question_regenerate, name='exit_question_regenerate'),
+    path('curriculum/exit-question/<int:question_id>/save-regen/', views.exit_question_save_regen, name='exit_question_save_regen'),
     path('curriculum/lesson/<int:lesson_id>/prerequisites/', views.lesson_prerequisite_edit, name='lesson_prerequisite_edit'),
     
     # Weekly assignments — teacher creates/edits per (course, week)

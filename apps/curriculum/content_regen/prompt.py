@@ -185,4 +185,91 @@ def build_step_prompt_regen_prompt(
     }
 
 
-__all__ = ["build_step_regen_prompt", "build_step_prompt_regen_prompt"]
+_EXIT_Q_PROMPT_REGEN_SYSTEM = """\
+Rewrite ONE multiple-choice exit-ticket question following the \
+teacher's guidance. Keep the question pedagogically sound and \
+matched to the lesson and step objectives.
+
+Output MUST be a single JSON object — no preamble, no explanation, \
+no XML tags, no code fences. Schema:
+
+{
+  "question_text": "<the question stem>",
+  "option_a": "<answer choice A>",
+  "option_b": "<answer choice B>",
+  "option_c": "<answer choice C>",
+  "option_d": "<answer choice D>",
+  "correct_answer": "A" | "B" | "C" | "D",
+  "explanation": "<one short sentence on why the correct option is right>"
+}
+
+Constraints on the rewrite:
+  - Apply the teacher's guidance literally.
+  - Keep all four options non-empty and meaningfully distinct — \
+distractors must be plausible-but-wrong, not absurd or off-topic.
+  - The correct_answer letter must point to the option that is \
+actually correct given the rewritten stem.
+  - Match the lesson grade band — vocabulary and complexity.
+  - Stay on-topic for the lesson and step objectives.
+  - Preserve the original question_type (this is an MCQ).
+"""
+
+
+def build_exit_q_prompt_regen_prompt(
+    *,
+    original_question: Dict[str, Any],
+    teacher_guidance: str,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+) -> Dict[str, str]:
+    """Compose the teacher-prompt-driven regen prompt for one MCQ.
+
+    `original_question` should be a dict with: question_text, option_a,
+    option_b, option_c, option_d, correct_answer, explanation. Missing
+    keys render as empty.
+    """
+    user = (
+        "<lesson>\n"
+        f"  <subject>{(lesson_subject or '(unspecified)').strip()[:120]}</subject>\n"
+        f"  <grade>{(lesson_grade or '(unspecified)').strip()[:80]}</grade>\n"
+        f"  <title>{(lesson_title or '(unspecified)').strip()[:200]}</title>\n"
+        f"  <overall_objective>{(lesson_objective or '(none)').strip()[:400]}</overall_objective>\n"
+        "</lesson>\n"
+        "<question_context>\n"
+        f"  <concept>{(step_concept_tag or '(unspecified)').strip()[:200]}</concept>\n"
+        f"  <enabling_objective>{(enabling_objective or '(none)').strip()[:400]}</enabling_objective>\n"
+        "</question_context>\n"
+        "<teacher_guidance>\n"
+        f"{(teacher_guidance or '').strip()[:600]}\n"
+        "</teacher_guidance>\n"
+        "<original_question>\n"
+        f"  <question_text>{(original_question.get('question_text') or '').strip()[:600]}</question_text>\n"
+        f"  <option_a>{(original_question.get('option_a') or '').strip()[:200]}</option_a>\n"
+        f"  <option_b>{(original_question.get('option_b') or '').strip()[:200]}</option_b>\n"
+        f"  <option_c>{(original_question.get('option_c') or '').strip()[:200]}</option_c>\n"
+        f"  <option_d>{(original_question.get('option_d') or '').strip()[:200]}</option_d>\n"
+        f"  <correct_answer>{(original_question.get('correct_answer') or '').strip()[:1]}</correct_answer>\n"
+        f"  <explanation>{(original_question.get('explanation') or '').strip()[:300]}</explanation>\n"
+        "</original_question>\n"
+        "\n"
+        "Based on the lesson context above and the teacher's guidance, "
+        "produce a rewritten MCQ as a single JSON object matching the "
+        "schema in the system instruction. Output the JSON ONLY — "
+        "nothing else, no fences, no preamble."
+    )
+
+    return {
+        "system": _EXIT_Q_PROMPT_REGEN_SYSTEM,
+        "user": user,
+    }
+
+
+__all__ = [
+    "build_step_regen_prompt",
+    "build_step_prompt_regen_prompt",
+    "build_exit_q_prompt_regen_prompt",
+]

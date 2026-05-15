@@ -1059,8 +1059,84 @@
                 {% if user.is_superuser %}
                 <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
                     <button type="button" onclick="editQuestion(this)" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Edit</button>
+                    {% if question.question_type == 'mcq' %}
+                    <button type="button" class="exitq-regen-toggle btn btn-sm"
+                            data-question-id="{{ question.id }}"
+                            style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">🔁 Regenerate</button>
+                    {% endif %}
                     <button type="button" onclick="deleteQuestion(this)" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: var(--danger);">Delete</button>
                 </div>
+
+                {% if question.question_type == 'mcq' %}
+                <div class="exitq-regen-panel" data-question-id="{{ question.id }}" hidden
+                     style="margin-top:0.625rem; padding:0.75rem; background:#f9fafb;
+                            border:1px solid var(--gray-200); border-radius:0.375rem;">
+                    <div style="font-size:0.75rem; color:var(--gray-600); margin-bottom:0.375rem;">
+                        Prompt-mode rewrite (auto-review for exit questions ships in Q4):
+                    </div>
+                    <textarea class="exitq-regen-prompt" data-question-id="{{ question.id }}"
+                              placeholder="e.g. make the distractors more plausible / simpler wording / focus on the scientific term"
+                              rows="2"
+                              style="width:100%; font-size:0.875rem; padding:0.375rem 0.5rem;
+                                     border:1px solid var(--gray-300); border-radius:0.25rem;
+                                     margin-bottom:0.5rem; font-family:inherit;"></textarea>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button type="button" class="exitq-regen-apply btn btn-sm"
+                                data-question-id="{{ question.id }}"
+                                style="font-size:0.75rem; padding:0.25rem 0.75rem;
+                                       background:var(--primary,#7c3aed); color:white; border:none;
+                                       border-radius:0.25rem; cursor:pointer;">Apply</button>
+                        <button type="button" class="exitq-regen-cancel btn btn-sm"
+                                data-question-id="{{ question.id }}"
+                                style="font-size:0.75rem; padding:0.25rem 0.75rem;">Cancel</button>
+                        <span class="exitq-regen-status" data-question-id="{{ question.id }}"
+                              style="font-size:0.75rem; color:var(--gray-500); align-self:center;"></span>
+                    </div>
+                    <div class="exitq-regen-result" data-question-id="{{ question.id }}" hidden style="margin-top:0.625rem;">
+                        <div style="font-size:0.75rem; color:var(--gray-600); margin-bottom:0.25rem;">
+                            Candidate (review then save or discard):
+                        </div>
+                        <div style="display:grid; grid-template-columns:auto 1fr; gap:0.375rem 0.5rem; font-size:0.8125rem;">
+                            <label style="font-weight:500; align-self:center;">Question</label>
+                            <textarea class="exitq-cand-text" data-question-id="{{ question.id }}" rows="2"
+                                      style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem; font-family:inherit;"></textarea>
+                            <label style="font-weight:500; align-self:center;">A</label>
+                            <input type="text" class="exitq-cand-a" data-question-id="{{ question.id }}"
+                                   style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem;">
+                            <label style="font-weight:500; align-self:center;">B</label>
+                            <input type="text" class="exitq-cand-b" data-question-id="{{ question.id }}"
+                                   style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem;">
+                            <label style="font-weight:500; align-self:center;">C</label>
+                            <input type="text" class="exitq-cand-c" data-question-id="{{ question.id }}"
+                                   style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem;">
+                            <label style="font-weight:500; align-self:center;">D</label>
+                            <input type="text" class="exitq-cand-d" data-question-id="{{ question.id }}"
+                                   style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem;">
+                            <label style="font-weight:500; align-self:center;">Correct</label>
+                            <select class="exitq-cand-correct" data-question-id="{{ question.id }}"
+                                    style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem;">
+                                <option value="A">A</option><option value="B">B</option>
+                                <option value="C">C</option><option value="D">D</option>
+                            </select>
+                            <label style="font-weight:500; align-self:start;">Explanation</label>
+                            <textarea class="exitq-cand-expl" data-question-id="{{ question.id }}" rows="2"
+                                      style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem; font-family:inherit;"></textarea>
+                        </div>
+                        <div class="exitq-regen-meta" data-question-id="{{ question.id }}"
+                             style="font-size:0.75rem; color:var(--gray-500); margin-top:0.375rem;"></div>
+                        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                            <button type="button" class="exitq-regen-save btn btn-sm"
+                                    data-question-id="{{ question.id }}"
+                                    style="font-size:0.75rem; padding:0.25rem 0.75rem;
+                                           background:#047857; color:white; border:none;
+                                           border-radius:0.25rem; cursor:pointer;">Save to Question</button>
+                            <button type="button" class="exitq-regen-discard btn btn-sm"
+                                    data-question-id="{{ question.id }}"
+                                    style="font-size:0.75rem; padding:0.25rem 0.75rem;">Discard</button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 {% endif %}
             </div>
 
@@ -1301,6 +1377,118 @@ function toggleStep(header) {
             const stepId = e.target.name.replace('regen-mode-', '');
             const input = $('.regen-prompt-input', stepId);
             if (input) input.hidden = (e.target.value !== 'prompt');
+        }
+    });
+})();
+
+// ─── Exit-question manual regen UI (Q3.2) ───────────────────────────
+(function setupExitQRegenUI() {
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken = csrf ? csrf.value : (document.cookie.split('; ').find(r => r.startsWith('csrftoken='))||'').split('=')[1];
+
+    function $(sel, qid) {
+        return document.querySelector(`${sel}[data-question-id="${qid}"]`);
+    }
+    function setStatus(qid, msg) {
+        const el = $('.exitq-regen-status', qid);
+        if (el) el.textContent = msg || '';
+    }
+
+    document.body.addEventListener('click', async (e) => {
+        const t = e.target;
+        if (!t.dataset || !t.dataset.questionId) return;
+        const qid = t.dataset.questionId;
+        const panel = $('.exitq-regen-panel', qid);
+
+        if (t.classList.contains('exitq-regen-toggle')) {
+            if (!panel) return;
+            panel.hidden = !panel.hidden;
+            return;
+        }
+        if (t.classList.contains('exitq-regen-cancel')) {
+            panel.hidden = true;
+            $('.exitq-regen-result', qid).hidden = true;
+            return;
+        }
+        if (t.classList.contains('exitq-regen-discard')) {
+            $('.exitq-regen-result', qid).hidden = true;
+            return;
+        }
+        if (t.classList.contains('exitq-regen-apply')) {
+            const guidance = $('.exitq-regen-prompt', qid).value.trim();
+            if (!guidance) {
+                setStatus(qid, 'Enter guidance to apply.');
+                return;
+            }
+            t.disabled = true;
+            setStatus(qid, '⏳ Generating…');
+            try {
+                const fd = new FormData();
+                fd.set('mode', 'prompt');
+                fd.set('teacher_guidance', guidance);
+                const r = await fetch(`/dashboard/curriculum/exit-question/${qid}/regen/`, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken},
+                    body: fd,
+                });
+                const data = await r.json();
+                if (!data.ok) {
+                    setStatus(qid, '❌ ' + (data.error || 'failed'));
+                    return;
+                }
+                const c = data.candidate || {};
+                $('.exitq-cand-text', qid).value = c.question_text || '';
+                $('.exitq-cand-a', qid).value = c.option_a || '';
+                $('.exitq-cand-b', qid).value = c.option_b || '';
+                $('.exitq-cand-c', qid).value = c.option_c || '';
+                $('.exitq-cand-d', qid).value = c.option_d || '';
+                $('.exitq-cand-correct', qid).value = c.correct_answer || 'A';
+                $('.exitq-cand-expl', qid).value = c.explanation || '';
+                $('.exitq-regen-result', qid).hidden = false;
+                let meta = `Mode: prompt.`;
+                if (data.audit) {
+                    if (data.audit.picked_model) meta += ` via ${data.audit.picked_model}`;
+                    if (data.audit.elapsed_seconds) meta += ` (${data.audit.elapsed_seconds}s)`;
+                }
+                $('.exitq-regen-meta', qid).textContent = meta;
+                setStatus(qid, '✓ Candidate ready');
+            } catch (err) {
+                setStatus(qid, '❌ ' + err.message);
+            } finally {
+                t.disabled = false;
+            }
+            return;
+        }
+        if (t.classList.contains('exitq-regen-save')) {
+            t.disabled = true;
+            setStatus(qid, '⏳ Saving…');
+            try {
+                const fd = new FormData();
+                fd.set('question_text', $('.exitq-cand-text', qid).value);
+                fd.set('option_a', $('.exitq-cand-a', qid).value);
+                fd.set('option_b', $('.exitq-cand-b', qid).value);
+                fd.set('option_c', $('.exitq-cand-c', qid).value);
+                fd.set('option_d', $('.exitq-cand-d', qid).value);
+                fd.set('correct_answer', $('.exitq-cand-correct', qid).value);
+                fd.set('explanation', $('.exitq-cand-expl', qid).value);
+                const r = await fetch(`/dashboard/curriculum/exit-question/${qid}/save-regen/`, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken},
+                    body: fd,
+                });
+                const data = await r.json();
+                if (!data.ok) {
+                    setStatus(qid, '❌ ' + (data.error || 'save failed'));
+                    return;
+                }
+                setStatus(qid, '✓ Saved — reloading…');
+                setTimeout(() => location.reload(), 600);
+            } catch (err) {
+                setStatus(qid, '❌ ' + err.message);
+            } finally {
+                t.disabled = false;
+            }
+            return;
         }
     });
 })();

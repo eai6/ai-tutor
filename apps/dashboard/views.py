@@ -4632,6 +4632,175 @@ def course_subject_type(request, course_id):
 
 @teacher_required
 @require_POST
+def exit_question_regenerate(request, question_id):
+    """POST → prompt-mode rewrite of an MCQ exit-ticket question.
+    Returns the candidate fields as JSON. Does NOT persist.
+
+    For v1: MCQ only. Auto-review mode requires the exit_question
+    judge that ships in Q4 — for now, only `mode=prompt` is supported.
+
+    Body (form-encoded):
+      mode: must be 'prompt' (auto_review returns 400 until Q4).
+      teacher_guidance: free-form instruction (required).
+    """
+    from apps.tutoring.models import ExitTicketQuestion
+    from django.http import JsonResponse
+
+    institution = request.staff_ctx['institution']
+    question = get_object_or_404(
+        ExitTicketQuestion.objects.select_related(
+            'exit_ticket__lesson__unit__course',
+        ),
+        id=question_id,
+    )
+    course = question.exit_ticket.lesson.unit.course
+    if (
+        course.institution is not None
+        and institution is not None
+        and course.institution_id != institution.id
+        and not getattr(request.user, 'is_superuser', False)
+    ):
+        return JsonResponse({'ok': False, 'error': 'forbidden'}, status=403)
+
+    mode = (request.POST.get('mode') or 'prompt').strip().lower()
+    if mode == 'auto_review':
+        return JsonResponse({
+            'ok': False,
+            'error': (
+                'auto_review for exit questions ships in Q4 (requires '
+                'the exit_question judge). Use mode=prompt for now.'
+            ),
+        }, status=400)
+    if mode != 'prompt':
+        return JsonResponse({
+            'ok': False, 'error': f'unknown mode: {mode}',
+        }, status=400)
+
+    if question.question_type != 'mcq':
+        return JsonResponse({
+            'ok': False,
+            'error': (
+                f'prompt regen for question_type={question.question_type!r} '
+                'not yet supported (v1 covers MCQ only)'
+            ),
+        }, status=400)
+
+    teacher_guidance = (request.POST.get('teacher_guidance') or '').strip()
+    if not teacher_guidance:
+        return JsonResponse({
+            'ok': False,
+            'error': 'teacher_guidance is required for Prompt mode',
+        }, status=400)
+
+    try:
+        from apps.curriculum.content_regen import (
+            run_exit_question_prompt_regen,
+        )
+        result = run_exit_question_prompt_regen(
+            original_question={
+                'question_text': question.question_text or '',
+                'option_a': question.option_a or '',
+                'option_b': question.option_b or '',
+                'option_c': question.option_c or '',
+                'option_d': question.option_d or '',
+                'correct_answer': question.correct_answer or '',
+                'explanation': question.explanation or '',
+            },
+            teacher_guidance=teacher_guidance,
+            lesson=question.exit_ticket.lesson,
+            step_concept_tag=question.concept_tag or '',
+            enabling_objective=question.enabling_objective or '',
+        )
+    except Exception as exc:
+        logger.error(
+            f"[ExitQRegen] question={question_id} failed: "
+            f"{type(exc).__name__}: {exc}",
+            exc_info=True,
+        )
+        return JsonResponse({
+            'ok': False,
+            'error': f'{type(exc).__name__}: {str(exc)[:200]}',
+        }, status=500)
+
+    if result.error:
+        return JsonResponse({
+            'ok': False,
+            'error': f'regen failed: {result.error}',
+        }, status=500)
+
+    return JsonResponse({
+        'ok': True,
+        'mode': 'prompt',
+        'candidate': result.as_dict(),
+        'audit': {
+            'picked_model': result.picked_model,
+            'elapsed_seconds': round(result.elapsed_seconds, 2),
+        },
+    })
+
+
+@teacher_required
+@require_POST
+def exit_question_save_regen(request, question_id):
+    """POST → persist accepted MCQ regen candidate to the question.
+
+    Body (form-encoded): question_text, option_a, option_b, option_c,
+    option_d, correct_answer (single letter), explanation. Optional
+    audit_blob (JSON string) is stored on the parent ExitTicket's
+    metadata so we can see manual regen history.
+    """
+    from apps.tutoring.models import ExitTicketQuestion
+    from django.http import JsonResponse
+
+    institution = request.staff_ctx['institution']
+    question = get_object_or_404(
+        ExitTicketQuestion.objects.select_related(
+            'exit_ticket__lesson__unit__course',
+        ),
+        id=question_id,
+    )
+    course = question.exit_ticket.lesson.unit.course
+    if (
+        course.institution is not None
+        and institution is not None
+        and course.institution_id != institution.id
+        and not getattr(request.user, 'is_superuser', False)
+    ):
+        return JsonResponse({'ok': False, 'error': 'forbidden'}, status=403)
+
+    qt = (request.POST.get('question_text') or '').strip()
+    if not qt:
+        return JsonResponse({
+            'ok': False, 'error': 'question_text is required',
+        }, status=400)
+
+    correct = (request.POST.get('correct_answer') or '').strip().upper()[:1]
+    if correct not in ('A', 'B', 'C', 'D'):
+        return JsonResponse({
+            'ok': False,
+            'error': 'correct_answer must be A, B, C, or D',
+        }, status=400)
+
+    question.question_text = qt[:1500]
+    question.option_a = (request.POST.get('option_a') or '').strip()[:500]
+    question.option_b = (request.POST.get('option_b') or '').strip()[:500]
+    question.option_c = (request.POST.get('option_c') or '').strip()[:500]
+    question.option_d = (request.POST.get('option_d') or '').strip()[:500]
+    question.correct_answer = correct
+    question.explanation = (request.POST.get('explanation') or '').strip()[:1000]
+    question.save(update_fields=[
+        'question_text', 'option_a', 'option_b', 'option_c',
+        'option_d', 'correct_answer', 'explanation',
+    ])
+
+    return JsonResponse({
+        'ok': True,
+        'question_id': question.id,
+    })
+
+
+@teacher_required
+@require_POST
 def lesson_step_regenerate(request, step_id):
     """POST → run regen on a lesson step's teacher_script. Returns the
     candidate text + audit as JSON. Does NOT persist.
