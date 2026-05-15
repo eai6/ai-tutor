@@ -188,6 +188,15 @@ CONTENT_REGEN_ENABLED = (
     not in ('0', 'false', 'no', 'off', '')
 )
 
+# Q4 exit_question content judge — runs POST-gen on every newly-generated
+# MCQ exit-ticket question. Verdict persists to
+# ExitTicketQuestion.judge_outputs.exit_question and surfaces as a
+# badge in the lesson detail UI.
+CONTENT_JUDGE_EXIT_QUESTION_ENABLED = (
+    os.getenv('CONTENT_JUDGE_EXIT_QUESTION_ENABLED', '1').lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

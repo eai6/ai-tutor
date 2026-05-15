@@ -4663,15 +4663,7 @@ def exit_question_regenerate(request, question_id):
         return JsonResponse({'ok': False, 'error': 'forbidden'}, status=403)
 
     mode = (request.POST.get('mode') or 'prompt').strip().lower()
-    if mode == 'auto_review':
-        return JsonResponse({
-            'ok': False,
-            'error': (
-                'auto_review for exit questions ships in Q4 (requires '
-                'the exit_question judge). Use mode=prompt for now.'
-            ),
-        }, status=400)
-    if mode != 'prompt':
+    if mode not in ('auto_review', 'prompt'):
         return JsonResponse({
             'ok': False, 'error': f'unknown mode: {mode}',
         }, status=400)
@@ -4680,11 +4672,123 @@ def exit_question_regenerate(request, question_id):
         return JsonResponse({
             'ok': False,
             'error': (
-                f'prompt regen for question_type={question.question_type!r} '
+                f'regen for question_type={question.question_type!r} '
                 'not yet supported (v1 covers MCQ only)'
             ),
         }, status=400)
 
+    if mode == 'auto_review':
+        # Q4 wired: run the exit_question judge first; if it rejects,
+        # rewrite using the recommended_fix as guidance and re-judge.
+        # Single-shot rewrite (no cycle loop) — exit-Q regen is
+        # deterministic enough that the cycle ensemble we use for
+        # lesson steps doesn't add value.
+        try:
+            from apps.curriculum.content_judges.exit_question import (
+                run_exit_question_judge,
+            )
+            from apps.llm.models import ModelConfig
+            gen_config = ModelConfig.get_for('generation')
+            judge_exclude = (
+                (gen_config.provider or '').lower() if gen_config else None
+            )
+            verdict = run_exit_question_judge(
+                question_text=question.question_text or '',
+                option_a=question.option_a or '', option_b=question.option_b or '',
+                option_c=question.option_c or '', option_d=question.option_d or '',
+                correct_answer=question.correct_answer or '',
+                explanation=question.explanation or '',
+                lesson=question.exit_ticket.lesson,
+                step_concept_tag=question.concept_tag or '',
+                enabling_objective=question.enabling_objective or '',
+                exclude_provider=judge_exclude,
+            )
+            verdict_dict = {
+                'passed': verdict.passed,
+                'violations': list(verdict.violations or []),
+                'reasoning': verdict.reasoning or '',
+                'recommended_fix': verdict.recommended_fix or '',
+                'provider': verdict.provider or '',
+                'model_name': verdict.model_name or '',
+                'skipped': verdict.skipped,
+                'skip_reason': verdict.skip_reason or '',
+            }
+
+            if verdict.skipped or (verdict.passed and not verdict.violations):
+                return JsonResponse({
+                    'ok': True,
+                    'mode': 'auto_review',
+                    'changed': False,
+                    'message': (
+                        f'Judge {"skipped" if verdict.skipped else "passed"} '
+                        '— nothing to fix. Switch to Prompt mode to '
+                        'request a specific rewrite.'
+                    ),
+                    'candidate': {
+                        'question_text': question.question_text,
+                        'option_a': question.option_a,
+                        'option_b': question.option_b,
+                        'option_c': question.option_c,
+                        'option_d': question.option_d,
+                        'correct_answer': question.correct_answer,
+                        'explanation': question.explanation,
+                    },
+                    'judge_verdict': verdict_dict,
+                })
+
+            # Rewrite using the judge's recommended_fix as guidance.
+            from apps.curriculum.content_regen import (
+                run_exit_question_prompt_regen,
+            )
+            guidance = verdict.recommended_fix or (
+                "Address these violations: "
+                + ", ".join(verdict.violations or [])
+            )
+            result = run_exit_question_prompt_regen(
+                original_question={
+                    'question_text': question.question_text or '',
+                    'option_a': question.option_a or '',
+                    'option_b': question.option_b or '',
+                    'option_c': question.option_c or '',
+                    'option_d': question.option_d or '',
+                    'correct_answer': question.correct_answer or '',
+                    'explanation': question.explanation or '',
+                },
+                teacher_guidance=guidance,
+                lesson=question.exit_ticket.lesson,
+                step_concept_tag=question.concept_tag or '',
+                enabling_objective=question.enabling_objective or '',
+            )
+            if result.error:
+                return JsonResponse({
+                    'ok': False,
+                    'error': f'regen failed: {result.error}',
+                    'judge_verdict': verdict_dict,
+                }, status=500)
+
+            return JsonResponse({
+                'ok': True,
+                'mode': 'auto_review',
+                'changed': True,
+                'candidate': result.as_dict(),
+                'judge_verdict': verdict_dict,
+                'audit': {
+                    'picked_model': result.picked_model,
+                    'elapsed_seconds': round(result.elapsed_seconds, 2),
+                },
+            })
+        except Exception as exc:
+            logger.error(
+                f"[ExitQRegen] auto_review question={question_id} failed: "
+                f"{type(exc).__name__}: {exc}",
+                exc_info=True,
+            )
+            return JsonResponse({
+                'ok': False,
+                'error': f'{type(exc).__name__}: {str(exc)[:200]}',
+            }, status=500)
+
+    # mode == 'prompt'
     teacher_guidance = (request.POST.get('teacher_guidance') or '').strip()
     if not teacher_guidance:
         return JsonResponse({

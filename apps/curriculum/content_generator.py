@@ -219,6 +219,98 @@ def _regen_one_step(step, lesson, verdict_dict: dict):
         )
 
 
+def _run_exit_question_judge_for_mcqs(lesson, mcqs):
+    """Fan out the exit_question content judge across newly-persisted
+    MCQ rows. Mirrors _run_content_judges_for_steps from Q1.8 — same
+    ThreadPoolExecutor + fail-soft pattern.
+
+    Verdicts land on ExitTicketQuestion.judge_outputs.exit_question.
+    No regen ensemble for v1 — flagged questions surface a Needs
+    Review badge in the UI and use the manual regen UI (Q3.2) to fix.
+    """
+    if not mcqs:
+        return
+
+    import concurrent.futures
+    from apps.curriculum.content_judges.exit_question import (
+        run_exit_question_judge,
+    )
+
+    # Cross-provider: exclude the generator's provider from the judge
+    # chain so the judge can't be the same vendor that produced the
+    # artefact.
+    exclude_provider = None
+    try:
+        from apps.llm.models import ModelConfig
+        gen_config = ModelConfig.get_for('generation')
+        if gen_config:
+            exclude_provider = (gen_config.provider or '').lower() or None
+    except Exception:
+        pass
+
+    def _judge_one(q):
+        try:
+            verdict = run_exit_question_judge(
+                question_text=q.question_text or '',
+                option_a=q.option_a or '', option_b=q.option_b or '',
+                option_c=q.option_c or '', option_d=q.option_d or '',
+                correct_answer=q.correct_answer or '',
+                explanation=q.explanation or '',
+                lesson=lesson,
+                step_concept_tag=q.concept_tag or '',
+                enabling_objective=q.enabling_objective or '',
+                exclude_provider=exclude_provider,
+            )
+        except Exception as exc:
+            print(
+                f"[ContentGen] [{lesson.title}] exit_question judge "
+                f"raised for Q#{q.id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return q, None
+        return q, verdict
+
+    persisted = 0
+    flagged = 0
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(8, len(mcqs))
+    ) as ex:
+        futures = [ex.submit(_judge_one, q) for q in mcqs]
+        for f in concurrent.futures.as_completed(futures):
+            q, verdict = f.result()
+            if verdict is None:
+                continue
+            outputs = dict(q.judge_outputs or {})
+            outputs['exit_question'] = {
+                'passed': verdict.passed,
+                'violations': list(verdict.violations or []),
+                'reasoning': verdict.reasoning or '',
+                'recommended_fix': verdict.recommended_fix or '',
+                'provider': verdict.provider or '',
+                'model_name': verdict.model_name or '',
+                'skipped': verdict.skipped,
+                'skip_reason': verdict.skip_reason or '',
+            }
+            q.judge_outputs = outputs
+            try:
+                q.save(update_fields=['judge_outputs'])
+                persisted += 1
+                if not verdict.passed and not verdict.skipped:
+                    flagged += 1
+            except Exception as exc:
+                print(
+                    f"[ContentGen] [{lesson.title}] exit-Q #{q.id} "
+                    f"save failed: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+    print(
+        f"[ContentGen] [{lesson.title}] exit_question judge: "
+        f"{persisted}/{len(mcqs)} persisted (flagged={flagged})",
+        flush=True,
+    )
+
+
 def _normalize_enabling_objective(
     question_eo: str,
     canonical_eos: List[str],
@@ -2854,6 +2946,10 @@ RULES:
                 )
             questions = safe_questions
 
+            # Collect persisted MCQ instances for the exit_question judge
+            # fan-out that runs after the loop (Q4.3 wire-up).
+            persisted_mcqs: list = []
+
             for i, q in enumerate(questions):
                 q_type = q.get('question_type', 'mcq')
                 kwargs = {
@@ -2916,7 +3012,29 @@ RULES:
                     for legacy in ('figure_spec', 'figure', 'plot_spec', 'figure_svg'):
                         ad.pop(legacy, None)
                     kwargs['answer_data'] = ad
-                ExitTicketQuestion.objects.create(**kwargs)
+                created_q = ExitTicketQuestion.objects.create(**kwargs)
+                # Collect MCQ instances for the judge fan-out below.
+                # Non-MCQ types are out of scope for v1 (see plan).
+                if q_type == 'mcq':
+                    persisted_mcqs.append(created_q)
+
+        # Q4 content-quality judge — exit_question (MCQ only). Runs
+        # POST-gen on every newly-persisted MCQ. Concurrent fan-out;
+        # per-question fail-soft. Verdict lands on
+        # ExitTicketQuestion.judge_outputs.exit_question.
+        try:
+            from django.conf import settings
+            if getattr(
+                settings, 'CONTENT_JUDGE_EXIT_QUESTION_ENABLED', True,
+            ):
+                _run_exit_question_judge_for_mcqs(lesson, persisted_mcqs)
+        except Exception as exc:
+            print(
+                f"[ContentGen] [{lesson.title}] exit_question judge "
+                f"fan-out raised (swallowed; never blocks generation): "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
         # Layers 1 + 2 + 4 — append exit-ticket audit to lesson.metadata.
         # Mirrors the step-audit write in _save_steps_to_db. We

@@ -608,6 +608,17 @@ class ExitTicketQuestion(models.Model):
             "objective text. Shown in the dashboard as the broad pill."
         ),
     )
+    # Content-quality judge verdicts keyed by judge name
+    # (exit_question, safety_content, ...). Mirrors LessonStep.judge_outputs
+    # from Q1.8 + MediaAsset.judge_outputs from Q1.10. Populated by
+    # apps/curriculum/content_judges/exit_question.py POST-gen via
+    # the curriculum pipeline. Read by lesson detail UI for badges.
+    judge_outputs = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Content-judge verdicts keyed by judge name (exit_question, ...)"
+    )
+
     enabling_objective = models.CharField(
         max_length=500,
         blank=True,

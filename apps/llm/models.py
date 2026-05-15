@@ -152,6 +152,7 @@ class ModelConfig(models.Model):
         CONTENT_JUDGE_IMAGE_PROMPT = 'content_judge_image_prompt', 'Content Judge — Image Prompt (PRE-gen)'
         CONTENT_JUDGE_FACTUAL_STEP = 'content_judge_factual_step', 'Content Judge — Factual (Lesson Step)'
         CONTENT_JUDGE_FIGURE_ALIGNMENT = 'content_judge_figure_alignment', 'Content Judge — Figure Alignment (POST-gen vision)'
+        CONTENT_JUDGE_EXIT_QUESTION = 'content_judge_exit_question', 'Content Judge — Exit Ticket Question (MCQ)'
 
     institution = models.ForeignKey(
         Institution,

@@ -911,6 +911,23 @@
                     <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}#d1fae5{% elif question.difficulty == 'hard' %}#fee2e2{% else %}#fef3c7{% endif %};">{{ question.difficulty }}</span>
                     {% endif %}
                     <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe;" title="Teaching objective">{% if question.concept_tag %}{{ question.concept_tag }}{% else %}<span style="color:#a16207;">no teaching objective</span>{% endif %}</span>
+                    {% with eq=question.judge_outputs.exit_question %}
+                    {% if eq %}
+                        {% if eq.skipped %}
+                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--gray-100); color: var(--gray-500);"
+                                  title="Exit-question judge skipped: {{ eq.skip_reason }}">⊘ AI</span>
+                        {% elif not eq.passed %}
+                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fee2e2; color: #991b1b; font-weight: 600;"
+                                  title="{{ eq.recommended_fix|default:eq.reasoning }}">⚠ {{ eq.violations|join:", " }}</span>
+                        {% elif eq.violations %}
+                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fef3c7; color: #92400e;"
+                                  title="{{ eq.recommended_fix|default:eq.reasoning }}">⚠ Review</span>
+                        {% else %}
+                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #d1fae5; color: #047857;"
+                                  title="Exit-question judge passed via {{ eq.provider }}">✓ AI</span>
+                        {% endif %}
+                    {% endif %}
+                    {% endwith %}
                 </div>
 
                 <!-- Full teaching objective shown below the stem so
@@ -1071,12 +1088,19 @@
                 <div class="exitq-regen-panel" data-question-id="{{ question.id }}" hidden
                      style="margin-top:0.625rem; padding:0.75rem; background:#f9fafb;
                             border:1px solid var(--gray-200); border-radius:0.375rem;">
-                    <div style="font-size:0.75rem; color:var(--gray-600); margin-bottom:0.375rem;">
-                        Prompt-mode rewrite (auto-review for exit questions ships in Q4):
+                    <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem; font-size:0.8125rem;">
+                        <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer;">
+                            <input type="radio" name="exitq-mode-{{ question.id }}" value="auto_review" checked>
+                            Auto-review (run judge + auto-fix)
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer;">
+                            <input type="radio" name="exitq-mode-{{ question.id }}" value="prompt">
+                            Prompt mode (you guide the rewrite)
+                        </label>
                     </div>
                     <textarea class="exitq-regen-prompt" data-question-id="{{ question.id }}"
                               placeholder="e.g. make the distractors more plausible / simpler wording / focus on the scientific term"
-                              rows="2"
+                              rows="2" hidden
                               style="width:100%; font-size:0.875rem; padding:0.375rem 0.5rem;
                                      border:1px solid var(--gray-300); border-radius:0.25rem;
                                      margin-bottom:0.5rem; font-family:inherit;"></textarea>
@@ -1415,17 +1439,19 @@ function toggleStep(header) {
             return;
         }
         if (t.classList.contains('exitq-regen-apply')) {
+            const modeRadio = panel.querySelector(`input[name="exitq-mode-${qid}"]:checked`);
+            const mode = modeRadio ? modeRadio.value : 'auto_review';
             const guidance = $('.exitq-regen-prompt', qid).value.trim();
-            if (!guidance) {
-                setStatus(qid, 'Enter guidance to apply.');
+            if (mode === 'prompt' && !guidance) {
+                setStatus(qid, 'Enter guidance for Prompt mode.');
                 return;
             }
             t.disabled = true;
             setStatus(qid, '⏳ Generating…');
             try {
                 const fd = new FormData();
-                fd.set('mode', 'prompt');
-                fd.set('teacher_guidance', guidance);
+                fd.set('mode', mode);
+                if (mode === 'prompt') fd.set('teacher_guidance', guidance);
                 const r = await fetch(`/dashboard/curriculum/exit-question/${qid}/regen/`, {
                     method: 'POST',
                     headers: {'X-CSRFToken': csrfToken},
@@ -1489,6 +1515,15 @@ function toggleStep(header) {
                 t.disabled = false;
             }
             return;
+        }
+    });
+
+    // Show/hide the prompt textarea based on mode radio.
+    document.body.addEventListener('change', (e) => {
+        if (e.target.name && e.target.name.startsWith('exitq-mode-')) {
+            const qid = e.target.name.replace('exitq-mode-', '');
+            const ta = $('.exitq-regen-prompt', qid);
+            if (ta) ta.hidden = (e.target.value !== 'prompt');
         }
     });
 })();
