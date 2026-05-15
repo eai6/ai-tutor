@@ -291,6 +291,86 @@ def _merge_competencies_into_structure(structure: Dict, competencies: List[Dict]
                 units[0]['enabling_objectives'].append(comp_full)
 
 
+def _normalize_objective_key(text: str) -> str:
+    """Lowercase + collapse all whitespace runs to single space.
+
+    Same key function used by curriculum_approve view (Python) and
+    process.html collectData() (JS regex /\\s+/g) so all three layers
+    agree on what counts as "the same" objective.
+    """
+    return ' '.join((text or '').lower().split())
+
+
+def _dedupe_parsed_curriculum(structure: Dict) -> Dict[str, int]:
+    """Within-lesson dedup + lesson-title-as-first-EO drop.
+
+    Walks every lesson in the parsed structure and:
+      1. Drops EO entries that match the lesson's title or singular
+         objective verbatim (case + whitespace insensitive). The parser
+         often appends the lesson title as the first EO, which is just
+         visual noise — same content, two slots.
+      2. Within each lesson, dedupes EO list using the same
+         normalization (case + whitespace insensitive). Keeps first
+         occurrence's original (non-normalized) text so capitalisation
+         choices survive.
+
+    Mutates structure in place. Returns counts so the caller can
+    surface "N duplicates removed" in the processing log + review UI.
+
+    Cross-lesson dedup + manual move are deferred to L4 (see
+    memory/lesson_objectives_management_plan.md).
+    """
+    counts = {
+        'within_lesson_duplicates': 0,
+        'title_duplicate_drops': 0,
+        'lessons_touched': 0,
+    }
+
+    for unit in structure.get('units', []) or []:
+        for lesson in unit.get('lessons', []) or []:
+            eos = lesson.get('enabling_objectives') or []
+            if not eos:
+                continue
+
+            title_key = _normalize_objective_key(lesson.get('title', ''))
+            objective_key = _normalize_objective_key(lesson.get('objective', ''))
+
+            seen = set()
+            cleaned = []
+            removed_here = 0
+            for eo in eos:
+                if not isinstance(eo, str):
+                    continue
+                text = eo.strip()
+                if not text:
+                    continue
+                key = _normalize_objective_key(text)
+                # Drop title/objective duplicates first — they're the
+                # most common parser noise and the most actionable
+                # to surface to the teacher ("we cleaned up redundant
+                # title-as-objective entries").
+                if title_key and key == title_key:
+                    counts['title_duplicate_drops'] += 1
+                    removed_here += 1
+                    continue
+                if objective_key and key == objective_key:
+                    counts['title_duplicate_drops'] += 1
+                    removed_here += 1
+                    continue
+                if key in seen:
+                    counts['within_lesson_duplicates'] += 1
+                    removed_here += 1
+                    continue
+                seen.add(key)
+                cleaned.append(text)
+
+            if removed_here:
+                counts['lessons_touched'] += 1
+            lesson['enabling_objectives'] = cleaned
+
+    return counts
+
+
 # ============================================================================
 # STEP 3: GENERATE LESSONS (Query KB + LLM)
 # ============================================================================
@@ -1118,6 +1198,33 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict
                     _merge_competencies_into_structure(structure, competencies)
             except Exception as e:
                 upload.add_log(f"   ⚠ Competency extraction skipped: {e}")
+
+            # L3 — within-lesson dedup + lesson-title-as-first-EO drop.
+            # Runs after merge_competencies so KB-merged duplicates
+            # get cleaned up too. Mutates structure in place.
+            try:
+                dedup_counts = _dedupe_parsed_curriculum(structure)
+                total_dropped = (
+                    dedup_counts['within_lesson_duplicates']
+                    + dedup_counts['title_duplicate_drops']
+                )
+                if total_dropped:
+                    parts = []
+                    if dedup_counts['title_duplicate_drops']:
+                        parts.append(
+                            f"{dedup_counts['title_duplicate_drops']} title-as-TO"
+                        )
+                    if dedup_counts['within_lesson_duplicates']:
+                        parts.append(
+                            f"{dedup_counts['within_lesson_duplicates']} duplicate"
+                        )
+                    upload.add_log(
+                        f"   🧹 Cleaned {total_dropped} redundant objective(s) "
+                        f"across {dedup_counts['lessons_touched']} lesson(s) "
+                        f"({', '.join(parts)})"
+                    )
+            except Exception as e:
+                upload.add_log(f"   ⚠ Objective dedup skipped: {e}")
 
             upload.parsed_data = structure
             upload.save()
