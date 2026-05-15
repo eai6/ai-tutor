@@ -5025,6 +5025,65 @@ def content_edit_events_list(request):
 
 
 @teacher_required
+def content_edit_dashboard(request):
+    """Aggregate metrics over ContentEditEvent — per-judge precision,
+    tag frequency, source breakdown, edit-volume sparkline.
+
+    Filters via querystring same as the list view (content_type,
+    source, tag, lesson_id) so admin can re-slice.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Super admin access required')
+
+    from apps.curriculum.quality_models import ContentEditEvent, ContentEditTag
+    from apps.curriculum.quality_metrics import (
+        tag_frequency, source_breakdown, content_type_breakdown,
+        edit_volume_by_day, judge_precision,
+    )
+
+    qs = _filtered_content_edit_events(request)
+    total = qs.count()
+
+    tag_counts = tag_frequency(qs)
+    src_counts = source_breakdown(qs)
+    type_counts = content_type_breakdown(qs)
+    volume = edit_volume_by_day(qs, days=30)
+    precision = judge_precision(qs)
+
+    # For the sparkline: a simple SVG path needs the y-values
+    # normalised. Compute max for scaling.
+    max_volume = max((c for _, c in volume), default=0) or 1
+
+    # Top tag slice for the bar chart — first 8 tags so the layout
+    # doesn't overflow horizontally.
+    top_tags = list(tag_counts.items())[:8]
+    max_tag = max((c for _, c in top_tags), default=0) or 1
+
+    context = {
+        **request.staff_ctx,
+        'total': total,
+        'tag_counts': top_tags,
+        'max_tag': max_tag,
+        'all_tag_counts': tag_counts,  # full table below the chart
+        'source_counts': src_counts,
+        'type_counts': type_counts,
+        'volume': volume,
+        'max_volume': max_volume,
+        'precision': precision,
+        'content_types': ContentEditEvent.ContentType.choices,
+        'sources': ContentEditEvent.Source.choices,
+        'tags': ContentEditTag.choices,
+        'filters': {
+            'content_type': request.GET.get('content_type', ''),
+            'source': request.GET.get('source', ''),
+            'tag': request.GET.get('tag', ''),
+            'lesson_id': request.GET.get('lesson_id', ''),
+        },
+    }
+    return render(request, 'dashboard/quality/content_edit_dashboard.html', context)
+
+
+@teacher_required
 def content_edit_event_detail(request, event_id):
     """Per-event detail view with diff + tag picker + notes editor.
 

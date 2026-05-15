@@ -79,6 +79,7 @@ urlpatterns = [
     path('curriculum/exit-question/<int:question_id>/save-regen/', views.exit_question_save_regen, name='exit_question_save_regen'),
     # Content-quality benchmark (Q5)
     path('content-edits/', views.content_edit_events_list, name='content_edit_events_list'),
+    path('content-edits/dashboard/', views.content_edit_dashboard, name='content_edit_dashboard'),
     path('content-edits/<int:event_id>/', views.content_edit_event_detail, name='content_edit_event_detail'),
     path('content-edits/export.csv', views.content_edit_events_export_csv, name='content_edit_events_export_csv'),
     path('content-edits/export.jsonl', views.content_edit_events_export_jsonl, name='content_edit_events_export_jsonl'),
