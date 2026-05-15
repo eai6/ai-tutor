@@ -77,6 +77,11 @@ urlpatterns = [
     path('curriculum/exit-question/<int:question_id>/edit/', views.exit_question_edit, name='exit_question_edit'),
     path('curriculum/exit-question/<int:question_id>/regen/', views.exit_question_regenerate, name='exit_question_regenerate'),
     path('curriculum/exit-question/<int:question_id>/save-regen/', views.exit_question_save_regen, name='exit_question_save_regen'),
+    # Content-quality benchmark (Q5)
+    path('content-edits/', views.content_edit_events_list, name='content_edit_events_list'),
+    path('content-edits/<int:event_id>/', views.content_edit_event_detail, name='content_edit_event_detail'),
+    path('content-edits/export.csv', views.content_edit_events_export_csv, name='content_edit_events_export_csv'),
+    path('content-edits/export.jsonl', views.content_edit_events_export_jsonl, name='content_edit_events_export_jsonl'),
     path('curriculum/lesson/<int:lesson_id>/prerequisites/', views.lesson_prerequisite_edit, name='lesson_prerequisite_edit'),
     
     # Weekly assignments — teacher creates/edits per (course, week)

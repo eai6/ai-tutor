@@ -17,7 +17,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.db.models import Count, Avg, Q, F, Max
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -4941,6 +4941,228 @@ def exit_question_save_regen(request, question_id):
         'ok': True,
         'question_id': question.id,
     })
+
+
+# ─── Q5: Content edit benchmark — admin views + exports ────────────────
+
+def _filtered_content_edit_events(request):
+    """Apply shared GET filters to the ContentEditEvent queryset.
+
+    Accepts: ?content_type=step|exit_question|image, ?source=...,
+    ?tag=FACTUAL_INCORRECT, ?lesson_id=N. Order by -created_at.
+    Used by both the admin list view and the export endpoints so
+    "narrow the page → download exactly that" holds.
+    """
+    from apps.curriculum.quality_models import ContentEditEvent
+    qs = ContentEditEvent.objects.select_related(
+        'lesson', 'lesson__unit__course', 'edited_by',
+    ).order_by('-created_at')
+
+    content_type = (request.GET.get('content_type') or '').strip().lower()
+    if content_type in {c[0] for c in ContentEditEvent.ContentType.choices}:
+        qs = qs.filter(content_type=content_type)
+
+    source = (request.GET.get('source') or '').strip().lower()
+    if source in {c[0] for c in ContentEditEvent.Source.choices}:
+        qs = qs.filter(source=source)
+
+    tag = (request.GET.get('tag') or '').strip().upper()
+    if tag:
+        # SQLite doesn't support __contains on JSONField, but Postgres
+        # does. Use __icontains on the JSON's text representation so
+        # the filter works on both backends. Tag enum values are
+        # distinct enough that substring collisions aren't a real risk
+        # (e.g. "FACTUAL_INCORRECT" never appears inside any other tag).
+        qs = qs.filter(error_tags__icontains=tag)
+
+    lesson_id = request.GET.get('lesson_id')
+    if lesson_id and str(lesson_id).isdigit():
+        qs = qs.filter(lesson_id=int(lesson_id))
+
+    return qs
+
+
+@teacher_required
+def content_edit_events_list(request):
+    """Super-admin paginated list of teacher edits to generated content.
+
+    Filters via querystring: content_type, source, tag, lesson_id.
+    Pagination: ?page=N (50 per page).
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Super admin access required')
+
+    from django.core.paginator import Paginator
+    from apps.curriculum.quality_models import ContentEditEvent, ContentEditTag
+
+    qs = _filtered_content_edit_events(request)
+    paginator = Paginator(qs, 50)
+    page = paginator.get_page(request.GET.get('page') or 1)
+
+    # Aggregate counts for the filter sidebar
+    from django.db.models import Count
+    tag_counts = {}
+    for evt in ContentEditEvent.objects.all().only('error_tags'):
+        for t in (evt.error_tags or []):
+            tag_counts[t] = tag_counts.get(t, 0) + 1
+
+    context = {
+        **request.staff_ctx,
+        'page': page,
+        'total': paginator.count,
+        'content_types': ContentEditEvent.ContentType.choices,
+        'sources': ContentEditEvent.Source.choices,
+        'tags': ContentEditTag.choices,
+        'tag_counts': sorted(tag_counts.items(), key=lambda p: -p[1]),
+        'filters': {
+            'content_type': request.GET.get('content_type', ''),
+            'source': request.GET.get('source', ''),
+            'tag': request.GET.get('tag', ''),
+            'lesson_id': request.GET.get('lesson_id', ''),
+        },
+    }
+    return render(request, 'dashboard/quality/content_edit_events_list.html', context)
+
+
+@teacher_required
+def content_edit_event_detail(request, event_id):
+    """Per-event detail view with diff + tag picker + notes editor.
+
+    GET: render detail template.
+    POST: update error_tags + teacher_notes.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Super admin access required')
+
+    from apps.curriculum.quality_models import ContentEditEvent, ContentEditTag
+    evt = get_object_or_404(ContentEditEvent, id=event_id)
+
+    if request.method == 'POST':
+        # Tag checkboxes in form: name='tags' value='FACTUAL_INCORRECT' (multi)
+        valid = {c[0] for c in ContentEditTag.choices}
+        submitted = [
+            t for t in request.POST.getlist('tags')
+            if t in valid
+        ]
+        evt.error_tags = submitted
+        evt.teacher_notes = (request.POST.get('teacher_notes') or '').strip()[:2000]
+        evt.save(update_fields=['error_tags', 'teacher_notes'])
+        messages.success(request, "Tags + notes saved.")
+        return redirect('dashboard:content_edit_event_detail', event_id=evt.id)
+
+    # Compute simple diff lines for the template (just before/after side
+    # by side; heavy diffing is overkill for small text changes).
+    context = {
+        **request.staff_ctx,
+        'event': evt,
+        'tags': ContentEditTag.choices,
+        'selected_tags': set(evt.error_tags or []),
+        'suggested_tags': set(evt.suggested_tags or []),
+    }
+    return render(request, 'dashboard/quality/content_edit_event_detail.html', context)
+
+
+@teacher_required
+def content_edit_events_export_csv(request):
+    """Stream a CSV of ContentEditEvent rows matching the same filters
+    as the admin list view. Used for ad-hoc analysis + benchmark
+    snapshots."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Super admin access required')
+
+    import csv
+    from django.http import StreamingHttpResponse
+
+    qs = _filtered_content_edit_events(request)
+
+    headers = [
+        'event_id', 'created_at', 'content_type', 'content_id',
+        'lesson_id', 'lesson_title', 'source', 'edited_by',
+        'suggested_tags', 'error_tags',
+        'before_text', 'after_text',
+        'judge_outputs_keys', 'teacher_notes',
+    ]
+
+    class _Echo:
+        def write(self, value):
+            return value
+    writer = csv.writer(_Echo())
+
+    def _payload_text(payload):
+        # Pick the most useful text field by content_type.
+        if not isinstance(payload, dict):
+            return ''
+        for key in ('teacher_script', 'question_text', 'url'):
+            v = payload.get(key)
+            if v:
+                return str(v).replace('\r', ' ').replace('\n', ' ')
+        return ''
+
+    def _rows():
+        yield writer.writerow(headers)
+        for evt in qs.iterator(chunk_size=200):
+            yield writer.writerow([
+                evt.id,
+                evt.created_at.isoformat(),
+                evt.content_type,
+                evt.content_id,
+                evt.lesson_id or '',
+                (evt.lesson.title if evt.lesson else '')[:100],
+                evt.source,
+                evt.edited_by.username if evt.edited_by else '',
+                ';'.join(evt.suggested_tags or []),
+                ';'.join(evt.error_tags or []),
+                _payload_text(evt.before_payload)[:500],
+                _payload_text(evt.after_payload)[:500],
+                ';'.join((evt.judge_outputs_at_edit or {}).keys()),
+                (evt.teacher_notes or '').replace('\r', ' ').replace('\n', ' '),
+            ])
+
+    from django.utils import timezone
+    ts = timezone.now().strftime('%Y%m%d-%H%M%S')
+    fname = f'content-edits-{ts}.csv'
+    response = StreamingHttpResponse(_rows(), content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{fname}"'
+    return response
+
+
+@teacher_required
+def content_edit_events_export_jsonl(request):
+    """Stream JSONL — full payloads, no truncation. For ML / external
+    eval pipelines that want every byte."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Super admin access required')
+
+    from django.http import StreamingHttpResponse
+
+    qs = _filtered_content_edit_events(request)
+
+    def _lines():
+        for evt in qs.iterator(chunk_size=100):
+            row = {
+                'event_id': evt.id,
+                'created_at': evt.created_at.isoformat(),
+                'content_type': evt.content_type,
+                'content_id': evt.content_id,
+                'lesson_id': evt.lesson_id,
+                'lesson_title': evt.lesson.title if evt.lesson else None,
+                'source': evt.source,
+                'edited_by': evt.edited_by.username if evt.edited_by else None,
+                'suggested_tags': evt.suggested_tags or [],
+                'error_tags': evt.error_tags or [],
+                'before_payload': evt.before_payload or {},
+                'after_payload': evt.after_payload or {},
+                'judge_outputs_at_edit': evt.judge_outputs_at_edit or {},
+                'teacher_notes': evt.teacher_notes or '',
+            }
+            yield (json.dumps(row, ensure_ascii=False) + '\n').encode('utf-8')
+
+    from django.utils import timezone
+    ts = timezone.now().strftime('%Y%m%d-%H%M%S')
+    fname = f'content-edits-{ts}.jsonl'
+    response = StreamingHttpResponse(_lines(), content_type='application/x-ndjson')
+    response['Content-Disposition'] = f'attachment; filename="{fname}"'
+    return response
 
 
 @teacher_required
