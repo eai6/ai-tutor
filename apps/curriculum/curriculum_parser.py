@@ -42,6 +42,7 @@ class OCRFailure(Exception):
         'oversized_page',    # all pages still over MAX_IMAGE_BYTES after fallback
         'no_pages',          # zero renderable pages
         'empty_response',    # provider returned no text
+        'all_providers_failed',  # every provider in the fallback chain failed
         'unknown',           # uncategorised — see detail
     )
 
@@ -482,33 +483,44 @@ def _extract_pdf_with_vision(
     """
     Render PDF pages to images and use multimodal LLM to extract content.
 
+    Provider strategy: uses ``apps.curriculum.vision_ocr`` for pluggable
+    multi-provider fallback. Per batch:
+      1. Try the primary provider (active ModelConfig for purpose='generation')
+      2. On any failure, fall through to the next provider in the chain
+         (typically a different vendor — e.g. Gemini → Claude → GPT)
+      3. If ALL providers fail for that batch, mark the batch skipped
+         and continue with the rest. The rest of the document still gets
+         indexed; one bad batch doesn't kill the whole run.
+
     Streams page rendering (one batch at a time) and dispatches batches
     concurrently (up to _VISION_MAX_WORKERS in flight) so memory stays bounded
-    AND wall-clock drops ~5× vs the old sequential implementation.
+    AND wall-clock drops ~5× vs sequential.
 
     Args:
         doc: PyMuPDF document handle (caller owns close())
         progress_cb: Optional callback ``(pages_processed, pages_total, phase)``
-            invoked after each batch completes. Used by the materials pipeline
-            to write `pages_processed` + `phase` on the upload row so the UI
-            can show a live progress indicator.
-        start_page: Resume hint (P3). Pages [0, start_page) are skipped — the
-            caller is expected to have already indexed those chunks.
+            invoked after each batch completes.
+        start_page: Resume hint (P3). Pages [0, start_page) are skipped.
 
     Raises:
-        OCRFailure: classifiable failure (rate limit, timeout, etc.) — see
-            OCRFailure.REASONS. Detail includes the failing batch index.
+        OCRFailure: only when EVERY batch failed across EVERY provider, OR
+            when there are no providers configured, OR when there are no
+            renderable pages. Partial success → returns concatenated text.
     """
     from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
-    from apps.llm.models import ModelConfig
-    from apps.llm.client import get_llm_client
+    from apps.curriculum.vision_ocr import (
+        RenderedPage,
+        get_vision_provider_chain,
+        extract_text_with_fallback,
+    )
 
-    config = ModelConfig.get_for('generation')
-    if not config:
-        raise OCRFailure('no_config', "No active ModelConfig for purpose='generation'")
-
-    client = get_llm_client(config)
-    is_anthropic = config.provider == ModelConfig.Provider.ANTHROPIC
+    providers = get_vision_provider_chain()
+    if not providers:
+        raise OCRFailure(
+            'no_config',
+            "No active ModelConfig found across purposes (generation, judge, "
+            "tutoring, exit_tickets) — cannot run vision OCR.",
+        )
 
     pages_total = len(doc)
     if pages_total == 0:
@@ -536,50 +548,40 @@ def _extract_pdf_with_vision(
     ]
     total_batches = len(batches)
     results: List[Optional[str]] = [None] * total_batches
-    pages_done = start_page  # global counter, includes resumed pages
+    skipped_batches: List[Tuple[int, str]] = []   # [(batch_idx, reason)]
+    pages_done = start_page
     skipped_oversized_total = 0
 
-    def _llm_call(batch_idx: int, rendered: List[Tuple[str, str]]) -> str:
-        """LLM call only — runs in worker thread.
+    def _process_one_batch(batch_idx: int, pages: List[RenderedPage]) -> Tuple[int, Optional[str], Optional[str]]:
+        """Run the provider chain on one batch. Runs in worker thread.
 
-        PyMuPDF docs aren't thread-safe for reads, so rendering happens in the
-        main thread before submit (see _render_batch). Workers only do the
-        outbound HTTP — vision calls are I/O wait.
+        Returns (batch_idx, text_or_None, error_reason_or_None).
+        Never raises — the orchestrator decides skip-vs-fail at the end.
         """
-        if not rendered:
-            return ""   # entire batch was oversized; skip silently
-        content_blocks = []
-        for img_b64, media_type in rendered:
-            if is_anthropic:
-                content_blocks.append({
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": media_type, "data": img_b64},
-                })
-            else:
-                content_blocks.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{media_type};base64,{img_b64}"},
-                })
-        content_blocks.append({"type": "text", "text": extraction_prompt})
-        messages = [{"role": "user", "content": content_blocks}]
-        try:
-            response = client.generate(
-                messages=messages, system_prompt=system_prompt, max_tokens=4096,
-            )
-        except Exception as exc:
-            reason = _classify_llm_error(exc)
-            detail = (
-                f"batch {batch_idx + 1}/{total_batches} "
-                f"(pages {batches[batch_idx][0] + 1}-{batches[batch_idx][1]}): "
-                f"{type(exc).__name__}: {str(exc)[:300]}"
-            )
-            raise OCRFailure(reason, detail) from exc
-        return response.content
+        if not pages:
+            return batch_idx, "", None   # whole batch was oversized; treat as empty
 
-    def _render_batch(batch_idx: int) -> Tuple[List[Tuple[str, str]], int]:
-        """Render pages for batch_idx in main thread. Returns (rendered, skipped_oversized)."""
+        result = extract_text_with_fallback(
+            pages=pages,
+            providers=providers,
+            system_prompt=system_prompt,
+            extraction_prompt=extraction_prompt,
+        )
+        if result.success:
+            return batch_idx, result.text, None
+        # All providers failed for this batch
         start, end = batches[batch_idx]
-        rendered = []
+        reason = (
+            f"batch {batch_idx + 1}/{total_batches} (pages {start + 1}-{end}): "
+            f"all providers failed; last={result.provider}/{result.model_name} "
+            f"({result.error_reason}: {result.error_detail[:200]})"
+        )
+        return batch_idx, None, reason
+
+    def _render_batch(batch_idx: int) -> Tuple[List[RenderedPage], int]:
+        """Render pages for batch_idx (main thread; PyMuPDF not thread-safe)."""
+        start, end = batches[batch_idx]
+        rendered: List[RenderedPage] = []
         skipped = 0
         for page_idx in range(start, end):
             r = _render_page_for_vision(doc[page_idx])
@@ -589,15 +591,12 @@ def _extract_pdf_with_vision(
                 )
                 skipped += 1
             else:
-                rendered.append(r)
+                rendered.append(RenderedPage(b64=r[0], media_type=r[1]))
         return rendered, skipped
 
     # Sliding window: keep at most _VISION_MAX_WORKERS batches in flight.
-    # Render the next batch in the main thread, submit to executor, wait for
-    # at least one to complete, then continue. Caps in-flight memory at
-    # ~5 × 10 pages × ~4 MB ≈ 200 MB.
     with ThreadPoolExecutor(max_workers=_VISION_MAX_WORKERS) as executor:
-        in_flight: Dict[object, Tuple[int, int]] = {}  # future -> (batch_idx, batch_pages)
+        in_flight: Dict[object, Tuple[int, int]] = {}   # future -> (batch_idx, batch_pages)
         next_to_submit = 0
 
         def _submit_next():
@@ -607,7 +606,7 @@ def _extract_pdf_with_vision(
                 rendered, skipped = _render_batch(bi)
                 skipped_oversized_total += skipped
                 start, end = batches[bi]
-                fut = executor.submit(_llm_call, bi, rendered)
+                fut = executor.submit(_process_one_batch, bi, rendered)
                 in_flight[fut] = (bi, end - start)
                 next_to_submit += 1
 
@@ -618,14 +617,18 @@ def _extract_pdf_with_vision(
             for done_fut in done:
                 bi, batch_pages = in_flight.pop(done_fut)
                 try:
-                    results[bi] = done_fut.result()
-                except OCRFailure:
-                    # Cancel the rest and re-raise. as_completed semantics
-                    # mean other in-flight calls keep running until cancel
-                    # propagates — that's acceptable.
-                    for f in in_flight:
-                        f.cancel()
-                    raise
+                    _bi, text, error_reason = done_fut.result()
+                except Exception as exc:
+                    # _process_one_batch is no-raise by design; this would
+                    # be an orchestrator bug, not a provider failure.
+                    skipped_batches.append((bi, f"orchestrator-bug: {exc!r}"))
+                    text = None
+                else:
+                    if text is None:
+                        skipped_batches.append((bi, error_reason or 'unknown'))
+                        logger.warning(f"OCR batch skipped: {error_reason}")
+                    else:
+                        results[bi] = text
                 pages_done += batch_pages
                 if progress_cb is not None:
                     try:
@@ -634,20 +637,36 @@ def _extract_pdf_with_vision(
                         logger.warning(f"progress_cb raised — ignoring: {cb_exc}")
             _submit_next()
 
-    # Concatenate in batch order. Empty across all batches → empty_response.
-    if not any(r and r.strip() for r in results):
-        if skipped_oversized_total == sum(end - start for start, end in batches):
-            raise OCRFailure(
-                'oversized_page',
-                f"All {skipped_oversized_total} page(s) exceeded {_VISION_MAX_IMAGE_BYTES} bytes "
-                f"after fallback to 120 DPI JPEG."
+    # Decide outcome:
+    #   - At least one batch succeeded → return concatenated text +
+    #     log the skipped count so the materials UI can surface it
+    #   - Every batch failed → raise with the most informative reason
+    successful = [r for r in results if r and r.strip()]
+    if successful:
+        if skipped_batches:
+            logger.warning(
+                "Vision OCR completed with %d/%d batches skipped after all "
+                "providers failed: %s",
+                len(skipped_batches), total_batches,
+                '; '.join(f"#{bi+1}" for bi, _ in skipped_batches[:5]),
             )
-        raise OCRFailure(
-            'empty_response',
-            f"Vision LLM returned no text across {total_batches} batch(es).",
-        )
+        return "\n\n".join(r for r in results if r)
 
-    return "\n\n".join(r for r in results if r)
+    # Nothing succeeded — figure out the best reason to surface
+    if skipped_oversized_total == sum(end - start for start, end in batches):
+        raise OCRFailure(
+            'oversized_page',
+            f"All {skipped_oversized_total} page(s) exceeded {_VISION_MAX_IMAGE_BYTES} bytes "
+            f"after fallback to 120 DPI JPEG.",
+        )
+    if skipped_batches:
+        # Use the first skipped batch's reason as the headline; it's
+        # already prefixed with "batch N/M (pages X-Y): all providers failed; last=..."
+        raise OCRFailure('all_providers_failed', skipped_batches[0][1])
+    raise OCRFailure(
+        'empty_response',
+        f"Vision LLM returned no text across {total_batches} batch(es).",
+    )
 
 
 def extract_curriculum_with_vision(file_path: str, subject: str, grade_level: str) -> Optional['ParsedCurriculum']:
