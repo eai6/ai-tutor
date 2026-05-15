@@ -60,6 +60,7 @@ def _dispatch_via_azure_sdk(
         from azure.mgmt.appcontainers.models import (
             JobExecutionTemplate,
             JobExecutionContainer,
+            ContainerResources,
         )
     except ImportError as exc:
         raise RuntimeError(
@@ -93,10 +94,24 @@ def _dispatch_via_azure_sdk(
     base_container = base_containers[0]
     base_image = getattr(base_container, 'image', None)
     base_command = list(getattr(base_container, 'command', None) or [])
+    base_resources = getattr(base_container, 'resources', None)
     if not base_image:
         raise RuntimeError(
             f"Container Apps Job {job_name!r} container has no image — "
             "cannot dispatch."
+        )
+
+    # Carry CPU/memory from the Job's base template. Without this, the
+    # per-execution container defaults to Azure's 0.5 CPU / 1 Gi RAM
+    # which OOMs sentence-transformers + the curriculum parser. We
+    # learned this the hard way after the image fix (see commit
+    # 3ef5753) — each run failed silently with no detailedStatus, only
+    # a "Failed" status and zero output.
+    exec_resources = None
+    if base_resources is not None:
+        exec_resources = ContainerResources(
+            cpu=getattr(base_resources, 'cpu', None),
+            memory=getattr(base_resources, 'memory', None),
         )
 
     template = JobExecutionTemplate(
@@ -106,6 +121,7 @@ def _dispatch_via_azure_sdk(
                 image=base_image,
                 command=base_command or ["python", "manage.py", "process_material"],
                 args=[str(upload_id), "--mode", mode],
+                resources=exec_resources,
             ),
         ],
     )
