@@ -351,6 +351,178 @@ def run_step_regen(
     return result
 
 
+def run_step_prompt_regen(
+    *,
+    step_text: str,
+    teacher_guidance: str,
+    lesson,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_objective: str = "",
+    step_concept_tag: str = "",
+    temperature: float = 0.30,
+) -> RegenResult:
+    """Teacher-prompt-driven rewrite. Single LLM call, no judge gating.
+
+    Used by Q3 manual-regen UI's "Prompt mode" — the teacher says what
+    they want changed, the model applies it. We don't run the
+    factual_step judge here because the teacher's guidance is the
+    source of truth for this rewrite (e.g. "make this shorter" doesn't
+    fail factual judging). Runs ONCE; the teacher reviews + accepts
+    the candidate or discards it.
+
+    Args:
+        step_text: The current step.teacher_script.
+        teacher_guidance: Free-form instruction from the teacher
+            ("make this shorter / less abstract / add a Seychelles
+            example"). Empty/whitespace → returns the original
+            unchanged with an audit note.
+        lesson: Lesson instance (for context derivation).
+        lesson_*/step_*: Context for the regen prompt.
+        temperature: Generation temperature. Default 0.30 — slightly
+            higher than auto-regen because teacher guidance often
+            asks for stylistic shifts that benefit from variability.
+
+    Returns:
+        RegenResult with `clean=True` (single-pass; we treat the
+        teacher's prompt as authoritative). `audit` carries the
+        single cycle's record. Caller decides whether to persist.
+    """
+    started = time.monotonic()
+    result = RegenResult(text=step_text or '', cycles_run=0)
+
+    if not (step_text or '').strip():
+        result.text = ''
+        result.audit.append({
+            'cycle': 0, 'error': 'empty_step_text', 'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    if not (teacher_guidance or '').strip():
+        result.audit.append({
+            'cycle': 0, 'error': 'empty_teacher_guidance', 'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    try:
+        from apps.llm.models import ModelConfig
+        from apps.llm.client import get_llm_client
+        gen_config = ModelConfig.get_for('generation')
+    except Exception as exc:
+        result.audit.append({
+            'cycle': 0, 'error': f'config_lookup_failed: {exc}',
+            'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    if gen_config is None:
+        result.audit.append({
+            'cycle': 0, 'error': 'no_generation_config', 'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    try:
+        gen_client = get_llm_client(gen_config)
+    except Exception as exc:
+        result.audit.append({
+            'cycle': 0, 'error': f'client_construction_failed: {exc}',
+            'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    # Auto-derive lesson context from the Lesson instance when caller
+    # didn't supply it.
+    if lesson is not None and not (lesson_subject and lesson_title):
+        try:
+            lesson_title = lesson_title or str(getattr(lesson, 'title', '') or '')
+            lesson_objective = lesson_objective or str(
+                getattr(lesson, 'objective', '') or ''
+            )
+            unit = getattr(lesson, 'unit', None)
+            course = getattr(unit, 'course', None) if unit else None
+            if course is not None and not lesson_subject:
+                subj_type = getattr(course, 'subject_type', '') or ''
+                course_name = getattr(course, 'name', '') or ''
+                lesson_subject = str(subj_type or course_name)
+            if course is not None and not lesson_grade:
+                grades = getattr(course, 'grade_levels', None) or []
+                if isinstance(grades, list) and grades:
+                    lesson_grade = ", ".join(str(g) for g in grades[:3])
+                else:
+                    lesson_grade = str(getattr(course, 'grade_level', '') or '')
+        except Exception:
+            pass
+
+    from apps.curriculum.content_regen.prompt import (
+        build_step_prompt_regen_prompt,
+    )
+
+    prompt = build_step_prompt_regen_prompt(
+        original_text=step_text,
+        teacher_guidance=teacher_guidance,
+        lesson_subject=lesson_subject,
+        lesson_grade=lesson_grade,
+        lesson_title=lesson_title,
+        lesson_objective=lesson_objective,
+        step_objective=step_objective,
+        step_concept_tag=step_concept_tag,
+    )
+
+    candidate = RegenCandidate(
+        cycle=1,
+        model_name=gen_config.model_name or '',
+        temperature=temperature,
+    )
+
+    try:
+        response = gen_client.generate(
+            messages=[{"role": "user", "content": prompt['user']}],
+            system_prompt=prompt['system'],
+            max_tokens=2000,
+            temperature=temperature,
+        )
+    except Exception as exc:
+        logger.warning(
+            f"[ContentRegen] prompt-mode gen call failed: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        candidate.error = f"gen_failed: {type(exc).__name__}"
+        result.audit.append(_candidate_to_audit(candidate, picked=False))
+        result.elapsed_seconds = time.monotonic() - started
+        result.text = step_text  # Keep original on error
+        return result
+
+    candidate_text = (response.content or '').strip()
+    if candidate_text.startswith('```'):
+        import re
+        candidate_text = re.sub(
+            r"^```[a-z]*\s*|\s*```$", "", candidate_text,
+            flags=re.IGNORECASE,
+        ).strip()
+    candidate.text = candidate_text
+    candidate.judge_passed = True   # No judge ran — teacher prompt is authority
+    candidate.score = 1.0
+    result.audit.append(_candidate_to_audit(candidate, picked=True))
+    result.cycles_run = 1
+    result.text = candidate_text or step_text
+    result.clean = True
+    result.picked_model = candidate.model_name
+    result.elapsed_seconds = time.monotonic() - started
+
+    logger.info(
+        f"[ContentRegen] prompt-mode rewrite via {candidate.model_name} "
+        f"({len(candidate_text)} chars) elapsed={result.elapsed_seconds:.1f}s"
+    )
+    return result
+
+
 __all__ = [
     "DEFAULT_MAX_CYCLES",
     "DEFAULT_TEMPERATURE_START",
@@ -358,4 +530,5 @@ __all__ = [
     "RegenCandidate",
     "RegenResult",
     "run_step_regen",
+    "run_step_prompt_regen",
 ]

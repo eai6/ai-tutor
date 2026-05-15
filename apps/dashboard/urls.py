@@ -72,6 +72,8 @@ urlpatterns = [
     path('staff/<int:user_id>/reset-password/show/', views.staff_reset_password_show, name='staff_reset_password_show'),
     path('staff/<int:user_id>/reset-password/email/', views.staff_reset_password_email, name='staff_reset_password_email'),
     path('curriculum/step/<int:step_id>/edit/', views.step_edit, name='step_edit'),
+    path('curriculum/step/<int:step_id>/regen/', views.lesson_step_regenerate, name='lesson_step_regenerate'),
+    path('curriculum/step/<int:step_id>/save-regen/', views.lesson_step_save_regen, name='lesson_step_save_regen'),
     path('curriculum/exit-question/<int:question_id>/edit/', views.exit_question_edit, name='exit_question_edit'),
     path('curriculum/lesson/<int:lesson_id>/prerequisites/', views.lesson_prerequisite_edit, name='lesson_prerequisite_edit'),
     

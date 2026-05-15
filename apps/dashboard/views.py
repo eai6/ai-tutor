@@ -4631,6 +4631,225 @@ def course_subject_type(request, course_id):
 
 
 @teacher_required
+@require_POST
+def lesson_step_regenerate(request, step_id):
+    """POST → run regen on a lesson step's teacher_script. Returns the
+    candidate text + audit as JSON. Does NOT persist.
+
+    The teacher reviews the candidate inline, then either POSTs to
+    lesson_step_save_regen (commit) or discards (no-op).
+
+    Modes (POST `mode`):
+      auto_review — runs the Q2 factual_step judge + run_step_regen
+        ensemble (cycle cap 2, temp decay). Only meaningful when the
+        lesson has KB evidence to verify against.
+      prompt — single-pass rewrite driven by `teacher_guidance`.
+        No judge gating — the teacher's prompt is authoritative.
+    """
+    from apps.curriculum.models import LessonStep
+    from django.http import JsonResponse
+
+    institution = request.staff_ctx['institution']
+    step = get_object_or_404(
+        LessonStep.objects.select_related('lesson__unit__course'),
+        id=step_id,
+    )
+    # Same institution scoping as step_edit — let teachers regen
+    # platform-wide course steps too (institution=None on course is OK).
+    course = step.lesson.unit.course
+    if (
+        course.institution is not None
+        and institution is not None
+        and course.institution_id != institution.id
+        and not getattr(request.user, 'is_superuser', False)
+    ):
+        return JsonResponse({'ok': False, 'error': 'forbidden'}, status=403)
+
+    mode = (request.POST.get('mode') or 'auto_review').strip().lower()
+    if mode not in ('auto_review', 'prompt'):
+        return JsonResponse({
+            'ok': False, 'error': f'unknown mode: {mode}',
+        }, status=400)
+
+    if not (step.teacher_script or '').strip():
+        return JsonResponse({
+            'ok': False, 'error': 'step has no teacher_script to rewrite',
+        }, status=400)
+
+    try:
+        if mode == 'auto_review':
+            # First: run the factual_step judge so we have something
+            # to feed run_step_regen as the source verdict.
+            from apps.curriculum.content_judges.factual_step import (
+                run_factual_step_judge,
+            )
+            from apps.curriculum.content_regen import run_step_regen
+            from apps.llm.models import ModelConfig
+
+            gen_config = ModelConfig.get_for('generation')
+            judge_exclude = (
+                (gen_config.provider or '').lower() if gen_config else None
+            )
+            verdict = run_factual_step_judge(
+                step.teacher_script,
+                lesson=step.lesson,
+                exclude_provider=judge_exclude,
+            )
+            verdict_dict = {
+                'passed': verdict.passed,
+                'violations': list(verdict.violations or []),
+                'reasoning': verdict.reasoning or '',
+                'recommended_fix': verdict.recommended_fix or '',
+                'provider': verdict.provider or '',
+                'model_name': verdict.model_name or '',
+                'skipped': verdict.skipped,
+                'skip_reason': verdict.skip_reason or '',
+            }
+
+            if verdict.skipped or (verdict.passed and not verdict.violations):
+                # No issues to regen against — return the original
+                # text + a note. The teacher can switch to prompt mode
+                # if they still want a rewrite.
+                return JsonResponse({
+                    'ok': True,
+                    'mode': 'auto_review',
+                    'changed': False,
+                    'message': (
+                        f'Judge {"skipped" if verdict.skipped else "passed"} '
+                        '— nothing to fix. Switch to Prompt mode to '
+                        'request a specific rewrite.'
+                    ),
+                    'candidate_text': step.teacher_script,
+                    'judge_verdict': verdict_dict,
+                    'audit': None,
+                })
+
+            regen_result = run_step_regen(
+                step_text=step.teacher_script,
+                judge_result=verdict_dict,
+                lesson=step.lesson,
+                step_objective=step.enabling_objective or '',
+                step_concept_tag=step.concept_tag or '',
+            )
+            return JsonResponse({
+                'ok': True,
+                'mode': 'auto_review',
+                'changed': regen_result.text != step.teacher_script,
+                'candidate_text': regen_result.text,
+                'judge_verdict': verdict_dict,
+                'audit': {
+                    'cycles_run': regen_result.cycles_run,
+                    'clean': regen_result.clean,
+                    'picked_model': regen_result.picked_model,
+                    'elapsed_seconds': round(regen_result.elapsed_seconds, 2),
+                    'final_violations': list(regen_result.final_violations),
+                    'cycles': regen_result.audit,
+                },
+            })
+
+        # mode == 'prompt'
+        teacher_guidance = (request.POST.get('teacher_guidance') or '').strip()
+        if not teacher_guidance:
+            return JsonResponse({
+                'ok': False,
+                'error': 'teacher_guidance is required for Prompt mode',
+            }, status=400)
+
+        from apps.curriculum.content_regen import run_step_prompt_regen
+        regen_result = run_step_prompt_regen(
+            step_text=step.teacher_script,
+            teacher_guidance=teacher_guidance,
+            lesson=step.lesson,
+            step_objective=step.enabling_objective or '',
+            step_concept_tag=step.concept_tag or '',
+        )
+        return JsonResponse({
+            'ok': True,
+            'mode': 'prompt',
+            'changed': regen_result.text != step.teacher_script,
+            'candidate_text': regen_result.text,
+            'audit': {
+                'cycles_run': regen_result.cycles_run,
+                'picked_model': regen_result.picked_model,
+                'elapsed_seconds': round(regen_result.elapsed_seconds, 2),
+                'cycles': regen_result.audit,
+            },
+        })
+    except Exception as exc:
+        logger.error(
+            f"[StepRegen] step={step_id} mode={mode} failed: "
+            f"{type(exc).__name__}: {exc}",
+            exc_info=True,
+        )
+        return JsonResponse({
+            'ok': False,
+            'error': f'{type(exc).__name__}: {str(exc)[:200]}',
+        }, status=500)
+
+
+@teacher_required
+@require_POST
+def lesson_step_save_regen(request, step_id):
+    """POST → persist the regen candidate to step.teacher_script.
+
+    Body: candidate_text (the text the teacher reviewed and accepted),
+    plus optional `audit_blob` (JSON string) from the regen call so we
+    can record the audit on step.judge_outputs['regen_audit'].
+
+    On save: also sets content_quality_status='human_edited' so the
+    UI shows the "edited" badge instead of the prior auto/flagged state.
+    """
+    from apps.curriculum.models import LessonStep
+    from django.http import JsonResponse
+
+    institution = request.staff_ctx['institution']
+    step = get_object_or_404(
+        LessonStep.objects.select_related('lesson__unit__course'),
+        id=step_id,
+    )
+    course = step.lesson.unit.course
+    if (
+        course.institution is not None
+        and institution is not None
+        and course.institution_id != institution.id
+        and not getattr(request.user, 'is_superuser', False)
+    ):
+        return JsonResponse({'ok': False, 'error': 'forbidden'}, status=403)
+
+    candidate_text = (request.POST.get('candidate_text') or '').strip()
+    if not candidate_text:
+        return JsonResponse({
+            'ok': False, 'error': 'candidate_text is required',
+        }, status=400)
+
+    audit_blob = request.POST.get('audit_blob') or ''
+    parsed_audit = None
+    if audit_blob:
+        try:
+            parsed_audit = json.loads(audit_blob)
+        except Exception:
+            parsed_audit = None
+
+    step.teacher_script = candidate_text
+    step.content_quality_status = LessonStep.ContentQualityStatus.HUMAN_EDITED
+    outputs = dict(step.judge_outputs or {})
+    if parsed_audit:
+        # Store last manual regen audit alongside any auto regen_audit
+        # so we can see both histories.
+        outputs['manual_regen_audit'] = parsed_audit
+    step.judge_outputs = outputs
+    step.save(update_fields=[
+        'teacher_script', 'content_quality_status', 'judge_outputs',
+    ])
+
+    return JsonResponse({
+        'ok': True,
+        'step_id': step.id,
+        'content_quality_status': step.content_quality_status,
+    })
+
+
+@teacher_required
 def step_edit(request, step_id):
     """Edit a lesson step."""
     from apps.curriculum.models import LessonStep

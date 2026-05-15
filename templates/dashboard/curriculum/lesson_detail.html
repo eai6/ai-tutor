@@ -727,8 +727,72 @@
 
                     {% if step.teacher_script %}
                     <div class="step-content-section">
-                        <h4>📝 Tutor Script</h4>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+                            <h4 style="margin:0;">📝 Tutor Script</h4>
+                            <button type="button" class="regen-toggle-btn"
+                                    data-step-id="{{ step.id }}"
+                                    style="font-size:0.8125rem; padding:0.25rem 0.625rem; border-radius:0.25rem;
+                                           border:1px solid var(--gray-300); background:white; color:var(--gray-700);
+                                           cursor:pointer;">🔁 Regenerate</button>
+                        </div>
                         <div class="step-script">{{ step.teacher_script }}</div>
+
+                        <div class="regen-panel" data-step-id="{{ step.id }}" hidden
+                             style="margin-top:0.625rem; padding:0.75rem; background:#f9fafb;
+                                    border:1px solid var(--gray-200); border-radius:0.375rem;">
+                            <div style="display:flex; gap:0.5rem; margin-bottom:0.625rem; font-size:0.8125rem;">
+                                <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer;">
+                                    <input type="radio" name="regen-mode-{{ step.id }}" value="auto_review" checked>
+                                    Auto-review (run judges + regen)
+                                </label>
+                                <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer;">
+                                    <input type="radio" name="regen-mode-{{ step.id }}" value="prompt">
+                                    Prompt mode (you guide the rewrite)
+                                </label>
+                            </div>
+                            <textarea class="regen-prompt-input" data-step-id="{{ step.id }}"
+                                      placeholder="e.g. make this shorter / less abstract / add a Seychelles example"
+                                      rows="2" hidden
+                                      style="width:100%; font-size:0.875rem; padding:0.375rem 0.5rem;
+                                             border:1px solid var(--gray-300); border-radius:0.25rem;
+                                             margin-bottom:0.5rem; font-family:inherit;"></textarea>
+                            <div style="display:flex; gap:0.5rem;">
+                                <button type="button" class="regen-apply-btn" data-step-id="{{ step.id }}"
+                                        style="font-size:0.8125rem; padding:0.375rem 0.75rem;
+                                               background:var(--primary,#7c3aed); color:white; border:none;
+                                               border-radius:0.25rem; cursor:pointer;">Apply</button>
+                                <button type="button" class="regen-cancel-btn" data-step-id="{{ step.id }}"
+                                        style="font-size:0.8125rem; padding:0.375rem 0.75rem;
+                                               background:white; color:var(--gray-700);
+                                               border:1px solid var(--gray-300); border-radius:0.25rem;
+                                               cursor:pointer;">Cancel</button>
+                                <span class="regen-status" data-step-id="{{ step.id }}"
+                                      style="font-size:0.8125rem; color:var(--gray-500); align-self:center;"></span>
+                            </div>
+                            <div class="regen-result" data-step-id="{{ step.id }}" hidden style="margin-top:0.625rem;">
+                                <div style="font-size:0.75rem; color:var(--gray-600); margin-bottom:0.25rem;">
+                                    Candidate (review then save or discard):
+                                </div>
+                                <textarea class="regen-candidate-text" data-step-id="{{ step.id }}"
+                                          rows="6"
+                                          style="width:100%; font-size:0.875rem; padding:0.5rem;
+                                                 border:1px solid var(--gray-300); border-radius:0.25rem;
+                                                 background:white; font-family:inherit;"></textarea>
+                                <div class="regen-meta" data-step-id="{{ step.id }}"
+                                     style="font-size:0.75rem; color:var(--gray-500); margin-top:0.375rem;"></div>
+                                <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                                    <button type="button" class="regen-save-btn" data-step-id="{{ step.id }}"
+                                            style="font-size:0.8125rem; padding:0.375rem 0.75rem;
+                                                   background:#047857; color:white; border:none;
+                                                   border-radius:0.25rem; cursor:pointer;">Save to Step</button>
+                                    <button type="button" class="regen-discard-btn" data-step-id="{{ step.id }}"
+                                            style="font-size:0.8125rem; padding:0.375rem 0.75rem;
+                                                   background:white; color:var(--gray-700);
+                                                   border:1px solid var(--gray-300); border-radius:0.25rem;
+                                                   cursor:pointer;">Discard</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     {% endif %}
                     
@@ -1120,6 +1184,126 @@
 function toggleStep(header) {
     header.closest('.step-card').classList.toggle('expanded');
 }
+
+// ─── Manual regen UI (Q3.1) ──────────────────────────────────────────
+(function setupRegenUI() {
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken = csrf ? csrf.value : (document.cookie.split('; ').find(r => r.startsWith('csrftoken='))||'').split('=')[1];
+
+    function $(sel, stepId) {
+        return document.querySelector(`${sel}[data-step-id="${stepId}"]`);
+    }
+    function setStatus(stepId, msg) {
+        const el = $('.regen-status', stepId);
+        if (el) el.textContent = msg || '';
+    }
+
+    document.body.addEventListener('click', async (e) => {
+        const t = e.target;
+        if (!t.dataset || !t.dataset.stepId) return;
+        const stepId = t.dataset.stepId;
+        const panel = $('.regen-panel', stepId);
+
+        if (t.classList.contains('regen-toggle-btn')) {
+            if (!panel) return;
+            panel.hidden = !panel.hidden;
+            return;
+        }
+        if (t.classList.contains('regen-cancel-btn')) {
+            panel.hidden = true;
+            $('.regen-result', stepId).hidden = true;
+            return;
+        }
+        if (t.classList.contains('regen-discard-btn')) {
+            $('.regen-result', stepId).hidden = true;
+            $('.regen-candidate-text', stepId).value = '';
+            $('.regen-meta', stepId).textContent = '';
+            return;
+        }
+        if (t.classList.contains('regen-apply-btn')) {
+            const mode = panel.querySelector(`input[name="regen-mode-${stepId}"]:checked`).value;
+            const guidance = $('.regen-prompt-input', stepId).value.trim();
+            if (mode === 'prompt' && !guidance) {
+                setStatus(stepId, 'Enter guidance for Prompt mode.');
+                return;
+            }
+            t.disabled = true;
+            setStatus(stepId, '⏳ Generating…');
+            try {
+                const fd = new FormData();
+                fd.set('mode', mode);
+                if (mode === 'prompt') fd.set('teacher_guidance', guidance);
+                const r = await fetch(`/dashboard/curriculum/step/${stepId}/regen/`, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken},
+                    body: fd,
+                });
+                const data = await r.json();
+                if (!data.ok) {
+                    setStatus(stepId, '❌ ' + (data.error || 'failed'));
+                    return;
+                }
+                $('.regen-candidate-text', stepId).value = data.candidate_text || '';
+                $('.regen-result', stepId).hidden = false;
+                let meta = `Mode: ${data.mode}.`;
+                if (data.audit) {
+                    meta += ` ${data.audit.cycles_run} cycle${data.audit.cycles_run!==1?'s':''}`;
+                    if (data.audit.picked_model) meta += ` via ${data.audit.picked_model}`;
+                    if (data.audit.elapsed_seconds) meta += ` (${data.audit.elapsed_seconds}s)`;
+                    if (data.audit.final_violations && data.audit.final_violations.length) {
+                        meta += ` — remaining: ${data.audit.final_violations.join(', ')}`;
+                    }
+                }
+                if (data.message) meta += ' ' + data.message;
+                $('.regen-meta', stepId).textContent = meta;
+                $('.regen-result', stepId).dataset.auditBlob = JSON.stringify(data.audit || {});
+                setStatus(stepId, data.changed ? '✓ Candidate ready' : '— no change suggested');
+            } catch (err) {
+                setStatus(stepId, '❌ ' + err.message);
+            } finally {
+                t.disabled = false;
+            }
+            return;
+        }
+        if (t.classList.contains('regen-save-btn')) {
+            t.disabled = true;
+            setStatus(stepId, '⏳ Saving…');
+            try {
+                const candidate = $('.regen-candidate-text', stepId).value;
+                const auditBlob = $('.regen-result', stepId).dataset.auditBlob || '';
+                const fd = new FormData();
+                fd.set('candidate_text', candidate);
+                if (auditBlob) fd.set('audit_blob', auditBlob);
+                const r = await fetch(`/dashboard/curriculum/step/${stepId}/save-regen/`, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken},
+                    body: fd,
+                });
+                const data = await r.json();
+                if (!data.ok) {
+                    setStatus(stepId, '❌ ' + (data.error || 'save failed'));
+                    return;
+                }
+                setStatus(stepId, '✓ Saved — reloading…');
+                setTimeout(() => location.reload(), 600);
+            } catch (err) {
+                setStatus(stepId, '❌ ' + err.message);
+            } finally {
+                t.disabled = false;
+            }
+            return;
+        }
+    });
+
+    // Show/hide the prompt textarea based on mode radio.
+    document.body.addEventListener('change', (e) => {
+        if (e.target.name && e.target.name.startsWith('regen-mode-')) {
+            const stepId = e.target.name.replace('regen-mode-', '');
+            const input = $('.regen-prompt-input', stepId);
+            if (input) input.hidden = (e.target.value !== 'prompt');
+        }
+    });
+})();
 
 function toggleAllSteps() {
     const cards = document.querySelectorAll('.step-card');
