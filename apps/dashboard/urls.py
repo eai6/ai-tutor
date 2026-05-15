@@ -52,6 +52,7 @@ urlpatterns = [
     path('curriculum/lesson/<int:lesson_id>/publish/', views.lesson_publish, name='lesson_publish'),
     path('curriculum/lesson/<int:lesson_id>/approve/', views.lesson_approve, name='lesson_approve'),
     path('curriculum/lesson/<int:lesson_id>/group-settings/', views.lesson_group_settings, name='lesson_group_settings'),
+    path('curriculum/lesson/<int:lesson_id>/edit-objectives/', views.lesson_edit_objectives, name='lesson_edit_objectives'),
 
     # Exit-ticket figure editing (teacher dashboard)
     path('exit-tickets/questions/<int:question_id>/figure/',

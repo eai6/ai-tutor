@@ -5161,6 +5161,54 @@ def lesson_create(request, unit_id):
 
 @teacher_required
 @require_POST
+def lesson_edit_objectives(request, lesson_id):
+    """Edit a lesson's enabling_objectives (rendered as "Lesson Terminal
+    Objectives" in the UI). Mirrors the trim+dedup+drop-empties logic
+    from curriculum_approve so server behavior matches.
+
+    See memory/lesson_objectives_management_plan.md (L2). The previous
+    decision to deprecate the EO list (commit context: pilot_session_plan)
+    was reversed when teachers needed per-lesson TO management — see
+    L1 commit 706b141 which restored the editable list at review time.
+    """
+    from apps.curriculum.models import Lesson
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        lesson = get_object_or_404(Lesson, id=lesson_id, unit__course__institution=institution)
+    else:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    raw = request.POST.getlist('enabling_objectives')   # multiple inputs same name
+    seen = set()
+    cleaned = []
+    for eo in raw:
+        if not isinstance(eo, str):
+            continue
+        text = eo.strip()
+        if not text:
+            continue
+        key = ' '.join(text.lower().split())
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(text)
+
+    prior_count = len(lesson.enabling_objectives or [])
+    lesson.enabling_objectives = cleaned
+    lesson.save(update_fields=['enabling_objectives'])
+
+    delta = len(cleaned) - prior_count
+    if delta > 0:
+        messages.success(request, f"Saved — {delta} new TO(s) added ({len(cleaned)} total).")
+    elif delta < 0:
+        messages.success(request, f"Saved — {-delta} TO(s) removed ({len(cleaned)} total).")
+    else:
+        messages.success(request, f"Saved {len(cleaned)} TO(s).")
+    return redirect('dashboard:lesson_detail', lesson_id=lesson.id)
+
+
+@teacher_required
+@require_POST
 def course_edit(request, course_id):
     """Edit course title, description, subject, grade levels."""
     institution = request.staff_ctx['institution']
