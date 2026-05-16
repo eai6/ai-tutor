@@ -137,7 +137,29 @@ def grade_bank_response(
         raw = student_input
 
     if qt == "mcq":
-        return _grade_mcq(question, raw)
+        det = _grade_mcq(question, raw)
+        # If the student typed free-form prose (not a letter, no option
+        # text match), the deterministic check returns is_correct=False
+        # with detail.reason='no_option_matched'. Route to the LLM
+        # grader using the CORRECT OPTION'S TEXT as the model answer,
+        # so a semantically equivalent free-form answer is still
+        # accepted as correct. Pilot directive 2026-05-16: bank MCQs
+        # sometimes render in chat without their A/B/C/D options
+        # (intermittent rendering bug), and the student answers in
+        # prose. Grading those prose answers against the bare letter
+        # produces false-negatives that strand the lesson.
+        if (
+            llm_client is not None
+            and det.is_correct is False
+            and isinstance(det.detail, dict)
+            and det.detail.get("reason") == "no_option_matched"
+        ):
+            return _grade_mcq_with_llm(
+                question, raw,
+                llm_client=llm_client,
+                deterministic_fallback=det,
+            )
+        return det
     if qt == "short_numeric":
         # Numeric fast-path; on miss + LLM available, fall through to
         # batch grader (catches "two hundred ten" / "210 deg" / etc).
@@ -541,6 +563,103 @@ def _grade_mcq(question, raw: str) -> BankGradeResult:
         expected=correct_letter,
         student_parsed=raw[:60],
         detail={"reason": "no_option_matched"},
+    )
+
+
+def _grade_mcq_with_llm(
+    question,
+    raw: str,
+    *,
+    llm_client,
+    deterministic_fallback: 'Optional[BankGradeResult]' = None,
+) -> BankGradeResult:
+    """Free-form MCQ fallback. Uses the CORRECT OPTION'S text as the
+    model answer so a prose answer can be matched conceptually.
+
+    Builds a one-item batch by constructing a duck-typed question whose
+    `correct_answer` is the correct option's text (not the letter), so
+    `build_batch_grade_item` produces an `expected` string the batch
+    grader can compare against the student's prose. Falls back to the
+    deterministic verdict on LLM failure.
+    """
+    from apps.tutoring.exit_ticket_grader import (
+        build_batch_grade_item,
+        grade_written_responses_batch,
+    )
+
+    correct_letter = (getattr(question, "correct_answer", "") or "").strip().upper()
+    correct_text = (
+        getattr(question, f"option_{correct_letter.lower()}", "") or ""
+    ).strip()
+    if not correct_text:
+        return deterministic_fallback or BankGradeResult(
+            is_correct=False,
+            expected=correct_letter,
+            student_parsed=raw[:60],
+            detail={"reason": "no_correct_option_text_for_llm"},
+        )
+
+    # Render full stem + options so the LLM has the same context the
+    # student would have seen in a properly-rendered MCQ.
+    options_block_lines = []
+    for letter in ("A", "B", "C", "D"):
+        opt = (getattr(question, f"option_{letter.lower()}", "") or "").strip()
+        if opt:
+            options_block_lines.append(f"{letter}) {opt}")
+    options_block = "\n".join(options_block_lines)
+    full_stem = (getattr(question, "question_text", "") or "").strip()
+    if options_block:
+        full_stem = f"{full_stem}\n\n{options_block}".strip()
+
+    # Build a minimal duck that build_batch_grade_item can serialise as
+    # a "short_answer"-style item with the correct option's text as the
+    # expected model answer.
+    class _MCQDuck:
+        question_type = "short_answer"
+        question_text = full_stem
+        correct_answer = correct_text
+        answer_data = {"model_answer": correct_text}
+
+    try:
+        item = build_batch_grade_item(
+            index=0,
+            question=_MCQDuck(),
+            student_answer=raw,
+            is_math=False,
+        )
+        results = grade_written_responses_batch(
+            [item], llm_client=llm_client,
+        )
+    except Exception as exc:
+        logger.warning(
+            "[BankGrader/MCQ-LLM] batch call crashed: %s: %s",
+            type(exc).__name__, exc,
+        )
+        return deterministic_fallback or BankGradeResult(
+            is_correct=False,
+            expected=correct_letter,
+            student_parsed=raw[:60],
+            detail={"reason": f"llm_crash:{type(exc).__name__}"},
+        )
+
+    if not results:
+        return deterministic_fallback or BankGradeResult(
+            is_correct=False,
+            expected=correct_letter,
+            student_parsed=raw[:60],
+            detail={"reason": "llm_no_results"},
+        )
+
+    r = results[0]
+    return BankGradeResult(
+        is_correct=bool(r.correct),
+        expected=correct_letter,
+        student_parsed=raw[:200],
+        detail={
+            "source": "mcq_llm_fallback",
+            "correct_option_text": correct_text[:160],
+            "reasoning": (r.reasoning or "")[:300],
+        },
     )
 
 

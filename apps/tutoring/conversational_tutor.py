@@ -2272,6 +2272,20 @@ Keep it to 2-3 sentences."""
         """
         self._step_just_advanced = False
 
+        # Snapshot awaiting_answer's turn_index so we can detect at the
+        # end of this turn whether pose_question / pose_inline_question
+        # replaced it. If the prior bank answer was correct AND the
+        # tutor moved on without posing a new bank question (e.g. moved
+        # to a chat-authored conceptual probe), we need to clear
+        # awaiting_answer at end-of-turn so the NEXT student input
+        # doesn't get mis-routed through the bank grader against a
+        # stale question. Pilot 2026-05-16: lesson 538 session 36 turn
+        # 14 — student's urban-coastal conceptual reply was graded
+        # against an earlier MCQ (expected 'C') and marked wrong,
+        # producing an empty tutor turn.
+        _prev_aa = getattr(self, '_awaiting_answer', None) or {}
+        self._prev_awaiting_turn_index = _prev_aa.get('turn_index')
+
         # Track lesson start time on first interaction
         if not self.session.started_lesson_at:
             self.session.started_lesson_at = timezone.now()
@@ -2889,6 +2903,31 @@ Keep it to 2-3 sentences."""
                 }
                 for m in media if m and m.get('url')
             ]
+
+        # Clear awaiting_answer when the prior bank question was
+        # answered correctly AND this turn didn't pose a new bank
+        # question. Without this, a chat-authored conceptual probe
+        # leaves awaiting_answer pointing at the just-answered bank
+        # question — and the next student input gets graded against
+        # that stale question. Pilot 2026-05-16: lesson 538 session
+        # 36 turn 14 (see _prev_awaiting_turn_index snapshot above).
+        bank_grade_now = getattr(self, '_pending_bank_grade', None)
+        cur_aa = getattr(self, '_awaiting_answer', None) or {}
+        cur_turn_idx = cur_aa.get('turn_index')
+        prev_turn_idx = getattr(self, '_prev_awaiting_turn_index', None)
+        if (
+            bank_grade_now is not None
+            and getattr(bank_grade_now, 'is_correct', None) is True
+            and prev_turn_idx is not None
+            and cur_turn_idx == prev_turn_idx
+        ):
+            logger.info(
+                "[BankGrade] prior bank answer correct; clearing "
+                "stale awaiting_answer (turn_index=%s) — no new "
+                "pose_question this turn",
+                prev_turn_idx,
+            )
+            self._clear_awaiting_answer()
 
         # Save state
         self._save_state()
