@@ -2746,7 +2746,7 @@ Keep it to 2-3 sentences."""
                         student_input, clean_response,
                         math_check=turn_math_check,
                     ),
-                    bank_stems=self._current_bank_stems(),
+                    bank_stems=self._current_bank_full_render(),
                     media_catalog_text=getattr(self, '_last_media_catalog_text', '') or '',
                     attached_media=attached_media_list,
                     regen_clients=self.regen_clients,
@@ -6573,6 +6573,34 @@ Follow the current step; this concept will be covered in sequence."""
                 stems.append(qt.strip())
         return stems
 
+    def _current_bank_full_render(self) -> List[str]:
+        """Like _current_bank_stems but includes the rendered options
+        for MCQs / blanks for FIB / pairs for matching — i.e. the full
+        student-facing text the bank entry would produce.
+
+        Use this for the regen ensemble: when the rewrite LLM picks a
+        bank question to pose, it needs the OPTIONS too. Bare stems
+        cause the regen to emit the question without A/B/C/D and
+        strands the student (pilot 2026-05-16, lesson 538 session 38 —
+        bank Q 3724 'How do tourist resorts modify the environment?'
+        rendered in chat as a bare stem after regen, options dropped).
+        """
+        from apps.tutoring.question_bank import render_question_to_prose
+        id_map = getattr(self, '_question_id_map', {}) or {}
+        out: List[str] = []
+        for entry in id_map.values():
+            try:
+                full = render_question_to_prose(entry)
+            except Exception as exc:
+                logger.warning(
+                    "[BankFullRender] render failed for entry=%r: %s",
+                    getattr(entry, 'id', '?'), exc,
+                )
+                continue
+            if full and full.strip():
+                out.append(full.strip())
+        return out
+
     def _record_bank_question_on_turn(self, turn_metadata: Dict, entry) -> None:
         """When a tutor turn renders a bank question, write the entry's
         identity onto turn_metadata so the NEXT respond() call can
@@ -8768,8 +8796,25 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
             # deterministic (the student's reply matches expected_answer
             # exactly). LLM-judged is_correct could be a sub-step
             # working line — we don't want to advance prematurely.
+            #
+            # A bank grader verdict (mid-lesson MCQ / FIB / etc) ALSO
+            # counts as deterministic: the bank entry has a verified
+            # correct_answer, the student's reply matched it (either
+            # directly or via the MCQ LLM fallback against the option
+            # text). Without this, 'teach' steps with a bank
+            # comprehension check sat indefinitely because the
+            # LLM step evaluator kept returning step_complete=False
+            # ("teaching content not fully delivered" — pilot
+            # 2026-05-16, lesson 538 session 38, step 0 stuck for
+            # 5+ correct bank answers).
+            bank_grade_now = getattr(self, '_pending_bank_grade', None)
+            bank_correct_now = (
+                bank_grade_now is not None
+                and getattr(bank_grade_now, 'is_correct', None) is True
+            )
             is_correct_was_deterministic = (
                 eval_layer == 'deterministic_numeric'
+                or bank_correct_now
             )
             should_advance = self._should_advance_step(
                 student_input, tutor_response, is_correct, step_eval_result,
@@ -9026,17 +9071,20 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
         if exchanges < min_exchanges:
             return False
 
-        # 3. Deterministic-correct fast-path. Only fires when the
-        # is_correct verdict came from the deterministic numeric check
-        # (student typed the FINAL answer that matches expected_answer
-        # with tolerance), AND the step is practice/quiz where final
-        # answer = step done. For teach/worked_example/summary, the
-        # student isn't being asked for a single final answer — defer
-        # to step_complete from the LLM judge.
+        # 3. Deterministic-correct fast-path. Fires when the is_correct
+        # verdict came from a deterministic source:
+        #   - numeric expected_answer match (practice/quiz)
+        #   - bank grader verdict (any step type — MCQ/FIB/etc.)
+        # For practice/quiz: final answer = step done (original rule).
+        # For teach/worked_example/summary: a CORRECT bank-backed
+        # comprehension check is the step's evaluation criterion — once
+        # met (and the min exchange floor is past), advance instead of
+        # waiting for the LLM step-eval to say "teaching content
+        # delivered" (which can stall the step indefinitely — pilot
+        # 2026-05-16 lesson 538 step 0 stuck for 5+ correct answers).
         if (
             is_correct is True
             and is_correct_was_deterministic
-            and step_type in ('practice', 'quiz')
         ):
             logger.info(
                 "[StepAdvance] DETERMINISTIC_CORRECT step=%d type=%s → advance",
