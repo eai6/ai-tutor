@@ -175,6 +175,94 @@ def grade_bank_response(
     return BankGradeResult(is_correct=None, skip_reason=f"unknown_type:{qt}")
 
 
+def grade_chat_authored_question(
+    question_text: str,
+    student_response: str,
+    *,
+    llm_client,
+    is_math: bool = False,
+) -> BankGradeResult:
+    """LLM grades a tutor-authored question with NO answer key.
+
+    Used as a fallback when the tutor authored a question in chat
+    narrative without calling pose_inline_question (which would carry
+    an answer key). The LLM uses its own domain knowledge to
+    determine the correct answer for `question_text` and judge whether
+    `student_response` is correct.
+
+    Built atop grade_written_responses_batch — same prompt + same
+    generous-on-synonyms rubric. The expected field is left empty;
+    the LLM is told to derive the correct answer from the question
+    text. This matches what a human tutor does when grading on the
+    fly without an answer key.
+
+    Returns BankGradeResult. Never raises; on LLM crash returns
+    is_correct=None with skip_reason set.
+
+    Pilot directive 2026-05-16: stripping authored questions
+    produces incoherent turns. Better to let them through + grade
+    them robustly.
+    """
+    from apps.tutoring.exit_ticket_grader import (
+        BatchGradeItem,
+        grade_written_responses_batch,
+    )
+
+    if not question_text or not student_response or llm_client is None:
+        return BankGradeResult(
+            is_correct=None,
+            skip_reason="missing_input_or_client",
+        )
+
+    item = BatchGradeItem(
+        index=0,
+        # Prepend a sentinel so the grader knows it must derive the
+        # correct answer rather than compare against `expected`. The
+        # batch prompt already says "favour CORRECT when in doubt"
+        # so this works even without a custom prompt.
+        question_text=(
+            f"[NO ANSWER KEY PROVIDED — derive the correct answer "
+            f"from your domain knowledge, then judge whether the "
+            f"student's response is correct.] {question_text}"
+        ),
+        q_type='short_answer',
+        expected='',  # no key — the LLM determines what's correct
+        keywords=[],
+        student_answer=student_response,
+        is_math=is_math,
+    )
+    try:
+        results = grade_written_responses_batch(
+            [item], llm_client=llm_client,
+        )
+    except Exception as exc:
+        logger.warning(
+            "[BankGrader] chat_authored LLM call crashed: %s: %s",
+            type(exc).__name__, exc,
+        )
+        return BankGradeResult(
+            is_correct=None,
+            skip_reason=f"llm_crash:{type(exc).__name__}",
+        )
+
+    if not results:
+        return BankGradeResult(
+            is_correct=None,
+            skip_reason="llm_no_results",
+        )
+
+    r = results[0]
+    return BankGradeResult(
+        is_correct=bool(r.correct),
+        expected="(derived by LLM)",
+        student_parsed=student_response[:200],
+        detail={
+            'source': 'llm_chat_authored',
+            'reasoning': (r.reasoning or '')[:300],
+        },
+    )
+
+
 def _grade_with_llm_batch(
     question,
     student_input,

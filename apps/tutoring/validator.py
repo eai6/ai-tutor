@@ -101,11 +101,21 @@ class ValidationResult:
 
     # Issues that should trigger regeneration (V3) — strong evidence
     # the tutor is wrong, can't be patched in place.
+    #
+    # Removed 2026-05-16 per pilot directive (regen rate was too high,
+    # destroying tool calls + producing incoherent turns):
+    #   - ISSUE_AUTHORING_VIOLATION: the grader now handles
+    #     tutor-authored questions (with or without answer key via
+    #     pose_inline_question). Tool-driven authoring is legitimate.
+    #   - ISSUE_RULE1_VIOLATION: "praise on bare answer" rule. The
+    #     grader is the source of truth on correctness; if grader
+    #     says correct, "Perfect!" is justified. Was firing on every
+    #     warmup turn.
+    # Both still appear in validator_issues for analytics; they just
+    # no longer trigger the regen ensemble.
     _REGEN_ISSUES = frozenset({
         ISSUE_NUMERIC_CLAIM_CONTRADICTED,
-        ISSUE_AUTHORING_VIOLATION,
         ISSUE_ARITHMETIC_VIOLATION,
-        ISSUE_RULE1_VIOLATION,
         # "Looking at the diagram…" with no |||MEDIA:N||| emitted —
         # student sees the deictic reference without the visual.
         # Regen with explicit instruction to either signal or rephrase.
@@ -318,11 +328,31 @@ def validate_tutor_response(
                 RULE_NO_AUTHORING,
                 RULE_RULE_1,
             )
-            if RULE_NO_AUTHORING in combined_result.violated_rules:
+            # NO_AUTHORING suppression 2026-05-16: the rule_compliance
+            # LLM judge sees the question text in the chat content and
+            # flags it as authoring, but the tutor may have used the
+            # pose_inline_question tool LEGITIMATELY (the question
+            # text comes from the tool input, with an answer_key the
+            # grader will use). When bank_signal_used=True we trust
+            # the tool path and suppress this rule.
+            if (
+                RULE_NO_AUTHORING in combined_result.violated_rules
+                and not bank_signal_used
+            ):
                 issues.append(ISSUE_AUTHORING_VIOLATION)
             if RULE_ARITHMETIC in combined_result.violated_rules:
                 issues.append(ISSUE_ARITHMETIC_VIOLATION)
-            if RULE_RULE_1 in combined_result.violated_rules:
+            # RULE_RULE_1 suppression 2026-05-16: Math Rule 1 forbids
+            # praise words ("perfect", "right", "exactly") on bare
+            # numeric answers. Designed for practice problems where
+            # working is expected. But when the GRADER has already
+            # verified the answer is correct (is_correct=True), the
+            # praise is justified — the LLM rule judge is being too
+            # strict. Trust the grader as the authoritative source.
+            if (
+                RULE_RULE_1 in combined_result.violated_rules
+                and is_correct is not True
+            ):
                 issues.append(ISSUE_RULE1_VIOLATION)
         # Coherence judge findings (2026-05-08).
         if getattr(combined_result, "coherence_violations", None):
@@ -404,11 +434,21 @@ def validate_tutor_response(
                 )
                 extra_meta.update(rc.to_metadata())
                 if rc.has_violations:
-                    if RULE_NO_AUTHORING in rc.violated_rules:
+                    # NO_AUTHORING suppressed when bank_signal_used —
+                    # see combined_result branch above for rationale.
+                    if (
+                        RULE_NO_AUTHORING in rc.violated_rules
+                        and not bank_signal_used
+                    ):
                         issues.append(ISSUE_AUTHORING_VIOLATION)
                     if RULE_ARITHMETIC in rc.violated_rules:
                         issues.append(ISSUE_ARITHMETIC_VIOLATION)
-                    if RULE_RULE_1 in rc.violated_rules:
+                    # See combined_result branch above for Rule 1
+                    # suppression rationale.
+                    if (
+                        RULE_RULE_1 in rc.violated_rules
+                        and is_correct is not True
+                    ):
                         issues.append(ISSUE_RULE1_VIOLATION)
 
     # L6 — deterministic gates that don't rely on the LLM judge.

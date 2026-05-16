@@ -274,6 +274,7 @@ class AnthropicClient(BaseLLMClient):
         system_prompt: str,
         tools: list[dict],
         max_tokens: int | None = None,
+        tool_choice: dict | None = None,
     ):
         """Non-streaming call that returns the full Anthropic Message
         object (not just text) so the caller can introspect tool_use
@@ -284,6 +285,15 @@ class AnthropicClient(BaseLLMClient):
         renders it. Streaming is intentionally NOT used here because
         the tool-use flow needs the whole message structure, not a
         text stream.
+
+        `tool_choice` — when provided, forwarded to Anthropic's
+        messages.create. Common values:
+          {"type": "auto"} — model decides whether to call a tool (default).
+          {"type": "any"}  — model MUST call one of the provided tools.
+          {"type": "tool", "name": "..."} — model MUST call this specific tool.
+        Pilot 2026-05-16: tutor uses {"type": "any"} on math turns to
+        force the LLM through pose_question or pose_inline_question
+        rather than authoring numerical questions in free text.
 
         Returns:
           anthropic.types.Message with .content (list of blocks),
@@ -300,6 +310,8 @@ class AnthropicClient(BaseLLMClient):
             messages=messages,
             tools=tools,
         )
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
         if self._supports_temperature():
             kwargs["temperature"] = self.config.temperature
         logger.info(

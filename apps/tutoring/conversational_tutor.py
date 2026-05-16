@@ -911,6 +911,34 @@ def _strip_bank_overlap_sentences(
     return ' '.join(kept).strip(), n_removed
 
 
+# Duck-typed question for inline-authored grading. Matches the
+# attribute shape that bank_grader.grade_bank_response + the LLM
+# batch grader expect (question_text, question_type, correct_answer,
+# answer_data, plus optional option_a..d for MCQ). Created on the fly
+# from the tutor's pose_inline_question tool input so we don't need
+# a DB row for tutor-authored throwaway questions.
+class _InlineAuthoredQuestion:
+    def __init__(
+        self,
+        *,
+        question_text: str,
+        question_type: str,
+        correct_answer: str,
+        answer_data: Optional[Dict] = None,
+    ):
+        self.question_text = question_text or ''
+        self.question_type = question_type or 'short_answer'
+        self.correct_answer = correct_answer or ''
+        self.answer_data = answer_data or {}
+        # ExitTicketQuestion attributes the grader/batch-builder may
+        # touch; leave as empty defaults.
+        self.option_a = ''
+        self.option_b = ''
+        self.option_c = ''
+        self.option_d = ''
+        self.id = 0  # not a real DB id
+
+
 # =============================================================================
 # CONVERSATIONAL TUTOR ENGINE
 # =============================================================================
@@ -2610,27 +2638,21 @@ Keep it to 2-3 sentences."""
             turn_metadata['validator_issues'] = list(validation.issues)
             turn_metadata['validator_passed'] = validation.passed
 
-        # Probe-strip on correct answers (pilot directive 2026-05-12):
-        # never probe ("how did you solve…") when the student got the
-        # question right. System prompt + eval-signal try to prevent
-        # this at generation time; this is the server-side backstop.
+        # PROBE-STRIP REMOVED 2026-05-16 per pilot directive (no
+        # surgical stripping — produces incoherent turns). The probe
+        # was previously removed when the grader said the student's
+        # answer was correct, but stripping breaks tutor flow,
+        # especially when the probe IS the pose_inline_question text.
+        # If the LLM keeps probing on correct answers despite the
+        # eval_signal telling it not to, we'll fix that with a
+        # stronger prompt + (last resort) regen, not strip. Probe
+        # detection still tracked for metrics below.
         bank_grade = getattr(self, '_pending_bank_grade', None)
         bank_correct = bank_grade is not None and bank_grade.is_correct is True
         math_correct = (
             turn_math_check is not None
             and turn_math_check.is_correct is True
         )
-        if bank_correct or math_correct:
-            stripped, n_probes = _strip_probe_sentences(clean_response)
-            if n_probes > 0:
-                clean_response = stripped
-                turn_metadata['probe_stripped_count'] = n_probes
-                logger.info(
-                    "[ProbeStrip] removed %d probe sentence(s) on correct "
-                    "answer session=%s step=%s source=%s",
-                    n_probes, self.session.id, self.current_topic_index,
-                    'bank' if bank_correct else 'math',
-                )
 
         # Always attach fact-check + rule-check metadata so the teacher
         # dashboard can show it even on clean turns.
@@ -2737,38 +2759,16 @@ Keep it to 2-3 sentences."""
 
             # Re-parse a possible |||MEDIA:N||| in the chosen candidate.
             regen_clean, regen_media = self._parse_media_signal(ensemble_result.text)
-            # Apply the SAME bank-overlap + authored-question strips
-            # the initial response goes through. Pilot e2e 2026-05-16
-            # found that regen output regularly re-introduces the bank
-            # question stem in the chat narrative — the LLM rewrites
-            # the response but adds the question text back. Without
-            # this strip the artifact panel and the chat bubble each
-            # show the same numeric question to the student, defeating
-            # the whole point of the artifact channel.
-            _bank_text = getattr(self, '_last_bank_rendered_text', '') or ''
-            if _bank_text:
-                regen_clean, _n_ovr = _strip_bank_overlap_sentences(
-                    regen_clean, _bank_text,
-                )
-                if _n_ovr:
-                    logger.warning(
-                        "[Regen] STRIPPED_BANK_OVERLAP n=%d — regen "
-                        "output repeated bank question stem; cleaned "
-                        "before saving.", _n_ovr,
-                    )
-                    turn_metadata.setdefault('regen_stripped_bank_overlap', 0)
-                    turn_metadata['regen_stripped_bank_overlap'] += _n_ovr
-            regen_clean, _n_auth = _strip_authored_numeric_questions(
-                regen_clean,
-            )
-            if _n_auth:
-                logger.warning(
-                    "[Regen] STRIPPED_AUTHORED_SENTENCES n=%d — regen "
-                    "output had authored numeric question(s); cleaned.",
-                    _n_auth,
-                )
-                turn_metadata.setdefault('regen_stripped_authored', 0)
-                turn_metadata['regen_stripped_authored'] += _n_auth
+            # PROBE-STRIP-ON-REGEN REMOVED 2026-05-16 (same directive
+            # as the initial-path removal above). No surgical strip.
+            # REGEN-OUTPUT STRIPS REMOVED 2026-05-16 per pilot
+            # directive: incoherent-turn rate from strip post-regen
+            # was too high. The grader is robust to authored
+            # questions without an answer key
+            # (grade_chat_authored_question) so even a regen that
+            # still authors a question won't strand the student —
+            # they reply, the grader judges via LLM. Coherence wins
+            # over surgery.
             clean_response = regen_clean
 
             turn_metadata['regenerated'] = True
@@ -4668,18 +4668,54 @@ Follow the current step; this concept will be covered in sequence."""
                 if hasattr(self.llm_client, 'generate_with_tools')
                 else None
             )
+            # NEW (2026-05-16, A/B for inline-authored questions):
+            # also offer pose_inline_question so the tutor can author
+            # its own check/scaffolding question WITH an answer key.
+            # The handler routes the answer key into turn metadata so
+            # the grader can verify the student response. Coexists with
+            # pose_question — LLM picks per turn. Pilot directive: the
+            # tutor authors questions naturally anyway; stop fighting
+            # it, just require it to provide ground truth.
+            inline_tool = (
+                self._build_pose_inline_question_tool()
+                if hasattr(self.llm_client, 'generate_with_tools')
+                else None
+            )
 
-            if tool is not None:
-                # Tool-capable client + bank exists → tool-use path. The LLM
-                # cannot type a numerical question in prose; the only
-                # way to ask is via pose_question(slot=N).
+            if tool is not None or inline_tool is not None:
+                # Tool-capable client → tool-use path. The LLM can pose
+                # via pose_question (bank) OR pose_inline_question
+                # (authored-with-key) depending on context.
                 self._pending_pose_question_meta = {}
+                tools_to_offer = [t for t in (tool, inline_tool) if t is not None]
+                # Force the LLM through a tool on math turns. Pilot
+                # e2e 2026-05-16 showed the LLM ignores the
+                # pose_inline_question option and authors questions in
+                # free text. tool_choice="any" makes it MUST call one
+                # of the tools — either pose_question (bank slot) or
+                # pose_inline_question (authored with answer_key).
+                # Non-math lessons still get tool_choice="auto" because
+                # free-prose conceptual questions ("why does that
+                # work?") are fine there.
+                try:
+                    _is_math = bool(
+                        self.lesson.unit.course.is_math
+                        if self.lesson.unit and self.lesson.unit.course
+                        else False
+                    )
+                except Exception:
+                    _is_math = False
+                _force_tool_choice = (
+                    {"type": "any"} if _is_math and tools_to_offer
+                    else None
+                )
                 try:
                     message = self.llm_client.generate_with_tools(
                         messages=messages,
                         system_prompt=system_prompt,
-                        tools=[tool],
+                        tools=tools_to_offer,
                         max_tokens=2048,
+                        tool_choice=_force_tool_choice,
                     )
                     # The handler iterates message.content as a list of
                     # blocks. If we got back something that doesn't
@@ -4836,13 +4872,19 @@ Follow the current step; this concept will be covered in sequence."""
             "\n   EVERY turn must end with a question that moves the student"
             "\n   forward. No exceptions except the final wrap-up turn after the"
             "\n   student has demonstrated mastery of the lesson objective."
-            "\n   For math turns: if the question is numerical, call the"
-            "\n   pose_question tool — do NOT type the question in prose."
-            "\n   For non-numerical questions (\"which rule applies?\","
-            "\n   \"what did you notice?\", \"why does that work?\"),"
-            "\n   end your text response with the question itself — never"
-            "\n   end with a colon or trailing fragment like \"Quick check:\""
-            "\n   without a question following."
+            "\n   Two tools are available for posing questions:"
+            "\n     - pose_question(slot): pull a CANONICAL question from the"
+            "\n       lesson bank (curriculum-aligned practice + exit-ticket items)."
+            "\n       Prefer this when a fitting slot exists."
+            "\n     - pose_inline_question(question, answer_key, type, ...):"
+            "\n       AUTHOR your own check / scaffolding question with an"
+            "\n       answer key the grader will use. Use this when no bank"
+            "\n       slot fits — quick comprehension checks, simpler"
+            "\n       sub-steps, rephrased versions for struggling students."
+            "\n   For non-numerical free-prose questions (\"why does that"
+            "\n   work?\"), it's still OK to end with the question in your"
+            "\n   text — never end with a colon or fragment like \"Quick"
+            "\n   check:\" without a question following."
             "\n"
             "\n3. ONE NEW IDEA AT A TIME. Do not list 5 facts in a single turn."
             "\n   Introduce one concept, ask the student to engage with it, then"
@@ -5079,22 +5121,22 @@ Follow the current step; this concept will be covered in sequence."""
         if is_math_final:
             system_prompt += (
                 "\n\n<final_reminder>"
-                "\nMATH RULE — to ask any numerical question this turn,"
-                "\nyou MUST call the pose_question tool. The tool's slot"
-                "\nparameter is the only way to identify a bank entry;"
-                "\nthere is no question_text parameter — you cannot pass"
-                "\narbitrary text."
+                "\nMATH RULE — to ask a numerical question this turn,"
+                "\ncall a TOOL. You have two options:"
+                "\n  1. pose_question(slot): pull from the canonical"
+                "\n     lesson bank. Use this when a bank slot fits."
+                "\n  2. pose_inline_question(question, answer_key, type):"
+                "\n     AUTHOR your own question with an answer key the"
+                "\n     grader will use. Use this for check / scaffolding"
+                "\n     questions that aren't in the bank."
                 "\n"
-                "\nDo NOT type questions in your text response. If you"
-                "\ntype a numerical question (any sentence ending in '?'"
-                "\nthat contains 2+ specific numbers like angles, sums,"
-                "\nor measurements), the post-response judge will flag it"
-                "\nas NO_AUTHORING and your response will be regenerated."
-                "\nThe bank is the ONLY source of truth — invoke the"
-                "\npose_question tool to use it. Do NOT type the tool"
-                "\ncall as text — emit it as a real tool_use block. If"
-                "\nyou write text like 'pose_question(slot=0)' the"
-                "\nstudent will literally see those characters."
+                "\nDo NOT type a numerical question in your text response"
+                "\nwithout calling a tool. If you author a question in"
+                "\nfree prose without supplying an answer_key, the grader"
+                "\ncan't verify the student's response — the post-response"
+                "\njudge will flag NO_AUTHORING and regen. Use"
+                "\npose_inline_question if you want to author."
+                "\nEmit tool calls as real tool_use blocks, never as text."
                 "\n"
                 "\nIf the bank has no question that fits (e.g. you want"
                 "\na warmup recap from the previous lesson and no"
@@ -5837,6 +5879,168 @@ Follow the current step; this concept will be covered in sequence."""
         )
         return tool
 
+    # =========================================================================
+    # POSE-INLINE-QUESTION TOOL (Anthropic tool use, 2026-05-16 A/B)
+    # =========================================================================
+    # The tutor sometimes wants to author its own check / scaffolding
+    # question rather than pull from the bank ("Now let's try a simpler
+    # version..." / "Quick check before we move on..."). The strip+regen
+    # path tried to prevent this and produced incoherent turns. Per
+    # pilot directive 2026-05-16, the user wants the tutor to be ALLOWED
+    # to author — but ONLY if it provides an answer key so the grader
+    # can still reliably verify the student's response.
+    #
+    # This tool requires (question, answer_key, type) and renders the
+    # question inline in chat (text is in the chat bubble). The answer
+    # key + working go to turn_metadata so the next student reply gets
+    # graded via grade_written_responses_batch (same LLM grader the
+    # exit ticket + bank use).
+
+    POSE_INLINE_QUESTION_TOOL_NAME = "pose_inline_question"
+
+    def _build_pose_inline_question_tool(self) -> Optional[dict]:
+        """Build the Anthropic tool definition for pose_inline_question.
+
+        Returns the tool dict, or None if tool offering is disabled
+        (currently never None — this tool is always available since
+        it doesn't depend on a bank). The LLM must supply an answer
+        key alongside the question so the grader has ground truth.
+        """
+        return {
+            "name": self.POSE_INLINE_QUESTION_TOOL_NAME,
+            "description": (
+                "Use this tool when you want to author your OWN check "
+                "question — a quick comprehension probe, a simpler "
+                "scaffolding step, or any question that isn't in the "
+                "lesson's bank. You MUST supply the answer key so the "
+                "system can reliably grade the student's response.\n\n"
+                "When to PREFER this over pose_question:\n"
+                "  - You want to ask a quick check before moving on "
+                "(\"What's 360 - 90?\") that isn't in the bank.\n"
+                "  - You're scaffolding a multi-step problem and need a "
+                "sub-question.\n"
+                "  - You're echoing/rephrasing for a struggling student.\n"
+                "When to use pose_question INSTEAD:\n"
+                "  - The lesson bank has a question that fits — pull from "
+                "the bank for canonical curriculum coverage.\n"
+                "  - Practice / exit-ticket items belong to the bank.\n\n"
+                "The question text goes INTO the chat bubble (the student "
+                "answers in the regular chat input). The answer_key is "
+                "kept server-side and fed to the grader, never shown to "
+                "the student."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": (
+                            "The full question text shown to the student "
+                            "in the chat bubble. Include any setup + the "
+                            "ask in one sentence or two. Examples: "
+                            "'Two angles sum to 360°; one is 120°. What's "
+                            "the other?' / 'In your own words, why do "
+                            "angles around a point add to 360°?'"
+                        ),
+                    },
+                    "answer_key": {
+                        "type": "string",
+                        "description": (
+                            "The canonical correct answer. For numeric "
+                            "questions give the value with unit "
+                            "('240°' or '240'). For short-answer give "
+                            "the key concept/keywords the student must "
+                            "convey ('full rotation' / 'sum equals 360'). "
+                            "Used as ground truth by the LLM grader."
+                        ),
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["short_numeric", "short_answer", "concept"],
+                        "description": (
+                            "short_numeric = expects a number ('240°', "
+                            "'90'). short_answer = expects a 1-2 sentence "
+                            "written response. concept = expects "
+                            "explanation of a concept (grader is generous "
+                            "on phrasing)."
+                        ),
+                    },
+                    "working": {
+                        "type": "string",
+                        "description": (
+                            "Optional step-by-step solution. Used by the "
+                            "tutor's next turn to scaffold remediation if "
+                            "the student gets it wrong. Not shown to the "
+                            "student until needed."
+                        ),
+                    },
+                    "alternatives": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional list of acceptable equivalent "
+                            "answers ('two hundred forty', '240 degrees'). "
+                            "The grader is already generous on phrasing; "
+                            "leave empty unless there are multiple "
+                            "genuinely-different correct answers."
+                        ),
+                    },
+                },
+                "required": ["question", "answer_key", "type"],
+            },
+        }
+
+    def _record_inline_authored_question(
+        self,
+        turn_metadata: Dict,
+        question: str,
+        answer_key: str,
+        question_type: str,
+        working: str = '',
+        alternatives: Optional[List[str]] = None,
+    ) -> None:
+        """Stash the tutor's authored question + answer key on the
+        upcoming turn so the next student reply gets graded.
+
+        Mirrors `_record_bank_question_on_turn` but for the
+        inline-authored path. Sets engine_state.awaiting_answer with
+        kind='inline_authored' so `_grade_against_last_bank_question`
+        knows to pull the answer key from turn_metadata instead of
+        the bank tables.
+        """
+        turn_index = len(getattr(self, 'conversation', []))
+        from django.utils import timezone as _tz
+        posed_at_iso = _tz.now().isoformat()
+
+        turn_metadata['inline_authored_question'] = {
+            'question': (question or '')[:1000],
+            'answer_key': (answer_key or '')[:300],
+            'question_type': question_type or 'short_answer',
+            'working': (working or '')[:1000],
+            'alternatives': list(alternatives or [])[:8],
+            'turn_index': turn_index,
+            'posed_at': posed_at_iso,
+        }
+        # Mirror bank-question-ref shape so downstream code (artifact
+        # panel resume, grade dispatch) can branch on `kind`.
+        turn_metadata['bank_question_ref'] = {
+            'kind': 'inline_authored',
+            'id': None,  # no DB row — the question lives only on this turn
+            'question_type': question_type or 'short_answer',
+        }
+        # Engine-state awaiting_answer for the grader to find.
+        record = {
+            'kind': 'inline_authored',
+            'question_id': None,
+            'question_type': question_type or 'short_answer',
+            'turn_index': int(turn_index),
+            'posed_at': posed_at_iso,
+        }
+        if not hasattr(self, '_turn_questions') or self._turn_questions is None:
+            self._turn_questions = {}
+        self._turn_questions[str(turn_index)] = record
+        self._awaiting_answer = record
+
     # NOTE: text-block defense-strip REMOVED (2026-05-04). Editing the
     # tutor's text after generation produced robotic-feeling output
     # ("Quick check:" with no question following) when the heuristic
@@ -5963,50 +6167,61 @@ Follow the current step; this concept will be covered in sequence."""
                         "of emitting a tool_use block.",
                         leaked,
                     )
-                # Strip 1: bank-overlap. Drop sentences that overlap
-                # with the rendered bank text — catches the case the
-                # `_strip_authored_numeric_questions` heuristic misses
-                # (the SETUP sentence "Four equal angles meet at a
-                # point." has no question-verb + isn't a question).
-                # Pilot e2e 2026-05-16: this was the dominant R7
-                # failure mode on regen turns.
-                if bank_rendered_text_for_strip:
-                    cleaned, n_overlap = _strip_bank_overlap_sentences(
-                        cleaned, bank_rendered_text_for_strip,
-                    )
-                    if n_overlap:
-                        logger.warning(
-                            "[QuestionTool] STRIPPED_BANK_OVERLAP n=%d — "
-                            "LLM repeated the bank question stem in the "
-                            "text block; artifact already shows it.",
-                            n_overlap,
-                        )
-                        turn_metadata.setdefault(
-                            'stripped_bank_overlap', 0,
-                        )
-                        turn_metadata['stripped_bank_overlap'] += n_overlap
-                # Strip 2: authored-numeric-question heuristic. Catches
-                # "Find x" / "Solve for y" patterns even when the
-                # setup didn't match bank text exactly. Belt + braces.
-                cleaned, n_authored = _strip_authored_numeric_questions(
-                    cleaned,
-                )
-                if n_authored:
-                    logger.warning(
-                        "[QuestionTool] STRIPPED_AUTHORED_SENTENCES n=%d — "
-                        "LLM smuggled numeric question(s) into the text "
-                        "block. Bank question goes to artifact only.",
-                        n_authored,
-                    )
-                    turn_metadata.setdefault(
-                        'stripped_authored_sentences', 0,
-                    )
-                    turn_metadata['stripped_authored_sentences'] += n_authored
+                # STRIP REMOVED 2026-05-16 per pilot directive: the
+                # text-block strip was producing incoherent tutor turns
+                # (cut a sentence mid-flow, left the surrounding
+                # narrative awkward). The grader is now robust enough
+                # to handle a tutor-authored question without an answer
+                # key — see grade_chat_authored fallback in
+                # _grade_against_last_bank_question — so we don't need
+                # to surgically remove authored questions from the
+                # chat. If the validator detects an authoring violation
+                # it triggers regen via the existing path; that's
+                # cheaper coherence-wise than mid-sentence editing.
                 if cleaned.strip():
                     text_parts.append(cleaned.strip())
             elif btype == 'tool_use':
                 tool_use_count += 1
                 tool_name = getattr(block, 'name', '')
+                # NEW (2026-05-16): pose_inline_question branch.
+                # Tutor authored its own question + supplied answer key.
+                # Render the question inline in chat (append the question
+                # text to text_parts) and stash the answer key on turn
+                # metadata so the grader can verify.
+                if tool_name == self.POSE_INLINE_QUESTION_TOOL_NAME:
+                    inline_input = getattr(block, 'input', {}) or {}
+                    q_text = (inline_input.get('question') or '').strip()
+                    a_key = (inline_input.get('answer_key') or '').strip()
+                    q_type = (
+                        inline_input.get('type') or 'short_answer'
+                    ).strip()
+                    working = (inline_input.get('working') or '').strip()
+                    alternatives = inline_input.get('alternatives') or []
+                    if not q_text or not a_key:
+                        logger.warning(
+                            "[QuestionTool] pose_inline_question: "
+                            "MISSING_FIELDS question=%r answer_key=%r — "
+                            "skipping render",
+                            bool(q_text), bool(a_key),
+                        )
+                        continue
+                    logger.info(
+                        "[QuestionTool] inline_authored: type=%s q=%r "
+                        "key=%r",
+                        q_type, q_text[:80], a_key[:40],
+                    )
+                    self._record_inline_authored_question(
+                        turn_metadata,
+                        question=q_text,
+                        answer_key=a_key,
+                        question_type=q_type,
+                        working=working,
+                        alternatives=alternatives,
+                    )
+                    text_parts.append(q_text)
+                    self._bank_signal_used_this_turn = True  # suppresses authoring gate
+                    bank_rendered = True  # for TurnSummary metrics
+                    continue
                 if tool_name != self.POSE_QUESTION_TOOL_NAME:
                     logger.warning(
                         "[QuestionTool] tool_call: UNEXPECTED tool_name='%s' — ignoring",
@@ -6433,7 +6648,50 @@ Follow the current step; this concept will be covered in sequence."""
         ref = (last_tutor_turn.metadata or {}).get('bank_question_ref') or {}
         kind = ref.get('kind')
         ref_id = ref.get('id')
-        if not kind or not ref_id:
+        # Fallback path 2026-05-16: no bank_question_ref but the previous
+        # tutor turn ended in a question — likely a tutor-authored
+        # question without an answer key. Use the no-key LLM grader so
+        # the student isn't stranded. This is what makes removing the
+        # strip safe: we don't need to enforce "no authoring" because
+        # we can grade the authored question anyway.
+        if not kind:
+            tutor_content = (last_tutor_turn.content or '').strip()
+            if tutor_content and tutor_content.endswith('?'):
+                # Extract the last question sentence as the prompt.
+                # The grader takes the whole tutor turn; we only
+                # extract the tail so the grader prompt is tight.
+                sentences = re.split(r'(?<=[.!?])\s+', tutor_content)
+                question_text = next(
+                    (s for s in reversed(sentences) if s.strip().endswith('?')),
+                    tutor_content,
+                ).strip()
+                from apps.tutoring.bank_grader import (
+                    grade_chat_authored_question,
+                )
+                is_math = (
+                    self.lesson.unit.course.is_math
+                    if self.lesson.unit and self.lesson.unit.course
+                    else False
+                )
+                result = grade_chat_authored_question(
+                    question_text=question_text,
+                    student_response=student_input,
+                    llm_client=self.judge_client,
+                    is_math=is_math,
+                )
+                self._pending_bank_grade = result
+                self._pending_bank_question = None
+                if result is not None and getattr(result, 'is_correct', None) is True:
+                    self._clear_awaiting_answer()
+                logger.info(
+                    "[BankGrade/ChatAuthored] session=%s is_correct=%s "
+                    "q=%r reply=%r",
+                    self.session.id, result.is_correct,
+                    question_text[:80], student_input[:60],
+                )
+                return result
+            return None
+        if not ref_id and kind not in ('inline_authored',):
             return None
 
         # Resolve the question record + grade with the right shape.
@@ -6475,6 +6733,45 @@ Follow the current step; this concept will be covered in sequence."""
                 llm_client=self.judge_client,
                 is_math=is_math,
             )
+        elif kind == 'inline_authored':
+            # NEW 2026-05-16: tutor authored its own question via
+            # pose_inline_question. The question + answer_key are on
+            # the previous tutor turn's metadata. Build a duck-typed
+            # object with the same shape ExitTicketQuestion has so
+            # grade_bank_response can grade it the same way.
+            ia = (last_tutor_turn.metadata or {}).get(
+                'inline_authored_question', {},
+            ) or {}
+            if not ia.get('answer_key'):
+                logger.warning(
+                    "[BankGrade] inline_authored: no answer_key on "
+                    "previous turn metadata; skipping grade"
+                )
+                return None
+            q_type = ia.get('question_type') or 'short_answer'
+            answer_key = ia.get('answer_key', '')
+            alternatives = ia.get('alternatives', []) or []
+            keywords_for_grader = [answer_key] + list(alternatives)
+            duck = _InlineAuthoredQuestion(
+                question_text=ia.get('question', ''),
+                question_type=q_type,
+                correct_answer=answer_key,
+                answer_data={
+                    'model_answer': answer_key,
+                    'keywords': keywords_for_grader,
+                },
+            )
+            is_math = (
+                self.lesson.unit.course.is_math
+                if self.lesson.unit and self.lesson.unit.course
+                else False
+            )
+            result = grade_bank_response(
+                duck, student_input,
+                llm_client=self.judge_client,
+                is_math=is_math,
+            )
+            question = duck
         else:
             return None
         self._pending_bank_grade = result

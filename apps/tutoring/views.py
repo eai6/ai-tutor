@@ -848,6 +848,14 @@ def chat_start_session(request, lesson_id):
             "is_complete": response.is_complete,
             "step_number": response.step_number,
             "total_steps": response.total_steps,
+            # Same artifact-panel payload the resume path returns
+            # (line 745). Without this, the opener's pose_question
+            # tool call sets awaiting_answer in engine_state but the
+            # frontend never knows there's a pending question to
+            # render — student sees only the tutor's lead-in and an
+            # empty artifact panel. Pilot e2e 2026-05-16.
+            "pending_question": getattr(response, 'pending_question', None)
+                or tutor._build_pending_question_payload(),
         })
 
 
