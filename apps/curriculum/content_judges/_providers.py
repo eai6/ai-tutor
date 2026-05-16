@@ -34,7 +34,16 @@ logger = logging.getLogger(__name__)
 # provider chain. The judge-specific purpose comes first, then we
 # fall through to general-purpose configs to find any provider with
 # vision-LLM access.
-_FALLBACK_PURPOSES = ('generation', 'judge', 'tutoring', 'exit_tickets')
+#
+# `judge_fallback` is a dedicated purpose for the third-vendor
+# fallback when both the primary judge vendor and the generator's
+# vendor (excluded by cross-provider rule) are unavailable. With
+# generation=Claude + judge=Gemini, setting judge_fallback=OpenAI
+# yields chain [Gemini, OpenAI] — full 2-vendor judge fallback even
+# under generator-side outage.
+_FALLBACK_PURPOSES = (
+    'generation', 'judge', 'judge_fallback', 'tutoring', 'exit_tickets',
+)
 
 
 @dataclass

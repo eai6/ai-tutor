@@ -43,7 +43,8 @@ logger = logging.getLogger(__name__)
 # fall through to other gen-capable purposes to find distinct
 # providers.
 _FALLBACK_PURPOSES = (
-    'generation', 'judge', 'tutoring', 'exit_tickets', 'image_prompt',
+    'generation', 'judge', 'judge_fallback', 'tutoring',
+    'exit_tickets', 'image_prompt',
 )
 
 
