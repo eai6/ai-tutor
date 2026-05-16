@@ -1912,12 +1912,25 @@ function addMessage(role, content, media = [], artifactHtml = null, probe = null
     // Render LaTeX math (KaTeX, math lessons only)
     renderMath(div.querySelector('.bubble'));
 
-    // Bind replay button (always works, even with audio mode off)
+    // Bind replay button (always works, even with audio mode off).
+    // R9a (2026-05-15): toggle behaviour — clicking while THIS bubble
+    // is currently playing stops playback. Single-active-playback rule
+    // is enforced inside speakResponse() (it calls stopCurrentAudio()
+    // first), so clicking on a different bubble's button stops the
+    // current one + starts the new one as expected.
     const rBtn = div.querySelector('.replay-btn');
     if (rBtn) {
         const plainText = content.replace(/[#*_`~\[\]()>|\\-]/g, '').replace(/!\[.*?\]\(.*?\)/g, '').trim();
         rBtn.addEventListener('click', () => {
             const bubble = div.querySelector('.bubble');
+            // If this bubble is the one currently speaking, treat the
+            // click as "pause/stop". Otherwise start replay.
+            if (currentSpeakingBubble === bubble) {
+                stopCurrentAudio();
+                setReplayBtnState(rBtn, 'play');
+                return;
+            }
+            setReplayBtnState(rBtn, 'pause');
             speakResponse(plainText, bubble, true);
         });
     }
@@ -2939,6 +2952,33 @@ function matchTimingsToSpans(wordTimings, wordSpans) {
 
 // ── Audio control ──
 
+// R9a (2026-05-15): swap the per-bubble replay button between
+// play (▶) and pause (⏸) states so it reads as a toggle, not just
+// a "play again" affordance. Used by both the click handler in
+// addMessage() and stopCurrentAudio() so any code path that ends
+// playback resets the icon.
+const PLAY_ICON_HTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+const PAUSE_ICON_HTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+
+function setReplayBtnState(btn, state) {
+    if (!btn) return;
+    if (state === 'pause') {
+        btn.innerHTML = PAUSE_ICON_HTML;
+        btn.setAttribute('aria-label', 'Stop audio');
+        btn.setAttribute('title', 'Stop audio');
+        btn.classList.add('playing');
+    } else {
+        btn.innerHTML = PLAY_ICON_HTML;
+        btn.setAttribute('aria-label', 'Replay audio');
+        btn.setAttribute('title', 'Replay audio');
+        btn.classList.remove('playing');
+    }
+}
+
+function resetAllReplayBtns() {
+    document.querySelectorAll('.replay-btn.playing').forEach(b => setReplayBtnState(b, 'play'));
+}
+
 function stopCurrentAudio() {
     speakGeneration++;  // Invalidate any in-flight fetch
     if (currentRAF) {
@@ -2956,6 +2996,11 @@ function stopCurrentAudio() {
         unwrapBubbleWords(currentSpeakingBubble);
         currentSpeakingBubble = null;
     }
+    // R9a: any time playback halts, sync ALL per-bubble replay buttons
+    // back to the ▶ state. Cheap (querySelector on a small set) and
+    // means we never leave a stale ⏸ icon when playback ends naturally
+    // or got interrupted by a different bubble's button.
+    resetAllReplayBtns();
 }
 
 async function speakResponse(text, bubbleEl, force = false) {
