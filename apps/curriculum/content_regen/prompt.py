@@ -744,6 +744,204 @@ def build_match_auto_regen_prompt(
     }
 
 
+_FIB_TEACHER_PROMPT_SYSTEM = """\
+Rewrite ONE fill-in-the-blank exit-ticket question following the \
+teacher's guidance. The teacher knows their class — apply their \
+guidance literally while keeping the question pedagogically sound.
+
+Output MUST conform to the FillInBlankRewrite schema. Required \
+fields: question_text, text_template (use ___ for each blank), \
+blanks (canonical value per blank, in left-to-right order), \
+accept_alternatives.
+
+Constraints:
+  - Apply the teacher's guidance as the primary driver.
+  - Number of ___ markers in text_template must match len(blanks).
+  - Match the lesson grade band — vocabulary and complexity.
+  - Stay on-topic for the lesson + enabling_objective UNLESS the \
+guidance explicitly changes the focus.
+"""
+
+
+def build_fib_teacher_prompt(
+    *,
+    original_question: Dict[str, Any],
+    teacher_guidance: str,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+) -> Dict[str, str]:
+    """Teacher-prompt-driven FIB rewrite. Single call, no judge gating."""
+    orig_blanks = original_question.get('blanks') or []
+    orig_alts = original_question.get('accept_alternatives') or []
+
+    user = (
+        "<lesson>\n"
+        f"  <subject>{(lesson_subject or '(unspecified)').strip()[:120]}</subject>\n"
+        f"  <grade>{(lesson_grade or '(unspecified)').strip()[:80]}</grade>\n"
+        f"  <title>{(lesson_title or '(unspecified)').strip()[:200]}</title>\n"
+        f"  <overall_objective>{(lesson_objective or '(none)').strip()[:400]}</overall_objective>\n"
+        "</lesson>\n"
+        "<question_context>\n"
+        f"  <concept>{(step_concept_tag or '(unspecified)').strip()[:200]}</concept>\n"
+        f"  <enabling_objective>{(enabling_objective or '(none)').strip()[:400]}</enabling_objective>\n"
+        "</question_context>\n"
+        "<teacher_guidance>\n"
+        f"{(teacher_guidance or '').strip()[:600]}\n"
+        "</teacher_guidance>\n"
+        "<original_question>\n"
+        f"  <question_text>{(original_question.get('question_text') or '').strip()[:600]}</question_text>\n"
+        f"  <text_template>{(original_question.get('text_template') or '').strip()[:1200]}</text_template>\n"
+        f"  <blanks>{', '.join(str(b)[:120] for b in orig_blanks[:6])}</blanks>\n"
+        f"  <accept_alternatives>{orig_alts!r}</accept_alternatives>\n"
+        f"  <explanation>{(original_question.get('explanation') or '').strip()[:300]}</explanation>\n"
+        "</original_question>\n"
+        "\n"
+        "Based on the lesson context above and the teacher's guidance, "
+        "produce a rewritten fill-in-the-blank question conforming to "
+        "the FillInBlankRewrite schema."
+    )
+
+    return {
+        "system": _FIB_TEACHER_PROMPT_SYSTEM,
+        "user": user,
+    }
+
+
+_SA_TEACHER_PROMPT_SYSTEM = """\
+Rewrite ONE short-answer exit-ticket question following the teacher's \
+guidance. Apply their guidance literally.
+
+Output MUST conform to the ShortAnswerRewrite schema. Required: \
+question_text, model_answer, keywords, min_keywords, explanation.
+
+Constraints:
+  - The rewritten model_answer must contain or directly imply each \
+keyword (so the grader's keyword-match correctly identifies a valid \
+answer).
+  - Apply the teacher's guidance as the primary driver.
+  - Match the lesson grade band.
+"""
+
+
+def build_sa_teacher_prompt(
+    *,
+    original_question: Dict[str, Any],
+    teacher_guidance: str,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+) -> Dict[str, str]:
+    """Teacher-prompt-driven SA rewrite."""
+    orig_keywords = original_question.get('keywords') or []
+    user = (
+        "<lesson>\n"
+        f"  <subject>{(lesson_subject or '(unspecified)').strip()[:120]}</subject>\n"
+        f"  <grade>{(lesson_grade or '(unspecified)').strip()[:80]}</grade>\n"
+        f"  <title>{(lesson_title or '(unspecified)').strip()[:200]}</title>\n"
+        f"  <overall_objective>{(lesson_objective or '(none)').strip()[:400]}</overall_objective>\n"
+        "</lesson>\n"
+        "<question_context>\n"
+        f"  <concept>{(step_concept_tag or '(unspecified)').strip()[:200]}</concept>\n"
+        f"  <enabling_objective>{(enabling_objective or '(none)').strip()[:400]}</enabling_objective>\n"
+        "</question_context>\n"
+        "<teacher_guidance>\n"
+        f"{(teacher_guidance or '').strip()[:600]}\n"
+        "</teacher_guidance>\n"
+        "<original_question>\n"
+        f"  <question_text>{(original_question.get('question_text') or '').strip()[:600]}</question_text>\n"
+        f"  <model_answer>{(original_question.get('model_answer') or '').strip()[:800]}</model_answer>\n"
+        f"  <keywords>{', '.join(str(k)[:120] for k in orig_keywords[:15])}</keywords>\n"
+        f"  <min_keywords>{original_question.get('min_keywords', 1)}</min_keywords>\n"
+        f"  <explanation>{(original_question.get('explanation') or '').strip()[:300]}</explanation>\n"
+        "</original_question>\n"
+        "\n"
+        "Based on the lesson context above and the teacher's guidance, "
+        "produce a rewritten short-answer question conforming to the "
+        "ShortAnswerRewrite schema."
+    )
+    return {
+        "system": _SA_TEACHER_PROMPT_SYSTEM,
+        "user": user,
+    }
+
+
+_MATCH_TEACHER_PROMPT_SYSTEM = """\
+Rewrite ONE matching exit-ticket question following the teacher's \
+guidance. Apply their guidance literally while keeping the question \
+pedagogically sound.
+
+Output MUST conform to the MatchingRewrite schema. Required: \
+question_text, pairs (list of {left, right} objects), \
+distractor_rights, explanation.
+
+Constraints:
+  - Every left must have ONE and only one valid right under any \
+reasonable reading.
+  - No distractor_rights item may be a valid match for any left.
+  - 2-8 canonical pairs; 0-6 distractor_rights.
+  - Apply the teacher's guidance as the primary driver.
+  - Match the lesson grade band.
+"""
+
+
+def build_match_teacher_prompt(
+    *,
+    original_question: Dict[str, Any],
+    teacher_guidance: str,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+) -> Dict[str, str]:
+    """Teacher-prompt-driven matching rewrite."""
+    orig_pairs = original_question.get('pairs') or []
+    orig_distractors = original_question.get('distractor_rights') or []
+    pair_str = '; '.join(
+        f"{(p.get('left') if isinstance(p, dict) else '')[:120]}"
+        f" ↔ "
+        f"{(p.get('right') if isinstance(p, dict) else '')[:120]}"
+        for p in orig_pairs[:8]
+    )
+    user = (
+        "<lesson>\n"
+        f"  <subject>{(lesson_subject or '(unspecified)').strip()[:120]}</subject>\n"
+        f"  <grade>{(lesson_grade or '(unspecified)').strip()[:80]}</grade>\n"
+        f"  <title>{(lesson_title or '(unspecified)').strip()[:200]}</title>\n"
+        f"  <overall_objective>{(lesson_objective or '(none)').strip()[:400]}</overall_objective>\n"
+        "</lesson>\n"
+        "<question_context>\n"
+        f"  <concept>{(step_concept_tag or '(unspecified)').strip()[:200]}</concept>\n"
+        f"  <enabling_objective>{(enabling_objective or '(none)').strip()[:400]}</enabling_objective>\n"
+        "</question_context>\n"
+        "<teacher_guidance>\n"
+        f"{(teacher_guidance or '').strip()[:600]}\n"
+        "</teacher_guidance>\n"
+        "<original_question>\n"
+        f"  <question_text>{(original_question.get('question_text') or '').strip()[:600]}</question_text>\n"
+        f"  <pairs>{pair_str}</pairs>\n"
+        f"  <distractor_rights>{', '.join(str(d)[:120] for d in orig_distractors[:8])}</distractor_rights>\n"
+        f"  <explanation>{(original_question.get('explanation') or '').strip()[:300]}</explanation>\n"
+        "</original_question>\n"
+        "\n"
+        "Based on the lesson context above and the teacher's guidance, "
+        "produce a rewritten matching question conforming to the "
+        "MatchingRewrite schema."
+    )
+    return {
+        "system": _MATCH_TEACHER_PROMPT_SYSTEM,
+        "user": user,
+    }
+
+
 __all__ = [
     "build_step_regen_prompt",
     "build_step_multi_judge_regen_prompt",
@@ -753,4 +951,7 @@ __all__ = [
     "build_fib_auto_regen_prompt",
     "build_sa_auto_regen_prompt",
     "build_match_auto_regen_prompt",
+    "build_fib_teacher_prompt",
+    "build_sa_teacher_prompt",
+    "build_match_teacher_prompt",
 ]

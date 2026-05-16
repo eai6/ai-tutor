@@ -4943,6 +4943,494 @@ def exit_question_save_regen(request, question_id):
     })
 
 
+def _exit_q_inplace_prompt_regen(question, teacher_guidance: str):
+    """Teacher-prompt-driven rewrite for non-MCQ exit-Q. Single
+    instructor call (no judge pre-check); persists in place; re-runs
+    the type-specific judge so the badge reflects post-rewrite state.
+
+    Helper for `exit_question_inplace_regen` (mode=prompt branch).
+    Kept separate so the main view stays readable.
+    """
+    from django.http import JsonResponse
+    from apps.curriculum.content_gen_providers import (
+        call_gen_structured_with_fallback, get_gen_provider_chain,
+    )
+    from apps.curriculum.content_regen.schemas import (
+        FillInBlankRewrite, ShortAnswerRewrite, MatchingRewrite,
+    )
+    from apps.curriculum.content_regen.prompt import (
+        build_fib_teacher_prompt, build_sa_teacher_prompt,
+        build_match_teacher_prompt,
+    )
+
+    qt = question.question_type
+    lesson = question.exit_ticket.lesson
+    ad = question.answer_data or {}
+    course = lesson.unit.course
+
+    # Auto-derive lesson context fields the prompt builders need.
+    lesson_subject = ''
+    lesson_grade = ''
+    try:
+        if course is not None:
+            lesson_subject = (
+                getattr(course, 'subject_type', '') or
+                getattr(course, 'name', '') or ''
+            )
+            grades = getattr(course, 'grade_levels', None) or []
+            if isinstance(grades, list) and grades:
+                lesson_grade = ", ".join(str(g) for g in grades[:3])
+            else:
+                lesson_grade = str(getattr(course, 'grade_level', '') or '')
+    except Exception:
+        pass
+
+    # Pick schema + prompt builder per question type.
+    if qt == 'fill_in_blank':
+        schema = FillInBlankRewrite
+        builder = build_fib_teacher_prompt
+        original = {
+            'question_text': question.question_text or '',
+            'text_template': ad.get('text_template') or '',
+            'blanks': ad.get('blanks') or [],
+            'accept_alternatives': ad.get('accept_alternatives') or [],
+            'explanation': question.explanation or '',
+        }
+        judge_key = 'fill_in_blank'
+    elif qt == 'short_answer':
+        schema = ShortAnswerRewrite
+        builder = build_sa_teacher_prompt
+        original = {
+            'question_text': question.question_text or '',
+            'model_answer': ad.get('model_answer') or '',
+            'keywords': ad.get('keywords') or [],
+            'min_keywords': ad.get('min_keywords') or 1,
+            'explanation': question.explanation or '',
+        }
+        judge_key = 'short_answer'
+    else:  # matching
+        schema = MatchingRewrite
+        builder = build_match_teacher_prompt
+        original = {
+            'question_text': question.question_text or '',
+            'pairs': ad.get('pairs') or [],
+            'distractor_rights': ad.get('distractor_rights') or [],
+            'explanation': question.explanation or '',
+        }
+        judge_key = 'matching'
+
+    prompt = builder(
+        original_question=original,
+        teacher_guidance=teacher_guidance,
+        lesson_subject=lesson_subject,
+        lesson_grade=lesson_grade,
+        lesson_title=getattr(lesson, 'title', '') or '',
+        lesson_objective=getattr(lesson, 'objective', '') or '',
+        step_concept_tag=question.concept_tag or '',
+        enabling_objective=question.enabling_objective or '',
+    )
+
+    providers = get_gen_provider_chain('generation')
+    if not providers:
+        return JsonResponse({
+            'ok': False, 'error': 'no_gen_providers',
+        }, status=503)
+
+    call = call_gen_structured_with_fallback(
+        providers,
+        schema,
+        system_prompt=prompt['system'],
+        user_prompt=prompt['user'],
+        max_tokens=4000,
+        max_retries=2,
+        timeout_seconds=90.0,
+    )
+    if not call.success:
+        return JsonResponse({
+            'ok': False,
+            'error': (
+                f'gen chain exhausted: {call.error_class}: '
+                f'{call.error_detail}'
+            ),
+        }, status=502)
+
+    # Down-convert the typed Pydantic into the persistence shape.
+    parsed = call.verdict
+    if qt == 'fill_in_blank':
+        new_text = parsed.question_text
+        new_ad = {
+            'text_template': parsed.text_template,
+            'blanks': list(parsed.blanks or []),
+            'accept_alternatives': [list(a) for a in (parsed.accept_alternatives or [])],
+        }
+    elif qt == 'short_answer':
+        new_text = parsed.question_text
+        new_ad = {
+            'model_answer': parsed.model_answer,
+            'keywords': list(parsed.keywords or []),
+            'min_keywords': int(parsed.min_keywords or 1),
+        }
+    else:  # matching
+        new_text = parsed.question_text
+        new_ad = {
+            'pairs': [
+                {'left': p.left, 'right': p.right}
+                for p in (parsed.pairs or [])
+            ],
+            'distractor_rights': list(parsed.distractor_rights or []),
+        }
+    new_explanation = parsed.explanation or question.explanation
+
+    # Persist new fields, then re-run the judge so the badge updates.
+    question.question_text = new_text
+    merged_ad = dict(question.answer_data or {})
+    merged_ad.update(new_ad)
+    question.answer_data = merged_ad
+    question.explanation = new_explanation
+
+    # Re-judge with the new content
+    from apps.llm.models import ModelConfig
+    gen_config = ModelConfig.get_for('generation')
+    judge_exclude = (
+        (gen_config.provider or '').lower() if gen_config else None
+    )
+    if qt == 'fill_in_blank':
+        from apps.curriculum.content_judges.fill_in_blank import (
+            run_fill_in_blank_judge as judge_fn,
+        )
+    elif qt == 'short_answer':
+        from apps.curriculum.content_judges.short_answer import (
+            run_short_answer_judge as judge_fn,
+        )
+    else:
+        from apps.curriculum.content_judges.matching import (
+            run_matching_judge as judge_fn,
+        )
+    new_verdict = judge_fn(
+        question_text=question.question_text,
+        answer_data=question.answer_data,
+        explanation=question.explanation,
+        lesson=lesson,
+        step_concept_tag=question.concept_tag or '',
+        enabling_objective=question.enabling_objective or '',
+        exclude_provider=judge_exclude,
+    )
+    new_verdict_dict = {
+        'passed': new_verdict.passed,
+        'violations': list(new_verdict.violations or []),
+        'reasoning': new_verdict.reasoning or '',
+        'recommended_fix': new_verdict.recommended_fix or '',
+        'provider': new_verdict.provider or '',
+        'model_name': new_verdict.model_name or '',
+        'skipped': new_verdict.skipped,
+        'skip_reason': new_verdict.skip_reason or '',
+    }
+
+    outputs = dict(question.judge_outputs or {})
+    outputs[judge_key] = new_verdict_dict
+    outputs['regen_audit'] = {
+        'cycles_run': 1,
+        'clean': bool(new_verdict.passed and not new_verdict.violations),
+        'picked_model': call.model_name,
+        'elapsed_seconds': 0.0,
+        'final_violations': list(new_verdict.violations or []),
+        'final_judge_result': new_verdict_dict,
+        'cycles': [{
+            'cycle': 1,
+            'mode': 'teacher_prompt',
+            'teacher_guidance': teacher_guidance[:300],
+            'picked': True,
+        }],
+        'source': 'teacher_prompt',
+    }
+    question.judge_outputs = outputs
+
+    try:
+        question.save(update_fields=[
+            'question_text', 'answer_data', 'explanation', 'judge_outputs',
+        ])
+    except Exception as exc:
+        return JsonResponse({
+            'ok': False,
+            'error': f'save_failed: {type(exc).__name__}: {exc}',
+        }, status=500)
+
+    return JsonResponse({
+        'ok': True,
+        'changed': True,
+        'mode': 'prompt',
+        'message': (
+            f'Rewrote per teacher guidance via {call.provider}/'
+            f'{call.model_name}. Judge: '
+            f'{"PASS" if new_verdict.passed else "REJECT"}.'
+        ),
+        'verdict': new_verdict_dict,
+    })
+
+
+@teacher_required
+@require_POST
+def exit_question_inplace_regen(request, question_id):
+    """POST → judge-driven auto-regen OR teacher-prompt regen for
+    non-MCQ exit-ticket questions, with in-place persist.
+
+    Counterpart to `exit_question_regenerate` (MCQ-only,
+    candidate-review flow). For FIB / SA / Matching question types,
+    runs the type-specific judge + regen orchestrator (auto_review
+    mode) OR a teacher-driven rewrite when `teacher_guidance` is
+    supplied (prompt mode) — and PERSISTS the rewritten fields in
+    place. No candidate-review UI for v1 because the answer_data
+    schema is heterogeneous per type. Teacher can re-edit afterwards
+    via the Edit button if the regen output isn't quite right.
+
+    POST params (form-encoded):
+      mode: 'auto_review' (default) | 'prompt'
+      teacher_guidance: required for mode=prompt — free-form
+        instruction the teacher wants applied to the rewrite.
+
+    Returns the updated question payload + judge verdict + regen
+    audit so the client can update the page without reloading.
+    """
+    from apps.tutoring.models import ExitTicketQuestion
+    from django.http import JsonResponse
+
+    institution = request.staff_ctx['institution']
+    question = get_object_or_404(
+        ExitTicketQuestion.objects.select_related(
+            'exit_ticket__lesson__unit__course',
+        ),
+        id=question_id,
+    )
+    course = question.exit_ticket.lesson.unit.course
+    if (
+        course.institution is not None
+        and institution is not None
+        and course.institution_id != institution.id
+        and not getattr(request.user, 'is_superuser', False)
+    ):
+        return JsonResponse({'ok': False, 'error': 'forbidden'}, status=403)
+
+    qt = question.question_type
+    if qt not in ('fill_in_blank', 'short_answer', 'matching'):
+        return JsonResponse({
+            'ok': False,
+            'error': (
+                f'in-place regen for question_type={qt!r} not supported '
+                f'(use the MCQ regen endpoint for MCQ; other types not '
+                f'covered)'
+            ),
+        }, status=400)
+
+    mode = (request.POST.get('mode') or 'auto_review').strip().lower()
+    teacher_guidance = (request.POST.get('teacher_guidance') or '').strip()
+    if mode not in ('auto_review', 'prompt'):
+        return JsonResponse({
+            'ok': False, 'error': f'unknown mode: {mode}',
+        }, status=400)
+    if mode == 'prompt' and not teacher_guidance:
+        return JsonResponse({
+            'ok': False, 'error': 'teacher_guidance required for mode=prompt',
+        }, status=400)
+
+    # Branch: prompt mode → teacher-driven rewrite via instructor.
+    # The current question is context; teacher_guidance is the
+    # rewrite brief. Skip judge pre-check (teacher's prompt is the
+    # source of truth) but RE-RUN the judge after rewrite so the
+    # badge reflects the new verdict.
+    if mode == 'prompt':
+        return _exit_q_inplace_prompt_regen(
+            question, teacher_guidance,
+        )
+
+    from apps.llm.models import ModelConfig
+    gen_config = ModelConfig.get_for('generation')
+    judge_exclude = (
+        (gen_config.provider or '').lower() if gen_config else None
+    )
+    lesson = question.exit_ticket.lesson
+    ad = question.answer_data or {}
+
+    # 1. Run the type-specific judge first to get a verdict + fix
+    #    instruction. We always run the judge fresh so the regen has
+    #    current guidance (the cached verdict may be stale if the
+    #    teacher edited the question manually since the last judge run).
+    if qt == 'fill_in_blank':
+        from apps.curriculum.content_judges.fill_in_blank import (
+            run_fill_in_blank_judge,
+        )
+        from apps.curriculum.content_regen import run_fill_in_blank_regen
+        judge_key = 'fill_in_blank'
+        verdict = run_fill_in_blank_judge(
+            question_text=question.question_text or '',
+            answer_data=ad,
+            explanation=question.explanation or '',
+            lesson=lesson,
+            step_concept_tag=question.concept_tag or '',
+            enabling_objective=question.enabling_objective or '',
+            exclude_provider=judge_exclude,
+        )
+    elif qt == 'short_answer':
+        from apps.curriculum.content_judges.short_answer import (
+            run_short_answer_judge,
+        )
+        from apps.curriculum.content_regen import run_short_answer_regen
+        judge_key = 'short_answer'
+        verdict = run_short_answer_judge(
+            question_text=question.question_text or '',
+            answer_data=ad,
+            explanation=question.explanation or '',
+            lesson=lesson,
+            step_concept_tag=question.concept_tag or '',
+            enabling_objective=question.enabling_objective or '',
+            exclude_provider=judge_exclude,
+        )
+    else:  # matching
+        from apps.curriculum.content_judges.matching import (
+            run_matching_judge,
+        )
+        from apps.curriculum.content_regen import run_matching_regen
+        judge_key = 'matching'
+        verdict = run_matching_judge(
+            question_text=question.question_text or '',
+            answer_data=ad,
+            explanation=question.explanation or '',
+            lesson=lesson,
+            step_concept_tag=question.concept_tag or '',
+            enabling_objective=question.enabling_objective or '',
+            exclude_provider=judge_exclude,
+        )
+
+    verdict_dict = {
+        'passed': verdict.passed,
+        'violations': list(verdict.violations or []),
+        'reasoning': verdict.reasoning or '',
+        'recommended_fix': verdict.recommended_fix or '',
+        'provider': verdict.provider or '',
+        'model_name': verdict.model_name or '',
+        'skipped': verdict.skipped,
+        'skip_reason': verdict.skip_reason or '',
+    }
+
+    # 2. If the judge already passed cleanly, nothing to regen. Tell
+    #    the client so it can refresh the badge and avoid the wasted
+    #    rewrite call.
+    if verdict.skipped or (verdict.passed and not verdict.violations):
+        outputs = dict(question.judge_outputs or {})
+        outputs[judge_key] = verdict_dict
+        question.judge_outputs = outputs
+        question.save(update_fields=['judge_outputs'])
+        return JsonResponse({
+            'ok': True,
+            'changed': False,
+            'message': (
+                f'Judge {"skipped" if verdict.skipped else "passed clean"} '
+                f'— no rewrite issued. To force a specific edit, use the '
+                f'Edit button.'
+            ),
+            'verdict': verdict_dict,
+        })
+
+    # 3. Fire the type-specific regen orchestrator.
+    if qt == 'fill_in_blank':
+        result = run_fill_in_blank_regen(
+            original_question={
+                'question_text': question.question_text or '',
+                'text_template': ad.get('text_template') or '',
+                'blanks': ad.get('blanks') or [],
+                'accept_alternatives': ad.get('accept_alternatives') or [],
+                'explanation': question.explanation or '',
+            },
+            judge_result=verdict_dict,
+            lesson=lesson,
+            step_concept_tag=question.concept_tag or '',
+            enabling_objective=question.enabling_objective or '',
+        )
+    elif qt == 'short_answer':
+        result = run_short_answer_regen(
+            original_question={
+                'question_text': question.question_text or '',
+                'model_answer': ad.get('model_answer') or '',
+                'keywords': ad.get('keywords') or [],
+                'min_keywords': ad.get('min_keywords') or 1,
+                'explanation': question.explanation or '',
+            },
+            judge_result=verdict_dict,
+            lesson=lesson,
+            step_concept_tag=question.concept_tag or '',
+            enabling_objective=question.enabling_objective or '',
+        )
+    else:  # matching
+        result = run_matching_regen(
+            original_question={
+                'question_text': question.question_text or '',
+                'pairs': ad.get('pairs') or [],
+                'distractor_rights': ad.get('distractor_rights') or [],
+                'explanation': question.explanation or '',
+            },
+            judge_result=verdict_dict,
+            lesson=lesson,
+            step_concept_tag=question.concept_tag or '',
+            enabling_objective=question.enabling_objective or '',
+        )
+
+    # 4. Persist whatever the regen produced (even if not perfectly
+    #    clean — the partial rewrite is usually still an improvement,
+    #    and the teacher can re-edit).
+    update_fields = ['judge_outputs']
+    if result.question_text:
+        question.question_text = result.question_text
+        new_ad = dict(question.answer_data or {})
+        new_ad.update(result.as_answer_data())
+        question.answer_data = new_ad
+        question.explanation = result.explanation or question.explanation
+        update_fields += ['question_text', 'answer_data', 'explanation']
+
+    outputs = dict(question.judge_outputs or {})
+    # Use the post-regen judge verdict (if available) as the latest
+    # judge_outputs[type] entry, so the badge reflects the new state.
+    if result.final_judge_result:
+        outputs[judge_key] = dict(result.final_judge_result)
+    else:
+        outputs[judge_key] = verdict_dict
+    outputs['regen_audit'] = {
+        'cycles_run': result.cycles_run,
+        'clean': result.clean,
+        'picked_model': result.picked_model,
+        'elapsed_seconds': round(result.elapsed_seconds, 2),
+        'final_violations': list(result.final_violations),
+        'final_judge_result': dict(result.final_judge_result or {}),
+        'cycles': result.audit,
+        'source': 'teacher_manual',
+    }
+    question.judge_outputs = outputs
+
+    try:
+        question.save(update_fields=list(set(update_fields)))
+    except Exception as exc:
+        return JsonResponse({
+            'ok': False,
+            'error': f'save_failed: {type(exc).__name__}: {exc}',
+        }, status=500)
+
+    return JsonResponse({
+        'ok': True,
+        'changed': True,
+        'clean': bool(result.clean),
+        'cycles_run': result.cycles_run,
+        'picked_model': result.picked_model,
+        'message': (
+            f'{"Rewrote and verified" if result.clean else "Rewrote but still flagged"} '
+            f'after {result.cycles_run} cycle(s) via {result.picked_model}.'
+        ),
+        'verdict': outputs[judge_key],
+        'question': {
+            'question_text': question.question_text,
+            'answer_data': question.answer_data,
+            'explanation': question.explanation,
+        },
+    })
+
+
 # ─── Q5: Content edit benchmark — admin views + exports ────────────────
 
 def _filtered_content_edit_events(request):

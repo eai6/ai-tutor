@@ -77,6 +77,7 @@ urlpatterns = [
     path('curriculum/exit-question/<int:question_id>/edit/', views.exit_question_edit, name='exit_question_edit'),
     path('curriculum/exit-question/<int:question_id>/regen/', views.exit_question_regenerate, name='exit_question_regenerate'),
     path('curriculum/exit-question/<int:question_id>/save-regen/', views.exit_question_save_regen, name='exit_question_save_regen'),
+    path('curriculum/exit-question/<int:question_id>/inplace-regen/', views.exit_question_inplace_regen, name='exit_question_inplace_regen'),
     # Content-quality benchmark (Q5)
     path('content-edits/', views.content_edit_events_list, name='content_edit_events_list'),
     path('content-edits/dashboard/', views.content_edit_dashboard, name='content_edit_dashboard'),

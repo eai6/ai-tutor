@@ -911,22 +911,35 @@
                     <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}#d1fae5{% elif question.difficulty == 'hard' %}#fee2e2{% else %}#fef3c7{% endif %};">{{ question.difficulty }}</span>
                     {% endif %}
                     <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe;" title="Teaching objective">{% if question.concept_tag %}{{ question.concept_tag }}{% else %}<span style="color:#a16207;">no teaching objective</span>{% endif %}</span>
-                    {% with eq=question.judge_outputs.exit_question %}
-                    {% if eq %}
-                        {% if eq.skipped %}
+                    {% comment %}Pick whichever judge ran for this question type — MCQ → exit_question; FIB/SA/Matching → their dedicated judges. Each writes to judge_outputs.<type> with the same shape, so the badge logic below is uniform.{% endcomment %}
+                    {% with eq=question.judge_outputs.exit_question fib=question.judge_outputs.fill_in_blank sa=question.judge_outputs.short_answer mt=question.judge_outputs.matching %}
+                    {% with verdict=eq|default:fib|default:sa|default:mt %}
+                    {% if verdict %}
+                        {% if verdict.skipped %}
                             <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--gray-100); color: var(--gray-500);"
-                                  title="Exit-question judge skipped: {{ eq.skip_reason }}">⊘ AI</span>
-                        {% elif not eq.passed %}
+                                  title="Judge skipped: {{ verdict.skip_reason }}">⊘ AI</span>
+                        {% elif not verdict.passed %}
                             <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fee2e2; color: #991b1b; font-weight: 600;"
-                                  title="{{ eq.recommended_fix|default:eq.reasoning }}">⚠ {{ eq.violations|join:", " }}</span>
-                        {% elif eq.violations %}
+                                  title="{{ verdict.recommended_fix|default:verdict.reasoning }}">⚠ {{ verdict.violations|join:", " }}</span>
+                        {% elif verdict.violations %}
                             <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fef3c7; color: #92400e;"
-                                  title="{{ eq.recommended_fix|default:eq.reasoning }}">⚠ Review</span>
+                                  title="{{ verdict.recommended_fix|default:verdict.reasoning }}">⚠ Review: {{ verdict.violations|join:", " }}</span>
                         {% else %}
-                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #d1fae5; color: #047857;"
-                                  title="Exit-question judge passed via {{ eq.provider }}">✓ AI</span>
+                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #d1fae5; color: #047857; font-weight: 600;"
+                                  title="AI Verified via {{ verdict.provider }}/{{ verdict.model_name }}">✓ AI Verified</span>
                         {% endif %}
+                    {% else %}
+                        {# No judge verdict at all — surface so teacher knows it wasn't validated #}
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--gray-100); color: var(--gray-500);"
+                              title="No AI judge verdict on file">⊘ Unreviewed</span>
                     {% endif %}
+                    {% with ra=question.judge_outputs.regen_audit %}
+                    {% if ra and ra.cycles_run %}
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #e0f2fe; color: #075985;"
+                              title="Auto-rewritten by regen ensemble — {{ ra.cycles_run }} cycle(s), final model {{ ra.picked_model }}">🔄 Auto-fixed</span>
+                    {% endif %}
+                    {% endwith %}
+                    {% endwith %}
                     {% endwith %}
                 </div>
 
@@ -1080,9 +1093,51 @@
                     <button type="button" class="exitq-regen-toggle btn btn-sm"
                             data-question-id="{{ question.id }}"
                             style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">🔁 Regenerate</button>
+                    {% elif question.question_type == 'fill_in_blank' or question.question_type == 'short_answer' or question.question_type == 'matching' %}
+                    {% comment %}Non-MCQ regenerate: opens a panel with auto-review / prompt mode. Persists in place (no candidate-review UI since schema is heterogeneous per type).{% endcomment %}
+                    <button type="button" class="exitq-inplace-toggle btn btn-sm"
+                            data-question-id="{{ question.id }}"
+                            data-question-type="{{ question.question_type }}"
+                            style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">🔁 Regenerate</button>
                     {% endif %}
                     <button type="button" onclick="deleteQuestion(this)" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: var(--danger);">Delete</button>
                 </div>
+
+                {% if question.question_type == 'fill_in_blank' or question.question_type == 'short_answer' or question.question_type == 'matching' %}
+                {% comment %}Non-MCQ regen panel — auto-review + prompt mode. Persists in place + reloads on success (no candidate-review UI for now).{% endcomment %}
+                <div class="exitq-inplace-panel" data-question-id="{{ question.id }}" hidden
+                     style="margin-top:0.625rem; padding:0.75rem; background:#f9fafb;
+                            border:1px solid var(--gray-200); border-radius:0.375rem;">
+                    <div style="display:flex; gap:0.75rem; margin-bottom:0.5rem; font-size:0.8125rem;">
+                        <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer;">
+                            <input type="radio" name="exitq-ip-mode-{{ question.id }}" value="auto_review" checked>
+                            Auto-review (run judge + auto-fix)
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer;">
+                            <input type="radio" name="exitq-ip-mode-{{ question.id }}" value="prompt">
+                            Prompt mode (you guide the rewrite)
+                        </label>
+                    </div>
+                    <textarea class="exitq-ip-prompt" data-question-id="{{ question.id }}"
+                              placeholder="e.g. simpler wording / focus on the geological process / replace this distractor"
+                              rows="2" hidden
+                              style="width:100%; font-size:0.875rem; padding:0.375rem 0.5rem;
+                                     border:1px solid var(--gray-300); border-radius:0.25rem;
+                                     margin-bottom:0.5rem; font-family:inherit;"></textarea>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button type="button" class="exitq-ip-apply btn btn-sm"
+                                data-question-id="{{ question.id }}"
+                                style="font-size:0.75rem; padding:0.25rem 0.75rem;
+                                       background:var(--primary,#7c3aed); color:white; border:none;
+                                       border-radius:0.25rem; cursor:pointer;">Apply</button>
+                        <button type="button" class="exitq-ip-cancel btn btn-sm"
+                                data-question-id="{{ question.id }}"
+                                style="font-size:0.75rem; padding:0.25rem 0.75rem;">Cancel</button>
+                        <span class="exitq-ip-status" data-question-id="{{ question.id }}"
+                              style="font-size:0.75rem; color:var(--gray-500); align-self:center;"></span>
+                    </div>
+                </div>
+                {% endif %}
 
                 {% if question.question_type == 'mcq' %}
                 <div class="exitq-regen-panel" data-question-id="{{ question.id }}" hidden
@@ -1427,6 +1482,65 @@ function toggleStep(header) {
         if (t.classList.contains('exitq-regen-toggle')) {
             if (!panel) return;
             panel.hidden = !panel.hidden;
+            return;
+        }
+
+        if (t.classList.contains('exitq-inplace-toggle')) {
+            // Open / close the non-MCQ regen panel.
+            const ipPanel = $('.exitq-inplace-panel', qid);
+            if (!ipPanel) return;
+            ipPanel.hidden = !ipPanel.hidden;
+            // Wire the prompt-mode textarea visibility to the radio.
+            const promptArea = $('.exitq-ip-prompt', qid);
+            const radios = ipPanel.querySelectorAll(`input[name="exitq-ip-mode-${qid}"]`);
+            radios.forEach(r => {
+                r.onchange = () => {
+                    if (promptArea) promptArea.hidden = (r.value !== 'prompt');
+                };
+            });
+            return;
+        }
+        if (t.classList.contains('exitq-ip-cancel')) {
+            const ipPanel = $('.exitq-inplace-panel', qid);
+            if (ipPanel) ipPanel.hidden = true;
+            return;
+        }
+        if (t.classList.contains('exitq-ip-apply')) {
+            const ipPanel = $('.exitq-inplace-panel', qid);
+            const modeRadio = ipPanel?.querySelector(`input[name="exitq-ip-mode-${qid}"]:checked`);
+            const mode = modeRadio ? modeRadio.value : 'auto_review';
+            const promptArea = $('.exitq-ip-prompt', qid);
+            const guidance = promptArea ? promptArea.value.trim() : '';
+            const statusEl = $('.exitq-ip-status', qid);
+            if (mode === 'prompt' && !guidance) {
+                if (statusEl) statusEl.textContent = 'Enter guidance for Prompt mode.';
+                return;
+            }
+            t.disabled = true;
+            if (statusEl) statusEl.textContent = '⏳ Generating…';
+            try {
+                const fd = new FormData();
+                fd.set('mode', mode);
+                if (mode === 'prompt') fd.set('teacher_guidance', guidance);
+                const r = await fetch(`/dashboard/curriculum/exit-question/${qid}/inplace-regen/`, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken},
+                    body: fd,
+                });
+                const data = await r.json();
+                if (!data.ok) {
+                    if (statusEl) statusEl.textContent = '❌ ' + (data.error || 'failed');
+                    return;
+                }
+                // Surface the result message + reload so the badge +
+                // question fields reflect the persisted state.
+                if (statusEl) statusEl.textContent = '✓ ' + (data.message || 'Done.') + ' Reloading…';
+                setTimeout(() => window.location.reload(), 600);
+            } catch (err) {
+                if (statusEl) statusEl.textContent = '❌ ' + err;
+            } finally {
+                t.disabled = false;
+            }
             return;
         }
         if (t.classList.contains('exitq-regen-cancel')) {
