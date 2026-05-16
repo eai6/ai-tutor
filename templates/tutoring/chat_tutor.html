@@ -1570,7 +1570,22 @@ function renderPendingQuestionInArtifact(pq) {
         }
         body += '</div>';
     } else if (pq.question_type === 'short_numeric' || pq.question_type === 'short_answer' || pq.kind === 'lesson_step') {
-        body += '<input type="text" class="bank-q-text" placeholder="Type your answer…" style="padding:0.625rem 0.75rem;border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;">';
+        // R6 (2026-05-15): split into final-answer + show-working.
+        // Final answer feeds bank_grader deterministically; working
+        // is feedback-only (the LLM grader can read it for tutor
+        // scaffolding but the verdict comes from the final-answer
+        // box). Lets students think out loud without the grader
+        // getting confused by their reasoning text.
+        body += '<div style="display:flex;flex-direction:column;gap:0.625rem;">';
+        body += '<label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.8125rem;color:#52525b;">';
+        body += '<span style="font-weight:500;">Final answer</span>';
+        body += '<input type="text" class="bank-q-text" placeholder="e.g. 905" style="padding:0.625rem 0.75rem;border:1.5px solid #a855f7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;background:#fafafa;">';
+        body += '</label>';
+        body += '<label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.8125rem;color:#52525b;">';
+        body += '<span style="font-weight:500;">Show your working <span style="color:#a1a1aa;font-weight:400;">(optional)</span></span>';
+        body += '<textarea class="bank-q-working" rows="3" placeholder="Show how you got there — formulas, steps, reasoning…" style="padding:0.5rem 0.625rem;border:1px solid #e4e4e7;border-radius:0.5rem;font-size:0.875rem;font-family:inherit;resize:vertical;background:#fff;"></textarea>';
+        body += '</label>';
+        body += '</div>';
     } else if (pq.question_type === 'fill_in_blank') {
         // Render the text_template with each ___ replaced by an inline
         // input. answer_data.blanks tells us how many blanks (one input
@@ -1679,10 +1694,17 @@ function bindBankQuestionHandlers(pq) {
             const input = card.querySelector('.bank-q-text');
             answer = (input && input.value || '').trim();
             if (!answer) {
-                statusEl.textContent = 'Type an answer first.';
+                statusEl.textContent = 'Type a final answer first.';
                 return;
             }
         }
+        // R6 (2026-05-15): collect optional show_working for the
+        // textarea-bearing question types (short_numeric / short_answer
+        // / lesson_step). MCQ + fill_in_blank don't have a working
+        // area today (could add for math word problems later).
+        const workingEl = card.querySelector('.bank-q-working');
+        const showWorking = workingEl ? (workingEl.value || '').trim() : '';
+
         submitBtn.disabled = true;
         statusEl.textContent = '⏳ Sending…';
         showTyping(true);
@@ -1697,6 +1719,7 @@ function bindBankQuestionHandlers(pq) {
                     question_id: pq.question_id,
                     kind: pq.kind,
                     answer: answer,
+                    show_working: showWorking,
                 }),
             });
             const data = await r.json();
