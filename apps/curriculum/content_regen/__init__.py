@@ -359,24 +359,32 @@ def run_step_regen(
             step_concept_tag=step_concept_tag,
         )
 
-        # Generate
-        try:
-            response = gen_client.generate(
-                messages=[{"role": "user", "content": prompt['user']}],
-                system_prompt=prompt['system'],
-                max_tokens=2000,
-                temperature=temperature,
-            )
-        except Exception as exc:
+        # Generate via the multi-provider gen chain — first
+        # provider to respond within 90s wins. Stops Gemini stalls
+        # from hanging the entire regen cycle (lesson 549 run 10
+        # hung 10+ minutes here).
+        from apps.curriculum.content_gen_providers import (
+            call_gen_text_with_fallback, get_gen_provider_chain,
+        )
+        gen_providers = get_gen_provider_chain('generation')
+        gen_call = call_gen_text_with_fallback(
+            gen_providers,
+            system_prompt=prompt['system'],
+            user_prompt=prompt['user'],
+            max_tokens=2000,
+            temperature=temperature,
+            timeout_seconds=90.0,
+        )
+        if not gen_call.success:
             logger.warning(
-                f"[ContentRegen] cycle {cycle+1} gen call failed: "
-                f"{type(exc).__name__}: {exc}"
+                f"[ContentRegen] cycle {cycle+1} gen chain exhausted: "
+                f"{gen_call.error_class}: {gen_call.error_detail}"
             )
-            c.error = f"gen_failed: {type(exc).__name__}"
+            c.error = f"gen_failed: {gen_call.error_class}"
             candidates.append(c)
             continue
 
-        candidate_text = (response.content or '').strip()
+        candidate_text = gen_call.text.strip()
         # Strip any code-fence wrapping the model added.
         if candidate_text.startswith('```'):
             import re
@@ -1065,42 +1073,35 @@ def run_exit_question_regen(
             enabling_objective=enabling_objective,
         )
 
-        parsed = None
-        if instructor_client is not None:
-            try:
-                create_kwargs = dict(
-                    response_model=MCQRewrite,
-                    messages=[
-                        {"role": "system", "content": prompt['system']},
-                        {"role": "user", "content": prompt['user']},
-                    ],
-                    max_retries=2,
-                )
-                # Gemini 3 burns ~1500 tokens on internal thinking
-                # before the function call returns; budget 4000 so the
-                # MCQ payload itself has room. Anthropic/OpenAI don't
-                # need the headroom but the higher cap is harmless.
-                if str(gen_config.provider).lower() == 'google':
-                    create_kwargs['generation_config'] = {'max_tokens': 4000}
-                else:
-                    create_kwargs['max_tokens'] = 4000
-                parsed = instructor_client.chat.completions.create(**create_kwargs)
-            except Exception as exc:
-                logger.warning(
-                    f"[ContentRegen] exit-Q cycle {cycle+1} instructor "
-                    f"call failed: {type(exc).__name__}: {exc}"
-                )
-                c.error = f"gen_failed: {type(exc).__name__}"
-                candidates.append(c)
-                continue
-        else:
-            # Instructor unavailable (initialization failed). Skip the
-            # cycle cleanly rather than falling back to brittle JSON
-            # parsing — better to flag for human review than to ship
-            # malformed content.
-            c.error = "instructor_unavailable"
+        # Multi-provider chain + 90s per-provider timeout so a
+        # stalled Gemini doesn't hang the regen loop.
+        from apps.curriculum.content_gen_providers import (
+            call_gen_structured_with_fallback, get_gen_provider_chain,
+        )
+        gen_providers = get_gen_provider_chain('generation')
+        if not gen_providers:
+            c.error = "no_providers"
             candidates.append(c)
             continue
+        gen_call = call_gen_structured_with_fallback(
+            gen_providers,
+            MCQRewrite,
+            system_prompt=prompt['system'],
+            user_prompt=prompt['user'],
+            max_tokens=4000,
+            max_retries=2,
+            timeout_seconds=90.0,
+        )
+        if not gen_call.success:
+            logger.warning(
+                f"[ContentRegen] exit-Q cycle {cycle+1} gen chain "
+                f"exhausted: {gen_call.error_class}: {gen_call.error_detail}"
+            )
+            c.error = f"gen_failed: {gen_call.error_class}"
+            candidates.append(c)
+            continue
+        parsed = gen_call.verdict
+        c.model_name = gen_call.model_name or c.model_name
 
         snap = _coerce(parsed, result)
         c.text = (snap.question_text or '')[:200]
@@ -1367,24 +1368,16 @@ def _typed_question_regen_loop(
 
     from apps.curriculum.content_regen.score import score_candidate
 
-    instructor_client = None
-    try:
-        import instructor
-        provider_map = {
-            'anthropic': 'anthropic', 'openai': 'openai',
-            'google': 'google', 'local_ollama': 'ollama',
-        }
-        provider_key = provider_map.get(
-            str(gen_config.provider).lower(), str(gen_config.provider).lower()
-        )
-        instructor_client = instructor.from_provider(
-            f"{provider_key}/{gen_config.model_name}",
-            api_key=gen_config.get_api_key(),
-        )
-    except Exception as exc:
+    # Multi-provider gen chain so a stalled Gemini call doesn't hang
+    # the regen pipeline. Per-provider 90s timeout; first success wins.
+    from apps.curriculum.content_gen_providers import (
+        call_gen_structured_with_fallback,
+        get_gen_provider_chain,
+    )
+    providers = get_gen_provider_chain('generation')
+    if not providers:
         logger.warning(
-            f"[ContentRegen] {judge_log_prefix} instructor init failed: "
-            f"{type(exc).__name__}: {exc}"
+            f"[ContentRegen] {judge_log_prefix} no gen providers available"
         )
 
     judge_exclude = (gen_config.provider or '').lower() or None
@@ -1406,8 +1399,8 @@ def _typed_question_regen_loop(
             temperature=temperature,
         )
 
-        if instructor_client is None:
-            c.error = "instructor_unavailable"
+        if not providers:
+            c.error = "no_providers"
             candidates.append(c)
             continue
 
@@ -1422,31 +1415,25 @@ def _typed_question_regen_loop(
             enabling_objective=enabling_objective,
         )
 
-        create_kwargs = dict(
-            response_model=rewrite_schema,
-            messages=[
-                {"role": "system", "content": prompt['system']},
-                {"role": "user", "content": prompt['user']},
-            ],
+        call = call_gen_structured_with_fallback(
+            providers,
+            rewrite_schema,
+            system_prompt=prompt['system'],
+            user_prompt=prompt['user'],
+            max_tokens=4000,
             max_retries=2,
+            timeout_seconds=90.0,
         )
-        # Gemini 3 thinking-budget safe (see
-        # auto-memory/feedback_use_instructor_for_structured_output.md).
-        if str(gen_config.provider).lower() == 'google':
-            create_kwargs['generation_config'] = {'max_tokens': 4000}
-        else:
-            create_kwargs['max_tokens'] = 4000
-
-        try:
-            parsed = instructor_client.chat.completions.create(**create_kwargs)
-        except Exception as exc:
+        if not call.success:
             logger.warning(
                 f"[ContentRegen] {judge_log_prefix} cycle {cycle+1} "
-                f"instructor call failed: {type(exc).__name__}: {exc}"
+                f"gen chain exhausted: {call.error_class}: {call.error_detail}"
             )
-            c.error = f"gen_failed: {type(exc).__name__}"
+            c.error = f"gen_failed: {call.error_class}"
             candidates.append(c)
             continue
+        parsed = call.verdict
+        c.model_name = call.model_name or c.model_name
 
         snap = snapshot_from_parsed(parsed, result)
         c.text = (snap.question_text or '')[:200]

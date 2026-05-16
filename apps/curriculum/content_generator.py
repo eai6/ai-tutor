@@ -440,78 +440,60 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
     )
 
 
-def _instructor_generate_exit_ticket(llm_client, *, prompt: str, system_prompt: str, max_tokens: int = 16000):
+def _instructor_generate_exit_ticket(
+    llm_client,
+    *,
+    prompt: str,
+    system_prompt: str,
+    max_tokens: int = 16000,
+    timeout_seconds: float = 180.0,
+):
     """Call an LLM via instructor + GeneratedExitTicket schema.
 
-    Replaces `llm_client.generate(...) + parse_llm_json` for the
-    exit-ticket gen + retry paths. Instructor enforces the top-level
-    `{questions: [...]}` shape via the provider's native
-    structured-output API — eliminates the "All JSON repair attempts
-    failed" failure class that previously dropped entire exit-ticket
-    batches when the LLM emitted malformed JSON.
+    Uses the multi-provider chain (`get_gen_provider_chain`) so
+    when the primary provider stalls / errors, falls through to the
+    next provider in the chain instead of hanging the pipeline.
+    Per-provider wall-time cap (default 180s — exit-ticket gen is
+    the largest single LLM call in the pipeline).
 
     Returns a list of question dicts (down-converted from the
     validated Pydantic instances) for the existing persistence loop
-    to consume. Returns None on infrastructure failure so the caller
-    can fall back to the legacy `parse_llm_json` path.
-
-    Same Gemini-3 thinking-budget rule as the other instructor sites:
-    `max_tokens` should be ≥4000; the 16000 default for exit tickets
-    covers 30+ questions × ~400 tokens each + thinking budget.
+    to consume. Returns None when every provider in the chain fails
+    — caller falls back to the legacy `parse_llm_json` path.
     """
-    config = getattr(llm_client, 'config', None)
-    if config is None:
-        return None
-    try:
-        import instructor
-    except ImportError:
-        return None
-    provider_map = {
-        'anthropic': 'anthropic', 'openai': 'openai',
-        'google': 'google', 'local_ollama': 'ollama',
-    }
-    provider_key = provider_map.get(
-        str(config.provider).lower(), str(config.provider).lower()
+    from apps.curriculum.content_gen_providers import (
+        call_gen_structured_with_fallback,
+        get_gen_provider_chain,
     )
-    try:
-        ic = instructor.from_provider(
-            f"{provider_key}/{config.model_name}",
-            api_key=config.get_api_key(),
-        )
-    except Exception as exc:
-        print(
-            f"[ContentGen] instructor.from_provider failed for exit-ticket "
-            f"gen: {type(exc).__name__}: {exc} — falling back",
-            flush=True,
-        )
-        return None
-
     from apps.curriculum.content_gen_schemas import GeneratedExitTicket
 
-    create_kwargs = dict(
-        response_model=GeneratedExitTicket,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
-        max_retries=2,
-    )
-    if str(config.provider).lower() == 'google':
-        create_kwargs['generation_config'] = {'max_tokens': max_tokens}
-    else:
-        create_kwargs['max_tokens'] = max_tokens
+    providers = get_gen_provider_chain('generation')
+    if not providers:
+        return None
 
-    try:
-        result: 'GeneratedExitTicket' = ic.chat.completions.create(**create_kwargs)
-    except Exception as exc:
+    call = call_gen_structured_with_fallback(
+        providers,
+        GeneratedExitTicket,
+        system_prompt=system_prompt,
+        user_prompt=prompt,
+        max_tokens=max_tokens,
+        timeout_seconds=timeout_seconds,
+    )
+    if not call.success:
         print(
-            f"[ContentGen] exit-ticket instructor call failed: "
-            f"{type(exc).__name__}: {exc} — falling back to parse_llm_json",
+            f"[ContentGen] exit-ticket gen chain exhausted "
+            f"({call.error_class}: {call.error_detail}) — falling back "
+            f"to parse_llm_json",
             flush=True,
         )
         return None
 
-    return [q.model_dump(exclude_none=True) for q in result.questions]
+    print(
+        f"[ContentGen] exit-ticket gen succeeded via "
+        f"{call.provider}/{call.model_name}",
+        flush=True,
+    )
+    return [q.model_dump(exclude_none=True) for q in call.verdict.questions]
 
 
 def _instructor_structured_call(
@@ -522,12 +504,14 @@ def _instructor_structured_call(
     system_prompt: str,
     max_tokens: int = 4000,
     max_retries: int = 2,
+    timeout_seconds: float = 120.0,
 ):
-    """Generic instructor-backed structured-output call.
+    """Generic instructor-backed structured-output call with
+    multi-provider fallback chain + per-provider timeout.
 
-    Returns the validated Pydantic instance, or None on infrastructure
-    failure (no config / no instructor / provider error). Caller falls
-    back to legacy parsing.
+    Returns the validated Pydantic instance, or None when every
+    provider in the chain fails / times out. Caller falls back to
+    legacy parsing.
 
     Mirrors `_instructor_generate_exit_ticket` but for arbitrary
     schemas — used by EO-expansion + competency-extraction + other
@@ -535,58 +519,47 @@ def _instructor_structured_call(
     down-conversion.
 
     Gemini-3 safe default (max_tokens=4000) — bump for long-list
-    outputs.
+    outputs. Default timeout 120s per provider covers typical
+    Claude/Gemini structured-output latency.
+
+    `llm_client` is kept in the signature for backward compatibility
+    but the chain ignores it — the gen provider chain is queried
+    fresh from ModelConfig so all callers benefit from fallback even
+    when they pass a single-provider client.
     """
-    config = getattr(llm_client, 'config', None)
-    if config is None:
-        return None
-    try:
-        import instructor
-    except ImportError:
-        return None
-    provider_map = {
-        'anthropic': 'anthropic', 'openai': 'openai',
-        'google': 'google', 'local_ollama': 'ollama',
-    }
-    provider_key = provider_map.get(
-        str(config.provider).lower(), str(config.provider).lower()
+    from apps.curriculum.content_gen_providers import (
+        call_gen_structured_with_fallback,
+        get_gen_provider_chain,
     )
-    try:
-        ic = instructor.from_provider(
-            f"{provider_key}/{config.model_name}",
-            api_key=config.get_api_key(),
-        )
-    except Exception as exc:
-        print(
-            f"[ContentGen] instructor.from_provider failed: "
-            f"{type(exc).__name__}: {exc} — falling back",
-            flush=True,
-        )
+
+    providers = get_gen_provider_chain('generation')
+    if not providers:
         return None
 
-    create_kwargs = dict(
-        response_model=response_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
+    call = call_gen_structured_with_fallback(
+        providers,
+        response_model,
+        system_prompt=system_prompt,
+        user_prompt=prompt,
+        max_tokens=max_tokens,
         max_retries=max_retries,
+        timeout_seconds=timeout_seconds,
     )
-    if str(config.provider).lower() == 'google':
-        create_kwargs['generation_config'] = {'max_tokens': max_tokens}
-    else:
-        create_kwargs['max_tokens'] = max_tokens
-
-    try:
-        return ic.chat.completions.create(**create_kwargs)
-    except Exception as exc:
+    if not call.success:
         print(
-            f"[ContentGen] instructor call failed for "
-            f"{response_model.__name__}: {type(exc).__name__}: {exc} — "
-            f"falling back",
+            f"[ContentGen] structured-call chain exhausted for "
+            f"{response_model.__name__}: {call.error_class}: "
+            f"{call.error_detail} — falling back",
             flush=True,
         )
         return None
+
+    print(
+        f"[ContentGen] {response_model.__name__} succeeded via "
+        f"{call.provider}/{call.model_name}",
+        flush=True,
+    )
+    return call.verdict
 
 
 def _run_fill_in_blank_judge_for_qs(lesson, qs):
