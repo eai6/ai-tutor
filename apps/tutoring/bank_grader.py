@@ -181,52 +181,79 @@ def grade_chat_authored_question(
     *,
     llm_client,
     is_math: bool = False,
+    kb_context: str = '',
+    use_grounding: bool = True,
 ) -> BankGradeResult:
     """LLM grades a tutor-authored question with NO answer key.
 
     Used as a fallback when the tutor authored a question in chat
     narrative without calling pose_inline_question (which would carry
-    an answer key). The LLM uses its own domain knowledge to
-    determine the correct answer for `question_text` and judge whether
-    `student_response` is correct.
+    an answer key).
 
-    Built atop grade_written_responses_batch — same prompt + same
-    generous-on-synonyms rubric. The expected field is left empty;
-    the LLM is told to derive the correct answer from the question
-    text. This matches what a human tutor does when grading on the
-    fly without an answer key.
+    **Two-layer grounding** (pilot directive 2026-05-16):
+      1. `kb_context` — relevant chunks pulled from the lesson's
+         knowledge base. Anchors the verdict to the curriculum
+         (vs. the LLM's parametric knowledge which may be wrong on
+         local / niche topics like Seychelles geography facts).
+      2. Google search grounding via the two-call pattern in
+         `call_judge_grounded_then_structured` — when the picked
+         provider is Gemini, fact-checks against live web sources.
+         Especially useful for current events, place facts, named
+         entities.
+
+    Falls back to the simple `grade_written_responses_batch` path
+    when grounding is disabled / unavailable.
 
     Returns BankGradeResult. Never raises; on LLM crash returns
     is_correct=None with skip_reason set.
-
-    Pilot directive 2026-05-16: stripping authored questions
-    produces incoherent turns. Better to let them through + grade
-    them robustly.
     """
-    from apps.tutoring.exit_ticket_grader import (
-        BatchGradeItem,
-        grade_written_responses_batch,
-    )
-
     if not question_text or not student_response or llm_client is None:
         return BankGradeResult(
             is_correct=None,
             skip_reason="missing_input_or_client",
         )
 
+    # Try the grounded path first (KB context + Google search).
+    if use_grounding:
+        try:
+            return _grade_chat_authored_grounded(
+                question_text=question_text,
+                student_response=student_response,
+                kb_context=kb_context,
+                is_math=is_math,
+            )
+        except Exception as exc:
+            logger.warning(
+                "[BankGrader] grounded chat_authored failed (%s: %s) — "
+                "falling back to batch grader without grounding",
+                type(exc).__name__, str(exc)[:120],
+            )
+            # Fall through to batch path below.
+
+    # Fallback: non-grounded batch grader with KB context spliced
+    # into the question text. Still uses the LLM, just without web
+    # search verification.
+    from apps.tutoring.exit_ticket_grader import (
+        BatchGradeItem,
+        grade_written_responses_batch,
+    )
+
+    item_question = (
+        f"[NO ANSWER KEY PROVIDED — derive the correct answer "
+        f"from your domain knowledge"
+        + (
+            f" + the following curriculum context, then judge whether "
+            f"the student's response is correct.\n\nCURRICULUM CONTEXT:\n"
+            f"{kb_context[:2000]}\n\nQUESTION: {question_text}"
+            if kb_context.strip()
+            else f", then judge whether the student's response is correct.] {question_text}"
+        )
+    )
     item = BatchGradeItem(
         index=0,
-        # Prepend a sentinel so the grader knows it must derive the
-        # correct answer rather than compare against `expected`. The
-        # batch prompt already says "favour CORRECT when in doubt"
-        # so this works even without a custom prompt.
-        question_text=(
-            f"[NO ANSWER KEY PROVIDED — derive the correct answer "
-            f"from your domain knowledge, then judge whether the "
-            f"student's response is correct.] {question_text}"
-        ),
+        question_text=item_question,
         q_type='short_answer',
-        expected='',  # no key — the LLM determines what's correct
+        expected='',
         keywords=[],
         student_answer=student_response,
         is_math=is_math,
@@ -237,7 +264,7 @@ def grade_chat_authored_question(
         )
     except Exception as exc:
         logger.warning(
-            "[BankGrader] chat_authored LLM call crashed: %s: %s",
+            "[BankGrader] chat_authored batch fallback crashed: %s: %s",
             type(exc).__name__, exc,
         )
         return BankGradeResult(
@@ -257,8 +284,147 @@ def grade_chat_authored_question(
         expected="(derived by LLM)",
         student_parsed=student_response[:200],
         detail={
-            'source': 'llm_chat_authored',
+            'source': 'llm_chat_authored_batch',
             'reasoning': (r.reasoning or '')[:300],
+        },
+    )
+
+
+# Pydantic schema for the grounded chat-authored verdict (two-call
+# pattern: first call is grounded free-form Gemini, second is
+# structured-output extraction into this shape).
+def _build_chat_authored_verdict_schema():
+    """Lazy-build the verdict Pydantic class so importing bank_grader
+    doesn't require pydantic at module load."""
+    from pydantic import BaseModel, Field
+
+    class ChatAuthoredVerdict(BaseModel):
+        is_correct: bool = Field(
+            description=(
+                "True if the student's response correctly answers the "
+                "question. False otherwise. Be generous on phrasing — "
+                "what matters is whether they convey the correct idea."
+            ),
+        )
+        reasoning: str = Field(
+            description=(
+                "One short sentence (<= 200 chars) explaining the "
+                "verdict. Cite the curriculum context or web source "
+                "if used."
+            ),
+            max_length=300,
+        )
+        derived_answer: str = Field(
+            default='',
+            description=(
+                "What the correct answer is, in your judgment. "
+                "Used for downstream tutor scaffolding."
+            ),
+            max_length=300,
+        )
+
+    return ChatAuthoredVerdict
+
+
+def _grade_chat_authored_grounded(
+    *,
+    question_text: str,
+    student_response: str,
+    kb_context: str,
+    is_math: bool,
+) -> BankGradeResult:
+    """Grounded grading path — uses `call_judge_grounded_then_structured`.
+
+    Builds a judge_provider chain, runs the two-call pattern (Gemini
+    grounded free-form → structured-output extraction), returns a
+    BankGradeResult. Raises on infrastructure failure so the caller
+    can fall back to the non-grounded batch path.
+    """
+    from apps.curriculum.content_judges._providers import (
+        call_judge_grounded_then_structured,
+        get_judge_provider_chain,
+    )
+
+    verdict_schema = _build_chat_authored_verdict_schema()
+
+    # judge_purpose is a positional arg, not keyword. 'judge' is the
+    # standard purpose; chain helper falls through to other purposes
+    # if no active 'judge' config exists.
+    providers = get_judge_provider_chain('judge')
+    if not providers:
+        raise RuntimeError("no judge providers available")
+
+    # Build the user prompt. KB context first so it grounds the
+    # subsequent question + response evaluation.
+    parts = []
+    if kb_context.strip():
+        parts.append("## CURRICULUM CONTEXT (authoritative for this lesson)")
+        parts.append(kb_context.strip()[:2500])
+        parts.append("")
+    parts.append("## QUESTION (no canonical answer key was provided)")
+    parts.append(question_text.strip()[:1000])
+    parts.append("")
+    parts.append("## STUDENT_RESPONSE")
+    parts.append(student_response.strip()[:1000])
+    parts.append("")
+    parts.append("## YOUR JOB")
+    parts.append(
+        "Determine whether the student's response correctly answers "
+        "the question.\n"
+        "Priority order for ground truth:\n"
+        "  1. The CURRICULUM CONTEXT above (this is what the lesson "
+        "teaches).\n"
+        "  2. Live web search results (use Google Search to verify "
+        "any factual claim about places, dates, numbers, named "
+        "entities — especially Seychelles-specific facts).\n"
+        "  3. Your own domain knowledge (last resort).\n\n"
+        "Be GENEROUS on phrasing — what matters is whether the "
+        "student conveys the correct idea, not whether they used the "
+        "exact words from the curriculum."
+    )
+    user_prompt = "\n".join(parts)
+
+    system_prompt = (
+        "You are an expert grader for school exit-ticket-style "
+        "questions. You evaluate written student responses against "
+        "the curriculum + verifiable facts. Output structured "
+        "JSON per the verdict schema."
+    )
+
+    grounded_result = call_judge_grounded_then_structured(
+        user_prompt=user_prompt,
+        providers=providers,
+        response_model=verdict_schema,
+        system_prompt=system_prompt,
+        max_tokens=2000,
+        max_retries=1,
+        grounding_instruction=(
+            "Use Google Search to verify any place name, date, "
+            "number, or named entity in the question or student "
+            "response. Especially relevant for Seychelles geography "
+            "facts which may be missing from your training data. "
+            "Cite the sources you used inline."
+        ),
+    )
+
+    if not grounded_result.success or grounded_result.verdict is None:
+        raise RuntimeError(
+            f"grounded judge failed: "
+            f"{grounded_result.error_class}: "
+            f"{grounded_result.error_detail[:150]}"
+        )
+
+    v = grounded_result.verdict
+    return BankGradeResult(
+        is_correct=bool(v.is_correct),
+        expected=(getattr(v, 'derived_answer', '') or "(derived by LLM)")[:200],
+        student_parsed=student_response[:200],
+        detail={
+            'source': 'llm_chat_authored_grounded',
+            'reasoning': (v.reasoning or '')[:300],
+            'provider': grounded_result.provider,
+            'model_name': grounded_result.model_name,
+            'kb_context_used': bool(kb_context.strip()),
         },
     )
 

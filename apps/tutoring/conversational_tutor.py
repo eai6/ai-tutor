@@ -6644,11 +6644,21 @@ Follow the current step; this concept will be covered in sequence."""
         """Render the active awaiting_answer record into the dict
         shape the frontend artifact panel (R3) consumes.
 
-        Looks up the canonical bank entry by id so the frontend
-        renders the question deterministically — no dependence on
-        inline prose. Returns None when no question is awaiting OR
-        when the entry can't be resolved (deleted course, etc).
+        DISABLED 2026-05-16 per pilot directive: "I think the artifact
+        question layer is bringing a layer of confusion and chaos. Let
+        us remove it for now." Returning None unconditionally so the
+        frontend never renders the artifact question card. The bank
+        question text already appears in the chat narrative (via
+        pose_question handler), and the student answers in the chat
+        textbox. `_grade_against_last_bank_question` runs against the
+        most-recent bank_question_ref on the previous tutor turn, so
+        grading still works without the artifact UI.
+
+        The code below is kept (commented out indirectly via the early
+        return) so re-enabling the artifact panel is a one-line revert
+        when we decide to bring it back.
         """
+        return None
         rec = getattr(self, '_awaiting_answer', None)
         if not rec or not rec.get('question_id'):
             return None
@@ -6758,11 +6768,27 @@ Follow the current step; this concept will be covered in sequence."""
                     if self.lesson.unit and self.lesson.unit.course
                     else False
                 )
+                # Pull relevant KB chunks so the grader has the
+                # curriculum context (not just LLM parametric
+                # knowledge). Pilot 2026-05-16: niche / local facts
+                # (Seychelles geography, etc.) need curriculum
+                # grounding to be judged correctly. The grader also
+                # uses Google search grounding on top via the
+                # two-call pattern.
+                kb_ctx = ''
+                try:
+                    kb_ctx = self._get_knowledge_context(student_input) or ''
+                except Exception as _exc:
+                    logger.debug(
+                        f"[ChatAuthored] KB context fetch failed: {_exc}"
+                    )
                 result = grade_chat_authored_question(
                     question_text=question_text,
                     student_response=student_input,
                     llm_client=self.judge_client,
                     is_math=is_math,
+                    kb_context=kb_ctx,
+                    use_grounding=True,
                 )
                 self._pending_bank_grade = result
                 self._pending_bank_question = None

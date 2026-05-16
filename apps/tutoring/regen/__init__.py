@@ -82,7 +82,7 @@ logger = logging.getLogger(__name__)
 # "we should not need more than two regen in fact to fix something.
 # 3 is even too much." Production logs showed cycles 2/3/4 converging
 # identically — the marginal value of cycles 3-4 is near zero.
-DEFAULT_MAX_CYCLES = 2
+DEFAULT_MAX_CYCLES = 3
 
 # Starting temperature for cycle 1. Each subsequent cycle drops by
 # DEFAULT_TEMPERATURE_DECAY (so the model becomes more deterministic).
@@ -300,15 +300,29 @@ def run_regen_ensemble(
         )
 
     # Exhausted all cycles without a clean candidate. Send the
-    # best-scoring one (still has issues but is the least bad), OR
-    # fall back to a stock response when nothing scored.
+    # best-scoring one (least violations across ALL cycles, NOT
+    # necessarily the last cycle — pilot directive 2026-05-16:
+    # "at the end of the 3 regens, we should pick the cycle with
+    # the least violations not necessarily the last one"). The
+    # `best_overall` tracking above already implements this: it
+    # keeps the highest-score candidate seen across every cycle,
+    # so cycle 2's output can beat cycle 3's if cycle 2 had fewer
+    # violations.
     result.elapsed_seconds = time.monotonic() - started
     if best_overall is not None and best_overall.text.strip():
+        # Find which cycle best_overall came from (for log clarity).
+        best_cycle_idx = None
+        for ci, cands in enumerate(result.candidates_per_cycle):
+            if any(c is best_overall for c in cands):
+                best_cycle_idx = ci + 1  # 1-indexed for human reading
+                break
         logger.warning(
-            "[Regen] cycles exhausted — sending best-effort candidate "
-            "model=%s score=%.2f issues_remaining=%s",
-            best_overall.model_name, best_overall.score,
+            "[Regen] cycles exhausted — picking least-violation "
+            "candidate from cycle %s (model=%s score=%.2f "
+            "issues_remaining=%s); cycles_run=%d",
+            best_cycle_idx, best_overall.model_name, best_overall.score,
             _judge_issue_summary(best_overall.judge_result),
+            result.cycles_run,
         )
         result.text = best_overall.text
         result.picked_model = best_overall.model_name
