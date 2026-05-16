@@ -1497,10 +1497,17 @@ def chat_answer_bank_question(request, session_id):
             exc_info=True,
         )
 
+    # Surface the synthetic student message as a `student_display`
+    # so the frontend can render it as a chat bubble — the artifact
+    # submission should appear in the conversation history just like
+    # a typed chat reply. Pilot directive 2026-05-16: "return the
+    # student answer in the artifact into the chat history. so that
+    # we have a complete unbroken history".
     return JsonResponse({
         'ok': True,
         'verdict': verdict.to_metadata(),
         'tutor_message': tutor_message,
+        'student_display': summary,
     })
 
 

@@ -6512,7 +6512,7 @@ def lesson_create(request, unit_id):
         
         if title:
             # Get next order index
-            max_order = unit.lessons.aggregate(models.Max('order_index'))['order_index__max'] or -1
+            max_order = unit.lessons.aggregate(Max('order_index'))['order_index__max'] or -1
             
             lesson = Lesson.objects.create(
                 unit=unit,

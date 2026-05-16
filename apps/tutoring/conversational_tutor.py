@@ -6350,23 +6350,16 @@ Follow the current step; this concept will be covered in sequence."""
                     "[QuestionTool] render: chars=%d slot=%d", len(rendered), slot,
                 )
                 self._record_bank_question_on_turn(turn_metadata, entry)
-                # Question content goes to the ARTIFACT PANEL only,
-                # never inline in chat (per user requirement
-                # 2026-05-16). The artifact panel reads from
-                # `_turn_questions` (set by _record_bank_question_on_turn)
-                # via `_build_pending_question_payload()` and renders
-                # the question with proper UI controls.
-                #
-                # Chat bubble shows ONLY the LLM's lead-in (transition
-                # text). If lead_in is empty, fall back to a generic
-                # pointer so the bubble isn't blank.
+                # Render the bank question text inline in the chat AND
+                # to the artifact panel (pilot directive 2026-05-16):
+                # showing it in chat makes the question readable by TTS
+                # (audio mode) and gives the conversation history a
+                # complete reading transcript. The artifact still
+                # renders the interactive UI controls (radios for MCQ,
+                # blanks for FIB, etc) so the student can ANSWER there.
                 if lead_in:
                     text_parts.append(lead_in)
-                elif not text_parts:
-                    # No text block emitted + no lead_in → fall back
-                    # so the chat bubble isn't empty when the artifact
-                    # opens. Brief, neutral, no question authoring.
-                    text_parts.append("Have a look at the question →")
+                text_parts.append(rendered)
                 bank_rendered = True
                 # Track for the validator's authoring gate so it knows
                 # a verified bank pull happened on this turn.

@@ -1756,6 +1756,19 @@ function bindBankQuestionHandlers(pq) {
             } else {
                 statusEl.textContent = '✓ Submitted — see chat for tutor reply.';
             }
+            // Append the student's answer as a chat bubble so the
+            // conversation history is unbroken — artifact submissions
+            // now appear in chat like typed replies. Pilot directive
+            // 2026-05-16: "return the student answer in the artifact
+            // into the chat history". Strip the "[Answering: \"...\"]"
+            // disambiguation prefix the server adds for the LLM — it's
+            // useful in the tutor's context but visual noise in the
+            // student-facing chat.
+            if (data.student_display) {
+                let display = String(data.student_display);
+                display = display.replace(/^\[Answering:[^\]]*\]\s*/, '');
+                addMessage('student', display);
+            }
             if (data.tutor_message) {
                 applyTutorResponse(data.tutor_message);
             }

@@ -3205,7 +3205,13 @@ RULES:
             )
             kept = []
             for i, q in enumerate(questions):
-                tmpl_data = q.get('template')
+                # Read both 'template_data' (schema field name, what
+                # model_dump emits) AND 'template' (legacy / direct
+                # JSON-parsed path). Pre-2026-05-16 this read only
+                # 'template' which is now an alias the instructor
+                # input layer accepts but doesn't dump under — 100%
+                # of math questions were rejected silently.
+                tmpl_data = q.get('template_data') or q.get('template')
                 # MANDATORY in math: a question without a template
                 # is rejected outright (per the prompt). Free-form
                 # math has no escape hatch.
@@ -3300,6 +3306,32 @@ RULES:
                 f"{len(layer4_rejections)} rejected",
                 flush=True,
             )
+            # Surface rejection-reason breakdown so operators can
+            # see WHY questions failed (pre-2026-05-16 this info was
+            # only fed back to the LLM retry — invisible to humans
+            # when the retry also failed, leaving the lesson with an
+            # empty bank with no diagnostic trail).
+            if layer4_rejections:
+                from collections import Counter
+                reason_counts = Counter(r['reason'] for r in layer4_rejections)
+                print(
+                    f"[ContentGen] [{lesson.title}] Layer 4 rejection "
+                    f"reasons: {dict(reason_counts)}",
+                    flush=True,
+                )
+                # Sample messages — first one per reason kind.
+                seen_reasons = set()
+                for r in layer4_rejections:
+                    if r['reason'] in seen_reasons:
+                        continue
+                    seen_reasons.add(r['reason'])
+                    print(
+                        f"[ContentGen] [{lesson.title}] Layer 4 sample "
+                        f"[{r['reason']}]: "
+                        f"q={r.get('question_text', '')[:80]!r} "
+                        f"msg={r.get('message', '')[:200]}",
+                        flush=True,
+                    )
 
         # Layer 4 retry — top up the bank if drops brought us below
         # the target. Cap at 1 retry (latency + cost). After retry,
@@ -3375,7 +3407,9 @@ RULES:
                 # `questions`; failures are logged but not re-retried.
                 retry_kept = 0
                 for j, rq in enumerate(retry_questions[:shortfall * 2]):
-                    tmpl_data = rq.get('template')
+                    # Same dual-name read as Layer 4 (schema field is
+                    # `template_data`, prompt-side alias is `template`).
+                    tmpl_data = rq.get('template_data') or rq.get('template')
                     if not tmpl_data:
                         layer4_rejections.append({
                             'question_index': len(questions) + j,
