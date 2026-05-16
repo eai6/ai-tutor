@@ -1737,6 +1737,29 @@ function escapeHtml(s) {
     }[c]));
 }
 
+// R5 (2026-05-15): on session resume, when a bank question is still
+// pending, drop a brief "welcome back, the question is on the right"
+// banner above the chat so the student knows where they left off.
+// The artifact panel is the persistent reminder; this banner just
+// catches their eye after the page loads. Auto-dismisses after 6s.
+function showResumePendingBanner() {
+    if (document.querySelector('.resume-pending-banner')) return;
+    const div = document.createElement('div');
+    div.className = 'resume-pending-banner';
+    div.style.cssText = 'margin:0.5rem auto;padding:0.625rem 1rem;'
+        + 'background:linear-gradient(90deg,#f3e8ff,#ede9fe);'
+        + 'border:1px solid #c4b5fd;border-radius:0.5rem;'
+        + 'font-size:0.8125rem;color:#5b21b6;text-align:center;'
+        + 'max-width:36rem;display:flex;align-items:center;'
+        + 'justify-content:center;gap:0.5rem;'
+        + 'transition:opacity 0.5s;';
+    div.innerHTML = '<span>↩</span><span>Welcome back — your previous question is still waiting in the panel on the right.</span>';
+    chatMessages.insertBefore(div, typing);
+    scrollToBottom();
+    setTimeout(() => { div.style.opacity = '0'; }, 6000);
+    setTimeout(() => div.remove(), 6500);
+}
+
 function addThumbnail(mediaItem) {
     // Skip if already in thumbnail strip
     if (sessionMedia.find(m => m.url === mediaItem.url)) return;
@@ -2034,6 +2057,21 @@ function handleResponse(data) {
 
     // Add tutor message
     addMessage('tutor', data.message, data.media, data.artifact_html, data.probe || null);
+
+    // R5 (2026-05-15): if a bank question is awaiting answer (set on
+    // session resume by chat_start_session), re-render it in the
+    // artifact panel + show a "welcome back" banner so the student
+    // knows where they left off. The deterministic bank-entry render
+    // means we don't need the tutor to re-pose the question in prose.
+    if (data.pending_question) {
+        renderPendingQuestionInArtifact(data.pending_question);
+        // Banner shows briefly above the chat — the artifact panel
+        // is the persistent reminder. Skip when this is a brand-new
+        // session (history is empty → no "welcome back" makes sense).
+        if (data.history && data.history.length > 0) {
+            showResumePendingBanner();
+        }
+    }
 
     // Handle exit ticket
     if (data.show_exit_ticket && data.exit_ticket) {

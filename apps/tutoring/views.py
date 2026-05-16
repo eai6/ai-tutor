@@ -735,6 +735,15 @@ def chat_start_session(request, lesson_id):
             "step_number": response.step_number,
             "total_steps": response.total_steps,
             "history": history,
+            # R5 (2026-05-15): if a bank question was awaiting an
+            # answer when the student left, the artifact panel
+            # re-renders it on load so they don't lose their place.
+            # The pending_question is computed deterministically from
+            # engine_state.awaiting_answer (set by R2's
+            # _record_bank_question_on_turn) — survives session
+            # reloads since engine_state is persisted.
+            "pending_question": getattr(response, 'pending_question', None)
+                or tutor._build_pending_question_payload(),
         })
 
     elif completed_session:
