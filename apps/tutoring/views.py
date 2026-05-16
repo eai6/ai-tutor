@@ -1275,6 +1275,175 @@ def chat_difficulty_signal(request, session_id):
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
+def chat_answer_bank_question(request, session_id):
+    """R4 (2026-05-15): the artifact-panel Submit button posts here
+    instead of routing the picked answer through the legacy
+    chat_respond text path. Eliminates MCQ false-rejects + over-eager
+    show-working class entirely:
+
+      1. Look up the bank entry by question_id + kind from the
+         pending_question metadata the artifact UI received.
+      2. Grade the answer DETERMINISTICALLY via bank_grader
+         (same path the post-lesson exit-ticket uses today —
+         already proven in production).
+      3. Persist the answer + verdict on a new SessionTurn marked
+         metadata.synthetic_source='bank_answer' so the chat UI
+         doesn't double-render and the analytics layer can slice
+         by submit-via-artifact vs typed.
+      4. Inject a synthetic student turn that summarises the
+         attempt for the conversation history (e.g. "I picked B"
+         / "I answered: 905"); fire respond() so the tutor reacts
+         using the verified verdict + R2 active_bank_question
+         scaffolding rules (no probing on correct, hint-then-probe
+         on wrong, etc).
+      5. Return BOTH the verdict AND the new tutor_message in one
+         payload so the frontend can show ✓/✗ feedback then render
+         the tutor's reply.
+
+    Body (JSON or form-encoded):
+      question_id (int, required)
+      kind (str, required) — 'lesson_step' | 'exit_ticket_question'
+      answer (str | list) — for MCQ a letter A/B/C/D; for
+        fill_in_blank a comma-string or list; for short_numeric a
+        value; for short_answer a free-text string.
+      show_working (str, optional) — R6 will use this; today it's
+        accepted but only persisted on the turn metadata for
+        analytics.
+    """
+    from apps.tutoring.conversational_tutor import ConversationalTutor
+
+    session = get_object_or_404(
+        TutorSession, id=session_id, student=request.user,
+    )
+
+    try:
+        if request.content_type and 'application/json' in request.content_type:
+            data = json.loads(request.body or b'{}')
+        else:
+            data = {
+                'question_id': request.POST.get('question_id'),
+                'kind': request.POST.get('kind'),
+                'answer': request.POST.get('answer', ''),
+                'show_working': request.POST.get('show_working', ''),
+            }
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    raw_qid = data.get('question_id')
+    kind = (data.get('kind') or '').strip().lower()
+    answer = data.get('answer')
+    show_working = (data.get('show_working') or '').strip()
+
+    if not raw_qid or kind not in ('lesson_step', 'exit_ticket_question'):
+        return JsonResponse({
+            'error': 'question_id + kind=lesson_step|exit_ticket_question required',
+        }, status=400)
+    try:
+        question_id = int(raw_qid)
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'question_id must be an integer'}, status=400)
+
+    # Resolve the bank entry. Fail-loud if it's gone (deleted course
+    # mid-session) — the frontend should surface the error so the
+    # student knows to refresh.
+    if kind == 'lesson_step':
+        from apps.curriculum.models import LessonStep
+        question = LessonStep.objects.filter(id=question_id).first()
+    else:
+        from apps.tutoring.models import ExitTicketQuestion
+        question = ExitTicketQuestion.objects.filter(id=question_id).first()
+    if question is None:
+        return JsonResponse({
+            'error': f'{kind} #{question_id} not found',
+        }, status=404)
+
+    # Grade. Use the lesson_step grader for slot 0; the bank grader for
+    # exit-ticket questions — same dispatch the legacy
+    # _grade_against_last_bank_question path does.
+    from apps.tutoring.bank_grader import (
+        grade_bank_response, grade_lesson_step_response,
+    )
+    if kind == 'lesson_step':
+        # Lesson-step grader expects a string.
+        verdict = grade_lesson_step_response(question, str(answer or ''))
+    else:
+        # Bank grader handles list / dict / str dispatch by question_type.
+        verdict = grade_bank_response(question, answer)
+
+    # Build the synthetic student message — short summary of what
+    # they picked. Goes into the conversation history so the tutor
+    # has context for its reply. NOT shown in the chat UI (the
+    # artifact-panel verdict + the tutor's reply are the visible
+    # signals; the literal "I picked B" would clutter).
+    if kind == 'exit_ticket_question' and (
+        getattr(question, 'question_type', '') == 'mcq'
+    ):
+        summary = f"I picked {str(answer).strip().upper()}."
+    elif isinstance(answer, list):
+        summary = "I answered: " + ", ".join(str(a) for a in answer)
+    else:
+        summary = f"I answered: {str(answer).strip()}"
+    if show_working:
+        summary += f"\n\nMy working:\n{show_working}"
+
+    # Drive the tutor's reaction through the existing respond() loop.
+    # The synthetic student turn carries the structured verdict in
+    # metadata so the active_bank_question system-prompt block (R2)
+    # can render student_status='answered_correct' / 'answered_wrong'
+    # — that's what makes the tutor confirm + explain (correct) or
+    # acknowledge + probe (wrong) without re-asking.
+    student_metadata = {
+        'synthetic_source': 'bank_answer',
+        'bank_question_id': question.id,
+        'bank_question_kind': kind,
+        'bank_grade_verdict': verdict.to_metadata(),
+    }
+    if show_working:
+        student_metadata['show_working'] = show_working[:2000]
+
+    tutor_message = None
+    try:
+        tutor = ConversationalTutor(session)
+        # Pre-load the verdict on the engine so _grade_against_last_bank_question
+        # doesn't re-grade against the synthetic turn's text.
+        tutor._pending_bank_grade = verdict
+        tutor._pending_bank_question = question
+
+        result = tutor.respond(summary, student_metadata=student_metadata)
+        tutor_message = {
+            'message': result.content,
+            'phase': result.phase,
+            'media': result.media,
+            'show_exit_ticket': result.show_exit_ticket,
+            'exit_ticket': result.exit_ticket_data,
+            'is_complete': result.is_complete,
+            'step_number': result.step_number,
+            'total_steps': result.total_steps,
+            'is_correct': result.is_correct,
+            'streak_count': result.streak_count,
+            'practice_score': result.practice_score,
+            'milestone': result.milestone,
+            'artifact_html': getattr(result, 'artifact_html', None),
+            'probe': getattr(result, 'probe', None),
+            'pending_question': getattr(result, 'pending_question', None),
+        }
+    except Exception as exc:
+        import logging as _lg
+        _lg.getLogger('apps').warning(
+            f"[chat_answer_bank_question] respond failed: {exc}",
+            exc_info=True,
+        )
+
+    return JsonResponse({
+        'ok': True,
+        'verdict': verdict.to_metadata(),
+        'tutor_message': tutor_message,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
 def chat_exit_ticket(request, session_id):
     """Submit exit ticket answers."""
     from apps.tutoring.conversational_tutor import ConversationalTutor

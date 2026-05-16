@@ -1650,16 +1650,13 @@ function bindBankQuestionHandlers(pq) {
         });
     });
 
-    submitBtn.addEventListener('click', () => {
-        // R3 stub: submit POSTs to the existing chat_respond endpoint
-        // with the picked answer as the student message. R4 will add
-        // a dedicated /answer-bank-question/ endpoint that uses the
-        // exit-ticket grader directly. For now, the legacy text-mode
-        // grader (already wired via _grade_against_last_bank_question)
-        // sees the structured answer string and produces a verdict
-        // — same path as today, just with the answer typed for the
-        // student via the artifact UI.
-        let answer = '';
+    submitBtn.addEventListener('click', async () => {
+        // R4 (2026-05-15): submit POSTs to the dedicated bank-answer
+        // endpoint which grades deterministically via bank_grader +
+        // fires the tutor's reply with the verdict baked into the
+        // active_bank_question system-prompt context (R2). Replaces
+        // the legacy route through chat_respond text grading.
+        let answer = null;  // string for MCQ/short; list for fill_in_blank
         if (pq.question_type === 'mcq') {
             const picked = card.querySelector('input[type=radio]:checked');
             if (!picked) {
@@ -1668,10 +1665,8 @@ function bindBankQuestionHandlers(pq) {
             }
             answer = picked.value;  // 'A' / 'B' / 'C' / 'D'
         } else if (pq.question_type === 'fill_in_blank') {
-            // Collect per-blank values in order. Comma-separate so the
-            // legacy text-mode grader (bank_grader._grade_fill_blank)
-            // splits on ',' / ';' / newline. R4's dedicated endpoint
-            // will accept the array directly.
+            // Send as a list — R4 endpoint forwards directly to
+            // bank_grader._grade_fill_blank which accepts list shape.
             const blanks = Array.from(card.querySelectorAll('.bank-q-blank'))
                 .sort((a, b) => Number(a.dataset.blankIndex) - Number(b.dataset.blankIndex))
                 .map(i => (i.value || '').trim());
@@ -1679,7 +1674,7 @@ function bindBankQuestionHandlers(pq) {
                 statusEl.textContent = 'Fill in at least one blank.';
                 return;
             }
-            answer = blanks.join(', ');
+            answer = blanks;
         } else {
             const input = card.querySelector('.bank-q-text');
             answer = (input && input.value || '').trim();
@@ -1690,13 +1685,49 @@ function bindBankQuestionHandlers(pq) {
         }
         submitBtn.disabled = true;
         statusEl.textContent = '⏳ Sending…';
-        // Drop the answer into the chat input + fire the standard
-        // sendMessage flow. The existing turn loop sees it as a
-        // student reply and grades against bank_question_ref on the
-        // last tutor turn (the inline path is still in place).
-        userInput.value = answer;
-        sendMessage();
-        statusEl.textContent = '✓ Answer sent — see chat for the tutor\'s reply.';
+        showTyping(true);
+        try {
+            const r = await fetch(`/tutor/api/chat/${sessionId}/answer-bank-question/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({
+                    question_id: pq.question_id,
+                    kind: pq.kind,
+                    answer: answer,
+                }),
+            });
+            const data = await r.json();
+            showTyping(false);
+            if (!data.ok) {
+                statusEl.textContent = '❌ ' + (data.error || 'submit failed');
+                submitBtn.disabled = false;
+                return;
+            }
+            // Render the verdict locally on the question card before
+            // the tutor's reply lands. Green check for correct, amber
+            // mark for wrong, neutral when skipped.
+            const verdict = data.verdict || {};
+            const isCorrect = verdict.is_correct;
+            if (isCorrect === true) {
+                statusEl.style.color = '#047857';
+                statusEl.textContent = '✓ Correct! Tutor is responding…';
+            } else if (isCorrect === false) {
+                statusEl.style.color = '#b45309';
+                statusEl.textContent = '✗ Not quite — tutor will help…';
+            } else {
+                statusEl.textContent = '✓ Submitted — see chat for tutor reply.';
+            }
+            if (data.tutor_message) {
+                applyTutorResponse(data.tutor_message);
+            }
+        } catch (err) {
+            showTyping(false);
+            statusEl.textContent = '❌ ' + err.message;
+            submitBtn.disabled = false;
+        }
     });
 }
 
