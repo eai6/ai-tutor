@@ -56,12 +56,13 @@ from __future__ import annotations
 
 import json
 import logging
-import re
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Literal, Optional
+
+from pydantic import BaseModel, Field
 
 from apps.curriculum.content_judges import JudgeResult
 from apps.curriculum.content_judges._providers import (
-    call_judge_with_fallback,
+    call_judge_structured_with_fallback,
     get_judge_provider_chain,
 )
 
@@ -150,56 +151,64 @@ the regen layer a concrete, self-contained instruction — name the \
 specific edit (which option to fix, which to relabel as correct, \
 what to rephrase). No "make it better" comments.
 
-Output exactly two XML blocks in this order, with no extra prose:
-
-<reasoning>
-3-5 short sentences. Walk through whether the marked answer is \
-correct, whether each distractor is unambiguously wrong, whether the \
-question is on-objective, and whether the wording is fair. Cite the \
-specific options when justifying.
-</reasoning>
-<verdict>
-{"passed": true|false, "violations": ["CODE", ...], \
-"recommended_fix": "concrete instruction or empty string"}
-</verdict>
+In `reasoning`, write 3-5 short sentences. Walk through whether the \
+marked answer is correct, whether each distractor is unambiguously \
+wrong, whether the question is on-objective, and whether the wording \
+is fair. Cite the specific options when justifying.
 """
 
 
-# ─── Output parsing ────────────────────────────────────────────────────
-_REASONING_RE = re.compile(
-    r"<reasoning>(.*?)</reasoning>", re.DOTALL | re.IGNORECASE,
-)
-_VERDICT_RE = re.compile(
-    r"<verdict>(.*?)</verdict>", re.DOTALL | re.IGNORECASE,
-)
-_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+_ALLOWED_VIOLATIONS = Literal[
+    "EXITQ_WRONG_ANSWER_KEY",
+    "EXITQ_MULTIPLE_CORRECT",
+    "EXITQ_AMBIGUOUS_DISTRACTOR",
+    "EXITQ_OFF_OBJECTIVE",
+    "EXITQ_TRICK_WORDING",
+]
 
 
-def _parse_verdict(raw: str) -> Optional[Dict[str, Any]]:
-    """Extract the verdict JSON. Returns None on parse failure."""
-    if not raw:
-        return None
-    m = _VERDICT_RE.search(raw)
-    if not m:
-        m2 = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not m2:
-            return None
-        candidate = m2.group(0)
-    else:
-        candidate = m.group(1).strip()
-    candidate = _FENCE_RE.sub("", candidate).strip()
-    try:
-        data = json.loads(candidate)
-    except Exception:
-        return None
-    return data if isinstance(data, dict) else None
+class ExitQuestionVerdict(BaseModel):
+    """Structured output for the exit_question judge.
+
+    Instructor enforces this schema via each provider's native
+    structured-output API — eliminates the unparseable_json failure
+    class entirely.
+    """
+    reasoning: str = Field(
+        description=(
+            "3-5 short sentences walking through whether the marked "
+            "answer is correct, whether distractors are unambiguously "
+            "wrong, whether the question is on-objective, and whether "
+            "the wording is fair. Cite specific options."
+        ),
+        max_length=2000,
+    )
+    passed: bool = Field(
+        description=(
+            "True iff the question is approved for use. False if any "
+            "HARD violation is present (WRONG_ANSWER_KEY / "
+            "MULTIPLE_CORRECT / OFF_OBJECTIVE)."
+        ),
+    )
+    violations: List[_ALLOWED_VIOLATIONS] = Field(
+        default_factory=list,
+        description="Zero or more violation codes from the enum.",
+    )
+    recommended_fix: str = Field(
+        default="",
+        description=(
+            "When rejecting: ≤120-word concrete instruction the "
+            "regen layer can act on (which option to fix, which to "
+            "relabel as correct, what to rephrase). Empty when passing."
+        ),
+        max_length=800,
+    )
 
 
-def _normalise_violations(raw_codes: Any) -> List[str]:
-    if not isinstance(raw_codes, list):
-        return []
+def _dedupe_violations(codes: List[str]) -> List[str]:
     out: List[str] = []
-    for code in raw_codes:
+    for code in codes:
         s = str(code or "").strip().upper()
         if s in VIOLATION_CODES and s not in out:
             out.append(s)
@@ -250,8 +259,7 @@ def _build_user_prompt(
         "Based on the lesson context and the question above, decide "
         "whether this MCQ is approved for use. Apply each rejection "
         "code definition strictly. Cite specific options when "
-        "justifying. Reply with ONE <reasoning> block then ONE "
-        "<verdict> JSON block — no other prose."
+        "justifying."
     )
 
 
@@ -274,7 +282,7 @@ def run_exit_question_judge(
     enabling_objective: str = "",
     exclude_provider: Optional[str] = None,
     judge_purpose: str = "content_judge_exit_question",
-    max_tokens: int = 1200,
+    max_tokens: int = 3500,
 ) -> JudgeResult:
     """Verify an MCQ exit-ticket question.
 
@@ -361,9 +369,10 @@ def run_exit_question_judge(
         enabling_objective=enabling_objective,
     )
 
-    call = call_judge_with_fallback(
+    call = call_judge_structured_with_fallback(
         user_prompt,
         providers,
+        ExitQuestionVerdict,
         system_prompt=_SYSTEM_INSTRUCTION,
         max_tokens=max_tokens,
     )
@@ -379,23 +388,11 @@ def run_exit_question_judge(
     result.provider = call.provider
     result.model_name = call.model_name
 
-    verdict = _parse_verdict(call.text)
-    if verdict is None:
-        logger.warning(
-            f"[ExitQuestionJudge] unparseable verdict from "
-            f"{call.provider}/{call.model_name}: {call.text[:200]!r}"
-        )
-        result.skipped = True
-        result.skip_reason = "verdict_unparseable"
-        return result
+    verdict: ExitQuestionVerdict = call.verdict
+    result.reasoning = (verdict.reasoning or "").strip()[:300]
 
-    reasoning_match = _REASONING_RE.search(call.text or "")
-    if reasoning_match:
-        result.reasoning = reasoning_match.group(1).strip()[:300]
-
-    raw_passed = bool(verdict.get("passed", True))
-    violations = _normalise_violations(verdict.get("violations"))
-    fix = str(verdict.get("recommended_fix") or "").strip()[:600]
+    violations = _dedupe_violations(list(verdict.violations or []))
+    fix = (verdict.recommended_fix or "").strip()[:600]
 
     # Pass policy: any HARD code → fail; only SOFT codes → pass with
     # warning; respect model's passed=false even if codes are all soft
@@ -404,7 +401,7 @@ def run_exit_question_judge(
     if hard_violations:
         passed = False
     else:
-        passed = raw_passed or not violations
+        passed = bool(verdict.passed) or not violations
 
     result.passed = passed
     result.violations = violations

@@ -73,13 +73,18 @@ class RegenCandidate:
 class RegenResult:
     """Outcome of a full regen run for one piece of content."""
     text: str = ""                           # Final text to persist
-    clean: bool = False                      # True iff no violations
+    clean: bool = False                      # True iff ALL judges pass
     cycles_run: int = 0
     picked_model: str = ""
     elapsed_seconds: float = 0.0
     final_violations: List[str] = field(default_factory=list)
     final_reasoning: str = ""
     audit: List[Dict[str, Any]] = field(default_factory=list)
+    # Per-judge final verdicts (post-regen). Keys: judge_name → dict
+    # with 'passed', 'violations', 'reasoning'. Used by the caller to
+    # update step.judge_outputs so the UI shows the FINAL per-judge
+    # state, not the original failing one.
+    final_judge_results: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
 
 def _candidate_to_audit(c: RegenCandidate, *, picked: bool) -> Dict[str, Any]:
@@ -102,7 +107,8 @@ def _candidate_to_audit(c: RegenCandidate, *, picked: bool) -> Dict[str, Any]:
 def run_step_regen(
     *,
     step_text: str,
-    judge_result: Dict[str, Any],
+    judge_results: Dict[str, Dict[str, Any]] = None,
+    judge_result: Dict[str, Any] = None,  # Legacy single-verdict shape
     lesson,
     lesson_subject: str = "",
     lesson_grade: str = "",
@@ -114,13 +120,26 @@ def run_step_regen(
     temperature_start: float = DEFAULT_TEMPERATURE_START,
     temperature_decay: float = DEFAULT_TEMPERATURE_DECAY,
 ) -> RegenResult:
-    """Rewrite step.teacher_script until factual_step judge passes
+    """Rewrite step.teacher_script until ALL enabled step judges pass
     OR the cycle cap is hit.
 
+    Multi-judge orchestration: per cycle, run the rewrite prompt that
+    targets the union of violations across factual_step + pedagogy_step
+    + safety_content, then re-run all 3 judges concurrently. Step is
+    `clean=True` only when every judge that ran passes. This guarantees
+    the post-regen text isn't fixing one judge while breaking another.
+
     Args:
-        step_text: The original teacher_script that failed the judge.
-        judge_result: The factual_step verdict dict — provides
-            violations + recommended_fix that drive the rewrite prompt.
+        step_text: The original teacher_script that failed at least
+            one judge.
+        judge_results: Mapping `{judge_name: verdict_dict}` covering
+            factual_step / pedagogy_step / safety_content. Verdicts
+            with `passed=True` or `skipped=True` are passed through
+            (used as constraints in the rewrite prompt) but don't
+            block the clean gate.
+        judge_result: Legacy single-verdict shape (factual_step only).
+            When supplied without `judge_results`, wrapped as
+            `{'factual_step': judge_result}` for back-compat.
         lesson: Lesson instance (for KB scoping in re-judge).
         lesson_*/step_*: Context for the regen prompt. Auto-derived
             from `lesson` when not supplied.
@@ -129,11 +148,18 @@ def run_step_regen(
             decay by `temperature_decay`.
 
     Returns:
-        RegenResult with the picked text + audit. `clean=True` iff a
-        cycle produced a candidate the judge passed (no violations);
-        otherwise `clean=False` and the caller should set
+        RegenResult with the picked text + per-judge final verdicts.
+        `clean=True` iff every judge that ran (excluding skipped)
+        passed on the picked candidate. Otherwise `clean=False` and
+        the caller should set
         step.content_quality_status = 'auto_flagged'.
     """
+    # Normalise legacy single-verdict shape to multi-judge dict.
+    if judge_results is None:
+        if judge_result is not None:
+            judge_results = {'factual_step': judge_result}
+        else:
+            judge_results = {}
     started = time.monotonic()
     result = RegenResult(text=step_text or '', cycles_run=0)
 
@@ -202,22 +228,113 @@ def run_step_regen(
         except Exception:
             pass
 
+    import concurrent.futures
+    from django.conf import settings as _s
     from apps.curriculum.content_judges.factual_step import (
         run_factual_step_judge,
     )
+    from apps.curriculum.content_judges.pedagogy_step import (
+        run_pedagogy_step_judge,
+    )
+    from apps.curriculum.content_judges.safety_content import (
+        run_safety_content_judge,
+    )
     from apps.curriculum.content_regen.prompt import (
-        build_step_regen_prompt,
+        build_step_multi_judge_regen_prompt,
     )
     from apps.curriculum.content_regen.score import score_candidate
+
+    pedagogy_enabled = getattr(_s, 'CONTENT_JUDGE_PEDAGOGY_STEP_ENABLED', True)
+    safety_enabled = getattr(_s, 'CONTENT_JUDGE_SAFETY_CONTENT_ENABLED', True)
 
     # exclude_provider for re-judge: same as the original judge ran
     # against — exclude the generation provider so the judge stays on
     # a different vendor for cross-provider review.
     judge_exclude = (gen_config.provider or '').lower() or None
 
+    def _serialize_verdict(verdict) -> Dict[str, Any]:
+        """Render a JudgeResult into the shape the prompt builder expects."""
+        return {
+            'passed': bool(verdict.passed),
+            'skipped': bool(verdict.skipped),
+            'violations': list(verdict.violations or []),
+            'reasoning': verdict.reasoning or '',
+            'recommended_fix': verdict.recommended_fix or '',
+            'provider': verdict.provider or '',
+            'model_name': verdict.model_name or '',
+            'skip_reason': verdict.skip_reason or '',
+        }
+
+    def _all_pass(verdict_dict: Dict[str, Dict[str, Any]]) -> bool:
+        """All non-skipped judges pass."""
+        for _, v in (verdict_dict or {}).items():
+            if not isinstance(v, dict):
+                continue
+            if v.get('skipped'):
+                continue
+            if not v.get('passed'):
+                return False
+        return True
+
+    def _union_violations(verdict_dict: Dict[str, Dict[str, Any]]) -> List[str]:
+        out: List[str] = []
+        for _, v in (verdict_dict or {}).items():
+            if not isinstance(v, dict):
+                continue
+            if v.get('skipped') or v.get('passed'):
+                continue
+            for code in v.get('violations') or []:
+                if code not in out:
+                    out.append(code)
+        return out
+
+    def _rejudge_all(text: str) -> Dict[str, Dict[str, Any]]:
+        """Run the 3 step judges in parallel and return per-judge dicts."""
+        verdicts: Dict[str, Dict[str, Any]] = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pex:
+            futures = {
+                pex.submit(
+                    run_factual_step_judge,
+                    text,
+                    lesson=lesson, exclude_provider=judge_exclude,
+                ): 'factual_step',
+            }
+            if pedagogy_enabled:
+                futures[pex.submit(
+                    run_pedagogy_step_judge,
+                    text,
+                    lesson=lesson,
+                    step_objective=step_objective,
+                    step_concept_tag=step_concept_tag,
+                    exclude_provider=judge_exclude,
+                )] = 'pedagogy_step'
+            if safety_enabled:
+                futures[pex.submit(
+                    run_safety_content_judge,
+                    text,
+                    lesson=lesson,
+                    exclude_provider=judge_exclude,
+                )] = 'safety_content'
+            for fut in concurrent.futures.as_completed(futures):
+                judge_name = futures[fut]
+                try:
+                    verdicts[judge_name] = _serialize_verdict(fut.result())
+                except Exception as exc:
+                    logger.warning(
+                        f"[ContentRegen] re-judge {judge_name} failed: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+                    verdicts[judge_name] = {
+                        'passed': False, 'skipped': True,
+                        'violations': [],
+                        'skip_reason': f'rejudge_error: {type(exc).__name__}',
+                    }
+        return verdicts
+
     candidates: List[RegenCandidate] = []
     best: Optional[RegenCandidate] = None
-    current_judge = dict(judge_result or {})
+    best_verdicts: Dict[str, Dict[str, Any]] = {}
+    current_verdicts: Dict[str, Dict[str, Any]] = dict(judge_results or {})
 
     for cycle in range(max_cycles):
         temperature = max(
@@ -230,12 +347,10 @@ def run_step_regen(
             temperature=temperature,
         )
 
-        # Build the focused regen prompt from the CURRENT verdict
-        # (judge_result on cycle 0; the previous cycle's verdict on
-        # cycle 1+).
-        prompt = build_step_regen_prompt(
+        # Build the multi-judge regen prompt from the CURRENT verdicts.
+        prompt = build_step_multi_judge_regen_prompt(
             original_text=step_text if cycle == 0 else (best.text if best else step_text),
-            judge_result=current_judge,
+            judge_results=current_verdicts,
             lesson_subject=lesson_subject,
             lesson_grade=lesson_grade,
             lesson_title=lesson_title,
@@ -276,30 +391,36 @@ def run_step_regen(
             candidates.append(c)
             continue
 
-        # Re-judge
+        # Re-judge — run all 3 judges in parallel
         try:
-            verdict = run_factual_step_judge(
-                candidate_text,
-                lesson=lesson,
-                exclude_provider=judge_exclude,
-            )
+            cycle_verdicts = _rejudge_all(candidate_text)
         except Exception as exc:
             logger.warning(
-                f"[ContentRegen] cycle {cycle+1} re-judge failed: "
+                f"[ContentRegen] cycle {cycle+1} re-judge orch failed: "
                 f"{type(exc).__name__}: {exc}"
             )
-            c.error = f"judge_failed: {type(exc).__name__}"
+            c.error = f"rejudge_orch_failed: {type(exc).__name__}"
             c.score = score_candidate({'violations': [], 'skipped': True})
             candidates.append(c)
             continue
 
-        c.judge_passed = bool(verdict.passed)
-        c.judge_violations = list(verdict.violations or [])
-        c.judge_reasoning = verdict.reasoning or ''
+        union_viols = _union_violations(cycle_verdicts)
+        all_pass = _all_pass(cycle_verdicts)
+        c.judge_passed = all_pass
+        c.judge_violations = union_viols
+        # Compose a short reasoning summary across judges for the audit.
+        reasoning_bits = []
+        for jname, v in cycle_verdicts.items():
+            if not isinstance(v, dict) or v.get('skipped') or v.get('passed'):
+                continue
+            r = (v.get('reasoning') or '').strip()
+            if r:
+                reasoning_bits.append(f"{jname}: {r[:150]}")
+        c.judge_reasoning = " | ".join(reasoning_bits)[:400]
         c.score = score_candidate({
-            'violations': c.judge_violations,
-            'skipped': verdict.skipped,
-            'passed': verdict.passed,
+            'violations': union_viols,
+            'skipped': False,
+            'passed': all_pass,
         })
         candidates.append(c)
 
@@ -307,17 +428,15 @@ def run_step_regen(
         # ever appears.
         if best is None or c.score > best.score:
             best = c
+            best_verdicts = cycle_verdicts
 
-        # Refresh the verdict that drives the next cycle's prompt.
-        current_judge = {
-            'violations': c.judge_violations,
-            'reasoning': c.judge_reasoning,
-            'recommended_fix': verdict.recommended_fix or '',
-        }
+        # Refresh the verdicts that drive the next cycle's prompt.
+        current_verdicts = cycle_verdicts
 
-        # Early-exit on first clean candidate (no violations).
-        if c.judge_passed and not c.judge_violations:
+        # Early-exit on first all-judges-clean candidate.
+        if all_pass:
             best = c
+            best_verdicts = cycle_verdicts
             break
 
     result.cycles_run = len(candidates)
@@ -338,6 +457,7 @@ def run_step_regen(
     result.picked_model = best.model_name
     result.final_violations = list(best.judge_violations)
     result.final_reasoning = best.judge_reasoning
+    result.final_judge_results = best_verdicts
     result.audit = [
         _candidate_to_audit(c, picked=(c is best)) for c in candidates
     ]
@@ -346,7 +466,8 @@ def run_step_regen(
     logger.info(
         f"[ContentRegen] {'CLEAN' if result.clean else 'FLAGGED'} after "
         f"{result.cycles_run} cycle(s) — picked model={best.model_name} "
-        f"violations={best.judge_violations} elapsed={result.elapsed_seconds:.1f}s"
+        f"final_violations={best.judge_violations} "
+        f"elapsed={result.elapsed_seconds:.1f}s"
     )
     return result
 
@@ -730,6 +851,361 @@ def run_exit_question_prompt_regen(
     return result
 
 
+@dataclass
+class ExitQuestionAutoRegenResult:
+    """Outcome of judge-driven (auto) MCQ regen.
+
+    Distinct from `ExitQuestionRegenResult` (teacher-prompt-driven) so
+    we can carry the per-cycle audit + post-regen verdict without
+    overloading the manual-UI shape.
+    """
+    question_text: str = ""
+    option_a: str = ""
+    option_b: str = ""
+    option_c: str = ""
+    option_d: str = ""
+    correct_answer: str = ""
+    explanation: str = ""
+    clean: bool = False
+    cycles_run: int = 0
+    picked_model: str = ""
+    elapsed_seconds: float = 0.0
+    final_violations: List[str] = field(default_factory=list)
+    final_reasoning: str = ""
+    final_judge_result: Dict[str, Any] = field(default_factory=dict)
+    audit: List[Dict[str, Any]] = field(default_factory=list)
+
+    def as_dict(self) -> Dict[str, str]:
+        return {
+            'question_text': self.question_text,
+            'option_a': self.option_a,
+            'option_b': self.option_b,
+            'option_c': self.option_c,
+            'option_d': self.option_d,
+            'correct_answer': self.correct_answer,
+            'explanation': self.explanation,
+        }
+
+
+def run_exit_question_regen(
+    *,
+    original_question: Dict[str, Any],
+    judge_result: Dict[str, Any],
+    lesson,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+    max_cycles: int = DEFAULT_MAX_CYCLES,
+    temperature_start: float = DEFAULT_TEMPERATURE_START,
+    temperature_decay: float = DEFAULT_TEMPERATURE_DECAY,
+) -> ExitQuestionAutoRegenResult:
+    """Rewrite ONE MCQ until the exit_question judge passes OR the
+    cycle cap is hit.
+
+    Cycle = 1 generation call + 1 re-judge call. Hard cap matches
+    `run_step_regen` (DEFAULT_MAX_CYCLES). Early-exit on first clean
+    candidate. After cap with violations remaining: return the BEST
+    candidate (fewest violations) and let caller flag
+    content_quality_status='auto_flagged'.
+
+    Args:
+        original_question: Dict with question_text, option_a..d,
+            correct_answer (single letter), explanation.
+        judge_result: The exit_question verdict dict — provides the
+            violations + reasoning + recommended_fix that drive the
+            cycle-1 rewrite prompt.
+        lesson: Lesson instance (for KB scoping in re-judge).
+        lesson_*/step_*: Context for the regen prompt. Auto-derived
+            from `lesson` when not supplied.
+
+    Returns:
+        ExitQuestionAutoRegenResult. `clean=True` iff the picked
+        candidate's exit_question verdict passes.
+    """
+    started = time.monotonic()
+    result = ExitQuestionAutoRegenResult(
+        question_text=original_question.get('question_text') or '',
+        option_a=original_question.get('option_a') or '',
+        option_b=original_question.get('option_b') or '',
+        option_c=original_question.get('option_c') or '',
+        option_d=original_question.get('option_d') or '',
+        correct_answer=original_question.get('correct_answer') or '',
+        explanation=original_question.get('explanation') or '',
+    )
+
+    try:
+        from apps.llm.models import ModelConfig
+        from apps.llm.client import get_llm_client
+        gen_config = ModelConfig.get_for('generation')
+    except Exception as exc:
+        result.audit.append({
+            'cycle': 0, 'error': f'config_lookup_failed: {exc}',
+            'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    if gen_config is None:
+        result.audit.append({
+            'cycle': 0, 'error': 'no_generation_config', 'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    try:
+        gen_client = get_llm_client(gen_config)
+    except Exception as exc:
+        result.audit.append({
+            'cycle': 0, 'error': f'client_construction_failed: {exc}',
+            'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    if lesson is not None and not (lesson_subject and lesson_title):
+        try:
+            lesson_title = lesson_title or str(getattr(lesson, 'title', '') or '')
+            lesson_objective = lesson_objective or str(
+                getattr(lesson, 'objective', '') or ''
+            )
+            unit = getattr(lesson, 'unit', None)
+            course = getattr(unit, 'course', None) if unit else None
+            if course is not None and not lesson_subject:
+                subj_type = getattr(course, 'subject_type', '') or ''
+                course_name = getattr(course, 'name', '') or ''
+                lesson_subject = str(subj_type or course_name)
+            if course is not None and not lesson_grade:
+                grades = getattr(course, 'grade_levels', None) or []
+                if isinstance(grades, list) and grades:
+                    lesson_grade = ", ".join(str(g) for g in grades[:3])
+                else:
+                    lesson_grade = str(getattr(course, 'grade_level', '') or '')
+        except Exception:
+            pass
+
+    from apps.curriculum.content_judges.exit_question import (
+        run_exit_question_judge,
+    )
+    from apps.curriculum.content_regen.prompt import (
+        build_exit_q_auto_regen_prompt,
+    )
+    from apps.curriculum.content_regen.score import score_candidate
+    from apps.curriculum.content_regen.schemas import MCQRewrite
+
+    judge_exclude = (gen_config.provider or '').lower() or None
+
+    # Instructor-wrap the generation client so each cycle's output is
+    # schema-validated (eliminates the unparseable_json failure class
+    # that previously caused entire 2-cycle runs to error out).
+    instructor_client = None
+    try:
+        import instructor
+        provider_map = {
+            'anthropic': 'anthropic', 'openai': 'openai',
+            'google': 'google', 'local_ollama': 'ollama',
+        }
+        provider_key = provider_map.get(
+            str(gen_config.provider).lower(), str(gen_config.provider).lower()
+        )
+        instructor_client = instructor.from_provider(
+            f"{provider_key}/{gen_config.model_name}",
+            api_key=gen_config.get_api_key(),
+        )
+    except Exception as exc:
+        logger.warning(
+            f"[ContentRegen] exit-Q instructor init failed — falling back "
+            f"to raw gen client: {type(exc).__name__}: {exc}"
+        )
+
+    def _coerce(parsed: MCQRewrite, fallback) -> ExitQuestionAutoRegenResult:
+        """Build a result snapshot from a validated Pydantic MCQRewrite."""
+        snap = ExitQuestionAutoRegenResult(
+            question_text=(parsed.question_text or fallback.question_text)[:600],
+            option_a=(parsed.option_a or fallback.option_a)[:200],
+            option_b=(parsed.option_b or fallback.option_b)[:200],
+            option_c=(parsed.option_c or fallback.option_c)[:200],
+            option_d=(parsed.option_d or fallback.option_d)[:200],
+            explanation=(parsed.explanation or fallback.explanation)[:500],
+        )
+        raw_correct = (parsed.correct_answer or fallback.correct_answer)[:1].upper()
+        snap.correct_answer = (
+            raw_correct if raw_correct in ('A', 'B', 'C', 'D')
+            else fallback.correct_answer
+        )
+        return snap
+
+    candidates: List[RegenCandidate] = []
+    best: Optional[RegenCandidate] = None
+    best_snap: Optional[ExitQuestionAutoRegenResult] = None
+    best_verdict: Dict[str, Any] = {}
+    current_judge = dict(judge_result or {})
+    current_question: Dict[str, Any] = dict(original_question or {})
+
+    for cycle in range(max_cycles):
+        temperature = max(
+            0.0, temperature_start - cycle * temperature_decay,
+        )
+        c = RegenCandidate(
+            cycle=cycle + 1,
+            model_name=gen_config.model_name or '',
+            temperature=temperature,
+        )
+
+        prompt = build_exit_q_auto_regen_prompt(
+            original_question=current_question,
+            judge_result=current_judge,
+            lesson_subject=lesson_subject,
+            lesson_grade=lesson_grade,
+            lesson_title=lesson_title,
+            lesson_objective=lesson_objective,
+            step_concept_tag=step_concept_tag,
+            enabling_objective=enabling_objective,
+        )
+
+        parsed = None
+        if instructor_client is not None:
+            try:
+                create_kwargs = dict(
+                    response_model=MCQRewrite,
+                    messages=[
+                        {"role": "system", "content": prompt['system']},
+                        {"role": "user", "content": prompt['user']},
+                    ],
+                    max_retries=2,
+                )
+                # Gemini 3 burns ~1500 tokens on internal thinking
+                # before the function call returns; budget 4000 so the
+                # MCQ payload itself has room. Anthropic/OpenAI don't
+                # need the headroom but the higher cap is harmless.
+                if str(gen_config.provider).lower() == 'google':
+                    create_kwargs['generation_config'] = {'max_tokens': 4000}
+                else:
+                    create_kwargs['max_tokens'] = 4000
+                parsed = instructor_client.chat.completions.create(**create_kwargs)
+            except Exception as exc:
+                logger.warning(
+                    f"[ContentRegen] exit-Q cycle {cycle+1} instructor "
+                    f"call failed: {type(exc).__name__}: {exc}"
+                )
+                c.error = f"gen_failed: {type(exc).__name__}"
+                candidates.append(c)
+                continue
+        else:
+            # Instructor unavailable (initialization failed). Skip the
+            # cycle cleanly rather than falling back to brittle JSON
+            # parsing — better to flag for human review than to ship
+            # malformed content.
+            c.error = "instructor_unavailable"
+            candidates.append(c)
+            continue
+
+        snap = _coerce(parsed, result)
+        c.text = (snap.question_text or '')[:200]
+
+        # Re-judge
+        try:
+            verdict = run_exit_question_judge(
+                question_text=snap.question_text,
+                option_a=snap.option_a, option_b=snap.option_b,
+                option_c=snap.option_c, option_d=snap.option_d,
+                correct_answer=snap.correct_answer,
+                explanation=snap.explanation,
+                lesson=lesson,
+                step_concept_tag=step_concept_tag,
+                enabling_objective=enabling_objective,
+                exclude_provider=judge_exclude,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"[ContentRegen] exit-Q cycle {cycle+1} re-judge failed: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            c.error = f"judge_failed: {type(exc).__name__}"
+            c.score = score_candidate({'violations': [], 'skipped': True})
+            candidates.append(c)
+            continue
+
+        c.judge_passed = bool(verdict.passed)
+        c.judge_violations = list(verdict.violations or [])
+        c.judge_reasoning = verdict.reasoning or ''
+        c.score = score_candidate({
+            'violations': c.judge_violations,
+            'skipped': verdict.skipped,
+            'passed': verdict.passed,
+        })
+        candidates.append(c)
+
+        verdict_dict = {
+            'passed': bool(verdict.passed),
+            'skipped': bool(verdict.skipped),
+            'violations': list(verdict.violations or []),
+            'reasoning': verdict.reasoning or '',
+            'recommended_fix': verdict.recommended_fix or '',
+            'provider': verdict.provider or '',
+            'model_name': verdict.model_name or '',
+            'skip_reason': verdict.skip_reason or '',
+        }
+
+        if best is None or c.score > best.score:
+            best = c
+            best_snap = snap
+            best_verdict = verdict_dict
+
+        # Refresh inputs that drive the next cycle's prompt.
+        current_judge = {
+            'violations': c.judge_violations,
+            'reasoning': c.judge_reasoning,
+            'recommended_fix': verdict.recommended_fix or '',
+        }
+        current_question = snap.as_dict()
+
+        if c.judge_passed and not c.judge_violations:
+            best = c
+            best_snap = snap
+            best_verdict = verdict_dict
+            break
+
+    result.cycles_run = len(candidates)
+    if best is None or best_snap is None:
+        result.clean = False
+        result.audit = [_candidate_to_audit(c, picked=False) for c in candidates]
+        result.elapsed_seconds = time.monotonic() - started
+        logger.warning(
+            f"[ContentRegen] exit-Q all {len(candidates)} cycles errored — "
+            f"keeping original"
+        )
+        return result
+
+    # Promote best snapshot's fields onto the result.
+    result.question_text = best_snap.question_text
+    result.option_a = best_snap.option_a
+    result.option_b = best_snap.option_b
+    result.option_c = best_snap.option_c
+    result.option_d = best_snap.option_d
+    result.correct_answer = best_snap.correct_answer
+    result.explanation = best_snap.explanation
+    result.clean = bool(best.judge_passed and not best.judge_violations)
+    result.picked_model = best.model_name
+    result.final_violations = list(best.judge_violations)
+    result.final_reasoning = best.judge_reasoning
+    result.final_judge_result = best_verdict
+    result.audit = [
+        _candidate_to_audit(c, picked=(c is best)) for c in candidates
+    ]
+    result.elapsed_seconds = time.monotonic() - started
+
+    logger.info(
+        f"[ContentRegen] exit-Q {'CLEAN' if result.clean else 'FLAGGED'} after "
+        f"{result.cycles_run} cycle(s) — picked={best.model_name} "
+        f"final_violations={best.judge_violations} "
+        f"elapsed={result.elapsed_seconds:.1f}s"
+    )
+    return result
+
+
 __all__ = [
     "DEFAULT_MAX_CYCLES",
     "DEFAULT_TEMPERATURE_START",
@@ -737,7 +1213,9 @@ __all__ = [
     "RegenCandidate",
     "RegenResult",
     "ExitQuestionRegenResult",
+    "ExitQuestionAutoRegenResult",
     "run_step_regen",
     "run_step_prompt_regen",
     "run_exit_question_prompt_regen",
+    "run_exit_question_regen",
 ]

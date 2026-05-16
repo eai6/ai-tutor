@@ -132,29 +132,42 @@ def _run_content_judges_for_steps(lesson, steps):
                 if jv is not None:
                     outputs[judge_name] = _serialize_factual_verdict(jv)
 
-            # Default to whatever the judge said: passed → auto_ok,
-            # skipped → keep unreviewed, failed → either regen or
-            # auto_flagged. We may overwrite verdict + status below
-            # if regen produces a clean candidate.
+            # Compose the multi-judge view of this step's verdicts so
+            # we can decide regen on ANY judge REJECT (not just
+            # factual_step). A judge that REJECTs but is `skipped` does
+            # not count — only honest rejections trigger regen.
+            judge_names = ('factual_step', 'pedagogy_step', 'safety_content')
+            multi_verdicts = {
+                jn: outputs[jn] for jn in judge_names if jn in outputs
+            }
+            any_failed = any(
+                isinstance(v, dict)
+                and not v.get('skipped')
+                and not v.get('passed')
+                for v in multi_verdicts.values()
+            )
+            all_skipped_or_passed = not any_failed
+
+            # Default to whatever the judges said: all-pass/skipped →
+            # auto_ok, otherwise → regen-then-decide. We may overwrite
+            # verdict + status below if regen produces a clean
+            # candidate across ALL judges.
             new_status = step.content_quality_status
             update_fields = ['judge_outputs', 'content_quality_status']
 
-            if verdict.skipped:
-                # Couldn't verify — leave whatever status the step had.
-                # Don't auto_ok (we don't know it's clean) and don't
-                # auto_flag (we don't know it's bad).
-                pass
-            elif verdict.passed:
+            if all_skipped_or_passed:
                 # Includes both clean (no violations) AND soft-warning
                 # cases (passed=True with STEP_FACT_UNSUPPORTED). Soft
                 # warnings surface as ⚠ Review badge in the UI but
-                # don't auto_flag the step — the judge says it's OK
-                # to ship, just worth a teacher glance.
+                # don't auto_flag — the judges say it's OK to ship,
+                # just worth a teacher glance.
                 new_status = LessonStep.ContentQualityStatus.AUTO_OK
-            elif not verdict.passed and regen_enabled:
-                # Q2 regen — try to fix the step before flagging it.
+            elif any_failed and regen_enabled:
+                # Multi-judge regen: try to fix EVERY violation across
+                # EVERY judge in one rewrite, re-judge all 3 per cycle,
+                # accept only when ALL pass.
                 regen_result = _regen_one_step(
-                    step, lesson, verdict_dict,
+                    step, lesson, multi_verdicts,
                 )
                 outputs['regen_audit'] = {
                     'cycles_run': regen_result.cycles_run,
@@ -162,36 +175,36 @@ def _run_content_judges_for_steps(lesson, steps):
                     'picked_model': regen_result.picked_model,
                     'elapsed_seconds': round(regen_result.elapsed_seconds, 2),
                     'final_violations': list(regen_result.final_violations),
+                    'final_judge_results': dict(regen_result.final_judge_results or {}),
                     'cycles': regen_result.audit,
                 }
                 if regen_result.clean and regen_result.text:
                     # Replace the step text with the clean candidate
-                    # and update the verdict to the clean re-judge result.
+                    # and refresh ALL judge verdicts to the post-regen
+                    # state so the UI shows the FINAL passing verdicts,
+                    # not the original failing ones.
                     step.teacher_script = regen_result.text
                     new_status = LessonStep.ContentQualityStatus.AUTO_OK
-                    # Refresh factual_step verdict with the post-regen
-                    # state so the UI shows the FINAL passing verdict,
-                    # not the original failing one.
-                    outputs['factual_step'] = {
-                        **verdict_dict,
-                        'passed': True,
-                        'violations': [],
-                        'reasoning': (
-                            "Original step failed factual check; "
-                            f"regen cycle {regen_result.cycles_run} "
-                            "produced a clean rewrite."
-                        ),
-                        'recommended_fix': '',
-                    }
+                    for jn, jv in (regen_result.final_judge_results or {}).items():
+                        if isinstance(jv, dict):
+                            outputs[jn] = jv
                     update_fields.append('teacher_script')
                     regenerated += 1
                 else:
-                    # Regen exhausted without a clean candidate — flag
-                    # for human review. NEVER silently fail.
+                    # Regen exhausted without an all-judges-clean
+                    # candidate — flag for human review. NEVER silently
+                    # fail. Persist the partial post-regen verdicts
+                    # too so the teacher sees the best attempt.
                     new_status = LessonStep.ContentQualityStatus.AUTO_FLAGGED
+                    if regen_result.text:
+                        step.teacher_script = regen_result.text
+                        update_fields.append('teacher_script')
+                    for jn, jv in (regen_result.final_judge_results or {}).items():
+                        if isinstance(jv, dict):
+                            outputs[jn] = jv
                     flagged += 1
             else:
-                # Judge failed but regen disabled → flag directly.
+                # Judges failed but regen disabled → flag directly.
                 new_status = LessonStep.ContentQualityStatus.AUTO_FLAGGED
                 flagged += 1
 
@@ -230,9 +243,14 @@ def _serialize_factual_verdict(verdict) -> dict:
     }
 
 
-def _regen_one_step(step, lesson, verdict_dict: dict):
+def _regen_one_step(step, lesson, judge_results: dict):
     """Wrapper around content_regen.run_step_regen that derives the
     needed lesson/step context from the LessonStep instance.
+
+    `judge_results` is the multi-judge dict
+    `{judge_name: verdict_dict}` covering factual_step / pedagogy_step
+    / safety_content. Regen fixes the union of all violations and
+    re-runs all 3 judges per cycle; `clean=True` only when ALL pass.
 
     Fail-soft: any exception inside regen returns a synthetic "no clean
     candidate" RegenResult so the caller still flags auto_flagged
@@ -242,7 +260,7 @@ def _regen_one_step(step, lesson, verdict_dict: dict):
     try:
         return run_step_regen(
             step_text=step.teacher_script or '',
-            judge_result=verdict_dict,
+            judge_results=judge_results,
             lesson=lesson,
             step_objective=step.enabling_objective or '',
             step_concept_tag=step.concept_tag or '',
@@ -270,16 +288,20 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
     ThreadPoolExecutor + fail-soft pattern.
 
     Verdicts land on ExitTicketQuestion.judge_outputs.exit_question.
-    No regen ensemble for v1 — flagged questions surface a Needs
-    Review badge in the UI and use the manual regen UI (Q3.2) to fix.
+    REJECTs trigger a bounded regen ensemble (run_exit_question_regen)
+    that rewrites + re-judges up to DEFAULT_MAX_CYCLES times. Only
+    questions that REJECT after every cycle land in auto_flagged.
     """
     if not mcqs:
         return
 
     import concurrent.futures
+    from django.conf import settings as _s
     from apps.curriculum.content_judges.exit_question import (
         run_exit_question_judge,
     )
+
+    regen_enabled = getattr(_s, 'CONTENT_REGEN_ENABLED', True)
 
     # Cross-provider: exclude the generator's provider from the judge
     # chain so the judge can't be the same vendor that produced the
@@ -316,6 +338,7 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
         return q, verdict
 
     persisted = 0
+    regenerated = 0
     flagged = 0
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=min(8, len(mcqs))
@@ -325,8 +348,7 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
             q, verdict = f.result()
             if verdict is None:
                 continue
-            outputs = dict(q.judge_outputs or {})
-            outputs['exit_question'] = {
+            verdict_dict = {
                 'passed': verdict.passed,
                 'violations': list(verdict.violations or []),
                 'reasoning': verdict.reasoning or '',
@@ -336,12 +358,73 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
                 'skipped': verdict.skipped,
                 'skip_reason': verdict.skip_reason or '',
             }
+            outputs = dict(q.judge_outputs or {})
+            outputs['exit_question'] = verdict_dict
+            update_fields = ['judge_outputs']
+            # ExitTicketQuestion has no content_quality_status field —
+            # flagged vs ok is implicit in judge_outputs.exit_question.passed.
+
+            if verdict.skipped:
+                # Couldn't verify — nothing to do.
+                pass
+            elif verdict.passed:
+                pass  # already clean; no regen needed
+            elif regen_enabled:
+                regen_result = _regen_one_exit_q(q, lesson, verdict_dict)
+                outputs['regen_audit'] = {
+                    'cycles_run': regen_result.cycles_run,
+                    'clean': regen_result.clean,
+                    'picked_model': regen_result.picked_model,
+                    'elapsed_seconds': round(regen_result.elapsed_seconds, 2),
+                    'final_violations': list(regen_result.final_violations),
+                    'final_judge_result': dict(regen_result.final_judge_result or {}),
+                    'cycles': regen_result.audit,
+                }
+                if regen_result.clean and regen_result.question_text:
+                    # Replace MCQ fields + refresh judge verdict.
+                    q.question_text = regen_result.question_text
+                    q.option_a = regen_result.option_a
+                    q.option_b = regen_result.option_b
+                    q.option_c = regen_result.option_c
+                    q.option_d = regen_result.option_d
+                    q.correct_answer = regen_result.correct_answer
+                    q.explanation = regen_result.explanation
+                    if regen_result.final_judge_result:
+                        outputs['exit_question'] = dict(regen_result.final_judge_result)
+                    update_fields += [
+                        'question_text', 'option_a', 'option_b',
+                        'option_c', 'option_d', 'correct_answer',
+                        'explanation',
+                    ]
+                    regenerated += 1
+                else:
+                    # Regen exhausted — flag is implicit (judge_outputs
+                    # carries passed=False). Persist the best partial
+                    # rewrite + its verdict so the teacher sees the
+                    # most recent attempt.
+                    if regen_result.question_text:
+                        q.question_text = regen_result.question_text
+                        q.option_a = regen_result.option_a
+                        q.option_b = regen_result.option_b
+                        q.option_c = regen_result.option_c
+                        q.option_d = regen_result.option_d
+                        q.correct_answer = regen_result.correct_answer
+                        q.explanation = regen_result.explanation
+                        update_fields += [
+                            'question_text', 'option_a', 'option_b',
+                            'option_c', 'option_d', 'correct_answer',
+                            'explanation',
+                        ]
+                    if regen_result.final_judge_result:
+                        outputs['exit_question'] = dict(regen_result.final_judge_result)
+                    flagged += 1
+            else:
+                flagged += 1
+
             q.judge_outputs = outputs
             try:
-                q.save(update_fields=['judge_outputs'])
+                q.save(update_fields=list(set(update_fields)))
                 persisted += 1
-                if not verdict.passed and not verdict.skipped:
-                    flagged += 1
             except Exception as exc:
                 print(
                     f"[ContentGen] [{lesson.title}] exit-Q #{q.id} "
@@ -351,9 +434,58 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
 
     print(
         f"[ContentGen] [{lesson.title}] exit_question judge: "
-        f"{persisted}/{len(mcqs)} persisted (flagged={flagged})",
+        f"{persisted}/{len(mcqs)} persisted "
+        f"(regenerated={regenerated}, auto_flagged={flagged})",
         flush=True,
     )
+
+
+def _regen_one_exit_q(q, lesson, verdict_dict: dict):
+    """Wrapper around content_regen.run_exit_question_regen that
+    derives lesson context from the question instance.
+
+    Fail-soft: any exception inside regen returns a synthetic "no
+    clean candidate" result so the caller still flags auto_flagged
+    rather than crashing the pipeline.
+    """
+    from apps.curriculum.content_regen import (
+        run_exit_question_regen, ExitQuestionAutoRegenResult,
+    )
+    try:
+        return run_exit_question_regen(
+            original_question={
+                'question_text': q.question_text or '',
+                'option_a': q.option_a or '',
+                'option_b': q.option_b or '',
+                'option_c': q.option_c or '',
+                'option_d': q.option_d or '',
+                'correct_answer': q.correct_answer or '',
+                'explanation': q.explanation or '',
+            },
+            judge_result=verdict_dict,
+            lesson=lesson,
+            step_concept_tag=q.concept_tag or '',
+            enabling_objective=q.enabling_objective or '',
+        )
+    except Exception as exc:
+        print(
+            f"[ContentGen] [{lesson.title}] exit-Q #{q.id} "
+            f"regen raised: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return ExitQuestionAutoRegenResult(
+            question_text=q.question_text or '',
+            option_a=q.option_a or '', option_b=q.option_b or '',
+            option_c=q.option_c or '', option_d=q.option_d or '',
+            correct_answer=q.correct_answer or '',
+            explanation=q.explanation or '',
+            clean=False, cycles_run=0,
+            audit=[{
+                'cycle': 0,
+                'error': f'orchestrator_raised: {type(exc).__name__}',
+                'picked': False,
+            }],
+        )
 
 
 def _normalize_enabling_objective(

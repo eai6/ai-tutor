@@ -197,3 +197,156 @@ def call_judge_with_fallback(
     return last_result if last_result else JudgeCallResult(
         success=False, provider="(unknown)",
     )
+
+
+# ─── Structured-output (instructor-backed) sibling ──────────────────────
+@dataclass
+class JudgeStructuredResult:
+    """Outcome of a structured-output judge call. `verdict` is the
+    validated Pydantic instance (typed via `response_model`)."""
+    verdict: object = None       # response_model instance, or None on failure
+    success: bool = False
+    provider: str = ""
+    model_name: str = ""
+    error_class: str = ""
+    error_detail: str = ""
+
+
+# Maps `ModelConfig.provider` (DB enum) to the prefix instructor expects
+# in `from_provider("<prefix>/<model>")`. Same mapping used in
+# apps/curriculum/pipeline.py::_get_instructor_client + grader.py.
+_PROVIDER_INSTRUCTOR_MAP = {
+    'anthropic': 'anthropic',
+    'openai': 'openai',
+    'google': 'google',
+    'local_ollama': 'ollama',
+}
+
+
+def _get_instructor_client_for(config):
+    """Wrap a ModelConfig in an instructor-augmented client.
+
+    Returns None when instructor / the provider SDK isn't installed.
+    Caller falls back to next provider in chain.
+    """
+    try:
+        import instructor
+    except ImportError:
+        logger.warning("instructor package not installed — structured output unavailable")
+        return None
+    provider_key = _PROVIDER_INSTRUCTOR_MAP.get(
+        str(config.provider).lower(), str(config.provider).lower()
+    )
+    try:
+        return instructor.from_provider(
+            f"{provider_key}/{config.model_name}",
+            api_key=config.get_api_key(),
+        )
+    except Exception as exc:
+        logger.warning(
+            f"instructor.from_provider({provider_key}/{config.model_name}) "
+            f"failed: {type(exc).__name__}: {exc}"
+        )
+        return None
+
+
+def call_judge_structured_with_fallback(
+    user_prompt: str,
+    providers: List[JudgeProvider],
+    response_model,
+    *,
+    system_prompt: str = "",
+    max_tokens: int = 2048,
+    max_retries: int = 1,
+) -> JudgeStructuredResult:
+    """Structured-output sibling of `call_judge_with_fallback`.
+
+    Wraps each provider's underlying client in `instructor` and calls
+    `chat.completions.create(response_model=...)` so the model output
+    is validated against the Pydantic schema before return. Eliminates
+    the fragile `json.loads` + regex-repair codepath.
+
+    Provider-side failures (no instructor, schema-violation retries
+    exhausted, network error) fall through to the next provider in the
+    chain. Never raises — failures land in `JudgeStructuredResult` with
+    `success=False`.
+
+    Args:
+        user_prompt: The user-message content (rendered prompt body).
+        providers: Ordered list of JudgeProvider candidates.
+        response_model: Pydantic model class for the expected output.
+        system_prompt: System-message content.
+        max_tokens: Output token cap.
+        max_retries: Instructor's schema-violation retry budget per
+            provider call. Cycle cap is separate (per provider).
+
+    Returns:
+        JudgeStructuredResult. On success, `verdict` is a validated
+        instance of `response_model`.
+    """
+    if not providers:
+        return JudgeStructuredResult(
+            success=False,
+            provider="(no-providers)",
+            error_class="NoProviders",
+            error_detail="get_judge_provider_chain returned empty",
+        )
+
+    last_result: Optional[JudgeStructuredResult] = None
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ] if system_prompt else [{"role": "user", "content": user_prompt}]
+
+    for provider in providers:
+        client = _get_instructor_client_for(provider.config)
+        if client is None:
+            last_result = JudgeStructuredResult(
+                success=False,
+                provider=provider.name,
+                model_name=provider.model_name,
+                error_class="InstructorUnavailable",
+                error_detail="instructor.from_provider returned None",
+            )
+            continue
+
+        # Provider-specific kwarg shape — Google wants
+        # `generation_config={'max_tokens': N}`, others want
+        # `max_tokens=N`. Mirrors pipeline.py::_get_instructor_client.
+        create_kwargs = dict(
+            response_model=response_model,
+            messages=messages,
+            max_retries=max_retries,
+        )
+        if str(provider.config.provider).lower() == 'google':
+            create_kwargs['generation_config'] = {'max_tokens': max_tokens}
+        else:
+            create_kwargs['max_tokens'] = max_tokens
+
+        try:
+            verdict = client.chat.completions.create(**create_kwargs)
+        except Exception as exc:
+            last_result = JudgeStructuredResult(
+                success=False,
+                provider=provider.name,
+                model_name=provider.model_name,
+                error_class=type(exc).__name__,
+                error_detail=str(exc)[:300],
+            )
+            logger.warning(
+                f"Structured judge call failed via {provider.name}/"
+                f"{provider.model_name}: {type(exc).__name__}: "
+                f"{str(exc)[:150]} — trying next"
+            )
+            continue
+
+        return JudgeStructuredResult(
+            verdict=verdict,
+            success=True,
+            provider=provider.name,
+            model_name=provider.model_name,
+        )
+
+    return last_result if last_result else JudgeStructuredResult(
+        success=False, provider="(unknown)",
+    )
