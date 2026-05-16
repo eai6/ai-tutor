@@ -1300,6 +1300,19 @@ body {
     50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
 }
 
+/* R8 (2026-05-15): when the mic is recording, the Send button doubles
+   as the stop-and-send trigger. Visual: same red treatment as the
+   mic so the affordance is unmistakable, plus a subtle pulse so it
+   reads as "tap me to finish". Hover keeps a stronger red. */
+#send-btn.recording-active {
+    background: #ef4444;
+    color: #fff;
+    animation: pulse-red 1.5s infinite;
+}
+#send-btn.recording-active:hover {
+    background: #dc2626;
+}
+
 .bubble.speaking {
     outline: 2px solid #6366f1;
     outline-offset: 2px;
@@ -2216,6 +2229,15 @@ function applyTutorResponse(data) {
 }
 
 async function sendMessage() {
+    // R8 (2026-05-15): if the mic is currently recording, treat the
+    // Send click as "stop & send". mediaRecorder.stop() fires onstop
+    // → transcribeAudio() → sendMessage() with the transcribed text.
+    // No second mic click required; no VAD.
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        return;
+    }
+
     const text = userInput.value.trim();
     if (!text || !sessionId || isSending) return;
 
@@ -3103,11 +3125,18 @@ async function toggleRecording() {
         mediaRecorder.onstop = () => {
             stream.getTracks().forEach(t => t.stop());
             micBtn.classList.remove('recording');
+            // R8: clear the Send-button-as-stop affordance
+            sendBtn.classList.remove('recording-active');
+            sendBtn.setAttribute('aria-label', 'Send message');
             const blob = new Blob(audioChunks, { type: 'audio/webm' });
             transcribeAudio(blob);
         };
         mediaRecorder.start();
         micBtn.classList.add('recording');
+        // R8: light up the Send button so the user knows tapping it
+        // stops + transcribes + sends without needing a second mic click.
+        sendBtn.classList.add('recording-active');
+        sendBtn.setAttribute('aria-label', 'Stop recording and send');
     } catch (e) {
         console.error('Mic access denied:', e);
     }
