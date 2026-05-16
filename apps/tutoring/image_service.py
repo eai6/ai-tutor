@@ -155,6 +155,12 @@ class ImageGenerationService:
             or None on failure.
         """
         self.last_error = None  # reset between calls
+        # Stash category + textbook_context so the post-gen figure
+        # regen path can re-issue gen calls with the same shape.
+        # Lives on `self` instead of a thread-local because the
+        # ImageService instance is created per-request.
+        self._last_category = category
+        self._last_textbook_context = textbook_context
         if not self.available:
             logger.warning(f"Image generation unavailable for: {prompt[:50]}...")
             self.last_error = "Image generation is disabled or no API keys configured."
@@ -446,6 +452,11 @@ class ImageGenerationService:
             'skip_reason': verdict.skip_reason or '',
         }
 
+        # Track the result fields locally so the regen branch (below)
+        # can swap in new image bytes / new url when it produces a
+        # clean candidate, without re-running anything.
+        regen_audit_blob: Optional[Dict] = None
+
         if verdict.skipped:
             logger.info(
                 f"[FigureAlignmentJudge] skipped "
@@ -462,6 +473,30 @@ class ImageGenerationService:
                 f"{verdict.model_name} violations={verdict.violations} "
                 f"reasoning={verdict.reasoning[:120]!r}"
             )
+
+            # Auto-regen on REJECT — mirror the text-rewrite flow.
+            # Re-uses the same gen provider as the original image
+            # generation, calling back into _generate_with_<provider>
+            # via a closure so the orchestrator stays free of
+            # image-API dependencies.
+            if getattr(settings, 'CONTENT_REGEN_ENABLED', True):
+                regen_audit_blob = self._run_figure_regen(
+                    result=result,
+                    verdict_dict=verdict_dict,
+                    original_bytes=image_bytes,
+                    original_prompt=prompt,
+                    gen_provider=gen_provider,
+                    category=getattr(self, '_last_category', 'general'),
+                    textbook_context=getattr(self, '_last_textbook_context', ''),
+                    ctx=ctx,
+                )
+                if regen_audit_blob and regen_audit_blob.get('clean'):
+                    # Regen produced a clean candidate. Refresh the
+                    # local verdict_dict so the downstream persistence
+                    # path picks up the post-regen verdict.
+                    final_jr = regen_audit_blob.get('final_judge_result') or {}
+                    if final_jr:
+                        verdict_dict = dict(final_jr)
 
         # Persist to MediaAsset.judge_outputs by file URL lookup.
         # Best-effort — a missing asset just means the verdict only
@@ -481,6 +516,8 @@ class ImageGenerationService:
                 if asset:
                     outputs = dict(asset.judge_outputs or {})
                     outputs['figure_alignment'] = verdict_dict
+                    if regen_audit_blob is not None:
+                        outputs['regen_audit'] = regen_audit_blob
                     asset.judge_outputs = outputs
                     asset.save(update_fields=['judge_outputs', 'updated_at'])
                     logger.debug(
@@ -497,9 +534,140 @@ class ImageGenerationService:
         # that don't query MediaAsset can still see it.
         outputs = result.get('judge_outputs') or {}
         outputs['figure_alignment'] = verdict_dict
+        if regen_audit_blob is not None:
+            outputs['regen_audit'] = regen_audit_blob
         result['judge_outputs'] = outputs
 
         return result
+
+    def _run_figure_regen(
+        self,
+        *,
+        result: Dict,
+        verdict_dict: Dict,
+        original_bytes: bytes,
+        original_prompt: str,
+        gen_provider: str,
+        category: str,
+        textbook_context: str,
+        ctx: Dict,
+    ) -> Optional[Dict]:
+        """Drive `run_figure_regen` against the flagged image and, on
+        clean candidate, replace the saved image bytes + URL in
+        `result`. Returns the audit blob (for persistence to
+        MediaAsset.judge_outputs['regen_audit']) or None on infra
+        failure.
+
+        Mirrors the text-rewrite flow: the orchestrator owns the
+        cycle loop + re-judging; this wrapper provides the image-gen
+        callback closure + handles disk I/O when a clean image lands.
+        """
+        try:
+            from apps.curriculum.content_regen import run_figure_regen
+        except Exception as exc:
+            logger.warning(
+                f"[FigureRegen] import failed: {type(exc).__name__}: {exc}"
+            )
+            return None
+
+        original_media_type = self._guess_mime(result.get('url') or '') or 'image/png'
+
+        # Resolve the lesson instance for re-judge context derivation.
+        # _lesson_context_for_judge gave us the strings; the
+        # orchestrator can use them directly so we don't need the
+        # Lesson object here.
+        def _gen_image(prompt: str):
+            """Per-cycle image-gen callback. Returns (bytes, media_type)
+            or (None, None) on gen failure."""
+            try:
+                if gen_provider == 'openai':
+                    res = self._generate_with_openai(
+                        prompt, category, textbook_context,
+                        include_bytes=True, current_image_url=None,
+                    )
+                elif gen_provider in ('google', 'gemini'):
+                    res = self._generate_with_gemini(
+                        prompt, category, textbook_context,
+                        include_bytes=True, current_image_url=None,
+                    )
+                else:
+                    logger.warning(
+                        f"[FigureRegen] unknown gen_provider={gen_provider!r}"
+                    )
+                    return None, None
+            except Exception as exc:
+                logger.warning(
+                    f"[FigureRegen] gen call raised: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                return None, None
+            if not res:
+                return None, None
+            new_bytes = res.get('_raw_bytes')
+            new_url = res.get('url') or ''
+            new_mt = self._guess_mime(new_url) if new_url else 'image/png'
+            if not new_bytes and new_url:
+                new_bytes = self._read_image_bytes(new_url)
+            if not new_bytes:
+                return None, None
+            return new_bytes, new_mt
+
+        try:
+            regen_result = run_figure_regen(
+                original_bytes=original_bytes,
+                original_media_type=original_media_type,
+                original_prompt=original_prompt,
+                judge_result=verdict_dict,
+                lesson=None,
+                lesson_subject=ctx.get('subject', ''),
+                lesson_grade=ctx.get('grade', ''),
+                lesson_title=ctx.get('title', ''),
+                lesson_objective=ctx.get('objective', ''),
+                step_objective=ctx.get('objective', ''),
+                image_gen_fn=_gen_image,
+                exclude_provider=gen_provider,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"[FigureRegen] orchestrator raised: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            return None
+
+        audit_blob = {
+            'cycles_run': regen_result.cycles_run,
+            'clean': regen_result.clean,
+            'picked_model': regen_result.picked_model,
+            'elapsed_seconds': round(regen_result.elapsed_seconds, 2),
+            'final_violations': list(regen_result.final_violations),
+            'final_judge_result': dict(regen_result.final_judge_result or {}),
+            'prompt_used': regen_result.prompt_used[:300],
+            'cycles': regen_result.audit,
+        }
+
+        # On clean candidate: save new image bytes + update the
+        # result dict to point at the new URL so callers see the
+        # rewritten image, not the flagged original.
+        if regen_result.clean and regen_result.image_bytes:
+            ext = (
+                '.jpg' if (regen_result.image_media_type or '').endswith('jpeg')
+                else '.png'
+            )
+            new_url = self._save_generated_image_bytes(
+                regen_result.image_bytes,
+                regen_result.prompt_used,
+                ext,
+            )
+            if new_url:
+                result['url'] = new_url
+                if '_raw_bytes' in result:
+                    result['_raw_bytes'] = regen_result.image_bytes
+                logger.info(
+                    f"[FigureRegen] CLEAN after {regen_result.cycles_run} "
+                    f"cycle(s) — replaced image with {new_url[-60:]}"
+                )
+
+        return audit_blob
 
     # ─── OpenAI gpt-image-2 ─────────────────────────────────────────
 

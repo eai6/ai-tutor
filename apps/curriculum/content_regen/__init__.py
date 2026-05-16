@@ -1725,6 +1725,276 @@ def run_matching_regen(
     )
 
 
+@dataclass
+class FigureAutoRegenResult:
+    """Outcome of judge-driven (auto) figure regen.
+
+    Mirrors the text-rewrite result types but the "rewrite" here is
+    a NEW image: each cycle calls the image-gen API with a refined
+    prompt, then re-runs `figure_alignment` on the new bytes.
+
+    The clean image's bytes + media_type are returned for the caller
+    to persist (write to disk, update MediaAsset.file, etc.) —
+    keeping image I/O out of the orchestrator.
+    """
+    image_bytes: bytes = b''
+    image_media_type: str = 'image/png'
+    prompt_used: str = ""        # The prompt that produced this image
+    clean: bool = False
+    cycles_run: int = 0
+    picked_model: str = ""
+    elapsed_seconds: float = 0.0
+    final_violations: List[str] = field(default_factory=list)
+    final_reasoning: str = ""
+    final_judge_result: Dict[str, Any] = field(default_factory=dict)
+    audit: List[Dict[str, Any]] = field(default_factory=list)
+
+
+def run_figure_regen(
+    *,
+    original_bytes: bytes,
+    original_media_type: str,
+    original_prompt: str,
+    judge_result: Dict[str, Any],
+    lesson,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_objective: str = "",
+    step_concept_tag: str = "",
+    image_gen_fn=None,
+    exclude_provider: Optional[str] = None,
+    max_cycles: int = DEFAULT_MAX_CYCLES,
+) -> FigureAutoRegenResult:
+    """Regenerate a flagged figure until figure_alignment passes OR
+    cycle cap hit.
+
+    Per cycle: build a refined image prompt from the previous judge's
+    `recommended_fix` (the figure_alignment judge emits a rewritten
+    prompt as its fix instruction — perfect for direct reuse). Call
+    `image_gen_fn(prompt)` to produce new bytes. Re-run
+    figure_alignment on the new image.
+
+    The caller (image_service._post_gen_judge) supplies
+    `image_gen_fn` as a closure over its provider-specific
+    `_generate_with_*` method so the orchestrator stays free of
+    image-API dependencies.
+
+    Args:
+        original_bytes: The flagged image's bytes (kept as fallback).
+        original_media_type: e.g. 'image/png'.
+        original_prompt: The prompt that produced the flagged image.
+        judge_result: The figure_alignment verdict dict.
+            `recommended_fix` becomes cycle-1's new prompt.
+        lesson: Lesson instance for context derivation in re-judge.
+        lesson_*/step_*: Context auto-derived from `lesson` if blank.
+        image_gen_fn: Callable `(prompt: str) -> (bytes, media_type)`.
+            Returns (None, None) on gen failure — the orchestrator
+            records the cycle error and moves on.
+        exclude_provider: Provider that GENERATED the flagged image.
+            Forwarded to the figure_alignment re-judge so the judge
+            stays cross-provider.
+        max_cycles: Hard cap on rewrite attempts.
+
+    Returns:
+        FigureAutoRegenResult. `clean=True` iff the picked candidate's
+        figure_alignment verdict passes. Caller decides what to do
+        with non-clean results (persist as best-effort + flag).
+    """
+    started = time.monotonic()
+    result = FigureAutoRegenResult(
+        image_bytes=original_bytes,
+        image_media_type=original_media_type,
+        prompt_used=original_prompt,
+    )
+
+    if image_gen_fn is None:
+        result.audit.append({
+            'cycle': 0, 'error': 'no_image_gen_fn', 'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    if lesson is not None and not (lesson_subject and lesson_title):
+        try:
+            lesson_title = lesson_title or str(getattr(lesson, 'title', '') or '')
+            lesson_objective = lesson_objective or str(
+                getattr(lesson, 'objective', '') or ''
+            )
+            unit = getattr(lesson, 'unit', None)
+            course = getattr(unit, 'course', None) if unit else None
+            if course is not None and not lesson_subject:
+                subj_type = getattr(course, 'subject_type', '') or ''
+                course_name = getattr(course, 'name', '') or ''
+                lesson_subject = str(subj_type or course_name)
+            if course is not None and not lesson_grade:
+                grades = getattr(course, 'grade_levels', None) or []
+                if isinstance(grades, list) and grades:
+                    lesson_grade = ", ".join(str(g) for g in grades[:3])
+                else:
+                    lesson_grade = str(getattr(course, 'grade_level', '') or '')
+        except Exception:
+            pass
+
+    from apps.curriculum.content_judges.figure_alignment import (
+        run_figure_alignment_judge,
+    )
+    from apps.curriculum.content_regen.score import score_candidate
+
+    def _refine_prompt(prev_verdict: Dict[str, Any], prev_prompt: str) -> str:
+        """Use the judge's recommended_fix as the next prompt when
+        present; otherwise append the violation guidance to the
+        previous prompt so the gen model knows what to fix."""
+        fix = (prev_verdict.get('recommended_fix') or '').strip()
+        if fix:
+            return fix[:1500]
+        # Fallback: include violation codes + reasoning so the gen
+        # model can self-correct without an explicit rewrite.
+        viols = ', '.join(prev_verdict.get('violations') or [])
+        reasoning = (prev_verdict.get('reasoning') or '').strip()[:300]
+        return (
+            f"{prev_prompt}\n\n"
+            f"Fix these issues from the previous attempt: {viols}. "
+            f"Judge note: {reasoning}"
+        )[:1500]
+
+    candidates: List[RegenCandidate] = []
+    best: Optional[RegenCandidate] = None
+    best_bytes: bytes = original_bytes
+    best_media_type: str = original_media_type
+    best_prompt: str = original_prompt
+    best_verdict: Dict[str, Any] = {}
+    current_judge = dict(judge_result or {})
+    current_prompt = original_prompt
+
+    for cycle in range(max_cycles):
+        c = RegenCandidate(
+            cycle=cycle + 1,
+            model_name='image_gen',
+            temperature=0.0,
+        )
+
+        new_prompt = _refine_prompt(current_judge, current_prompt)
+
+        try:
+            new_bytes, new_media_type = image_gen_fn(new_prompt)
+        except Exception as exc:
+            logger.warning(
+                f"[FigureRegen] cycle {cycle+1} image_gen failed: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            c.error = f"image_gen_failed: {type(exc).__name__}"
+            candidates.append(c)
+            continue
+
+        if not new_bytes:
+            c.error = "image_gen_empty"
+            candidates.append(c)
+            continue
+
+        # Re-judge the new image
+        try:
+            verdict = run_figure_alignment_judge(
+                image_bytes=new_bytes,
+                image_media_type=new_media_type or 'image/png',
+                image_prompt=new_prompt,
+                lesson_subject=lesson_subject,
+                lesson_grade=lesson_grade,
+                lesson_title=lesson_title,
+                lesson_objective=lesson_objective,
+                step_objective=step_objective,
+                step_concept_tag=step_concept_tag,
+                exclude_provider=exclude_provider,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"[FigureRegen] cycle {cycle+1} re-judge failed: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            c.error = f"judge_failed: {type(exc).__name__}"
+            c.score = score_candidate({'violations': [], 'skipped': True})
+            candidates.append(c)
+            continue
+
+        c.text = new_prompt[:200]
+        c.judge_passed = bool(verdict.passed)
+        c.judge_violations = list(verdict.violations or [])
+        c.judge_reasoning = (verdict.reasoning or '')[:300]
+        c.score = score_candidate({
+            'violations': c.judge_violations,
+            'skipped': verdict.skipped,
+            'passed': verdict.passed,
+        })
+        candidates.append(c)
+
+        verdict_dict = {
+            'passed': bool(verdict.passed),
+            'skipped': bool(verdict.skipped),
+            'violations': list(verdict.violations or []),
+            'reasoning': verdict.reasoning or '',
+            'recommended_fix': verdict.recommended_fix or '',
+            'provider': verdict.provider or '',
+            'model_name': verdict.model_name or '',
+            'skip_reason': verdict.skip_reason or '',
+        }
+
+        if best is None or c.score > best.score:
+            best = c
+            best_bytes = new_bytes
+            best_media_type = new_media_type or 'image/png'
+            best_prompt = new_prompt
+            best_verdict = verdict_dict
+
+        current_judge = {
+            'violations': c.judge_violations,
+            'reasoning': c.judge_reasoning,
+            'recommended_fix': verdict.recommended_fix or '',
+        }
+        current_prompt = new_prompt
+
+        if c.judge_passed and not c.judge_violations:
+            best = c
+            best_bytes = new_bytes
+            best_media_type = new_media_type or 'image/png'
+            best_prompt = new_prompt
+            best_verdict = verdict_dict
+            break
+
+    result.cycles_run = len(candidates)
+    if best is None:
+        # Every cycle errored — keep the original.
+        result.clean = False
+        result.audit = [_candidate_to_audit(c, picked=False) for c in candidates]
+        result.elapsed_seconds = time.monotonic() - started
+        logger.warning(
+            f"[FigureRegen] all {len(candidates)} cycles errored — "
+            f"keeping original image"
+        )
+        return result
+
+    result.image_bytes = best_bytes
+    result.image_media_type = best_media_type
+    result.prompt_used = best_prompt
+    result.clean = bool(best.judge_passed and not best.judge_violations)
+    result.picked_model = 'image_gen'
+    result.final_violations = list(best.judge_violations)
+    result.final_reasoning = best.judge_reasoning
+    result.final_judge_result = best_verdict
+    result.audit = [
+        _candidate_to_audit(c, picked=(c is best)) for c in candidates
+    ]
+    result.elapsed_seconds = time.monotonic() - started
+
+    logger.info(
+        f"[FigureRegen] {'CLEAN' if result.clean else 'FLAGGED'} after "
+        f"{result.cycles_run} cycle(s) — "
+        f"final_violations={best.judge_violations} "
+        f"elapsed={result.elapsed_seconds:.1f}s"
+    )
+    return result
+
+
 __all__ = [
     "DEFAULT_MAX_CYCLES",
     "DEFAULT_TEMPERATURE_START",
@@ -1736,6 +2006,7 @@ __all__ = [
     "FillInBlankAutoRegenResult",
     "ShortAnswerAutoRegenResult",
     "MatchingAutoRegenResult",
+    "FigureAutoRegenResult",
     "run_step_regen",
     "run_step_prompt_regen",
     "run_exit_question_prompt_regen",
@@ -1743,4 +2014,5 @@ __all__ = [
     "run_fill_in_blank_regen",
     "run_short_answer_regen",
     "run_matching_regen",
+    "run_figure_regen",
 ]
