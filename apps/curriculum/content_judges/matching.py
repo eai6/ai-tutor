@@ -54,6 +54,8 @@ from pydantic import BaseModel, Field
 
 from apps.curriculum.content_judges import JudgeResult
 from apps.curriculum.content_judges._providers import (
+    _grounding_enabled,
+    call_judge_grounded_then_structured,
     call_judge_structured_with_fallback,
     get_judge_provider_chain,
 )
@@ -322,13 +324,25 @@ def run_matching_judge(
         enabling_objective=enabling_objective,
     )
 
-    call = call_judge_structured_with_fallback(
-        user_prompt,
-        providers,
-        MatchingVerdict,
-        system_prompt=_SYSTEM_INSTRUCTION,
-        max_tokens=max_tokens,
-    )
+    # Matching pair correctness IS factual — Gemini search grounding
+    # catches wrong pairs (e.g. "Eurasian Plate ↔ South America")
+    # that the curriculum KB might miss.
+    if _grounding_enabled():
+        call = call_judge_grounded_then_structured(
+            user_prompt,
+            providers,
+            MatchingVerdict,
+            system_prompt=_SYSTEM_INSTRUCTION,
+            max_tokens=max_tokens,
+        )
+    else:
+        call = call_judge_structured_with_fallback(
+            user_prompt,
+            providers,
+            MatchingVerdict,
+            system_prompt=_SYSTEM_INSTRUCTION,
+            max_tokens=max_tokens,
+        )
     if not call.success:
         logger.warning(
             f"[MatchingJudge] all providers failed: "

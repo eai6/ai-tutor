@@ -45,6 +45,8 @@ from pydantic import BaseModel, Field
 
 from apps.curriculum.content_judges import JudgeResult
 from apps.curriculum.content_judges._providers import (
+    _grounding_enabled,
+    call_judge_grounded_then_structured,
     call_judge_structured_with_fallback,
     get_judge_provider_chain,
 )
@@ -381,13 +383,27 @@ def run_factual_step_judge(
         lesson_objective=lesson_objective,
     )
 
-    call = call_judge_structured_with_fallback(
-        user_prompt,
-        providers,
-        FactualStepVerdict,
-        system_prompt=_SYSTEM_INSTRUCTION,
-        max_tokens=max_tokens,
-    )
+    # Factual judge → use Gemini search-grounded two-call pattern when
+    # available (catches claims contradicted by live web sources, not
+    # just by the curriculum KB). Falls through to non-Google providers
+    # via single-call structured output. Settings flag toggles the
+    # whole grounding path globally.
+    if _grounding_enabled():
+        call = call_judge_grounded_then_structured(
+            user_prompt,
+            providers,
+            FactualStepVerdict,
+            system_prompt=_SYSTEM_INSTRUCTION,
+            max_tokens=max_tokens,
+        )
+    else:
+        call = call_judge_structured_with_fallback(
+            user_prompt,
+            providers,
+            FactualStepVerdict,
+            system_prompt=_SYSTEM_INSTRUCTION,
+            max_tokens=max_tokens,
+        )
     if not call.success:
         logger.warning(
             f"[FactualStepJudge] all providers failed: "

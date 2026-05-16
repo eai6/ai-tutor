@@ -223,6 +223,18 @@ _PROVIDER_INSTRUCTOR_MAP = {
 }
 
 
+# Settings flag that gates Gemini search grounding on factual judges.
+# Default True; can be disabled if cost / quota becomes a concern.
+def _grounding_enabled() -> bool:
+    try:
+        from django.conf import settings
+        return bool(getattr(
+            settings, 'CONTENT_JUDGE_GEMINI_GROUNDING_ENABLED', True,
+        ))
+    except Exception:
+        return True
+
+
 def _get_instructor_client_for(config):
     """Wrap a ModelConfig in an instructor-augmented client.
 
@@ -350,3 +362,260 @@ def call_judge_structured_with_fallback(
     return last_result if last_result else JudgeStructuredResult(
         success=False, provider="(unknown)",
     )
+
+
+# ─── Two-call Gemini grounding pattern ──────────────────────────────────
+# Gemini API treats `responseSchema` (structured output) and
+# `tools=[google_search]` (search grounding) as MUTUALLY EXCLUSIVE in
+# the same request. To get both rigour mechanisms on factual judges:
+#   Call 1: Gemini with google_search tool, free-form output → reasoning
+#           grounded in live web search.
+#   Call 2: instructor structured output that translates the grounded
+#           reasoning into the typed Pydantic verdict. No new reasoning
+#           in this call — just format conversion.
+#
+# Cost: ~2× the LLM calls per Gemini-judged claim. Worth it for
+# factual judges (factual_step, exit_question, fill_in_blank,
+# short_answer, matching, figure_alignment) where catching
+# fabricated facts protects students. Skip on pedagogy / safety /
+# image_prompt judges — those check structural properties, not
+# truthfulness, so grounding adds no value.
+#
+# Per project_model_routing memory: Gemini-with-grounding is the
+# intended primary for content judges. The grounding-fallback wires
+# into the standard chain so when Gemini is picked, this path
+# fires; otherwise the regular `call_judge_structured_with_fallback`
+# applies.
+
+
+def call_judge_grounded_then_structured(
+    user_prompt: str,
+    providers: List[JudgeProvider],
+    response_model,
+    *,
+    system_prompt: str = "",
+    max_tokens: int = 3500,
+    max_retries: int = 1,
+    grounding_instruction: str = (
+        "Use Google Search to verify any factual claim that could be "
+        "checked against authoritative sources (numbers, dates, names "
+        "of people / places / institutions). Cite the sources you used."
+    ),
+) -> JudgeStructuredResult:
+    """Two-call Gemini-grounded structured judge.
+
+    Iterates the provider chain. When the picked provider is Google,
+    uses the 2-call pattern (grounded free-form → structured format).
+    For non-Google providers (Anthropic, OpenAI), falls through to
+    the standard structured-output path.
+
+    Returns the same `JudgeStructuredResult` shape as the
+    non-grounded sibling so callers can swap freely.
+    """
+    if not providers:
+        return JudgeStructuredResult(
+            success=False,
+            provider="(no-providers)",
+            error_class="NoProviders",
+            error_detail="get_judge_provider_chain returned empty",
+        )
+
+    last_result: Optional[JudgeStructuredResult] = None
+
+    for provider in providers:
+        provider_name = str(provider.config.provider).lower()
+
+        if provider_name == 'google':
+            # Two-call pattern. Call 1 uses google-genai SDK directly
+            # (instructor doesn't expose tools=[google_search] cleanly,
+            # and grounding requires the native config shape).
+            grounded_text, gr_error = _call_gemini_grounded(
+                provider.config, system_prompt, user_prompt,
+                grounding_instruction, max_tokens,
+            )
+            if gr_error:
+                last_result = JudgeStructuredResult(
+                    success=False,
+                    provider=provider.name,
+                    model_name=provider.model_name,
+                    error_class=gr_error[0],
+                    error_detail=gr_error[1],
+                )
+                logger.warning(
+                    f"[GroundedJudge] {provider.name}/{provider.model_name} "
+                    f"call-1 (grounded) failed: {gr_error[0]}: "
+                    f"{gr_error[1][:150]} — trying next"
+                )
+                continue
+            if not grounded_text:
+                last_result = JudgeStructuredResult(
+                    success=False,
+                    provider=provider.name,
+                    model_name=provider.model_name,
+                    error_class="EmptyGroundedResponse",
+                    error_detail="Gemini returned empty grounded text",
+                )
+                continue
+
+            # Call 2: format the grounded reasoning into the Pydantic
+            # schema. Use the SAME provider+model (no new reasoning, just
+            # extraction) so we stay on Gemini's quality but use
+            # structured output (which can't coexist with grounding in
+            # one call).
+            format_user_prompt = (
+                f"FACT-CHECKER REASONING (with web-search grounding):\n"
+                f"{grounded_text}\n\n"
+                f"ORIGINAL INPUT THAT WAS REVIEWED:\n{user_prompt}\n\n"
+                f"Translate the fact-checker's reasoning into the "
+                f"verdict schema. Preserve every violation code the "
+                f"reasoning identified; if reasoning is silent on a "
+                f"required field, use the schema default."
+            )
+            format_system = (
+                "You are translating a previous fact-checker's reasoning "
+                "into a structured verdict. Do not introduce new "
+                "judgments — only format what the reasoning already "
+                "states."
+            )
+            ic = _get_instructor_client_for(provider.config)
+            if ic is None:
+                last_result = JudgeStructuredResult(
+                    success=False,
+                    provider=provider.name,
+                    model_name=provider.model_name,
+                    error_class="InstructorUnavailable",
+                    error_detail="instructor.from_provider returned None for format call",
+                )
+                continue
+            create_kwargs = dict(
+                response_model=response_model,
+                messages=[
+                    {"role": "system", "content": format_system},
+                    {"role": "user", "content": format_user_prompt},
+                ],
+                max_retries=max_retries,
+                generation_config={'max_tokens': max_tokens},
+            )
+            try:
+                verdict = ic.chat.completions.create(**create_kwargs)
+            except Exception as exc:
+                last_result = JudgeStructuredResult(
+                    success=False,
+                    provider=provider.name,
+                    model_name=provider.model_name,
+                    error_class=type(exc).__name__,
+                    error_detail=str(exc)[:300],
+                )
+                logger.warning(
+                    f"[GroundedJudge] {provider.name}/{provider.model_name} "
+                    f"call-2 (format) failed: {type(exc).__name__}: "
+                    f"{str(exc)[:150]} — trying next"
+                )
+                continue
+
+            logger.info(
+                f"[GroundedJudge] {provider.name}/{provider.model_name} "
+                f"two-call grounded judge succeeded"
+            )
+            return JudgeStructuredResult(
+                verdict=verdict,
+                success=True,
+                provider=provider.name,
+                model_name=provider.model_name,
+            )
+
+        # Non-Google: use the standard 1-call structured path.
+        ic = _get_instructor_client_for(provider.config)
+        if ic is None:
+            last_result = JudgeStructuredResult(
+                success=False,
+                provider=provider.name,
+                model_name=provider.model_name,
+                error_class="InstructorUnavailable",
+                error_detail="instructor.from_provider returned None",
+            )
+            continue
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ] if system_prompt else [{"role": "user", "content": user_prompt}]
+        create_kwargs = dict(
+            response_model=response_model,
+            messages=messages,
+            max_retries=max_retries,
+            max_tokens=max_tokens,
+        )
+        try:
+            verdict = ic.chat.completions.create(**create_kwargs)
+        except Exception as exc:
+            last_result = JudgeStructuredResult(
+                success=False,
+                provider=provider.name,
+                model_name=provider.model_name,
+                error_class=type(exc).__name__,
+                error_detail=str(exc)[:300],
+            )
+            logger.warning(
+                f"[GroundedJudge/non-google] {provider.name}/"
+                f"{provider.model_name} failed: {type(exc).__name__}: "
+                f"{str(exc)[:150]} — trying next"
+            )
+            continue
+
+        return JudgeStructuredResult(
+            verdict=verdict,
+            success=True,
+            provider=provider.name,
+            model_name=provider.model_name,
+        )
+
+    return last_result if last_result else JudgeStructuredResult(
+        success=False, provider="(unknown)",
+    )
+
+
+def _call_gemini_grounded(
+    config,
+    system_prompt: str,
+    user_prompt: str,
+    grounding_instruction: str,
+    max_tokens: int,
+) -> tuple:
+    """Call Gemini with google_search tool enabled. Returns
+    (grounded_text, None) on success or ('', (error_class,
+    error_detail)) on failure.
+
+    Uses the google-genai SDK directly — instructor doesn't expose
+    `tools=[google_search]` since that conflicts with response_schema
+    in Gemini's API.
+    """
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError as exc:
+        return '', ('ImportError', str(exc))
+
+    try:
+        client = genai.Client(api_key=config.get_api_key())
+        # Combine system + grounding instruction so the model knows
+        # WHEN to use search (only on factual claims, not on every
+        # token). Gemini's `system_instruction` is per-call.
+        sys_combined = (
+            (system_prompt or '').strip()
+            + "\n\n"
+            + grounding_instruction
+        ).strip()
+        gen_config = types.GenerateContentConfig(
+            system_instruction=sys_combined,
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            max_output_tokens=max_tokens,
+        )
+        response = client.models.generate_content(
+            model=config.model_name,
+            contents=user_prompt,
+            config=gen_config,
+        )
+        text = (getattr(response, 'text', None) or '').strip()
+        return text, None
+    except Exception as exc:
+        return '', (type(exc).__name__, str(exc)[:300])
