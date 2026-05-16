@@ -1377,7 +1377,34 @@ def chat_answer_bank_question(request, session_id):
         verdict = grade_lesson_step_response(question, str(answer or ''))
     else:
         # Bank grader handles list / dict / str dispatch by question_type.
-        verdict = grade_bank_response(question, answer)
+        # Pass a judge_client so text-content types use the SAME LLM
+        # batch grader the exit ticket uses (no false-NEGs on
+        # paraphrased / synonym / partial-credit answers). Pilot
+        # directive 2026-05-16. Build the client here from the JUDGE
+        # ModelConfig — mirrors ConversationalTutor.judge_client.
+        _judge_llm_client = None
+        try:
+            from apps.llm.models import ModelConfig
+            from apps.llm.client import get_llm_client
+            _judge_cfg = ModelConfig.get_for('judge')
+            if _judge_cfg is not None:
+                _judge_llm_client = get_llm_client(_judge_cfg)
+        except Exception as _e:
+            import logging as _lg
+            _lg.getLogger('apps').warning(
+                f"[chat_answer_bank_question] judge_client init failed: {_e} "
+                f"— falling back to deterministic grader"
+            )
+        _is_math = (
+            session.lesson.unit.course.is_math
+            if session.lesson.unit and session.lesson.unit.course
+            else False
+        )
+        verdict = grade_bank_response(
+            question, answer,
+            llm_client=_judge_llm_client,
+            is_math=_is_math,
+        )
 
     # Build the synthetic student message — short summary of what
     # they picked. Goes into the conversation history so the tutor

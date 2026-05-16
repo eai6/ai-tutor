@@ -1556,7 +1556,20 @@ function renderPendingQuestionInArtifact(pq) {
         : `Question (${pq.question_type})`;
 
     let body = '<div class="bank-question-card" data-question-id="' + pq.question_id + '" data-kind="' + (pq.kind || '') + '" style="display:flex;flex-direction:column;gap:0.75rem;width:100%;padding:0.5rem;">';
-    body += '<div class="bank-q-stem" style="font-size:1rem;line-height:1.5;color:#18181b;font-weight:500;">' + escapeHtml(pq.stem || '') + '</div>';
+    // Skip the redundant stem when fill_in_blank will render the
+    // question text INLINE with embedded inputs (template with ___
+    // markers). The inline form already shows the question — printing
+    // it again at the top is the duplicate the user flagged
+    // 2026-05-16. Matching is similar in spirit but ships v2.
+    const _fibInlineWillRender = (
+        pq.question_type === 'fill_in_blank'
+        && pq.answer_data
+        && typeof pq.answer_data.text_template === 'string'
+        && /_{2,}/.test(pq.answer_data.text_template)
+    );
+    if (!_fibInlineWillRender) {
+        body += '<div class="bank-q-stem" style="font-size:1rem;line-height:1.5;color:#18181b;font-weight:500;">' + escapeHtml(pq.stem || '') + '</div>';
+    }
 
     if (pq.question_type === 'mcq' && pq.options) {
         body += '<div class="bank-q-options" style="display:flex;flex-direction:column;gap:0.5rem;">';

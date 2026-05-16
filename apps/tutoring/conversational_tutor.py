@@ -763,6 +763,68 @@ def _looks_like_authored_question(lead_in: str) -> bool:
     return False
 
 
+# Sentence splitter for the text-block authored-question strip.
+# Keeps the trailing punctuation on each sentence so re-joining
+# preserves "Find x." not "Find x". Splits on `.`, `!`, `?` followed
+# by whitespace or end-of-string. Conservative — does not try to be
+# smart about abbreviations; the tutor doesn't use "Mr." / "Dr." in
+# math content so the simple split is fine.
+_SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])\s+')
+
+
+def _strip_authored_numeric_questions(text: str) -> Tuple[str, int]:
+    """Remove sentences that look like authored numeric questions.
+
+    Used inside the tutor text-block branch — the tutor's narrative
+    must NEVER carry a math problem; bank questions go to the
+    artifact panel via the pose_question tool. Pilot ground truth
+    2026-05-16: user reported the tutor printed
+    "Four angles around a point are 20°, 50°, 80°, and x°. Find x."
+    as inline text alongside a different bank question in the
+    artifact. Two questions on screen confuses students and breaks
+    grading.
+
+    A sentence is stripped when it carries STRONG authored-question
+    signals:
+      - `_LEAD_IN_QUESTION_VERB_RE` match — "find x", "solve",
+        "calculate", "what is the", etc. These imperatives ask the
+        student to compute and unambiguously mean "authored problem".
+      - ends with '?' AND contains `_LEAD_IN_NUMERIC_SETUP_RE` match
+        — a numeric question ("What do you get when you add
+        20° + 50° + 80°?"). Catches check-questions the LLM smuggles
+        into remediation prose.
+
+    Numeric content ALONE is intentionally NOT a trigger: confirmation
+    sentences like "Each sector measures 72°." are legitimate narrative
+    and must survive. Likewise generic `ends_with_q` alone is allowed
+    so Socratic probes like "Can you think of why this makes sense?"
+    pass through unchanged.
+
+    Returns (stripped_text, n_removed). When n_removed > 0 the caller
+    should log it so we can measure how often the LLM disobeys the
+    no-authoring rule.
+    """
+    if not text:
+        return text, 0
+    sentences = _SENTENCE_SPLIT_RE.split(text)
+    kept: List[str] = []
+    n_removed = 0
+    for sent in sentences:
+        s = sent.strip()
+        if not s:
+            continue
+        has_question_verb = bool(_LEAD_IN_QUESTION_VERB_RE.search(s))
+        has_numeric_setup = bool(_LEAD_IN_NUMERIC_SETUP_RE.search(s))
+        ends_with_q = s.endswith('?')
+        if has_question_verb or (ends_with_q and has_numeric_setup):
+            n_removed += 1
+            continue
+        kept.append(s)
+    if n_removed == 0:
+        return text, 0
+    return ' '.join(kept).strip(), n_removed
+
+
 # =============================================================================
 # CONVERSATIONAL TUTOR ENGINE
 # =============================================================================
@@ -2113,13 +2175,40 @@ Keep it to 2-3 sentences."""
         # <evaluation_signal> block so the LLM cannot disagree with
         # the bank. See memory/curriculum_tutor_v2_plan.md item 5
         # (the platform-wide rule).
-        self._pending_bank_grade = None
-        self._pending_bank_question = None
+        #
+        # Pre-loaded verdict short-circuit: the artifact-submission
+        # endpoint (chat_answer_bank_question) grades against the raw
+        # student answer ("210") then injects a SYNTHETIC student
+        # message ("I answered: 210") before calling respond(). It
+        # sets self._pending_bank_grade + ._pending_bank_question on
+        # the engine FIRST, then calls respond(). Re-grading the
+        # synthetic "I answered: 210" string here would fail (`_norm`
+        # can't strip the prefix) and overwrite the correct verdict
+        # with a false negative — exactly what we saw on 2026-05-16
+        # ("210" submitted, grader called false-NEG because it tried
+        # to match "I answered: 210" vs "210°"). Skip re-grading when
+        # a verdict is already in flight.
         self._bank_signal_used_this_turn = False
-        try:
-            self._grade_against_last_bank_question(student_input)
-        except Exception as e:
-            logger.warning(f"[BankGrade] grade attempt crashed: {e}")
+        if (
+            getattr(self, '_pending_bank_grade', None) is not None
+            and getattr(self, '_pending_bank_question', None) is not None
+        ):
+            logger.info(
+                "[BankGrade] using pre-loaded verdict (artifact submit) — "
+                "skipping re-grade. is_correct=%s expected=%r",
+                self._pending_bank_grade.is_correct,
+                self._pending_bank_grade.expected,
+            )
+            # Clear awaiting_answer to mirror the regrade path's effect.
+            if getattr(self._pending_bank_grade, 'is_correct', None) is not None:
+                self._clear_awaiting_answer()
+        else:
+            self._pending_bank_grade = None
+            self._pending_bank_question = None
+            try:
+                self._grade_against_last_bank_question(student_input)
+            except Exception as e:
+                logger.warning(f"[BankGrade] grade attempt crashed: {e}")
 
         # Deterministic math check BEFORE response generation (Layer 1 + 2 of
         # math-tutor false-positive fix). When the expected answer is numeric
@@ -5708,6 +5797,23 @@ Follow the current step; this concept will be covered in sequence."""
                         "of emitting a tool_use block.",
                         leaked,
                     )
+                # Strip authored numeric questions the LLM smuggled into
+                # the narrative. Questions belong in the artifact (via
+                # pose_question) only. Pilot directive 2026-05-16.
+                cleaned, n_authored = _strip_authored_numeric_questions(
+                    cleaned,
+                )
+                if n_authored:
+                    logger.warning(
+                        "[QuestionTool] STRIPPED_AUTHORED_SENTENCES n=%d — "
+                        "LLM smuggled numeric question(s) into the text "
+                        "block. Bank question goes to artifact only.",
+                        n_authored,
+                    )
+                    turn_metadata.setdefault(
+                        'stripped_authored_sentences', 0,
+                    )
+                    turn_metadata['stripped_authored_sentences'] += n_authored
                 if cleaned.strip():
                     text_parts.append(cleaned.strip())
             elif btype == 'tool_use':
@@ -5718,6 +5824,32 @@ Follow the current step; this concept will be covered in sequence."""
                         "[QuestionTool] tool_call: UNEXPECTED tool_name='%s' — ignoring",
                         tool_name,
                     )
+                    continue
+                # Stay-on-question-during-remediation gate (2026-05-16):
+                # when the student's most recent answer was WRONG, the
+                # tutor must not advance the artifact to a new bank
+                # question — the existing one stays in flight so the
+                # student can retry. Drop the new tool call here; the
+                # awaiting_answer state remains from the previous turn
+                # so the artifact panel keeps rendering the same
+                # question. The narrative explanation/hint still goes
+                # through (text blocks above are unaffected).
+                pending_grade = getattr(self, '_pending_bank_grade', None)
+                if (
+                    pending_grade is not None
+                    and getattr(pending_grade, 'is_correct', None) is False
+                ):
+                    logger.warning(
+                        "[QuestionTool] BLOCKED_ROTATE_ON_WRONG slot=%r — "
+                        "last verdict was wrong; keeping existing artifact "
+                        "question in flight for retry instead of posing a "
+                        "new one.",
+                        (getattr(block, 'input', {}) or {}).get('slot'),
+                    )
+                    turn_metadata.setdefault(
+                        'blocked_rotates_on_wrong', 0,
+                    )
+                    turn_metadata['blocked_rotates_on_wrong'] += 1
                     continue
                 tool_input = getattr(block, 'input', {}) or {}
                 slot = tool_input.get('slot')
@@ -6133,7 +6265,22 @@ Follow the current step; this concept will be covered in sequence."""
             question = ExitTicketQuestion.objects.filter(id=ref_id).first()
             if question is None:
                 return None
-            result = grade_bank_response(question, student_input)
+            # Pass the judge_client so text-content question types
+            # (short_answer, non-numeric FIB, matching) route through
+            # the same LLM batch grader the exit ticket uses.
+            # Deterministic types (MCQ, numeric short_numeric) still
+            # short-circuit. Pilot directive 2026-05-16: mid-lesson
+            # grading must match exit-ticket grading exactly.
+            is_math = (
+                self.lesson.unit.course.is_math
+                if self.lesson.unit and self.lesson.unit.course
+                else False
+            )
+            result = grade_bank_response(
+                question, student_input,
+                llm_client=self.judge_client,
+                is_math=is_math,
+            )
         else:
             return None
         self._pending_bank_grade = result
@@ -6142,14 +6289,14 @@ Follow the current step; this concept will be covered in sequence."""
         # the tutor uses it to scaffold remediation after a wrong
         # answer (rather than re-deriving the math itself).
         self._pending_bank_question = question
-        # R2: the student has now ATTEMPTED the pending question; we no
-        # longer need to re-render it on resume. The grade result is
-        # what drives the next tutor turn (not the unanswered prompt).
-        # Keep awaiting_answer set ONLY when the grader couldn't
-        # produce a verdict (None / skipped) — that means the student
-        # said something the grader couldn't interpret as an answer
-        # attempt, and the question is still effectively pending.
-        if result is not None and getattr(result, 'is_correct', None) is not None:
+        # R2 + retry-on-wrong (2026-05-16): clear awaiting_answer ONLY
+        # on a CORRECT verdict. On WRONG, keep the question pending so
+        # the artifact panel keeps showing it and the student can retry
+        # instead of being silently advanced to a new bank question.
+        # On None/skipped (grader couldn't interpret), also keep it
+        # pending — the student said something the grader can't parse,
+        # not a real answer attempt.
+        if result is not None and getattr(result, 'is_correct', None) is True:
             self._clear_awaiting_answer()
         logger.info(
             "[BankGrade] session=%s ref=%s:%s is_correct=%s expected=%r student=%r",
@@ -8537,71 +8684,25 @@ Which concept numbers were meaningfully covered?"""
     def _build_batch_grade_item(
         self, index: int, question, student_answer,
     ):
-        """Serialise one exit-ticket question into a BatchGradeItem
-        for the batched LLM grader."""
-        from apps.tutoring.exit_ticket_grader import BatchGradeItem
-        q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
-        data = question.answer_data or {}
-        is_math = self.lesson.unit.course.is_math if self.lesson.unit and self.lesson.unit.course else False
+        """Serialise one exit-ticket question into a BatchGradeItem.
 
-        # extra_kwargs is populated below for q_types that carry per-
-        # blank or per-pair structured detail; currently only
-        # fill_in_blank uses it.
-        extra_kwargs: dict = {}
-        if q_type == 'fill_in_blank':
-            blanks = data.get('blanks', []) or []
-            student_blanks = student_answer if isinstance(student_answer, list) else [student_answer]
-            expected = "; ".join(str(b) for b in blanks)
-            student_str = "; ".join(str(b) for b in student_blanks)
-            # Pass the per-blank arrays explicitly so the grader can
-            # evaluate each blank separately and the frontend can colour
-            # each input individually. See exit_ticket_grader.py.
-            extra_kwargs = {
-                'expected_blanks': [str(b) for b in blanks],
-                'student_blanks': [str(b) for b in student_blanks],
-            }
-        elif q_type == 'matching':
-            pairs = data.get('pairs', []) or []
-            expected = "; ".join(
-                f"{p.get('left', '')} → {p.get('right', '')}"
-                for p in pairs
-            )
-            student_map = student_answer if isinstance(student_answer, dict) else {}
-            student_str = "; ".join(
-                f"{k} → {v}" for k, v in student_map.items()
-            )
-            # Pass per-pair arrays so the grader emits one verdict per
-            # pair and the frontend can colour each select individually.
-            extra_kwargs = {
-                'expected_pairs': [
-                    {'left': str(p.get('left', '')), 'right': str(p.get('right', ''))}
-                    for p in pairs
-                ],
-                # Ordered by expected pairs so the verdict array lines
-                # up with the rendered selects (which are also
-                # ordered by `pairs`).
-                'student_pairs': [
-                    {
-                        'left': str(p.get('left', '')),
-                        'right': str(student_map.get(str(p.get('left', '')), '')),
-                    }
-                    for p in pairs
-                ],
-            }
-        else:  # short_answer / data_interpretation
-            expected = str(data.get('model_answer', '') or '')
-            student_str = str(student_answer or '')
-
-        keywords = list(data.get('keywords', []) or [])
-        return BatchGradeItem(
+        Thin wrapper around the top-level
+        `exit_ticket_grader.build_batch_grade_item` so mid-lesson
+        artifact grading (bank_grader) can reuse the exact same
+        builder. The only thing this wrapper adds is the lesson-aware
+        is_math flag.
+        """
+        from apps.tutoring.exit_ticket_grader import build_batch_grade_item
+        is_math = (
+            self.lesson.unit.course.is_math
+            if self.lesson.unit and self.lesson.unit.course
+            else False
+        )
+        return build_batch_grade_item(
             index=index,
-            question_text=question.question_text,
-            q_type=q_type,
-            expected=expected,
-            keywords=keywords,
-            student_answer=student_str,
+            question=question,
+            student_answer=student_answer,
             is_math=is_math,
-            **extra_kwargs,
         )
 
     def _grade_exit_question(self, question, student_answer) -> bool:

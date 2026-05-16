@@ -67,8 +67,10 @@ def _norm(s: str) -> str:
     s = re.sub(r"\s+", " ", s)
     s = re.sub(r"[\.,;:!?]+$", "", s)
     # Drop common unit suffixes — the schema may store "180°" while
-    # the student typed "180".
-    s = s.replace("°", "").replace(" deg", "").replace(" degrees", "")
+    # the student typed "180". ORDER MATTERS: " degrees" before
+    # " deg" so the latter doesn't clip inside the former
+    # ("210 degrees".replace(" deg", "") used to produce "210rees").
+    s = s.replace("°", "").replace(" degrees", "").replace(" deg", "")
     s = s.replace(" m²", "").replace(" m2", "").replace(" sq m", "")
     s = s.replace(" kg", "").replace(" %", "").replace("%", "")
     return s.strip()
@@ -84,7 +86,13 @@ def _numeric_equal(a: str, b: str, eps: float = 0.01) -> bool:
     return _norm(a) == _norm(b)
 
 
-def grade_bank_response(question, student_input) -> BankGradeResult:
+def grade_bank_response(
+    question,
+    student_input,
+    *,
+    llm_client=None,
+    is_math: bool = False,
+) -> BankGradeResult:
     """Grade a student's input against the bank's stored answer.
 
     `question` is an ExitTicketQuestion model instance OR a
@@ -96,6 +104,20 @@ def grade_bank_response(question, student_input) -> BankGradeResult:
       - list — for fill_in_blank (per-blank list) or matching
                (list of {left, right} dicts)
       - dict — for short_answer (with `final_answer` + `working`)
+
+    `llm_client` — optional. When provided, text-content question
+    types (short_answer, non-numeric fill_in_blank, matching when
+    exact match fails) are graded via the SAME LLM batch grader
+    used by the exit ticket (`grade_written_responses_batch`,
+    single-item batch). Without it, all types fall through to the
+    deterministic path. Pilot directive 2026-05-16: mid-lesson
+    grading must mirror exit-ticket grading exactly — same prompt,
+    same rubric, same generosity around synonyms / phrasings — so
+    students don't get false-NEGs during tutoring that they wouldn't
+    get on the same question at submission time.
+
+    `is_math` — propagated into the BatchGradeItem so the LLM grader
+    knows to focus on numerical correctness over phrasing.
 
     Returns BankGradeResult. Never raises; on unrecoverable
     inputs returns is_correct=None with skip_reason set.
@@ -117,14 +139,105 @@ def grade_bank_response(question, student_input) -> BankGradeResult:
     if qt == "mcq":
         return _grade_mcq(question, raw)
     if qt == "short_numeric":
-        return _grade_numeric(question, raw)
+        # Numeric fast-path; on miss + LLM available, fall through to
+        # batch grader (catches "two hundred ten" / "210 deg" / etc).
+        det = _grade_numeric(question, raw)
+        if det.is_correct or llm_client is None:
+            return det
+        return _grade_with_llm_batch(
+            question, raw, llm_client=llm_client, is_math=True,
+            deterministic_fallback=det,
+        )
     if qt == "fill_in_blank":
+        # If LLM client provided, route ALL FIB through the batch
+        # grader — the exit-ticket grader handles numeric blanks via
+        # its own fast-path inside grade_written_responses_batch's
+        # caller path. Without client, deterministic only.
+        if llm_client is not None:
+            return _grade_with_llm_batch(
+                question, raw, llm_client=llm_client, is_math=is_math,
+            )
         return _grade_fill_blank(question, raw)
     if qt == "matching":
-        return _grade_matching(question, raw)
+        det = _grade_matching(question, raw)
+        if det.is_correct or llm_client is None:
+            return det
+        return _grade_with_llm_batch(
+            question, raw, llm_client=llm_client, is_math=is_math,
+            deterministic_fallback=det,
+        )
     if qt == "short_answer":
+        if llm_client is not None:
+            return _grade_with_llm_batch(
+                question, raw, llm_client=llm_client, is_math=is_math,
+            )
         return _grade_short_answer(question, raw)
     return BankGradeResult(is_correct=None, skip_reason=f"unknown_type:{qt}")
+
+
+def _grade_with_llm_batch(
+    question,
+    student_input,
+    *,
+    llm_client,
+    is_math: bool = False,
+    deterministic_fallback: 'Optional[BankGradeResult]' = None,
+) -> BankGradeResult:
+    """Single-item wrapper around grade_written_responses_batch.
+
+    Builds one BatchGradeItem via the shared
+    exit_ticket_grader.build_batch_grade_item, runs the batch
+    grader (batch size = 1), and maps the verdict back to a
+    BankGradeResult so callers get a uniform return shape regardless
+    of which path graded.
+
+    `deterministic_fallback` — when set, returned if the LLM call
+    fails or returns no entry. Keeps callers safe in network outages.
+    """
+    from apps.tutoring.exit_ticket_grader import (
+        build_batch_grade_item,
+        grade_written_responses_batch,
+    )
+
+    try:
+        item = build_batch_grade_item(
+            index=0,
+            question=question,
+            student_answer=student_input,
+            is_math=is_math,
+        )
+        results = grade_written_responses_batch(
+            [item], llm_client=llm_client,
+        )
+    except Exception as exc:
+        logger.warning(
+            "[BankGrader] LLM batch call crashed: %s: %s",
+            type(exc).__name__, exc,
+        )
+        return deterministic_fallback or BankGradeResult(
+            is_correct=None,
+            skip_reason=f"llm_crash:{type(exc).__name__}",
+        )
+
+    if not results:
+        return deterministic_fallback or BankGradeResult(
+            is_correct=None, skip_reason="llm_no_results",
+        )
+
+    r = results[0]
+    return BankGradeResult(
+        is_correct=bool(r.correct),
+        expected=str(item.expected)[:200],
+        student_parsed=str(item.student_answer)[:200],
+        detail={
+            'source': 'llm_batch',
+            'reasoning': (r.reasoning or '')[:300],
+            'parts': [
+                {'is_correct': p.is_correct, 'reasoning': p.reasoning}
+                for p in (r.parts or [])
+            ],
+        },
+    )
 
 
 # ─── MCQ ───────────────────────────────────────────────────────────

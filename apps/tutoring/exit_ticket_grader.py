@@ -210,6 +210,85 @@ def _build_user_prompt(items: List[BatchGradeItem]) -> str:
     )
 
 
+def build_batch_grade_item(
+    index: int,
+    question,
+    student_answer,
+    *,
+    is_math: bool = False,
+) -> BatchGradeItem:
+    """Serialise one ExitTicketQuestion into a BatchGradeItem.
+
+    Extracted from ConversationalTutor._build_batch_grade_item so the
+    same builder can be reused by mid-lesson artifact grading
+    (bank_grader.grade_bank_response → grade_with_llm_single) without
+    duplicating the per-q_type serialisation logic. Per pilot directive
+    2026-05-16: mid-lesson grading must mirror exit-ticket grading
+    exactly, no separate grader path.
+    """
+    q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
+    data = question.answer_data or {}
+
+    extra_kwargs: dict = {}
+    if q_type == 'fill_in_blank':
+        blanks = data.get('blanks', []) or []
+        student_blanks = (
+            student_answer if isinstance(student_answer, list)
+            else [student_answer]
+        )
+        expected = "; ".join(str(b) for b in blanks)
+        student_str = "; ".join(str(b) for b in student_blanks)
+        extra_kwargs = {
+            'expected_blanks': [str(b) for b in blanks],
+            'student_blanks': [str(b) for b in student_blanks],
+        }
+    elif q_type == 'matching':
+        pairs = data.get('pairs', []) or []
+        expected = "; ".join(
+            f"{p.get('left', '')} → {p.get('right', '')}"
+            for p in pairs
+        )
+        student_map = student_answer if isinstance(student_answer, dict) else {}
+        student_str = "; ".join(
+            f"{k} → {v}" for k, v in student_map.items()
+        )
+        extra_kwargs = {
+            'expected_pairs': [
+                {'left': str(p.get('left', '')),
+                 'right': str(p.get('right', ''))}
+                for p in pairs
+            ],
+            'student_pairs': [
+                {
+                    'left': str(p.get('left', '')),
+                    'right': str(
+                        student_map.get(str(p.get('left', '')), ''),
+                    ),
+                }
+                for p in pairs
+            ],
+        }
+    else:  # short_answer / data_interpretation / short_numeric
+        expected = str(
+            data.get('model_answer', '')
+            or getattr(question, 'correct_answer', '')
+            or '',
+        )
+        student_str = str(student_answer or '')
+
+    keywords = list(data.get('keywords', []) or [])
+    return BatchGradeItem(
+        index=index,
+        question_text=getattr(question, 'question_text', '') or '',
+        q_type=q_type,
+        expected=expected,
+        keywords=keywords,
+        student_answer=student_str,
+        is_math=is_math,
+        **extra_kwargs,
+    )
+
+
 def grade_written_responses_batch(
     items: List[BatchGradeItem],
     *,
