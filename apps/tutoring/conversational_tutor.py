@@ -825,6 +825,92 @@ def _strip_authored_numeric_questions(text: str) -> Tuple[str, int]:
     return ' '.join(kept).strip(), n_removed
 
 
+def _normalize_for_overlap(s: str) -> str:
+    """Lowercase + collapse whitespace + strip leading/trailing punctuation
+    so two restatements of the same question match despite trivial
+    formatting differences.
+    """
+    if not s:
+        return ''
+    s = re.sub(r'\s+', ' ', s.strip().lower())
+    # Trim leading/trailing punctuation that varies by author
+    s = s.strip('.,;:!?"\'()[]{}')
+    return s
+
+
+def _strip_bank_overlap_sentences(
+    text: str,
+    bank_rendered_text: str,
+    *,
+    min_overlap_chars: int = 25,
+) -> Tuple[str, int]:
+    """Remove sentences from `text` that substantially overlap with the
+    rendered bank question text.
+
+    Catches the failure mode the e2e pilot 2026-05-16 surfaced:
+    tutor narrative was repeating the bank question's stem AND the
+    artifact was rendering the same question — two copies on screen.
+    The `_strip_authored_numeric_questions` heuristic only catches
+    sentences ending in a question verb ("Find x.") and leaves the
+    SETUP sentence ("Three angles around a point are 100°, 50°, and
+    x°.") intact. This overlap-based stripper catches both because
+    it compares against the actual rendered bank text rather than
+    relying on syntactic shape.
+
+    A tutor sentence is dropped when ANY bank-text sentence is
+    substantially contained inside it OR it inside the bank sentence,
+    where "substantially" means normalized substring of at least
+    `min_overlap_chars`. Normalization: lowercase, collapse whitespace,
+    strip surrounding punctuation.
+
+    Returns (cleaned_text, n_removed). Safe on empty inputs (returns
+    text unchanged).
+    """
+    if not text or not bank_rendered_text:
+        return text, 0
+    bank_norm = _normalize_for_overlap(bank_rendered_text)
+    if len(bank_norm) < min_overlap_chars:
+        return text, 0
+    bank_sentences = [
+        _normalize_for_overlap(s)
+        for s in _SENTENCE_SPLIT_RE.split(bank_rendered_text)
+    ]
+    bank_sentences = [b for b in bank_sentences if len(b) >= min_overlap_chars]
+    # Always also consider the full bank text as one chunk — some
+    # bank entries render as a single long sentence without
+    # punctuation breaks.
+    candidates = bank_sentences + [bank_norm]
+
+    sentences = _SENTENCE_SPLIT_RE.split(text)
+    kept: List[str] = []
+    n_removed = 0
+    for sent in sentences:
+        s = sent.strip()
+        if not s:
+            continue
+        s_norm = _normalize_for_overlap(s)
+        if len(s_norm) < min_overlap_chars:
+            kept.append(s)
+            continue
+        matched = False
+        for bc in candidates:
+            if not bc:
+                continue
+            # Either direction: tutor sentence is in bank, OR bank
+            # chunk is in tutor sentence. Both indicate the tutor is
+            # reading the bank question to the student.
+            if s_norm in bc or bc in s_norm:
+                matched = True
+                break
+        if matched:
+            n_removed += 1
+            continue
+        kept.append(s)
+    if n_removed == 0:
+        return text, 0
+    return ' '.join(kept).strip(), n_removed
+
+
 # =============================================================================
 # CONVERSATIONAL TUTOR ENGINE
 # =============================================================================
@@ -2636,6 +2722,38 @@ Keep it to 2-3 sentences."""
 
             # Re-parse a possible |||MEDIA:N||| in the chosen candidate.
             regen_clean, regen_media = self._parse_media_signal(ensemble_result.text)
+            # Apply the SAME bank-overlap + authored-question strips
+            # the initial response goes through. Pilot e2e 2026-05-16
+            # found that regen output regularly re-introduces the bank
+            # question stem in the chat narrative — the LLM rewrites
+            # the response but adds the question text back. Without
+            # this strip the artifact panel and the chat bubble each
+            # show the same numeric question to the student, defeating
+            # the whole point of the artifact channel.
+            _bank_text = getattr(self, '_last_bank_rendered_text', '') or ''
+            if _bank_text:
+                regen_clean, _n_ovr = _strip_bank_overlap_sentences(
+                    regen_clean, _bank_text,
+                )
+                if _n_ovr:
+                    logger.warning(
+                        "[Regen] STRIPPED_BANK_OVERLAP n=%d — regen "
+                        "output repeated bank question stem; cleaned "
+                        "before saving.", _n_ovr,
+                    )
+                    turn_metadata.setdefault('regen_stripped_bank_overlap', 0)
+                    turn_metadata['regen_stripped_bank_overlap'] += _n_ovr
+            regen_clean, _n_auth = _strip_authored_numeric_questions(
+                regen_clean,
+            )
+            if _n_auth:
+                logger.warning(
+                    "[Regen] STRIPPED_AUTHORED_SENTENCES n=%d — regen "
+                    "output had authored numeric question(s); cleaned.",
+                    _n_auth,
+                )
+                turn_metadata.setdefault('regen_stripped_authored', 0)
+                turn_metadata['regen_stripped_authored'] += _n_auth
             clean_response = regen_clean
 
             turn_metadata['regenerated'] = True
@@ -5771,6 +5889,39 @@ Follow the current step; this concept will be covered in sequence."""
         tool_use_count = 0
         bank_rendered = False
 
+        # PRE-SCAN: extract the bank-rendered text from any pose_question
+        # tool_use so the text-block strip (below) can drop sentences
+        # that overlap with it. Without this 2-pass, text blocks are
+        # processed BEFORE the tool block in the loop order, and we'd
+        # have no bank text to compare against. The e2e pilot
+        # 2026-05-16 showed the LLM repeatedly emitting the bank
+        # question stem inside the text block AND then calling
+        # pose_question with the same slot — two copies on screen.
+        # Stash on engine so the regen path (which runs later, in
+        # _respond_impl) can apply the same strip to regen output.
+        bank_rendered_text_for_strip = ''
+        for _blk in (message.content or []):
+            if (
+                getattr(_blk, 'type', None) == 'tool_use'
+                and getattr(_blk, 'name', '') == self.POSE_QUESTION_TOOL_NAME
+            ):
+                _ti = getattr(_blk, 'input', {}) or {}
+                _slot = _ti.get('slot') if isinstance(_ti.get('slot'), int) else 0
+                _entry = id_map.get(_slot) or id_map.get(0)
+                if _entry is not None:
+                    try:
+                        bank_rendered_text_for_strip = (
+                            render_question_to_prose(_entry) or ''
+                        )
+                    except Exception as _exc:
+                        logger.warning(
+                            "[QuestionTool] pre-scan render failed: %s",
+                            _exc,
+                        )
+                break  # only one pose_question per turn
+        # Stash on engine for the regen finalize path
+        self._last_bank_rendered_text = bank_rendered_text_for_strip
+
         for block in (message.content or []):
             btype = getattr(block, 'type', None)
             if btype == 'text':
@@ -5797,9 +5948,31 @@ Follow the current step; this concept will be covered in sequence."""
                         "of emitting a tool_use block.",
                         leaked,
                     )
-                # Strip authored numeric questions the LLM smuggled into
-                # the narrative. Questions belong in the artifact (via
-                # pose_question) only. Pilot directive 2026-05-16.
+                # Strip 1: bank-overlap. Drop sentences that overlap
+                # with the rendered bank text — catches the case the
+                # `_strip_authored_numeric_questions` heuristic misses
+                # (the SETUP sentence "Four equal angles meet at a
+                # point." has no question-verb + isn't a question).
+                # Pilot e2e 2026-05-16: this was the dominant R7
+                # failure mode on regen turns.
+                if bank_rendered_text_for_strip:
+                    cleaned, n_overlap = _strip_bank_overlap_sentences(
+                        cleaned, bank_rendered_text_for_strip,
+                    )
+                    if n_overlap:
+                        logger.warning(
+                            "[QuestionTool] STRIPPED_BANK_OVERLAP n=%d — "
+                            "LLM repeated the bank question stem in the "
+                            "text block; artifact already shows it.",
+                            n_overlap,
+                        )
+                        turn_metadata.setdefault(
+                            'stripped_bank_overlap', 0,
+                        )
+                        turn_metadata['stripped_bank_overlap'] += n_overlap
+                # Strip 2: authored-numeric-question heuristic. Catches
+                # "Find x" / "Solve for y" patterns even when the
+                # setup didn't match bank text exactly. Belt + braces.
                 cleaned, n_authored = _strip_authored_numeric_questions(
                     cleaned,
                 )
