@@ -722,6 +722,53 @@ def _strip_probe_sentences(content: str) -> Tuple[str, int]:
     return new_content.strip(), n
 
 
+# Detects MCQ-style option listings in a tutor text block.
+# Examples that match:
+#   "A) Physical geography\nB) Human geography\nC) ..."
+#   "A. Physical\nB. Human\nC. ..."
+# Requires at least 3 letter-labeled options on separate lines to
+# avoid false positives on benign lists ("A and B are wrong").
+_MCQ_OPTIONS_BLOCK_RE = re.compile(
+    r'(?:^|\n)\s*A[\)\.]\s+\S.+\n\s*B[\)\.]\s+\S.+\n\s*C[\)\.]\s+\S',
+    re.MULTILINE,
+)
+
+
+def _text_block_has_authored_question(text: str) -> bool:
+    """Detect if a tutor text block already authored a question that
+    would conflict with a bank pull.
+
+    Two signals (either triggers):
+      1) MCQ options block (A) / B) / C) [/ D)] on separate lines).
+         Strong signal — the LLM is clearly authoring a multiple-choice
+         question that the student will answer.
+      2) Trailing question mark — the text ends with "?" indicating
+         the LLM authored a question at the tail. Only triggers when
+         the trailing question is substantive (>20 chars from the
+         last sentence boundary), to skip "ok?" / "right?" tail
+         tags inside the narrative.
+
+    Use this when deciding whether a pose_question bank render would
+    create a two-question turn. If True, skip the bank render so the
+    student answers the AUTHORED question (graded via chat-authored
+    grounded grader) instead of being mis-graded against the bank pull.
+    """
+    if not text or not text.strip():
+        return False
+    # Signal 1: MCQ options block.
+    if _MCQ_OPTIONS_BLOCK_RE.search(text):
+        return True
+    # Signal 2: substantive tail question.
+    stripped = text.rstrip()
+    if stripped.endswith('?'):
+        # Find the last sentence boundary before the '?'.
+        sentences = re.split(r'(?<=[.!?])\s+', stripped)
+        tail = sentences[-1].strip() if sentences else stripped
+        if len(tail) > 20:
+            return True
+    return False
+
+
 def _looks_like_authored_question(lead_in: str) -> bool:
     """Heuristic: does the lead_in carry an authored question / numeric
     setup the LLM should have left to the BANK slot?
@@ -6443,6 +6490,41 @@ Follow the current step; this concept will be covered in sequence."""
                 logger.info(
                     "[QuestionTool] render: chars=%d slot=%d", len(rendered), slot,
                 )
+                # AUTHORED-vs-BANK CONFLICT GUARD (2026-05-16). If the
+                # tutor's text block already authored a question
+                # (esp. an MCQ with A/B/C/D options), rendering an
+                # UNRELATED bank Q here would put two questions on
+                # screen — the student answers the authored one, but
+                # awaiting_answer points at the bank Q so the grader
+                # judges against the wrong question (false negative,
+                # student stranded). Pilot 2026-05-16 lesson 538
+                # session 39 turn 9: text authored sea-turtle MCQ
+                # while pose_question pulled Q3711 ('Compose a
+                # definition of geography'). Fix: when conflict
+                # detected, SKIP the bank render — let the authored
+                # question stay in chat and route the next student
+                # input through the chat-authored grounded grader
+                # (no awaiting_answer set means
+                # _grade_against_last_bank_question takes the
+                # tail-question fallback path). Must run BEFORE
+                # _record_bank_question_on_turn so awaiting_answer
+                # isn't written.
+                existing_text = "\n\n".join(text_parts)
+                if _text_block_has_authored_question(existing_text):
+                    logger.warning(
+                        "[QuestionTool] AUTHORED_VS_BANK_CONFLICT: text "
+                        "block already contains an authored question — "
+                        "SKIPPING bank render (slot=%d, %s id=%s) so "
+                        "awaiting_answer doesn't mis-point. Student's "
+                        "next reply will route through the chat-authored "
+                        "grader.",
+                        slot, kind, getattr(entry, 'id', '?'),
+                    )
+                    turn_metadata.setdefault(
+                        'authored_vs_bank_conflicts', 0,
+                    )
+                    turn_metadata['authored_vs_bank_conflicts'] += 1
+                    continue
                 self._record_bank_question_on_turn(turn_metadata, entry)
                 # Render the bank question text inline in the chat AND
                 # to the artifact panel (pilot directive 2026-05-16):
