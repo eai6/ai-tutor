@@ -139,20 +139,42 @@ def _retrieve_evidence(lesson, claims: List[str], n_results: int = 5) -> str:
     chunks: List[str] = []
     query = " | ".join(claims)[:500]
 
-    # Curriculum KB
+    # Curriculum KB — query BOTH the lesson's institution-scoped KB
+    # AND the global (institution_id=0) KB, then merge. Mirrors the
+    # `Q(institution=inst) | Q(institution__isnull=True)` pattern from
+    # CLAUDE.md: institution-specific content plus platform-wide
+    # curriculum (e.g. global Geography textbooks indexed under
+    # institution_0) both contribute evidence. Without this merge, a
+    # lesson at institution=12 would never see globally-shared
+    # curriculum and the judge would skip with no_kb_evidence on
+    # otherwise-checkable claims.
     try:
         from apps.curriculum.knowledge_base import get_knowledge_base
         institution_id = (
             getattr(lesson.unit.course.institution, "id", None)
             if lesson and lesson.unit and lesson.unit.course
-            else 0
+            else None
         )
-        kb = get_knowledge_base(institution_id or 0)
-        results = kb.search(query, n_results=n_results) or []
-        for r in results:
-            content = (r.get("content") or "").strip()
-            if content:
-                chunks.append(f"[curriculum] {content[:600]}")
+        kb_buckets = []
+        if institution_id and institution_id != 0:
+            kb_buckets.append(institution_id)
+        kb_buckets.append(0)
+        per_bucket = max(2, n_results // len(kb_buckets))
+        seen_content = set()
+        for iid in kb_buckets:
+            try:
+                kb = get_knowledge_base(iid)
+                results = kb.search(query, n_results=per_bucket) or []
+            except Exception as inner_e:
+                logger.debug(f"[FactCheck] KB inst={iid} unavailable: {inner_e}")
+                continue
+            for r in results:
+                content = (r.get("content") or "").strip()
+                if not content or content[:120] in seen_content:
+                    continue
+                seen_content.add(content[:120])
+                tag = "curriculum" if iid == 0 else f"curriculum:inst{iid}"
+                chunks.append(f"[{tag}] {content[:600]}")
     except Exception as e:
         logger.warning(f"[FactCheck] KB retrieval failed: {e}")
 
