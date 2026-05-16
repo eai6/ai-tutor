@@ -3943,7 +3943,12 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         Returns "" when no question is awaiting (most turns).
         """
         rec = getattr(self, '_awaiting_answer', None)
-        if not rec or not rec.get('question_id'):
+        if not rec:
+            return ""
+        # inline_authored has no question_id (the question lives only
+        # on the previous tutor turn's metadata). Allow it through;
+        # the kind-dispatch below will read from turn metadata.
+        if not rec.get('question_id') and rec.get('kind') != 'inline_authored':
             return ""
 
         # Resolve student_status from the most-recent grade verdict
@@ -4008,6 +4013,42 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
                 if q.explanation:
                     lines.append(f"  explanation: {q.explanation[:400]}")
                 lines.append(f"  student_status: {status}")
+            elif kind == 'inline_authored':
+                # The tutor authored this question via
+                # pose_inline_question. Question text + answer_key
+                # live on the previous tutor turn's metadata. Pull
+                # them so the LLM sees what was asked + the verdict.
+                from apps.tutoring.models import SessionTurn
+                _last_t = (
+                    SessionTurn.objects
+                    .filter(session=self.session, role='tutor')
+                    .order_by('-created_at')
+                    .first()
+                )
+                ia = (
+                    ((_last_t.metadata or {}).get(
+                        'inline_authored_question', {}
+                    ) or {})
+                    if _last_t else {}
+                )
+                if not ia:
+                    return ""
+                lines = [
+                    "[ACTIVE INLINE-AUTHORED QUESTION]",
+                    "You authored this question on the previous turn",
+                    "via pose_inline_question. Use the answer_key +",
+                    "student_status below to scaffold the next turn.",
+                    "",
+                    f"  kind: inline_authored",
+                    f"  question_type: {ia.get('question_type', 'short_answer')}",
+                    f"  stem: {(ia.get('question') or '')[:600]}",
+                    f"  answer_key: {(ia.get('answer_key') or '')[:200]}",
+                    f"  student_status: {status}",
+                ]
+                if ia.get('working'):
+                    lines.append(
+                        f"  reference_working: {(ia.get('working') or '')[:300]}"
+                    )
             else:
                 return ""
         except Exception as exc:
@@ -6232,15 +6273,23 @@ Follow the current step; this concept will be covered in sequence."""
                 # when the student's most recent answer was WRONG, the
                 # tutor must not advance the artifact to a new bank
                 # question — the existing one stays in flight so the
-                # student can retry. Drop the new tool call here; the
-                # awaiting_answer state remains from the previous turn
-                # so the artifact panel keeps rendering the same
-                # question. The narrative explanation/hint still goes
-                # through (text blocks above are unaffected).
+                # student can retry.
+                # Only applies when the PREVIOUS question had an
+                # artifact representation (bank kinds:
+                # lesson_step / exit_ticket_question). For
+                # inline_authored questions there's no artifact to
+                # keep alive, and blocking leaves the student with
+                # an empty response (pilot 2026-05-16: session 32
+                # turn 12 stranded after a conceptual question with
+                # a bad numeric answer_key was marked wrong).
                 pending_grade = getattr(self, '_pending_bank_grade', None)
+                _awaiting = getattr(self, '_awaiting_answer', None) or {}
+                _prev_kind = _awaiting.get('kind') if isinstance(_awaiting, dict) else None
+                _prev_was_bank = _prev_kind in ('lesson_step', 'exit_ticket_question')
                 if (
                     pending_grade is not None
                     and getattr(pending_grade, 'is_correct', None) is False
+                    and _prev_was_bank
                 ):
                     logger.warning(
                         "[QuestionTool] BLOCKED_ROTATE_ON_WRONG slot=%r — "
@@ -6780,15 +6829,17 @@ Follow the current step; this concept will be covered in sequence."""
         # the tutor uses it to scaffold remediation after a wrong
         # answer (rather than re-deriving the math itself).
         self._pending_bank_question = question
-        # R2 + retry-on-wrong (2026-05-16): clear awaiting_answer ONLY
-        # on a CORRECT verdict. On WRONG, keep the question pending so
-        # the artifact panel keeps showing it and the student can retry
-        # instead of being silently advanced to a new bank question.
-        # On None/skipped (grader couldn't interpret), also keep it
-        # pending — the student said something the grader can't parse,
-        # not a real answer attempt.
-        if result is not None and getattr(result, 'is_correct', None) is True:
-            self._clear_awaiting_answer()
+        # Keep awaiting_answer populated through the NEXT tutor turn so
+        # the system prompt's <active_bank_question> block renders with
+        # student_status='answered_correct' / 'answered_wrong' — that's
+        # how the LLM knows the student replied and the result. Without
+        # this, the LLM saw no signal that the previous question got
+        # answered, and re-asked the same question on the next turn
+        # (e2e 2026-05-16, session 32 turn 6 repeated "If angles around
+        # a point are 45°, 90°, 135°, and x, what is x?"). The next
+        # pose_question / pose_inline_question call naturally overwrites
+        # _awaiting_answer with the new question, so it doesn't
+        # accumulate across many turns.
         logger.info(
             "[BankGrade] session=%s ref=%s:%s is_correct=%s expected=%r student=%r",
             self.session.id, kind, ref_id,
