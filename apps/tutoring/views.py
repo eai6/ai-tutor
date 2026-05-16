@@ -1132,6 +1132,11 @@ def chat_respond(request, session_id):
             "artifact_html": getattr(result, 'artifact_html', None),
             # Easy-mode interactive probe (MCQ / fill-in-blank widget).
             "probe": getattr(result, 'probe', None),
+            # R2 (2026-05-15): bank question awaiting answer — the
+            # frontend artifact panel (R3) renders this as a question
+            # widget instead of relying on inline prose. None when no
+            # question is in flight.
+            "pending_question": getattr(result, 'pending_question', None),
         })
     except Exception as e:
         logger.error(f"[respond] Failed: {e}", exc_info=True)
@@ -1247,6 +1252,7 @@ def chat_difficulty_signal(request, session_id):
             "milestone": result.milestone,
             "artifact_html": getattr(result, 'artifact_html', None),
             "probe": getattr(result, 'probe', None),
+            "pending_question": getattr(result, 'pending_question', None),
         }
     except Exception as exc:
         # Fail-soft: even if the synthetic-turn generation fails, the

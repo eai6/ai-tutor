@@ -614,6 +614,16 @@ class TutorMessage:
     skills_covered: List[str] = field(default_factory=list)
     tokens_used: int = 0
 
+    # R2 (2026-05-15): pending bank question for the artifact panel.
+    # When the tutor poses a bank question on this turn (or one is
+    # already in flight from a previous turn), this dict carries the
+    # data the frontend needs to render the question in the side
+    # artifact panel (R3) instead of relying on the inline prose.
+    # Shape: {kind, question_id, question_type, turn_index, posed_at,
+    # stem, options, ...} — backend looks up the canonical bank entry
+    # and serialises it. None when no question is in flight.
+    pending_question: Optional[Dict] = None
+
 
 # Strip "thinking leakage" — opening sentences where the LLM narrates
 # its own plan instead of just executing it. Triggered by phrases like
@@ -1346,6 +1356,20 @@ class ConversationalTutor:
         # Turn media for resume (artifact panel)
         self._turn_media = state.get('turn_media', {})
 
+        # R2 (2026-05-15): per-turn bank question lookup for the
+        # artifact panel + resume system. Same shape as _turn_media:
+        # {turn_index_str: {question_id, kind, posed_at}}.
+        self._turn_questions = state.get('turn_questions', {})
+
+        # R2 (2026-05-15): "we're awaiting an answer to question X"
+        # state. Set when a bank question is posed; cleared when the
+        # next student message arrives. Drives the resume system (R5)
+        # — on session reload, if awaiting_answer is set we re-render
+        # the question in the artifact panel rather than asking the
+        # student a brand-new question. None when no question is
+        # in flight.
+        self._awaiting_answer = state.get('awaiting_answer') or None
+
         # Worked example deduplication (Issue 1)
         self.shown_worked_example_indices = set(state.get('shown_worked_example_indices', []))
 
@@ -1449,6 +1473,10 @@ class ConversationalTutor:
             'step_exchange_count': getattr(self, 'step_exchange_count', 0),
             # Turn media for resume (artifact panel)
             'turn_media': getattr(self, '_turn_media', {}),
+            # R2: per-turn bank question lookup + awaiting-answer state
+            # for the resume system. See _load_state for shape.
+            'turn_questions': getattr(self, '_turn_questions', {}),
+            'awaiting_answer': getattr(self, '_awaiting_answer', None),
             # Worked example deduplication (Issue 1)
             'shown_worked_example_indices': list(getattr(self, 'shown_worked_example_indices', set())),
             # Covered enabling objectives (for competency report)
@@ -2019,7 +2047,24 @@ Keep it to 2-3 sentences."""
         from apps.tutoring.tracing import start_span_buffer, reset_span_buffer
         token = start_span_buffer()
         try:
-            return self._respond_impl(student_input, student_metadata=student_metadata)
+            result = self._respond_impl(
+                student_input, student_metadata=student_metadata,
+            )
+            # R2 (2026-05-15): every TutorMessage gets the current
+            # pending_question state attached after the impl runs, so
+            # the artifact panel (R3) sees the right data regardless of
+            # which of the seven internal TutorMessage construction
+            # sites produced the result. Cheap (one DB lookup at most;
+            # None when no question is in flight).
+            try:
+                if isinstance(result, TutorMessage):
+                    result.pending_question = self._build_pending_question_payload()
+            except Exception as _exc:
+                logger.warning(
+                    f"[PendingQuestion] post-impl attach failed: "
+                    f"{type(_exc).__name__}: {_exc}"
+                )
+            return result
         finally:
             reset_span_buffer(token)
 
@@ -3649,6 +3694,134 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
             + "\nApply this guidance in your next response.\n"
         )
 
+    def _build_active_bank_question_block(self) -> str:
+        """[ACTIVE BANK QUESTION] context block for the system prompt.
+
+        Injected when self._awaiting_answer is set. Carries:
+          - The question stem + (for MCQ) the four options
+          - The verified expected_answer / correct_answer + explanation
+            so the tutor scaffolds against truth, not its own guess.
+          - student_status: 'awaiting_answer' | 'answered_correct' |
+            'answered_wrong' — drives the scaffolding rules below.
+
+        Scaffolding rules per memory/tutor_reliability_v2_plan.md
+        (decided 2026-05-15):
+
+          awaiting_answer  → hints only, no Socratic probes; let the
+                             student answer first.
+          answered_correct → confirm + explain WHY using the bank's
+                             explanation field. NEVER ask the student
+                             to show working on a known-correct answer.
+                             NEVER ask "let's check that" — the tutor
+                             knows it's correct.
+          answered_wrong   → acknowledge gently; THEN it's OK to probe
+                             ("what was your reasoning?") to find the
+                             misconception, then re-explain.
+
+        Returns "" when no question is awaiting (most turns).
+        """
+        rec = getattr(self, '_awaiting_answer', None)
+        if not rec or not rec.get('question_id'):
+            return ""
+
+        # Resolve student_status from the most-recent grade verdict
+        # if any. _pending_bank_grade is set by
+        # _grade_against_last_bank_question whenever the student replies
+        # to a bank question (BankGradeResult with .is_correct).
+        status = 'awaiting_answer'
+        grade = getattr(self, '_pending_bank_grade', None)
+        if grade is not None and getattr(grade, 'is_correct', None) is not None:
+            status = 'answered_correct' if grade.is_correct else 'answered_wrong'
+
+        kind = rec.get('kind')
+        question_id = rec['question_id']
+
+        # Look up the bank entry for the verified key + explanation.
+        try:
+            if kind == 'lesson_step':
+                from apps.curriculum.models import LessonStep
+                step = LessonStep.objects.filter(id=question_id).first()
+                if step is None:
+                    return ""
+                stem = (step.question or step.teacher_script or '')[:600]
+                expected = (step.expected_answer or '').strip()[:200]
+                lines = [
+                    "[ACTIVE BANK QUESTION]",
+                    "A bank question is awaiting an answer. The student",
+                    "sees the question rendered in the side artifact panel.",
+                    "DO NOT re-author the question stem in your reply.",
+                    "",
+                    f"  question_id: {step.id}",
+                    f"  kind: lesson_step",
+                    f"  stem: {stem}",
+                    f"  expected_answer: {expected}",
+                    f"  student_status: {status}",
+                ]
+            elif kind == 'exit_ticket_question':
+                from apps.tutoring.models import ExitTicketQuestion
+                q = ExitTicketQuestion.objects.filter(id=question_id).first()
+                if q is None:
+                    return ""
+                stem = (q.question_text or '')[:600]
+                lines = [
+                    "[ACTIVE BANK QUESTION]",
+                    "A bank question is awaiting an answer. The student",
+                    "sees the question rendered in the side artifact panel.",
+                    "DO NOT re-author the question stem in your reply.",
+                    "",
+                    f"  question_id: {q.id}",
+                    f"  kind: exit_ticket_question",
+                    f"  question_type: {q.question_type or 'mcq'}",
+                    f"  stem: {stem}",
+                ]
+                if q.question_type == 'mcq':
+                    lines += [
+                        f"  options:",
+                        f"    A: {(q.option_a or '')[:200]}",
+                        f"    B: {(q.option_b or '')[:200]}",
+                        f"    C: {(q.option_c or '')[:200]}",
+                        f"    D: {(q.option_d or '')[:200]}",
+                        f"  correct_answer: {q.correct_answer or '(none)'}",
+                    ]
+                if q.explanation:
+                    lines.append(f"  explanation: {q.explanation[:400]}")
+                lines.append(f"  student_status: {status}")
+            else:
+                return ""
+        except Exception as exc:
+            logger.warning(
+                f"[ActiveBankQuestion] resolve failed for {kind}#{question_id}: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            return ""
+
+        # Status-driven scaffolding rules. Tight wording so the LLM
+        # internalises them without a separate behavioural prompt.
+        rules = {
+            'awaiting_answer': (
+                "Scaffolding: hints only. Don't ask the student to "
+                "explain their reasoning yet — let them answer first. "
+                "Reference the question's content (e.g. 'Look at "
+                "option C') without re-stating the stem."
+            ),
+            'answered_correct': (
+                "Scaffolding: the student got it RIGHT. Confirm "
+                "briefly + explain WHY using the explanation field "
+                "above. NEVER ask 'let's check that', NEVER ask the "
+                "student to show working, NEVER probe their reasoning. "
+                "The verified answer key tells you it's correct."
+            ),
+            'answered_wrong': (
+                "Scaffolding: the student answered INCORRECTLY. "
+                "Acknowledge gently, THEN you may ask one short probe "
+                "('what was your thinking?') to find the misconception "
+                "before re-explaining or re-posing."
+            ),
+        }
+        lines.append("")
+        lines.append(rules.get(status, rules['awaiting_answer']))
+        return "\n".join(lines)
+
     def _build_difficulty_signal_block(self) -> str:
         """Build [DIFFICULTY ADJUSTMENT] + [COGNITIVE LOAD] context blocks.
 
@@ -3954,6 +4127,16 @@ SCAFFOLDING TONE ({intensity} application):
         pretest_block = self._build_pretest_diagnostic_block()
         if pretest_block:
             difficulty_block = (difficulty_block + "\n\n" + pretest_block).strip()
+
+        # R2 (2026-05-15): when a bank question is awaiting an answer
+        # we inject a context block so the tutor can scaffold without
+        # re-authoring the stem (which trips NO_AUTHORING). The block
+        # carries the verified answer key + explanation so the tutor
+        # can confirm + explain WHY rather than asking the student to
+        # show working on a known-correct answer. Read the docstring
+        # on _build_active_bank_question_block for the scaffolding
+        # rules this enables.
+        active_question_block = self._build_active_bank_question_block()
         worked_example_block = self._build_worked_example_block()
         interleaved_block = self._build_interleaved_practice_block()
         enabling_obj_block = self._build_enabling_objectives_block()
@@ -4022,6 +4205,8 @@ CURRENT STEP DIRECTIVE (follow this exactly):
 {student_profile}
 
 {difficulty_block}
+
+{active_question_block}
 
 {enabling_obj_block}
 {guidance_block}
@@ -5723,9 +5908,28 @@ Follow the current step; this concept will be covered in sequence."""
 
         Uses {kind, id, question_type} so the grader doesn't need the
         Pydantic id_map (which only lives in memory for the current turn).
+
+        R2 (2026-05-15): also writes engine_state.awaiting_answer +
+        engine_state.turn_questions so:
+          - The artifact panel (R3) can render the question by id
+            without depending on inline prose.
+          - The resume system (R5) knows what to re-pose when the
+            student returns mid-question.
+          - The active_bank_question system-prompt context block
+            (R2.2 below) can scaffold without the tutor re-authoring.
         """
         if entry is None:
             return
+
+        # Compute the upcoming tutor turn index (matches the
+        # _turn_media[turn_index] convention: conversation hasn't been
+        # appended yet at this point; the upcoming index = len + 1
+        # because the student turn was appended before respond() was
+        # called but the tutor turn isn't appended yet).
+        turn_index = len(getattr(self, 'conversation', []))
+        from django.utils import timezone as _tz
+        posed_at_iso = _tz.now().isoformat()
+
         # LessonStep — slot 0 in the bank block. Graded against
         # LessonStep.expected_answer via the existing
         # _deterministic_math_check; we still record it for forensics.
@@ -5735,7 +5939,15 @@ Follow the current step; this concept will be covered in sequence."""
                 'id': entry.id,
                 'question_type': 'short_numeric',
             }
+            self._set_awaiting_answer(
+                kind='lesson_step',
+                question_id=entry.id,
+                question_type='short_numeric',
+                turn_index=turn_index,
+                posed_at_iso=posed_at_iso,
+            )
             return
+
         # ExitTicketQuestion — bank slots 1..N. Mark as shown so the
         # session-pool picker excludes it on subsequent turns; this
         # stops the tutor recycling the same question after a correct
@@ -5747,11 +5959,119 @@ Follow the current step; this concept will be covered in sequence."""
             self.shown_question_ids.add(int(entry.id))
         except (TypeError, ValueError, AttributeError):
             pass
+
+        qtype = getattr(entry, 'question_type', 'mcq') or 'mcq'
         turn_metadata['bank_question_ref'] = {
             'kind': 'exit_ticket_question',
             'id': entry.id,
-            'question_type': getattr(entry, 'question_type', 'mcq') or 'mcq',
+            'question_type': qtype,
         }
+        self._set_awaiting_answer(
+            kind='exit_ticket_question',
+            question_id=entry.id,
+            question_type=qtype,
+            turn_index=turn_index,
+            posed_at_iso=posed_at_iso,
+        )
+
+    def _set_awaiting_answer(
+        self,
+        *,
+        kind: str,
+        question_id: int,
+        question_type: str,
+        turn_index: int,
+        posed_at_iso: str,
+    ) -> None:
+        """Persist 'we're awaiting an answer to question X' state for
+        the artifact panel + resume system. Reads-after-writes go via
+        the engine instance vars; full state lands in engine_state on
+        the next _save_state.
+        """
+        record = {
+            'kind': kind,
+            'question_id': int(question_id),
+            'question_type': question_type,
+            'turn_index': int(turn_index),
+            'posed_at': posed_at_iso,
+        }
+        if not hasattr(self, '_turn_questions') or self._turn_questions is None:
+            self._turn_questions = {}
+        self._turn_questions[str(turn_index)] = record
+        self._awaiting_answer = record
+
+    def _clear_awaiting_answer(self) -> None:
+        """Drop the awaiting_answer flag — call when the student has
+        submitted an answer (via the artifact UI in R4, or via a
+        free-text reply that the grader processes).
+        """
+        self._awaiting_answer = None
+
+    def _build_pending_question_payload(self) -> Optional[Dict]:
+        """Render the active awaiting_answer record into the dict
+        shape the frontend artifact panel (R3) consumes.
+
+        Looks up the canonical bank entry by id so the frontend
+        renders the question deterministically — no dependence on
+        inline prose. Returns None when no question is awaiting OR
+        when the entry can't be resolved (deleted course, etc).
+        """
+        rec = getattr(self, '_awaiting_answer', None)
+        if not rec or not rec.get('question_id'):
+            return None
+        kind = rec.get('kind')
+        question_id = rec['question_id']
+
+        try:
+            if kind == 'lesson_step':
+                from apps.curriculum.models import LessonStep
+                step = LessonStep.objects.filter(id=question_id).first()
+                if step is None:
+                    return None
+                return {
+                    'kind': 'lesson_step',
+                    'question_id': step.id,
+                    'question_type': step.answer_type or 'short_numeric',
+                    'turn_index': rec.get('turn_index'),
+                    'posed_at': rec.get('posed_at'),
+                    'stem': step.question or step.teacher_script or '',
+                    'expected_answer': step.expected_answer or '',
+                    'choices': step.choices or [],
+                }
+            if kind == 'exit_ticket_question':
+                from apps.tutoring.models import ExitTicketQuestion
+                q = ExitTicketQuestion.objects.filter(id=question_id).first()
+                if q is None:
+                    return None
+                payload = {
+                    'kind': 'exit_ticket_question',
+                    'question_id': q.id,
+                    'question_type': q.question_type or 'mcq',
+                    'turn_index': rec.get('turn_index'),
+                    'posed_at': rec.get('posed_at'),
+                    'stem': q.question_text or '',
+                    'explanation': q.explanation or '',
+                }
+                if q.question_type == 'mcq':
+                    payload['options'] = {
+                        'A': q.option_a or '',
+                        'B': q.option_b or '',
+                        'C': q.option_c or '',
+                        'D': q.option_d or '',
+                    }
+                    payload['correct_answer'] = q.correct_answer or ''
+                else:
+                    # Non-MCQ types (fill_in_blank, matching, short_answer,
+                    # data_interpretation) carry their own answer_data
+                    # shape — surface verbatim for the frontend to dispatch.
+                    payload['answer_data'] = q.answer_data or {}
+                return payload
+        except Exception as exc:
+            logger.warning(
+                f"[PendingQuestion] resolve failed for {kind}#{question_id}: "
+                f"{type(exc).__name__}: {exc}"
+            )
+        return None
 
     def _grade_against_last_bank_question(self, student_input: str):
         """If the most recent tutor turn rendered a bank question, run
@@ -5809,6 +6129,15 @@ Follow the current step; this concept will be covered in sequence."""
         # the tutor uses it to scaffold remediation after a wrong
         # answer (rather than re-deriving the math itself).
         self._pending_bank_question = question
+        # R2: the student has now ATTEMPTED the pending question; we no
+        # longer need to re-render it on resume. The grade result is
+        # what drives the next tutor turn (not the unanswered prompt).
+        # Keep awaiting_answer set ONLY when the grader couldn't
+        # produce a verdict (None / skipped) — that means the student
+        # said something the grader couldn't interpret as an answer
+        # attempt, and the question is still effectively pending.
+        if result is not None and getattr(result, 'is_correct', None) is not None:
+            self._clear_awaiting_answer()
         logger.info(
             "[BankGrade] session=%s ref=%s:%s is_correct=%s expected=%r student=%r",
             self.session.id, kind, ref_id,
