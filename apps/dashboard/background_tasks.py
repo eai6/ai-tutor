@@ -459,17 +459,25 @@ Return ONLY the JSON array, no other text."""
             system_prompt = system_prompt + "\n\n" + dok_guidance_for("assessment")
             messages = [{"role": "user", "content": prompt}]
 
-            response = client.generate(messages, system_prompt, max_tokens=16000)
-            response_text = response.content.strip()
-
-            log(f"      LLM response: {len(response_text)} chars, stop={response.stop_reason}")
-
-            from apps.llm.json_utils import parse_llm_json
-            questions_data = parse_llm_json(response_text, expect_array=True)
+            # Try instructor first — Pydantic-validated question list
+            # eliminates parse_llm_json failures. Falls back to the
+            # raw-text path on infra failure.
+            from apps.curriculum.content_generator import _instructor_generate_exit_ticket
+            questions_data = _instructor_generate_exit_ticket(
+                client,
+                prompt=prompt,
+                system_prompt=system_prompt,
+                max_tokens=16000,
+            )
+            if questions_data is None:
+                response = client.generate(messages, system_prompt, max_tokens=16000)
+                response_text = response.content.strip()
+                log(f"      LLM response: {len(response_text)} chars, stop={response.stop_reason}")
+                from apps.llm.json_utils import parse_llm_json
+                questions_data = parse_llm_json(response_text, expect_array=True)
 
             if not questions_data or not isinstance(questions_data, list):
                 log(f"   [{idx+1}/{total_lessons}] ✗ {lesson.title}: Failed to parse JSON from LLM response")
-                log(f"      First 200 chars: {response_text[:200]}")
                 failed += 1
                 continue
 
@@ -802,16 +810,27 @@ Return ONLY the JSON array, no other text."""
     try:
         client = get_llm_client(config)
 
-        system_prompt = "You are an expert teacher creating assessment questions. Return ONLY valid JSON, no other text."
-        messages = [{"role": "user", "content": prompt}]
-
-        response = client.generate(messages, system_prompt, max_tokens=16000)
-        response_text = response.content.strip()
-
-        logger.info(f"Exit ticket response: {len(response_text)} chars, stop={response.stop_reason}")
-
-        from apps.llm.json_utils import parse_llm_json
-        questions_data = parse_llm_json(response_text, expect_array=True)
+        system_prompt = "You are an expert teacher creating assessment questions."
+        # Try instructor first — Pydantic-validated question list.
+        from apps.curriculum.content_generator import _instructor_generate_exit_ticket
+        questions_data = _instructor_generate_exit_ticket(
+            client,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            max_tokens=16000,
+        )
+        if questions_data is None:
+            # Fallback: legacy raw-text + parse_llm_json
+            messages = [{"role": "user", "content": prompt}]
+            response = client.generate(
+                messages,
+                system_prompt + " Return ONLY valid JSON, no other text.",
+                max_tokens=16000,
+            )
+            response_text = response.content.strip()
+            logger.info(f"Exit ticket response: {len(response_text)} chars, stop={response.stop_reason}")
+            from apps.llm.json_utils import parse_llm_json
+            questions_data = parse_llm_json(response_text, expect_array=True)
 
         if not questions_data or not isinstance(questions_data, list):
             logger.warning(f"Failed to parse exit ticket JSON for {lesson.title}")

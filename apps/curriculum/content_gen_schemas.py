@@ -123,7 +123,81 @@ class GeneratedExitTicket(BaseModel):
     )
 
 
+class GranularSubSkill(BaseModel):
+    """One atomic sub-skill from the EO expansion call."""
+    text: str = Field(
+        description=(
+            "An action-verb-led, measurable sub-skill (8-200 chars). "
+            "E.g. 'Label the inner core on a cross-section diagram.' "
+            "Avoid weak openers (understand, know, appreciate)."
+        ),
+        min_length=8,
+        max_length=200,
+    )
+
+
+class GranularSubSkillList(BaseModel):
+    """Wrapper so instructor can drive a single chat.completions.create
+    call returning a list (instructor requires a top-level object)."""
+    sub_skills: List[GranularSubSkill] = Field(
+        description=(
+            "5-10 atomic sub-skills that decompose the lesson's "
+            "broader enabling objectives. Each one is a single "
+            "teaching-step-sized skill the pre-test can target."
+        ),
+        min_length=1,
+        max_length=15,
+    )
+
+
+class ExtractedCompetency(BaseModel):
+    """One competency extracted from the curriculum KB."""
+    text: str = Field(
+        description="The competency statement (action verb + content).",
+        max_length=500,
+    )
+    type: Literal["knowledge", "skill", "attitude"] = Field(
+        default="knowledge",
+        description="Competency type.",
+    )
+    bloom_level: Literal[
+        "remember", "understand", "apply", "analyze", "evaluate", "create",
+    ] = Field(
+        default="understand",
+        description="Bloom's taxonomy level.",
+    )
+    source_code: str = Field(
+        default="",
+        description="Original curriculum code if visible (e.g. K408, S401).",
+        max_length=50,
+    )
+    strand: str = Field(
+        default="",
+        description=(
+            "Topic/strand this belongs to (e.g. 'Number', "
+            "'Map Skills', 'Population')."
+        ),
+        max_length=200,
+    )
+
+
+class ExtractedCompetencyList(BaseModel):
+    """Wrapper for the competency-extraction call."""
+    competencies: List[ExtractedCompetency] = Field(
+        description=(
+            "Every specific, measurable competency extracted from the "
+            "source material. Do NOT summarize or merge."
+        ),
+        min_length=1,
+        max_length=200,
+    )
+
+
 __all__ = [
     "GeneratedExitQuestion",
     "GeneratedExitTicket",
+    "GranularSubSkill",
+    "GranularSubSkillList",
+    "ExtractedCompetency",
+    "ExtractedCompetencyList",
 ]

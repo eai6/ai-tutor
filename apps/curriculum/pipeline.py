@@ -235,10 +235,39 @@ Extract every specific, measurable competency. For each one, provide:
 Return a JSON array of competency objects. Extract as many as you can find — do NOT summarize or merge.
 Return ONLY valid JSON."""
 
+    sys_prompt = "You are a curriculum analysis expert. Extract learning competencies precisely."
+
+    # Try instructor first — Pydantic-validated competency list
+    # eliminates the parse_llm_json failure class. Falls back to the
+    # legacy raw-text path on infra failure.
+    try:
+        from apps.curriculum.content_generator import _instructor_structured_call
+        from apps.curriculum.content_gen_schemas import ExtractedCompetencyList
+        parsed_obj = _instructor_structured_call(
+            llm_client,
+            response_model=ExtractedCompetencyList,
+            prompt=prompt,
+            system_prompt=sys_prompt,
+            max_tokens=8000,
+        )
+        if parsed_obj is not None:
+            competencies = [
+                c.model_dump(exclude_none=True)
+                for c in parsed_obj.competencies
+            ]
+            logger.info(
+                f"Extracted {len(competencies)} competencies (instructor) "
+                f"from KB for {subject} {grade_level}"
+            )
+            return competencies
+    except Exception as e:
+        logger.warning(f"Instructor competency extraction failed: {e}")
+
+    # Legacy fallback path
     try:
         response = llm_client.generate(
             messages=[{"role": "user", "content": prompt}],
-            system_prompt="You are a curriculum analysis expert. Extract learning competencies precisely. Return only valid JSON.",
+            system_prompt=sys_prompt + " Return only valid JSON.",
             max_tokens=8000,
         )
 

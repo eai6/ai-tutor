@@ -514,6 +514,81 @@ def _instructor_generate_exit_ticket(llm_client, *, prompt: str, system_prompt: 
     return [q.model_dump(exclude_none=True) for q in result.questions]
 
 
+def _instructor_structured_call(
+    llm_client,
+    *,
+    response_model,
+    prompt: str,
+    system_prompt: str,
+    max_tokens: int = 4000,
+    max_retries: int = 2,
+):
+    """Generic instructor-backed structured-output call.
+
+    Returns the validated Pydantic instance, or None on infrastructure
+    failure (no config / no instructor / provider error). Caller falls
+    back to legacy parsing.
+
+    Mirrors `_instructor_generate_exit_ticket` but for arbitrary
+    schemas — used by EO-expansion + competency-extraction + other
+    structured-output sites that don't need the exit-ticket-specific
+    down-conversion.
+
+    Gemini-3 safe default (max_tokens=4000) — bump for long-list
+    outputs.
+    """
+    config = getattr(llm_client, 'config', None)
+    if config is None:
+        return None
+    try:
+        import instructor
+    except ImportError:
+        return None
+    provider_map = {
+        'anthropic': 'anthropic', 'openai': 'openai',
+        'google': 'google', 'local_ollama': 'ollama',
+    }
+    provider_key = provider_map.get(
+        str(config.provider).lower(), str(config.provider).lower()
+    )
+    try:
+        ic = instructor.from_provider(
+            f"{provider_key}/{config.model_name}",
+            api_key=config.get_api_key(),
+        )
+    except Exception as exc:
+        print(
+            f"[ContentGen] instructor.from_provider failed: "
+            f"{type(exc).__name__}: {exc} — falling back",
+            flush=True,
+        )
+        return None
+
+    create_kwargs = dict(
+        response_model=response_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
+        max_retries=max_retries,
+    )
+    if str(config.provider).lower() == 'google':
+        create_kwargs['generation_config'] = {'max_tokens': max_tokens}
+    else:
+        create_kwargs['max_tokens'] = max_tokens
+
+    try:
+        return ic.chat.completions.create(**create_kwargs)
+    except Exception as exc:
+        print(
+            f"[ContentGen] instructor call failed for "
+            f"{response_model.__name__}: {type(exc).__name__}: {exc} — "
+            f"falling back",
+            flush=True,
+        )
+        return None
+
+
 def _run_fill_in_blank_judge_for_qs(lesson, qs):
     """Fan out the fill_in_blank content judge + regen across
     newly-persisted FIB rows. Mirrors `_run_exit_question_judge_for_mcqs`
@@ -1685,28 +1760,40 @@ code fence. Example shape:
             # ``get_llm_client`` chain the rest of the file uses.
             from apps.llm.client import get_llm_client
             from apps.llm.models import ModelConfig
+            from apps.curriculum.content_gen_schemas import GranularSubSkillList
             cfg = ModelConfig.get_for('generation') or self._model_config
             llm = get_llm_client(cfg)
-            response = llm.generate(
-                [{'role': 'user', 'content': prompt}],
+
+            # Try instructor first — Pydantic-validated list. Falls
+            # back to legacy parse_llm_json on infra failure so the
+            # EO-expansion path never silently degrades.
+            parsed_obj = _instructor_structured_call(
+                llm,
+                response_model=GranularSubSkillList,
+                prompt=prompt,
                 system_prompt=sys_prompt,
-                max_tokens=1500,
+                max_tokens=4000,
             )
-            raw = (response.content or '').strip()
+            if parsed_obj is not None:
+                parsed = [s.text for s in parsed_obj.sub_skills]
+            else:
+                response = llm.generate(
+                    [{'role': 'user', 'content': prompt}],
+                    system_prompt=sys_prompt,
+                    max_tokens=1500,
+                )
+                raw = (response.content or '').strip()
+                from apps.llm.json_utils import parse_llm_json
+                try:
+                    parsed = parse_llm_json(raw)
+                except Exception as e:
+                    print(f"[ContentGen] [{lesson.title}] sub-skill JSON parse failed: {e}", flush=True)
+                    return
+                if not isinstance(parsed, list):
+                    print(f"[ContentGen] [{lesson.title}] sub-skill output not a list: {type(parsed)}", flush=True)
+                    return
         except Exception as e:
             print(f"[ContentGen] [{lesson.title}] sub-skill expansion failed: {e}", flush=True)
-            return
-
-        # Parse JSON array. Tolerate code fences, single quotes, etc.
-        from apps.llm.json_utils import parse_llm_json
-        try:
-            parsed = parse_llm_json(raw)
-        except Exception as e:
-            print(f"[ContentGen] [{lesson.title}] sub-skill JSON parse failed: {e}", flush=True)
-            return
-
-        if not isinstance(parsed, list):
-            print(f"[ContentGen] [{lesson.title}] sub-skill output not a list: {type(parsed)}", flush=True)
             return
 
         cleaned = []
