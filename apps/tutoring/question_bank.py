@@ -278,10 +278,16 @@ def pick_published_for_concept_tag(
     """
     from apps.tutoring.models import ExitTicket, ExitTicketQuestion
     # See sample_session_pool — is_published is summative-only.
+    # Exclude 'matching' for the same reason: it has no inline / artifact
+    # rendering for the in-tutor flow yet (drag-and-drop UX). Matching
+    # questions stay reachable via the post-lesson exit-ticket modal
+    # only. Without this filter, the EO-targeted picker (used by
+    # pick_question_for_eo + the remediation flow) could surface a
+    # matching question to the tutor and produce a broken inline render.
     base = ExitTicketQuestion.objects.filter(
         exit_ticket__lesson=lesson,
         exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
-    )
+    ).exclude(question_type='matching')
     tag = (concept_tag or '').strip()
     if tag:
         matches = list(
