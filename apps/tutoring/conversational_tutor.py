@@ -2034,8 +2034,23 @@ class ConversationalTutor:
         self._load_personalization()
 
         # Generate opening message
-        return self._generate_opening()
-    
+        msg = self._generate_opening()
+        # Attach pending_question (artifact-panel payload) — same as
+        # respond() does after _respond_impl. Pilot e2e 2026-05-16:
+        # the opener pose_question correctly set awaiting_answer in
+        # engine_state, but without this attach the frontend artifact
+        # panel never rendered, leaving the student stuck with no
+        # question to answer.
+        try:
+            if isinstance(msg, TutorMessage):
+                msg.pending_question = self._build_pending_question_payload()
+        except Exception as _exc:
+            logger.warning(
+                f"[PendingQuestion] start() attach failed: "
+                f"{type(_exc).__name__}: {_exc}"
+            )
+        return msg
+
     def resume(self) -> TutorMessage:
         """Resume an existing conversation."""
         if self.session_state == SessionState.COMPLETED and not self.is_review:
