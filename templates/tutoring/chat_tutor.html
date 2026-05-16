@@ -1535,6 +1535,126 @@ function closeArtifactPanel() {
     artifactZoomReset();
 }
 
+// R3 (2026-05-15): render a pending bank question in the artifact
+// panel. Replaces the current panel content (image OR question) since
+// only one is in flight at a time. When both an image AND a question
+// land on the same turn, the question wins — students need to act on
+// it; the image is reference material they can scroll back to in the
+// chat.
+function renderPendingQuestionInArtifact(pq) {
+    if (!isDesktop()) {
+        // Mobile: artifact panel is hidden; question renders inline
+        // as a chat-bubble companion in the future. For now mobile
+        // students will still see the inline-rendered question text
+        // (the legacy path is kept intact during R3-R6 development).
+        return false;
+    }
+    if (!pq || !pq.question_id) return false;
+
+    artifactTitle.textContent = pq.question_type === 'mcq'
+        ? 'Question (multiple choice)'
+        : `Question (${pq.question_type})`;
+
+    let body = '<div class="bank-question-card" data-question-id="' + pq.question_id + '" data-kind="' + (pq.kind || '') + '" style="display:flex;flex-direction:column;gap:0.75rem;width:100%;padding:0.5rem;">';
+    body += '<div class="bank-q-stem" style="font-size:1rem;line-height:1.5;color:#18181b;font-weight:500;">' + escapeHtml(pq.stem || '') + '</div>';
+
+    if (pq.question_type === 'mcq' && pq.options) {
+        body += '<div class="bank-q-options" style="display:flex;flex-direction:column;gap:0.5rem;">';
+        for (const letter of ['A', 'B', 'C', 'D']) {
+            const text = pq.options[letter];
+            if (!text) continue;
+            body += '<label class="bank-q-option" style="display:flex;align-items:flex-start;gap:0.625rem;padding:0.625rem 0.75rem;background:#fff;border:1.5px solid #e4e4e7;border-radius:0.5rem;cursor:pointer;transition:all 0.15s;">';
+            body += '<input type="radio" name="bank-q-' + pq.question_id + '" value="' + letter + '" style="margin-top:0.25rem;flex-shrink:0;">';
+            body += '<span style="flex:1;line-height:1.4;"><strong style="margin-right:0.375rem;">' + letter + '.</strong>' + escapeHtml(text) + '</span>';
+            body += '</label>';
+        }
+        body += '</div>';
+    } else if (pq.question_type === 'short_numeric' || pq.question_type === 'short_answer' || pq.kind === 'lesson_step') {
+        body += '<input type="text" class="bank-q-text" placeholder="Type your answer…" style="padding:0.625rem 0.75rem;border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;">';
+    } else if (pq.question_type === 'fill_in_blank') {
+        body += '<input type="text" class="bank-q-text" placeholder="Fill in the blank…" style="padding:0.625rem 0.75rem;border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;">';
+    } else {
+        // Other types (matching, data_interpretation, …) — full UI
+        // ships in R6; for now render a textarea so students can at
+        // least answer in free text and the legacy text grader picks
+        // it up.
+        body += '<textarea class="bank-q-text" placeholder="Your answer…" rows="3" style="padding:0.625rem 0.75rem;border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;resize:vertical;"></textarea>';
+    }
+
+    body += '<button class="bank-q-submit" type="button" style="align-self:flex-start;padding:0.5rem 1.25rem;background:#7c3aed;color:#fff;border:none;border-radius:0.5rem;font-weight:500;cursor:pointer;font-size:0.9375rem;">Submit answer</button>';
+    body += '<div class="bank-q-status" style="font-size:0.8125rem;color:#71717a;min-height:1.2em;"></div>';
+    body += '</div>';
+
+    artifactBody.innerHTML = body;
+    artifactPanel.classList.add('open');
+    bindBankQuestionHandlers(pq);
+    return true;
+}
+
+function bindBankQuestionHandlers(pq) {
+    const card = artifactBody.querySelector('.bank-question-card');
+    if (!card) return;
+    const submitBtn = card.querySelector('.bank-q-submit');
+    const statusEl = card.querySelector('.bank-q-status');
+
+    // Visual feedback on radio selection (highlight the chosen option).
+    card.querySelectorAll('input[type=radio]').forEach(r => {
+        r.addEventListener('change', () => {
+            card.querySelectorAll('.bank-q-option').forEach(l => {
+                l.style.background = '#fff';
+                l.style.borderColor = '#e4e4e7';
+            });
+            const label = r.closest('.bank-q-option');
+            if (label) {
+                label.style.background = '#f3e8ff';
+                label.style.borderColor = '#a855f7';
+            }
+        });
+    });
+
+    submitBtn.addEventListener('click', () => {
+        // R3 stub: submit POSTs to the existing chat_respond endpoint
+        // with the picked answer as the student message. R4 will add
+        // a dedicated /answer-bank-question/ endpoint that uses the
+        // exit-ticket grader directly. For now, the legacy text-mode
+        // grader (already wired via _grade_against_last_bank_question)
+        // sees the structured answer string and produces a verdict
+        // — same path as today, just with the answer typed for the
+        // student via the artifact UI.
+        let answer = '';
+        if (pq.question_type === 'mcq') {
+            const picked = card.querySelector('input[type=radio]:checked');
+            if (!picked) {
+                statusEl.textContent = 'Pick an option first.';
+                return;
+            }
+            answer = picked.value;  // 'A' / 'B' / 'C' / 'D'
+        } else {
+            const input = card.querySelector('.bank-q-text');
+            answer = (input && input.value || '').trim();
+            if (!answer) {
+                statusEl.textContent = 'Type an answer first.';
+                return;
+            }
+        }
+        submitBtn.disabled = true;
+        statusEl.textContent = '⏳ Sending…';
+        // Drop the answer into the chat input + fire the standard
+        // sendMessage flow. The existing turn loop sees it as a
+        // student reply and grades against bank_question_ref on the
+        // last tutor turn (the inline path is still in place).
+        userInput.value = answer;
+        sendMessage();
+        statusEl.textContent = '✓ Answer sent — see chat for the tutor\'s reply.';
+    });
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+}
+
 function addThumbnail(mediaItem) {
     // Skip if already in thumbnail strip
     if (sessionMedia.find(m => m.url === mediaItem.url)) return;
@@ -2230,6 +2350,13 @@ function applyTutorResponse(data) {
     if (data.milestone) showMilestone(data.milestone, data.step_number, data.total_steps);
     if (data.phase) phaseBadge.textContent = phaseLabel(data.phase);
     updateStepProgress(data);
+    // R3 (2026-05-15): pending bank question → render in artifact panel.
+    // Wins over images on the same turn (image is reference; question
+    // is action). When pending_question is null/missing the panel keeps
+    // whatever it was showing (image or empty state).
+    if (data.pending_question) {
+        renderPendingQuestionInArtifact(data.pending_question);
+    }
     if (data.show_exit_ticket && data.exit_ticket) {
         exitTicketData = data.exit_ticket;
         setTimeout(() => showExitTicket(), 1000);
