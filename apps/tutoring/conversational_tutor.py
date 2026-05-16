@@ -4709,19 +4709,19 @@ Follow the current step; this concept will be covered in sequence."""
                 if hasattr(self.llm_client, 'generate_with_tools')
                 else None
             )
-            # NEW (2026-05-16, A/B for inline-authored questions):
-            # also offer pose_inline_question so the tutor can author
-            # its own check/scaffolding question WITH an answer key.
-            # The handler routes the answer key into turn metadata so
-            # the grader can verify the student response. Coexists with
-            # pose_question — LLM picks per turn. Pilot directive: the
-            # tutor authors questions naturally anyway; stop fighting
-            # it, just require it to provide ground truth.
-            inline_tool = (
-                self._build_pose_inline_question_tool()
-                if hasattr(self.llm_client, 'generate_with_tools')
-                else None
-            )
+            # pose_inline_question was tried 2026-05-16 to allow the
+            # tutor to author check/scaffolding questions with an
+            # answer key. REVERTED same day: the LLM supplied bad
+            # answer keys (numeric '85' for a conceptual "set up the
+            # equation" question), grader graded against the bad key,
+            # student marked wrong, downstream gates fired → empty
+            # turn. Net: tutor-authored questions are unreliable. Stick
+            # with bank-only. When the bank has no fit AND the LLM
+            # still authors in chat, the chat-authored fallback grader
+            # (no-key, LLM-derived) handles it without the bad-key
+            # trap. Per user direction 2026-05-16: "this is why I did
+            # not want to allow the tutor to pose its own question."
+            inline_tool = None
 
             if tool is not None or inline_tool is not None:
                 # Tool-capable client → tool-use path. The LLM can pose
@@ -4729,27 +4729,15 @@ Follow the current step; this concept will be covered in sequence."""
                 # (authored-with-key) depending on context.
                 self._pending_pose_question_meta = {}
                 tools_to_offer = [t for t in (tool, inline_tool) if t is not None]
-                # Force the LLM through a tool on math turns. Pilot
-                # e2e 2026-05-16 showed the LLM ignores the
-                # pose_inline_question option and authors questions in
-                # free text. tool_choice="any" makes it MUST call one
-                # of the tools — either pose_question (bank slot) or
-                # pose_inline_question (authored with answer_key).
-                # Non-math lessons still get tool_choice="auto" because
-                # free-prose conceptual questions ("why does that
-                # work?") are fine there.
-                try:
-                    _is_math = bool(
-                        self.lesson.unit.course.is_math
-                        if self.lesson.unit and self.lesson.unit.course
-                        else False
-                    )
-                except Exception:
-                    _is_math = False
-                _force_tool_choice = (
-                    {"type": "any"} if _is_math and tools_to_offer
-                    else None
-                )
+                # tool_choice="auto" — LLM picks whether to call
+                # pose_question (when a bank slot fits) or generate
+                # free-prose narrative. The forced tool_choice="any"
+                # was reverted 2026-05-16 alongside the
+                # pose_inline_question removal: with only the bank
+                # tool available, forcing would push the LLM to call
+                # it even when no slot fits, which produced
+                # off-curriculum questions.
+                _force_tool_choice = None
                 try:
                     message = self.llm_client.generate_with_tools(
                         messages=messages,
