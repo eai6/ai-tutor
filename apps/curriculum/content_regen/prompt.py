@@ -483,10 +483,274 @@ def build_exit_q_auto_regen_prompt(
     }
 
 
+_FIB_AUTO_REGEN_SYSTEM = """\
+Rewrite ONE fill-in-the-blank exit-ticket question so the named \
+violations are fixed while keeping the question pedagogically sound \
+and matched to the lesson and enabling objective.
+
+Output MUST conform to the FillInBlankRewrite schema (instructor will \
+validate). Required fields: question_text, text_template (use ___ for \
+each blank), blanks (canonical value per blank, in left-to-right \
+order), accept_alternatives (list-of-lists, one inner list per blank).
+
+Violation guidance:
+  FIB_WRONG_ANSWER → replace the wrong canonical value with the \
+correct one and update accept_alternatives accordingly.
+  FIB_AMBIGUOUS_BLANK → tighten the surrounding context so ONE value \
+is clearly expected (add a qualifier, a unit, a date, a place name).
+  FIB_OFF_OBJECTIVE → rephrase the stem to test the enabling \
+objective directly.
+  FIB_MISSING_ALTERNATIVES → expand accept_alternatives to cover \
+common variants (synonyms, abbreviations, alternate spellings).
+  FIB_TRICK_WORDING → rewrite the stem in plain direct form; remove \
+double-negatives / awkward word order.
+
+Constraints:
+  - Number of ___ markers in text_template must match len(blanks).
+  - accept_alternatives outer list should match len(blanks); inner \
+lists may be empty when no common variants exist.
+  - Match the lesson grade band — vocabulary and complexity.
+  - Stay on-topic for the enabling_objective.
+"""
+
+
+def build_fib_auto_regen_prompt(
+    *,
+    original_question: Dict[str, Any],
+    judge_result: Dict[str, Any],
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+) -> Dict[str, str]:
+    """Compose judge-driven regen prompt for one fill-in-blank question."""
+    violations = judge_result.get('violations') or []
+    reasoning = (judge_result.get('reasoning') or '').strip()
+    recommended_fix = (judge_result.get('recommended_fix') or '').strip()
+
+    orig_blanks = original_question.get('blanks') or []
+    orig_alts = original_question.get('accept_alternatives') or []
+
+    user = (
+        "<lesson>\n"
+        f"  <subject>{(lesson_subject or '(unspecified)').strip()[:120]}</subject>\n"
+        f"  <grade>{(lesson_grade or '(unspecified)').strip()[:80]}</grade>\n"
+        f"  <title>{(lesson_title or '(unspecified)').strip()[:200]}</title>\n"
+        f"  <overall_objective>{(lesson_objective or '(none)').strip()[:400]}</overall_objective>\n"
+        "</lesson>\n"
+        "<question_context>\n"
+        f"  <concept>{(step_concept_tag or '(unspecified)').strip()[:200]}</concept>\n"
+        f"  <enabling_objective>{(enabling_objective or '(none)').strip()[:400]}</enabling_objective>\n"
+        "</question_context>\n"
+        "<violations>\n"
+        f"  <codes>{', '.join(violations) if violations else '(none)'}</codes>\n"
+        f"  <judge_reasoning>{reasoning[:400]}</judge_reasoning>\n"
+        f"  <recommended_fix>{recommended_fix[:600]}</recommended_fix>\n"
+        "</violations>\n"
+        "<original_question>\n"
+        f"  <question_text>{(original_question.get('question_text') or '').strip()[:600]}</question_text>\n"
+        f"  <text_template>{(original_question.get('text_template') or '').strip()[:1200]}</text_template>\n"
+        f"  <blanks>{', '.join(str(b)[:120] for b in orig_blanks[:6])}</blanks>\n"
+        f"  <accept_alternatives>{orig_alts!r}</accept_alternatives>\n"
+        f"  <explanation>{(original_question.get('explanation') or '').strip()[:300]}</explanation>\n"
+        "</original_question>\n"
+        "\n"
+        "Based on the lesson context, the enabling objective, and the "
+        "violation detail, produce a rewritten fill-in-the-blank "
+        "question conforming to the FillInBlankRewrite schema."
+    )
+
+    return {
+        "system": _FIB_AUTO_REGEN_SYSTEM,
+        "user": user,
+    }
+
+
+_SA_AUTO_REGEN_SYSTEM = """\
+Rewrite ONE short-answer exit-ticket question so the named violations \
+are fixed while keeping the question pedagogically sound and matched \
+to the lesson and enabling objective.
+
+Output MUST conform to the ShortAnswerRewrite schema. Required fields: \
+question_text, model_answer, keywords (list of expected terms), \
+min_keywords (threshold for "correct"), explanation.
+
+Violation guidance:
+  SA_WRONG_MODEL_ANSWER → replace the wrong model_answer with the \
+correct curriculum-supported answer.
+  SA_VAGUE_QUESTION → tighten the stem so ONE focus is clearly \
+expected (add a qualifier, narrow the scope).
+  SA_OFF_OBJECTIVE → rephrase the stem to test the enabling \
+objective directly.
+  SA_KEYWORDS_INCOMPLETE → expand keywords to cover common variants \
+(synonyms, alternate phrasings).
+  SA_KEYWORDS_TOO_PERMISSIVE → replace generic / stopword keywords \
+with specific terms tied to the model answer.
+  SA_RUBRIC_MISMATCH → make sure the model_answer itself contains \
+(or implies) the keywords the grader will require.
+
+Constraints:
+  - The rewritten model_answer must contain or directly imply each \
+keyword.
+  - min_keywords usually 1-3 (depends on keyword count).
+  - Match the lesson grade band.
+"""
+
+
+def build_sa_auto_regen_prompt(
+    *,
+    original_question: Dict[str, Any],
+    judge_result: Dict[str, Any],
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+) -> Dict[str, str]:
+    """Compose judge-driven regen prompt for one short-answer question."""
+    violations = judge_result.get('violations') or []
+    reasoning = (judge_result.get('reasoning') or '').strip()
+    recommended_fix = (judge_result.get('recommended_fix') or '').strip()
+
+    orig_keywords = original_question.get('keywords') or []
+
+    user = (
+        "<lesson>\n"
+        f"  <subject>{(lesson_subject or '(unspecified)').strip()[:120]}</subject>\n"
+        f"  <grade>{(lesson_grade or '(unspecified)').strip()[:80]}</grade>\n"
+        f"  <title>{(lesson_title or '(unspecified)').strip()[:200]}</title>\n"
+        f"  <overall_objective>{(lesson_objective or '(none)').strip()[:400]}</overall_objective>\n"
+        "</lesson>\n"
+        "<question_context>\n"
+        f"  <concept>{(step_concept_tag or '(unspecified)').strip()[:200]}</concept>\n"
+        f"  <enabling_objective>{(enabling_objective or '(none)').strip()[:400]}</enabling_objective>\n"
+        "</question_context>\n"
+        "<violations>\n"
+        f"  <codes>{', '.join(violations) if violations else '(none)'}</codes>\n"
+        f"  <judge_reasoning>{reasoning[:400]}</judge_reasoning>\n"
+        f"  <recommended_fix>{recommended_fix[:600]}</recommended_fix>\n"
+        "</violations>\n"
+        "<original_question>\n"
+        f"  <question_text>{(original_question.get('question_text') or '').strip()[:600]}</question_text>\n"
+        f"  <model_answer>{(original_question.get('model_answer') or '').strip()[:800]}</model_answer>\n"
+        f"  <keywords>{', '.join(str(k)[:120] for k in orig_keywords[:15])}</keywords>\n"
+        f"  <min_keywords>{original_question.get('min_keywords', 1)}</min_keywords>\n"
+        f"  <explanation>{(original_question.get('explanation') or '').strip()[:300]}</explanation>\n"
+        "</original_question>\n"
+        "\n"
+        "Based on the lesson context, the enabling objective, and the "
+        "violation detail, produce a rewritten short-answer question "
+        "conforming to the ShortAnswerRewrite schema."
+    )
+
+    return {
+        "system": _SA_AUTO_REGEN_SYSTEM,
+        "user": user,
+    }
+
+
+_MATCH_AUTO_REGEN_SYSTEM = """\
+Rewrite ONE matching exit-ticket question so the named violations are \
+fixed while keeping the question pedagogically sound and matched to \
+the lesson and enabling objective.
+
+Output MUST conform to the MatchingRewrite schema. Required fields: \
+question_text, pairs (list of {"left": "...", "right": "..."} objects), \
+distractor_rights (extra right-side options that are plausibly wrong), \
+explanation.
+
+Violation guidance:
+  MATCH_WRONG_PAIR → replace the wrong pair with the correct \
+curriculum-supported pairing.
+  MATCH_AMBIGUOUS_PAIRING → tighten the left or right items so the \
+mapping is unique (add a qualifier, scope down).
+  MATCH_DISTRACTOR_VALID → replace the bad distractor with one that \
+is genuinely WRONG for every left item.
+  MATCH_OFF_OBJECTIVE → rebuild the pairs to test the enabling \
+objective directly.
+  MATCH_UNEVEN_DIFFICULTY → equalise pair difficulty (don't mix \
+recall + analysis in the same set).
+  MATCH_TRIVIAL_DISTRACTORS → swap absurd distractors for \
+plausibly-wrong ones a student might actually pick.
+
+Constraints:
+  - Every left must have ONE and only one valid right under any \
+reasonable reading.
+  - No distractor_rights item may be a valid match for any left.
+  - 2-8 canonical pairs; 0-6 distractor_rights.
+  - Match the lesson grade band.
+"""
+
+
+def build_match_auto_regen_prompt(
+    *,
+    original_question: Dict[str, Any],
+    judge_result: Dict[str, Any],
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+) -> Dict[str, str]:
+    """Compose judge-driven regen prompt for one matching question."""
+    violations = judge_result.get('violations') or []
+    reasoning = (judge_result.get('reasoning') or '').strip()
+    recommended_fix = (judge_result.get('recommended_fix') or '').strip()
+
+    orig_pairs = original_question.get('pairs') or []
+    orig_distractors = original_question.get('distractor_rights') or []
+    pair_str = '; '.join(
+        f"{(p.get('left') if isinstance(p, dict) else '')[:120]}"
+        f" ↔ "
+        f"{(p.get('right') if isinstance(p, dict) else '')[:120]}"
+        for p in orig_pairs[:8]
+    )
+
+    user = (
+        "<lesson>\n"
+        f"  <subject>{(lesson_subject or '(unspecified)').strip()[:120]}</subject>\n"
+        f"  <grade>{(lesson_grade or '(unspecified)').strip()[:80]}</grade>\n"
+        f"  <title>{(lesson_title or '(unspecified)').strip()[:200]}</title>\n"
+        f"  <overall_objective>{(lesson_objective or '(none)').strip()[:400]}</overall_objective>\n"
+        "</lesson>\n"
+        "<question_context>\n"
+        f"  <concept>{(step_concept_tag or '(unspecified)').strip()[:200]}</concept>\n"
+        f"  <enabling_objective>{(enabling_objective or '(none)').strip()[:400]}</enabling_objective>\n"
+        "</question_context>\n"
+        "<violations>\n"
+        f"  <codes>{', '.join(violations) if violations else '(none)'}</codes>\n"
+        f"  <judge_reasoning>{reasoning[:400]}</judge_reasoning>\n"
+        f"  <recommended_fix>{recommended_fix[:600]}</recommended_fix>\n"
+        "</violations>\n"
+        "<original_question>\n"
+        f"  <question_text>{(original_question.get('question_text') or '').strip()[:600]}</question_text>\n"
+        f"  <pairs>{pair_str}</pairs>\n"
+        f"  <distractor_rights>{', '.join(str(d)[:120] for d in orig_distractors[:8])}</distractor_rights>\n"
+        f"  <explanation>{(original_question.get('explanation') or '').strip()[:300]}</explanation>\n"
+        "</original_question>\n"
+        "\n"
+        "Based on the lesson context, the enabling objective, and the "
+        "violation detail, produce a rewritten matching question "
+        "conforming to the MatchingRewrite schema."
+    )
+
+    return {
+        "system": _MATCH_AUTO_REGEN_SYSTEM,
+        "user": user,
+    }
+
+
 __all__ = [
     "build_step_regen_prompt",
     "build_step_multi_judge_regen_prompt",
     "build_step_prompt_regen_prompt",
     "build_exit_q_prompt_regen_prompt",
     "build_exit_q_auto_regen_prompt",
+    "build_fib_auto_regen_prompt",
+    "build_sa_auto_regen_prompt",
+    "build_match_auto_regen_prompt",
 ]

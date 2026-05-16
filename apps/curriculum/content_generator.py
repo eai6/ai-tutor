@@ -441,21 +441,21 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
 
 
 def _run_fill_in_blank_judge_for_qs(lesson, qs):
-    """Fan out the fill_in_blank content judge across newly-persisted
-    fill_in_blank rows. Mirrors `_run_exit_question_judge_for_mcqs`
-    shape (concurrent ThreadPoolExecutor + fail-soft per question).
-
-    Verdict-only (no regen) for v1 of this judge — regen wiring lands
-    in a follow-up commit alongside the short_answer and matching
-    regen paths so they ship together.
+    """Fan out the fill_in_blank content judge + regen across
+    newly-persisted FIB rows. Mirrors `_run_exit_question_judge_for_mcqs`
+    (concurrent ThreadPoolExecutor + fail-soft per question +
+    auto-regen on REJECT).
     """
     if not qs:
         return
 
     import concurrent.futures
+    from django.conf import settings as _s
     from apps.curriculum.content_judges.fill_in_blank import (
         run_fill_in_blank_judge,
     )
+
+    regen_enabled = getattr(_s, 'CONTENT_REGEN_ENABLED', True)
 
     exclude_provider = None
     try:
@@ -487,6 +487,7 @@ def _run_fill_in_blank_judge_for_qs(lesson, qs):
         return q, verdict
 
     persisted = 0
+    regenerated = 0
     flagged = 0
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=min(8, len(qs))
@@ -508,12 +509,50 @@ def _run_fill_in_blank_judge_for_qs(lesson, qs):
             }
             outputs = dict(q.judge_outputs or {})
             outputs['fill_in_blank'] = verdict_dict
+            update_fields = ['judge_outputs']
+
+            if verdict.skipped or verdict.passed:
+                pass  # no regen needed
+            elif regen_enabled:
+                regen_result = _regen_one_fib(q, lesson, verdict_dict)
+                outputs['regen_audit'] = {
+                    'cycles_run': regen_result.cycles_run,
+                    'clean': regen_result.clean,
+                    'picked_model': regen_result.picked_model,
+                    'elapsed_seconds': round(regen_result.elapsed_seconds, 2),
+                    'final_violations': list(regen_result.final_violations),
+                    'final_judge_result': dict(regen_result.final_judge_result or {}),
+                    'cycles': regen_result.audit,
+                }
+                if regen_result.clean and regen_result.text_template:
+                    q.question_text = regen_result.question_text
+                    new_ad = dict(q.answer_data or {})
+                    new_ad.update(regen_result.as_answer_data())
+                    q.answer_data = new_ad
+                    q.explanation = regen_result.explanation
+                    if regen_result.final_judge_result:
+                        outputs['fill_in_blank'] = dict(regen_result.final_judge_result)
+                    update_fields += ['question_text', 'answer_data', 'explanation']
+                    regenerated += 1
+                else:
+                    # Persist the best partial rewrite + verdict.
+                    if regen_result.text_template:
+                        q.question_text = regen_result.question_text
+                        new_ad = dict(q.answer_data or {})
+                        new_ad.update(regen_result.as_answer_data())
+                        q.answer_data = new_ad
+                        q.explanation = regen_result.explanation
+                        update_fields += ['question_text', 'answer_data', 'explanation']
+                    if regen_result.final_judge_result:
+                        outputs['fill_in_blank'] = dict(regen_result.final_judge_result)
+                    flagged += 1
+            else:
+                flagged += 1
+
             q.judge_outputs = outputs
             try:
-                q.save(update_fields=['judge_outputs'])
+                q.save(update_fields=list(set(update_fields)))
                 persisted += 1
-                if not verdict.passed and not verdict.skipped:
-                    flagged += 1
             except Exception as exc:
                 print(
                     f"[ContentGen] [{lesson.title}] fill_in_blank Q#{q.id} "
@@ -523,22 +562,67 @@ def _run_fill_in_blank_judge_for_qs(lesson, qs):
 
     print(
         f"[ContentGen] [{lesson.title}] fill_in_blank judge: "
-        f"{persisted}/{len(qs)} persisted (auto_flagged={flagged})",
+        f"{persisted}/{len(qs)} persisted "
+        f"(regenerated={regenerated}, auto_flagged={flagged})",
         flush=True,
     )
 
 
+def _regen_one_fib(q, lesson, verdict_dict: dict):
+    """Wrapper around content_regen.run_fill_in_blank_regen. Fail-soft."""
+    from apps.curriculum.content_regen import (
+        run_fill_in_blank_regen, FillInBlankAutoRegenResult,
+    )
+    ad = q.answer_data or {}
+    try:
+        return run_fill_in_blank_regen(
+            original_question={
+                'question_text': q.question_text or '',
+                'text_template': ad.get('text_template') or '',
+                'blanks': ad.get('blanks') or [],
+                'accept_alternatives': ad.get('accept_alternatives') or [],
+                'explanation': q.explanation or '',
+            },
+            judge_result=verdict_dict,
+            lesson=lesson,
+            step_concept_tag=q.concept_tag or '',
+            enabling_objective=q.enabling_objective or '',
+        )
+    except Exception as exc:
+        print(
+            f"[ContentGen] [{lesson.title}] fill_in_blank Q#{q.id} "
+            f"regen raised: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return FillInBlankAutoRegenResult(
+            question_text=q.question_text or '',
+            text_template=ad.get('text_template') or '',
+            blanks=ad.get('blanks') or [],
+            accept_alternatives=ad.get('accept_alternatives') or [],
+            explanation=q.explanation or '',
+            clean=False, cycles_run=0,
+            audit=[{
+                'cycle': 0,
+                'error': f'orchestrator_raised: {type(exc).__name__}',
+                'picked': False,
+            }],
+        )
+
+
 def _run_short_answer_judge_for_qs(lesson, qs):
-    """Fan out the short_answer content judge across newly-persisted
-    short_answer rows. Verdict-only for v1 (regen lands later).
+    """Fan out the short_answer content judge + regen across
+    newly-persisted SA rows.
     """
     if not qs:
         return
 
     import concurrent.futures
+    from django.conf import settings as _s
     from apps.curriculum.content_judges.short_answer import (
         run_short_answer_judge,
     )
+
+    regen_enabled = getattr(_s, 'CONTENT_REGEN_ENABLED', True)
 
     exclude_provider = None
     try:
@@ -570,6 +654,7 @@ def _run_short_answer_judge_for_qs(lesson, qs):
         return q, verdict
 
     persisted = 0
+    regenerated = 0
     flagged = 0
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=min(8, len(qs))
@@ -591,12 +676,49 @@ def _run_short_answer_judge_for_qs(lesson, qs):
             }
             outputs = dict(q.judge_outputs or {})
             outputs['short_answer'] = verdict_dict
+            update_fields = ['judge_outputs']
+
+            if verdict.skipped or verdict.passed:
+                pass
+            elif regen_enabled:
+                regen_result = _regen_one_sa(q, lesson, verdict_dict)
+                outputs['regen_audit'] = {
+                    'cycles_run': regen_result.cycles_run,
+                    'clean': regen_result.clean,
+                    'picked_model': regen_result.picked_model,
+                    'elapsed_seconds': round(regen_result.elapsed_seconds, 2),
+                    'final_violations': list(regen_result.final_violations),
+                    'final_judge_result': dict(regen_result.final_judge_result or {}),
+                    'cycles': regen_result.audit,
+                }
+                if regen_result.clean and regen_result.model_answer:
+                    q.question_text = regen_result.question_text
+                    new_ad = dict(q.answer_data or {})
+                    new_ad.update(regen_result.as_answer_data())
+                    q.answer_data = new_ad
+                    q.explanation = regen_result.explanation
+                    if regen_result.final_judge_result:
+                        outputs['short_answer'] = dict(regen_result.final_judge_result)
+                    update_fields += ['question_text', 'answer_data', 'explanation']
+                    regenerated += 1
+                else:
+                    if regen_result.model_answer:
+                        q.question_text = regen_result.question_text
+                        new_ad = dict(q.answer_data or {})
+                        new_ad.update(regen_result.as_answer_data())
+                        q.answer_data = new_ad
+                        q.explanation = regen_result.explanation
+                        update_fields += ['question_text', 'answer_data', 'explanation']
+                    if regen_result.final_judge_result:
+                        outputs['short_answer'] = dict(regen_result.final_judge_result)
+                    flagged += 1
+            else:
+                flagged += 1
+
             q.judge_outputs = outputs
             try:
-                q.save(update_fields=['judge_outputs'])
+                q.save(update_fields=list(set(update_fields)))
                 persisted += 1
-                if not verdict.passed and not verdict.skipped:
-                    flagged += 1
             except Exception as exc:
                 print(
                     f"[ContentGen] [{lesson.title}] short_answer Q#{q.id} "
@@ -606,22 +728,67 @@ def _run_short_answer_judge_for_qs(lesson, qs):
 
     print(
         f"[ContentGen] [{lesson.title}] short_answer judge: "
-        f"{persisted}/{len(qs)} persisted (auto_flagged={flagged})",
+        f"{persisted}/{len(qs)} persisted "
+        f"(regenerated={regenerated}, auto_flagged={flagged})",
         flush=True,
     )
 
 
+def _regen_one_sa(q, lesson, verdict_dict: dict):
+    """Wrapper around content_regen.run_short_answer_regen. Fail-soft."""
+    from apps.curriculum.content_regen import (
+        run_short_answer_regen, ShortAnswerAutoRegenResult,
+    )
+    ad = q.answer_data or {}
+    try:
+        return run_short_answer_regen(
+            original_question={
+                'question_text': q.question_text or '',
+                'model_answer': ad.get('model_answer') or '',
+                'keywords': ad.get('keywords') or [],
+                'min_keywords': ad.get('min_keywords') or 1,
+                'explanation': q.explanation or '',
+            },
+            judge_result=verdict_dict,
+            lesson=lesson,
+            step_concept_tag=q.concept_tag or '',
+            enabling_objective=q.enabling_objective or '',
+        )
+    except Exception as exc:
+        print(
+            f"[ContentGen] [{lesson.title}] short_answer Q#{q.id} "
+            f"regen raised: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return ShortAnswerAutoRegenResult(
+            question_text=q.question_text or '',
+            model_answer=ad.get('model_answer') or '',
+            keywords=ad.get('keywords') or [],
+            min_keywords=ad.get('min_keywords') or 1,
+            explanation=q.explanation or '',
+            clean=False, cycles_run=0,
+            audit=[{
+                'cycle': 0,
+                'error': f'orchestrator_raised: {type(exc).__name__}',
+                'picked': False,
+            }],
+        )
+
+
 def _run_matching_judge_for_qs(lesson, qs):
-    """Fan out the matching content judge across newly-persisted
-    matching rows. Verdict-only for v1 (regen lands later).
+    """Fan out the matching content judge + regen across
+    newly-persisted matching rows.
     """
     if not qs:
         return
 
     import concurrent.futures
+    from django.conf import settings as _s
     from apps.curriculum.content_judges.matching import (
         run_matching_judge,
     )
+
+    regen_enabled = getattr(_s, 'CONTENT_REGEN_ENABLED', True)
 
     exclude_provider = None
     try:
@@ -653,6 +820,7 @@ def _run_matching_judge_for_qs(lesson, qs):
         return q, verdict
 
     persisted = 0
+    regenerated = 0
     flagged = 0
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=min(8, len(qs))
@@ -674,12 +842,49 @@ def _run_matching_judge_for_qs(lesson, qs):
             }
             outputs = dict(q.judge_outputs or {})
             outputs['matching'] = verdict_dict
+            update_fields = ['judge_outputs']
+
+            if verdict.skipped or verdict.passed:
+                pass
+            elif regen_enabled:
+                regen_result = _regen_one_matching(q, lesson, verdict_dict)
+                outputs['regen_audit'] = {
+                    'cycles_run': regen_result.cycles_run,
+                    'clean': regen_result.clean,
+                    'picked_model': regen_result.picked_model,
+                    'elapsed_seconds': round(regen_result.elapsed_seconds, 2),
+                    'final_violations': list(regen_result.final_violations),
+                    'final_judge_result': dict(regen_result.final_judge_result or {}),
+                    'cycles': regen_result.audit,
+                }
+                if regen_result.clean and regen_result.pairs:
+                    q.question_text = regen_result.question_text
+                    new_ad = dict(q.answer_data or {})
+                    new_ad.update(regen_result.as_answer_data())
+                    q.answer_data = new_ad
+                    q.explanation = regen_result.explanation
+                    if regen_result.final_judge_result:
+                        outputs['matching'] = dict(regen_result.final_judge_result)
+                    update_fields += ['question_text', 'answer_data', 'explanation']
+                    regenerated += 1
+                else:
+                    if regen_result.pairs:
+                        q.question_text = regen_result.question_text
+                        new_ad = dict(q.answer_data or {})
+                        new_ad.update(regen_result.as_answer_data())
+                        q.answer_data = new_ad
+                        q.explanation = regen_result.explanation
+                        update_fields += ['question_text', 'answer_data', 'explanation']
+                    if regen_result.final_judge_result:
+                        outputs['matching'] = dict(regen_result.final_judge_result)
+                    flagged += 1
+            else:
+                flagged += 1
+
             q.judge_outputs = outputs
             try:
-                q.save(update_fields=['judge_outputs'])
+                q.save(update_fields=list(set(update_fields)))
                 persisted += 1
-                if not verdict.passed and not verdict.skipped:
-                    flagged += 1
             except Exception as exc:
                 print(
                     f"[ContentGen] [{lesson.title}] matching Q#{q.id} "
@@ -689,9 +894,49 @@ def _run_matching_judge_for_qs(lesson, qs):
 
     print(
         f"[ContentGen] [{lesson.title}] matching judge: "
-        f"{persisted}/{len(qs)} persisted (auto_flagged={flagged})",
+        f"{persisted}/{len(qs)} persisted "
+        f"(regenerated={regenerated}, auto_flagged={flagged})",
         flush=True,
     )
+
+
+def _regen_one_matching(q, lesson, verdict_dict: dict):
+    """Wrapper around content_regen.run_matching_regen. Fail-soft."""
+    from apps.curriculum.content_regen import (
+        run_matching_regen, MatchingAutoRegenResult,
+    )
+    ad = q.answer_data or {}
+    try:
+        return run_matching_regen(
+            original_question={
+                'question_text': q.question_text or '',
+                'pairs': ad.get('pairs') or [],
+                'distractor_rights': ad.get('distractor_rights') or [],
+                'explanation': q.explanation or '',
+            },
+            judge_result=verdict_dict,
+            lesson=lesson,
+            step_concept_tag=q.concept_tag or '',
+            enabling_objective=q.enabling_objective or '',
+        )
+    except Exception as exc:
+        print(
+            f"[ContentGen] [{lesson.title}] matching Q#{q.id} "
+            f"regen raised: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return MatchingAutoRegenResult(
+            question_text=q.question_text or '',
+            pairs=ad.get('pairs') or [],
+            distractor_rights=ad.get('distractor_rights') or [],
+            explanation=q.explanation or '',
+            clean=False, cycles_run=0,
+            audit=[{
+                'cycle': 0,
+                'error': f'orchestrator_raised: {type(exc).__name__}',
+                'picked': False,
+            }],
+        )
 
 
 def _regen_one_exit_q(q, lesson, verdict_dict: dict):

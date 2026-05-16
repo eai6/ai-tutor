@@ -1206,6 +1206,525 @@ def run_exit_question_regen(
     return result
 
 
+@dataclass
+class FillInBlankAutoRegenResult:
+    """Outcome of judge-driven (auto) fill_in_blank regen."""
+    question_text: str = ""
+    text_template: str = ""
+    blanks: List[str] = field(default_factory=list)
+    accept_alternatives: List[List[str]] = field(default_factory=list)
+    explanation: str = ""
+    clean: bool = False
+    cycles_run: int = 0
+    picked_model: str = ""
+    elapsed_seconds: float = 0.0
+    final_violations: List[str] = field(default_factory=list)
+    final_reasoning: str = ""
+    final_judge_result: Dict[str, Any] = field(default_factory=dict)
+    audit: List[Dict[str, Any]] = field(default_factory=list)
+
+    def as_answer_data(self) -> Dict[str, Any]:
+        return {
+            'text_template': self.text_template,
+            'blanks': list(self.blanks),
+            'accept_alternatives': [list(a) for a in self.accept_alternatives],
+        }
+
+
+@dataclass
+class ShortAnswerAutoRegenResult:
+    """Outcome of judge-driven (auto) short_answer regen."""
+    question_text: str = ""
+    model_answer: str = ""
+    keywords: List[str] = field(default_factory=list)
+    min_keywords: int = 1
+    explanation: str = ""
+    clean: bool = False
+    cycles_run: int = 0
+    picked_model: str = ""
+    elapsed_seconds: float = 0.0
+    final_violations: List[str] = field(default_factory=list)
+    final_reasoning: str = ""
+    final_judge_result: Dict[str, Any] = field(default_factory=dict)
+    audit: List[Dict[str, Any]] = field(default_factory=list)
+
+    def as_answer_data(self) -> Dict[str, Any]:
+        return {
+            'model_answer': self.model_answer,
+            'keywords': list(self.keywords),
+            'min_keywords': int(self.min_keywords),
+        }
+
+
+@dataclass
+class MatchingAutoRegenResult:
+    """Outcome of judge-driven (auto) matching regen."""
+    question_text: str = ""
+    pairs: List[Dict[str, str]] = field(default_factory=list)
+    distractor_rights: List[str] = field(default_factory=list)
+    explanation: str = ""
+    clean: bool = False
+    cycles_run: int = 0
+    picked_model: str = ""
+    elapsed_seconds: float = 0.0
+    final_violations: List[str] = field(default_factory=list)
+    final_reasoning: str = ""
+    final_judge_result: Dict[str, Any] = field(default_factory=dict)
+    audit: List[Dict[str, Any]] = field(default_factory=list)
+
+    def as_answer_data(self) -> Dict[str, Any]:
+        return {
+            'pairs': [dict(p) for p in self.pairs],
+            'distractor_rights': list(self.distractor_rights),
+        }
+
+
+def _typed_question_regen_loop(
+    *,
+    original_question: Dict[str, Any],
+    judge_result: Dict[str, Any],
+    lesson,
+    lesson_subject: str,
+    lesson_grade: str,
+    lesson_title: str,
+    lesson_objective: str,
+    step_concept_tag: str,
+    enabling_objective: str,
+    max_cycles: int,
+    temperature_start: float,
+    temperature_decay: float,
+    rewrite_schema,
+    prompt_builder,
+    judge_fn,
+    snapshot_from_parsed,
+    result_class,
+    judge_log_prefix: str,
+):
+    """Shared cycle loop for FIB / SA / matching regen.
+
+    Each type-specific orchestrator passes its own:
+      - rewrite_schema: Pydantic class for the LLM rewrite output
+      - prompt_builder: fn taking (original_question, judge_result, ...) → {system, user}
+      - judge_fn: re-judge function taking (question_text, answer_data, ...) → JudgeResult
+      - snapshot_from_parsed: fn taking (parsed_pydantic, fallback_result) → typed_result_snapshot
+      - result_class: dataclass for the final result (FillInBlankAutoRegenResult etc.)
+    """
+    started = time.monotonic()
+    result = result_class(
+        question_text=str(original_question.get('question_text') or ''),
+        explanation=str(original_question.get('explanation') or ''),
+    )
+
+    try:
+        from apps.llm.models import ModelConfig
+        from apps.llm.client import get_llm_client
+        gen_config = ModelConfig.get_for('generation')
+    except Exception as exc:
+        result.audit.append({
+            'cycle': 0, 'error': f'config_lookup_failed: {exc}',
+            'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    if gen_config is None:
+        result.audit.append({
+            'cycle': 0, 'error': 'no_generation_config', 'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    try:
+        get_llm_client(gen_config)  # validate the client constructs
+    except Exception as exc:
+        result.audit.append({
+            'cycle': 0, 'error': f'client_construction_failed: {exc}',
+            'picked': False,
+        })
+        result.elapsed_seconds = time.monotonic() - started
+        return result
+
+    if lesson is not None and not (lesson_subject and lesson_title):
+        try:
+            lesson_title = lesson_title or str(getattr(lesson, 'title', '') or '')
+            lesson_objective = lesson_objective or str(
+                getattr(lesson, 'objective', '') or ''
+            )
+            unit = getattr(lesson, 'unit', None)
+            course = getattr(unit, 'course', None) if unit else None
+            if course is not None and not lesson_subject:
+                subj_type = getattr(course, 'subject_type', '') or ''
+                course_name = getattr(course, 'name', '') or ''
+                lesson_subject = str(subj_type or course_name)
+            if course is not None and not lesson_grade:
+                grades = getattr(course, 'grade_levels', None) or []
+                if isinstance(grades, list) and grades:
+                    lesson_grade = ", ".join(str(g) for g in grades[:3])
+                else:
+                    lesson_grade = str(getattr(course, 'grade_level', '') or '')
+        except Exception:
+            pass
+
+    from apps.curriculum.content_regen.score import score_candidate
+
+    instructor_client = None
+    try:
+        import instructor
+        provider_map = {
+            'anthropic': 'anthropic', 'openai': 'openai',
+            'google': 'google', 'local_ollama': 'ollama',
+        }
+        provider_key = provider_map.get(
+            str(gen_config.provider).lower(), str(gen_config.provider).lower()
+        )
+        instructor_client = instructor.from_provider(
+            f"{provider_key}/{gen_config.model_name}",
+            api_key=gen_config.get_api_key(),
+        )
+    except Exception as exc:
+        logger.warning(
+            f"[ContentRegen] {judge_log_prefix} instructor init failed: "
+            f"{type(exc).__name__}: {exc}"
+        )
+
+    judge_exclude = (gen_config.provider or '').lower() or None
+
+    candidates: List[RegenCandidate] = []
+    best: Optional[RegenCandidate] = None
+    best_snap: Optional[Any] = None
+    best_verdict: Dict[str, Any] = {}
+    current_judge = dict(judge_result or {})
+    current_question: Dict[str, Any] = dict(original_question or {})
+
+    for cycle in range(max_cycles):
+        temperature = max(
+            0.0, temperature_start - cycle * temperature_decay,
+        )
+        c = RegenCandidate(
+            cycle=cycle + 1,
+            model_name=gen_config.model_name or '',
+            temperature=temperature,
+        )
+
+        if instructor_client is None:
+            c.error = "instructor_unavailable"
+            candidates.append(c)
+            continue
+
+        prompt = prompt_builder(
+            original_question=current_question,
+            judge_result=current_judge,
+            lesson_subject=lesson_subject,
+            lesson_grade=lesson_grade,
+            lesson_title=lesson_title,
+            lesson_objective=lesson_objective,
+            step_concept_tag=step_concept_tag,
+            enabling_objective=enabling_objective,
+        )
+
+        create_kwargs = dict(
+            response_model=rewrite_schema,
+            messages=[
+                {"role": "system", "content": prompt['system']},
+                {"role": "user", "content": prompt['user']},
+            ],
+            max_retries=2,
+        )
+        # Gemini 3 thinking-budget safe (see
+        # auto-memory/feedback_use_instructor_for_structured_output.md).
+        if str(gen_config.provider).lower() == 'google':
+            create_kwargs['generation_config'] = {'max_tokens': 4000}
+        else:
+            create_kwargs['max_tokens'] = 4000
+
+        try:
+            parsed = instructor_client.chat.completions.create(**create_kwargs)
+        except Exception as exc:
+            logger.warning(
+                f"[ContentRegen] {judge_log_prefix} cycle {cycle+1} "
+                f"instructor call failed: {type(exc).__name__}: {exc}"
+            )
+            c.error = f"gen_failed: {type(exc).__name__}"
+            candidates.append(c)
+            continue
+
+        snap = snapshot_from_parsed(parsed, result)
+        c.text = (snap.question_text or '')[:200]
+
+        # Re-judge with the type-specific judge
+        try:
+            verdict = judge_fn(
+                question_text=snap.question_text,
+                answer_data=snap.as_answer_data(),
+                explanation=snap.explanation,
+                lesson=lesson,
+                step_concept_tag=step_concept_tag,
+                enabling_objective=enabling_objective,
+                exclude_provider=judge_exclude,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"[ContentRegen] {judge_log_prefix} cycle {cycle+1} "
+                f"re-judge failed: {type(exc).__name__}: {exc}"
+            )
+            c.error = f"judge_failed: {type(exc).__name__}"
+            c.score = score_candidate({'violations': [], 'skipped': True})
+            candidates.append(c)
+            continue
+
+        c.judge_passed = bool(verdict.passed)
+        c.judge_violations = list(verdict.violations or [])
+        c.judge_reasoning = verdict.reasoning or ''
+        c.score = score_candidate({
+            'violations': c.judge_violations,
+            'skipped': verdict.skipped,
+            'passed': verdict.passed,
+        })
+        candidates.append(c)
+
+        verdict_dict = {
+            'passed': bool(verdict.passed),
+            'skipped': bool(verdict.skipped),
+            'violations': list(verdict.violations or []),
+            'reasoning': verdict.reasoning or '',
+            'recommended_fix': verdict.recommended_fix or '',
+            'provider': verdict.provider or '',
+            'model_name': verdict.model_name or '',
+            'skip_reason': verdict.skip_reason or '',
+        }
+
+        if best is None or c.score > best.score:
+            best = c
+            best_snap = snap
+            best_verdict = verdict_dict
+
+        current_judge = {
+            'violations': c.judge_violations,
+            'reasoning': c.judge_reasoning,
+            'recommended_fix': verdict.recommended_fix or '',
+        }
+        # Refresh `current_question` so the next cycle's prompt sees
+        # the latest snapshot's fields.
+        current_question = {
+            'question_text': snap.question_text,
+            'explanation': snap.explanation,
+            **snap.as_answer_data(),
+        }
+
+        if c.judge_passed and not c.judge_violations:
+            best = c
+            best_snap = snap
+            best_verdict = verdict_dict
+            break
+
+    result.cycles_run = len(candidates)
+    if best is None or best_snap is None:
+        result.clean = False
+        result.audit = [_candidate_to_audit(c, picked=False) for c in candidates]
+        result.elapsed_seconds = time.monotonic() - started
+        logger.warning(
+            f"[ContentRegen] {judge_log_prefix} all {len(candidates)} "
+            f"cycles errored — keeping original"
+        )
+        return result
+
+    # Promote best snapshot's fields. Each result_class has its own
+    # field set; the snap object is the same class, so we copy across.
+    for fname in result.__dataclass_fields__:
+        if fname in ('clean', 'cycles_run', 'picked_model',
+                     'elapsed_seconds', 'final_violations',
+                     'final_reasoning', 'final_judge_result', 'audit'):
+            continue
+        if hasattr(best_snap, fname):
+            setattr(result, fname, getattr(best_snap, fname))
+
+    result.clean = bool(best.judge_passed and not best.judge_violations)
+    result.picked_model = best.model_name
+    result.final_violations = list(best.judge_violations)
+    result.final_reasoning = best.judge_reasoning
+    result.final_judge_result = best_verdict
+    result.audit = [
+        _candidate_to_audit(c, picked=(c is best)) for c in candidates
+    ]
+    result.elapsed_seconds = time.monotonic() - started
+
+    logger.info(
+        f"[ContentRegen] {judge_log_prefix} "
+        f"{'CLEAN' if result.clean else 'FLAGGED'} after {result.cycles_run} "
+        f"cycle(s) — picked={best.model_name} "
+        f"final_violations={best.judge_violations} "
+        f"elapsed={result.elapsed_seconds:.1f}s"
+    )
+    return result
+
+
+def _fib_snapshot(parsed, fallback) -> FillInBlankAutoRegenResult:
+    return FillInBlankAutoRegenResult(
+        question_text=(parsed.question_text or fallback.question_text)[:600],
+        text_template=(parsed.text_template or '')[:1200],
+        blanks=[str(b)[:200] for b in (parsed.blanks or [])],
+        accept_alternatives=[
+            [str(a)[:200] for a in (alts or [])]
+            for alts in (parsed.accept_alternatives or [])
+        ],
+        explanation=(parsed.explanation or fallback.explanation or '')[:500],
+    )
+
+
+def _sa_snapshot(parsed, fallback) -> ShortAnswerAutoRegenResult:
+    return ShortAnswerAutoRegenResult(
+        question_text=(parsed.question_text or fallback.question_text)[:600],
+        model_answer=(parsed.model_answer or '')[:800],
+        keywords=[str(k)[:120] for k in (parsed.keywords or [])],
+        min_keywords=int(parsed.min_keywords or 1),
+        explanation=(parsed.explanation or fallback.explanation or '')[:500],
+    )
+
+
+def _match_snapshot(parsed, fallback) -> MatchingAutoRegenResult:
+    return MatchingAutoRegenResult(
+        question_text=(parsed.question_text or fallback.question_text)[:600],
+        pairs=[
+            {'left': str(p.left or '')[:200],
+             'right': str(p.right or '')[:200]}
+            for p in (parsed.pairs or [])
+        ],
+        distractor_rights=[
+            str(d)[:200] for d in (parsed.distractor_rights or [])
+        ],
+        explanation=(parsed.explanation or fallback.explanation or '')[:500],
+    )
+
+
+def run_fill_in_blank_regen(
+    *,
+    original_question: Dict[str, Any],
+    judge_result: Dict[str, Any],
+    lesson,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+    max_cycles: int = DEFAULT_MAX_CYCLES,
+    temperature_start: float = DEFAULT_TEMPERATURE_START,
+    temperature_decay: float = DEFAULT_TEMPERATURE_DECAY,
+) -> FillInBlankAutoRegenResult:
+    """Rewrite ONE fill-in-blank question until the fill_in_blank
+    judge passes OR cycle cap hit. Mirrors run_exit_question_regen.
+    """
+    from apps.curriculum.content_judges.fill_in_blank import run_fill_in_blank_judge
+    from apps.curriculum.content_regen.prompt import build_fib_auto_regen_prompt
+    from apps.curriculum.content_regen.schemas import FillInBlankRewrite
+    return _typed_question_regen_loop(
+        original_question=original_question,
+        judge_result=judge_result,
+        lesson=lesson,
+        lesson_subject=lesson_subject,
+        lesson_grade=lesson_grade,
+        lesson_title=lesson_title,
+        lesson_objective=lesson_objective,
+        step_concept_tag=step_concept_tag,
+        enabling_objective=enabling_objective,
+        max_cycles=max_cycles,
+        temperature_start=temperature_start,
+        temperature_decay=temperature_decay,
+        rewrite_schema=FillInBlankRewrite,
+        prompt_builder=build_fib_auto_regen_prompt,
+        judge_fn=run_fill_in_blank_judge,
+        snapshot_from_parsed=_fib_snapshot,
+        result_class=FillInBlankAutoRegenResult,
+        judge_log_prefix='fill_in_blank',
+    )
+
+
+def run_short_answer_regen(
+    *,
+    original_question: Dict[str, Any],
+    judge_result: Dict[str, Any],
+    lesson,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+    max_cycles: int = DEFAULT_MAX_CYCLES,
+    temperature_start: float = DEFAULT_TEMPERATURE_START,
+    temperature_decay: float = DEFAULT_TEMPERATURE_DECAY,
+) -> ShortAnswerAutoRegenResult:
+    """Rewrite ONE short-answer question until the short_answer judge
+    passes OR cycle cap hit.
+    """
+    from apps.curriculum.content_judges.short_answer import run_short_answer_judge
+    from apps.curriculum.content_regen.prompt import build_sa_auto_regen_prompt
+    from apps.curriculum.content_regen.schemas import ShortAnswerRewrite
+    return _typed_question_regen_loop(
+        original_question=original_question,
+        judge_result=judge_result,
+        lesson=lesson,
+        lesson_subject=lesson_subject,
+        lesson_grade=lesson_grade,
+        lesson_title=lesson_title,
+        lesson_objective=lesson_objective,
+        step_concept_tag=step_concept_tag,
+        enabling_objective=enabling_objective,
+        max_cycles=max_cycles,
+        temperature_start=temperature_start,
+        temperature_decay=temperature_decay,
+        rewrite_schema=ShortAnswerRewrite,
+        prompt_builder=build_sa_auto_regen_prompt,
+        judge_fn=run_short_answer_judge,
+        snapshot_from_parsed=_sa_snapshot,
+        result_class=ShortAnswerAutoRegenResult,
+        judge_log_prefix='short_answer',
+    )
+
+
+def run_matching_regen(
+    *,
+    original_question: Dict[str, Any],
+    judge_result: Dict[str, Any],
+    lesson,
+    lesson_subject: str = "",
+    lesson_grade: str = "",
+    lesson_title: str = "",
+    lesson_objective: str = "",
+    step_concept_tag: str = "",
+    enabling_objective: str = "",
+    max_cycles: int = DEFAULT_MAX_CYCLES,
+    temperature_start: float = DEFAULT_TEMPERATURE_START,
+    temperature_decay: float = DEFAULT_TEMPERATURE_DECAY,
+) -> MatchingAutoRegenResult:
+    """Rewrite ONE matching question until the matching judge passes
+    OR cycle cap hit.
+    """
+    from apps.curriculum.content_judges.matching import run_matching_judge
+    from apps.curriculum.content_regen.prompt import build_match_auto_regen_prompt
+    from apps.curriculum.content_regen.schemas import MatchingRewrite
+    return _typed_question_regen_loop(
+        original_question=original_question,
+        judge_result=judge_result,
+        lesson=lesson,
+        lesson_subject=lesson_subject,
+        lesson_grade=lesson_grade,
+        lesson_title=lesson_title,
+        lesson_objective=lesson_objective,
+        step_concept_tag=step_concept_tag,
+        enabling_objective=enabling_objective,
+        max_cycles=max_cycles,
+        temperature_start=temperature_start,
+        temperature_decay=temperature_decay,
+        rewrite_schema=MatchingRewrite,
+        prompt_builder=build_match_auto_regen_prompt,
+        judge_fn=run_matching_judge,
+        snapshot_from_parsed=_match_snapshot,
+        result_class=MatchingAutoRegenResult,
+        judge_log_prefix='matching',
+    )
+
+
 __all__ = [
     "DEFAULT_MAX_CYCLES",
     "DEFAULT_TEMPERATURE_START",
@@ -1214,8 +1733,14 @@ __all__ = [
     "RegenResult",
     "ExitQuestionRegenResult",
     "ExitQuestionAutoRegenResult",
+    "FillInBlankAutoRegenResult",
+    "ShortAnswerAutoRegenResult",
+    "MatchingAutoRegenResult",
     "run_step_regen",
     "run_step_prompt_regen",
     "run_exit_question_prompt_regen",
     "run_exit_question_regen",
+    "run_fill_in_blank_regen",
+    "run_short_answer_regen",
+    "run_matching_regen",
 ]
