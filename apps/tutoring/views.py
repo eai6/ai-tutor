@@ -49,13 +49,23 @@ def _build_session_history(session):
     for turn in turns:
         if turn.role == 'system':
             continue
+        # R1 (2026-05-15): synthetic student turns (e.g. injected by
+        # the difficulty button) are persisted for tutor context +
+        # analytics but should NOT re-render as chat bubbles on
+        # session resume — the click was the visual signal, not the
+        # text. Skip them here so the chat UI sees only real student
+        # messages.
+        meta = turn.metadata or {}
+        if turn.role == 'student' and meta.get('synthetic_source'):
+            idx += 1
+            continue
         content = _MEDIA_TAG_RE.sub('', turn.content).strip()
         if content:
             entry = {'role': turn.role, 'content': content}
             # Prefer per-turn metadata media (authoritative since
             # 2026-05-08); fall back to engine_state.turn_media for
             # sessions that started before that change.
-            md_media = (turn.metadata or {}).get('attached_media') or []
+            md_media = meta.get('attached_media') or []
             if md_media:
                 entry['media'] = list(md_media)
             else:
@@ -1161,7 +1171,17 @@ def chat_start_review(request, session_id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def chat_difficulty_signal(request, session_id):
-    """Handle student difficulty signal (too easy / too hard)."""
+    """Handle student difficulty signal (too easy / too hard / reset).
+
+    R1 (2026-05-15): in addition to bumping engine_state.difficulty_level,
+    we INJECT a synthetic student turn so the tutor responds immediately
+    instead of waiting for the next real student message. The synthetic
+    turn is marked metadata.synthetic_source='difficulty_button' so the
+    chat UI can suppress re-displaying its literal text — the button
+    click is the visual signal.
+    """
+    from apps.tutoring.conversational_tutor import ConversationalTutor
+
     session = get_object_or_404(
         TutorSession,
         id=session_id,
@@ -1184,17 +1204,65 @@ def chat_difficulty_signal(request, session_id):
         current_level = min(current_level + 1, 2)
     elif signal == "too_hard":
         current_level = max(current_level - 1, -2)
-    else:
+    else:  # reset
         current_level = 0
 
     state['difficulty_level'] = current_level
     session.engine_state = state
     session.save(update_fields=['engine_state'])
 
+    # Synthetic student message → drive an immediate tutor response.
+    # Phrasing matches how a real student might say it; the LLM handles
+    # paraphrases robustly and the difficulty context block will already
+    # be loaded with the new level.
+    synthetic_text = {
+        "too_easy": "This is too easy — could you make it more challenging?",
+        "too_hard": "This is too hard for me — could you go simpler?",
+        "reset": "Let's go back to a normal pace.",
+    }[signal]
+
+    tutor_message = None
+    try:
+        tutor = ConversationalTutor(session)
+        result = tutor.respond(
+            synthetic_text,
+            student_metadata={
+                'synthetic_source': 'difficulty_button',
+                'difficulty_signal': signal,
+                'difficulty_level_after': current_level,
+            },
+        )
+        tutor_message = {
+            "message": result.content,
+            "phase": result.phase,
+            "media": result.media,
+            "show_exit_ticket": result.show_exit_ticket,
+            "exit_ticket": result.exit_ticket_data,
+            "is_complete": result.is_complete,
+            "step_number": result.step_number,
+            "total_steps": result.total_steps,
+            "is_correct": result.is_correct,
+            "streak_count": result.streak_count,
+            "practice_score": result.practice_score,
+            "milestone": result.milestone,
+            "artifact_html": getattr(result, 'artifact_html', None),
+            "probe": getattr(result, 'probe', None),
+        }
+    except Exception as exc:
+        # Fail-soft: even if the synthetic-turn generation fails, the
+        # difficulty level update succeeded. Frontend will fall back to
+        # the legacy "wait for next student message" path.
+        import logging as _lg
+        _lg.getLogger('apps').warning(
+            f"[chat_difficulty_signal] synthetic respond failed: {exc}",
+            exc_info=True,
+        )
+
     return JsonResponse({
         "ok": True,
         "signal": signal,
         "difficulty_level": current_level,
+        "tutor_message": tutor_message,
     })
 
 

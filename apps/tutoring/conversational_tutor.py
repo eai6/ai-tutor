@@ -1989,7 +1989,12 @@ Keep it to 2-3 sentences."""
 
         return self._generate_response(prompt)
 
-    def respond(self, student_input: str) -> TutorMessage:
+    def respond(
+        self,
+        student_input: str,
+        *,
+        student_metadata: Optional[Dict] = None,
+    ) -> TutorMessage:
         """Generate a response to student input.
 
         Thin wrapper that opens a tracing span buffer for the duration of
@@ -2001,15 +2006,29 @@ Keep it to 2-3 sentences."""
         once the tutor turn's SessionTurn ID is known. See
         ``apps.tutoring.tracing`` and Phase 1 of
         ``memory/agentic_platform_architecture_plan.md``.
+
+        Args:
+            student_input: The student's message text.
+            student_metadata: Optional metadata dict attached to the saved
+                student SessionTurn. Used by R1 of the tutor reliability
+                plan: when the difficulty button fires, we inject a
+                synthetic student turn with metadata={'synthetic_source':
+                'difficulty_button'} so analytics / the chat UI can tell
+                this isn't a literal student message.
         """
         from apps.tutoring.tracing import start_span_buffer, reset_span_buffer
         token = start_span_buffer()
         try:
-            return self._respond_impl(student_input)
+            return self._respond_impl(student_input, student_metadata=student_metadata)
         finally:
             reset_span_buffer(token)
 
-    def _respond_impl(self, student_input: str) -> TutorMessage:
+    def _respond_impl(
+        self,
+        student_input: str,
+        *,
+        student_metadata: Optional[Dict] = None,
+    ) -> TutorMessage:
         """Actual response generation. Wrapped by ``respond()`` for tracing.
 
         This is the main conversation loop.
@@ -2022,8 +2041,10 @@ Keep it to 2-3 sentences."""
             self.session.started_lesson_at = timezone.now()
             self.session.save(update_fields=['started_lesson_at'])
 
-        # Save student message
-        self._save_turn("student", student_input)
+        # Save student message — synthetic-source marker (when set) lets
+        # the chat UI suppress re-rendering injected text like the
+        # difficulty-button synthetic turns from R1.
+        self._save_turn("student", student_input, metadata=student_metadata)
         self.conversation.append({"role": "user", "content": student_input})
 
         # Update counts

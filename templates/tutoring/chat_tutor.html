@@ -2359,6 +2359,15 @@ async function restartLesson() {
 
 async function sendDifficultySignal(signal) {
     if (!sessionId) return;
+    // R1 (2026-05-15): the backend now ALSO generates an immediate
+    // tutor response. Show typing while that LLM round-trip runs so
+    // the student sees something is happening; the toast lands first
+    // (instant), the new tutor bubble lands when the LLM returns.
+    const easyHardLabel = signal === 'too_easy'
+        ? 'Turning up the challenge'
+        : (signal === 'too_hard' ? 'Slowing things down for you' : 'Resetting pace');
+    showDifficultyFeedback(easyHardLabel, signal);
+    showTyping(true);
     try {
         const response = await fetch(`/tutor/api/chat/${sessionId}/difficulty-signal/`, {
             method: 'POST',
@@ -2366,13 +2375,22 @@ async function sendDifficultySignal(signal) {
             body: JSON.stringify({ signal }),
         });
         const data = await response.json();
-        if (data.ok) {
-            currentDifficultyLevel = data.difficulty_level;
-            updateDifficultyButtons();
-            const label = signal === 'too_easy' ? 'Turning up the challenge' : 'Slowing things down for you';
-            showDifficultyFeedback(label, signal);
+        showTyping(false);
+        if (!data.ok) return;
+
+        currentDifficultyLevel = data.difficulty_level;
+        updateDifficultyButtons();
+
+        // The synthetic student message ("This is too hard…") is NOT
+        // rendered as a chat bubble — the button click + toast IS the
+        // visual signal. The new tutor reply renders normally.
+        if (data.tutor_message) {
+            applyTutorResponse(data.tutor_message);
         }
-    } catch (e) { console.error('Difficulty signal error:', e); }
+    } catch (e) {
+        showTyping(false);
+        console.error('Difficulty signal error:', e);
+    }
 }
 
 function updateDifficultyButtons() {
