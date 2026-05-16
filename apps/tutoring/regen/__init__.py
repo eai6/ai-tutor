@@ -162,6 +162,7 @@ def run_regen_ensemble(
     answer_was_wrong: bool = False,
     conversation_history: Optional[List[dict]] = None,
     history_turns: Optional[int] = None,
+    bank_context: Optional[dict] = None,
     max_cycles: int = DEFAULT_MAX_CYCLES,
     temperature_start: float = DEFAULT_TEMPERATURE_START,
     temperature_decay: float = DEFAULT_TEMPERATURE_DECAY,
@@ -209,6 +210,14 @@ def run_regen_ensemble(
         # explanation"). Without this, regen was blind to prior turns
         # and converged identically across cycles.
         conversation_history=conversation_history,
+        # Pilot 2026-05-16: regen LLM was inventing answers that
+        # contradicted the bank's own explanation (e.g. student
+        # picked C=Human geography for a question whose
+        # correct_answer was C, but regen rewrote it as
+        # "cultural or social geography" — a non-option that
+        # contradicts the explanation field). Pass the bank's
+        # ground truth so the rewrite anchors to it.
+        bank_context=bank_context,
     )
 
     logger.info(

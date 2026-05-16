@@ -2748,6 +2748,14 @@ Keep it to 2-3 sentences."""
                         and turn_math_check.is_correct is False
                     ),
                     conversation_history=prior_conversation,
+                    # Pass the bank's ground truth to the regen LLM
+                    # so it can't contradict the explanation when
+                    # rewriting. Pilot 2026-05-16: regen was
+                    # inventing answers (e.g. "cultural geography"
+                    # for a Human-geography question that the
+                    # student got right) because it had no ground
+                    # truth in its prompt.
+                    bank_context=self._build_regen_bank_context(),
                 )
                 if _regen_span is not None:
                     _regen_span['payload'] = {
@@ -3915,6 +3923,53 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
             + "\n".join(lines)
             + "\nApply this guidance in your next response.\n"
         )
+
+    def _build_regen_bank_context(self) -> Optional[Dict]:
+        """Bundle the bank question + grader verdict as ground truth
+        for the regen LLM. Returns None when no bank context exists.
+
+        The shape matches what build_regen_prompt's `bank_context`
+        parameter consumes: {question_text, options, correct_answer,
+        explanation, student_answer, verdict}.
+
+        Pilot 2026-05-16: without this context, regen invented
+        contradicting answers (student picked C=Human geography for
+        a Human-geography question, grader confirmed CORRECT, regen
+        rewrote with "cultural or social geography" which wasn't even
+        one of the four options).
+        """
+        q = getattr(self, '_pending_bank_question', None)
+        grade = getattr(self, '_pending_bank_grade', None)
+        if q is None and grade is None:
+            return None
+        ctx: Dict[str, Any] = {}
+        if q is not None:
+            ctx['question_text'] = (
+                getattr(q, 'question_text', None)
+                or getattr(q, 'question', None)
+                or getattr(q, 'teacher_script', '')
+                or ''
+            )
+            # MCQ options if applicable
+            qtype = (getattr(q, 'question_type', '') or '').lower()
+            if qtype == 'mcq':
+                ctx['options'] = {
+                    'A': getattr(q, 'option_a', '') or '',
+                    'B': getattr(q, 'option_b', '') or '',
+                    'C': getattr(q, 'option_c', '') or '',
+                    'D': getattr(q, 'option_d', '') or '',
+                }
+            ctx['correct_answer'] = (
+                getattr(q, 'correct_answer', None)
+                or getattr(q, 'expected_answer', None)
+                or ''
+            )
+            ctx['explanation'] = getattr(q, 'explanation', '') or ''
+        if grade is not None:
+            ctx['verdict'] = getattr(grade, 'is_correct', None)
+            sp = getattr(grade, 'student_parsed', '')
+            ctx['student_answer'] = str(sp)[:200] if sp is not None else ''
+        return ctx if ctx else None
 
     def _build_active_bank_question_block(self) -> str:
         """[ACTIVE BANK QUESTION] context block for the system prompt.

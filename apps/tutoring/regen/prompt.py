@@ -62,6 +62,7 @@ def build_regen_prompt(
     student_input: str = "",
     conversation_history: list = None,
     history_turns: int = 6,
+    bank_context: Dict = None,
 ) -> Tuple[str, str]:
     """Return (user_prompt, system_prompt) for the rewrite-LLM.
 
@@ -90,6 +91,56 @@ def build_regen_prompt(
         needs to AVOID contradicting earlier turns.
     """
     parts: List[str] = []
+
+    # Bank context FIRST — ground truth the rewrite must anchor to.
+    # When the previous tutor turn posed a bank question and the
+    # student replied, the grader's verdict + the bank's explanation
+    # are the SOURCE OF TRUTH. Without this block, the regen LLM
+    # invented contradicting answers (pilot 2026-05-16: student
+    # picked C=Human geography for q3760, grader said CORRECT, regen
+    # rewrote with "cultural or social geography" — a non-option that
+    # contradicted the bank's own explanation). Top placement so the
+    # LLM internalises it before reading the broken response.
+    if bank_context:
+        parts.append("## BANK_GROUND_TRUTH (the question this turn responds to — DO NOT CONTRADICT)")
+        q_text = (bank_context.get('question_text') or '').strip()
+        if q_text:
+            parts.append(f"question: {q_text[:300]}")
+        opts = bank_context.get('options') or {}
+        if opts:
+            for letter in ('A', 'B', 'C', 'D'):
+                opt_text = (opts.get(letter) or '').strip()
+                if opt_text:
+                    parts.append(f"  {letter}. {opt_text[:120]}")
+        ca = (bank_context.get('correct_answer') or '').strip()
+        if ca:
+            parts.append(f"correct_answer: {ca}")
+        expl = (bank_context.get('explanation') or '').strip()
+        if expl:
+            parts.append(f"explanation: {expl[:400]}")
+        stud_ans = (bank_context.get('student_answer') or '').strip()
+        if stud_ans:
+            parts.append(f"student_answer: {stud_ans[:120]}")
+        verdict = bank_context.get('verdict')
+        if verdict is True:
+            parts.append("verdict: CORRECT")
+            parts.append(
+                "REWRITE MUST: confirm the student's answer + explain "
+                "WHY using the explanation field above. Do NOT invent "
+                "a different category or contradict the explanation. "
+                "Do NOT ask the student to show working on a correct "
+                "answer. Then advance via a bank question (do NOT "
+                "author a new question in prose)."
+            )
+        elif verdict is False:
+            parts.append("verdict: INCORRECT")
+            parts.append(
+                "REWRITE MUST: gently say their answer wasn't right, "
+                "use the explanation field above to show the actual "
+                "correct answer is the one labelled by `correct_answer`. "
+                "Do NOT invent a different correct option."
+            )
+        parts.append("")
 
     # Prior context — formatted same way the judges see history (see
     # apps/tutoring/judges/history.py). Placed up top so the LLM sees
