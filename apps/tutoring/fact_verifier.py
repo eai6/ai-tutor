@@ -139,15 +139,18 @@ def _retrieve_evidence(lesson, claims: List[str], n_results: int = 5) -> str:
     chunks: List[str] = []
     query = " | ".join(claims)[:500]
 
-    # Curriculum KB — query BOTH the lesson's institution-scoped KB
-    # AND the global (institution_id=0) KB, then merge. Mirrors the
-    # `Q(institution=inst) | Q(institution__isnull=True)` pattern from
-    # CLAUDE.md: institution-specific content plus platform-wide
-    # curriculum (e.g. global Geography textbooks indexed under
-    # institution_0) both contribute evidence. Without this merge, a
-    # lesson at institution=12 would never see globally-shared
-    # curriculum and the judge would skip with no_kb_evidence on
-    # otherwise-checkable claims.
+    # Curriculum KB — GLOBAL is canonical, institution adds on top.
+    # Decision (2026-05-15): the global (institution_id=0) KB is the
+    # default per-subject KB for all schools. The lesson's institution-
+    # specific KB augments it with school-specific content (uploaded
+    # syllabi, term plans, etc). This avoids the "no KB evidence"
+    # surprise when a lesson sits at a school whose own KB is sparse
+    # but the platform-wide subject KB has plenty.
+    #
+    # Slot allocation: global gets the full n_results; institution
+    # gets a smaller boost (~1/3) on top so school-specific content
+    # still surfaces when relevant. Dedup by content prefix so chunks
+    # that exist in both buckets only count once.
     try:
         from apps.curriculum.knowledge_base import get_knowledge_base
         institution_id = (
@@ -155,16 +158,18 @@ def _retrieve_evidence(lesson, claims: List[str], n_results: int = 5) -> str:
             if lesson and lesson.unit and lesson.unit.course
             else None
         )
-        kb_buckets = []
+        kb_buckets = [(0, n_results, "curriculum")]
         if institution_id and institution_id != 0:
-            kb_buckets.append(institution_id)
-        kb_buckets.append(0)
-        per_bucket = max(2, n_results // len(kb_buckets))
+            kb_buckets.append((
+                institution_id,
+                max(2, n_results // 3),
+                f"curriculum:inst{institution_id}",
+            ))
         seen_content = set()
-        for iid in kb_buckets:
+        for iid, slots, tag in kb_buckets:
             try:
                 kb = get_knowledge_base(iid)
-                results = kb.search(query, n_results=per_bucket) or []
+                results = kb.search(query, n_results=slots) or []
             except Exception as inner_e:
                 logger.debug(f"[FactCheck] KB inst={iid} unavailable: {inner_e}")
                 continue
@@ -173,7 +178,6 @@ def _retrieve_evidence(lesson, claims: List[str], n_results: int = 5) -> str:
                 if not content or content[:120] in seen_content:
                     continue
                 seen_content.add(content[:120])
-                tag = "curriculum" if iid == 0 else f"curriculum:inst{iid}"
                 chunks.append(f"[{tag}] {content[:600]}")
     except Exception as e:
         logger.warning(f"[FactCheck] KB retrieval failed: {e}")
