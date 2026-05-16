@@ -19,9 +19,12 @@ When neither precondition is true we skip — no LLM call.
 from __future__ import annotations
 
 import logging
-import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
+from apps.tutoring.judges._instructor_helper import get_instructor_from_client
 from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
@@ -64,11 +67,31 @@ _SYSTEM = (
     "Be CONSERVATIVE about flagging misalignment — only flag when a "
     "student would clearly be confused by the mismatch.\n"
     "\n"
-    "Output JSON ONLY (no prose, no code fence):\n"
-    "{\"aligned\": true|false|null, "
-    "\"figure_summary\": \"<<= 120 char description of what the figure shows>\", "
-    "\"mismatch_reason\": \"<<= 200 char explanation; '' when aligned>\"}\n"
+    "Return null for `aligned` ONLY when you genuinely cannot tell. "
+    "`mismatch_reason` is empty when aligned=true."
 )
+
+
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+class _FigureVisionVerdict(BaseModel):
+    aligned: Optional[bool] = Field(
+        default=None,
+        description=(
+            "True = figure matches the question; False = clear "
+            "misalignment a student would notice; null = genuinely "
+            "cannot tell (don't use as hedge)."
+        ),
+    )
+    figure_summary: str = Field(
+        default="",
+        description="≤120-char description of what the figure shows.",
+        max_length=200,
+    )
+    mismatch_reason: str = Field(
+        default="",
+        description="≤200-char explanation; empty when aligned=true.",
+        max_length=300,
+    )
 
 
 def _has_figure_question(text: str) -> bool:
@@ -155,54 +178,51 @@ def run_figure_vision_judge(
         result.skip_reason = "image_fetch_empty"
         return result
 
-    # Build a multimodal message in the Anthropic-style format the
-    # codebase already uses for vision (see conversational_tutor._read_image_for_vision).
-    # The Google client adapter remaps `image` blocks to inline_data;
-    # the OpenAI adapter would need image_url — judges currently run
-    # on Claude / Sonnet so the Anthropic format is the right default.
+    # instructor.Image auto-translates the base64 payload to each
+    # provider's native image format (Anthropic image blocks / OpenAI
+    # image_url / Gemini inline_data). Image first, text after — per
+    # the gemini-prompting-expert "image FIRST, text AFTER for
+    # single-image tasks" rule.
+    from instructor.processing.multimodal import Image
+
     user_prompt_text = (
         "Verify whether the attached figure aligns with the question "
-        "in the tutor response. Reply with ONLY the JSON object "
-        "specified.\n\n"
+        "in the tutor response.\n\n"
         f"TUTOR_RESPONSE (contains the question):\n{response_text[:2000]}\n\n"
         f"FIGURE_DESCRIPTION_FROM_CATALOG: "
         f"{(media.get('description') or media.get('alt') or '')[:200]}"
     )
 
+    instructor_client = get_instructor_from_client(llm_client)
+    if instructor_client is None:
+        result.skipped = True
+        result.skip_reason = "instructor_unavailable"
+        return result
+
+    img = Image.from_raw_base64(b64, media_type)
+    create_kwargs = dict(
+        response_model=_FigureVisionVerdict,
+        messages=[
+            {"role": "system", "content": _SYSTEM},
+            {"role": "user", "content": [img, user_prompt_text]},
+        ],
+        max_retries=1,
+    )
+    provider = str(getattr(llm_client.config, 'provider', '')).lower()
+    if provider == 'google':
+        create_kwargs['generation_config'] = {'max_tokens': 3500}
+    else:
+        create_kwargs['max_tokens'] = 3500
+
     try:
-        response = llm_client.generate(
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": b64,
-                        },
-                    },
-                    {"type": "text", "text": user_prompt_text},
-                ],
-            }],
-            system_prompt=_SYSTEM,
-            max_tokens=400,
-        )
-        raw = (response.content or "").strip()
-        import json
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
-        data = json.loads(raw)
+        verdict = instructor_client.chat.completions.create(**create_kwargs)
     except Exception as e:
         logger.warning("[FigureVisionJudge] vision call failed: %s", e)
         result.skipped = True
         result.skip_reason = f"vision_error: {type(e).__name__}"
         return result
 
-    aligned = data.get("aligned")
-    if aligned is True or aligned is False:
-        result.aligned = aligned
-    else:
-        result.aligned = None
-    result.mismatch_reason = str(data.get("mismatch_reason") or "")[:300]
-    result.figure_summary = str(data.get("figure_summary") or "")[:200]
+    result.aligned = verdict.aligned
+    result.mismatch_reason = (verdict.mismatch_reason or "")[:300]
+    result.figure_summary = (verdict.figure_summary or "")[:200]
     return result

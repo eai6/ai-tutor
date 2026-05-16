@@ -62,14 +62,14 @@ pipeline never blocks on judge infrastructure.
 from __future__ import annotations
 
 import base64
-import json
 import logging
-import re
-from typing import Any, Dict, List, Optional
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field
 
 from apps.curriculum.content_judges import JudgeResult
 from apps.curriculum.content_judges._providers import (
-    call_judge_with_fallback,
+    _get_instructor_client_for,
     get_judge_provider_chain,
 )
 
@@ -165,57 +165,64 @@ When rejecting, write a `recommended_fix` (≤120 words) that gives \
 the regen layer a concrete, self-contained instruction — name the \
 element to add/remove/relabel. No "make it better" comments.
 
-Output exactly two XML blocks in this order, with no extra prose:
+In `reasoning`, write 3-5 short sentences walking through what the \
+figure depicts, whether each rejection code applies, and citing \
+specific elements (labels, positions, missing concepts). Reference \
+the step + lesson objective explicitly when judging on-topic-ness.
 
-<reasoning>
-3-5 short sentences. Walk through what the figure depicts, whether \
-each rejection code applies, and cite specific elements (labels, \
-positions, missing concepts). Reference the step + lesson \
-objective explicitly when judging on-topic-ness.
-</reasoning>
-<verdict>
-{"passed": true|false, "violations": ["CODE", ...], \
-"recommended_fix": "rewritten instruction or empty string", \
-"figure_summary": "<<= 120 char description of what the figure shows"}
-</verdict>
+`figure_summary` is a ≤120-char description of what the figure shows.
 """
 
 
-# ─── Output parsing ────────────────────────────────────────────────────
-_REASONING_RE = re.compile(
-    r"<reasoning>(.*?)</reasoning>", re.DOTALL | re.IGNORECASE,
-)
-_VERDICT_RE = re.compile(
-    r"<verdict>(.*?)</verdict>", re.DOTALL | re.IGNORECASE,
-)
-_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+_ALLOWED_VIOLATIONS = Literal[
+    "FIGURE_OFF_OBJECTIVE",
+    "FIGURE_FACTUAL_ERROR",
+    "FIGURE_LABEL_INACCURATE",
+    "FIGURE_PEDAGOGICALLY_WEAK",
+    "FIGURE_VISUAL_QUALITY",
+]
 
 
-def _parse_verdict(raw: str) -> Optional[Dict[str, Any]]:
-    """Extract the verdict JSON. Returns None on parse failure."""
-    if not raw:
-        return None
-    m = _VERDICT_RE.search(raw)
-    if not m:
-        m2 = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not m2:
-            return None
-        candidate = m2.group(0)
-    else:
-        candidate = m.group(1).strip()
-    candidate = _FENCE_RE.sub("", candidate).strip()
-    try:
-        data = json.loads(candidate)
-    except Exception:
-        return None
-    return data if isinstance(data, dict) else None
+class FigureAlignmentVerdict(BaseModel):
+    """Structured output for the figure_alignment vision judge."""
+    reasoning: str = Field(
+        description=(
+            "3-5 short sentences walking through what the figure "
+            "depicts, whether each rejection code applies, citing "
+            "specific elements (labels, positions). Reference the "
+            "step + lesson objective when judging on-topic-ness."
+        ),
+        max_length=2000,
+    )
+    passed: bool = Field(
+        description=(
+            "True iff the figure is approved for use. False when any "
+            "hard violation present (anything except PEDAGOGICALLY_WEAK)."
+        ),
+    )
+    violations: List[_ALLOWED_VIOLATIONS] = Field(
+        default_factory=list,
+        description="Zero or more violation codes from the enum.",
+    )
+    recommended_fix: str = Field(
+        default="",
+        description=(
+            "When rejecting: ≤120-word concrete instruction. Empty "
+            "when passing clean."
+        ),
+        max_length=800,
+    )
+    figure_summary: str = Field(
+        default="",
+        description="≤120-char description of what the figure shows.",
+        max_length=200,
+    )
 
 
-def _normalise_violations(raw_codes: Any) -> List[str]:
-    if not isinstance(raw_codes, list):
-        return []
+def _dedupe_violations(codes: List[str]) -> List[str]:
     out: List[str] = []
-    for code in raw_codes:
+    for code in codes:
         s = str(code or "").strip().upper()
         if s in VIOLATION_CODES and s not in out:
             out.append(s)
@@ -225,9 +232,9 @@ def _normalise_violations(raw_codes: Any) -> List[str]:
 # ─── User prompt assembly ──────────────────────────────────────────────
 # Multimodal ordering: image FIRST (Gemini docs single-image rule),
 # context blocks AFTER, instruction at the very end (long-context
-# query-last). Anthropic-style content blocks; the BaseLLMClient
-# adapters translate to Gemini's inline_data and OpenAI's image_url.
-def _build_user_blocks(
+# query-last). Uses instructor.processing.multimodal.Image which
+# auto-translates to each provider's native image format.
+def _build_user_content(
     image_b64: str,
     image_media_type: str,
     *,
@@ -238,11 +245,15 @@ def _build_user_blocks(
     lesson_objective: str,
     step_objective: str,
     step_concept_tag: str,
-) -> List[Dict[str, Any]]:
-    """Build the user message content blocks.
+) -> list:
+    """Build the user message content list — Image first, then text.
 
-    Order: image → context (lesson + step + prompt) → instruction.
+    Returns a list with an `instructor.Image` wrapper followed by the
+    lesson context + instruction strings. Instructor translates the
+    Image into each provider's native shape at call time.
     """
+    from instructor.processing.multimodal import Image
+
     context_text = (
         "<lesson>\n"
         f"  <subject>{(lesson_subject or '(unspecified)').strip()[:120]}</subject>\n"
@@ -263,23 +274,11 @@ def _build_user_blocks(
         "Based on the figure above and the lesson + step + prompt "
         "context, decide whether this figure is approved for use. "
         "Apply each rejection code definition strictly. Cite specific "
-        "elements you see in the figure when justifying a verdict. "
-        "Reply with ONE <reasoning> block then ONE <verdict> JSON "
-        "block — no other prose."
+        "elements you see in the figure when justifying."
     )
 
-    return [
-        {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": image_media_type or "image/png",
-                "data": image_b64,
-            },
-        },
-        {"type": "text", "text": context_text},
-        {"type": "text", "text": instruction},
-    ]
+    img = Image.from_raw_base64(image_b64, image_media_type or "image/png")
+    return [img, context_text, instruction]
 
 
 def _bytes_to_b64(image_bytes: bytes) -> str:
@@ -310,7 +309,7 @@ def run_figure_alignment_judge(
     step_concept_tag: str = "",
     exclude_provider: Optional[str] = None,
     judge_purpose: str = "content_judge_figure_alignment",
-    max_tokens: int = 1200,
+    max_tokens: int = 3500,
     image_b64: Optional[str] = None,
 ) -> JudgeResult:
     """Vision-check a generated figure against the lesson context.
@@ -380,7 +379,7 @@ def run_figure_alignment_judge(
         result.skip_reason = "no_providers_available"
         return result
 
-    user_blocks = _build_user_blocks(
+    user_content = _build_user_content(
         image_b64,
         image_media_type,
         image_prompt=image_prompt,
@@ -392,66 +391,64 @@ def run_figure_alignment_judge(
         step_concept_tag=step_concept_tag,
     )
 
-    # call_judge_with_fallback expects a string user prompt; for
-    # multimodal we need to pass the content blocks directly. Inline
-    # the per-provider loop here so we can pass the structured
-    # content array.
+    # Per-provider loop: wrap each provider's underlying client in
+    # instructor and try the structured-output vision call. First
+    # success wins. Instructor's Image wrapper auto-translates to each
+    # provider's native image format (Anthropic / OpenAI / Gemini).
     last_provider_name = ""
     last_model = ""
     last_error = ""
-    raw_text = ""
-    success = False
+    last_error_class = ""
+    verdict: Optional[FigureAlignmentVerdict] = None
 
     for provider in providers:
+        iclient = _get_instructor_client_for(provider.config)
+        if iclient is None:
+            last_error = "instructor_init_failed"
+            last_error_class = "InstructorUnavailable"
+            continue
+
+        create_kwargs = dict(
+            response_model=FigureAlignmentVerdict,
+            messages=[
+                {"role": "system", "content": _SYSTEM_INSTRUCTION},
+                {"role": "user", "content": user_content},
+            ],
+            max_retries=1,
+        )
+        if str(provider.config.provider).lower() == 'google':
+            create_kwargs['generation_config'] = {'max_tokens': max_tokens}
+        else:
+            create_kwargs['max_tokens'] = max_tokens
+
         try:
-            response = provider.client.generate(
-                messages=[{"role": "user", "content": user_blocks}],
-                system_prompt=_SYSTEM_INSTRUCTION,
-                max_tokens=max_tokens,
-            )
+            verdict = iclient.chat.completions.create(**create_kwargs)
         except Exception as exc:
-            last_error = f"{type(exc).__name__}: {str(exc)[:200]}"
+            last_error = str(exc)[:200]
+            last_error_class = type(exc).__name__
             logger.warning(
                 f"[FigureAlignmentJudge] {provider.name}/{provider.model_name} "
-                f"vision call failed: {last_error} — trying next"
+                f"vision call failed: {last_error_class}: {last_error} — "
+                f"trying next"
             )
-            continue
-        raw_text = (getattr(response, "content", None) or "").strip()
-        if not raw_text:
-            last_error = "empty_response"
             continue
         last_provider_name = provider.name
         last_model = provider.model_name
-        success = True
         break
 
-    if not success:
+    if verdict is None:
         result.skipped = True
         result.skip_reason = (
-            f"all_providers_failed: {last_error or 'unknown'}"
+            f"all_providers_failed: {last_error_class or 'unknown'}"
         )
         return result
 
     result.provider = last_provider_name
     result.model_name = last_model
+    result.reasoning = (verdict.reasoning or "").strip()[:300]
 
-    verdict = _parse_verdict(raw_text)
-    if verdict is None:
-        logger.warning(
-            f"[FigureAlignmentJudge] unparseable verdict from "
-            f"{last_provider_name}/{last_model}: {raw_text[:200]!r}"
-        )
-        result.skipped = True
-        result.skip_reason = "verdict_unparseable"
-        return result
-
-    reasoning_match = _REASONING_RE.search(raw_text)
-    if reasoning_match:
-        result.reasoning = reasoning_match.group(1).strip()[:300]
-
-    raw_passed = bool(verdict.get("passed", True))
-    violations = _normalise_violations(verdict.get("violations"))
-    fix = str(verdict.get("recommended_fix") or "").strip()[:800]
+    violations = _dedupe_violations(list(verdict.violations or []))
+    fix = (verdict.recommended_fix or "").strip()[:800]
 
     # Pass policy: violations that are NOT in _SOFT_ONLY_CODES force
     # passed=False. PEDAGOGICALLY_WEAK alone is a soft warning.
@@ -459,10 +456,7 @@ def run_figure_alignment_judge(
     if hard_violations:
         passed = False
     else:
-        # Either no violations OR only PEDAGOGICALLY_WEAK — respect
-        # the model's passed value when it's already False (model may
-        # see another reason); otherwise pass.
-        passed = raw_passed or not violations
+        passed = bool(verdict.passed) or not violations
 
     result.passed = passed
     result.violations = violations
