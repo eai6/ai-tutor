@@ -1572,7 +1572,45 @@ function renderPendingQuestionInArtifact(pq) {
     } else if (pq.question_type === 'short_numeric' || pq.question_type === 'short_answer' || pq.kind === 'lesson_step') {
         body += '<input type="text" class="bank-q-text" placeholder="Type your answer…" style="padding:0.625rem 0.75rem;border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;">';
     } else if (pq.question_type === 'fill_in_blank') {
-        body += '<input type="text" class="bank-q-text" placeholder="Fill in the blank…" style="padding:0.625rem 0.75rem;border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;">';
+        // Render the text_template with each ___ replaced by an inline
+        // input. answer_data.blanks tells us how many blanks (one input
+        // per expected answer). If text_template is missing we fall
+        // back to N flat inputs labelled "Blank 1", "Blank 2", etc.
+        const ad = pq.answer_data || {};
+        const blanks = ad.blanks || [];
+        const nBlanks = blanks.length || 1;
+        const template = ad.text_template || '';
+        body += '<div class="bank-q-fill" style="display:flex;flex-direction:column;gap:0.5rem;">';
+        if (template && /_{2,}/.test(template)) {
+            // Inject inputs into the template at each ___ marker.
+            // Each input gets a per-blank index for ordered submission.
+            const escaped = escapeHtml(template);
+            let i = 0;
+            const rendered = escaped.replace(/_{2,}/g, () => {
+                const idx = i++;
+                return '<input type="text" class="bank-q-blank" data-blank-index="' + idx + '" '
+                    + 'placeholder="?" style="display:inline-block;width:8rem;margin:0 0.25rem;'
+                    + 'padding:0.25rem 0.5rem;border:1.5px solid #a855f7;border-bottom:2px solid #7c3aed;'
+                    + 'border-radius:0.25rem;font-size:0.9375rem;font-family:inherit;background:#fafafa;">';
+            });
+            body += '<div style="line-height:2;font-size:0.9375rem;color:#3f3f46;background:#fafafa;'
+                + 'padding:0.75rem;border-radius:0.5rem;border:1px solid #e4e4e7;">' + rendered + '</div>';
+            // If we created fewer inputs than expected (template had
+            // fewer ___ than blanks list), pad with explicit inputs.
+            for (let j = i; j < nBlanks; j++) {
+                body += '<input type="text" class="bank-q-blank" data-blank-index="' + j + '" '
+                    + 'placeholder="Blank ' + (j+1) + '" style="padding:0.5rem;'
+                    + 'border:1.5px solid #e4e4e7;border-radius:0.25rem;font-size:0.9375rem;font-family:inherit;">';
+            }
+        } else {
+            // No template — just render N inputs.
+            for (let j = 0; j < nBlanks; j++) {
+                body += '<input type="text" class="bank-q-blank" data-blank-index="' + j + '" '
+                    + 'placeholder="Blank ' + (j+1) + '" style="padding:0.5rem;'
+                    + 'border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;">';
+            }
+        }
+        body += '</div>';
     } else {
         // Other types (matching, data_interpretation, …) — full UI
         // ships in R6; for now render a textarea so students can at
@@ -1629,6 +1667,19 @@ function bindBankQuestionHandlers(pq) {
                 return;
             }
             answer = picked.value;  // 'A' / 'B' / 'C' / 'D'
+        } else if (pq.question_type === 'fill_in_blank') {
+            // Collect per-blank values in order. Comma-separate so the
+            // legacy text-mode grader (bank_grader._grade_fill_blank)
+            // splits on ',' / ';' / newline. R4's dedicated endpoint
+            // will accept the array directly.
+            const blanks = Array.from(card.querySelectorAll('.bank-q-blank'))
+                .sort((a, b) => Number(a.dataset.blankIndex) - Number(b.dataset.blankIndex))
+                .map(i => (i.value || '').trim());
+            if (blanks.every(b => !b)) {
+                statusEl.textContent = 'Fill in at least one blank.';
+                return;
+            }
+            answer = blanks.join(', ');
         } else {
             const input = card.querySelector('.bank-q-text');
             answer = (input && input.value || '').trim();
