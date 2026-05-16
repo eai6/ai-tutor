@@ -14,10 +14,15 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Literal
 
+from pydantic import BaseModel, Field
+
+from apps.tutoring.judges._instructor_helper import (
+    get_instructor_from_client,
+    structured_completion,
+)
 from apps.tutoring.rule_compliance import (
     RULE_NO_AUTHORING,
     RULE_RULE_1,
@@ -63,15 +68,35 @@ _SYSTEM = (
     "teaching, NOT a RULE_1 violation. SKIP RULE_1 when "
     "subject_is_math is false.\n"
     "\n"
-    "Output JSON ONLY (no prose, no code fence):\n"
-    "{\"violations\": [{\"rule\": \"NO_AUTHORING|RULE_1\", "
-    "\"evidence\": \"<<=120 char quote>\", "
-    "\"suggested_fix\": \"<one-sentence rewrite>\"}]}\n"
-    "Empty array when nothing to flag.\n"
+    "Return violations=[] when nothing to flag.\n"
 )
 
 from apps.tutoring.judges._prompt_meta import prompt_fingerprint
 PROMPT_HASH, PROMPT_CHARS = prompt_fingerprint(_SYSTEM)
+
+
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+_RULE_CODE = Literal["NO_AUTHORING", "RULE_1"]
+
+
+class _RuleViolationItem(BaseModel):
+    rule: _RULE_CODE = Field(description="Which rule was violated.")
+    evidence: str = Field(
+        description="≤120-char quote from the tutor response.",
+        max_length=200,
+    )
+    suggested_fix: str = Field(
+        default="",
+        description="One-sentence rewrite suggestion.",
+        max_length=300,
+    )
+
+
+class _RuleVerdict(BaseModel):
+    violations: List[_RuleViolationItem] = Field(
+        default_factory=list,
+        description="Zero or more rule violations identified in the tutor response.",
+    )
 
 
 @traced_judge('rule')
@@ -124,47 +149,43 @@ def run_rule_judge(
         "\"great work\" can be valid when the most recent prior STUDENT "
         "turn in prior_exchanges showed correct working, even when "
         "input.student_last_input is itself a non-answer "
-        "(acknowledgement, follow-up question). Reply with ONLY the "
-        "JSON object specified."
+        "(acknowledgement, follow-up question)."
     )
 
+    instructor_client = get_instructor_from_client(llm_client)
+    if instructor_client is None:
+        result.skipped = True
+        result.skip_reason = "instructor_unavailable"
+        return result
+
     try:
-        response = llm_client.generate(
-            messages=[{"role": "user", "content": user_prompt}],
+        verdict = structured_completion(
+            instructor_client,
+            _RuleVerdict,
             system_prompt=_SYSTEM,
-            max_tokens=400,
+            user_prompt=user_prompt,
+            max_tokens=3500,
+            provider=str(getattr(llm_client.config, 'provider', '')),
         )
-        raw = (response.content or "").strip()
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
-        data = json.loads(raw)
     except Exception as e:
         logger.warning("[RuleJudge] call failed: %s", e)
         result.skipped = True
         result.skip_reason = f"llm_error: {type(e).__name__}"
         return result
 
-    items = data.get("violations") or []
-    if not isinstance(items, list):
-        return result
-
-    for item in items[:max_violations]:
-        if not isinstance(item, dict):
-            continue
-        rule = str(item.get("rule") or "").strip().upper()
-        if rule not in VALID_RULES:
-            continue
+    for item in (verdict.violations or [])[:max_violations]:
+        rule = item.rule
         # Programmatic safety net: drop RULE_1 on non-math, drop
-        # NO_AUTHORING when no bank was offered. The prompt asks for
-        # this but Sonnet has been observed to ignore it.
+        # NO_AUTHORING when no bank was offered.
         if not subject_is_math and rule == RULE_RULE_1:
             logger.info("[RuleJudge] dropping RULE_1 on non-math turn")
             continue
         if not bank_offered and rule == RULE_NO_AUTHORING:
             logger.info("[RuleJudge] dropping NO_AUTHORING when bank not offered")
             continue
-        evidence = str(item.get("evidence") or "")[:200]
-        fix = str(item.get("suggested_fix") or "")[:300]
-        result.violations.append(
-            RuleViolation(rule=rule, evidence=evidence, suggested_fix=fix)
-        )
+        result.violations.append(RuleViolation(
+            rule=rule,
+            evidence=(item.evidence or "")[:200],
+            suggested_fix=(item.suggested_fix or "")[:300],
+        ))
     return result

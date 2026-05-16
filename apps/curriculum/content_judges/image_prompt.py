@@ -36,14 +36,14 @@ for telemetry.
 
 from __future__ import annotations
 
-import json
 import logging
-import re
-from typing import Any, Dict, List, Optional
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field
 
 from apps.curriculum.content_judges import JudgeResult
 from apps.curriculum.content_judges._providers import (
-    call_judge_with_fallback,
+    call_judge_structured_with_fallback,
     get_judge_provider_chain,
 )
 
@@ -124,17 +124,57 @@ When rejecting, write a `recommended_fix` that is a complete rewritten \
 prompt (≤80 words) the caller can send to the gen model directly. The \
 fix must be specific and self-contained — no "make it better" comments.
 
-Output exactly two XML blocks in this order, with no extra prose:
-
-<reasoning>
-2-4 short sentences walking through what the prompt asks for and \
-whether each violation code applies. Cite the lesson context.
-</reasoning>
-<verdict>
-{"passed": true|false, "violations": ["CODE", ...], \
-"recommended_fix": "rewritten prompt or empty string"}
-</verdict>
+In `reasoning`, write 2-4 short sentences walking through what the \
+prompt asks for and whether each violation code applies. Cite the \
+lesson context.
 """
+
+
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+_ALLOWED_VIOLATIONS = Literal[
+    "PROMPT_VAGUE",
+    "PROMPT_HALLUCINATION_TRIGGER",
+    "PROMPT_OFF_TOPIC",
+    "PROMPT_WRONG_VISUAL_TYPE",
+    "PROMPT_GRADE_MISMATCH",
+    "PROMPT_RELIES_ON_TEXT_IN_IMAGE",
+]
+
+
+class ImagePromptVerdict(BaseModel):
+    """Structured output for the image_prompt judge."""
+    reasoning: str = Field(
+        description=(
+            "2-4 short sentences walking through what the prompt asks "
+            "for and whether each violation code applies. Cite the "
+            "lesson context."
+        ),
+        max_length=1500,
+    )
+    passed: bool = Field(
+        description="True iff the candidate prompt is approved for use.",
+    )
+    violations: List[_ALLOWED_VIOLATIONS] = Field(
+        default_factory=list,
+        description="Zero or more violation codes from the enum.",
+    )
+    recommended_fix: str = Field(
+        default="",
+        description=(
+            "When rejecting: complete rewritten prompt (≤80 words) the "
+            "caller can send directly. Empty when passing."
+        ),
+        max_length=800,
+    )
+
+
+def _dedupe_violations(codes: List[str]) -> List[str]:
+    out: List[str] = []
+    for code in codes:
+        s = str(code or "").strip().upper()
+        if s in VIOLATION_CODES and s not in out:
+            out.append(s)
+    return out
 
 
 # ─── Few-shot examples ──────────────────────────────────────────────────
@@ -297,58 +337,11 @@ violation codes.
 </candidate_prompt>
 </input>
 
-Based on the lesson context and category above, produce ONE \
-<reasoning> block then ONE <verdict> JSON block. Use only the six \
-violation codes. If the prompt is acceptable, return passed=true and \
-an empty violations list.
+Based on the lesson context and category above, judge whether this \
+candidate prompt is approved. Use only the six violation codes. If \
+the prompt is acceptable, return passed=true and an empty violations \
+list.
 """
-
-
-# ─── Output parsing ────────────────────────────────────────────────────
-_REASONING_RE = re.compile(
-    r"<reasoning>(.*?)</reasoning>", re.DOTALL | re.IGNORECASE,
-)
-_VERDICT_RE = re.compile(
-    r"<verdict>(.*?)</verdict>", re.DOTALL | re.IGNORECASE,
-)
-
-
-def _parse_verdict(raw: str) -> Optional[Dict[str, Any]]:
-    """Extract the verdict JSON. None on parse failure."""
-    if not raw:
-        return None
-    m = _VERDICT_RE.search(raw)
-    if not m:
-        # Some providers occasionally drop the closing tag — try a
-        # looser fall-through: locate the first {…} JSON object.
-        m2 = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not m2:
-            return None
-        candidate = m2.group(0)
-    else:
-        candidate = m.group(1).strip()
-    candidate = re.sub(
-        r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.IGNORECASE,
-    ).strip()
-    try:
-        data = json.loads(candidate)
-    except Exception:
-        return None
-    if not isinstance(data, dict):
-        return None
-    return data
-
-
-def _normalise_violations(raw_codes: Any) -> List[str]:
-    """Coerce model output into the closed violation-code set."""
-    if not isinstance(raw_codes, list):
-        return []
-    out: List[str] = []
-    for code in raw_codes:
-        s = str(code or "").strip().upper()
-        if s in VIOLATION_CODES and s not in out:
-            out.append(s)
-    return out
 
 
 # ─── Public entry point ────────────────────────────────────────────────
@@ -363,7 +356,7 @@ def run_image_prompt_judge(
     textbook_context: str = "",
     exclude_provider: Optional[str] = None,
     judge_purpose: str = "content_judge_image_prompt",
-    max_tokens: int = 800,
+    max_tokens: int = 3500,
 ) -> JudgeResult:
     """Review an image-generation prompt before it's sent to the gen model.
 
@@ -428,9 +421,10 @@ def run_image_prompt_judge(
         textbook_context=textbook_context,
     )
 
-    call = call_judge_with_fallback(
+    call = call_judge_structured_with_fallback(
         user_prompt,
         providers,
+        ImagePromptVerdict,
         system_prompt=_SYSTEM_INSTRUCTION,
         max_tokens=max_tokens,
     )
@@ -448,26 +442,12 @@ def run_image_prompt_judge(
     result.provider = call.provider
     result.model_name = call.model_name
 
-    verdict = _parse_verdict(call.text)
-    if verdict is None:
-        logger.warning(
-            f"[ImagePromptJudge] unparseable verdict from "
-            f"{call.provider}/{call.model_name}: {call.text[:200]!r}"
-        )
-        result.skipped = True
-        result.skip_reason = "verdict_unparseable"
-        return result
+    verdict: ImagePromptVerdict = call.verdict
+    result.reasoning = (verdict.reasoning or "").strip()[:300]
 
-    # Reasoning is best-effort — useful for telemetry / regen guidance,
-    # but a missing reasoning block is non-fatal.
-    reasoning_match = _REASONING_RE.search(call.text or "")
-    if reasoning_match:
-        result.reasoning = reasoning_match.group(1).strip()[:300]
-
-    # Coerce the verdict into the JudgeResult shape.
-    passed = bool(verdict.get("passed", True))
-    violations = _normalise_violations(verdict.get("violations"))
-    fix = str(verdict.get("recommended_fix") or "").strip()[:600]
+    passed = bool(verdict.passed)
+    violations = _dedupe_violations(list(verdict.violations or []))
+    fix = (verdict.recommended_fix or "").strip()[:600]
 
     # Internal consistency: passed=true with violations is contradictory.
     # Trust the violation list (it's the actionable signal) and downgrade

@@ -39,11 +39,13 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field
 
 from apps.curriculum.content_judges import JudgeResult
 from apps.curriculum.content_judges._providers import (
-    call_judge_with_fallback,
+    call_judge_structured_with_fallback,
     get_judge_provider_chain,
 )
 
@@ -54,11 +56,6 @@ logger = logging.getLogger(__name__)
 VIOLATION_CONTRADICTED = "STEP_FACT_CONTRADICTED"
 VIOLATION_UNSUPPORTED = "STEP_FACT_UNSUPPORTED"
 VIOLATION_CODES = (VIOLATION_CONTRADICTED, VIOLATION_UNSUPPORTED)
-
-
-# Status vocabulary the model uses (matches tutor-side factual.py so
-# the two fact-checkers agree on the verdict surface).
-_VALID_STATUSES = {"supported", "contradicted", "unverified"}
 
 
 # ─── System instruction ────────────────────────────────────────────────
@@ -97,54 +94,59 @@ Be conservative on "supported". Approve only when the evidence \
 explicitly contains the claim or a matching number / name. When in \
 doubt return "unverified".
 
-Output exactly two XML blocks in this order, with no extra prose:
+In `reasoning`, write 2-4 short sentences. Note how many claims you \
+identified, cite the evidence span you relied on for the most \
+important verdict, and flag if evidence was sparse for any claim.
 
-<reasoning>
-2-4 short sentences. Note how many claims you identified, cite the \
-evidence span you relied on for the most important verdict, flag if \
-evidence was sparse for any claim.
-</reasoning>
-<verdict>
-{"claims": [
-  {"claim": "<text from the step>", \
-"status": "supported|contradicted|unverified", \
-"is_high_stakes": true|false, \
-"evidence": "<<=80 char quote or empty>"}
-]}
-</verdict>
-
-If the step contains no checkable claims, return {"claims": []}.
+If the step contains no checkable claims, return claims=[].
 """
 
 
-# ─── Output parsing ────────────────────────────────────────────────────
-_REASONING_RE = re.compile(
-    r"<reasoning>(.*?)</reasoning>", re.DOTALL | re.IGNORECASE,
-)
-_VERDICT_RE = re.compile(
-    r"<verdict>(.*?)</verdict>", re.DOTALL | re.IGNORECASE,
-)
-_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+_CLAIM_STATUS = Literal["supported", "contradicted", "unverified"]
 
 
-def _parse_verdict(raw: str) -> Optional[Dict[str, Any]]:
-    """Extract the verdict JSON. Returns None on parse failure."""
-    if not raw:
-        return None
-    m = _VERDICT_RE.search(raw)
-    if not m:
-        m2 = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not m2:
-            return None
-        candidate = m2.group(0)
-    else:
-        candidate = m.group(1).strip()
-    candidate = _FENCE_RE.sub("", candidate).strip()
-    try:
-        data = json.loads(candidate)
-    except Exception:
-        return None
-    return data if isinstance(data, dict) else None
+class FactClaim(BaseModel):
+    claim: str = Field(
+        description="The claim text exactly as it appears in the step.",
+        max_length=300,
+    )
+    status: _CLAIM_STATUS = Field(
+        description=(
+            "supported = evidence states the claim or a matching value; "
+            "contradicted = evidence states a different value or the "
+            "opposite; unverified = evidence does not address the claim."
+        ),
+    )
+    is_high_stakes: bool = Field(
+        default=True,
+        description=(
+            "true for numbers / dates / proper nouns / unit measurements "
+            "/ statistics; false for narrative observations the "
+            "curriculum likely doesn't address."
+        ),
+    )
+    evidence: str = Field(
+        default="",
+        description="≤80-char quote from the evidence, or empty.",
+        max_length=120,
+    )
+
+
+class FactualStepVerdict(BaseModel):
+    """Structured output for the factual_step judge."""
+    reasoning: str = Field(
+        description=(
+            "2-4 short sentences noting how many claims were identified, "
+            "the evidence span relied on for the most important verdict, "
+            "and any sparse-evidence flags."
+        ),
+        max_length=2000,
+    )
+    claims: List[FactClaim] = Field(
+        default_factory=list,
+        description="Every checkable factual claim in the step.",
+    )
 
 
 # ─── KB evidence retrieval ─────────────────────────────────────────────
@@ -263,8 +265,7 @@ def _build_user_prompt(
         f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}\n\n"
         "Based on input.step_text and input.evidence above, extract "
         "every checkable factual claim from the step text and assign "
-        "each a status. Reply with the <reasoning> and <verdict> "
-        "blocks specified."
+        "each a status."
     )
 
 
@@ -279,7 +280,7 @@ def run_factual_step_judge(
     lesson_objective: str = "",
     exclude_provider: Optional[str] = None,
     judge_purpose: str = "content_judge_factual_step",
-    max_tokens: int = 1400,
+    max_tokens: int = 3500,
     _evidence_override: Optional[str] = None,
 ) -> JudgeResult:
     """Verify factual claims in a generated lesson step.
@@ -380,9 +381,10 @@ def run_factual_step_judge(
         lesson_objective=lesson_objective,
     )
 
-    call = call_judge_with_fallback(
+    call = call_judge_structured_with_fallback(
         user_prompt,
         providers,
+        FactualStepVerdict,
         system_prompt=_SYSTEM_INSTRUCTION,
         max_tokens=max_tokens,
     )
@@ -398,41 +400,22 @@ def run_factual_step_judge(
     result.provider = call.provider
     result.model_name = call.model_name
 
-    verdict = _parse_verdict(call.text)
-    if verdict is None:
-        logger.warning(
-            f"[FactualStepJudge] unparseable verdict from "
-            f"{call.provider}/{call.model_name}: {call.text[:200]!r}"
-        )
-        result.skipped = True
-        result.skip_reason = "verdict_unparseable"
-        return result
+    verdict: FactualStepVerdict = call.verdict
+    result.reasoning = (verdict.reasoning or "").strip()[:300]
 
-    reasoning_match = _REASONING_RE.search(call.text or "")
-    if reasoning_match:
-        result.reasoning = reasoning_match.group(1).strip()[:300]
-
-    items = verdict.get("claims") or []
     contradicted: List[str] = []
     unsupported_high_stakes: List[str] = []
     total_claims = 0
 
-    if isinstance(items, list):
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            claim = str(item.get("claim") or "").strip()[:200]
-            if not claim:
-                continue
-            status = str(item.get("status") or "unverified").strip().lower()
-            if status not in _VALID_STATUSES:
-                status = "unverified"
-            is_high_stakes = bool(item.get("is_high_stakes", True))
-            total_claims += 1
-            if status == "contradicted":
-                contradicted.append(claim)
-            elif status == "unverified" and is_high_stakes:
-                unsupported_high_stakes.append(claim)
+    for item in (verdict.claims or []):
+        claim = (item.claim or "").strip()[:200]
+        if not claim:
+            continue
+        total_claims += 1
+        if item.status == "contradicted":
+            contradicted.append(claim)
+        elif item.status == "unverified" and item.is_high_stakes:
+            unsupported_high_stakes.append(claim)
 
     violations: List[str] = []
     fix_lines: List[str] = []

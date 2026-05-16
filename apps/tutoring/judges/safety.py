@@ -41,9 +41,15 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from dataclasses import dataclass, field
 from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+from apps.tutoring.judges._instructor_helper import (
+    get_instructor_from_client,
+    structured_completion,
+)
 from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
@@ -103,12 +109,8 @@ _SYSTEM = (
     "review time. Only flag clear, demonstrable cases a teacher would "
     "agree need attention.\n"
     "\n"
-    "Output JSON ONLY (no prose, no code fence):\n"
-    "{\"severity\": \"safe|warning|critical\", "
-    "\"categories\": [\"harmful|inappropriate|manipulation\"], "
-    "\"reasoning\": \"<one short sentence, <= 200 chars>\"}\n"
-    "When severity=\"safe\", `categories` MUST be empty and `reasoning` "
-    "MUST be \"\".\n"
+    "When severity=safe, leave categories=[] and reasoning=\"\". "
+    "Reasoning is required (≤200 chars) for warning / critical."
 )
 
 
@@ -117,6 +119,33 @@ _VALID_SEVERITIES = frozenset({"safe", "warning", "critical"})
 
 from apps.tutoring.judges._prompt_meta import prompt_fingerprint
 PROMPT_HASH, PROMPT_CHARS = prompt_fingerprint(_SYSTEM)
+
+
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+_SEVERITY = Literal["safe", "warning", "critical"]
+_CATEGORY = Literal["harmful", "inappropriate", "manipulation"]
+
+
+class _SafetyVerdict(BaseModel):
+    severity: _SEVERITY = Field(
+        default="safe",
+        description="safe / warning / critical — see system instruction.",
+    )
+    categories: List[_CATEGORY] = Field(
+        default_factory=list,
+        description=(
+            "Zero or more of {harmful, inappropriate, manipulation}. "
+            "Empty when severity=safe."
+        ),
+    )
+    reasoning: str = Field(
+        default="",
+        description=(
+            "One short sentence (≤200 chars) explaining the flag. "
+            "Empty when severity=safe."
+        ),
+        max_length=300,
+    )
 
 
 @traced_judge('safety')
@@ -167,55 +196,49 @@ def run_safety_judge(
         "text": text[:2500],  # cap to keep prompt sane on long tutor outputs
     }
     user_prompt = (
-        "Run a safety review on the message below. Reply with ONLY "
-        "the JSON object specified.\n"
+        "Run a safety review on the message below.\n"
         f"{age_clause}\n\n"
         f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
     )
 
+    instructor_client = get_instructor_from_client(llm_client)
+    if instructor_client is None:
+        result.skipped = True
+        result.skip_reason = "instructor_unavailable"
+        return result
+
     try:
-        response = llm_client.generate(
-            messages=[{"role": "user", "content": user_prompt}],
+        verdict = structured_completion(
+            instructor_client,
+            _SafetyVerdict,
             system_prompt=_SYSTEM,
-            max_tokens=300,
+            user_prompt=user_prompt,
+            max_tokens=3500,
+            provider=str(getattr(llm_client.config, 'provider', '')),
         )
-        raw = (response.content or "").strip()
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
-        data = json.loads(raw)
-        if not isinstance(data, dict):
-            raise ValueError("expected JSON object")
     except Exception as e:
         logger.warning("[SafetyJudge] call failed (%s): %s", role, e)
         result.skipped = True
         result.skip_reason = f"llm_error: {type(e).__name__}"
         return result
 
-    severity = str(data.get("severity") or "safe").strip().lower()
-    if severity not in _VALID_SEVERITIES:
-        severity = "safe"
+    severity = verdict.severity
 
-    raw_cats = data.get("categories") or []
     categories: List[str] = []
-    if isinstance(raw_cats, list):
-        for c in raw_cats:
-            cat = str(c or "").strip().lower()
-            if cat in _VALID_CATEGORIES:
-                # Programmatic safety net: NEVER record manipulation
-                # against the tutor — the LLM occasionally ignores
-                # the prompt instruction. The tutor is the system,
-                # not the manipulator.
-                if cat == "manipulation" and role == "tutor":
-                    logger.info(
-                        "[SafetyJudge] dropping manipulation flag on "
-                        "tutor turn (LLM ignored role rule)"
-                    )
-                    continue
-                if cat not in categories:
-                    categories.append(cat)
+    for cat in (verdict.categories or []):
+        # Programmatic safety net: NEVER record manipulation against
+        # the tutor — the tutor is the system, not the manipulator.
+        if cat == "manipulation" and role == "tutor":
+            logger.info(
+                "[SafetyJudge] dropping manipulation flag on "
+                "tutor turn (LLM ignored role rule)"
+            )
+            continue
+        if cat not in categories:
+            categories.append(cat)
 
-    # Cross-check: severity vs categories. If LLM said "warning" or
-    # "critical" but no valid category survived filtering, downgrade
-    # to "safe" (better to miss than to falsely flag).
+    # Cross-check: severity vs categories. If "warning" or "critical"
+    # but no valid category survived filtering, downgrade to "safe".
     if severity in ("warning", "critical") and not categories:
         logger.info(
             "[SafetyJudge] downgrading %s → safe (no valid category)",
@@ -223,13 +246,13 @@ def run_safety_judge(
         )
         severity = "safe"
 
-    # Cross-check: severity vs categories the other way — when
-    # categories include 'harmful', force severity to 'critical'.
+    # Cross-check: when categories include 'harmful', force severity
+    # to 'critical'.
     if "harmful" in categories and severity != "critical":
         severity = "critical"
 
     result.severity = severity  # type: ignore[assignment]
     result.categories = categories
     if severity != "safe":
-        result.reasoning = str(data.get("reasoning") or "")[:200]
+        result.reasoning = (verdict.reasoning or "")[:200]
     return result

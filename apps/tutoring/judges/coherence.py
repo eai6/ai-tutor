@@ -20,11 +20,17 @@ strings — the validator decides whether to escalate to regen.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from dataclasses import dataclass, field
 from typing import List
+
+from pydantic import BaseModel, Field
+
+from apps.tutoring.judges._instructor_helper import (
+    get_instructor_from_client,
+    structured_completion,
+)
 from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
@@ -89,16 +95,26 @@ _SYSTEM = (
     "    teaching beat, one ask.\n"
     "\n"
     "Be CONSERVATIVE. Only flag clear, demonstrable issues a student "
-    "would notice. When in doubt, return [].\n"
+    "would notice. When in doubt, return violations=[].\n"
     "\n"
-    "Output JSON ONLY (no prose, no code fence):\n"
-    "{\"violations\": [\"<short description, <= 140 chars, naming WHAT "
-    "contradicts WHAT — or for parallel questions, name BOTH>\"]}\n"
-    "Empty array when nothing to flag.\n"
+    "Each violation entry must be a short description (≤140 chars) "
+    "naming WHAT contradicts WHAT — or for parallel questions, name "
+    "BOTH questions explicitly.\n"
 )
 
 from apps.tutoring.judges._prompt_meta import prompt_fingerprint
 PROMPT_HASH, PROMPT_CHARS = prompt_fingerprint(_SYSTEM)
+
+
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+class _CoherenceVerdict(BaseModel):
+    violations: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Each entry: ≤140-char description naming WHAT contradicts "
+            "WHAT. Empty when no coherence issue identified."
+        ),
+    )
 
 
 # Cheap pre-gate: skip the LLM when the response is too short to
@@ -153,31 +169,32 @@ def run_coherence_judge(
         f"TUTOR_RESPONSE (the one to review):\n{response_text[:2500]}\n\n"
         "Flag self-contradictions inside TUTOR_RESPONSE, and any "
         "contradiction between TUTOR_RESPONSE and the most recent "
-        "TUTOR turn in PRIOR_EXCHANGES. Reply with ONLY the JSON "
-        "object specified."
+        "TUTOR turn in PRIOR_EXCHANGES."
     )
 
+    instructor_client = get_instructor_from_client(llm_client)
+    if instructor_client is None:
+        result.skipped = True
+        result.skip_reason = "instructor_unavailable"
+        return result
+
     try:
-        response = llm_client.generate(
-            messages=[{"role": "user", "content": user_prompt}],
+        verdict = structured_completion(
+            instructor_client,
+            _CoherenceVerdict,
             system_prompt=_SYSTEM,
-            max_tokens=400,
+            user_prompt=user_prompt,
+            max_tokens=3500,
+            provider=str(getattr(llm_client.config, 'provider', '')),
         )
-        raw = (response.content or "").strip()
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
-        data = json.loads(raw)
     except Exception as e:
         logger.warning("[CoherenceJudge] call failed: %s", e)
         result.skipped = True
         result.skip_reason = f"llm_error: {type(e).__name__}"
         return result
 
-    items = data.get("violations") or []
-    if not isinstance(items, list):
-        return result
-
-    for item in items[:max_violations]:
-        text = str(item or "").strip()
+    for text in (verdict.violations or [])[:max_violations]:
+        text = (text or "").strip()
         if text:
             result.violations.append(text[:200])
     return result

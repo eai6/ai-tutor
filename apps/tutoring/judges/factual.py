@@ -26,13 +26,18 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Literal
+
+from pydantic import BaseModel, Field
 
 from apps.tutoring.fact_verifier import (
     ClaimVerdict,
     _retrieve_evidence,
+)
+from apps.tutoring.judges._instructor_helper import (
+    get_instructor_from_client,
+    structured_completion,
 )
 from apps.tutoring.tracing import traced_judge
 
@@ -77,19 +82,42 @@ _SYSTEM = (
     "evidence (or prior_exchanges) explicitly contains the claim or "
     "a matching number / name.\n"
     "\n"
-    "Output JSON ONLY (no prose, no code fence):\n"
-    "{\"fact_claims\": [{\"claim\": \"<text from the response>\", "
-    "\"status\": \"supported|contradicted|unverified\", "
-    "\"evidence\": \"<<=80 char quote or empty>\"}]}\n"
-    "\n"
-    "If the response contains no checkable claims, return "
-    "{\"fact_claims\": []}.\n"
+    "If the response contains no checkable claims, return fact_claims=[]."
 )
 
 from apps.tutoring.judges._prompt_meta import prompt_fingerprint
 PROMPT_HASH, PROMPT_CHARS = prompt_fingerprint(_SYSTEM)
 
-_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+_CLAIM_STATUS = Literal["supported", "contradicted", "unverified"]
+
+
+class _FactClaim(BaseModel):
+    claim: str = Field(
+        description="The claim text exactly as it appears in the tutor response.",
+        max_length=300,
+    )
+    status: _CLAIM_STATUS = Field(
+        description=(
+            "supported = evidence (curriculum or prior_exchanges) states "
+            "the claim; contradicted = evidence states a different value "
+            "or the opposite; unverified = evidence does not address the "
+            "claim either way."
+        ),
+    )
+    evidence: str = Field(
+        default="",
+        description="≤80-char quote from the evidence, or empty.",
+        max_length=120,
+    )
+
+
+class _FactualVerdict(BaseModel):
+    fact_claims: List[_FactClaim] = Field(
+        default_factory=list,
+        description="Every checkable factual claim in the tutor response.",
+    )
 
 
 @traced_judge('factual')
@@ -157,42 +185,41 @@ def run_factual_judge(
         "Identify every checkable factual claim in input.tutor_response "
         "and assign each a status using input.evidence (curriculum) "
         "and input.prior_exchanges (the tutor's earlier statements "
-        "this session). Reply with ONLY the JSON object specified."
+        "this session)."
     )
 
+    instructor_client = get_instructor_from_client(llm_client)
+    if instructor_client is None:
+        result.skipped = True
+        result.skip_reason = "instructor_unavailable"
+        return result
+
     try:
-        response = llm_client.generate(
-            messages=[{"role": "user", "content": user_prompt}],
+        verdict = structured_completion(
+            instructor_client,
+            _FactualVerdict,
             system_prompt=_SYSTEM,
-            max_tokens=600,
+            user_prompt=user_prompt,
+            max_tokens=3500,
+            provider=str(getattr(llm_client.config, 'provider', '')),
         )
-        raw = (response.content or "").strip()
-        raw = _FENCE_RE.sub("", raw)
-        data = json.loads(raw)
     except Exception as e:
         logger.warning("[FactualJudge] call failed: %s", e)
         result.skipped = True
         result.skip_reason = f"llm_error: {type(e).__name__}"
         return result
 
-    items = data.get("fact_claims") or []
     seen: set = set()
-    if isinstance(items, list):
-        for item in items[:max_claims]:
-            if not isinstance(item, dict):
-                continue
-            claim = str(item.get("claim") or "").strip()[:200]
-            if not claim:
-                continue
-            key = claim.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            status = str(item.get("status") or "unverified").strip().lower()
-            if status not in ("supported", "contradicted", "unverified"):
-                status = "unverified"
-            ev = str(item.get("evidence") or "")[:120]
-            result.claims.append(ClaimVerdict(claim, status, ev))
+    for item in (verdict.fact_claims or [])[:max_claims]:
+        claim = (item.claim or "").strip()[:200]
+        if not claim:
+            continue
+        key = claim.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        ev = (item.evidence or "")[:120]
+        result.claims.append(ClaimVerdict(claim, item.status, ev))
 
     # Structured log line so the benchmark slice can compare regex-era
     # vs LLM-extraction-era distributions over time. See

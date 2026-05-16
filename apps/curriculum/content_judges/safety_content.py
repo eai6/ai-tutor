@@ -43,12 +43,13 @@ from __future__ import annotations
 
 import json
 import logging
-import re
-from typing import Any, Dict, List, Optional
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field
 
 from apps.curriculum.content_judges import JudgeResult
 from apps.curriculum.content_judges._providers import (
-    call_judge_with_fallback,
+    call_judge_structured_with_fallback,
     get_judge_provider_chain,
 )
 
@@ -118,52 +119,54 @@ assumptions, regional stereotypes, or politically loaded framings.
 When rejecting, write a `recommended_fix` (≤120 words) — a concrete \
 edit instruction. No "make it better" comments.
 
-Output exactly two XML blocks in this order, with no extra prose:
-
-<reasoning>
-3-5 short sentences. Walk through harm-content check, age-appropriateness, \
-cultural fit, framing balance. Cite specific phrases when justifying.
-</reasoning>
-<verdict>
-{"passed": true|false, "violations": ["CODE", ...], \
-"recommended_fix": "concrete instruction or empty string"}
-</verdict>
+In `reasoning`, write 3-5 short sentences covering harm-content \
+check, age-appropriateness, cultural fit, framing balance. Cite \
+specific phrases when justifying.
 """
 
 
-_REASONING_RE = re.compile(
-    r"<reasoning>(.*?)</reasoning>", re.DOTALL | re.IGNORECASE,
-)
-_VERDICT_RE = re.compile(
-    r"<verdict>(.*?)</verdict>", re.DOTALL | re.IGNORECASE,
-)
-_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+_ALLOWED_VIOLATIONS = Literal[
+    "SAFETY_HARMFUL_CONTENT",
+    "SAFETY_AGE_INAPPROPRIATE",
+    "SAFETY_CULTURAL_MISFIT",
+    "SAFETY_BIASED_FRAMING",
+]
 
 
-def _parse_verdict(raw: str) -> Optional[Dict[str, Any]]:
-    if not raw:
-        return None
-    m = _VERDICT_RE.search(raw)
-    if not m:
-        m2 = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not m2:
-            return None
-        candidate = m2.group(0)
-    else:
-        candidate = m.group(1).strip()
-    candidate = _FENCE_RE.sub("", candidate).strip()
-    try:
-        data = json.loads(candidate)
-    except Exception:
-        return None
-    return data if isinstance(data, dict) else None
+class SafetyContentVerdict(BaseModel):
+    """Structured output for the safety_content judge."""
+    reasoning: str = Field(
+        description=(
+            "3-5 short sentences covering harm check, "
+            "age-appropriateness, cultural fit, and framing balance. "
+            "Cite specific phrases."
+        ),
+        max_length=2000,
+    )
+    passed: bool = Field(
+        description=(
+            "True iff the content is safe. False when any HARD "
+            "violation (HARMFUL_CONTENT / AGE_INAPPROPRIATE) is present."
+        ),
+    )
+    violations: List[_ALLOWED_VIOLATIONS] = Field(
+        default_factory=list,
+        description="Zero or more violation codes from the enum.",
+    )
+    recommended_fix: str = Field(
+        default="",
+        description=(
+            "When rejecting: ≤120-word concrete edit. Empty when "
+            "passing clean."
+        ),
+        max_length=800,
+    )
 
 
-def _normalise_violations(raw_codes: Any) -> List[str]:
-    if not isinstance(raw_codes, list):
-        return []
+def _dedupe_violations(codes: List[str]) -> List[str]:
     out: List[str] = []
-    for code in raw_codes:
+    for code in codes:
         s = str(code or "").strip().upper()
         if s in VIOLATION_CODES and s not in out:
             out.append(s)
@@ -181,7 +184,7 @@ def run_safety_content_judge(
     cultural_context: str = "Seychelles secondary school",
     exclude_provider: Optional[str] = None,
     judge_purpose: str = "content_judge_safety_content",
-    max_tokens: int = 1100,
+    max_tokens: int = 3500,
 ) -> JudgeResult:
     """Safety + cultural-appropriateness verdict on generated step text.
 
@@ -251,13 +254,13 @@ def run_safety_content_judge(
     user_prompt = (
         f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}\n\n"
         "Based on the input above, judge whether this lesson-step "
-        "narrative is safe and culturally appropriate. Reply with "
-        "the <reasoning> and <verdict> blocks specified."
+        "narrative is safe and culturally appropriate."
     )
 
-    call = call_judge_with_fallback(
+    call = call_judge_structured_with_fallback(
         user_prompt,
         providers,
+        SafetyContentVerdict,
         system_prompt=_SYSTEM_INSTRUCTION,
         max_tokens=max_tokens,
     )
@@ -273,29 +276,17 @@ def run_safety_content_judge(
     result.provider = call.provider
     result.model_name = call.model_name
 
-    verdict = _parse_verdict(call.text)
-    if verdict is None:
-        logger.warning(
-            f"[SafetyContentJudge] unparseable verdict from "
-            f"{call.provider}/{call.model_name}: {call.text[:200]!r}"
-        )
-        result.skipped = True
-        result.skip_reason = "verdict_unparseable"
-        return result
+    verdict: SafetyContentVerdict = call.verdict
+    result.reasoning = (verdict.reasoning or "").strip()[:300]
 
-    reasoning_match = _REASONING_RE.search(call.text or "")
-    if reasoning_match:
-        result.reasoning = reasoning_match.group(1).strip()[:300]
-
-    raw_passed = bool(verdict.get("passed", True))
-    violations = _normalise_violations(verdict.get("violations"))
-    fix = str(verdict.get("recommended_fix") or "").strip()[:600]
+    violations = _dedupe_violations(list(verdict.violations or []))
+    fix = (verdict.recommended_fix or "").strip()[:600]
 
     hard = [v for v in violations if v in _HARD_CODES]
     if hard:
         passed = False
     else:
-        passed = raw_passed or not violations
+        passed = bool(verdict.passed) or not violations
 
     result.passed = passed
     result.violations = violations

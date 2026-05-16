@@ -19,9 +19,15 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from dataclasses import dataclass
 from typing import Optional
+
+from pydantic import BaseModel, Field
+
+from apps.tutoring.judges._instructor_helper import (
+    get_instructor_from_client,
+    structured_completion,
+)
 from apps.tutoring.tracing import traced_judge
 
 logger = logging.getLogger(__name__)
@@ -101,16 +107,32 @@ _SYSTEM = (
     "\n"
     "The deterministic layer protects against arithmetic errors. Your "
     "job is broader judgment — equivalent forms, partial credit, "
-    "working quality, MCQ-content equivalence — NOT re-doing arithmetic.\n"
-    "\n"
-    "Output JSON ONLY (no prose, no code fence):\n"
-    "{\"answer_correct\": true|false|null, "
-    "\"step_complete\": true|false, "
-    "\"reasoning\": \"<one-sentence rationale, <= 280 chars>\"}\n"
+    "working quality, MCQ-content equivalence — NOT re-doing arithmetic."
 )
 
 from apps.tutoring.judges._prompt_meta import prompt_fingerprint
 PROMPT_HASH, PROMPT_CHARS = prompt_fingerprint(_SYSTEM)
+
+
+# ─── Output schema (instructor / Pydantic) ─────────────────────────────
+class _StepEvalVerdict(BaseModel):
+    answer_correct: Optional[bool] = Field(
+        default=None,
+        description=(
+            "True = clear correct answer to posed_question; False = "
+            "clear wrong answer; null = acknowledgement / question / "
+            "non-answer engagement (don't mark wrong)."
+        ),
+    )
+    step_complete: bool = Field(
+        default=False,
+        description="True iff the engine should advance to the next step.",
+    )
+    reasoning: str = Field(
+        default="",
+        description="One-sentence rationale (≤280 chars).",
+        max_length=400,
+    )
 
 
 @traced_judge('step_eval')
@@ -186,22 +208,27 @@ def run_step_eval_judge(
         "step_context": step_context,
     }
     user_prompt = (
-        "Run step evaluation on the turn below. Reply with ONLY the JSON "
-        "object specified — no prose, no code fence.\n\n"
+        "Run step evaluation on the turn below.\n\n"
         f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
     )
 
-    try:
-        response = llm_client.generate(
-            messages=[{"role": "user", "content": user_prompt}],
-            system_prompt=_SYSTEM,
-            max_tokens=300,
+    instructor_client = get_instructor_from_client(llm_client)
+    if instructor_client is None:
+        return StepEvalResult(
+            skipped=True,
+            skip_reason="instructor_unavailable",
+            source="skipped",
         )
-        raw = (response.content or "").strip()
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
-        data = json.loads(raw)
-        if not isinstance(data, dict):
-            raise ValueError("expected JSON object")
+
+    try:
+        verdict = structured_completion(
+            instructor_client,
+            _StepEvalVerdict,
+            system_prompt=_SYSTEM,
+            user_prompt=user_prompt,
+            max_tokens=3500,
+            provider=str(getattr(llm_client.config, 'provider', '')),
+        )
     except Exception as e:
         logger.warning("[StepEvalJudge] call failed: %s", e)
         return StepEvalResult(
@@ -210,17 +237,9 @@ def run_step_eval_judge(
             source="skipped",
         )
 
-    ac = data.get("answer_correct", None)
-    if ac is True or ac is False:
-        answer_correct = ac
-    else:
-        answer_correct = None
-    step_complete = bool(data.get("step_complete", False))
-    reasoning = str(data.get("reasoning", "") or "")[:280]
-
     return StepEvalResult(
-        answer_correct=answer_correct,
-        step_complete=step_complete,
-        reasoning=reasoning,
+        answer_correct=verdict.answer_correct,
+        step_complete=bool(verdict.step_complete),
+        reasoning=(verdict.reasoning or "")[:280],
         source="llm",
     )
