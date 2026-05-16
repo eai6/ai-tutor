@@ -440,6 +440,260 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
     )
 
 
+def _run_fill_in_blank_judge_for_qs(lesson, qs):
+    """Fan out the fill_in_blank content judge across newly-persisted
+    fill_in_blank rows. Mirrors `_run_exit_question_judge_for_mcqs`
+    shape (concurrent ThreadPoolExecutor + fail-soft per question).
+
+    Verdict-only (no regen) for v1 of this judge — regen wiring lands
+    in a follow-up commit alongside the short_answer and matching
+    regen paths so they ship together.
+    """
+    if not qs:
+        return
+
+    import concurrent.futures
+    from apps.curriculum.content_judges.fill_in_blank import (
+        run_fill_in_blank_judge,
+    )
+
+    exclude_provider = None
+    try:
+        from apps.llm.models import ModelConfig
+        gen_config = ModelConfig.get_for('generation')
+        if gen_config:
+            exclude_provider = (gen_config.provider or '').lower() or None
+    except Exception:
+        pass
+
+    def _judge_one(q):
+        try:
+            verdict = run_fill_in_blank_judge(
+                question_text=q.question_text or '',
+                answer_data=q.answer_data or {},
+                explanation=q.explanation or '',
+                lesson=lesson,
+                step_concept_tag=q.concept_tag or '',
+                enabling_objective=q.enabling_objective or '',
+                exclude_provider=exclude_provider,
+            )
+        except Exception as exc:
+            print(
+                f"[ContentGen] [{lesson.title}] fill_in_blank judge "
+                f"raised for Q#{q.id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return q, None
+        return q, verdict
+
+    persisted = 0
+    flagged = 0
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(8, len(qs))
+    ) as ex:
+        futures = [ex.submit(_judge_one, q) for q in qs]
+        for f in concurrent.futures.as_completed(futures):
+            q, verdict = f.result()
+            if verdict is None:
+                continue
+            verdict_dict = {
+                'passed': verdict.passed,
+                'violations': list(verdict.violations or []),
+                'reasoning': verdict.reasoning or '',
+                'recommended_fix': verdict.recommended_fix or '',
+                'provider': verdict.provider or '',
+                'model_name': verdict.model_name or '',
+                'skipped': verdict.skipped,
+                'skip_reason': verdict.skip_reason or '',
+            }
+            outputs = dict(q.judge_outputs or {})
+            outputs['fill_in_blank'] = verdict_dict
+            q.judge_outputs = outputs
+            try:
+                q.save(update_fields=['judge_outputs'])
+                persisted += 1
+                if not verdict.passed and not verdict.skipped:
+                    flagged += 1
+            except Exception as exc:
+                print(
+                    f"[ContentGen] [{lesson.title}] fill_in_blank Q#{q.id} "
+                    f"save failed: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+    print(
+        f"[ContentGen] [{lesson.title}] fill_in_blank judge: "
+        f"{persisted}/{len(qs)} persisted (auto_flagged={flagged})",
+        flush=True,
+    )
+
+
+def _run_short_answer_judge_for_qs(lesson, qs):
+    """Fan out the short_answer content judge across newly-persisted
+    short_answer rows. Verdict-only for v1 (regen lands later).
+    """
+    if not qs:
+        return
+
+    import concurrent.futures
+    from apps.curriculum.content_judges.short_answer import (
+        run_short_answer_judge,
+    )
+
+    exclude_provider = None
+    try:
+        from apps.llm.models import ModelConfig
+        gen_config = ModelConfig.get_for('generation')
+        if gen_config:
+            exclude_provider = (gen_config.provider or '').lower() or None
+    except Exception:
+        pass
+
+    def _judge_one(q):
+        try:
+            verdict = run_short_answer_judge(
+                question_text=q.question_text or '',
+                answer_data=q.answer_data or {},
+                explanation=q.explanation or '',
+                lesson=lesson,
+                step_concept_tag=q.concept_tag or '',
+                enabling_objective=q.enabling_objective or '',
+                exclude_provider=exclude_provider,
+            )
+        except Exception as exc:
+            print(
+                f"[ContentGen] [{lesson.title}] short_answer judge "
+                f"raised for Q#{q.id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return q, None
+        return q, verdict
+
+    persisted = 0
+    flagged = 0
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(8, len(qs))
+    ) as ex:
+        futures = [ex.submit(_judge_one, q) for q in qs]
+        for f in concurrent.futures.as_completed(futures):
+            q, verdict = f.result()
+            if verdict is None:
+                continue
+            verdict_dict = {
+                'passed': verdict.passed,
+                'violations': list(verdict.violations or []),
+                'reasoning': verdict.reasoning or '',
+                'recommended_fix': verdict.recommended_fix or '',
+                'provider': verdict.provider or '',
+                'model_name': verdict.model_name or '',
+                'skipped': verdict.skipped,
+                'skip_reason': verdict.skip_reason or '',
+            }
+            outputs = dict(q.judge_outputs or {})
+            outputs['short_answer'] = verdict_dict
+            q.judge_outputs = outputs
+            try:
+                q.save(update_fields=['judge_outputs'])
+                persisted += 1
+                if not verdict.passed and not verdict.skipped:
+                    flagged += 1
+            except Exception as exc:
+                print(
+                    f"[ContentGen] [{lesson.title}] short_answer Q#{q.id} "
+                    f"save failed: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+    print(
+        f"[ContentGen] [{lesson.title}] short_answer judge: "
+        f"{persisted}/{len(qs)} persisted (auto_flagged={flagged})",
+        flush=True,
+    )
+
+
+def _run_matching_judge_for_qs(lesson, qs):
+    """Fan out the matching content judge across newly-persisted
+    matching rows. Verdict-only for v1 (regen lands later).
+    """
+    if not qs:
+        return
+
+    import concurrent.futures
+    from apps.curriculum.content_judges.matching import (
+        run_matching_judge,
+    )
+
+    exclude_provider = None
+    try:
+        from apps.llm.models import ModelConfig
+        gen_config = ModelConfig.get_for('generation')
+        if gen_config:
+            exclude_provider = (gen_config.provider or '').lower() or None
+    except Exception:
+        pass
+
+    def _judge_one(q):
+        try:
+            verdict = run_matching_judge(
+                question_text=q.question_text or '',
+                answer_data=q.answer_data or {},
+                explanation=q.explanation or '',
+                lesson=lesson,
+                step_concept_tag=q.concept_tag or '',
+                enabling_objective=q.enabling_objective or '',
+                exclude_provider=exclude_provider,
+            )
+        except Exception as exc:
+            print(
+                f"[ContentGen] [{lesson.title}] matching judge "
+                f"raised for Q#{q.id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return q, None
+        return q, verdict
+
+    persisted = 0
+    flagged = 0
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(8, len(qs))
+    ) as ex:
+        futures = [ex.submit(_judge_one, q) for q in qs]
+        for f in concurrent.futures.as_completed(futures):
+            q, verdict = f.result()
+            if verdict is None:
+                continue
+            verdict_dict = {
+                'passed': verdict.passed,
+                'violations': list(verdict.violations or []),
+                'reasoning': verdict.reasoning or '',
+                'recommended_fix': verdict.recommended_fix or '',
+                'provider': verdict.provider or '',
+                'model_name': verdict.model_name or '',
+                'skipped': verdict.skipped,
+                'skip_reason': verdict.skip_reason or '',
+            }
+            outputs = dict(q.judge_outputs or {})
+            outputs['matching'] = verdict_dict
+            q.judge_outputs = outputs
+            try:
+                q.save(update_fields=['judge_outputs'])
+                persisted += 1
+                if not verdict.passed and not verdict.skipped:
+                    flagged += 1
+            except Exception as exc:
+                print(
+                    f"[ContentGen] [{lesson.title}] matching Q#{q.id} "
+                    f"save failed: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+    print(
+        f"[ContentGen] [{lesson.title}] matching judge: "
+        f"{persisted}/{len(qs)} persisted (auto_flagged={flagged})",
+        flush=True,
+    )
+
+
 def _regen_one_exit_q(q, lesson, verdict_dict: dict):
     """Wrapper around content_regen.run_exit_question_regen that
     derives lesson context from the question instance.
@@ -3129,9 +3383,15 @@ RULES:
                 )
             questions = safe_questions
 
-            # Collect persisted MCQ instances for the exit_question judge
-            # fan-out that runs after the loop (Q4.3 wire-up).
+            # Collect persisted instances by type so each judge can
+            # run on its own dispatch. MCQ → exit_question judge;
+            # fill_in_blank / short_answer / matching each get their
+            # own dedicated judge (added 2026-05-16 to close the
+            # "13/34 questions ship unchecked" gap).
             persisted_mcqs: list = []
+            persisted_fill_in_blanks: list = []
+            persisted_short_answers: list = []
+            persisted_matchings: list = []
 
             for i, q in enumerate(questions):
                 q_type = q.get('question_type', 'mcq')
@@ -3196,21 +3456,30 @@ RULES:
                         ad.pop(legacy, None)
                     kwargs['answer_data'] = ad
                 created_q = ExitTicketQuestion.objects.create(**kwargs)
-                # Collect MCQ instances for the judge fan-out below.
-                # Non-MCQ types are out of scope for v1 (see plan).
+                # Collect persisted instances by type. Each type has
+                # its own dedicated judge.
                 if q_type == 'mcq':
                     persisted_mcqs.append(created_q)
+                elif q_type == 'fill_in_blank':
+                    persisted_fill_in_blanks.append(created_q)
+                elif q_type == 'short_answer':
+                    persisted_short_answers.append(created_q)
+                elif q_type == 'matching':
+                    persisted_matchings.append(created_q)
 
-        # Q4 content-quality judge — exit_question (MCQ only). Runs
-        # POST-gen on every newly-persisted MCQ. Concurrent fan-out;
-        # per-question fail-soft. Verdict lands on
-        # ExitTicketQuestion.judge_outputs.exit_question.
+        # Content-quality judges — one per question type. Each runs
+        # POST-gen on its slice of newly-persisted questions.
+        # Concurrent fan-out per type; per-question fail-soft. Verdict
+        # lands on ExitTicketQuestion.judge_outputs.<judge_name>.
         try:
             from django.conf import settings
             if getattr(
                 settings, 'CONTENT_JUDGE_EXIT_QUESTION_ENABLED', True,
             ):
                 _run_exit_question_judge_for_mcqs(lesson, persisted_mcqs)
+                _run_fill_in_blank_judge_for_qs(lesson, persisted_fill_in_blanks)
+                _run_short_answer_judge_for_qs(lesson, persisted_short_answers)
+                _run_matching_judge_for_qs(lesson, persisted_matchings)
         except Exception as exc:
             print(
                 f"[ContentGen] [{lesson.title}] exit_question judge "
