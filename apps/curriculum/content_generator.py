@@ -440,6 +440,80 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
     )
 
 
+def _instructor_generate_exit_ticket(llm_client, *, prompt: str, system_prompt: str, max_tokens: int = 16000):
+    """Call an LLM via instructor + GeneratedExitTicket schema.
+
+    Replaces `llm_client.generate(...) + parse_llm_json` for the
+    exit-ticket gen + retry paths. Instructor enforces the top-level
+    `{questions: [...]}` shape via the provider's native
+    structured-output API — eliminates the "All JSON repair attempts
+    failed" failure class that previously dropped entire exit-ticket
+    batches when the LLM emitted malformed JSON.
+
+    Returns a list of question dicts (down-converted from the
+    validated Pydantic instances) for the existing persistence loop
+    to consume. Returns None on infrastructure failure so the caller
+    can fall back to the legacy `parse_llm_json` path.
+
+    Same Gemini-3 thinking-budget rule as the other instructor sites:
+    `max_tokens` should be ≥4000; the 16000 default for exit tickets
+    covers 30+ questions × ~400 tokens each + thinking budget.
+    """
+    config = getattr(llm_client, 'config', None)
+    if config is None:
+        return None
+    try:
+        import instructor
+    except ImportError:
+        return None
+    provider_map = {
+        'anthropic': 'anthropic', 'openai': 'openai',
+        'google': 'google', 'local_ollama': 'ollama',
+    }
+    provider_key = provider_map.get(
+        str(config.provider).lower(), str(config.provider).lower()
+    )
+    try:
+        ic = instructor.from_provider(
+            f"{provider_key}/{config.model_name}",
+            api_key=config.get_api_key(),
+        )
+    except Exception as exc:
+        print(
+            f"[ContentGen] instructor.from_provider failed for exit-ticket "
+            f"gen: {type(exc).__name__}: {exc} — falling back",
+            flush=True,
+        )
+        return None
+
+    from apps.curriculum.content_gen_schemas import GeneratedExitTicket
+
+    create_kwargs = dict(
+        response_model=GeneratedExitTicket,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
+        max_retries=2,
+    )
+    if str(config.provider).lower() == 'google':
+        create_kwargs['generation_config'] = {'max_tokens': max_tokens}
+    else:
+        create_kwargs['max_tokens'] = max_tokens
+
+    try:
+        result: 'GeneratedExitTicket' = ic.chat.completions.create(**create_kwargs)
+    except Exception as exc:
+        print(
+            f"[ContentGen] exit-ticket instructor call failed: "
+            f"{type(exc).__name__}: {exc} — falling back to parse_llm_json",
+            flush=True,
+        )
+        return None
+
+    return [q.model_dump(exclude_none=True) for q in result.questions]
+
+
 def _run_fill_in_blank_judge_for_qs(lesson, qs):
     """Fan out the fill_in_blank content judge + regen across
     newly-persisted FIB rows. Mirrors `_run_exit_question_judge_for_mcqs`
@@ -3007,11 +3081,23 @@ RULES:
             f"({llm_client.__class__.__name__})…",
             flush=True,
         )
-        messages = [{"role": "user", "content": prompt}]
-        response = llm_client.generate(messages, system_prompt=exit_sys_prompt, max_tokens=16000)
-
-        from apps.llm.json_utils import parse_llm_json
-        questions = parse_llm_json(response.content, expect_array=True)
+        # Instructor + GeneratedExitTicket Pydantic schema enforces
+        # the {questions: [...]} shape at decode time. Falls back to
+        # parse_llm_json on instructor unavailable / client error so
+        # the gen path never silently degrades.
+        questions = _instructor_generate_exit_ticket(
+            llm_client,
+            prompt=prompt,
+            system_prompt=exit_sys_prompt,
+            max_tokens=16000,
+        )
+        if questions is None:
+            messages = [{"role": "user", "content": prompt}]
+            response = llm_client.generate(
+                messages, system_prompt=exit_sys_prompt, max_tokens=16000,
+            )
+            from apps.llm.json_utils import parse_llm_json
+            questions = parse_llm_json(response.content, expect_array=True)
 
         if not questions or not isinstance(questions, list) or len(questions) < 10:
             print(
@@ -3207,15 +3293,23 @@ RULES:
 
             try:
                 retry_prompt = constraint + prompt
-                retry_response = llm_client.generate(
-                    [{"role": "user", "content": retry_prompt}],
+                retry_questions = _instructor_generate_exit_ticket(
+                    llm_client,
+                    prompt=retry_prompt,
                     system_prompt=exit_sys_prompt,
                     max_tokens=16000,
                 )
-                from apps.llm.json_utils import parse_llm_json
-                retry_questions = parse_llm_json(
-                    retry_response.content, expect_array=True,
-                ) or []
+                if retry_questions is None:
+                    retry_response = llm_client.generate(
+                        [{"role": "user", "content": retry_prompt}],
+                        system_prompt=exit_sys_prompt,
+                        max_tokens=16000,
+                    )
+                    from apps.llm.json_utils import parse_llm_json
+                    retry_questions = parse_llm_json(
+                        retry_response.content, expect_array=True,
+                    ) or []
+                retry_questions = retry_questions or []
                 # Process retry questions through the same Layer 4
                 # validator. Anything that passes gets appended to
                 # `questions`; failures are logged but not re-retried.
@@ -3355,15 +3449,24 @@ RULES:
                     "Original brief follows:\n\n"
                 )
                 try:
-                    fmt_response = llm_client.generate(
-                        [{"role": "user", "content": fmt_constraint + prompt}],
+                    fmt_prompt = fmt_constraint + prompt
+                    fmt_questions = _instructor_generate_exit_ticket(
+                        llm_client,
+                        prompt=fmt_prompt,
                         system_prompt=exit_sys_prompt,
                         max_tokens=16000,
                     )
-                    from apps.llm.json_utils import parse_llm_json
-                    fmt_questions = parse_llm_json(
-                        fmt_response.content, expect_array=True,
-                    ) or []
+                    if fmt_questions is None:
+                        fmt_response = llm_client.generate(
+                            [{"role": "user", "content": fmt_prompt}],
+                            system_prompt=exit_sys_prompt,
+                            max_tokens=16000,
+                        )
+                        from apps.llm.json_utils import parse_llm_json
+                        fmt_questions = parse_llm_json(
+                            fmt_response.content, expect_array=True,
+                        ) or []
+                    fmt_questions = fmt_questions or []
                     fmt_kept = 0
                     for j, rq in enumerate(fmt_questions[:shortfall_total * 2]):
                         rq_type = (rq.get('question_type') or '').strip()
