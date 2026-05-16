@@ -277,7 +277,13 @@ def _build_user_content(
         "elements you see in the figure when justifying."
     )
 
-    img = Image.from_raw_base64(image_b64, image_media_type or "image/png")
+    # Build a data-URI so the MIME is encoded with the payload —
+    # instructor's `from_base64` accepts that shape directly, and
+    # `from_raw_base64` takes only the bare data string (no
+    # media_type arg). Either path translates per-provider at call
+    # time via instructor.Image.to_anthropic / to_openai / to_genai.
+    mime = (image_media_type or "image/png").strip()
+    img = Image.from_base64(f"data:{mime};base64,{image_b64}")
     return [img, context_text, instruction]
 
 

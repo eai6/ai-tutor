@@ -199,7 +199,10 @@ def run_figure_vision_judge(
         result.skip_reason = "instructor_unavailable"
         return result
 
-    img = Image.from_raw_base64(b64, media_type)
+    # Data-URI form so the MIME is encoded with the payload.
+    # instructor.Image.from_base64 accepts data:<mime>;base64,<data>
+    # directly, then translates per-provider at call time.
+    img = Image.from_base64(f"data:{media_type};base64,{b64}")
     create_kwargs = dict(
         response_model=_FigureVisionVerdict,
         messages=[
