@@ -49,7 +49,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from apps.curriculum.content_generator import LessonContentGenerator
-        
+        from apps.dashboard.background_tasks import generate_complete_lesson
+
         lesson_id = options.get('lesson_id')
         course_id = options.get('course_id')
         dry_run = options.get('dry_run')
@@ -77,12 +78,19 @@ class Command(BaseCommand):
         self.stdout.write(f"Dry run: {dry_run}")
         self.stdout.write("-" * 50)
         
-        # Initialize generator
-        try:
-            generator = LessonContentGenerator(institution_id=institution_id)
-            self.stdout.write(self.style.SUCCESS("✓ Generator initialized"))
-        except Exception as e:
-            raise CommandError(f"Failed to initialize generator: {e}")
+        # Initialize generator (only used directly for --dry-run; real
+        # runs route through generate_complete_lesson so they hit the
+        # same status state-machine + media + skills pipeline as the
+        # dashboard background task).
+        if dry_run:
+            try:
+                generator = LessonContentGenerator(institution_id=institution_id)
+                self.stdout.write(self.style.SUCCESS("✓ Generator initialized (dry-run)"))
+            except Exception as e:
+                raise CommandError(f"Failed to initialize generator: {e}")
+        else:
+            generator = None
+            self.stdout.write(self.style.SUCCESS("✓ Routing through generate_complete_lesson pipeline"))
         
         # Process lessons
         total_steps = 0
@@ -103,21 +111,30 @@ class Command(BaseCommand):
                 continue
             
             try:
-                result = generator.generate_for_lesson(
-                    lesson=lesson,
-                    save_to_db=not dry_run
-                )
-                
+                if dry_run:
+                    result = generator.generate_for_lesson(
+                        lesson=lesson,
+                        save_to_db=False,
+                    )
+                else:
+                    result = generate_complete_lesson(
+                        lesson_id=lesson.id,
+                        institution_id=institution_id,
+                    )
+
                 if result.get('success'):
-                    steps = result.get('steps_generated', 0)
-                    exit_q = result.get('exit_ticket_questions', 0)
+                    steps = result.get('steps_generated') or result.get('steps', 0)
+                    exit_q = (
+                        result.get('exit_ticket_questions')
+                        or result.get('exit_questions', 0)
+                    )
                     total_steps += steps
                     success_count += 1
-                    
+
                     self.stdout.write(self.style.SUCCESS(
                         f"   ✓ Generated {steps} steps, {exit_q} exit questions"
                     ))
-                    
+
                     if dry_run:
                         # Show preview of first step
                         steps_data = result.get('steps', [])
@@ -129,7 +146,7 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.ERROR(
                         f"   ✗ Failed: {result.get('error', 'Unknown error')}"
                     ))
-                    
+
             except Exception as e:
                 fail_count += 1
                 self.stdout.write(self.style.ERROR(f"   ✗ Error: {e}"))
