@@ -6170,16 +6170,22 @@ Follow the current step; this concept will be covered in sequence."""
         try:
             if kind == 'lesson_step':
                 from apps.curriculum.models import LessonStep
+                from apps.tutoring.question_bank import render_question_to_prose
                 step = LessonStep.objects.filter(id=question_id).first()
                 if step is None:
                     return None
+                # Use the canonical renderer so the artifact stem
+                # carries the full setup+ask (e.g. "Look at the
+                # diagram... four angles meet at a central point...
+                # Find y") — not just one field. Matches what the
+                # tool-render path produces.
                 return {
                     'kind': 'lesson_step',
                     'question_id': step.id,
                     'question_type': step.answer_type or 'short_numeric',
                     'turn_index': rec.get('turn_index'),
                     'posed_at': rec.get('posed_at'),
-                    'stem': step.question or step.teacher_script or '',
+                    'stem': render_question_to_prose(step),
                     'expected_answer': step.expected_answer or '',
                     'choices': step.choices or [],
                 }
