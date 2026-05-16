@@ -1407,10 +1407,16 @@ def chat_answer_bank_question(request, session_id):
         )
 
     # Build the synthetic student message — short summary of what
-    # they picked. Goes into the conversation history so the tutor
-    # has context for its reply. NOT shown in the chat UI (the
-    # artifact-panel verdict + the tutor's reply are the visible
-    # signals; the literal "I picked B" would clutter).
+    # they picked, prefixed with a question reference so the LLM
+    # anchors its reply to THIS specific question. Without the
+    # reference the LLM re-derived against the most-recent context
+    # in chat (pilot 2026-05-16: student answered FIB "90, 170"
+    # correctly but the LLM responded as if they were answering an
+    # earlier "Find x" question and contradicted the CORRECT verdict).
+    #
+    # Format: "[Re: <30-char snippet of question>...] I answered: …"
+    # — short enough not to clutter chat history, long enough that
+    # the LLM can disambiguate from any older question it sees.
     if kind == 'exit_ticket_question' and (
         getattr(question, 'question_type', '') == 'mcq'
     ):
@@ -1419,6 +1425,19 @@ def chat_answer_bank_question(request, session_id):
         summary = "I answered: " + ", ".join(str(a) for a in answer)
     else:
         summary = f"I answered: {str(answer).strip()}"
+    # Question reference snippet. Use stem fields most likely populated
+    # for each kind. Truncate to 80 chars so the conversation history
+    # stays readable.
+    q_stem = (
+        (getattr(question, 'question_text', None) or '')
+        or (getattr(question, 'question', None) or '')
+        or (getattr(question, 'teacher_script', None) or '')
+    ).strip()
+    if q_stem:
+        snippet = q_stem[:80].rstrip()
+        if len(q_stem) > 80:
+            snippet += '…'
+        summary = f"[Answering: \"{snippet}\"]\n{summary}"
     if show_working:
         summary += f"\n\nMy working:\n{show_working}"
 

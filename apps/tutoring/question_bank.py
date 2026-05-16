@@ -546,11 +546,18 @@ def render_question_to_prose(entry) -> str:
     question stem in the response.
 
     LessonStep field choice:
-      - For practice/quiz steps, render LessonStep.question (the
-        student-facing question) and append choices for MCQ. The
-        teacher_script for those steps is the tutor's setup directive
-        ("Now try a similar problem…") — not what should be posed to
-        the student.
+      - For practice/quiz steps, COMBINE teacher_script (setup /
+        problem context) + question (the ask) so the artifact shows
+        both. teacher_script alone carries the diagram description,
+        given values, etc.; question alone is often a bare prompt
+        ("Find the value of y in degrees.") with no context. Rendering
+        question only — the prior behavior — produced unanswerable
+        artifact entries when the setup lived in teacher_script
+        (pilot 2026-05-16, lesson_step id=1522 "Find y" lost its
+        "four angles meet at a central point. The given angles are
+        90°, 110°, 60°..." setup).
+        Dedup: when question text is already contained verbatim in
+        teacher_script, render teacher_script only.
       - For worked_example, render teacher_script (it's the example
         walkthrough).
       - For other types or when question is empty, fall back to
@@ -565,6 +572,14 @@ def render_question_to_prose(entry) -> str:
         teacher_script = (getattr(entry, 'teacher_script', '') or '').strip()
         if step_type in ('practice', 'quiz') and question:
             atype = (getattr(entry, 'answer_type', '') or '').lower()
+            # Combine setup + ask. Dedup when question is already in
+            # teacher_script (some templates put both in teacher_script).
+            if teacher_script and question.lower() not in teacher_script.lower():
+                stem = f"{teacher_script}\n\n{question}"
+            elif teacher_script:
+                stem = teacher_script
+            else:
+                stem = question
             if atype == 'multiple_choice':
                 choices = list(getattr(entry, 'choices', None) or [])
                 rendered_choices = []
@@ -576,8 +591,8 @@ def render_question_to_prose(entry) -> str:
                     else:
                         rendered_choices.append(f"  {label}) {s}")
                 if rendered_choices:
-                    return question + "\n\n" + "\n".join(rendered_choices)
-            return question
+                    return stem + "\n\n" + "\n".join(rendered_choices)
+            return stem
         if teacher_script:
             return teacher_script
         return question
