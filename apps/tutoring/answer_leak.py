@@ -111,7 +111,12 @@ def _jaccard(a: Set, b: Set) -> float:
 
 # "the answer is B" / "the correct option is C" — strong reveal signal.
 _LETTER_STATEMENT_RE = re.compile(
-    r"\bthe\s+(?:answer|correct\s+(?:option|choice|answer))\s+(?:is|would\s+be)\s+\(?([A-D])\b",
+    # Widened 2026-05-17 (pilot session 61 turn 962 leaked "The correct
+    # answer was A) True" — old regex only matched 'is' / 'would be').
+    # Covers: was, is, would be, should be, will be, has been, is going to be.
+    r"\bthe\s+(?:answer|correct\s+(?:option|choice|answer))\s+"
+    r"(?:is|was|would\s+be|should\s+be|will\s+be|has\s+been|"
+    r"is\s+going\s+to\s+be)\s+\(?([A-D])\b",
     re.IGNORECASE,
 )
 
@@ -388,6 +393,7 @@ def _llm_check(
     )
 
     # Build the item — bank Q if present, else chat-authored fallback
+    correct_letter_for_judge: Optional[str] = None
     if bank_question is not None:
         q_type = (getattr(bank_question, 'question_type', None) or '').lower()
         stem = (getattr(bank_question, 'question_text', None)
@@ -403,6 +409,8 @@ def _llm_check(
                 'D': getattr(bank_question, 'option_d', '') or '',
             }
             canonical = options.get(correct_letter, '')
+            if correct_letter in ('A', 'B', 'C', 'D'):
+                correct_letter_for_judge = correct_letter
         else:
             options = None
             answer_data = getattr(bank_question, 'answer_data', None) or {}
@@ -427,6 +435,7 @@ def _llm_check(
         canonical_answer=canonical,
         response=response,
         options=options,
+        correct_letter=correct_letter_for_judge,
     )
     try:
         results = run_grading_batch(

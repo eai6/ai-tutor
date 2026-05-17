@@ -425,12 +425,18 @@ class BatchLeakItem:
     For chat-authored questions where there's no canonical bank entry,
     pass the LLM grader's best understanding of the expected answer
     as `canonical_answer` (it becomes the reference the judge checks
-    against)."""
+    against).
+
+    For MCQ items, supplying `correct_letter` (the A/B/C/D the question
+    expects) makes the LLM judge explicit about WHAT to look for —
+    catches "the correct answer was A" style leaks that ambiguous
+    canonical_answer-only payloads miss."""
     index: int
     question_text: str
     canonical_answer: str
     response: str
     options: Optional[dict] = None  # {'A': '...', 'B': '...', ...} for MCQ
+    correct_letter: Optional[str] = None  # 'A' | 'B' | 'C' | 'D' for MCQ
     # Arbiter mode (set when det + LLM disagreed and we need tie-break):
     arbiter: bool = False
     det_verdict: Optional[bool] = None
@@ -450,22 +456,44 @@ _LEAK_SYSTEM = (
     "You judge whether a tutor's response REVEALED the correct answer "
     "to a student during a tutoring session.\n"
     "\n"
-    "REVEAL means the tutor:\n"
-    "  - Stated the correct option letter ('the answer is B').\n"
-    "  - Stated the correct answer text verbatim.\n"
-    "  - PARAPHRASED the correct answer in different words so the\n"
-    "    student can copy / pick it. E.g. if option B says 'Use it\n"
-    "    to determine which direction you need to travel', then 'It\n"
-    "    helps you figure out which direction to travel' IS a reveal.\n"
+    "Each input gives you:\n"
+    "  - question: the MCQ stem the student is trying to answer\n"
+    "  - correct_letter: the canonical correct option (A/B/C/D)\n"
+    "  - canonical_answer: the text of the correct option\n"
+    "  - options: all four options A/B/C/D (when MCQ)\n"
+    "  - tutor_response: the message about to be sent to the student\n"
     "\n"
-    "NOT a reveal (concept-level hints — these are OK):\n"
-    "  - Naming what the question is testing without stating the answer.\n"
+    "Your single job: read tutor_response and decide whether it would\n"
+    "let the student copy/pick the correct answer without thinking.\n"
+    "\n"
+    "REVEAL (leaked=true) — flag ALL of these:\n"
+    "  (a) Tutor states the correct option LETTER, in any tense:\n"
+    "      'the answer is B', 'the correct answer was A', 'it would\n"
+    "      be C', 'should be D', 'A) True is correct', etc.\n"
+    "  (b) Tutor states the canonical_answer text verbatim or with\n"
+    "      trivial reordering. E.g. canonical='Readers would not know\n"
+    "      what area the map represents' and tutor says 'Without it,\n"
+    "      readers don't know what the map represents' → LEAK.\n"
+    "  (c) Tutor PARAPHRASES the canonical in different words so\n"
+    "      the student can copy/pick it. E.g. canonical='Use it to\n"
+    "      determine which direction you need to travel' and tutor\n"
+    "      says 'It helps you figure out which direction to travel'\n"
+    "      → LEAK.\n"
+    "  (d) Tutor states the answer as a fact in a teach-back, even\n"
+    "      while explaining. 'The correct answer was A because...'\n"
+    "      and 'X is the answer here' both → LEAK.\n"
+    "\n"
+    "NOT a reveal (leaked=false) — concept-level hints are OK:\n"
+    "  - Names what the question is testing without stating the answer.\n"
     "    'Think about what a compass rose actually shows on a map.' ✓\n"
-    "  - Asking a Socratic question that narrows the option space\n"
+    "  - Asks a Socratic question that narrows the option space\n"
     "    without giving the answer. 'What's the key thing you need to\n"
     "    know about your route?' ✓\n"
-    "  - Eliminating wrong options without naming the right one.\n"
+    "  - Eliminates wrong options without naming the right one.\n"
     "    'Two of these options are about distance, not direction.' ✓\n"
+    "\n"
+    "WHEN IN DOUBT: lean leaked=true. False positives just trigger a\n"
+    "regen; false negatives ship the answer to the student.\n"
     "\n"
     "Output JSON ARRAY ONLY — one object per input item, in input order:\n"
     "[\n"
@@ -507,6 +535,13 @@ def _build_leak_user_prompt(items: Sequence['BatchLeakItem']) -> str:
             entry["options"] = {
                 k: str(v)[:200] for k, v in it.options.items() if v
             }
+        # Explicit correct-letter signal for MCQ items — the LLM's job
+        # becomes "did the tutor say letter X or paraphrase the option
+        # X text". Catches the "the correct answer was A) True" pattern
+        # the loose canonical_answer-only check missed in pilot 540
+        # session 61 turn 962.
+        if it.correct_letter:
+            entry["correct_letter"] = it.correct_letter
         if it.arbiter:
             entry["detector_a_verdict"] = it.det_verdict
             entry["detector_a_reason"] = (it.det_reason or "")[:300]
