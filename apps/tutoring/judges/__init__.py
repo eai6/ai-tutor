@@ -95,6 +95,15 @@ def run_all_judges(
     history_turns: Optional[int] = None,
     max_workers: int = 8,
     bank_will_render: bool = False,
+    # Answer-leak detection (task #202, 2026-05-17). Folded into the
+    # concurrent judge fan-out so EVERY candidate (initial + retry
+    # cycles) gets a leak verdict — no separate post-regen branch.
+    # When bank_question is None and chat_authored_q is empty, the
+    # detector pre-gates and skips (no canonical to leak against).
+    bank_question=None,
+    chat_authored_q: Optional[str] = None,
+    wrong_attempts: int = 0,
+    reveal_threshold: int = 3,
 ) -> CombinedJudgeResult:
     """Run all domain judges concurrently and merge into a
     CombinedJudgeResult. Each judge is fail-soft — if one errors, the
@@ -274,6 +283,25 @@ def run_all_judges(
             llm_client=llm_client,
             bank_will_render=bool(bank_will_render),
         )
+        # Answer-leak — task #202 (2026-05-17). Runs concurrently
+        # alongside the other judges so every candidate (initial +
+        # retry cycles) gets a leak verdict. Replaces the
+        # post-regen-leak branch in _respond_impl that fired AFTER
+        # self_retry had already picked a winner. Pre-gates when
+        # neither bank_question nor chat_authored_q is provided.
+        def _run_leak_inline():
+            if bank_question is None and not chat_authored_q:
+                return None
+            from apps.tutoring.answer_leak import detect_answer_leak
+            return detect_answer_leak(
+                response=response_text,
+                bank_question=bank_question,
+                chat_authored_q=chat_authored_q,
+                wrong_attempts=wrong_attempts,
+                llm_client=llm_client,
+                reveal_threshold=reveal_threshold,
+            )
+        f_leak = _submit(_run_leak_inline)
 
         arith = _safe_result(f_arith, "arithmetic", ArithmeticResult)
         fact = _safe_result(f_fact, "factual", FactualResult)
@@ -284,6 +312,11 @@ def run_all_judges(
         figvis = _safe_result(f_figvis, "figure_vision", FigureVisionResult)
         safety = _safe_result(f_safety, "safety", SafetyResult)
         handoff = _safe_result(f_handoff, "handoff", HandoffResult)
+        try:
+            leak_verdict = f_leak.result(timeout=30)
+        except Exception as _exc:
+            logger.warning("[run_all_judges] leak future failed: %s", _exc)
+            leak_verdict = None
 
     # Merge deterministically. No final LLM call — each judge's verdict
     # is independent and the merge is mechanical.
@@ -323,6 +356,14 @@ def run_all_judges(
     if handoff and not handoff.skipped:
         result.handed_off = bool(handoff.handed_off)
         result.handoff_reason = handoff.reason or ""
+
+    # Leak verdict: None when detector skipped (no bank_question +
+    # no chat_authored_q), else a LeakVerdict. answer_leaked=True
+    # when the response stated the canonical answer or paraphrased it.
+    if leak_verdict is not None:
+        result.answer_leaked = True
+        result.answer_leak_reason = (leak_verdict.reason or "")[:300]
+        result.answer_leak_sources = list(getattr(leak_verdict, 'sources', []) or [])
 
     # Sub-skip telemetry — same shape combined_judge produced so
     # validator + dashboard pickup keeps working.

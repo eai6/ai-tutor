@@ -109,6 +109,16 @@ def score_candidate(jr: CombinedJudgeResult) -> Tuple[float, bool]:
         score -= _HARD_PENALTY
         hard_count += 1
 
+    # Answer leak (task #202, 2026-05-17). The detector now runs as
+    # part of run_all_judges (concurrent with all the others), so we
+    # see its verdict here. A leaky candidate ships the canonical to
+    # the student — penalise heavily so the cleanest non-leaky
+    # candidate wins the retry race. Default answer_leaked=False
+    # means a skipped/errored detector doesn't false-flag.
+    if getattr(jr, "answer_leaked", False) is True:
+        score -= _HARD_PENALTY * 2  # weight higher than ordinary issues
+        hard_count += 1
+
     # Step-eval verdict — if the candidate's text again disagrees with
     # the deterministic verdict, that's the worst kind of failure.
     # We don't have that direct signal here (the validator computes

@@ -101,6 +101,16 @@ class CombinedJudgeResult:
     # skipped/errored judge doesn't false-positive.
     handed_off: bool = True
     handoff_reason: str = ""
+    # Answer leak — task #202 (2026-05-17). Folded into run_all_judges
+    # so EVERY candidate (initial + retry cycles) gets a leak verdict
+    # concurrently, no separate post-regen branch needed. When
+    # `answer_leaked=True`, the validator raises ISSUE_ANSWER_LEAK and
+    # score_candidate penalises hard so leaky cycles lose the retry
+    # race. Default False so a skipped/errored detector doesn't false-
+    # positive.
+    answer_leaked: bool = False
+    answer_leak_reason: str = ""
+    answer_leak_sources: List[str] = field(default_factory=list)
     # Bookkeeping ----------------------------------------------------------
     skipped: bool = False
     skip_reason: str = ""
@@ -452,6 +462,12 @@ def run_combined_judge(
     max_claims: int = 5,
     max_arithmetic_corrections: int = 8,
     max_violations: int = 5,
+    # Task #202 (2026-05-17): forward answer-leak detector args so
+    # the leak verdict runs concurrent with the other judges.
+    bank_question=None,
+    chat_authored_q: Optional[str] = None,
+    wrong_attempts: int = 0,
+    reveal_threshold: int = 3,
 ) -> CombinedJudgeResult:
     """Compatibility shim — delegates to the per-domain concurrent
     judges in apps.tutoring.judges.
@@ -484,6 +500,10 @@ def run_combined_judge(
         bank_offered=bank_offered,
         conversation_history=conversation_history,
         history_turns=history_turns,
+        bank_question=bank_question,
+        chat_authored_q=chat_authored_q,
+        wrong_attempts=wrong_attempts,
+        reveal_threshold=reveal_threshold,
     )
 
 

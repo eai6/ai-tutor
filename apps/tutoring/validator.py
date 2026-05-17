@@ -484,6 +484,20 @@ def validate_tutor_response(
             extra_meta["safety_reasoning"] = (
                 getattr(combined_result, "safety_reasoning", "") or ""
             )
+        # Answer-leak judge (task #202, 2026-05-17): the detector runs
+        # concurrent with the other judges via run_all_judges. When
+        # the tutor stated the canonical answer or paraphrased it,
+        # answer_leaked=True surfaces here and we raise the same
+        # regen-triggering issue the old post-regen branch raised.
+        if getattr(combined_result, "answer_leaked", False) is True:
+            if ISSUE_ANSWER_LEAK not in issues:
+                issues.append(ISSUE_ANSWER_LEAK)
+            extra_meta["answer_leak_reason"] = getattr(
+                combined_result, "answer_leak_reason", "",
+            ) or ""
+            extra_meta["answer_leak_sources"] = list(getattr(
+                combined_result, "answer_leak_sources", [],
+            ) or [])
         # Handoff judge (task #183): the LLM verdict on whether the
         # tutor turn hands the floor back to the student. Catches
         # dangling promises ("Now let me ask:" with no question),

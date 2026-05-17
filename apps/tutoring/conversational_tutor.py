@@ -2652,6 +2652,9 @@ Keep it to 2-3 sentences."""
         prior_conversation = (
             self.conversation[:-1] if self.conversation else []
         )
+        # Task #202 (2026-05-17): pass leak-detection context so the
+        # answer_leak detector runs concurrent with the other judges.
+        _initial_aa = getattr(self, '_awaiting_answer', None) or {}
         combined_judge_result = run_combined_judge(
             clean_response,
             lesson=self.lesson,
@@ -2673,6 +2676,9 @@ Keep it to 2-3 sentences."""
             subject_is_math=subject_is_math,
             bank_offered=bool(getattr(self, '_question_id_map', None)),
             conversation_history=prior_conversation,
+            bank_question=getattr(self, '_pending_bank_question', None),
+            wrong_attempts=int(_initial_aa.get('wrong_attempts', 0) or 0),
+            reveal_threshold=self._reveal_threshold(),
         )
         if combined_judge_result.corrected_response:
             clean_response = combined_judge_result.corrected_response
@@ -3190,102 +3196,18 @@ Keep it to 2-3 sentences."""
                 merged.add('regen_did_not_clean')
                 turn_metadata['validator_issues'] = list(merged)
 
-            # 2026-05-17 — POST-REGEN LEAK CHECK. The regen ensemble's
-            # per-cycle judges don't include the answer-leak detector,
-            # so a regen prompted to fix `repeated_question` can still
-            # introduce a canonical reveal in its replacement text.
-            # Lesson 540 session 50 turn 861: regen fixed repeated_question
-            # but produced "Not quite. The correct answer is B - a grid
-            # system provides a systematic way to locate and reference
-            # specific locations." Pilot directive 2026-05-17: reveal
-            # is NEVER allowed regardless of attempt count.
-            try:
-                _bg_post = getattr(self, '_pending_bank_grade', None)
-                if (
-                    _bg_post is not None
-                    and getattr(_bg_post, 'is_correct', None) is False
-                ):
-                    from apps.tutoring.answer_leak import detect_answer_leak as _det_leak_post
-                    from apps.tutoring.validator import ISSUE_ANSWER_LEAK as _LEAK_ISSUE_POST
-                    _aa_post = getattr(self, '_awaiting_answer', None) or {}
-                    _wa_post = int(_aa_post.get('wrong_attempts', 0) or 0)
-                    _post_verdict = _det_leak_post(
-                        response=clean_response,
-                        bank_question=getattr(self, '_pending_bank_question', None),
-                        chat_authored_q=None,
-                        wrong_attempts=_wa_post,
-                        llm_client=self.judge_client,
-                        reveal_threshold=self._reveal_threshold(),
-                    )
-                    if _post_verdict is not None:
-                        logger.warning(
-                            "[LeakDetect] POST-REGEN FLAGGED session=%s "
-                            "sources=%s reason=%r — regen INTRODUCED a "
-                            "leak while fixing %s — substituting safe "
-                            "no-reveal fallback",
-                            self.session.id, _post_verdict.sources,
-                            _post_verdict.reason[:200],
-                            list(validation.issues or [])[:5],
-                        )
-                        # Pilot directive 2026-05-17 (task #201): no
-                        # CTA fallback substitution. Flag the issue in
-                        # metadata for audit, but ship the regen
-                        # winner as-is. The stock CTA was creating
-                        # engine/screen drift (bank_question_ref set
-                        # by the winner's tool call but screen showed
-                        # the CTA — student answers fall through to
-                        # the wrong Q). If the regen winner is dirty,
-                        # better to ship dirty than to ship a CTA the
-                        # engine state doesn't agree with.
-                        merged = set(turn_metadata.get('validator_issues', []))
-                        merged.add(_LEAK_ISSUE_POST)
-                        merged.add('post_regen_leak')
-                        turn_metadata['validator_issues'] = list(merged)
-                        turn_metadata['post_regen_leak_reason'] = _post_verdict.reason
-            except Exception as _exc:
-                logger.warning(
-                    "[LeakDetect] post-regen check crashed: %s: %s",
-                    type(_exc).__name__, _exc,
-                )
-
-            # 2026-05-17 (task #183 follow-up) — POST-REGEN HANDOFF CHECK.
-            # Mirror the post-regen leak check. The handoff judge ran in
-            # the regen cycle judges, but if every cycle produced a
-            # dangling candidate the engine ships the best-of-the-rest
-            # with `regen_did_not_clean`. Catch that case here and
-            # substitute a safe stock CTA so the student never sees a
-            # truncated "Now let me ask:" with nothing after it.
-            try:
-                from apps.tutoring.judges.handoff import run_handoff_judge as _post_handoff
-                from apps.tutoring.validator import ISSUE_NO_QUESTION as _NQ
-                _hr = _post_handoff(
-                    clean_response,
-                    llm_client=self.judge_client,
-                    bank_will_render=bool(turn_metadata.get('bank_rendered')),
-                )
-                if _hr is not None and not _hr.skipped and _hr.handed_off is False:
-                    logger.warning(
-                        "[HandoffJudge] POST-REGEN FLAGGED session=%s "
-                        "reason=%r — flagging; no CTA substitution",
-                        self.session.id, _hr.reason[:200],
-                    )
-                    # Pilot directive 2026-05-17 (task #201): no CTA
-                    # fallback substitution. Flag for audit, ship the
-                    # regen winner as-is. The stock CTA was creating
-                    # engine/screen drift (winner's tool call committed
-                    # bank_question_ref but the substituted CTA didn't
-                    # match — student replies fell through to the
-                    # wrong Q).
-                    merged = set(turn_metadata.get('validator_issues', []))
-                    merged.add(_NQ)
-                    merged.add('post_regen_no_question')
-                    turn_metadata['validator_issues'] = list(merged)
-                    turn_metadata['post_regen_handoff_reason'] = _hr.reason
-            except Exception as _exc:
-                logger.warning(
-                    "[HandoffJudge] post-regen check crashed: %s: %s",
-                    type(_exc).__name__, _exc,
-                )
+            # Post-regen leak + handoff checks DELETED 2026-05-17
+            # (task #202). Both detectors now run inside run_all_judges
+            # as concurrent siblings of the other judges:
+            #   - answer-leak: folded into run_all_judges, surfaces as
+            #     CombinedJudgeResult.answer_leaked → validator raises
+            #     ISSUE_ANSWER_LEAK → score_candidate penalises so
+            #     leaky cycles lose the retry race
+            #   - handoff: already a sibling judge (HandoffResult)
+            # The post-regen branches were defensive AFTER the winner
+            # was picked; with the detectors INSIDE the judge fan-out,
+            # leaky / no-handoff cycles are scored badly during the
+            # retry race itself and lose to cleaner candidates.
 
             # Update attached media when the regen picked a different one.
             if regen_media:
@@ -7643,7 +7565,14 @@ Follow the current step; this concept will be covered in sequence."""
 
         # Judge runner — re-runs the full concurrent judge fan-out on
         # each candidate. Mirrors what _respond_impl does for the
-        # initial response.
+        # initial response. Threads leak-detection context (task #202)
+        # so each cycle's leak verdict feeds into score_candidate and
+        # leaky cycles lose the retry race.
+        _aa_for_leak = getattr(self, '_awaiting_answer', None) or {}
+        _wrong_for_leak = int(_aa_for_leak.get('wrong_attempts', 0) or 0)
+        _bank_q_for_leak = getattr(self, '_pending_bank_question', None)
+        _reveal_th_for_leak = self._reveal_threshold()
+
         def _judge_runner(candidate_text: str):
             return run_all_judges(
                 response_text=candidate_text,
@@ -7661,6 +7590,9 @@ Follow the current step; this concept will be covered in sequence."""
                 image_reader=self._read_image_for_vision,
                 subject_is_math=subject_is_math,
                 bank_offered=bool(getattr(self, '_question_id_map', None)),
+                bank_question=_bank_q_for_leak,
+                wrong_attempts=_wrong_for_leak,
+                reveal_threshold=_reveal_th_for_leak,
             )
 
         result = run_tutor_self_retry(
