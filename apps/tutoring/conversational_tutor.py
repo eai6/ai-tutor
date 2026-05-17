@@ -3065,6 +3065,65 @@ Keep it to 2-3 sentences."""
                 merged.add('regen_did_not_clean')
                 turn_metadata['validator_issues'] = list(merged)
 
+            # 2026-05-17 — POST-REGEN LEAK CHECK. The regen ensemble's
+            # per-cycle judges don't include the answer-leak detector,
+            # so a regen prompted to fix `repeated_question` can still
+            # introduce a canonical reveal in its replacement text.
+            # Lesson 540 session 50 turn 861: regen fixed repeated_question
+            # but produced "Not quite. The correct answer is B - a grid
+            # system provides a systematic way to locate and reference
+            # specific locations." Pilot directive 2026-05-17: reveal
+            # is NEVER allowed regardless of attempt count.
+            try:
+                _bg_post = getattr(self, '_pending_bank_grade', None)
+                if (
+                    _bg_post is not None
+                    and getattr(_bg_post, 'is_correct', None) is False
+                ):
+                    from apps.tutoring.answer_leak import detect_answer_leak as _det_leak_post
+                    from apps.tutoring.validator import ISSUE_ANSWER_LEAK as _LEAK_ISSUE_POST
+                    _aa_post = getattr(self, '_awaiting_answer', None) or {}
+                    _wa_post = int(_aa_post.get('wrong_attempts', 0) or 0)
+                    _post_verdict = _det_leak_post(
+                        response=clean_response,
+                        bank_question=getattr(self, '_pending_bank_question', None),
+                        chat_authored_q=None,
+                        wrong_attempts=_wa_post,
+                        llm_client=self.judge_client,
+                        reveal_threshold=self._reveal_threshold(),
+                    )
+                    if _post_verdict is not None:
+                        logger.warning(
+                            "[LeakDetect] POST-REGEN FLAGGED session=%s "
+                            "sources=%s reason=%r — regen INTRODUCED a "
+                            "leak while fixing %s — substituting safe "
+                            "no-reveal fallback",
+                            self.session.id, _post_verdict.sources,
+                            _post_verdict.reason[:200],
+                            list(validation.issues or [])[:5],
+                        )
+                        merged = set(turn_metadata.get('validator_issues', []))
+                        merged.add(_LEAK_ISSUE_POST)
+                        merged.add('post_regen_leak')
+                        merged.add('safe_fallback_used')
+                        turn_metadata['validator_issues'] = list(merged)
+                        turn_metadata['post_regen_leak_reason'] = _post_verdict.reason
+                        # Safe fallback: a concept-level nudge that's
+                        # guaranteed not to reveal. Better to lose
+                        # specificity than to leak the canonical.
+                        clean_response = (
+                            "That's not quite it. Let's try a different "
+                            "angle — think about what this map feature "
+                            "actually shows, then take another look at "
+                            "the options. Which one matches the function "
+                            "you're picturing?"
+                        )
+            except Exception as _exc:
+                logger.warning(
+                    "[LeakDetect] post-regen check crashed: %s: %s",
+                    type(_exc).__name__, _exc,
+                )
+
             # Update attached media when the regen picked a different one.
             if regen_media:
                 media = [regen_media]
