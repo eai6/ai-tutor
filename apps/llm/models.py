@@ -199,7 +199,12 @@ class ModelConfig(models.Model):
     # property. JUDGE is forced to 0 for evaluation consistency; TUTORING
     # is clamped to [0.1, 0.3] for controlled variability. Stored value
     # may differ; runtime always uses effective_temperature.
-    TUTORING_TEMP_MIN = 0.1
+    # Lowered MIN from 0.1 → 0.0 on 2026-05-17 — pilot directive: try
+    # temperature=0 on the tutor to improve tool-use instruction
+    # following (LLM was emitting <tool_use> XML as prose under default
+    # temp). Stored values still respected; the floor just allows 0.0
+    # through.
+    TUTORING_TEMP_MIN = 0.0
     TUTORING_TEMP_MAX = 0.3
     JUDGE_TEMP = 0.0
 

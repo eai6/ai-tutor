@@ -2277,9 +2277,20 @@ Keep it to 1-2 sentences + question, ~60 words max."""
             turn_index = len(self.conversation)  # index before appending
             self._turn_media[str(turn_index)] = media[0]
 
+        # Task #204: route welcome / resume through the validator +
+        # judge + regen stack. Surfaces issues + may swap text for a
+        # cleaner self_retry winner. Engine state stays coupled via
+        # the dry-run apply-on-winner pattern.
+        welcome_turn_meta: Dict = dict(
+            getattr(self, '_pending_pose_question_meta', {}) or {},
+        )
+        clean_response = self._validate_welcome_turn(
+            clean_response, welcome_turn_meta,
+        )
+
         # Don't persist fallback messages — they pollute conversation history (Fix 2)
         if not self._last_response_was_fallback:
-            self._save_turn("tutor", clean_response)
+            self._save_turn("tutor", clean_response, metadata=welcome_turn_meta or None)
             self.conversation.append({"role": "assistant", "content": clean_response})
             self._save_state()
 
@@ -4290,8 +4301,18 @@ IMPORTANT: Any question you ask must be complete and self-contained. Never say "
             turn_index = len(self.conversation)  # index before appending
             self._turn_media[str(turn_index)] = media[0]
 
+        # Task #204: opening turn runs through validator + judge stack
+        # same as respond(). Catches leak / handoff / repeated_question
+        # / etc on the FIRST tutor turn.
+        opening_turn_meta: Dict = dict(
+            getattr(self, '_pending_pose_question_meta', {}) or {},
+        )
+        clean_response = self._validate_welcome_turn(
+            clean_response, opening_turn_meta,
+        )
+
         # Save
-        self._save_turn("tutor", clean_response)
+        self._save_turn("tutor", clean_response, metadata=opening_turn_meta or None)
         self.conversation.append({"role": "assistant", "content": clean_response})
         self._save_state()
 
@@ -7611,6 +7632,139 @@ Follow the current step; this concept will be covered in sequence."""
             max_tokens=2048,
         )
         return result
+
+    def _validate_welcome_turn(
+        self,
+        text: str,
+        turn_metadata: Dict,
+    ) -> str:
+        """Run judges + validator + maybe self_retry on a welcome,
+        resume, or review turn. Returns the final approved text.
+
+        Task #204 (2026-05-17, memory/welcome_validation_plan.md):
+        previously the welcome / resume / review paths called
+        `_generate_response` directly and saved the output without
+        running the validator + judge stack. That meant leaks,
+        repeated questions, and dangling responses on welcome turns
+        slipped through with no check.
+
+        Now mirror the validator+regen flow `_respond_impl` runs for
+        every other tutor turn. Engine-state coupling is preserved
+        because self_retry's dry-run path snapshots/restores
+        correctly even when called outside _respond_impl.
+
+        Fails open: if judges/validator/regen crash, return the
+        original text unchanged so the welcome doesn't get blocked.
+        """
+        if not text or not text.strip():
+            return text
+        if not self.judge_client:
+            return text  # can't validate without a judge model
+
+        try:
+            from apps.tutoring.combined_judge import run_combined_judge
+            from apps.tutoring.validator import validate_tutor_response
+
+            prior_conversation = (
+                self.conversation[:-1] if self.conversation else []
+            )
+
+            combined_judge_result = run_combined_judge(
+                text,
+                lesson=self.lesson,
+                llm_client=self.judge_client,
+                vision_client=self.judge_client,
+                image_reader=self._read_image_for_vision,
+                attached_media=[],
+                bank_stems=self._current_bank_stems(),
+                student_input="",
+                answer_was_bare=False,
+                answer_was_wrong=False,  # no student input → leak detector skips
+                step_context={},
+                subject_is_math=False,
+                bank_offered=bool(getattr(self, '_question_id_map', None)),
+                conversation_history=prior_conversation,
+                bank_question=getattr(self, '_pending_bank_question', None),
+                wrong_attempts=0,
+                reveal_threshold=self._reveal_threshold(),
+            )
+
+            validation = validate_tutor_response(
+                text,
+                is_correct=None,
+                bare_answer=False,
+                step_type=None,
+                lesson=self.lesson,
+                llm_client=self.judge_client,
+                student_input="",
+                bank_stems=self._current_bank_stems(),
+                bank_signal_used=bool(
+                    getattr(self, '_bank_signal_used_this_turn', False),
+                ),
+                combined_result=combined_judge_result,
+                fact_check=False,
+                rule_check=False,
+                media_attached=False,
+                tool_use_count=int(turn_metadata.get('tool_use_count', 0) or 0),
+                awaiting_answer_is_set=isinstance(
+                    getattr(self, '_awaiting_answer', None), dict,
+                ),
+            )
+
+            # Surface validator issues on the welcome turn's metadata
+            # for the same analytics treatment that respond() gets.
+            if validation.issues:
+                turn_metadata['validator_issues'] = list(validation.issues)
+                turn_metadata['validator_passed'] = validation.passed
+
+            if not validation.needs_regeneration:
+                return text
+
+            # Dirty → run self_retry. The dry-run path snapshots the
+            # CURRENT engine state (which includes whatever the welcome
+            # generation committed via _handle_pose_question_message)
+            # as `prev_delta` and competes it against retry cycles.
+            logger.info(
+                "[WelcomeValidate] regen triggered (issues=%s)",
+                validation.issues,
+            )
+            from django.conf import settings as _dj_settings
+            if not bool(getattr(_dj_settings, 'TUTOR_SELF_RETRY_ENABLED', True)):
+                # Flag disabled — flag the issues but ship as-is.
+                return text
+
+            retry_result = self._dispatch_self_retry(
+                previous_response=text,
+                validation=validation,
+                combined_judge_result=combined_judge_result,
+                turn_metadata=turn_metadata,
+                student_input="",
+                attached_media=[],
+                subject_is_math=False,
+                prior_conversation=prior_conversation,
+            )
+            # Surface retry telemetry the same way _respond_impl does.
+            turn_metadata['regenerated'] = True
+            turn_metadata['regeneration_reason'] = list(validation.issues)
+            turn_metadata['regen_cycles'] = retry_result.cycles_run
+            turn_metadata['regen_picked_model'] = retry_result.picked_model
+            turn_metadata['regen_clean'] = retry_result.clean
+            turn_metadata['regen_fallback_used'] = retry_result.fallback_used
+            turn_metadata['regen_elapsed_seconds'] = round(
+                retry_result.elapsed_seconds, 2,
+            )
+            try:
+                from apps.tutoring.regen.self_retry import summarise_self_retry
+                turn_metadata['regen_audit'] = summarise_self_retry(retry_result)
+            except Exception:
+                pass
+            return retry_result.text or text
+        except Exception as exc:
+            logger.warning(
+                "[WelcomeValidate] crashed; shipping original: %s: %s",
+                type(exc).__name__, exc,
+            )
+            return text
 
     def _current_bank_stems(self) -> List[str]:
         """Flatten the active question_id_map to a list of stem strings.
