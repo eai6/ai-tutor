@@ -3227,22 +3227,21 @@ Keep it to 2-3 sentences."""
                             _post_verdict.reason[:200],
                             list(validation.issues or [])[:5],
                         )
+                        # Pilot directive 2026-05-17 (task #201): no
+                        # CTA fallback substitution. Flag the issue in
+                        # metadata for audit, but ship the regen
+                        # winner as-is. The stock CTA was creating
+                        # engine/screen drift (bank_question_ref set
+                        # by the winner's tool call but screen showed
+                        # the CTA — student answers fall through to
+                        # the wrong Q). If the regen winner is dirty,
+                        # better to ship dirty than to ship a CTA the
+                        # engine state doesn't agree with.
                         merged = set(turn_metadata.get('validator_issues', []))
                         merged.add(_LEAK_ISSUE_POST)
                         merged.add('post_regen_leak')
-                        merged.add('safe_fallback_used')
                         turn_metadata['validator_issues'] = list(merged)
                         turn_metadata['post_regen_leak_reason'] = _post_verdict.reason
-                        # Safe fallback: a concept-level nudge that's
-                        # guaranteed not to reveal. Better to lose
-                        # specificity than to leak the canonical.
-                        clean_response = (
-                            "That's not quite it. Let's try a different "
-                            "angle — think about what this map feature "
-                            "actually shows, then take another look at "
-                            "the options. Which one matches the function "
-                            "you're picturing?"
-                        )
             except Exception as _exc:
                 logger.warning(
                     "[LeakDetect] post-regen check crashed: %s: %s",
@@ -3267,23 +3266,21 @@ Keep it to 2-3 sentences."""
                 if _hr is not None and not _hr.skipped and _hr.handed_off is False:
                     logger.warning(
                         "[HandoffJudge] POST-REGEN FLAGGED session=%s "
-                        "reason=%r — substituting safe handoff fallback",
+                        "reason=%r — flagging; no CTA substitution",
                         self.session.id, _hr.reason[:200],
                     )
+                    # Pilot directive 2026-05-17 (task #201): no CTA
+                    # fallback substitution. Flag for audit, ship the
+                    # regen winner as-is. The stock CTA was creating
+                    # engine/screen drift (winner's tool call committed
+                    # bank_question_ref but the substituted CTA didn't
+                    # match — student replies fell through to the
+                    # wrong Q).
                     merged = set(turn_metadata.get('validator_issues', []))
                     merged.add(_NQ)
                     merged.add('post_regen_no_question')
-                    merged.add('safe_fallback_used')
                     turn_metadata['validator_issues'] = list(merged)
                     turn_metadata['post_regen_handoff_reason'] = _hr.reason
-                    # Safe stock CTA: invites student input without
-                    # making any promise the engine can't keep.
-                    clean_response = (
-                        "Let's pause for a moment. Tell me which part "
-                        "of what we just covered feels clearest, and "
-                        "which part still feels confusing — I'll pick "
-                        "up from there."
-                    )
             except Exception as _exc:
                 logger.warning(
                     "[HandoffJudge] post-regen check crashed: %s: %s",
