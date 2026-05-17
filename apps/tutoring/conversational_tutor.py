@@ -8777,6 +8777,32 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
                 eval_layer = 'keyword_fallback'
                 eval_reasoning = 'no instructor client; used keyword heuristic'
 
+        # Bank grader override: when the student replied to a bank-pulled
+        # question, the deterministic bank verdict is more authoritative
+        # than the LLM step evaluator (which sometimes returns
+        # answer_correct=False for a verbatim-correct MCQ letter, e.g.
+        # lesson 538 session 40 turn 10: Q3725 'B' graded True by bank
+        # but step-eval said False, blocking advancement). Trust the
+        # bank for bank-backed turns.
+        _bank_grade = getattr(self, '_pending_bank_grade', None)
+        _bank_verdict = getattr(_bank_grade, 'is_correct', None) if _bank_grade else None
+        if _bank_verdict is True and is_correct is not True:
+            logger.info(
+                "[StepEval] BANK_OVERRIDE: is_correct=%s → True "
+                "(bank grader said True, eval_layer=%s)",
+                is_correct, eval_layer,
+            )
+            is_correct = True
+            eval_layer = 'bank_grader_override'
+        elif _bank_verdict is False and is_correct is not False:
+            logger.info(
+                "[StepEval] BANK_OVERRIDE: is_correct=%s → False "
+                "(bank grader said False, eval_layer=%s)",
+                is_correct, eval_layer,
+            )
+            is_correct = False
+            eval_layer = 'bank_grader_override'
+
         # Tri-state handling — None means "no signal", neither penalize
         # nor advance. is_correct is True / False / None.
         verdict_correct = (is_correct is True)
