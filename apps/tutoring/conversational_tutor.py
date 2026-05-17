@@ -1645,6 +1645,14 @@ class ConversationalTutor:
             if str(qid).lstrip('-').isdigit()
         )
 
+        # Track normalised signatures of the last N tutor questions —
+        # used by the W14 repeated-question guard to catch cross-turn
+        # authored repeats. Cap at 10 (oldest dropped) to keep
+        # engine_state JSON compact. See apps/tutoring/repeated_question.py.
+        self.recent_tutor_question_sigs: List[str] = list(
+            state.get('recent_tutor_question_sigs', []) or []
+        )[-10:]
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -1724,6 +1732,12 @@ class ConversationalTutor:
             # excludes these so the tutor doesn't recycle the same
             # question after the student answered it.
             'shown_question_ids': sorted(getattr(self, 'shown_question_ids', set())),
+            # W14 — last 10 normalised signatures of tutor questions
+            # so the repeated-question guard survives across turns +
+            # session resumes.
+            'recent_tutor_question_sigs': list(
+                getattr(self, 'recent_tutor_question_sigs', []) or []
+            )[-10:],
             # Enabling objective coverage (P1.2)
             'covered_objectives': [
                 o['objective'] for o in getattr(self, 'enabling_objectives', [])
@@ -2750,6 +2764,78 @@ Keep it to 2-3 sentences."""
         except Exception as _exc:
             logger.warning(
                 "[LeakDetect] guard crashed: %s: %s — continuing without regen flag",
+                type(_exc).__name__, _exc,
+            )
+
+        # W14 — repeated-question structural guard. Runs on every turn
+        # (not just wrong-answer turns) since cross-turn repetition
+        # can happen anywhere. Looks for: cross-turn authored repeats,
+        # paraphrases of already-shown bank questions, paraphrases of
+        # the active pending bank question.
+        try:
+            from apps.tutoring.repeated_question import (
+                detect_repeated_question, extract_questions,
+                normalise_question_signature,
+            )
+            from apps.tutoring.validator import ISSUE_REPEATED_QUESTION
+            # Build shown_bank_stems from shown_question_ids (lookup the
+            # current stems for cross-Q semantic compare).
+            _shown_bank_stems: List[str] = []
+            try:
+                _shown_ids = list(getattr(self, 'shown_question_ids', set()) or [])
+                if _shown_ids:
+                    from apps.tutoring.models import ExitTicketQuestion
+                    _shown_bank_stems = list(
+                        ExitTicketQuestion.objects
+                        .filter(id__in=_shown_ids)
+                        .values_list('question_text', flat=True)
+                    )
+            except Exception:
+                _shown_bank_stems = []
+            # Active bank stem — the question student is currently
+            # trying to answer.
+            _active_aa = getattr(self, '_awaiting_answer', None) or {}
+            _active_qid = _active_aa.get('question_id')
+            _active_stem: Optional[str] = None
+            if _active_qid and _active_aa.get('kind') == 'exit_ticket_question':
+                try:
+                    from apps.tutoring.models import ExitTicketQuestion
+                    _aq = ExitTicketQuestion.objects.filter(id=_active_qid).first()
+                    if _aq:
+                        _active_stem = _aq.question_text
+                except Exception:
+                    _active_stem = None
+            _repeat_verdict = detect_repeated_question(
+                response=clean_response,
+                recent_question_signatures=list(getattr(self, 'recent_tutor_question_sigs', []) or []),
+                shown_bank_stems=_shown_bank_stems,
+                active_bank_stem=_active_stem,
+                llm_client=self.judge_client,
+            )
+            if _repeat_verdict is not None:
+                validation.issues.append(ISSUE_REPEATED_QUESTION)
+                validation.metadata['repeated_question_reason'] = _repeat_verdict.reason
+                validation.metadata['repeated_question_kind'] = _repeat_verdict.repeat_kind
+                validation.metadata['repeated_question_sources'] = _repeat_verdict.sources
+                validation.metadata['repeated_question_matched'] = _repeat_verdict.matched_question[:200]
+                validation.metadata['repeated_question_ms'] = _repeat_verdict.elapsed_ms
+                logger.info(
+                    "[RepeatDetect] FLAGGED session=%s kind=%s sources=%s reason=%r",
+                    self.session.id, _repeat_verdict.repeat_kind,
+                    _repeat_verdict.sources, _repeat_verdict.reason[:200],
+                )
+            # Append the NEW questions extracted from this response to
+            # recent_tutor_question_sigs (capped at 10) so the next
+            # turn can detect cross-turn repeats.
+            _new_qs = extract_questions(clean_response)
+            for _q in _new_qs:
+                _sig = normalise_question_signature(_q)
+                if _sig and _sig not in self.recent_tutor_question_sigs:
+                    self.recent_tutor_question_sigs.append(_sig)
+            self.recent_tutor_question_sigs = self.recent_tutor_question_sigs[-10:]
+        except Exception as _exc:
+            logger.warning(
+                "[RepeatDetect] guard crashed: %s: %s — continuing without regen flag",
                 type(_exc).__name__, _exc,
             )
 
@@ -4153,6 +4239,119 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
             ctx['student_answer'] = str(sp)[:200] if sp is not None else ''
         return ctx if ctx else None
 
+    def _build_hint_calibration_block(
+        self,
+        correct_option_letter: Optional[str] = None,
+        correct_option_text: Optional[str] = None,
+        reveal_allowed: bool = False,
+    ) -> str:
+        """W2 — FORBIDDEN/ACCEPTABLE phrase list + difficulty-tiered
+        obviousness directive. Rendered inside both
+        `_build_active_bank_question_block` and
+        `_build_bank_grade_signal_block` so the hint policy stays
+        consistent whether the LLM is composing the hint pre-attempt or
+        post-wrong-attempt.
+
+        Returns "" when `reveal_allowed` (no need to constrain the
+        tutor — they're allowed to state the canonical answer).
+
+        Concrete examples beat abstract prohibitions on Sonnet
+        (learning L14). The forbidden list uses the actual option text
+        from the live question when known so the tutor can't
+        rationalise "well, that wasn't a paraphrase of THIS option".
+        """
+        if reveal_allowed:
+            return ""
+
+        lines: List[str] = ["", "[HINT CALIBRATION]"]
+
+        # --- FORBIDDEN / ACCEPTABLE phrase list ---
+        letter = (correct_option_letter or "").strip().upper()
+        opt = (correct_option_text or "").strip()
+        forbidden_examples: List[str] = []
+        if letter:
+            forbidden_examples += [
+                f'  - "The answer is {letter}."',
+                f'  - "The correct option is {letter}."',
+                f'  - "Option {letter} is right."',
+                f'  - "It\'s {letter}." / "{letter} is correct."',
+            ]
+        if opt:
+            short = opt[:120]
+            forbidden_examples += [
+                f'  - Restating the canonical answer text in different '
+                f'words. For example, if the correct option says '
+                f'"{short}", these all count as REVEAL:',
+                f'      • "Think about how it relates to {short.lower()}."',
+                f'      • "The key idea here is {short.lower()}."',
+                f'      • Any sentence whose main noun phrase is a '
+                f'paraphrase of the canonical answer text.',
+            ]
+        if not forbidden_examples:
+            # Chat-authored / non-MCQ — generic list.
+            forbidden_examples = [
+                '  - Stating the canonical answer directly.',
+                '  - Paraphrasing the canonical answer (substituting '
+                'synonyms still counts as REVEAL).',
+                '  - Walking through the full canonical explanation '
+                'before the student has attempted again.',
+            ]
+        lines.append("FORBIDDEN (counts as REVEAL — triggers regen):")
+        lines.extend(forbidden_examples)
+
+        lines.append("ACCEPTABLE (concept-level hints):")
+        lines += [
+            '  - Name the underlying concept the question is testing '
+            'without naming the answer ("Think about what this feature '
+            'is used for").',
+            '  - Eliminate ONE wrong option by describing what it is '
+            'about ("One option is about scale, which is a different '
+            'idea") — do NOT name the correct option.',
+            '  - Ask a sub-question that probes prerequisite knowledge.',
+        ]
+
+        # --- Difficulty-tiered obviousness directive ---
+        # difficulty_level: -2 very easy ←→ +2 very hard.
+        # Reveal threshold stays uniform (wrong_attempts >= 3 for
+        # everyone, per pilot directive 2026-05-17). Difficulty steers
+        # how OBVIOUS each hint should be, not when reveal fires.
+        level = int(getattr(self, 'difficulty_level', 0) or 0)
+        if level <= -2:
+            obviousness = (
+                "OBVIOUSNESS LEVEL — VERY OBVIOUS (very-easy mode): "
+                "near-Socratic. Eliminate at least one wrong option by "
+                "describing what it is about (without naming the right "
+                "one), then ask a yes/no sub-question that points at "
+                "the correct concept."
+            )
+        elif level == -1:
+            obviousness = (
+                "OBVIOUSNESS LEVEL — OBVIOUS (easy mode): name the "
+                "concept being tested directly and prompt the student "
+                "to apply it. Do not name the answer."
+            )
+        elif level == 0:
+            obviousness = (
+                "OBVIOUSNESS LEVEL — CONCEPT (default): one short "
+                "sentence that names the concept being tested. Let the "
+                "student do the connecting work."
+            )
+        elif level == 1:
+            obviousness = (
+                "OBVIOUSNESS LEVEL — SUBTLE (hard mode): a single "
+                "question that requires inference. Do not name the "
+                "concept directly; gesture at it."
+            )
+        else:  # level >= 2
+            obviousness = (
+                "OBVIOUSNESS LEVEL — MINIMAL (very-hard mode): one "
+                "short signal of WHICH idea to revisit, nothing more. "
+                "No concept naming, no sub-question. The student does "
+                "the work."
+            )
+        lines.append(obviousness)
+        return "\n".join(lines)
+
     def _build_active_bank_question_block(self) -> str:
         """[ACTIVE BANK QUESTION] context block for the system prompt.
 
@@ -4351,6 +4550,39 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         }
         lines.append("")
         lines.append(rules.get(status, rules['awaiting_answer']))
+
+        # W2 — append FORBIDDEN/ACCEPTABLE list + difficulty-tiered
+        # obviousness when in awaiting_answer or answered_wrong AND
+        # reveal is NOT yet allowed.
+        if status in ('awaiting_answer', 'answered_wrong'):
+            # Pull the correct-option text for MCQ so the forbidden
+            # list can quote the actual canonical text.
+            _opt_letter: Optional[str] = None
+            _opt_text: Optional[str] = None
+            try:
+                if kind == 'exit_ticket_question':
+                    from apps.tutoring.models import ExitTicketQuestion
+                    _q = ExitTicketQuestion.objects.filter(id=question_id).first()
+                    if _q and (_q.question_type or 'mcq') == 'mcq':
+                        _opt_letter = (_q.correct_answer or '').strip().upper()
+                        _opt_text = {
+                            'A': _q.option_a, 'B': _q.option_b,
+                            'C': _q.option_c, 'D': _q.option_d,
+                        }.get(_opt_letter)
+                elif kind == 'lesson_step':
+                    from apps.curriculum.models import LessonStep
+                    _s = LessonStep.objects.filter(id=question_id).first()
+                    if _s:
+                        _opt_text = (_s.expected_answer or '').strip()
+            except Exception:
+                pass
+            calib = self._build_hint_calibration_block(
+                correct_option_letter=_opt_letter,
+                correct_option_text=_opt_text,
+                reveal_allowed=reveal_allowed,
+            )
+            if calib:
+                lines.append(calib)
         return "\n".join(lines)
 
     def _build_difficulty_signal_block(self) -> str:
@@ -8117,6 +8349,41 @@ Follow the current step; this concept will be covered in sequence."""
                         f"\nCanonical step-by-step:\n  {cw[:600]}"
                     )
 
+        # W2 — append FORBIDDEN/ACCEPTABLE phrase list + difficulty-tiered
+        # obviousness directive when reveal is NOT yet allowed.
+        # Resolves the canonical option letter + text when MCQ so the
+        # forbidden list quotes the actual canonical text.
+        calibration_block = ""
+        if not grade.is_correct and not reveal_allowed:
+            _opt_letter: Optional[str] = None
+            _opt_text: Optional[str] = None
+            try:
+                if question is not None:
+                    qt = getattr(question, 'question_type', '') or 'mcq'
+                    if qt == 'mcq':
+                        _opt_letter = (
+                            getattr(question, 'correct_answer', '') or ''
+                        ).strip().upper()
+                        _opt_text = {
+                            'A': getattr(question, 'option_a', None),
+                            'B': getattr(question, 'option_b', None),
+                            'C': getattr(question, 'option_c', None),
+                            'D': getattr(question, 'option_d', None),
+                        }.get(_opt_letter)
+                    else:
+                        _opt_text = (
+                            getattr(question, 'expected_answer', '') or ''
+                        ).strip()
+            except Exception:
+                pass
+            calib = self._build_hint_calibration_block(
+                correct_option_letter=_opt_letter,
+                correct_option_text=_opt_text,
+                reveal_allowed=False,
+            )
+            if calib:
+                calibration_block = "\n" + calib
+
         return (
             "\n\n<bank_evaluation_signal>"
             f"\nStudent's response (parsed): {grade.student_parsed!r}"
@@ -8125,6 +8392,7 @@ Follow the current step; this concept will be covered in sequence."""
             f"\nDetail: {grade.detail}"
             f"{canonical_block}"
             f"\n{guidance}"
+            f"{calibration_block}"
             "\n</bank_evaluation_signal>"
         )
 

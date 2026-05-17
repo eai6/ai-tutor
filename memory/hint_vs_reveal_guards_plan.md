@@ -16,8 +16,8 @@ the tutor.
 
 | # | Learning | Status | Where covered |
 |---|---|---|---|
-| L1 | Sonnet soft-reveals via paraphrase | OPEN | W1 (leak guard) + W2 (forbidden examples) |
-| L2 | "re-explain" / "walk through canonical" read as reveal | OPEN | W2 + W7 (regen prompt restructure) |
+| L1 | Sonnet soft-reveals via paraphrase | SHIPPED (Bundle A) — W1 leak guard + W2 forbidden examples both live |
+| L2 | "re-explain" / "walk through canonical" read as reveal | PARTIAL — W2 shipped (Bundle A); W7 regen prompt restructure remains (Bundle B) |
 | L3 | Answer in context is a hazard, not just an aid | OPEN | W3 (leak-aware regen — strip canonical) |
 | L4 | Tool availability doesn't suppress text-authoring | SHIPPED `5495f7c` | — |
 | L5 | Bank verdict beats LLM verdict | SHIPPED `7b72765` + W4 (judge prompt belt) |
@@ -29,7 +29,7 @@ the tutor.
 | L11 | Difficulty signal must steer selection | SHIPPED `54fe231` | — |
 | L12 | Question-type ↔ chat-render fit varies | SHIPPED `5d26aba` | — |
 | L13 | Resume needs narrative continuity, not just state | LIVE (works) | W10 (regression test only) |
-| L14 | Concrete forbidden-phrase lists bind; abstract prohibitions don't | OPEN | W2 + W5 + W6 + W7 (concrete examples everywhere) |
+| L14 | Concrete forbidden-phrase lists bind; abstract prohibitions don't | PARTIAL — tutor side shipped (W2); judge prompts (W5) + regen prompt (W7) remain (Bundle B) |
 | L15 | Surface the *why* of a rule, not just the *what* | OPEN | W4 + W7 (rationale lines in prompts) |
 | L16 | Structured fields direct behavior more than prose | OPEN | W11 (`[STUDENT_STATE]` + `wrong_attempts` exposed as fields) |
 | L17 | Bank ground-truth in regen prevents invention | SHIPPED `6b38875` + W7 (verify still top-of-prompt) |
@@ -38,7 +38,7 @@ the tutor.
 | L20 | Reset state before symptom-patching | PROCESS | W12 (CLAUDE.md addition) |
 | L21 | Commit ↔ memory bidirectional links | PROCESS | already established (CLAUDE.md exists) |
 | L22 | Feature plans + execution artifacts live in repo `memory/` (git-tracked); auto-memory is for cross-cutting / general notes only | PROCESS | W12 (CLAUDE.md addition) |
-| L23 | Tutor repeats its own questions across turns; bank repetition is guarded but authored is not | OPEN | W14 (repeated-question structural guard) |
+| L23 | Tutor repeats its own questions across turns; bank repetition is guarded but authored is not | SHIPPED (Bundle A) — module `apps/tutoring/repeated_question.py` + wiring in `_respond_impl` + `recent_tutor_question_sigs` persisted on `engine_state` | W14 |
 
 ## Open work items (W1–W12)
 
@@ -182,7 +182,23 @@ coverage).
 
 ---
 
-### W2 — Concrete forbidden-phrase examples + difficulty-tiered hint obviousness
+### W2 — Concrete forbidden-phrase examples + difficulty-tiered hint obviousness — **SHIPPED (Bundle A, 2026-05-17)**
+
+**Status:** Helper `_build_hint_calibration_block(correct_option_letter,
+correct_option_text, reveal_allowed)` added next to
+`_build_active_bank_question_block`. Called from both the active-question
+block (status `awaiting_answer` or `answered_wrong`, reveal not yet
+allowed) and the bank-grade-signal block (verdict INCORRECT, reveal
+not yet allowed). Returns empty when `reveal_allowed=True` so the
+tutor isn't constrained on the 3rd-wrong walkthrough.
+
+Renders:
+- A FORBIDDEN list that quotes the actual canonical option text when
+  MCQ ("Restating ... 'A pictorial graph of...' counts as REVEAL")
+  + generic fallback for non-MCQ / chat-authored.
+- A 5-tier OBVIOUSNESS directive keyed off `difficulty_level`
+  (-2 VERY OBVIOUS ↔ +2 MINIMAL). Reveal threshold stays uniform at
+  `wrong_attempts >= 3`.
 
 **Scope:** L1, L2, L11, L14.
 
@@ -603,7 +619,23 @@ background research.
 
 ---
 
-### W14 — Repeated-question structural guard
+### W14 — Repeated-question structural guard — **SHIPPED (Bundle A, 2026-05-17)**
+
+**Status:** Module `apps/tutoring/repeated_question.py` complete;
+wired into `_respond_impl` after the W1 leak check; persists
+`recent_tutor_question_sigs` (cap 10) on `engine_state` for cross-turn
++ resume coverage; routes borderline Jaccard cases through
+`run_grading_batch(JUDGE_REPEAT)`; appends `ISSUE_REPEATED_QUESTION`
+to validation.issues so the regen path picks it up via the
+violation-handler block in `regen/prompt.py`.
+
+**Final tuned thresholds (lowered after smoke tests):**
+- `JACCARD_EXACT_REPEAT = 0.75`
+- `JACCARD_STRONG_REPEAT = 0.55` (was 0.7)
+- `JACCARD_BORDERLINE_LOW = 0.20` (was 0.45 — catches verb-swap paraphrases)
+- `ACTIVE_PARAPHRASE_THRESH = 0.45`
+
+**Original design (kept below for reference):**
 
 **Scope:** L23. Parallel to W1 — same flag-and-regen structural
 pattern. Per pilot directive 2026-05-17: enforce no-repeated-questions
