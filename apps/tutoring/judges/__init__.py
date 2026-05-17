@@ -287,10 +287,22 @@ def run_all_judges(
         # alongside the other judges so every candidate (initial +
         # retry cycles) gets a leak verdict. Replaces the
         # post-regen-leak branch in _respond_impl that fired AFTER
-        # self_retry had already picked a winner. Pre-gates when
-        # neither bank_question nor chat_authored_q is provided.
+        # self_retry had already picked a winner.
+        #
+        # Pre-gates:
+        #   1. No bank_question and no chat_authored_q → nothing to leak
+        #   2. answer_was_wrong is False → the student just got it
+        #      right, so confirming the answer ("Correct! It's B")
+        #      is legitimate post-resolution acknowledgement, not a
+        #      leak. The detector only matters when the question is
+        #      still unanswered.
         def _run_leak_inline():
             if bank_question is None and not chat_authored_q:
+                return None
+            if not answer_was_wrong:
+                # Question resolved (student got it right) — the tutor
+                # confirming the canonical is fine. Mirrors the old
+                # post-regen gate (`_pending_bank_grade.is_correct is False`).
                 return None
             from apps.tutoring.answer_leak import detect_answer_leak
             return detect_answer_leak(
