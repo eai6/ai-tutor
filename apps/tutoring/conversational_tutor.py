@@ -10744,44 +10744,141 @@ Which concept numbers were meaningfully covered?"""
     def _try_numeric_fast_path(
         self, question, student_answer,
     ) -> Optional[bool]:
-        """Numeric tolerance grading for fill_in_blank with numeric blanks.
-        Returns True/False when the verdict is unambiguous, or None to
-        defer to the LLM batch."""
+        """Deterministic grading short-circuit for question types the LLM
+        judge consistently mis-rates. Returns True/False when the
+        verdict is unambiguous, or None to defer to the LLM batch.
+
+        Covers:
+          - fill_in_blank (math): per-blank numeric tolerance or
+            case-insensitive exact match.
+          - short_numeric (any course): numeric tolerance against the
+            answer_data.keywords / model_answer / computed value, after
+            stripping unit symbols (°, ², π, etc.). Lesson 638 e2e
+            (2026-05-17) showed the LLM judge marking "45" wrong when
+            the answer key was "45°" — same number, just a missing unit
+            glyph. The student keyboard rarely produces these glyphs.
+          - matching (any course): exact value match per pair (after
+            normalisation). When every right-side choice exactly equals
+            the expected right-side (case + whitespace folded),
+            short-circuit. Same e2e showed the LLM mis-grading C1 where
+            all 4 student choices and all 4 expected values were the
+            literal string "Right angle = 90°".
+        """
         q_type = getattr(question, 'question_type', 'mcq') or 'mcq'
-        if q_type != 'fill_in_blank':
-            return None
-        is_math = self.lesson.unit.course.is_math if self.lesson.unit and self.lesson.unit.course else False
-        if not is_math:
-            return None
         data = question.answer_data or {}
-        blanks = data.get('blanks', []) or []
-        if not blanks:
-            return None
-        student_blanks = student_answer if isinstance(student_answer, list) else [student_answer]
-        from apps.tutoring.math_tools import safe_eval_expression
-        correct_count = 0
-        evaluated_count = 0
-        for idx, expected in enumerate(blanks):
-            given = str(student_blanks[idx] if idx < len(student_blanks) else '').strip()
-            expected_val = safe_eval_expression(str(expected))
-            given_val = safe_eval_expression(given)
-            if expected_val is not None and given_val is not None:
-                evaluated_count += 1
-                if abs(expected_val - given_val) < 0.01:
+        is_math = (
+            self.lesson.unit.course.is_math
+            if self.lesson.unit and self.lesson.unit.course
+            else False
+        )
+
+        if q_type == 'fill_in_blank':
+            if not is_math:
+                return None
+            blanks = data.get('blanks', []) or []
+            if not blanks:
+                return None
+            student_blanks = (
+                student_answer if isinstance(student_answer, list)
+                else [student_answer]
+            )
+            from apps.tutoring.math_tools import safe_eval_expression
+            correct_count = 0
+            evaluated_count = 0
+            for idx, expected in enumerate(blanks):
+                given = str(
+                    student_blanks[idx] if idx < len(student_blanks) else ''
+                ).strip()
+                expected_val = safe_eval_expression(str(expected))
+                given_val = safe_eval_expression(given)
+                if expected_val is not None and given_val is not None:
+                    evaluated_count += 1
+                    if abs(expected_val - given_val) < 0.01:
+                        correct_count += 1
+                    continue
+                # Plain string match fallback (case-insensitive)
+                if given.lower() == str(expected).lower():
                     correct_count += 1
-                continue
-            # Plain string match fallback (case-insensitive)
-            if given.lower() == str(expected).lower():
-                correct_count += 1
-                evaluated_count += 1
-        if evaluated_count == 0:
-            return None  # nothing parseable; defer to LLM
-        threshold = max(1, len(blanks) // 2 + 1)
-        if correct_count >= threshold:
-            return True
-        if correct_count == 0:
+                    evaluated_count += 1
+            if evaluated_count == 0:
+                return None  # nothing parseable; defer to LLM
+            threshold = max(1, len(blanks) // 2 + 1)
+            if correct_count >= threshold:
+                return True
+            if correct_count == 0:
+                return False
+            return None  # partial — let LLM decide
+
+        if q_type == 'short_numeric':
+            from apps.tutoring.summative_grading import _math_norm
+            import re as _re
+            text = _math_norm(
+                student_answer if isinstance(student_answer, str) else ''
+            )
+            if not text:
+                return False
+            student_nums = _re.findall(r'-?\d+(?:\.\d+)?', text)
+            if not student_nums:
+                return None  # no numbers extracted; let LLM handle prose
+            # Build target numbers: prefer keywords, fall back to
+            # computed / model_answer for older schemas.
+            targets: list[float] = []
+            for kw in (data.get('keywords') or []):
+                kw_norm = _math_norm(kw)
+                if _re.fullmatch(r'-?\d+(?:\.\d+)?', kw_norm):
+                    targets.append(float(kw_norm))
+            if not targets:
+                computed = data.get('computed')
+                if isinstance(computed, (int, float)):
+                    targets.append(float(computed))
+                else:
+                    model_norm = _math_norm(data.get('model_answer') or '')
+                    for n in _re.findall(r'-?\d+(?:\.\d+)?', model_norm):
+                        try:
+                            targets.append(float(n))
+                        except ValueError:
+                            continue
+            if not targets:
+                return None
+            for sn in student_nums:
+                try:
+                    val = float(sn)
+                except ValueError:
+                    continue
+                for target in targets:
+                    if abs(val - target) < 0.01:
+                        return True
             return False
-        return None  # partial — let LLM decide
+
+        if q_type == 'matching':
+            pairs = data.get('pairs') or []
+            if not pairs:
+                return None
+            student_map = (
+                student_answer if isinstance(student_answer, dict) else {}
+            )
+
+            def _fold(v) -> str:
+                return ' '.join(str(v or '').split()).strip().lower()
+
+            exact_correct = 0
+            for p in pairs:
+                expected_right = _fold(p.get('right'))
+                given_right = _fold(student_map.get(p.get('left'), ''))
+                if expected_right and given_right == expected_right:
+                    exact_correct += 1
+            # Same threshold as the legacy deterministic fallback in
+            # _llm_grade_exit_question — pass when majority match.
+            threshold = max(1, len(pairs) // 2 + 1)
+            if exact_correct >= threshold:
+                return True
+            if exact_correct == 0:
+                # Defer rather than auto-fail: semantic equivalents
+                # (synonyms) may still rescue the answer via LLM.
+                return None
+            return None  # partial — let LLM judge semantic equivalents
+
+        return None
 
     def _build_batch_grade_item(
         self, index: int, question, student_answer,
