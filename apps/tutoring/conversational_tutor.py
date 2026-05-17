@@ -4526,21 +4526,26 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         return True
 
     def _reveal_threshold(self) -> int:
-        """Number of wrong attempts at which reveal becomes allowed.
-        Difficulty-tiered (decision 2026-05-17):
+        """Number of wrong attempts at which move-on becomes allowed
+        (no reveal — pivot to easier same-concept Q). Difficulty-tiered
+        (decision 2026-05-17, revised same day — hard dropped 4→3 per
+        pilot directive: only 4 MCQ choices total, so 4 hints exceeds
+        the option count and is excessive):
 
-          easy (-2, -1) → 2  (1 hint, reveal on 2nd wrong)
-          medium (0)    → 3  (2 hints, reveal on 3rd wrong — original default)
-          hard  (+1,+2) → 4  (3 hints, reveal on 4th wrong)
+          easy (-2, -1) → 2  (1 hint, move-on at 2nd wrong)
+          medium (0)    → 3  (2 hints, move-on at 3rd wrong)
+          hard  (+1,+2) → 3  (2 hints — same count as medium, but
+                              difficulty differentiated by hint
+                              OBVIOUSNESS in _build_hint_calibration_block;
+                              hard hints stay subtle/inferential)
 
-        Lower-performing students get to canonical faster; higher-performing
-        students get more productive struggle time.
+        Lower-performing students get to canonical faster; higher-
+        performing students get more productive struggle time via
+        less-obvious hint phrasing rather than more hint cycles.
         """
         level = int(getattr(self, 'difficulty_level', 0) or 0)
         if level <= -1:
             return 2
-        if level >= 1:
-            return 4
         return 3
 
     def _build_hint_calibration_block(
