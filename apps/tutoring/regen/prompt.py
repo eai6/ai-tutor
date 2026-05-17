@@ -449,10 +449,27 @@ def _violation_line(issue: str, meta: Dict) -> str:
         )
 
     if issue == "no_question":
+        # The handoff LLM judge surfaces a specific reason via
+        # validation.metadata['handoff_reason'] when it flags
+        # handed_off=False (task #183). Include it so the regen LLM
+        # sees the exact failure mode (dangling colon, mid-sentence
+        # truncation, pure ack...) instead of generic "end with ?".
+        handoff_reason = (meta.get("handoff_reason") or "").strip()
+        head = (
+            "- NO_QUESTION: the response did not hand the floor back "
+            "to the student.\n"
+        )
+        if handoff_reason:
+            head += f"  Specifically: {handoff_reason[:200]}\n"
         return (
-            "- NO_QUESTION: the response did not end with a question. "
-            "Fix: end with ONE focused question. The literal LAST "
-            "character (before any |||MEDIA:N||| signal) must be '?'.\n"
+            head
+            + "  Fix: end with ONE focused question OR a clear "
+            "next-action directive. The LAST sentence MUST be either "
+            "(a) a complete question ending in '?', OR (b) an "
+            "imperative invitation (\"try this one\", \"pick one\", "
+            "\"tell me what you notice\"). Never dangle with \"Now "
+            "let me ask:\" + no question, never end mid-sentence, "
+            "never end on a pure acknowledgement (\"Great work!\").\n"
             "  Example: BEFORE: \"Algebra is useful for word "
             "problems.\" AFTER: \"Algebra is useful for word problems. "
             "What part trips you up most?\""

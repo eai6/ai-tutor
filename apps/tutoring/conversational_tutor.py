@@ -3204,6 +3204,47 @@ Keep it to 2-3 sentences."""
                     type(_exc).__name__, _exc,
                 )
 
+            # 2026-05-17 (task #183 follow-up) — POST-REGEN HANDOFF CHECK.
+            # Mirror the post-regen leak check. The handoff judge ran in
+            # the regen cycle judges, but if every cycle produced a
+            # dangling candidate the engine ships the best-of-the-rest
+            # with `regen_did_not_clean`. Catch that case here and
+            # substitute a safe stock CTA so the student never sees a
+            # truncated "Now let me ask:" with nothing after it.
+            try:
+                from apps.tutoring.judges.handoff import run_handoff_judge as _post_handoff
+                from apps.tutoring.validator import ISSUE_NO_QUESTION as _NQ
+                _hr = _post_handoff(
+                    clean_response,
+                    llm_client=self.judge_client,
+                    bank_will_render=bool(turn_metadata.get('bank_rendered')),
+                )
+                if _hr is not None and not _hr.skipped and _hr.handed_off is False:
+                    logger.warning(
+                        "[HandoffJudge] POST-REGEN FLAGGED session=%s "
+                        "reason=%r — substituting safe handoff fallback",
+                        self.session.id, _hr.reason[:200],
+                    )
+                    merged = set(turn_metadata.get('validator_issues', []))
+                    merged.add(_NQ)
+                    merged.add('post_regen_no_question')
+                    merged.add('safe_fallback_used')
+                    turn_metadata['validator_issues'] = list(merged)
+                    turn_metadata['post_regen_handoff_reason'] = _hr.reason
+                    # Safe stock CTA: invites student input without
+                    # making any promise the engine can't keep.
+                    clean_response = (
+                        "Let's pause for a moment. Tell me which part "
+                        "of what we just covered feels clearest, and "
+                        "which part still feels confusing — I'll pick "
+                        "up from there."
+                    )
+            except Exception as _exc:
+                logger.warning(
+                    "[HandoffJudge] post-regen check crashed: %s: %s",
+                    type(_exc).__name__, _exc,
+                )
+
             # Update attached media when the regen picked a different one.
             if regen_media:
                 media = [regen_media]

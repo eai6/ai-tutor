@@ -39,6 +39,29 @@ the tutor.
 | L21 | Commit ↔ memory bidirectional links | PROCESS | already established (CLAUDE.md exists) |
 | L22 | Feature plans + execution artifacts live in repo `memory/` (git-tracked); auto-memory is for cross-cutting / general notes only | PROCESS | W12 (CLAUDE.md addition) |
 | L23 | Tutor repeats its own questions across turns; bank repetition is guarded but authored is not | SHIPPED (Bundle A) — module `apps/tutoring/repeated_question.py` + wiring in `_respond_impl` + `recent_tutor_question_sigs` persisted on `engine_state` | W14 |
+| L24 | Tutor must always end with a question OR clear next-step directive — "Now let me ask:" with no question + mid-sentence truncation are real failure modes | SHIPPED — handoff LLM judge (`apps/tutoring/judges/handoff.py`) runs concurrently in `run_all_judges`, validator appends `ISSUE_NO_QUESTION` when `handed_off=False`, regen scorer hard-penalises (`apps/tutoring/regen/score.py`), regen prompt surfaces specific reason, post-regen safe-fallback substitutes a stock CTA on the rare case all cycles dangle | — |
+
+## MAJOR ISSUES — validator regen-triggers (current set)
+
+These are the issues that PROMPT REGEN today (i.e. `_REGEN_ISSUES` in
+`apps/tutoring/validator.py`). When any fires, regen runs ≤3 cycles
+and ships the cleanest candidate (or stock fallback if all dirty).
+Listed roughly in order of severity / pilot frequency.
+
+| Code | Detector | Trigger |
+|---|---|---|
+| `tutor_unsafe` | safety LLM judge | harmful or inappropriate tutor content |
+| `answer_leak` | det + LLM + arbiter (`answer_leak.py`) | tutor stated the canonical answer or paraphrased it |
+| `tutor_incoherent` | coherence LLM judge | self-contradiction, parallel questions, scaffold-vs-posed mismatch |
+| `verdict_mismatch` | deterministic | tutor text contradicts the deterministic bank/math verdict |
+| `figure_ref_without_signal` | regex | "looking at the diagram…" with no `|||MEDIA:N|||` attached |
+| `figure_mismatch` | vision LLM judge | attached figure doesn't match the question |
+| `numeric_claim_contradicted` | factual judge | numeric fact contradicted by grounded sources |
+| `arithmetic_violation` | arithmetic judge | wrong arithmetic in the tutor's prose |
+| `authoring_violation` | rule judge | tutor authored an MCQ inline instead of using `pose_question` |
+| `rule1_violation` | rule judge | praised a bare answer without showing working |
+| `repeated_question` | det + LLM + arbiter (`repeated_question.py`) | tutor re-asked an already-seen question (cross-turn / bank-repeat / active-paraphrase) |
+| **`no_question`** | **handoff LLM judge** | **response doesn't hand the floor back (dangling promise, mid-sentence truncation, pure ack)** |
 
 ## Open work items (W1–W12)
 

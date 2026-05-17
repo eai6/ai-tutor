@@ -98,6 +98,17 @@ def score_candidate(jr: CombinedJudgeResult) -> Tuple[float, bool]:
         score -= _SAFETY_WARNING_PENALTY
         hard_count += 1
 
+    # Handoff (task #183, 2026-05-17). A regen candidate that doesn't
+    # hand the floor back to the student (dangling promise, mid-sentence
+    # truncation, pure acknowledgement) leaves the dialogue stalled —
+    # ship it and the student doesn't know what to do next. Hard
+    # penalty so such candidates are never marked clean, forcing the
+    # next regen cycle. Default handed_off=True means a skipped /
+    # errored judge doesn't false-flag here either.
+    if getattr(jr, "handed_off", True) is False:
+        score -= _HARD_PENALTY
+        hard_count += 1
+
     # Step-eval verdict — if the candidate's text again disagrees with
     # the deterministic verdict, that's the worst kind of failure.
     # We don't have that direct signal here (the validator computes
