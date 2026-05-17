@@ -279,12 +279,17 @@ def detect_answer_leak(
     chat_authored_q: Optional[str],      # last tutor question text when chat-authored
     wrong_attempts: int,
     llm_client,                          # required — LLM judge always runs (when not skipped)
+    reveal_threshold: int = 3,           # difficulty-tiered; caller passes from _reveal_threshold()
 ) -> Optional[LeakVerdict]:
     """Detect whether the tutor response leaked the canonical answer.
 
     Parallel detection — deterministic + LLM judge always run together.
     Agreement: trust the consensus. Disagreement: arbiter call resolves.
     Returns None when no leak detected; LeakVerdict when leak detected.
+
+    `reveal_threshold` is the difficulty-tiered wrong-attempt count
+    at which reveal becomes legitimate; the detector skips once that
+    threshold is met so the canonical walkthrough isn't flagged.
     """
     import time
     t0 = time.monotonic()
@@ -292,7 +297,7 @@ def detect_answer_leak(
     # Skip cases
     if not response or not response.strip():
         return None
-    if wrong_attempts >= 3:
+    if wrong_attempts >= reveal_threshold:
         return None
     if bank_question is None and not chat_authored_q:
         return None

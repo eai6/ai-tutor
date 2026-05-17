@@ -1653,6 +1653,16 @@ class ConversationalTutor:
             state.get('recent_tutor_question_sigs', []) or []
         )[-10:]
 
+        # Exit-ticket hold gate (2026-05-17, pilot directive). When the
+        # tutor reveals a wrong-answered bank Q or the most recent grade
+        # was wrong, hold off triggering the exit ticket for one more
+        # student turn so the student gets a chance to acknowledge /
+        # discuss. Value = exchange_count at which the hold expires
+        # (i.e., next exchange after the wrong-revealed turn).
+        self.exit_ticket_hold_until_exchange: int = int(
+            state.get('exit_ticket_hold_until_exchange', 0) or 0
+        )
+
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
         for concept in self.exit_ticket_concepts:
@@ -1738,6 +1748,11 @@ class ConversationalTutor:
             'recent_tutor_question_sigs': list(
                 getattr(self, 'recent_tutor_question_sigs', []) or []
             )[-10:],
+            # Exit-ticket hold gate — prevent the trigger from firing
+            # on the same turn as a reveal or right after a wrong answer.
+            'exit_ticket_hold_until_exchange': int(
+                getattr(self, 'exit_ticket_hold_until_exchange', 0) or 0
+            ),
             # Enabling objective coverage (P1.2)
             'covered_objectives': [
                 o['objective'] for o in getattr(self, 'enabling_objectives', [])
@@ -2750,6 +2765,7 @@ Keep it to 2-3 sentences."""
                     chat_authored_q=_chat_authored_q,
                     wrong_attempts=_wrong_attempts,
                     llm_client=self.judge_client,
+                    reveal_threshold=self._reveal_threshold(),
                 )
                 if _leak_verdict is not None:
                     validation.issues.append(ISSUE_ANSWER_LEAK)
@@ -3052,12 +3068,23 @@ Keep it to 2-3 sentences."""
         if (self.current_topic_index >= len(self.steps)
                 and self.session_state == SessionState.TUTORING
                 and not getattr(self, 'is_remediation', False)):
-            self.session_state = SessionState.EXIT_TICKET
-            self._save_state()
-            # Save tutor response first, then return exit ticket
-            self._save_turn("tutor", clean_response, metadata=turn_metadata)
-            self.conversation.append({"role": "assistant", "content": clean_response})
-            return self._handle_exit_ticket()
+            if not self._can_trigger_exit_ticket():
+                # Hold the trigger; mark the hold window so the next
+                # student turn clears it once acknowledgement happens.
+                self.exit_ticket_hold_until_exchange = self.exchange_count + 1
+                logger.info(
+                    "[ExitTicket] HOLD session=%s — current bank Q not "
+                    "yet answered correctly / reveal in progress (next "
+                    "trigger eligible at exchange %d)",
+                    self.session.id, self.exit_ticket_hold_until_exchange,
+                )
+            else:
+                self.session_state = SessionState.EXIT_TICKET
+                self._save_state()
+                # Save tutor response first, then return exit ticket
+                self._save_turn("tutor", clean_response, metadata=turn_metadata)
+                self.conversation.append({"role": "assistant", "content": clean_response})
+                return self._handle_exit_ticket()
 
         # Remediation: check if all failed concepts re-covered
         if getattr(self, 'is_remediation', False) and self._remediation_steps_complete():
@@ -3371,8 +3398,16 @@ Keep it to 2-3 sentences."""
         if (self.current_topic_index >= len(self.steps)
                 and self.session_state == SessionState.TUTORING
                 and not getattr(self, 'is_remediation', False)):
-            self.session_state = SessionState.EXIT_TICKET
-            show_exit_ticket = True
+            if not self._can_trigger_exit_ticket():
+                self.exit_ticket_hold_until_exchange = self.exchange_count + 1
+                logger.info(
+                    "[ExitTicket] HOLD session=%s (alt-path) — wrong/"
+                    "reveal in progress; eligible at exchange %d",
+                    self.session.id, self.exit_ticket_hold_until_exchange,
+                )
+            else:
+                self.session_state = SessionState.EXIT_TICKET
+                show_exit_ticket = True
 
         # Remediation: check if all failed concepts re-covered
         if (not show_exit_ticket and getattr(self, 'is_remediation', False)
@@ -4239,6 +4274,68 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
             ctx['student_answer'] = str(sp)[:200] if sp is not None else ''
         return ctx if ctx else None
 
+    def _can_trigger_exit_ticket(self) -> bool:
+        """Pilot directive 2026-05-17 — hold the exit-ticket transition
+        until the just-answered bank question is fully discussed.
+
+        Holds when ANY of:
+          - The most recent bank grade verdict was wrong (the student
+            shouldn't be ejected into assessment right after a wrong).
+          - A reveal just happened this turn (wrong_attempts >= reveal
+            threshold on the current bank Q). The reveal walkthrough
+            needs at least one acknowledgement turn before assessment.
+          - We're inside the explicit hold window set by a prior turn.
+
+        Symptom this fixes: lesson 540 session 47 turn 828 — student
+        answered "D" wrong on the legend MCQ; the chat-authored grader
+        mis-graded it correct after W3 regen rewrote the stem; engine
+        advanced step 2 → 3 → triggered exit ticket immediately. Even
+        with the chat-authored mis-grade, this gate would have held the
+        trigger because the BANK verdict (the authoritative source) was
+        wrong on the just-answered question.
+        """
+        # Hold-window: previous turn marked a hold; honour until the
+        # next student exchange has happened.
+        if self.exchange_count < int(getattr(self, 'exit_ticket_hold_until_exchange', 0) or 0):
+            return False
+        # Last bank grade — if wrong, hold. _pending_bank_grade is set
+        # by _grade_against_last_bank_question on the current turn; we
+        # also consult _last_bank_grade_correct (persisted) for the
+        # most recent answered bank Q's verdict across turns.
+        bg = getattr(self, '_pending_bank_grade', None)
+        if bg is not None and getattr(bg, 'is_correct', None) is False:
+            return False
+        # Reveal-just-happened — current bank Q has wrong_attempts
+        # at or past the difficulty-tiered reveal threshold AND the
+        # most recent grade was wrong (the engine layer that set
+        # is_correct=True via chat-authored mis-grade still flips the
+        # bank verdict via the BANK_OVERRIDE path, so we trust that
+        # signal when present).
+        aa = getattr(self, '_awaiting_answer', None) or {}
+        wrong_attempts = int(aa.get('wrong_attempts', 0) or 0)
+        if wrong_attempts >= self._reveal_threshold():
+            # Reveal just unlocked. Hold for ≥1 more turn.
+            return False
+        return True
+
+    def _reveal_threshold(self) -> int:
+        """Number of wrong attempts at which reveal becomes allowed.
+        Difficulty-tiered (decision 2026-05-17):
+
+          easy (-2, -1) → 2  (1 hint, reveal on 2nd wrong)
+          medium (0)    → 3  (2 hints, reveal on 3rd wrong — original default)
+          hard  (+1,+2) → 4  (3 hints, reveal on 4th wrong)
+
+        Lower-performing students get to canonical faster; higher-performing
+        students get more productive struggle time.
+        """
+        level = int(getattr(self, 'difficulty_level', 0) or 0)
+        if level <= -1:
+            return 2
+        if level >= 1:
+            return 4
+        return 3
+
     def _build_hint_calibration_block(
         self,
         correct_option_letter: Optional[str] = None,
@@ -4509,7 +4606,8 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         # about the student's misconception and the student doesn't
         # struggle productively.
         wrong_attempts = int(rec.get('wrong_attempts', 0) or 0)
-        reveal_allowed = (status == 'answered_wrong' and wrong_attempts >= 3)
+        _reveal_at = self._reveal_threshold()
+        reveal_allowed = (status == 'answered_wrong' and wrong_attempts >= _reveal_at)
         rules = {
             'awaiting_answer': (
                 "Scaffolding: HINT ONLY — never reveal the correct "
@@ -4540,10 +4638,10 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
                 "('what made you pick that?'). Let them attempt the "
                 "question again."
                 + (
-                    "\n  ↳ REVEAL ALLOWED this turn: student has "
-                    "missed this question 3+ times — you may now "
-                    "state the correct answer + full explanation, "
-                    "then move on."
+                    f"\n  ↳ REVEAL ALLOWED this turn: student has "
+                    f"missed this question {_reveal_at}+ times — you "
+                    "may now state the correct answer + full "
+                    "explanation, then move on."
                     if reveal_allowed else ""
                 )
             ),
@@ -7252,6 +7350,37 @@ Follow the current step; this concept will be covered in sequence."""
         ref = (last_tutor_turn.metadata or {}).get('bank_question_ref') or {}
         kind = ref.get('kind')
         ref_id = ref.get('id')
+
+        # 2026-05-17 (task #171) — bank link persistence across hint
+        # turns. The previous logic only looked at the most-recent
+        # tutor turn's bank_question_ref. But pose_question only fires
+        # on the turn that posts the question; subsequent hint turns
+        # (after wrong#1, wrong#2, regen-rewrites...) carry no
+        # bank_question_ref, so the grader fell through to the
+        # chat-authored path and LLM-guessed the single-letter reply.
+        # Lesson 540 session 47 turn 828: 'D' graded True against a
+        # regen-rewritten stem despite correct=B.
+        #
+        # Fix: when the bank question is still active (self._awaiting_answer
+        # set with a bank-Q kind), the BANK grader is authoritative —
+        # regardless of which tutor turn rendered it. The last-turn
+        # metadata is the cheap path; self._awaiting_answer is the
+        # cross-turn anchor.
+        aa = getattr(self, '_awaiting_answer', None) or {}
+        aa_kind = aa.get('kind')
+        aa_qid = aa.get('question_id')
+        if (
+            not kind  # no bank_question_ref on the last turn
+            and aa_kind in ('lesson_step', 'exit_ticket_question')
+            and aa_qid
+        ):
+            kind = aa_kind
+            ref_id = aa_qid
+            logger.info(
+                "[BankGrade] reusing _awaiting_answer link (kind=%s id=%s) "
+                "— last tutor turn had no bank_question_ref (hint/regen turn)",
+                kind, ref_id,
+            )
         # Fallback path 2026-05-16: no bank_question_ref but the previous
         # tutor turn ended in a question — likely a tutor-authored
         # question without an answer key. Use the no-key LLM grader so
@@ -8287,7 +8416,8 @@ Follow the current step; this concept will be covered in sequence."""
         # to self-correct.
         _aa = getattr(self, '_awaiting_answer', None) or {}
         wrong_attempts = int(_aa.get('wrong_attempts', 0) or 0)
-        reveal_allowed = wrong_attempts >= 3
+        _reveal_at = self._reveal_threshold()
+        reveal_allowed = wrong_attempts >= _reveal_at
 
         if grade.is_correct:
             guidance = (
@@ -8303,16 +8433,18 @@ Follow the current step; this concept will be covered in sequence."""
         elif reveal_allowed:
             guidance = (
                 f"The student has now missed this question "
-                f"{wrong_attempts} times. REVEAL ALLOWED: state the "
-                "correct answer from the bank, then walk them through "
-                "the canonical explanation below LINE BY LINE, quoting "
+                f"{wrong_attempts} times (reveal threshold: "
+                f"{_reveal_at}). REVEAL ALLOWED: state the correct "
+                "answer from the bank, then walk them through the "
+                "canonical explanation below LINE BY LINE, quoting "
                 "the bank's wording. Do NOT paraphrase or invent "
                 "intermediate steps. After the walkthrough, move on."
             )
         else:
             guidance = (
                 f"The student's response does NOT match the bank's "
-                f"stored answer (wrong_attempts: {wrong_attempts}). "
+                f"stored answer (wrong_attempts: {wrong_attempts}, "
+                f"reveal at: {_reveal_at}). "
                 "DO NOT REVEAL the correct answer, the correct option "
                 "letter, or paraphrase the canonical text. You MUST "
                 "NOT say 'correct', 'right', 'exactly', or any "
@@ -8323,8 +8455,8 @@ Follow the current step; this concept will be covered in sequence."""
                 "but rephrase it so it narrows the answer space "
                 "without giving it away, (3) invite them to try again. "
                 "ONE short probe ('what made you pick that?') is OK. "
-                "Reveal is only permitted after 3 wrong attempts on "
-                "this question."
+                f"Reveal is only permitted after {_reveal_at} wrong "
+                "attempts on this question."
             )
 
         # Pull the stored explanation from the cached question. Limit
