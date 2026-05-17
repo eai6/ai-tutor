@@ -9919,6 +9919,33 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
             )
             return True
 
+        # 1.5 — Reveal-on-threshold advance (2026-05-17). If the bank
+        # Q on the current step reached the difficulty-tiered reveal
+        # threshold AND the just-graded verdict was wrong, the tutor
+        # has revealed the canonical answer — the step is "done" via
+        # reveal, not via a correct verdict. Without this, the step
+        # gets stuck because is_correct=False can't trip the
+        # deterministic fast-path, and the LLM step_complete judge
+        # tends to stay False after a wrong verdict.
+        # Pilot 2026-05-17 lesson 540 session 49: step 0 stuck after
+        # reveal on the population-density Q; tutor authored a new
+        # MCQ inline but engine didn't advance, so the next reply
+        # routed back to qid=3103 via the bank-link fallback.
+        _aa_advance = getattr(self, '_awaiting_answer', None) or {}
+        _wrong_attempts_advance = int(_aa_advance.get('wrong_attempts', 0) or 0)
+        _reveal_at = self._reveal_threshold()
+        if (
+            is_correct is False
+            and _wrong_attempts_advance >= _reveal_at
+        ):
+            logger.info(
+                "[StepAdvance] REVEAL_ON_THRESHOLD step=%d type=%s "
+                "wrong_attempts=%d >= reveal_threshold=%d → advance",
+                self.current_topic_index, step_type,
+                _wrong_attempts_advance, _reveal_at,
+            )
+            return True
+
         # 2. Min exchange floor before any advancement decision fires.
         min_exchanges = self._STEP_EVAL_MIN_EXCHANGES.get(step_type, 1)
         if exchanges < min_exchanges:
