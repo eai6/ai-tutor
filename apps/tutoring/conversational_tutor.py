@@ -6973,6 +6973,18 @@ Follow the current step; this concept will be covered in sequence."""
                 )
                 self._pending_bank_grade = result
                 self._pending_bank_question = None
+                # Track wrong_attempts on the awaiting_answer record
+                # so the hint-vs-reveal threshold also fires on
+                # chat-authored questions. Without this, attempts
+                # via chat-authored grading don't accumulate and
+                # the reveal-after-3 gate never opens.
+                if (
+                    result is not None
+                    and getattr(result, 'is_correct', None) is False
+                    and isinstance(getattr(self, '_awaiting_answer', None), dict)
+                ):
+                    cur = int(self._awaiting_answer.get('wrong_attempts', 0) or 0)
+                    self._awaiting_answer['wrong_attempts'] = cur + 1
                 if result is not None and getattr(result, 'is_correct', None) is True:
                     self._clear_awaiting_answer()
                 logger.info(
@@ -7937,6 +7949,18 @@ Follow the current step; this concept will be covered in sequence."""
         re-deriving (and risking new errors).
         """
         verdict = "CORRECT" if grade.is_correct else "INCORRECT"
+        # Read wrong_attempts from the awaiting_answer record (bank Qs)
+        # or fall back to the grade detail for chat-authored fallbacks.
+        # Reveal is gated at >= 3 attempts on the same question; before
+        # then the tutor MUST give a hint and let the student retry,
+        # so they actually learn to recognise the misconception. Pilot
+        # 2026-05-17 lesson 540: tutor revealed "physical geography"
+        # on the first wrong attempt, so the student never had a chance
+        # to self-correct.
+        _aa = getattr(self, '_awaiting_answer', None) or {}
+        wrong_attempts = int(_aa.get('wrong_attempts', 0) or 0)
+        reveal_allowed = wrong_attempts >= 3
+
         if grade.is_correct:
             guidance = (
                 "The bank's stored answer matches the student's response. "
@@ -7948,17 +7972,31 @@ Follow the current step; this concept will be covered in sequence."""
                 "canonical_working / explanation below verbatim — never "
                 "compute a fresh derivation."
             )
+        elif reveal_allowed:
+            guidance = (
+                f"The student has now missed this question "
+                f"{wrong_attempts} times. REVEAL ALLOWED: state the "
+                "correct answer from the bank, then walk them through "
+                "the canonical explanation below LINE BY LINE, quoting "
+                "the bank's wording. Do NOT paraphrase or invent "
+                "intermediate steps. After the walkthrough, move on."
+            )
         else:
             guidance = (
-                "The student's response does NOT match the bank's stored "
-                "answer. You MUST NOT say 'correct', 'right', 'exactly', "
-                "or any equivalent praise. Do NOT compute the correct "
-                "answer yourself — the bank already has it (above). When "
-                "the student is ready, walk them through the canonical "
-                "explanation below LINE BY LINE, quoting the bank's "
-                "wording. Do NOT paraphrase or invent intermediate steps. "
-                "The bank is the source of truth for both the answer "
-                "and the working."
+                f"The student's response does NOT match the bank's "
+                f"stored answer (wrong_attempts: {wrong_attempts}). "
+                "DO NOT REVEAL the correct answer, the correct option "
+                "letter, or paraphrase the canonical text. You MUST "
+                "NOT say 'correct', 'right', 'exactly', or any "
+                "equivalent praise. Instead: (1) acknowledge gently "
+                "('not quite' / 'close, but think about…'), (2) name "
+                "the underlying concept they need to consider — use "
+                "the canonical_explanation below to inform a CLUE, "
+                "but rephrase it so it narrows the answer space "
+                "without giving it away, (3) invite them to try again. "
+                "ONE short probe ('what made you pick that?') is OK. "
+                "Reveal is only permitted after 3 wrong attempts on "
+                "this question."
             )
 
         # Pull the stored explanation from the cached question. Limit
