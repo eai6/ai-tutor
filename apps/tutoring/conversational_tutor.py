@@ -4368,19 +4368,25 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         obviousness directive. Rendered inside both
         `_build_active_bank_question_block` and
         `_build_bank_grade_signal_block` so the hint policy stays
-        consistent whether the LLM is composing the hint pre-attempt or
-        post-wrong-attempt.
+        consistent whether the LLM is composing the hint pre-attempt
+        or past the move-on threshold.
 
-        Returns "" when `reveal_allowed` (no need to constrain the
-        tutor — they're allowed to state the canonical answer).
+        Pilot directive 2026-05-17: reveal is NEVER allowed — past
+        threshold, the tutor MOVES ON (re-explains concept, pivots to
+        easier Q) instead of stating the canonical answer. The
+        FORBIDDEN list therefore stays in force on every turn while a
+        bank Q is active. The `reveal_allowed` parameter is kept for
+        signature stability but the block always renders.
 
         Concrete examples beat abstract prohibitions on Sonnet
         (learning L14). The forbidden list uses the actual option text
         from the live question when known so the tutor can't
         rationalise "well, that wasn't a paraphrase of THIS option".
         """
-        if reveal_allowed:
-            return ""
+        # reveal_allowed kept for caller signature stability — no
+        # longer gates the block; reveal is never allowed under the
+        # 2026-05-17 directive.
+        _ = reveal_allowed  # noqa: F841
 
         lines: List[str] = ["", "[HINT CALIBRATION]"]
 
@@ -4685,10 +4691,13 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
                 "('what made you pick that?'). Let them attempt the "
                 "question again."
                 + (
-                    f"\n  ↳ REVEAL ALLOWED this turn: student has "
-                    f"missed this question {_reveal_at}+ times — you "
-                    "may now state the correct answer + full "
-                    "explanation, then move on."
+                    f"\n  ↳ MOVE-ON ALLOWED this turn: student has "
+                    f"missed this question {_reveal_at}+ times — do "
+                    "NOT reveal the answer. Re-explain the underlying "
+                    "concept in 1-2 sentences (no answer text, no "
+                    "option letter), then pose a DIFFERENT question "
+                    "on the same concept (or an easier related one) "
+                    "via pose_question."
                     if reveal_allowed else ""
                 )
             ),
@@ -8525,12 +8534,19 @@ Follow the current step; this concept will be covered in sequence."""
         elif reveal_allowed:
             guidance = (
                 f"The student has now missed this question "
-                f"{wrong_attempts} times (reveal threshold: "
-                f"{_reveal_at}). REVEAL ALLOWED: state the correct "
-                "answer from the bank, then walk them through the "
-                "canonical explanation below LINE BY LINE, quoting "
-                "the bank's wording. Do NOT paraphrase or invent "
-                "intermediate steps. After the walkthrough, move on."
+                f"{wrong_attempts} times (move-on threshold: "
+                f"{_reveal_at}). MOVE ON — do NOT reveal the correct "
+                "answer. Acknowledge their attempt gently ('that's a "
+                "tricky one — let's try a different angle'). In ONE "
+                "or TWO short sentences, RE-EXPLAIN the underlying "
+                "concept the question was testing WITHOUT naming the "
+                "correct option letter and WITHOUT paraphrasing the "
+                "canonical answer text. Then immediately pose a "
+                "DIFFERENT question on the SAME concept (or an "
+                "easier related one) via the pose_question tool — "
+                "ideally one tagged easy or with simpler wording. "
+                "NEVER state 'the correct answer is X' or describe "
+                "the canonical option."
             )
         else:
             guidance = (

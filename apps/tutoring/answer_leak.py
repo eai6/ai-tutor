@@ -279,7 +279,7 @@ def detect_answer_leak(
     chat_authored_q: Optional[str],      # last tutor question text when chat-authored
     wrong_attempts: int,
     llm_client,                          # required — LLM judge always runs (when not skipped)
-    reveal_threshold: int = 3,           # difficulty-tiered; caller passes from _reveal_threshold()
+    reveal_threshold: int = 3,           # kept for caller signature stability; no longer skips
 ) -> Optional[LeakVerdict]:
     """Detect whether the tutor response leaked the canonical answer.
 
@@ -287,17 +287,21 @@ def detect_answer_leak(
     Agreement: trust the consensus. Disagreement: arbiter call resolves.
     Returns None when no leak detected; LeakVerdict when leak detected.
 
-    `reveal_threshold` is the difficulty-tiered wrong-attempt count
-    at which reveal becomes legitimate; the detector skips once that
-    threshold is met so the canonical walkthrough isn't flagged.
+    Pilot directive 2026-05-17: reveal is NEVER allowed. Past the
+    wrong-attempts threshold, the tutor MOVES ON (pivots to a different
+    easier Q on the same concept) instead of stating the canonical.
+    The leak detector therefore runs on EVERY bank-Q turn regardless
+    of wrong_attempts — the previous skip-after-threshold logic
+    assumed reveal was a legitimate path, which it no longer is.
+    The `reveal_threshold` parameter is kept for caller signature
+    stability but is intentionally unused.
     """
     import time
+    _ = reveal_threshold  # noqa: F841 — see docstring
     t0 = time.monotonic()
 
     # Skip cases
     if not response or not response.strip():
-        return None
-    if wrong_attempts >= reveal_threshold:
         return None
     if bank_question is None and not chat_authored_q:
         return None

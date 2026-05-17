@@ -154,6 +154,10 @@ class ValidationResult:
         # Tutor re-asked a question already in flight or already
         # answered. Regen prompts for a different angle.
         ISSUE_REPEATED_QUESTION,
+        # Tutor ended without a question or a call-to-action — the
+        # student is left without direction. Pilot directive 2026-05-17:
+        # every turn must hand the floor back with an explicit next step.
+        ISSUE_NO_QUESTION,
     })
 
     @property
@@ -213,6 +217,52 @@ def _ends_with_question(text: str) -> bool:
     return bool(_QUESTION_RE.search(tail))
 
 
+# 2026-05-17 — call-to-action phrases. A turn that doesn't end with '?'
+# can still be acceptable when it explicitly invites the student to do
+# something next. Patterns are tight enough to reject pure
+# acknowledgements ("Great!") but accept genuine handoffs ("let's try
+# the next one", "tell me what you think", "your turn", "go ahead and...").
+# Pilot 2026-05-17 lesson 540 session 49: tutor ended turn 855 with
+# "Exactly right! The compass rose shows directions which is essential
+# for giving directions." → no question, no action, student stuck.
+_CALL_TO_ACTION_RE = re.compile(
+    r"\b("
+    r"let'?s\s+(?:try|move|continue|look|see|think|do|practice|tackle|explore|check|work|figure)|"
+    r"try\s+(?:this|that|the\s+next|to|out|it|one|another)|"
+    r"tell\s+me\b|"
+    r"let\s+me\s+know|"
+    r"show\s+me\b|"
+    r"walk\s+me\s+through|"
+    r"give\s+(?:it\s+a\s+(?:try|shot|go)|me\s+(?:a|an|your))|"
+    r"your\s+turn\b|"
+    r"go\s+ahead\s+(?:and|with)|"
+    r"pick\s+(?:one|a|the)|"
+    r"choose\s+(?:one|a|the|your)|"
+    r"ready\s+(?:to|for)|"
+    r"what\s+do\s+you\s+(?:think|see|notice|make)|"
+    r"see\s+if\s+you\s+can|"
+    r"work\s+(?:through|on|out)|"
+    r"think\s+about\b"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _has_call_to_action(text: str) -> bool:
+    """Return True if the response ends with a question OR contains a
+    clear next-step invitation. Used by the validator to flag turns
+    that leave the student without direction (e.g. pure
+    acknowledgements that stall the dialogue)."""
+    if _ends_with_question(text):
+        return True
+    if not text:
+        return False
+    # Only look at the tail half — a CTA in the opening paragraph
+    # but a wall of new info after doesn't count.
+    tail = text[-500:]
+    return bool(_CALL_TO_ACTION_RE.search(tail))
+
+
 def _info_dump_score(text: str) -> int:
     """Return number of named concepts (acronyms, numbers, percentages)
     that appear in the response. >= 5 is the threshold for an info dump."""
@@ -263,8 +313,18 @@ def validate_tutor_response(
 
     # L1 — structural
     layers_run.append("structural")
-    if step_type in {"practice", "quiz"} and not _ends_with_question(content):
-        issues.append(ISSUE_NO_QUESTION)
+    # Practice/quiz steps require a literal '?' (the student must be
+    # asked the next attempt question). Other step types are more
+    # flexible — they need EITHER a question OR a clear call-to-action
+    # so the student is never left without direction. Pilot directive
+    # 2026-05-17: every tutor turn must end with a question or an
+    # action; pure acknowledgements stall the dialogue.
+    if step_type in {"practice", "quiz"}:
+        if not _ends_with_question(content):
+            issues.append(ISSUE_NO_QUESTION)
+    else:
+        if not _has_call_to_action(content):
+            issues.append(ISSUE_NO_QUESTION)
     info_score = _info_dump_score(content)
     if info_score >= 6 and not _ends_with_question(content):
         issues.append(ISSUE_INFO_DUMP)

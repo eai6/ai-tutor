@@ -514,12 +514,15 @@ def _violation_line(issue: str, meta: Dict) -> str:
         reason = (meta.get("answer_leak_reason") or "").strip()
         return (
             "- ANSWER_LEAK: the original response REVEALED the correct "
-            "answer to the student before they earned reveal "
-            "(wrong_attempts < 3). The canonical answer has been "
-            "REMOVED from your context (see LEAK_AWARE_REGEN block "
-            "above) — output ONE concept-level hint that names what "
-            "the question is testing without describing what any "
-            "option says.\n"
+            "answer to the student. Pilot directive 2026-05-17: reveal "
+            "is NEVER allowed regardless of wrong_attempts. Past the "
+            "move-on threshold the tutor MUST pivot to a different "
+            "easier question on the same concept WITHOUT stating the "
+            "canonical. The canonical answer has been REMOVED from "
+            "your context (see LEAK_AWARE_REGEN block above) — output "
+            "ONE concept-level hint or a brief concept re-explanation "
+            "that names what the question is testing WITHOUT "
+            "describing what any option says.\n"
             + (f"  Detector reason: {reason[:200]}\n" if reason else "")
             + "  Example: BEFORE: \"A compass rose helps you figure "
             "out which direction to travel.\" AFTER: \"Think about "
