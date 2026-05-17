@@ -4830,14 +4830,12 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
 
         # Task #190 — unified rendering via Question. Replaces the
         # 4-branch kind-dispatch that used to live here (lesson_step /
-        # exit_ticket_question / inline_authored / inline_mcq).
+        # exit_ticket_question / inline_authored / inline_mcq). The
+        # hint-calibration block below reads canonical letter/text
+        # directly from the Question — no more source-specific DB
+        # lookups.
         lines = _q_unified.render_active_block_header()
         lines.append(f"  student_status: {status}")
-        # Locals kept for compatibility with the hint-calibration block
-        # below (it uses kind + question_id for the DB option-text
-        # lookup). Both can be derived from the Question.
-        kind = _q_unified.source
-        question_id = _q_unified.source_id
 
         # Status-driven scaffolding rules. Tight wording so the LLM
         # internalises them without a separate behavioural prompt.
@@ -4903,31 +4901,15 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         # W2 — append FORBIDDEN/ACCEPTABLE list + difficulty-tiered
         # obviousness when in awaiting_answer or answered_wrong AND
         # reveal is NOT yet allowed.
+        # Task #190 Phase 2: pull canonical letter + text directly from
+        # the Question — replaces the source-specific DB lookups that
+        # used to live here. canonical_letter is "" for non-MCQ;
+        # canonical_text gracefully falls back to expected_answer /
+        # answer_key for short-form Qs.
         if status in ('awaiting_answer', 'answered_wrong'):
-            # Pull the correct-option text for MCQ so the forbidden
-            # list can quote the actual canonical text.
-            _opt_letter: Optional[str] = None
-            _opt_text: Optional[str] = None
-            try:
-                if kind == 'exit_ticket_question':
-                    from apps.tutoring.models import ExitTicketQuestion
-                    _q = ExitTicketQuestion.objects.filter(id=question_id).first()
-                    if _q and (_q.question_type or 'mcq') == 'mcq':
-                        _opt_letter = (_q.correct_answer or '').strip().upper()
-                        _opt_text = {
-                            'A': _q.option_a, 'B': _q.option_b,
-                            'C': _q.option_c, 'D': _q.option_d,
-                        }.get(_opt_letter)
-                elif kind == 'lesson_step':
-                    from apps.curriculum.models import LessonStep
-                    _s = LessonStep.objects.filter(id=question_id).first()
-                    if _s:
-                        _opt_text = (_s.expected_answer or '').strip()
-            except Exception:
-                pass
             calib = self._build_hint_calibration_block(
-                correct_option_letter=_opt_letter,
-                correct_option_text=_opt_text,
+                correct_option_letter=_q_unified.canonical_letter or None,
+                correct_option_text=_q_unified.canonical_text or None,
                 reveal_allowed=reveal_allowed,
             )
             if calib:
