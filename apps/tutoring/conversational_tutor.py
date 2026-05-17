@@ -4777,17 +4777,46 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
 
         Returns "" when no question is awaiting (most turns).
         """
+        # Task #190 (2026-05-17) — Question abstraction. The engine
+        # used to dispatch on `kind` here (lesson_step /
+        # exit_ticket_question / inline_authored / inline_mcq) with
+        # four if/elif branches each pulling from different metadata
+        # sources. The Question dataclass now adapts every source to a
+        # uniform shape; downstream rendering / grading is one path.
+        # See apps/tutoring/question.py for the adapters.
+        from apps.tutoring.question import Question as _Q
         rec = getattr(self, '_awaiting_answer', None)
         if not rec:
             return ""
-        # inline_authored / inline_mcq have no question_id (the question
-        # lives only on the previous tutor turn's metadata or on the
-        # awaiting_answer record itself). Allow them through; the
-        # kind-dispatch below reads from turn metadata / the record.
+        _q_unified = _Q.from_engine_state(rec)
+        # For inline_authored where the question metadata lives on the
+        # POSING tutor turn (pose_inline_question tool path), the thin
+        # Question from from_engine_state lacks a stem. Hydrate from
+        # turn metadata when that's the case.
         if (
-            not rec.get('question_id')
-            and rec.get('kind') not in ('inline_authored', 'inline_mcq')
+            _q_unified is not None
+            and not _q_unified.stem
+            and rec.get('kind') == 'inline_authored'
         ):
+            try:
+                from apps.tutoring.models import SessionTurn
+                _last_t = (
+                    SessionTurn.objects
+                    .filter(session=self.session, role='tutor')
+                    .order_by('-created_at')
+                    .first()
+                )
+                ia = ((_last_t.metadata or {}).get(
+                    'inline_authored_question', {}
+                ) or {}) if _last_t else {}
+                if ia:
+                    _q_unified = _Q.from_inline_authored(ia)
+                    _q_unified.wrong_attempts = int(rec.get('wrong_attempts', 0) or 0)
+                    _q_unified.turn_index = rec.get('turn_index')
+                    _q_unified.posed_at = rec.get('posed_at') or ""
+            except Exception:
+                pass
+        if _q_unified is None or not _q_unified.stem:
             return ""
 
         # Resolve student_status from the most-recent grade verdict
@@ -4799,150 +4828,16 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         if grade is not None and getattr(grade, 'is_correct', None) is not None:
             status = 'answered_correct' if grade.is_correct else 'answered_wrong'
 
-        kind = rec.get('kind')
-        question_id = rec['question_id']
-
-        # Look up the bank entry for the verified key + explanation.
-        try:
-            if kind == 'lesson_step':
-                from apps.curriculum.models import LessonStep
-                step = LessonStep.objects.filter(id=question_id).first()
-                if step is None:
-                    return ""
-                stem = (step.question or step.teacher_script or '')[:600]
-                expected = (step.expected_answer or '').strip()[:200]
-                lines = [
-                    "[ACTIVE BANK QUESTION]",
-                    "A bank question is awaiting an answer. The student",
-                    "sees the question rendered in the side artifact panel.",
-                    "DO NOT re-author the question stem in your reply.",
-                    "",
-                    f"  question_id: {step.id}",
-                    f"  kind: lesson_step",
-                    f"  stem: {stem}",
-                    f"  expected_answer: {expected}",
-                    f"  student_status: {status}",
-                ]
-            elif kind == 'exit_ticket_question':
-                from apps.tutoring.models import ExitTicketQuestion
-                q = ExitTicketQuestion.objects.filter(id=question_id).first()
-                if q is None:
-                    return ""
-                stem = (q.question_text or '')[:600]
-                lines = [
-                    "[ACTIVE BANK QUESTION]",
-                    "A bank question is awaiting an answer. The student",
-                    "sees the question rendered in the side artifact panel.",
-                    "DO NOT re-author the question stem in your reply.",
-                    "",
-                    f"  question_id: {q.id}",
-                    f"  kind: exit_ticket_question",
-                    f"  question_type: {q.question_type or 'mcq'}",
-                    f"  stem: {stem}",
-                ]
-                if q.question_type == 'mcq':
-                    lines += [
-                        f"  options:",
-                        f"    A: {(q.option_a or '')[:200]}",
-                        f"    B: {(q.option_b or '')[:200]}",
-                        f"    C: {(q.option_c or '')[:200]}",
-                        f"    D: {(q.option_d or '')[:200]}",
-                        f"  correct_answer: {q.correct_answer or '(none)'}",
-                    ]
-                if q.explanation:
-                    lines.append(f"  explanation: {q.explanation[:400]}")
-                lines.append(f"  student_status: {status}")
-            elif kind == 'inline_authored':
-                # The tutor authored this question via
-                # pose_inline_question. Question text + answer_key
-                # live on the previous tutor turn's metadata. Pull
-                # them so the LLM sees what was asked + the verdict.
-                from apps.tutoring.models import SessionTurn
-                _last_t = (
-                    SessionTurn.objects
-                    .filter(session=self.session, role='tutor')
-                    .order_by('-created_at')
-                    .first()
-                )
-                ia = (
-                    ((_last_t.metadata or {}).get(
-                        'inline_authored_question', {}
-                    ) or {})
-                    if _last_t else {}
-                )
-                if ia:
-                    # Genuine pose_inline_question path — full metadata.
-                    lines = [
-                        "[ACTIVE INLINE-AUTHORED QUESTION]",
-                        "You authored this question on the previous turn",
-                        "via pose_inline_question. Use the answer_key +",
-                        "student_status below to scaffold the next turn.",
-                        "",
-                        f"  kind: inline_authored",
-                        f"  question_type: {ia.get('question_type', 'short_answer')}",
-                        f"  stem: {(ia.get('question') or '')[:600]}",
-                        f"  answer_key: {(ia.get('answer_key') or '')[:200]}",
-                        f"  student_status: {status}",
-                    ]
-                    if ia.get('working'):
-                        lines.append(
-                            f"  reference_working: {(ia.get('working') or '')[:300]}"
-                        )
-                else:
-                    # Task #189 (2026-05-17). Chat-authored conceptual /
-                    # warmup question — the LLM typed a question in
-                    # prose (no pose_inline_question). The bootstrap in
-                    # _grade_against_last_bank_question stored the
-                    # question text on the awaiting_answer record itself
-                    # (`authored_question_text`). Fall back to that so
-                    # the hint-vs-reveal scaffolding fires on warmups
-                    # too, not just on bank MCQs.
-                    stem = (rec.get('authored_question_text') or '').strip()
-                    if not stem:
-                        return ""
-                    lines = [
-                        "[ACTIVE CHAT-AUTHORED QUESTION]",
-                        "You authored a conceptual / open-ended question in",
-                        "chat narrative on a prior turn (no answer key in",
-                        "the bank). The chat-authored grader's LLM judges",
-                        "each reply; wrong_attempts is tracked on this record",
-                        "so the hint-vs-reveal threshold + move-on rules",
-                        "apply just like for bank MCQs.",
-                        "",
-                        f"  kind: inline_authored (chat-bootstrap)",
-                        f"  question_type: {rec.get('question_type') or 'short_answer'}",
-                        f"  stem: {stem[:600]}",
-                        f"  student_status: {status}",
-                    ]
-            elif kind == 'inline_mcq':
-                # Task #173 (2026-05-17). The LLM authored MCQ options
-                # inline (no pose_question, no answer key in the bank).
-                # We don't know the canonical answer programmatically;
-                # the chat-authored grader's LLM judges each reply. All
-                # this block does is surface the wrong_attempts +
-                # student_status to the tutor so the hint-vs-reveal
-                # gating still works.
-                lines = [
-                    "[ACTIVE INLINE-AUTHORED MCQ]",
-                    "You authored an MCQ in chat narrative on a prior",
-                    "turn (no answer key in the bank). The chat-authored",
-                    "grader's LLM judges each reply; wrong_attempts is",
-                    "tracked on this record so the hint-vs-reveal threshold",
-                    "still applies.",
-                    "",
-                    f"  kind: inline_mcq",
-                    f"  question_type: mcq",
-                    f"  stem: {(rec.get('authored_question_text') or '')[:600]}",
-                    f"  student_status: {status}",
-                ]
-            else:
-                return ""
-        except Exception as exc:
-            logger.warning(
-                f"[ActiveBankQuestion] resolve failed for {kind}#{question_id}: "
-                f"{type(exc).__name__}: {exc}"
-            )
-            return ""
+        # Task #190 — unified rendering via Question. Replaces the
+        # 4-branch kind-dispatch that used to live here (lesson_step /
+        # exit_ticket_question / inline_authored / inline_mcq).
+        lines = _q_unified.render_active_block_header()
+        lines.append(f"  student_status: {status}")
+        # Locals kept for compatibility with the hint-calibration block
+        # below (it uses kind + question_id for the DB option-text
+        # lookup). Both can be derived from the Question.
+        kind = _q_unified.source
+        question_id = _q_unified.source_id
 
         # Status-driven scaffolding rules. Tight wording so the LLM
         # internalises them without a separate behavioural prompt.
@@ -4958,7 +4853,7 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         # on the same question. Otherwise the tutor learns nothing
         # about the student's misconception and the student doesn't
         # struggle productively.
-        wrong_attempts = int(rec.get('wrong_attempts', 0) or 0)
+        wrong_attempts = _q_unified.wrong_attempts
         _reveal_at = self._reveal_threshold()
         reveal_allowed = (status == 'answered_wrong' and wrong_attempts >= _reveal_at)
         rules = {
