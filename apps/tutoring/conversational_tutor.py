@@ -9647,9 +9647,13 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         elif verdict_wrong:
             self.consecutive_first_try_correct = 0
 
-        # Auto-difficulty adjustment (2026-05-17 pilot directive).
+        # Auto-difficulty adjustment (2026-05-17 pilot directive,
+        # threshold revised to 4 wrong same day to preserve hint
+        # scaffolding at hard level — hard mode reveal threshold = 4,
+        # so 4 consecutive wrong = the student has exhausted all
+        # hint levels on the current Q, only THEN drop to easy).
         # Personalize per-student per-lesson without manual button mash:
-        #   - 2 consecutive wrong answers → drop to easy (-1) if not lower
+        #   - 4 consecutive wrong answers → drop to easy (-1) if not lower
         #   - 2 consecutive first-try-correct → bump to hard (+1) if not higher
         # Manual Too hard? / Too easy? buttons still override and clamp.
         # Once the adjustment fires, reset the counter so we don't bump
@@ -9657,7 +9661,7 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         # outcome breaks the streak).
         if (
             verdict_wrong
-            and getattr(self, 'consecutive_wrong', 0) >= 2
+            and getattr(self, 'consecutive_wrong', 0) >= 4
             and int(getattr(self, 'difficulty_level', 0) or 0) > -1
         ):
             _prev = self.difficulty_level
@@ -9665,7 +9669,7 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
             self.consecutive_wrong = 0  # re-arm
             logger.info(
                 "[AutoDifficulty] session=%s dropping difficulty %+d → -1 "
-                "(2 consecutive wrong)",
+                "(4 consecutive wrong)",
                 self.session.id, _prev,
             )
         elif (
