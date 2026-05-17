@@ -94,6 +94,13 @@ class CombinedJudgeResult:
     safety_severity: str = "safe"
     safety_categories: List[str] = field(default_factory=list)
     safety_reasoning: str = ""
+    # Handoff — task #183 (2026-05-17). LLM judges whether the tutor's
+    # turn hands the floor back to the student (real question or clear
+    # next-action directive). When `handed_off=False`, the validator
+    # raises ISSUE_NO_QUESTION → triggers regen. Default True so a
+    # skipped/errored judge doesn't false-positive.
+    handed_off: bool = True
+    handoff_reason: str = ""
     # Bookkeeping ----------------------------------------------------------
     skipped: bool = False
     skip_reason: str = ""

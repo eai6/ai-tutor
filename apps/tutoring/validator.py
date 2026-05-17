@@ -217,50 +217,14 @@ def _ends_with_question(text: str) -> bool:
     return bool(_QUESTION_RE.search(tail))
 
 
-# 2026-05-17 — call-to-action phrases. A turn that doesn't end with '?'
-# can still be acceptable when it explicitly invites the student to do
-# something next. Patterns are tight enough to reject pure
-# acknowledgements ("Great!") but accept genuine handoffs ("let's try
-# the next one", "tell me what you think", "your turn", "go ahead and...").
-# Pilot 2026-05-17 lesson 540 session 49: tutor ended turn 855 with
-# "Exactly right! The compass rose shows directions which is essential
-# for giving directions." → no question, no action, student stuck.
-_CALL_TO_ACTION_RE = re.compile(
-    r"\b("
-    r"let'?s\s+(?:try|move|continue|look|see|think|do|practice|tackle|explore|check|work|figure)|"
-    r"try\s+(?:this|that|the\s+next|to|out|it|one|another)|"
-    r"tell\s+me\b|"
-    r"let\s+me\s+know|"
-    r"show\s+me\b|"
-    r"walk\s+me\s+through|"
-    r"give\s+(?:it\s+a\s+(?:try|shot|go)|me\s+(?:a|an|your))|"
-    r"your\s+turn\b|"
-    r"go\s+ahead\s+(?:and|with)|"
-    r"pick\s+(?:one|a|the)|"
-    r"choose\s+(?:one|a|the|your)|"
-    r"ready\s+(?:to|for)|"
-    r"what\s+do\s+you\s+(?:think|see|notice|make)|"
-    r"see\s+if\s+you\s+can|"
-    r"work\s+(?:through|on|out)|"
-    r"think\s+about\b"
-    r")",
-    re.IGNORECASE,
-)
-
-
-def _has_call_to_action(text: str) -> bool:
-    """Return True if the response ends with a question OR contains a
-    clear next-step invitation. Used by the validator to flag turns
-    that leave the student without direction (e.g. pure
-    acknowledgements that stall the dialogue)."""
-    if _ends_with_question(text):
-        return True
-    if not text:
-        return False
-    # Only look at the tail half — a CTA in the opening paragraph
-    # but a wall of new info after doesn't count.
-    tail = text[-500:]
-    return bool(_CALL_TO_ACTION_RE.search(tail))
+# 2026-05-17 — call-to-action regex + _has_call_to_action helper
+# REMOVED. The structural check was brittle (dangling colons +
+# multi-sentence questions slipped past). Handoff detection is now
+# delegated to the dedicated `handoff` LLM judge in
+# apps/tutoring/judges/handoff.py, which runs concurrently with the
+# other judges and semantically classifies whether the turn hands
+# the floor back to the student. The validator consumes its verdict
+# below via combined_result.handed_off.
 
 
 def _info_dump_score(text: str) -> int:
@@ -314,16 +278,17 @@ def validate_tutor_response(
     # L1 — structural
     layers_run.append("structural")
     # Practice/quiz steps require a literal '?' (the student must be
-    # asked the next attempt question). Other step types are more
-    # flexible — they need EITHER a question OR a clear call-to-action
-    # so the student is never left without direction. Pilot directive
-    # 2026-05-17: every tutor turn must end with a question or an
-    # action; pure acknowledgements stall the dialogue.
+    # asked the next attempt question). The broader handoff check
+    # (does the response actually hand the floor back to the student
+    # via question OR clear next-step directive?) is delegated to the
+    # `handoff` LLM judge, which runs concurrently in run_all_judges
+    # and surfaces via combined_result.handed_off. The validator
+    # consumes that verdict below in the combined_result merge.
+    # Pilot 2026-05-17 (revised): regex CTA check was brittle —
+    # "Now let me ask:" with a dangling colon slipped past. The LLM
+    # judge sees the whole turn semantically.
     if step_type in {"practice", "quiz"}:
         if not _ends_with_question(content):
-            issues.append(ISSUE_NO_QUESTION)
-    else:
-        if not _has_call_to_action(content):
             issues.append(ISSUE_NO_QUESTION)
     info_score = _info_dump_score(content)
     if info_score >= 6 and not _ends_with_question(content):
@@ -473,6 +438,18 @@ def validate_tutor_response(
             )
             extra_meta["safety_reasoning"] = (
                 getattr(combined_result, "safety_reasoning", "") or ""
+            )
+        # Handoff judge (task #183): the LLM verdict on whether the
+        # tutor turn hands the floor back to the student. Catches
+        # dangling promises ("Now let me ask:" with no question),
+        # pure acknowledgements, and other parting lines that leave
+        # the student without direction. Default is handed_off=True
+        # (skipped / errored judge doesn't false-positive).
+        if getattr(combined_result, "handed_off", True) is False:
+            if ISSUE_NO_QUESTION not in issues:
+                issues.append(ISSUE_NO_QUESTION)
+            extra_meta["handoff_reason"] = (
+                getattr(combined_result, "handoff_reason", "") or ""
             )
     else:
         if fact_check and lesson is not None and llm_client is not None:

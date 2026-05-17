@@ -42,6 +42,10 @@ from apps.tutoring.judges.coherence import (
     CoherenceResult,
     run_coherence_judge,
 )
+from apps.tutoring.judges.handoff import (
+    HandoffResult,
+    run_handoff_judge,
+)
 from apps.tutoring.judges.factual import FactualResult, run_factual_judge
 from apps.tutoring.judges.figure_ref import (
     FigureRefResult,
@@ -64,6 +68,7 @@ __all__ = [
     "FactualResult",
     "FigureRefResult",
     "FigureVisionResult",
+    "HandoffResult",
     "RuleResult",
     "SafetyResult",
     "StepEvalResult",
@@ -89,6 +94,7 @@ def run_all_judges(
     conversation_history: Optional[List[dict]] = None,
     history_turns: Optional[int] = None,
     max_workers: int = 8,
+    bank_will_render: bool = False,
 ) -> CombinedJudgeResult:
     """Run all domain judges concurrently and merge into a
     CombinedJudgeResult. Each judge is fail-soft — if one errors, the
@@ -256,6 +262,18 @@ def run_all_judges(
             role="tutor",
             llm_client=llm_client,
         )
+        # Handoff — flags turns that don't hand the floor back to the
+        # student (dangling promise, pure ack, no next-step). Runs
+        # concurrently with the other judges, no extra wall-clock.
+        # bank_will_render lets the judge know the engine has a
+        # pose_question rendering OUTSIDE the text — when true, the
+        # bank Q counts as the handoff.
+        f_handoff = _submit(
+            run_handoff_judge,
+            response_text,
+            llm_client=llm_client,
+            bank_will_render=bool(bank_will_render),
+        )
 
         arith = _safe_result(f_arith, "arithmetic", ArithmeticResult)
         fact = _safe_result(f_fact, "factual", FactualResult)
@@ -265,6 +283,7 @@ def run_all_judges(
         figref = _safe_result(f_figref, "figure_ref", FigureRefResult)
         figvis = _safe_result(f_figvis, "figure_vision", FigureVisionResult)
         safety = _safe_result(f_safety, "safety", SafetyResult)
+        handoff = _safe_result(f_handoff, "handoff", HandoffResult)
 
     # Merge deterministically. No final LLM call — each judge's verdict
     # is independent and the merge is mechanical.
@@ -301,6 +320,10 @@ def run_all_judges(
         result.safety_categories = list(safety.categories or [])
         result.safety_reasoning = safety.reasoning
 
+    if handoff and not handoff.skipped:
+        result.handed_off = bool(handoff.handed_off)
+        result.handoff_reason = handoff.reason or ""
+
     # Sub-skip telemetry — same shape combined_judge produced so
     # validator + dashboard pickup keeps working.
     result.sub_skipped = {}
@@ -320,6 +343,8 @@ def run_all_judges(
         result.sub_skipped["figure_vision"] = figvis.skip_reason
     if safety and safety.skipped:
         result.sub_skipped["safety"] = safety.skip_reason
+    if handoff and handoff.skipped:
+        result.sub_skipped["handoff"] = handoff.skip_reason
 
     logger.info(
         "[Judges] arith=%s fact=%s rule=%s step=%s coh=%s figref=%s figvis=%s "
