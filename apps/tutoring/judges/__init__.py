@@ -348,7 +348,7 @@ def run_all_judges(
 
     logger.info(
         "[Judges] arith=%s fact=%s rule=%s step=%s coh=%s figref=%s figvis=%s "
-        "safety=%s answer_correct=%s step_complete=%s step_source=%s",
+        "safety=%s handoff=%s answer_correct=%s step_complete=%s step_source=%s",
         "skipped" if (arith and arith.skipped) else f"corrections={len(result.arithmetic_corrections)}",
         "skipped" if (fact and fact.skipped) else f"claims={len(result.fact_claims)}",
         "skipped" if (rule and rule.skipped) else f"violations={len(result.rule_violations)}",
@@ -360,6 +360,10 @@ def run_all_judges(
          else f"{result.safety_severity}"
               + (f"({','.join(result.safety_categories)})"
                  if result.safety_categories else "")),
+        ("skipped" if (handoff and handoff.skipped)
+         else f"handed_off={result.handed_off}"
+              + (f" reason={result.handoff_reason[:60]!r}"
+                 if (not result.handed_off and result.handoff_reason) else "")),
         result.answer_correct,
         result.step_complete,
         getattr(step, "source", ""),

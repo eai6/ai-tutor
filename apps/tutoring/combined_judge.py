@@ -238,6 +238,10 @@ class CombinedJudgeResult:
                 "categories": list(self.safety_categories),
                 "reasoning": self.safety_reasoning,
             },
+            "handoff": {
+                "handed_off": self.handed_off,
+                "reason": self.handoff_reason,
+            },
             "history_turns_used": self.history_turns_used,
             "prompt_versions": dict(self.prompt_versions or {}),
             "skipped": self.skipped,
