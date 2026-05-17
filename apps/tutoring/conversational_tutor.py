@@ -5806,20 +5806,20 @@ Follow the current step; this concept will be covered in sequence."""
             "\n       lesson bank (curriculum-aligned practice + exit-ticket"
             "\n       items). PREFER THIS — bank Qs already have verified"
             "\n       answer keys. Use it whenever a fitting slot exists."
-            "\n     - pose_inline_question(question, answer_key, type, ...):"
-            "\n       AUTHOR your own question with a REQUIRED answer_key"
-            "\n       the grader will use as ground truth. Examples: "
-            "\n       numeric ('240°'), true/false ('true'), short fact-"
-            "\n       recall ('legend'), key concept words for short-answer."
-            "\n       The grader is generous on phrasing but it MUST have"
-            "\n       a defensible canonical to compare against."
-            "\n   If you can't write a clear answer_key for an authored"
-            "\n   question, DO NOT use pose_inline_question. Either pick a"
-            "\n   bank slot via pose_question OR skip posing a new question"
-            "\n   this turn (stay on the active Q / shift to teach-back)."
-            "\n   Fabricated keys produce false-negative grades — student"
-            "\n   marked wrong when they're actually right — which damages"
-            "\n   trust. Empty / vague keys are worse than no question."
+            "\n     - pose_inline_question(question, options{A,B,C,D},"
+            "\n       correct_answer): AUTHOR your own MULTIPLE-CHOICE"
+            "\n       question with 4 options and a single correct"
+            "\n       letter. Grading is a deterministic letter-match."
+            "\n       Free-prose answers (short_answer, numeric, concept)"
+            "\n       are no longer accepted by this tool — the"
+            "\n       chat-authored grader was too noisy and produced"
+            "\n       false negatives on correct answers."
+            "\n   If your authored question doesn't fit a 4-option MCQ,"
+            "\n   DO NOT use pose_inline_question. Either pick a bank slot"
+            "\n   via pose_question (any type — bank Qs have verified keys)"
+            "\n   OR skip posing this turn (stay on the active Q / shift"
+            "\n   to teach-back). Open-ended prose questions via this tool"
+            "\n   will be rejected."
             "\n   Hint-probes inside a hint (\"what made you pick A?\")"
             "\n   are NOT new questions — they're rhetorical, scoped to the"
             "\n   active question, and don't need a tool. NEW questions"
@@ -6882,39 +6882,40 @@ Follow the current step; this concept will be covered in sequence."""
         return {
             "name": self.POSE_INLINE_QUESTION_TOOL_NAME,
             "description": (
-                "Use this tool when you want to author your OWN question — "
-                "a check, comprehension probe, scaffolding sub-step, "
-                "warmup, or any question that isn't in the lesson's bank.\n\n"
-                "REQUIRED: every question you pose to the student MUST go "
-                "through a tool call (either pose_question for bank items "
-                "or this one for authored items). Do NOT type a question "
-                "in your prose response — the engine has no way to grade "
-                "it. Hint-probes inside a hint ('What made you pick A?') "
-                "are NOT new questions and don't need a tool.\n\n"
+                "Author your OWN multiple-choice question (4 options, "
+                "exactly one correct). Use for warmups, comprehension "
+                "checks, scaffolding sub-steps, or any question that "
+                "isn't in the lesson's bank.\n\n"
+                "MCQ-ONLY (task #199, 2026-05-17): this tool ONLY "
+                "accepts multiple-choice questions with 4 options and a "
+                "single correct letter. Free-prose answers (numeric, "
+                "short_answer, concept) were dropped because the "
+                "chat-authored grader was too noisy — false negatives "
+                "on correct answers damaged student trust. Grading "
+                "MCQs is deterministic letter-match against "
+                "`correct_answer`.\n\n"
+                "REQUIRED: every NEW question you pose to the student "
+                "MUST go through a tool call (either pose_question for "
+                "bank items, or this one for authored MCQs). Do NOT "
+                "type a question in your prose response — the engine "
+                "has no way to track or grade it. Hint-probes inside a "
+                "hint ('What made you pick A?') are NOT new questions; "
+                "they're rhetorical and don't need a tool.\n\n"
                 "When to PREFER this over pose_question:\n"
-                "  - Quick check before moving on (\"What's 360 - 90?\")\n"
-                "  - Sub-question while scaffolding a multi-step problem\n"
-                "  - Warmup / fact-recall (\"What feature of a map tells "
-                "you what symbols mean?\")\n"
-                "  - Rephrasing a struggling student's question\n"
+                "  - Quick MCQ check before moving on (\"Which of these "
+                "is a map feature?\")\n"
+                "  - Warmup MCQ when no bank slot fits\n"
+                "  - Rephrasing the bank Q as a simpler MCQ\n"
                 "When to use pose_question INSTEAD:\n"
-                "  - The lesson bank has a question that fits — pull from "
-                "the bank for canonical curriculum coverage.\n"
+                "  - The lesson bank has a question (any type) that "
+                "fits — bank Qs come with verified keys, prefer them.\n"
                 "  - Practice / exit-ticket items belong to the bank.\n\n"
-                "`answer_key` is REQUIRED — supply the canonical correct "
-                "answer the grader will use as ground truth. The grader "
-                "is generous on phrasing (matches synonyms / equivalent "
-                "answers) but it needs SOMETHING to compare against.\n\n"
-                "If you can't write a clear, defensible answer_key — DO "
-                "NOT pose with this tool. Two safer alternatives:\n"
-                "  (a) Pick a fitting slot from pose_question (bank) "
-                "instead — bank Qs already have verified keys.\n"
-                "  (b) Don't pose a new question this turn — continue "
-                "scaffolding the active question, or shift to "
-                "explanation / teach-back mode.\n"
-                "Fabricated keys produce false-negative grades (student "
-                "marked wrong when they're actually right) which damages "
-                "trust. Empty / vague keys are worse than no question."
+                "When you CAN'T fit a question into 4 MCQ options:\n"
+                "  - Pick a bank slot via pose_question (any type).\n"
+                "  - OR skip posing this turn — stay on the active Q "
+                "or shift to teach-back mode.\n"
+                "Open-ended prose questions are no longer allowed via "
+                "this tool. The engine will reject and regen."
             ),
             "input_schema": {
                 "type": "object",
@@ -6922,67 +6923,52 @@ Follow the current step; this concept will be covered in sequence."""
                     "question": {
                         "type": "string",
                         "description": (
-                            "The full question text shown to the student "
-                            "in the chat bubble. Include any setup + the "
-                            "ask in one sentence or two. Examples: "
-                            "'Two angles sum to 360°; one is 120°. What's "
-                            "the other?' / 'In your own words, why do "
-                            "angles around a point add to 360°?'"
+                            "The question stem shown to the student "
+                            "in the chat bubble. ONE sentence; the "
+                            "options carry the answer choices. "
+                            "Example: 'Which feature of a map shows "
+                            "what symbols mean?' (followed by A/B/C/D "
+                            "options below)."
                         ),
                     },
-                    "answer_key": {
+                    "options": {
+                        "type": "object",
+                        "description": (
+                            "The four answer choices, exactly one of "
+                            "which is correct. Each value is the "
+                            "option text the student sees (NOT the "
+                            "letter prefix — the engine adds 'A) ', "
+                            "'B) ', etc. when rendering)."
+                        ),
+                        "properties": {
+                            "A": {"type": "string"},
+                            "B": {"type": "string"},
+                            "C": {"type": "string"},
+                            "D": {"type": "string"},
+                        },
+                        "required": ["A", "B", "C", "D"],
+                    },
+                    "correct_answer": {
+                        "type": "string",
+                        "enum": ["A", "B", "C", "D"],
+                        "description": (
+                            "The letter of the correct option. Grading "
+                            "is a deterministic letter-match against "
+                            "the student's reply (which the artifact "
+                            "captures as 'A' / 'B' / etc.)."
+                        ),
+                    },
+                    "explanation": {
                         "type": "string",
                         "description": (
-                            "REQUIRED canonical correct answer. Examples: "
-                            "numeric ('240°' or '240'), true/false "
-                            "('true'), short fact-recall ('legend'), key "
-                            "concept words for short-answer ('relative "
-                            "location' / 'sum equals 360'). The grader "
-                            "matches synonyms + equivalent phrasings, so "
-                            "it doesn't have to be word-perfect — but it "
-                            "MUST be a defensible canonical answer.\n"
-                            "Do NOT fabricate keys for open-ended questions "
-                            "where there's no single right answer (\"why "
-                            "do you think...?\", \"in your own words...\"). "
-                            "Instead, either pick a bank slot via "
-                            "pose_question or skip posing a new question "
-                            "this turn (stay on the active Q or shift to "
-                            "teach-back)."
-                        ),
-                    },
-                    "type": {
-                        "type": "string",
-                        "enum": ["short_numeric", "short_answer", "concept"],
-                        "description": (
-                            "short_numeric = expects a number ('240°', "
-                            "'90'). short_answer = expects a 1-2 sentence "
-                            "written response. concept = expects "
-                            "explanation of a concept (grader is generous "
-                            "on phrasing)."
-                        ),
-                    },
-                    "working": {
-                        "type": "string",
-                        "description": (
-                            "Optional step-by-step solution. Used by the "
-                            "tutor's next turn to scaffold remediation if "
-                            "the student gets it wrong. Not shown to the "
-                            "student until needed."
-                        ),
-                    },
-                    "alternatives": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": (
-                            "Optional list of acceptable equivalent "
-                            "answers ('two hundred forty', '240 degrees'). "
-                            "The grader is already generous on phrasing; "
-                            "leave empty unless there are multiple "
-                            "genuinely-different correct answers."
+                            "Optional 1-2 sentence rationale for the "
+                            "correct answer. Used in the tutor's "
+                            "remediation if the student gets it wrong. "
+                            "Not shown until needed."
                         ),
                     },
                 },
-                "required": ["question", "answer_key", "type"],
+                "required": ["question", "options", "correct_answer"],
             },
         }
 
@@ -6990,19 +6976,23 @@ Follow the current step; this concept will be covered in sequence."""
         self,
         turn_metadata: Dict,
         question: str,
-        answer_key: str,
-        question_type: str,
-        working: str = '',
-        alternatives: Optional[List[str]] = None,
+        options: Dict[str, str],
+        correct_answer: str,
+        explanation: str = '',
     ) -> None:
-        """Stash the tutor's authored question + answer key on the
-        upcoming turn so the next student reply gets graded.
+        """Stash the tutor's authored MCQ on the upcoming turn so
+        the next student reply gets deterministically graded.
+
+        MCQ-ONLY shape (task #199, 2026-05-17). Open-ended types
+        (short_answer / short_numeric / concept) are no longer
+        accepted by pose_inline_question — chat-authored grading
+        was too noisy and produced false negatives. MCQ is a
+        deterministic letter-match against `correct_answer`.
 
         Mirrors `_record_bank_question_on_turn` but for the
         inline-authored path. Sets engine_state.awaiting_answer with
         kind='inline_authored' so `_grade_against_last_bank_question`
-        knows to pull the answer key from turn_metadata instead of
-        the bank tables.
+        builds the Question via from_inline_authored.
         """
         turn_index = len(getattr(self, 'conversation', []))
         from django.utils import timezone as _tz
@@ -7010,10 +7000,14 @@ Follow the current step; this concept will be covered in sequence."""
 
         turn_metadata['inline_authored_question'] = {
             'question': (question or '')[:1000],
-            'answer_key': (answer_key or '')[:300],
-            'question_type': question_type or 'short_answer',
-            'working': (working or '')[:1000],
-            'alternatives': list(alternatives or [])[:8],
+            'options': {
+                letter: (text or '')[:200]
+                for letter, text in (options or {}).items()
+                if letter in ('A', 'B', 'C', 'D')
+            },
+            'correct_answer': (correct_answer or '').strip().upper(),
+            'explanation': (explanation or '')[:600],
+            'question_type': 'mcq',
             'turn_index': turn_index,
             'posed_at': posed_at_iso,
         }
@@ -7022,13 +7016,13 @@ Follow the current step; this concept will be covered in sequence."""
         turn_metadata['bank_question_ref'] = {
             'kind': 'inline_authored',
             'id': None,  # no DB row — the question lives only on this turn
-            'question_type': question_type or 'short_answer',
+            'question_type': 'mcq',
         }
         # Engine-state awaiting_answer for the grader to find.
         record = {
             'kind': 'inline_authored',
             'question_id': None,
-            'question_type': question_type or 'short_answer',
+            'question_type': 'mcq',
             'turn_index': int(turn_index),
             'posed_at': posed_at_iso,
         }
@@ -7185,37 +7179,74 @@ Follow the current step; this concept will be covered in sequence."""
                 # text to text_parts) and stash the answer key on turn
                 # metadata so the grader can verify.
                 if tool_name == self.POSE_INLINE_QUESTION_TOOL_NAME:
+                    # MCQ-ONLY shape (task #199, 2026-05-17).
+                    # Schema: question + options{A,B,C,D} + correct_answer letter.
                     inline_input = getattr(block, 'input', {}) or {}
                     q_text = (inline_input.get('question') or '').strip()
-                    a_key = (inline_input.get('answer_key') or '').strip()
-                    q_type = (
-                        inline_input.get('type') or 'short_answer'
-                    ).strip()
-                    working = (inline_input.get('working') or '').strip()
-                    alternatives = inline_input.get('alternatives') or []
-                    if not q_text or not a_key:
+                    options_in = inline_input.get('options') or {}
+                    correct_letter = (
+                        inline_input.get('correct_answer') or ''
+                    ).strip().upper()
+                    explanation = (inline_input.get('explanation') or '').strip()
+                    # Normalise options dict — keys uppercase, drop empties.
+                    options: Dict[str, str] = {}
+                    if isinstance(options_in, dict):
+                        for letter in ('A', 'B', 'C', 'D'):
+                            v = (
+                                options_in.get(letter)
+                                or options_in.get(letter.lower())
+                                or ''
+                            )
+                            if isinstance(v, str) and v.strip():
+                                options[letter] = v.strip()[:200]
+                    # Validate MCQ shape.
+                    if not q_text:
                         logger.warning(
                             "[QuestionTool] pose_inline_question: "
-                            "MISSING_FIELDS question=%r answer_key=%r — "
-                            "skipping render (both required, task #197 "
-                            "v2 — answer_key MUST be supplied)",
-                            bool(q_text), bool(a_key),
+                            "MISSING question text — skipping",
+                        )
+                        continue
+                    if len(options) < 2:
+                        logger.warning(
+                            "[QuestionTool] pose_inline_question: "
+                            "MCQ requires >=2 options, got %d — skipping. "
+                            "(task #199: inline tool is MCQ-only)",
+                            len(options),
+                        )
+                        continue
+                    if correct_letter not in ('A', 'B', 'C', 'D'):
+                        logger.warning(
+                            "[QuestionTool] pose_inline_question: "
+                            "correct_answer=%r invalid (must be A/B/C/D) — "
+                            "skipping",
+                            correct_letter,
+                        )
+                        continue
+                    if correct_letter not in options:
+                        logger.warning(
+                            "[QuestionTool] pose_inline_question: "
+                            "correct_answer=%s but options=%s — skipping",
+                            correct_letter, sorted(options.keys()),
                         )
                         continue
                     logger.info(
-                        "[QuestionTool] inline_authored: type=%s q=%r "
-                        "key=%r",
-                        q_type, q_text[:80], a_key[:40],
+                        "[QuestionTool] inline_authored MCQ: q=%r "
+                        "options=%s correct=%s",
+                        q_text[:80], sorted(options.keys()), correct_letter,
                     )
                     self._record_inline_authored_question(
                         turn_metadata,
                         question=q_text,
-                        answer_key=a_key,
-                        question_type=q_type,
-                        working=working,
-                        alternatives=alternatives,
+                        options=options,
+                        correct_answer=correct_letter,
+                        explanation=explanation,
                     )
-                    text_parts.append(q_text)
+                    # Render MCQ inline: stem + A) ... B) ... etc.
+                    mcq_render_lines = [q_text, ""]
+                    for letter in ('A', 'B', 'C', 'D'):
+                        if letter in options:
+                            mcq_render_lines.append(f"{letter}) {options[letter]}")
+                    text_parts.append("\n".join(mcq_render_lines))
                     self._bank_signal_used_this_turn = True  # suppresses authoring gate
                     bank_rendered = True  # for TurnSummary metrics
                     continue

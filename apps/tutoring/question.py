@@ -144,9 +144,40 @@ class Question:
     @classmethod
     def from_inline_authored(cls, ia: Dict[str, Any]) -> "Question":
         """Adapter for the `inline_authored_question` metadata block
-        emitted by the pose_inline_question tool (carries an answer_key)."""
+        emitted by the pose_inline_question tool.
+
+        MCQ-ONLY shape (task #199, 2026-05-17): the tool was
+        restricted to MCQ-with-options + correct_answer letter so
+        the grader is deterministic (letter-match, not noisy
+        chat-authored LLM judgment).
+
+        Backward-compat: legacy stash with `answer_key` (no options)
+        falls back to the old shape so in-flight sessions don't break.
+        """
         if not ia:
             return cls()
+
+        # MCQ-only path (current shape — preferred).
+        options = ia.get('options') or {}
+        correct_letter = (ia.get('correct_answer') or '').strip().upper()
+        if isinstance(options, dict) and options and correct_letter in ('A', 'B', 'C', 'D'):
+            opts: Dict[str, str] = {
+                letter: str(text or '')[:200]
+                for letter, text in options.items()
+                if letter in ('A', 'B', 'C', 'D') and text
+            }
+            return cls(
+                source=SOURCE_INLINE_AUTHORED,
+                stem=(ia.get('question') or "")[:600],
+                question_type='mcq',
+                options=opts,
+                correct_answer=correct_letter,
+                explanation=(ia.get('explanation') or "")[:600],
+            )
+
+        # Legacy shape (pre-task-#199) — answer_key as canonical text,
+        # no options. In-flight sessions persisting old shape still
+        # work; new sessions write the MCQ shape above.
         qtype = (ia.get('question_type') or 'short_answer').lower()
         return cls(
             source=SOURCE_INLINE_AUTHORED,
