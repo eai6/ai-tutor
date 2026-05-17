@@ -268,39 +268,32 @@ def run_tutor_self_retry(
         combined_judge_result=combined_judge_result,
     )
 
-    # Engine-state snapshot helpers. We compete previous_response
-    # against each retry cycle and restore the winning candidate's
-    # tool-effects on exit. Pilot directive 2026-05-17: drop the
-    # STOCK_FALLBACK path. Always ship the best-scoring candidate
-    # from {previous, cycle_1, cycle_2} — even a flagged original
-    # is better UX than the generic "walk me through your thinking"
-    # CTA appearing after a correct answer.
-    _META_TOOL_KEYS = (
-        'bank_question_ref', 'inline_authored_question',
-        'tool_use_count', 'bank_rendered',
-    )
+    # Dry-run dispatch (task #200, pilot directive 2026-05-17):
+    # engine state stays untouched throughout retry cycles. Each
+    # cycle calls `tutor._pose_dry_run()` which returns (text, delta)
+    # without mutating engine state. The winning candidate's delta is
+    # committed once at the end via `_apply_pose_delta()`. This
+    # eliminates the snapshot-and-restore dance from the previous
+    # implementation and structurally guarantees that engine state
+    # always matches the shipped text (fixes task #176 drift bug).
+    #
+    # previous_response is treated as a candidate too: its delta is
+    # whatever turn_metadata + engine state already reflect from the
+    # original generation (captured below as `prev_delta`).
 
-    def _snap_state():
-        return {
-            'aa': copy.deepcopy(getattr(tutor, '_awaiting_answer', None)),
-            'meta': {
-                k: copy.deepcopy(turn_metadata[k])
-                for k in _META_TOOL_KEYS
-                if k in turn_metadata
-            },
-        }
+    import copy as _copy
 
-    def _restore_state(snap):
-        tutor._awaiting_answer = snap['aa']
-        for k in _META_TOOL_KEYS:
-            turn_metadata.pop(k, None)
-        for k, v in snap['meta'].items():
-            turn_metadata[k] = v
-
-    # Snapshot the pre-retry state — that's the "previous response"
-    # candidate's engine state. If previous wins the score race, we
-    # restore this snapshot.
-    prev_snap = _snap_state()
+    # Capture the previous_response's current delta (what's already
+    # committed from the initial generation). If previous wins the
+    # score race, we re-apply this to ensure state consistency.
+    prev_delta = {
+        'aa': _copy.deepcopy(getattr(tutor, '_awaiting_answer', None)),
+        'shown_added': set(),  # initial gen already added these; don't re-add
+        'turn_q': _copy.deepcopy(getattr(tutor, '_turn_questions', {}) or {}),
+        'bank_used': bool(getattr(tutor, '_bank_signal_used_this_turn', False)),
+        'last_bank': str(getattr(tutor, '_last_bank_rendered_text', '') or ''),
+        'meta': _copy.deepcopy(turn_metadata),
+    }
 
     # Score the previous_response so it competes with the retry
     # cycles. Without this, we always preferred a retry candidate
@@ -308,8 +301,7 @@ def run_tutor_self_retry(
     prev_score = float('-inf')
     prev_clean = False
     prev_leak = _detect_leaked_tool_call(previous_response)
-    if prev_leak and (prev_snap['meta'].get('tool_use_count', 0) or 0) == 0:
-        # Original itself leaked tool-call syntax. Don't favour it.
+    if prev_leak and (prev_delta['meta'].get('tool_use_count', 0) or 0) == 0:
         prev_score = -10.0
         logger.warning(
             "[SelfRetry] previous_response itself contains leaked tool "
@@ -323,23 +315,36 @@ def run_tutor_self_retry(
         except Exception as exc:
             logger.debug("[SelfRetry] previous score fn failed: %s", exc)
 
-    # Candidates list. Each entry: dict with text/score/clean/snap/label.
+    # Candidates list. Each entry: dict with text/score/clean/delta/label.
     # Pre-seeded with previous_response. Retry cycles append.
     candidates: List[Dict[str, Any]] = [{
         'text': previous_response,
         'score': prev_score,
         'clean': prev_clean,
-        'snap': prev_snap,
+        'delta': prev_delta,
         'label': 'previous',
     }]
+
+    # Roll back the original generation's engine-state mutations
+    # BEFORE running retry cycles, so each cycle's dry-run sees a
+    # clean slate. We've already captured prev_delta so we can
+    # restore it if previous wins.
+    tutor._apply_pose_delta({
+        'aa': None,
+        'shown_added': set(),
+        'turn_q': {},
+        'bank_used': False,
+        'last_bank': '',
+        'meta': {
+            k: v for k, v in turn_metadata.items()
+            if k not in ('bank_question_ref', 'inline_authored_question',
+                         'tool_use_count', 'bank_rendered')
+        },
+    }, turn_metadata)
 
     for cycle_idx in range(1, max_cycles + 1):
         cycle = SelfRetryCycle(cycle=cycle_idx)
         result.cycles.append(cycle)
-
-        # Reset state for this cycle so _handle_pose_question_message
-        # rebuilds it from THIS cycle's tool calls.
-        _restore_state({'aa': None, 'meta': {}})
 
         # Build retry-cycle messages = original messages + synthetic
         # feedback user turn.
@@ -367,9 +372,12 @@ def run_tutor_self_retry(
                     f"generate_with_tools returned non-Message: "
                     f"{type(message).__name__}"
                 )
-            candidate_text = tutor._handle_pose_question_message(
+            # DRY-RUN: returns (text, delta) without mutating engine
+            # state. Caller commits delta only if this candidate wins.
+            candidate_text, cycle_delta = tutor._pose_dry_run(
                 message, turn_metadata,
-            ).strip()
+            )
+            candidate_text = candidate_text.strip()
         except Exception as exc:
             cycle.error = f"{type(exc).__name__}: {exc}"
             logger.warning(
@@ -386,16 +394,15 @@ def run_tutor_self_retry(
             continue
 
         cycle.text = candidate_text
-        cycle_snap = _snap_state()  # capture this cycle's tool effects
 
-        # PRE-JUDGE leak check: if the LLM typed the tool call as
-        # text (XML or function-call form) instead of emitting a real
-        # tool_use block, mark the cycle dirty with a fatal score so
-        # it loses the race. We do NOT strip (breaks coherence) and
-        # we do NOT include it in the candidates list (would risk
-        # shipping leaked answer keys to the student).
+        # PRE-JUDGE leak check (XML or function-call syntax in prose).
+        # The delta carries this cycle's tool_use_count — read from
+        # there since engine state is still at pre-retry baseline.
         leak_reason = _detect_leaked_tool_call(candidate_text)
-        if leak_reason and (cycle_snap['meta'].get('tool_use_count', 0) or 0) == 0:
+        _cycle_tool_count = int(
+            cycle_delta.get('meta', {}).get('tool_use_count', 0) or 0
+        )
+        if leak_reason and _cycle_tool_count == 0:
             cycle.error = f"leaked_tool_call:{leak_reason}"
             cycle.clean = False
             cycle.score = -10.0
@@ -430,7 +437,7 @@ def run_tutor_self_retry(
             'text': candidate_text,
             'score': score,
             'clean': clean,
-            'snap': cycle_snap,
+            'delta': cycle_delta,
             'label': f'cycle_{cycle_idx}',
         })
 
@@ -442,19 +449,16 @@ def run_tutor_self_retry(
     result.elapsed_seconds = elapsed
 
     # Pick the highest-scoring candidate. Ties broken by insertion
-    # order (earliest cycle wins — slight bias toward previous,
-    # which is fine: it's the only one with engine state already
-    # processed via the initial generation path).
+    # order (earliest cycle wins — slight bias toward previous).
     best = max(candidates, key=lambda c: c['score'])
     result.text = best['text']
     result.clean = bool(best['clean'])
     result.fallback_used = False  # stock fallback dropped 2026-05-17
-    # Restore engine state to match the winning candidate's tool
-    # effects. Critical when a non-last candidate wins — without
-    # this, engine state would reflect cycle_N (last cycle) but the
-    # shipped text would be from cycle_M (some earlier cycle) or
-    # previous_response.
-    _restore_state(best['snap'])
+
+    # Commit ONLY the winning candidate's delta. Engine state +
+    # turn_metadata now reflect EXACTLY the shipped text — no drift
+    # possible because we never committed losing candidates' state.
+    tutor._apply_pose_delta(best['delta'], turn_metadata)
 
     logger.info(
         "[SelfRetry] DONE cycles=%d winner=%s score=%.2f clean=%s "

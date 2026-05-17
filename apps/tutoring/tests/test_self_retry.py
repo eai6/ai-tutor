@@ -31,9 +31,14 @@ def _validation(issues=None, metadata=None):
     return v
 
 
-def _tutor_with_tool_message(text: str):
+def _tutor_with_tool_message(text: str, delta: dict = None):
     """Fake a ConversationalTutor with a generate_with_tools client that
-    returns a message whose _handle_pose_question_message yields `text`."""
+    returns a message and a _pose_dry_run that yields (text, delta).
+
+    The delta defaults to an empty/no-op state change so cycles that
+    don't tool produce nothing for _apply_pose_delta to commit. Tests
+    that want to verify tool-effect propagation can pass a real delta.
+    """
     tutor = MagicMock()
     tutor.session.id = 99
     tutor.llm_client = MagicMock()
@@ -41,7 +46,26 @@ def _tutor_with_tool_message(text: str):
     msg = MagicMock()
     msg.content = [MagicMock(type='text', text=text)]
     tutor.llm_client.generate_with_tools.return_value = msg
-    tutor._handle_pose_question_message.return_value = text
+
+    _delta = delta or {
+        'aa': None,
+        'shown_added': set(),
+        'turn_q': {},
+        'bank_used': False,
+        'last_bank': '',
+        'meta': {},
+    }
+    tutor._pose_dry_run.return_value = (text, _delta)
+    # Apply just commits the delta's aa onto the mock — enough for
+    # tests that verify aa restoration.
+    def _apply(d, tm):
+        tutor._awaiting_answer = d.get('aa')
+        for k in ('bank_question_ref', 'inline_authored_question',
+                  'tool_use_count', 'bank_rendered'):
+            tm.pop(k, None)
+        for k, v in (d.get('meta') or {}).items():
+            tm[k] = v
+    tutor._apply_pose_delta.side_effect = _apply
     tutor._awaiting_answer = None
     return tutor
 

@@ -7069,6 +7069,83 @@ Follow the current step; this concept will be covered in sequence."""
         cleaned = cleaned.strip()
         return cleaned, len(text) - len(cleaned)
 
+    def _pose_dry_run(self, message, turn_metadata: Dict) -> Tuple[str, Dict]:
+        """Run `_handle_pose_question_message` in dry-run mode.
+
+        Returns (text, delta) where:
+          - text: the rendered tutor response string
+          - delta: the captured state changes as a dict the caller can
+                   commit later via `_apply_pose_delta()`
+
+        Engine state and turn_metadata are rolled back to their
+        pre-call state before returning. This lets retry orchestrators
+        evaluate multiple candidates without persisting their tool
+        effects until a winner is approved by judges (task #200,
+        pilot directive 2026-05-17: "don't update state and point
+        question until the turn has actually been approved").
+
+        Implementation: snapshot → call mutating handler → capture
+        post-state → restore snapshot. Keeps the handler's tool-
+        processing logic in one place (single source of truth) without
+        forcing every mutation site to thread an `apply_state` flag.
+        """
+        import copy as _copy
+
+        # Snapshot pre-call state
+        _pre_aa = _copy.deepcopy(getattr(self, '_awaiting_answer', None))
+        _pre_shown = set(getattr(self, 'shown_question_ids', None) or set())
+        _pre_turn_q = _copy.deepcopy(getattr(self, '_turn_questions', None) or {})
+        _pre_bank_used = bool(getattr(self, '_bank_signal_used_this_turn', False))
+        _pre_last_bank = str(getattr(self, '_last_bank_rendered_text', '') or '')
+        _pre_meta = _copy.deepcopy(turn_metadata)
+
+        # Call the mutating handler
+        text = self._handle_pose_question_message(message, turn_metadata)
+
+        # Capture post-state delta
+        delta = {
+            'aa': _copy.deepcopy(getattr(self, '_awaiting_answer', None)),
+            'shown_added': set(self.shown_question_ids) - _pre_shown,
+            'turn_q': _copy.deepcopy(getattr(self, '_turn_questions', {}) or {}),
+            'bank_used': bool(getattr(self, '_bank_signal_used_this_turn', False)),
+            'last_bank': str(getattr(self, '_last_bank_rendered_text', '') or ''),
+            'meta': _copy.deepcopy(turn_metadata),
+        }
+
+        # Roll back to pre-call state
+        self._awaiting_answer = _pre_aa
+        self.shown_question_ids = _pre_shown
+        self._turn_questions = _pre_turn_q
+        self._bank_signal_used_this_turn = _pre_bank_used
+        self._last_bank_rendered_text = _pre_last_bank
+        turn_metadata.clear()
+        turn_metadata.update(_pre_meta)
+
+        return text, delta
+
+    def _apply_pose_delta(self, delta: Dict, turn_metadata: Dict) -> None:
+        """Commit a delta captured by `_pose_dry_run()`.
+
+        Idempotent: applying the same delta twice produces the same
+        result. Safe to call after judges approve a candidate.
+        """
+        if not delta:
+            return
+        self._awaiting_answer = delta.get('aa')
+        if not isinstance(getattr(self, 'shown_question_ids', None), set):
+            self.shown_question_ids = set()
+        for qid in delta.get('shown_added') or set():
+            self.shown_question_ids.add(qid)
+        self._turn_questions = delta.get('turn_q') or {}
+        self._bank_signal_used_this_turn = bool(delta.get('bank_used', False))
+        self._last_bank_rendered_text = str(delta.get('last_bank', '') or '')
+        # Replace turn_metadata wholesale with the delta's snapshot.
+        # turn_metadata is per-turn-attempt; the delta's snapshot
+        # reflects the chosen candidate's metadata.
+        meta = delta.get('meta') or {}
+        turn_metadata.clear()
+        turn_metadata.update(meta)
+
     def _handle_pose_question_message(
         self,
         message,
