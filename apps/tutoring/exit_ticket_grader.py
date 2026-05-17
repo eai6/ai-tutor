@@ -454,28 +454,39 @@ class BatchLeakResult:
 
 _LEAK_SYSTEM = (
     "You judge whether a tutor's response REVEALED the correct answer "
-    "to a student during a tutoring session.\n"
+    "to a student during a tutoring session. Works for MCQ AND non-MCQ "
+    "(short-answer, fill-in-blank, numeric, conceptual).\n"
     "\n"
     "Each input gives you:\n"
-    "  - question: the MCQ stem the student is trying to answer\n"
-    "  - correct_letter: the canonical correct option (A/B/C/D)\n"
-    "  - canonical_answer: the text of the correct option\n"
-    "  - options: all four options A/B/C/D (when MCQ)\n"
+    "  - question: the question stem the student is trying to answer\n"
+    "  - correct_answer_value: the actual answer text the student must\n"
+    "    produce / pick. For MCQ this is the text of the correct\n"
+    "    option (NOT just the letter). For short-answer / numeric, it's\n"
+    "    the canonical expected text. THE TUTOR MUST NOT STATE THIS\n"
+    "    VALUE OR A CLOSE PARAPHRASE.\n"
+    "  - correct_letter: (MCQ only) the option letter A/B/C/D that\n"
+    "    holds the canonical answer. The tutor must also not state\n"
+    "    THIS letter. Absent for non-MCQ questions.\n"
+    "  - options: (MCQ only) all four options A/B/C/D for context\n"
     "  - tutor_response: the message about to be sent to the student\n"
     "\n"
     "Your single job: read tutor_response and decide whether it would\n"
     "let the student copy/pick the correct answer without thinking.\n"
     "\n"
     "REVEAL (leaked=true) — flag ALL of these:\n"
-    "  (a) Tutor states the correct option LETTER, in any tense:\n"
+    "  (a) Tutor states the correct_letter (MCQ), in any tense:\n"
     "      'the answer is B', 'the correct answer was A', 'it would\n"
     "      be C', 'should be D', 'A) True is correct', etc.\n"
-    "  (b) Tutor states the canonical_answer text verbatim or with\n"
-    "      trivial reordering. E.g. canonical='Readers would not know\n"
+    "  (b) Tutor states the correct_answer_value verbatim or with\n"
+    "      trivial reordering. E.g. value='Readers would not know\n"
     "      what area the map represents' and tutor says 'Without it,\n"
     "      readers don't know what the map represents' → LEAK.\n"
-    "  (c) Tutor PARAPHRASES the canonical in different words so\n"
-    "      the student can copy/pick it. E.g. canonical='Use it to\n"
+    "      For short-answer: value='physical geography' and tutor\n"
+    "      says 'this branch is physical geography' → LEAK.\n"
+    "      For numeric: value='240°' and tutor says 'the answer\n"
+    "      comes out to 240 degrees' → LEAK.\n"
+    "  (c) Tutor PARAPHRASES correct_answer_value in different words\n"
+    "      so the student can copy/pick it. E.g. value='Use it to\n"
     "      determine which direction you need to travel' and tutor\n"
     "      says 'It helps you figure out which direction to travel'\n"
     "      → LEAK.\n"
@@ -525,21 +536,21 @@ _LEAK_ARBITER_SYSTEM = (
 def _build_leak_user_prompt(items: Sequence['BatchLeakItem']) -> str:
     payload = []
     for it in items:
+        # `correct_answer_value` is the explicit text the tutor MUST
+        # NOT state or paraphrase. Works for both MCQ (text of the
+        # correct option) and non-MCQ (canonical expected answer).
+        # `correct_letter` is MCQ-only and signals the letter that
+        # also must not be stated.
         entry = {
             "index": it.index,
             "question": (it.question_text or "")[:500],
-            "canonical_answer": (it.canonical_answer or "")[:400],
+            "correct_answer_value": (it.canonical_answer or "")[:400],
             "tutor_response": (it.response or "")[:1500],
         }
         if it.options:
             entry["options"] = {
                 k: str(v)[:200] for k, v in it.options.items() if v
             }
-        # Explicit correct-letter signal for MCQ items — the LLM's job
-        # becomes "did the tutor say letter X or paraphrase the option
-        # X text". Catches the "the correct answer was A) True" pattern
-        # the loose canonical_answer-only check missed in pilot 540
-        # session 61 turn 962.
         if it.correct_letter:
             entry["correct_letter"] = it.correct_letter
         if it.arbiter:
