@@ -2781,9 +2781,35 @@ Keep it to 2-3 sentences."""
                                 (s for s in reversed(_sentences) if s.strip().endswith('?')),
                                 _content,
                             ).strip()
+                # Task #180 (2026-05-17). For chat-authored Qs we have
+                # no bank record to deterministic-check against. But the
+                # chat-authored grader's BankGradeResult exposes
+                # `expected` (the LLM-derived canonical) when the
+                # grounded path runs. Build a duck-typed question so the
+                # deterministic check can fire on chat-authored Qs too.
+                _leak_bank_q = getattr(self, '_pending_bank_question', None)
+                if _leak_bank_q is None and _chat_authored_q:
+                    _expected_str = (
+                        getattr(_bank_grade_for_leak, 'expected', '') or ''
+                    )
+                    _expected_str = str(_expected_str).strip()
+                    if _expected_str and _expected_str != "(derived by LLM)":
+                        # Duck-typed minimal question: just enough fields
+                        # for _deterministic_check in answer_leak.py.
+                        class _SyntheticBankQ:
+                            question_text = _chat_authored_q
+                            question_type = 'short_answer'
+                            correct_answer = _expected_str
+                            expected_answer = _expected_str
+                            explanation = ''
+                            option_a = ''
+                            option_b = ''
+                            option_c = ''
+                            option_d = ''
+                        _leak_bank_q = _SyntheticBankQ()
                 _leak_verdict = detect_answer_leak(
                     response=clean_response,
-                    bank_question=getattr(self, '_pending_bank_question', None),
+                    bank_question=_leak_bank_q,
                     chat_authored_q=_chat_authored_q,
                     wrong_attempts=_wrong_attempts,
                     llm_client=self.judge_client,
