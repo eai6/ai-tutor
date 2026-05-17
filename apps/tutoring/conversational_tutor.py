@@ -4860,6 +4860,24 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         wrong_attempts = _q_unified.wrong_attempts
         _reveal_at = self._reveal_threshold()
         reveal_allowed = (status == 'answered_wrong' and wrong_attempts >= _reveal_at)
+        # ANTI-SMUGGLE STRUCTURAL RULE (2026-05-17, prod session 265
+        # diagnosis — see memory/tutor_state_drift_and_leak_simplification_plan.md):
+        # When a question is awaiting an answer, the tutor MUST NOT
+        # author a new question in this turn — even when hinting or
+        # remediating. The reason: the engine's bank_question_ref
+        # points at the ACTIVE question above; a new authored question
+        # creates state drift (student answers the new Q, grader matches
+        # against the old Q, marks wrong). The fix is to restate the
+        # active question above so the student has it in plain view to
+        # answer; the engine's pointer then matches the screen.
+        _anti_smuggle = (
+            " A NEW QUESTION IS NOT ALLOWED THIS TURN — the student is "
+            "still working on the active question above. End your turn "
+            "by restating the active question (stem + options for MCQ) "
+            "verbatim or with only minor rewording, so the student can "
+            "re-attempt it. Do NOT call pose_question or "
+            "pose_inline_question. Do NOT type a new MCQ in prose."
+        )
         rules = {
             'awaiting_answer': (
                 "Scaffolding: HINT ONLY — never reveal the correct "
@@ -4868,8 +4886,8 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
                 "yet — let them answer first. If they're stuck, "
                 "give ONE hint that narrows the choices or names "
                 "the concept being tested (e.g. 'Think about which "
-                "feature explains what symbols mean'). Reference "
-                "options indirectly without re-stating the stem."
+                "feature explains what symbols mean')."
+                + _anti_smuggle
             ),
             'answered_correct': (
                 "Scaffolding: the student got it RIGHT. Confirm "
@@ -4885,10 +4903,10 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
                 "answer text. Acknowledge gently ('not quite' / "
                 "'close, but think about…'), point at the concept "
                 "they missed (use the explanation field to inform "
-                "the hint, but rephrase as a clue not a giveaway), "
-                "and invite them to try again. ONE short probe is OK "
-                "('what made you pick that?'). Let them attempt the "
-                "question again."
+                "the hint, but rephrase as a clue not a giveaway). "
+                "ONE short probe is OK "
+                "('what made you pick that?')."
+                + (_anti_smuggle if not reveal_allowed else "")
                 + (
                     f"\n  ↳ MOVE-ON ALLOWED this turn: student has "
                     f"missed this question {_reveal_at}+ times — do "

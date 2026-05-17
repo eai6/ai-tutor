@@ -79,9 +79,10 @@ ISSUE_VERDICT_MISMATCH = "verdict_mismatch"
 # in apps/tutoring/views.py and surface at /dashboard/flagged/.
 ISSUE_TUTOR_UNSAFE = "tutor_unsafe"
 # Tutor revealed the canonical answer to a question the student
-# hasn't yet earned (wrong_attempts < 3). Detected by the W1
-# answer-leak guard (apps/tutoring/answer_leak.py — deterministic
-# n-gram/Jaccard + LLM judge + arbiter on disagreement). Triggers
+# hasn't yet resolved. Detected by the W1 answer-leak guard
+# (apps/tutoring/answer_leak.py — single LLM judge as of 2026-05-17,
+# was deterministic + LLM + arbiter; see
+# memory/tutor_state_drift_and_leak_simplification_plan.md). Triggers
 # regen with the canonical answer SCRUBBED from the regen context
 # so the rewrite can only produce a concept-level hint.
 ISSUE_ANSWER_LEAK = "answer_leak"
@@ -287,7 +288,7 @@ def validate_tutor_response(
     combined_result=None,
     media_attached: bool = True,
     tool_use_count: int = 0,
-    awaiting_answer_is_set: bool = True,
+    awaiting_answer_is_set: bool = False,
 ) -> ValidationResult:
     """Run V1+V2 validator layers over a tutor response.
 
@@ -311,7 +312,11 @@ def validate_tutor_response(
     issues: List[str] = []
     layers_run: List[str] = []
     content = response or ""
-    extra_meta: dict = {}
+    # Stash the awaiting_answer state so downstream consumers (regen
+    # prompt builder, telemetry) can branch on whether the tutor was
+    # mid-question. Anti-smuggle path uses this to repair `no_question`
+    # by restating the active question rather than authoring a new one.
+    extra_meta: dict = {"awaiting_answer_is_set": bool(awaiting_answer_is_set)}
 
     # L1 — structural
     layers_run.append("structural")
@@ -325,7 +330,15 @@ def validate_tutor_response(
     # Pilot 2026-05-17 (revised): regex CTA check was brittle —
     # "Now let me ask:" with a dangling colon slipped past. The LLM
     # judge sees the whole turn semantically.
-    if step_type in {"practice", "quiz"}:
+    # Anti-smuggle (2026-05-17, see
+    # memory/tutor_state_drift_and_leak_simplification_plan.md): when an
+    # answer is already awaiting, the tutor is on a hint/remediation
+    # turn for the existing question. The tutor MUST NOT author a new
+    # question — it should restate the active one. So the
+    # "must-end-with-?" structural check (which was prodding regen to
+    # smuggle a new question in) is suppressed in that case. The
+    # handoff LLM judge below still catches truly dangling turns.
+    if step_type in {"practice", "quiz"} and not awaiting_answer_is_set:
         if not _ends_with_question(content):
             issues.append(ISSUE_NO_QUESTION)
     info_score = _info_dump_score(content)
@@ -504,10 +517,26 @@ def validate_tutor_response(
         # pure acknowledgements, and other parting lines that leave
         # the student without direction. Default is handed_off=True
         # (skipped / errored judge doesn't false-positive).
-        if getattr(combined_result, "handed_off", True) is False:
+        #
+        # Anti-smuggle (2026-05-17): when an answer is already awaiting,
+        # the active question above IS the handoff. The handoff judge
+        # only sees the turn text and doesn't know about state, so it
+        # may flag handed_off=False even when the tutor restated the
+        # active question. Suppressing the issue (but still recording
+        # the reason in metadata for analysis) prevents the regen loop
+        # that drove the smuggle pattern on prod session 265.
+        if (
+            getattr(combined_result, "handed_off", True) is False
+            and not awaiting_answer_is_set
+        ):
             if ISSUE_NO_QUESTION not in issues:
                 issues.append(ISSUE_NO_QUESTION)
             extra_meta["handoff_reason"] = (
+                getattr(combined_result, "handoff_reason", "") or ""
+            )
+        elif getattr(combined_result, "handed_off", True) is False:
+            # Record but don't trigger regen — see comment above.
+            extra_meta["handoff_reason_suppressed"] = (
                 getattr(combined_result, "handoff_reason", "") or ""
             )
     else:

@@ -420,7 +420,7 @@ def grade_written_responses_batch(
 
 @dataclass
 class BatchLeakItem:
-    """One leak-detection input. Used by W1's LLM judge layer.
+    """One leak-detection input for the single LLM leak judge.
 
     For chat-authored questions where there's no canonical bank entry,
     pass the LLM grader's best understanding of the expected answer
@@ -437,12 +437,6 @@ class BatchLeakItem:
     response: str
     options: Optional[dict] = None  # {'A': '...', 'B': '...', ...} for MCQ
     correct_letter: Optional[str] = None  # 'A' | 'B' | 'C' | 'D' for MCQ
-    # Arbiter mode (set when det + LLM disagreed and we need tie-break):
-    arbiter: bool = False
-    det_verdict: Optional[bool] = None
-    det_reason: Optional[str] = None
-    llm_verdict: Optional[bool] = None
-    llm_reason: Optional[str] = None
 
 
 @dataclass
@@ -455,7 +449,9 @@ class BatchLeakResult:
 _LEAK_SYSTEM = (
     "You judge whether a tutor's response REVEALED the correct answer "
     "to a student during a tutoring session. Works for MCQ AND non-MCQ "
-    "(short-answer, fill-in-blank, numeric, conceptual).\n"
+    "(short-answer, fill-in-blank, numeric, conceptual). You are the "
+    "ONLY guard against the tutor giving the answer away — there is no "
+    "arbiter, no second opinion. Get it right.\n"
     "\n"
     "Each input gives you:\n"
     "  - question: the question stem the student is trying to answer\n"
@@ -474,9 +470,12 @@ _LEAK_SYSTEM = (
     "let the student copy/pick the correct answer without thinking.\n"
     "\n"
     "REVEAL (leaked=true) — flag ALL of these:\n"
-    "  (a) Tutor states the correct_letter (MCQ), in any tense:\n"
+    "  (a) Tutor states the correct_letter (MCQ), in ANY tense or\n"
+    "      framing — even when wrapped in a conceptual explanation:\n"
     "      'the answer is B', 'the correct answer was A', 'it would\n"
-    "      be C', 'should be D', 'A) True is correct', etc.\n"
+    "      be C', 'should be D', 'A) True is correct', 'choose C',\n"
+    "      'C is correct because...', 'the right one is B'. NAMING\n"
+    "      THE LETTER IS A LEAK regardless of the WHY framing.\n"
     "  (b) Tutor states the correct_answer_value verbatim or with\n"
     "      trivial reordering. E.g. value='Readers would not know\n"
     "      what area the map represents' and tutor says 'Without it,\n"
@@ -494,14 +493,37 @@ _LEAK_SYSTEM = (
     "      while explaining. 'The correct answer was A because...'\n"
     "      and 'X is the answer here' both → LEAK.\n"
     "\n"
+    "WORKED EXAMPLE (prod session 265 — the LLM judge correctly\n"
+    "flagged this, then an arbiter wrongly overruled it. The arbiter\n"
+    "no longer exists; your verdict is final.):\n"
+    "  question: 'A street map of Victoria (1:5,000) and a national\n"
+    "    map (1:500,000) differ in detail. Which statement is true?'\n"
+    "  correct_letter: 'C'\n"
+    "  correct_answer_value: 'The street map shows more detail because\n"
+    "    it uses a larger scale'\n"
+    "  tutor_response: 'Not quite, Edward. The answer is actually C)\n"
+    "    The street map shows more detail because it uses a larger\n"
+    "    scale. Here's the key idea: a scale of 1:5,000 means...'\n"
+    "  CORRECT VERDICT: leaked=true. The tutor names both the letter\n"
+    "  AND the option text. The conceptual explanation that follows\n"
+    "  does NOT redeem the leak — by the time the student reads it\n"
+    "  they already know the answer.\n"
+    "\n"
     "NOT a reveal (leaked=false) — concept-level hints are OK:\n"
-    "  - Names what the question is testing without stating the answer.\n"
-    "    'Think about what a compass rose actually shows on a map.' ✓\n"
+    "  - Names what the question is testing without stating the answer\n"
+    "    OR the correct letter. 'Think about what a compass rose\n"
+    "    actually shows on a map.' ✓\n"
     "  - Asks a Socratic question that narrows the option space\n"
     "    without giving the answer. 'What's the key thing you need to\n"
     "    know about your route?' ✓\n"
     "  - Eliminates wrong options without naming the right one.\n"
     "    'Two of these options are about distance, not direction.' ✓\n"
+    "  - Explains the underlying CONCEPT (the rule, the mechanism)\n"
+    "    without referring to a specific option letter or quoting the\n"
+    "    canonical text. 'Larger scales mean smaller denominators,\n"
+    "    which means each unit of map covers less ground.' ✓ — even\n"
+    "    though this primes the student toward C, it never names C\n"
+    "    or quotes C's exact wording.\n"
     "\n"
     "WHEN IN DOUBT: lean leaked=true. False positives just trigger a\n"
     "regen; false negatives ship the answer to the student.\n"
@@ -510,25 +532,6 @@ _LEAK_SYSTEM = (
     "[\n"
     '  {"index": <int>, "leaked": <true|false>, '
     '"reason": "<short why, <=200 chars>"}\n'
-    "]\n"
-)
-
-
-_LEAK_ARBITER_SYSTEM = (
-    "Two detectors disagreed about whether a tutor response leaked the "
-    "answer. Resolve the disagreement.\n"
-    "\n"
-    "REVEAL = stated the answer (letter or text), or paraphrased the\n"
-    "canonical so the student can copy it.\n"
-    "\n"
-    "NOT REVEAL = concept-level hint, Socratic question, eliminating\n"
-    "wrong options without naming the right one.\n"
-    "\n"
-    "Weigh both detectors' reasoning. Pick the verdict that better\n"
-    "fits the actual response. Output JSON ARRAY ONLY:\n"
-    "[\n"
-    '  {"index": <int>, "leaked": <true|false>, '
-    '"reason": "<short why, <=300 chars>"}\n'
     "]\n"
 )
 
@@ -553,11 +556,6 @@ def _build_leak_user_prompt(items: Sequence['BatchLeakItem']) -> str:
             }
         if it.correct_letter:
             entry["correct_letter"] = it.correct_letter
-        if it.arbiter:
-            entry["detector_a_verdict"] = it.det_verdict
-            entry["detector_a_reason"] = (it.det_reason or "")[:300]
-            entry["detector_b_verdict"] = it.llm_verdict
-            entry["detector_b_reason"] = (it.llm_reason or "")[:300]
         payload.append(entry)
     return (
         "Judge each item below. Reply with ONLY the JSON array — no "
@@ -775,17 +773,15 @@ def run_grading_batch(
     judgment_type: JudgmentType,
     llm_client,
     max_tokens: int = 1024,
-    arbiter: bool = False,
 ) -> List:
     """Unified entry point for batched LLM judgments.
 
     Dispatches on judgment_type:
       GRADE_CORRECTNESS → delegates to grade_written_responses_batch
                           (preserves existing behavior + back-compat).
-      JUDGE_LEAK        → answer-leak detector (W1).
-                          Set arbiter=True for the disagreement
-                          tie-break call (uses arbiter prompt + reads
-                          det/llm verdict+reason from each item).
+      JUDGE_LEAK        → answer-leak detector (W1). Single LLM judge,
+                          no arbiter (removed 2026-05-17 — see
+                          memory/tutor_state_drift_and_leak_simplification_plan.md).
       JUDGE_REPEAT      → repeated-question detector (W14).
       CLASSIFY_INTENT   → attempt / confusion / off_topic (W9).
 
@@ -813,10 +809,6 @@ def run_grading_batch(
         return []
     system_prompt, build_user, result_kind = config
 
-    # Leak arbiter uses a different system prompt.
-    if judgment_type == JudgmentType.JUDGE_LEAK and arbiter:
-        system_prompt = _LEAK_ARBITER_SYSTEM
-
     if llm_client is None:
         logger.info(
             "[Grader] no llm_client for judgment_type=%s — returning defaults",
@@ -826,8 +818,7 @@ def run_grading_batch(
 
     user_prompt = build_user(items)
     logger.info(
-        "[Grader] %s%s: %d items",
-        judgment_type.value, " (arbiter)" if arbiter else "", len(items),
+        "[Grader] %s: %d items", judgment_type.value, len(items),
     )
 
     try:

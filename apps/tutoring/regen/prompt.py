@@ -480,6 +480,31 @@ def _violation_line(issue: str, meta: Dict) -> str:
         )
         if handoff_reason:
             head += f"  Specifically: {handoff_reason[:200]}\n"
+        # Anti-smuggle (2026-05-17): when the validator passed an
+        # awaiting_answer_is_set=True signal AND we have bank_context
+        # above, the fix is to RESTATE the active question — NOT
+        # invent a new one. Inventing creates state drift (engine's
+        # bank_question_ref points at the active Q, but student sees
+        # the smuggled prose Q; grader then mismatches). See
+        # memory/tutor_state_drift_and_leak_simplification_plan.md.
+        if meta.get("awaiting_answer_is_set"):
+            return (
+                head
+                + "  Fix: RESTATE the active question (see "
+                "BANK_GROUND_TRUTH above) verbatim as the last "
+                "lines of your turn, so the student can re-attempt "
+                "it. Do NOT author a NEW question. Do NOT call "
+                "pose_question or pose_inline_question in your "
+                "response. The active question already lives in the "
+                "engine's state — your job is to put it back on "
+                "screen for the student.\n"
+                "  Example: BEFORE: \"Here's the key idea — larger "
+                "scales show more detail. Want to try again?\" "
+                "AFTER: \"Here's the key idea — larger scales show "
+                "more detail.\\n\\nWhich statement is true?\\n"
+                "A) ...\\nB) ...\\nC) ...\\nD) ...\" (the four "
+                "options come from the BANK_GROUND_TRUTH block above)"
+            )
         return (
             head
             + "  Fix: end with ONE focused question OR a clear "
