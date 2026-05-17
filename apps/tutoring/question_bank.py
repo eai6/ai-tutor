@@ -181,15 +181,20 @@ def sample_session_pool(
     # never saw lesson-level banks even when the teacher dashboard
     # showed them populated. Filter by assessment_type instead.
     #
-    # 'matching' questions are excluded from the in-chat tutoring pool —
-    # they render awkwardly inline ("70° → ___, choose from: …") and
-    # confuse students. Matching stays in the EXIT TICKET (post-lesson
-    # modal where the UI can render proper select boxes). Tutoring
-    # uses MCQ / short_numeric / short_answer / fill_in_blank only.
+    # 'matching' and 'fill_in_blank' questions are excluded from the
+    # in-chat tutoring pool — they render awkwardly inline
+    # ("70° → ___, choose from: …" or "Geography is the study of ___ and
+    # its ___.") and the bank grader is strict per-blank/per-pair, which
+    # produces false negatives (pilot 2026-05-16 lesson 537: "Earth,
+    # inhabitants" marked wrong because bank wanted full phrase; same
+    # turn even after retry). Both stay reachable via the EXIT TICKET
+    # modal where the UI renders proper select boxes / per-blank text
+    # inputs. Tutoring uses MCQ / short_numeric / short_answer /
+    # true_false only.
     bank_qs = ExitTicketQuestion.objects.filter(
         exit_ticket__lesson=lesson,
         exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
-    ).exclude(question_type='matching').order_by('order_index')
+    ).exclude(question_type__in=['matching', 'fill_in_blank']).order_by('order_index')
     bank = list(bank_qs)
     if not bank:
         return []
@@ -278,16 +283,19 @@ def pick_published_for_concept_tag(
     """
     from apps.tutoring.models import ExitTicket, ExitTicketQuestion
     # See sample_session_pool — is_published is summative-only.
-    # Exclude 'matching' for the same reason: it has no inline / artifact
-    # rendering for the in-tutor flow yet (drag-and-drop UX). Matching
-    # questions stay reachable via the post-lesson exit-ticket modal
-    # only. Without this filter, the EO-targeted picker (used by
-    # pick_question_for_eo + the remediation flow) could surface a
-    # matching question to the tutor and produce a broken inline render.
+    # Exclude 'matching' and 'fill_in_blank' for the same reason: neither
+    # has a clean inline rendering for the in-tutor flow ('70° → ___,
+    # choose from: …' for matching; bare '___' placeholders inline for
+    # FIB) and the per-blank/per-pair grader is strict, producing
+    # false negatives. Both stay reachable via the post-lesson
+    # exit-ticket modal where the UI can render proper select boxes /
+    # text inputs. Without this filter, the EO-targeted picker (used by
+    # pick_question_for_eo + the remediation flow) could surface one to
+    # the tutor and produce a broken inline render.
     base = ExitTicketQuestion.objects.filter(
         exit_ticket__lesson=lesson,
         exit_ticket__assessment_type=ExitTicket.AssessmentType.EXIT_TICKET,
-    ).exclude(question_type='matching')
+    ).exclude(question_type__in=['matching', 'fill_in_blank'])
     tag = (concept_tag or '').strip()
     if tag:
         matches = list(
