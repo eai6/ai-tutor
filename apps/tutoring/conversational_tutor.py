@@ -4870,24 +4870,50 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
                     ) or {})
                     if _last_t else {}
                 )
-                if not ia:
-                    return ""
-                lines = [
-                    "[ACTIVE INLINE-AUTHORED QUESTION]",
-                    "You authored this question on the previous turn",
-                    "via pose_inline_question. Use the answer_key +",
-                    "student_status below to scaffold the next turn.",
-                    "",
-                    f"  kind: inline_authored",
-                    f"  question_type: {ia.get('question_type', 'short_answer')}",
-                    f"  stem: {(ia.get('question') or '')[:600]}",
-                    f"  answer_key: {(ia.get('answer_key') or '')[:200]}",
-                    f"  student_status: {status}",
-                ]
-                if ia.get('working'):
-                    lines.append(
-                        f"  reference_working: {(ia.get('working') or '')[:300]}"
-                    )
+                if ia:
+                    # Genuine pose_inline_question path — full metadata.
+                    lines = [
+                        "[ACTIVE INLINE-AUTHORED QUESTION]",
+                        "You authored this question on the previous turn",
+                        "via pose_inline_question. Use the answer_key +",
+                        "student_status below to scaffold the next turn.",
+                        "",
+                        f"  kind: inline_authored",
+                        f"  question_type: {ia.get('question_type', 'short_answer')}",
+                        f"  stem: {(ia.get('question') or '')[:600]}",
+                        f"  answer_key: {(ia.get('answer_key') or '')[:200]}",
+                        f"  student_status: {status}",
+                    ]
+                    if ia.get('working'):
+                        lines.append(
+                            f"  reference_working: {(ia.get('working') or '')[:300]}"
+                        )
+                else:
+                    # Task #189 (2026-05-17). Chat-authored conceptual /
+                    # warmup question — the LLM typed a question in
+                    # prose (no pose_inline_question). The bootstrap in
+                    # _grade_against_last_bank_question stored the
+                    # question text on the awaiting_answer record itself
+                    # (`authored_question_text`). Fall back to that so
+                    # the hint-vs-reveal scaffolding fires on warmups
+                    # too, not just on bank MCQs.
+                    stem = (rec.get('authored_question_text') or '').strip()
+                    if not stem:
+                        return ""
+                    lines = [
+                        "[ACTIVE CHAT-AUTHORED QUESTION]",
+                        "You authored a conceptual / open-ended question in",
+                        "chat narrative on a prior turn (no answer key in",
+                        "the bank). The chat-authored grader's LLM judges",
+                        "each reply; wrong_attempts is tracked on this record",
+                        "so the hint-vs-reveal threshold + move-on rules",
+                        "apply just like for bank MCQs.",
+                        "",
+                        f"  kind: inline_authored (chat-bootstrap)",
+                        f"  question_type: {rec.get('question_type') or 'short_answer'}",
+                        f"  stem: {stem[:600]}",
+                        f"  student_status: {status}",
+                    ]
             elif kind == 'inline_mcq':
                 # Task #173 (2026-05-17). The LLM authored MCQ options
                 # inline (no pose_question, no answer key in the bank).
