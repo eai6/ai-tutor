@@ -38,7 +38,18 @@ ISSUE_NUMERIC_CLAIM_CONTRADICTED = "numeric_claim_contradicted"
 # memory/tutor_no_authoring_plan.md.
 ISSUE_AUTHORING_VIOLATION = "authoring_violation"
 ISSUE_ARITHMETIC_VIOLATION = "arithmetic_violation"
-ISSUE_RULE1_VIOLATION = "rule1_violation"
+# ISSUE_RULE1_VIOLATION ("praise on bare answer") REMOVED 2026-05-17.
+# Rationale: the rule was added when the grader was unreliable and the
+# tutor could praise a bare answer that was actually wrong. With the
+# bank grader + chat-authored grader now authoritative on correctness
+# (deterministic for MCQ/numeric, grounded LLM for the rest), praise
+# on a grader-confirmed-correct bare answer is justified. The pedagogy
+# concern ("but ask for working anyway") is a separate teaching pattern
+# handled elsewhere, not a regen-worthy violation. The RULE_RULE_1
+# category in `apps/tutoring/rule_compliance.py` + the LLM judge prompt
+# schema still exist for backward compat with stored judge outputs;
+# the validator just no longer translates them into a validator-level
+# issue or surfaces them in validator_issues.
 # Tutor referenced a figure ("the diagram", "in the figure") but no
 # |||MEDIA:N||| signal was emitted, so the student saw the reference
 # without the visual. Soft issue for now — surfaced in [TurnSummary]
@@ -371,7 +382,7 @@ def validate_tutor_response(
             from apps.tutoring.rule_compliance import (
                 RULE_ARITHMETIC,
                 RULE_NO_AUTHORING,
-                RULE_RULE_1,
+                # RULE_RULE_1 removed 2026-05-17 — see top of file.
             )
             # NO_AUTHORING suppression 2026-05-16: the rule_compliance
             # LLM judge sees the question text in the chat content and
@@ -387,18 +398,10 @@ def validate_tutor_response(
                 issues.append(ISSUE_AUTHORING_VIOLATION)
             if RULE_ARITHMETIC in combined_result.violated_rules:
                 issues.append(ISSUE_ARITHMETIC_VIOLATION)
-            # RULE_RULE_1 suppression 2026-05-16: Math Rule 1 forbids
-            # praise words ("perfect", "right", "exactly") on bare
-            # numeric answers. Designed for practice problems where
-            # working is expected. But when the GRADER has already
-            # verified the answer is correct (is_correct=True), the
-            # praise is justified — the LLM rule judge is being too
-            # strict. Trust the grader as the authoritative source.
-            if (
-                RULE_RULE_1 in combined_result.violated_rules
-                and is_correct is not True
-            ):
-                issues.append(ISSUE_RULE1_VIOLATION)
+            # RULE_RULE_1 ("praise on bare answer") FULLY REMOVED
+            # 2026-05-17 — dropped from VALID_RULES + judge prompt +
+            # validator + regen handler + tests. Grader is now
+            # authoritative on correctness.
         # Coherence judge findings (2026-05-08).
         if getattr(combined_result, "coherence_violations", None):
             issues.append(ISSUE_TUTOR_INCOHERENT)
@@ -478,7 +481,7 @@ def validate_tutor_response(
                 from apps.tutoring.rule_compliance import (
                     RULE_ARITHMETIC,
                     RULE_NO_AUTHORING,
-                    RULE_RULE_1,
+                    # RULE_RULE_1 removed 2026-05-17 — see top of file.
                     check_rule_compliance,
                 )
                 rc = check_rule_compliance(
@@ -500,13 +503,6 @@ def validate_tutor_response(
                         issues.append(ISSUE_AUTHORING_VIOLATION)
                     if RULE_ARITHMETIC in rc.violated_rules:
                         issues.append(ISSUE_ARITHMETIC_VIOLATION)
-                    # See combined_result branch above for Rule 1
-                    # suppression rationale.
-                    if (
-                        RULE_RULE_1 in rc.violated_rules
-                        and is_correct is not True
-                    ):
-                        issues.append(ISSUE_RULE1_VIOLATION)
 
     # L6 — deterministic gates that don't rely on the LLM judge.
     #

@@ -409,16 +409,9 @@ def _violation_line(issue: str, meta: Dict) -> str:
             "several angles meet at a single point?\""
         )
 
-    if issue == "rule1_violation":
-        return (
-            "- RULE_1: the original praised the student on a bare or "
-            "wrong math answer. Fix: drop the praise and ask for "
-            "reasoning — vary your wording, do NOT always default to "
-            "\"walk me through your steps\".\n"
-            "  Example: BEFORE: \"Perfect! You got it.\" AFTER: \"How "
-            "did you get there?\" — or \"Which rule did you apply?\" "
-            "— or \"What was the first thing you noticed?\""
-        )
+    # rule1_violation handler REMOVED 2026-05-17 — RULE_1 is gone.
+    # Grader is authoritative on correctness; praise on a verified-
+    # correct bare answer is justified.
 
     if issue == "numeric_claim_contradicted":
         contradicted = meta.get("factual_claims_contradicted") or []

@@ -42,7 +42,7 @@ from apps.tutoring.llm_arithmetic_verifier import _HAS_NUMBER_RE
 from apps.tutoring.rule_compliance import (
     RULE_ARITHMETIC,
     RULE_NO_AUTHORING,
-    RULE_RULE_1,
+    # RULE_RULE_1 removed from imports 2026-05-17 — rule deprecated.
     VALID_RULES,
     RuleViolation,
     _has_relevant_content,
@@ -296,20 +296,10 @@ _JUDGE_SYSTEM = (
     "tool, or reusing a stem that appears verbatim in input.bank_stems.\n"
     "  ARITHMETIC — flag this rule whenever any arithmetic claim is "
     "wrong, in addition to listing the correction in arithmetic_corrections.\n"
-    "  RULE_1 — APPLIES ONLY WHEN input.subject_is_math IS TRUE. The "
-    "rule was designed for math: a bare numeric answer (e.g. \"88\") "
-    "with no working shown must not be praised. On non-math turns "
-    "(geography, science, history, language), a one-word conceptual "
-    "answer (e.g. \"colonization\") IS the answer — there is no "
-    "\"working\" to wait for. Praising a correct conceptual answer is "
-    "normal teaching, NOT a RULE_1 violation. If subject_is_math is "
-    "false, return [] for RULE_1 even when the input looks bare.\n"
-    "  When subject_is_math is true AND input.student_answer_was_bare "
-    "or input.student_answer_was_wrong: tutor must NOT praise mastery. "
-    "\"exactly\", \"perfect\", \"you've nailed it\", \"you've got the "
-    "rule\", \"you understand\", \"smart\", \"spot on\" are all "
-    "violations in that math-bare context. Asking the student to walk "
-    "through their work is the correct response — NOT a violation.\n"
+    # RULE_1 ("no praise on bare answer") REMOVED 2026-05-17 — the
+    # grader is now authoritative on correctness; praising a verified-
+    # correct bare answer is fine. Do NOT emit RULE_1 in violations.
+
     "\n"
     "CHECK 4 — STEP EVALUATION (merged from former instructor "
     "_evaluate_step). Read input.step_context which gives:\n"
@@ -364,7 +354,7 @@ _JUDGE_SYSTEM = (
     '  "fact_claims": [{"claim": "<from input>", '
     '"status": "supported|contradicted|unverified", '
     '"evidence": "<<=80 char quote>"}],\n'
-    '  "rule_violations": [{"rule": "NO_AUTHORING|ARITHMETIC|RULE_1", '
+    '  "rule_violations": [{"rule": "NO_AUTHORING|ARITHMETIC", '
     '"evidence": "<<=120 char quote>", '
     '"suggested_fix": "<one-sentence rewrite>"}],\n'
     '  "answer_correct": true|false|null,\n'
@@ -401,10 +391,10 @@ def _build_user_prompt(
         "evidence": (evidence or "(no evidence retrieved)")[:3000],
         # Step context for CHECK 4. Empty dict → judge skips step eval.
         "step_context": step_context or {},
-        # Subject signal for the judge — math turns get arithmetic
-        # + RULE_1 (don't praise bare numeric) checks; non-math turns
-        # skip those (no arithmetic to verify, no bare-numeric rule).
+        # Subject signal for the judge — math turns get the arithmetic
+        # check; non-math turns skip it (no arithmetic to verify).
         # CHECK 2 (factual) and CHECK 4 (step eval) run for both.
+        # (RULE_1 was removed 2026-05-17 — grader is now authoritative.)
         "subject_is_math": bool(subject_is_math),
     }
     return (
@@ -624,12 +614,13 @@ def _run_combined_judge_legacy_monolithic(
         for missing in factual_claims[len(result.fact_claims):]:
             result.fact_claims.append(ClaimVerdict(missing, "unverified"))
 
-    # Rule violations. Programmatic RULE_1 + ARITHMETIC gating: the
-    # judge prompt asks the LLM to skip these on non-math turns, but
-    # Sonnet has been observed to emit RULE_1 anyway (geography
-    # transcripts had rule1_violation on every conceptual answer).
-    # Filter here so a non-compliant judge can't trigger regen for a
-    # rule that doesn't apply.
+    # Rule violations. Programmatic ARITHMETIC gating: the judge
+    # prompt asks the LLM to skip this on non-math turns; gate
+    # programmatically too so non-compliant judges can't trigger
+    # regen for a rule that doesn't apply.
+    # RULE_1 ("no praise on bare answer") REMOVED 2026-05-17 — any
+    # historical emission gets filtered out by the VALID_RULES set
+    # since RULE_RULE_1 is no longer in it.
     rule_items = data.get("rule_violations") or []
     if isinstance(rule_items, list):
         for item in rule_items[:max_violations]:
@@ -638,7 +629,7 @@ def _run_combined_judge_legacy_monolithic(
             rule = str(item.get("rule") or "").strip().upper()
             if rule not in VALID_RULES:
                 continue
-            if not subject_is_math and rule in (RULE_RULE_1, RULE_ARITHMETIC):
+            if not subject_is_math and rule == RULE_ARITHMETIC:
                 logger.info(
                     "[CombinedJudge] dropping %s on non-math turn", rule,
                 )

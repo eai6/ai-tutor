@@ -12,11 +12,15 @@ deterministic regex layers can't fully cover:
                  "subtracting gives Z") must be numerically correct.
                  Catches the prose-form failures that
                  verify_calculations regex misses.
-  RULE_1       — praise like "exactly", "you've nailed it", "perfect
-                 understanding" is forbidden when the student's last
-                 answer was bare or wrong (math_teaching Rule 1
-                 generalised to praise SYNONYMS, not just literal
-                 blocklist words).
+  RULE_1       — REMOVED 2026-05-17. Was "no praise on bare answer".
+                 Made sense when the grader was unreliable; now the
+                 bank / chat-authored grader is authoritative on
+                 correctness so praising a verified-correct bare
+                 answer is fine. Removed from VALID_RULES + judge
+                 prompt + validator. The constant `RULE_RULE_1` is
+                 kept as a deprecated alias only for backward compat
+                 with stored judge outputs in historical SessionTurn
+                 metadata.
 
 Designed to fail-closed: if the LLM client is missing or the call
 fails, returns "skipped" rather than blocking the response.
@@ -40,9 +44,13 @@ logger = logging.getLogger(__name__)
 # SessionTurn.metadata.
 RULE_NO_AUTHORING = "NO_AUTHORING"
 RULE_ARITHMETIC = "ARITHMETIC"
+# RULE_RULE_1 — DEPRECATED 2026-05-17, kept only as a string alias
+# for historical SessionTurn.metadata that may contain it. Not in
+# VALID_RULES anymore so the judge prompt no longer asks for it and
+# any model-side emission is dropped on the floor by validation.
 RULE_RULE_1 = "RULE_1"
 
-VALID_RULES = frozenset({RULE_NO_AUTHORING, RULE_ARITHMETIC, RULE_RULE_1})
+VALID_RULES = frozenset({RULE_NO_AUTHORING, RULE_ARITHMETIC})
 
 
 # Cheap pre-filter — only invoke the judge when the response has SOMETHING
@@ -138,13 +146,10 @@ _JUDGE_SYSTEM = (
     "measure 100°, 120°, 80° — do they sum to 360°?\" implies "
     "100+120+80 = 360, which is FALSE (300 ≠ 360). Flag both as "
     "ARITHMETIC and as NO_AUTHORING. Prose forms count: \"they sum to "
-    "180°\", \"subtracting gives 17\".\n"
-    "3. RULE_1 — when the student's most recent answer was BARE (no "
-    "working shown) OR WRONG, the tutor must NOT praise mastery in any "
-    "phrasing. \"exactly\", \"you've nailed it\", \"you've got the rule\", "
-    "\"you understand\", \"perfect\", \"smart\" are all violations in "
-    "this context. Asking \"can you walk me through your steps?\" is "
-    "the correct response and is NOT a violation."
+    "180°\", \"subtracting gives 17\"."
+    # RULE_1 ("no praise on bare answer") REMOVED 2026-05-17 —
+    # grader is now authoritative on correctness; praise on a
+    # verified-correct bare answer is acceptable.
 )
 
 
@@ -166,11 +171,11 @@ def _build_judge_prompt(
         "verified_question_bank": bank_block,
     }
     return (
-        "Review the tutor's response below for violations of NO_AUTHORING, "
-        "ARITHMETIC, RULE_1.\n\n"
+        "Review the tutor's response below for violations of NO_AUTHORING "
+        "or ARITHMETIC.\n\n"
         f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}\n\n"
         "Reply with ONLY a JSON object of the shape:\n"
-        '  {"violations": [{"rule": "NO_AUTHORING"|"ARITHMETIC"|"RULE_1", '
+        '  {"violations": [{"rule": "NO_AUTHORING"|"ARITHMETIC", '
         '"evidence": "<<=120-char quote from the response>", '
         '"suggested_fix": "<one-sentence rewrite>"}]}\n'
         "If no violations, return {\"violations\": []}."
@@ -196,8 +201,9 @@ def check_rule_compliance(
       bank_stems: list of allowed-question stems for context — pulled
                   from the active session bank. Used by the judge to
                   know what counts as authoring.
-      student_input: the student's last message (gives the judge
-                     enough context to evaluate RULE_1).
+      student_input: the student's last message (still passed for
+                     historical / future context; no longer used to
+                     evaluate RULE_1 which was removed 2026-05-17).
       answer_was_bare: True when the student's last input was a naked
                        numeric answer (no working shown).
       answer_was_wrong: True when the deterministic answer-check said

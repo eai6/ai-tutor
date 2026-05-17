@@ -201,7 +201,7 @@ class RunRegenEnsembleTest(SimpleTestCase):
         """Engine must fail-soft when no regen clients are configured."""
         result = run_regen_ensemble(
             previous_response="bad text",
-            validation=_validation(["rule1_violation"]),
+            validation=_validation(["tutor_incoherent"]),
             lesson=None,
             regen_clients=[],
         )
@@ -218,7 +218,7 @@ class RunRegenEnsembleTest(SimpleTestCase):
         with patch("apps.tutoring.regen.run_all_judges", return_value=clean_result):
             result = run_regen_ensemble(
                 previous_response="bad",
-                validation=_validation(["rule1_violation"]),
+                validation=_validation(["tutor_incoherent"]),
                 lesson=None,
                 regen_clients=[client],
                 max_cycles=3,
@@ -241,7 +241,7 @@ class RunRegenEnsembleTest(SimpleTestCase):
         with patch("apps.tutoring.regen.run_all_judges", return_value=dirty_result):
             result = run_regen_ensemble(
                 previous_response="bad",
-                validation=_validation(["rule1_violation"]),
+                validation=_validation(["tutor_incoherent"]),
                 lesson=None,
                 regen_clients=[client],
                 max_cycles=2,
@@ -285,7 +285,7 @@ class RunRegenEnsembleTest(SimpleTestCase):
         with patch("apps.tutoring.regen.run_all_judges", side_effect=fake_judges):
             result = run_regen_ensemble(
                 previous_response="bad",
-                validation=_validation(["rule1_violation"]),
+                validation=_validation(["tutor_incoherent"]),
                 lesson=None,
                 regen_clients=[c1, c2, c3],
                 max_cycles=1,
@@ -302,7 +302,7 @@ class RunRegenEnsembleTest(SimpleTestCase):
         with patch("apps.tutoring.regen.run_all_judges", return_value=good_jr):
             result = run_regen_ensemble(
                 previous_response="bad",
-                validation=_validation(["rule1_violation"]),
+                validation=_validation(["tutor_incoherent"]),
                 lesson=None,
                 regen_clients=[broken, good],
                 max_cycles=1,
@@ -314,7 +314,7 @@ class RunRegenEnsembleTest(SimpleTestCase):
         broken = _failing_llm(RuntimeError("API down"))
         result = run_regen_ensemble(
             previous_response="bad",
-            validation=_validation(["rule1_violation"]),
+            validation=_validation(["tutor_incoherent"]),
             lesson=None,
             regen_clients=[broken],
             max_cycles=2,
