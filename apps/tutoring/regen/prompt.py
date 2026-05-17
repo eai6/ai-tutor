@@ -102,7 +102,29 @@ def build_regen_prompt(
     # contradicted the bank's own explanation). Top placement so the
     # LLM internalises it before reading the broken response.
     if bank_context:
-        parts.append("## BANK_GROUND_TRUTH (the question this turn responds to — DO NOT CONTRADICT)")
+        suppress_reason = (bank_context.get('suppress_reason') or '').strip()
+        leak_mode = (suppress_reason == 'answer_leak_regen')
+
+        if leak_mode:
+            # W3 leak-aware regen: the canonical answer has been
+            # INTENTIONALLY REMOVED from your context because the
+            # previous response leaked it. Output a concept-level
+            # hint only — you literally don't know the answer.
+            parts.append("## LEAK_AWARE_REGEN — ANSWER INTENTIONALLY HIDDEN")
+            parts.append(
+                "The previous tutor response LEAKED the canonical answer. "
+                "The student answered wrong and is still allowed to retry. "
+                "The canonical answer has been REMOVED from your context "
+                "so you cannot leak it.\n"
+                "\n"
+                "OUTPUT: ONE concept-level hint that names what the "
+                "question is testing. Do NOT describe what any option "
+                "says. Do NOT name the correct option letter. Let the "
+                "student attempt again. ONE short scaffolding question "
+                "is OK ('what's the key thing you need before X?')."
+            )
+        else:
+            parts.append("## BANK_GROUND_TRUTH (the question this turn responds to — DO NOT CONTRADICT)")
         q_text = (bank_context.get('question_text') or '').strip()
         if q_text:
             parts.append(f"question: {q_text[:300]}")
@@ -112,17 +134,22 @@ def build_regen_prompt(
                 opt_text = (opts.get(letter) or '').strip()
                 if opt_text:
                     parts.append(f"  {letter}. {opt_text[:120]}")
-        ca = (bank_context.get('correct_answer') or '').strip()
-        if ca:
-            parts.append(f"correct_answer: {ca}")
-        expl = (bank_context.get('explanation') or '').strip()
-        if expl:
-            parts.append(f"explanation: {expl[:400]}")
+        if not leak_mode:
+            ca = (bank_context.get('correct_answer') or '').strip()
+            if ca:
+                parts.append(f"correct_answer: {ca}")
+            expl = (bank_context.get('explanation') or '').strip()
+            if expl:
+                parts.append(f"explanation: {expl[:400]}")
         stud_ans = (bank_context.get('student_answer') or '').strip()
         if stud_ans:
             parts.append(f"student_answer: {stud_ans[:120]}")
         verdict = bank_context.get('verdict')
-        if verdict is True:
+        if leak_mode:
+            # Don't re-state verdict-tied rewrite directives — the
+            # LEAK_AWARE_REGEN block above is the only directive.
+            pass
+        elif verdict is True:
             parts.append("verdict: CORRECT")
             parts.append(
                 "REWRITE MUST: confirm the student's answer + explain "
@@ -481,6 +508,40 @@ def _violation_line(issue: str, meta: Dict) -> str:
             "  Example: BEFORE: student wrote \"40\" to a wrong "
             "answer; tutor jumped to a new equation. AFTER: \"Let's "
             "check 40 — what's 5 × 40 + 20? Does that equal 35?\""
+        )
+
+    if issue == "answer_leak":
+        reason = (meta.get("answer_leak_reason") or "").strip()
+        return (
+            "- ANSWER_LEAK: the original response REVEALED the correct "
+            "answer to the student before they earned reveal "
+            "(wrong_attempts < 3). The canonical answer has been "
+            "REMOVED from your context (see LEAK_AWARE_REGEN block "
+            "above) — output ONE concept-level hint that names what "
+            "the question is testing without describing what any "
+            "option says.\n"
+            + (f"  Detector reason: {reason[:200]}\n" if reason else "")
+            + "  Example: BEFORE: \"A compass rose helps you figure "
+            "out which direction to travel.\" AFTER: \"Think about "
+            "what a compass rose actually shows on a map — and what "
+            "you need before you can pick a route.\""
+        )
+
+    if issue == "repeated_question":
+        reason = (meta.get("repeated_question_reason") or "").strip()
+        return (
+            "- REPEATED_QUESTION: the original re-asked a question the "
+            "student already saw (either a previous tutor probe or the "
+            "active bank Q paraphrased). Fix: choose ONE — (a) advance "
+            "to the next concept/step, (b) ask about a DIFFERENT "
+            "angle of the same concept, or (c) give a hint on the "
+            "still-pending question if there is one. Do NOT re-state "
+            "the same question.\n"
+            + (f"  Detector reason: {reason[:200]}\n" if reason else "")
+            + "  Example: BEFORE: \"What is the function of a compass "
+            "rose?\" (already asked). AFTER: \"Why is a compass rose "
+            "especially important for navigating between islands like "
+            "Mahé and Praslin?\""
         )
 
     return f"- {issue}: fix this issue per the original validator output."

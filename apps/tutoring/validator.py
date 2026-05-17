@@ -67,6 +67,19 @@ ISSUE_VERDICT_MISMATCH = "verdict_mismatch"
 # go directly to SessionTurn.is_flagged via the safety judge call
 # in apps/tutoring/views.py and surface at /dashboard/flagged/.
 ISSUE_TUTOR_UNSAFE = "tutor_unsafe"
+# Tutor revealed the canonical answer to a question the student
+# hasn't yet earned (wrong_attempts < 3). Detected by the W1
+# answer-leak guard (apps/tutoring/answer_leak.py — deterministic
+# n-gram/Jaccard + LLM judge + arbiter on disagreement). Triggers
+# regen with the canonical answer SCRUBBED from the regen context
+# so the rewrite can only produce a concept-level hint.
+ISSUE_ANSWER_LEAK = "answer_leak"
+# Tutor re-asked a question already asked (cross-turn authored
+# repeat, or paraphrased re-ask of the active bank Q). Detected by
+# the W14 repeated-question guard (apps/tutoring/repeated_question.py
+# — Jaccard signature match + LLM judge on borderline). Triggers
+# regen with a "rephrase from a different angle or advance" directive.
+ISSUE_REPEATED_QUESTION = "repeated_question"
 
 # Deictic figure references — phrases that strongly imply "I am
 # pointing at a visual right now". Used by the figure-ref-without-signal
@@ -134,6 +147,13 @@ class ValidationResult:
         # Safety judge flagged the tutor response — regen so the
         # student never sees the unsafe text.
         ISSUE_TUTOR_UNSAFE,
+        # Tutor leaked the canonical answer before the student earned
+        # reveal (wrong_attempts < 3). Regen scrubs canonical from
+        # the regen context — see apps/tutoring/regen/prompt.py.
+        ISSUE_ANSWER_LEAK,
+        # Tutor re-asked a question already in flight or already
+        # answered. Regen prompts for a different angle.
+        ISSUE_REPEATED_QUESTION,
     })
 
     @property

@@ -2695,6 +2695,64 @@ Keep it to 2-3 sentences."""
                 }
         if validation.content != clean_response:
             clean_response = validation.content
+
+        # W1 — answer-leak structural guard. Runs AFTER the validator so
+        # we can attach ISSUE_ANSWER_LEAK to validation.issues and let
+        # the existing regen branch fire. Skips silently when the
+        # bank grader verdict was correct (no leak possible), or when
+        # wrong_attempts has reached the reveal-allowed threshold (>=3).
+        # See memory/hint_vs_reveal_guards_plan.md W1.
+        try:
+            _bank_grade_for_leak = getattr(self, '_pending_bank_grade', None)
+            _bank_verdict_for_leak = getattr(_bank_grade_for_leak, 'is_correct', None) if _bank_grade_for_leak else None
+            if _bank_verdict_for_leak is False:
+                # Only fire leak check when the student JUST got wrong.
+                from apps.tutoring.answer_leak import detect_answer_leak
+                from apps.tutoring.validator import ISSUE_ANSWER_LEAK
+                _awaiting = getattr(self, '_awaiting_answer', None) or {}
+                _wrong_attempts = int(_awaiting.get('wrong_attempts', 0) or 0)
+                # Chat-authored Q text — pulled from previous tutor turn
+                # if no bank question is in flight.
+                _chat_authored_q = None
+                if getattr(self, '_pending_bank_question', None) is None:
+                    from apps.tutoring.models import SessionTurn
+                    _prev_tt = (
+                        SessionTurn.objects
+                        .filter(session=self.session, role='tutor')
+                        .order_by('-created_at')
+                        .first()
+                    )
+                    if _prev_tt and _prev_tt.content:
+                        _content = _prev_tt.content.strip()
+                        if _content.endswith('?'):
+                            _sentences = re.split(r'(?<=[.!?])\s+', _content)
+                            _chat_authored_q = next(
+                                (s for s in reversed(_sentences) if s.strip().endswith('?')),
+                                _content,
+                            ).strip()
+                _leak_verdict = detect_answer_leak(
+                    response=clean_response,
+                    bank_question=getattr(self, '_pending_bank_question', None),
+                    chat_authored_q=_chat_authored_q,
+                    wrong_attempts=_wrong_attempts,
+                    llm_client=self.judge_client,
+                )
+                if _leak_verdict is not None:
+                    validation.issues.append(ISSUE_ANSWER_LEAK)
+                    validation.metadata['answer_leak_reason'] = _leak_verdict.reason
+                    validation.metadata['answer_leak_sources'] = _leak_verdict.sources
+                    validation.metadata['answer_leak_ms'] = _leak_verdict.elapsed_ms
+                    logger.info(
+                        "[LeakDetect] FLAGGED session=%s sources=%s ms=%d reason=%r",
+                        self.session.id, _leak_verdict.sources,
+                        _leak_verdict.elapsed_ms, _leak_verdict.reason[:200],
+                    )
+        except Exception as _exc:
+            logger.warning(
+                "[LeakDetect] guard crashed: %s: %s — continuing without regen flag",
+                type(_exc).__name__, _exc,
+            )
+
         if validation.issues:
             turn_metadata['validator_issues'] = list(validation.issues)
             turn_metadata['validator_passed'] = validation.passed
@@ -2816,7 +2874,19 @@ Keep it to 2-3 sentences."""
                     # for a Human-geography question that the
                     # student got right) because it had no ground
                     # truth in its prompt.
-                    bank_context=self._build_regen_bank_context(),
+                    #
+                    # W3 leak-aware regen: when the regen was
+                    # triggered by ISSUE_ANSWER_LEAK, suppress the
+                    # canonical answer from the context — the
+                    # rewrite LLM literally cannot leak it again if
+                    # it doesn't have it. The regen prompt also gets
+                    # a stricter "concept-hint only" directive via
+                    # the bank_context.suppress_reason field.
+                    bank_context=self._build_regen_bank_context(
+                        suppress_canonical=(
+                            'answer_leak' in (validation.issues or [])
+                        ),
+                    ),
                 )
                 if _regen_span is not None:
                     _regen_span['payload'] = {
@@ -4010,19 +4080,28 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
             + "\nApply this guidance in your next response.\n"
         )
 
-    def _build_regen_bank_context(self) -> Optional[Dict]:
+    def _build_regen_bank_context(
+        self, suppress_canonical: bool = False,
+    ) -> Optional[Dict]:
         """Bundle the bank question + grader verdict as ground truth
         for the regen LLM. Returns None when no bank context exists.
 
         The shape matches what build_regen_prompt's `bank_context`
         parameter consumes: {question_text, options, correct_answer,
-        explanation, student_answer, verdict}.
+        explanation, student_answer, verdict, suppress_reason}.
 
         Pilot 2026-05-16: without this context, regen invented
         contradicting answers (student picked C=Human geography for
         a Human-geography question, grader confirmed CORRECT, regen
         rewrote with "cultural or social geography" which wasn't even
         one of the four options).
+
+        Pilot 2026-05-17 (W3, leak-aware regen): when the regen is
+        triggered by ISSUE_ANSWER_LEAK, pass suppress_canonical=True.
+        That STRIPS the correct_answer and explanation fields from the
+        context, so the rewrite LLM literally cannot leak them again.
+        The regen prompt also gets a stricter directive (set via
+        suppress_reason field) — see apps/tutoring/regen/prompt.py.
         """
         q = getattr(self, '_pending_bank_question', None)
         grade = getattr(self, '_pending_bank_grade', None)
@@ -4039,18 +4118,35 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
             # MCQ options if applicable
             qtype = (getattr(q, 'question_type', '') or '').lower()
             if qtype == 'mcq':
-                ctx['options'] = {
-                    'A': getattr(q, 'option_a', '') or '',
-                    'B': getattr(q, 'option_b', '') or '',
-                    'C': getattr(q, 'option_c', '') or '',
-                    'D': getattr(q, 'option_d', '') or '',
-                }
-            ctx['correct_answer'] = (
-                getattr(q, 'correct_answer', None)
-                or getattr(q, 'expected_answer', None)
-                or ''
-            )
-            ctx['explanation'] = getattr(q, 'explanation', '') or ''
+                if suppress_canonical:
+                    # In leak-regen mode keep the OPTIONS visible (the
+                    # rewrite needs to see them so it can ELIMINATE
+                    # wrong ones in its hint) but blank out which
+                    # letter is correct.
+                    ctx['options'] = {
+                        'A': getattr(q, 'option_a', '') or '',
+                        'B': getattr(q, 'option_b', '') or '',
+                        'C': getattr(q, 'option_c', '') or '',
+                        'D': getattr(q, 'option_d', '') or '',
+                    }
+                else:
+                    ctx['options'] = {
+                        'A': getattr(q, 'option_a', '') or '',
+                        'B': getattr(q, 'option_b', '') or '',
+                        'C': getattr(q, 'option_c', '') or '',
+                        'D': getattr(q, 'option_d', '') or '',
+                    }
+            if suppress_canonical:
+                # Leak-aware regen: hide the canonical so the rewrite
+                # cannot leak it.
+                ctx['suppress_reason'] = 'answer_leak_regen'
+            else:
+                ctx['correct_answer'] = (
+                    getattr(q, 'correct_answer', None)
+                    or getattr(q, 'expected_answer', None)
+                    or ''
+                )
+                ctx['explanation'] = getattr(q, 'explanation', '') or ''
         if grade is not None:
             ctx['verdict'] = getattr(grade, 'is_correct', None)
             sp = getattr(grade, 'student_parsed', '')
