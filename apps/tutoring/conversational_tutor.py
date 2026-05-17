@@ -4201,12 +4201,30 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
 
         # Status-driven scaffolding rules. Tight wording so the LLM
         # internalises them without a separate behavioural prompt.
+        #
+        # CRITICAL HINT POLICY (2026-05-17, pilot lesson 540 session 44):
+        # The correct_answer letter + explanation are above so the
+        # tutor can scaffold against TRUTH, NOT so it can reveal them.
+        # When awaiting / answered_wrong, the tutor MUST give a HINT
+        # (a clue that narrows the answer space or surfaces the
+        # underlying concept) and let the student retry. Reveal is
+        # permitted ONLY after the student has attempted twice and
+        # explicitly asked for the answer, or after wrong_attempts >= 3
+        # on the same question. Otherwise the tutor learns nothing
+        # about the student's misconception and the student doesn't
+        # struggle productively.
+        wrong_attempts = int(rec.get('wrong_attempts', 0) or 0)
+        reveal_allowed = (status == 'answered_wrong' and wrong_attempts >= 3)
         rules = {
             'awaiting_answer': (
-                "Scaffolding: hints only. Don't ask the student to "
-                "explain their reasoning yet — let them answer first. "
-                "Reference the question's content (e.g. 'Look at "
-                "option C') without re-stating the stem."
+                "Scaffolding: HINT ONLY — never reveal the correct "
+                "option letter or the answer text in this turn. "
+                "Don't ask the student to explain their reasoning "
+                "yet — let them answer first. If they're stuck, "
+                "give ONE hint that narrows the choices or names "
+                "the concept being tested (e.g. 'Think about which "
+                "feature explains what symbols mean'). Reference "
+                "options indirectly without re-stating the stem."
             ),
             'answered_correct': (
                 "Scaffolding: the student got it RIGHT. Confirm "
@@ -4216,10 +4234,23 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
                 "The verified answer key tells you it's correct."
             ),
             'answered_wrong': (
-                "Scaffolding: the student answered INCORRECTLY. "
-                "Acknowledge gently, THEN you may ask one short probe "
-                "('what was your thinking?') to find the misconception "
-                "before re-explaining or re-posing."
+                "Scaffolding: the student answered INCORRECTLY "
+                f"(wrong_attempts: {wrong_attempts}). DO NOT REVEAL "
+                "the correct option letter or paraphrase the correct "
+                "answer text. Acknowledge gently ('not quite' / "
+                "'close, but think about…'), point at the concept "
+                "they missed (use the explanation field to inform "
+                "the hint, but rephrase as a clue not a giveaway), "
+                "and invite them to try again. ONE short probe is OK "
+                "('what made you pick that?'). Let them attempt the "
+                "question again."
+                + (
+                    "\n  ↳ REVEAL ALLOWED this turn: student has "
+                    "missed this question 3+ times — you may now "
+                    "state the correct answer + full explanation, "
+                    "then move on."
+                    if reveal_allowed else ""
+                )
             ),
         }
         lines.append("")
@@ -5784,6 +5815,7 @@ Follow the current step; this concept will be covered in sequence."""
             pool,
             enabling_objective=getattr(current_step, 'enabling_objective', '') or '',
             concept_tag=current_step.concept_tag or '',
+            difficulty_level=int(getattr(self, 'difficulty_level', 0) or 0),
         )
 
         # Slot 0 is the current step's teacher_script. For practice /
@@ -7035,6 +7067,17 @@ Follow the current step; this concept will be covered in sequence."""
         else:
             return None
         self._pending_bank_grade = result
+        # Increment wrong_attempts on the awaiting_answer record when
+        # this verdict is False. The active_bank_question system block
+        # reads wrong_attempts to decide whether the tutor may finally
+        # reveal the answer (>= 3 attempts) or must keep giving hints.
+        if (
+            result is not None
+            and getattr(result, 'is_correct', None) is False
+            and isinstance(getattr(self, '_awaiting_answer', None), dict)
+        ):
+            cur = int(self._awaiting_answer.get('wrong_attempts', 0) or 0)
+            self._awaiting_answer['wrong_attempts'] = cur + 1
         # Stash the full question so the next-turn prompt builder can
         # surface the canonical explanation / step-by-step working —
         # the tutor uses it to scaffold remediation after a wrong

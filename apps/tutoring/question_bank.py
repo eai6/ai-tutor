@@ -208,11 +208,61 @@ def sample_session_pool(
     return _weighted_sample_without_replacement(bank, weights, pool_size, rng)
 
 
+# Difficulty-tier priority order keyed by student's difficulty_level
+# (-2..+2). The list is the preferred-tier order: try the first tier;
+# if it yields zero matches in this pool/EO slice, fall through to the
+# next. 'unknown' (q.difficulty is empty / None) is always last-resort
+# so untagged questions don't dominate.
+_DIFFICULTY_PRIORITY = {
+    -2: ['easy', 'medium', 'hard', 'unknown'],
+    -1: ['easy', 'medium', 'unknown', 'hard'],
+     0: ['medium', 'easy', 'hard', 'unknown'],
+     1: ['medium', 'hard', 'easy', 'unknown'],
+     2: ['hard', 'medium', 'easy', 'unknown'],
+}
+
+
+def _q_difficulty_tier(q) -> str:
+    """Normalise a question's difficulty tag to one of easy / medium /
+    hard / unknown. Tolerates case + None + unexpected values."""
+    v = (getattr(q, 'difficulty', '') or '').strip().lower()
+    if v in ('easy', 'medium', 'hard'):
+        return v
+    return 'unknown'
+
+
+def _filter_by_difficulty_priority(
+    candidates: List, difficulty_level: int,
+) -> List:
+    """Pick the first non-empty tier from _DIFFICULTY_PRIORITY for the
+    given level. Returns the input unchanged when difficulty_level == 0
+    (no bias) or when filtering would empty the pool — i.e. it's
+    advisory, never starves the tutor of options."""
+    if not candidates:
+        return candidates
+    try:
+        lvl = int(difficulty_level)
+    except (TypeError, ValueError):
+        lvl = 0
+    lvl = max(-2, min(2, lvl))
+    if lvl == 0:
+        return candidates
+    priority = _DIFFICULTY_PRIORITY.get(lvl, _DIFFICULTY_PRIORITY[0])
+    by_tier = {'easy': [], 'medium': [], 'hard': [], 'unknown': []}
+    for q in candidates:
+        by_tier[_q_difficulty_tier(q)].append(q)
+    for tier in priority:
+        if by_tier[tier]:
+            return by_tier[tier]
+    return candidates  # all tiers empty (shouldn't happen)
+
+
 def pick_candidates_for_step(
     pool: List,
     enabling_objective: str = '',
     concept_tag: str = '',
     max_candidates: int = CANDIDATES_PER_STEP,
+    difficulty_level: int = 0,
 ) -> List:
     """Return up to N candidate bank questions for the current step.
 
@@ -230,38 +280,44 @@ def pick_candidates_for_step(
          random sample of the lesson's published bank, NOT a global
          leak. Bank is never empty if the lesson has any published
          exit-ticket questions.
+
+    Within whichever tier wins above, candidates are further filtered
+    by the student's difficulty_level (-2..+2). Difficulty bias is
+    advisory — never empties the pool. See _DIFFICULTY_PRIORITY.
     """
     if not pool:
         logger.info("[QuestionTool] pick_candidates_for_step: empty pool")
         return []
 
+    chosen_path = 'RANDOM_FALLBACK'
+    matches: List = pool
+
     eo = (enabling_objective or '').strip()
     if eo:
-        matches = [q for q in pool if (q.enabling_objective or '').strip() == eo]
-        if matches:
-            logger.info(
-                "[QuestionTool] pick_candidates_for_step: EO='%s' pool=%d matches=%d (EO_MATCH)",
-                eo[:60], len(pool), len(matches),
-            )
-            return matches[:max_candidates]
+        eo_matches = [q for q in pool if (q.enabling_objective or '').strip() == eo]
+        if eo_matches:
+            matches = eo_matches
+            chosen_path = 'EO_MATCH'
 
-    tag = (concept_tag or '').strip()
-    if tag:
-        matches = [q for q in pool if (q.concept_tag or '').strip() == tag]
-        if matches:
-            logger.info(
-                "[QuestionTool] pick_candidates_for_step: tag='%s' pool=%d matches=%d (TAG_MATCH)",
-                tag, len(pool), len(matches),
-            )
-            return matches[:max_candidates]
+    if chosen_path == 'RANDOM_FALLBACK':
+        tag = (concept_tag or '').strip()
+        if tag:
+            tag_matches = [q for q in pool if (q.concept_tag or '').strip() == tag]
+            if tag_matches:
+                matches = tag_matches
+                chosen_path = 'TAG_MATCH'
 
-    # Random fallback — pool is already lesson-scoped + session-seeded.
+    # Difficulty bias is applied AFTER the EO/tag match so we stay
+    # on-topic even when biased.
+    biased = _filter_by_difficulty_priority(matches, difficulty_level)
+    tier_used = _q_difficulty_tier(biased[0]) if biased else 'unknown'
     logger.info(
-        "[QuestionTool] pick_candidates_for_step: no EO/tag match — "
-        "using random pool sample of %d (RANDOM_FALLBACK)",
-        min(len(pool), max_candidates),
+        "[QuestionTool] pick_candidates_for_step: %s pool=%d after_topic=%d "
+        "diff_level=%d tier_used=%s out=%d",
+        chosen_path, len(pool), len(matches), int(difficulty_level or 0),
+        tier_used, min(len(biased), max_candidates),
     )
-    return pool[:max_candidates]
+    return biased[:max_candidates]
 
 
 def pick_published_for_concept_tag(
