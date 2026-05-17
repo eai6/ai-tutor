@@ -2526,6 +2526,20 @@ function applyTutorResponse(data) {
     if (data.pending_question) {
         renderPendingQuestionInArtifact(data.pending_question);
     }
+    // 2026-05-17 (task #182): follow_up_message — second tutor bubble
+    // emitted on the same response when the engine split a move-on
+    // turn into ack (bubble A) + new question pose (bubble B).
+    // Render bubble B after a short delay so the chat feels like two
+    // separate tutor turns rather than one chunked response.
+    if (data.follow_up_message) {
+        const fu = data.follow_up_message;
+        setTimeout(() => {
+            addMessage('tutor', fu.message, fu.media || [], null, null);
+            if (fu.pending_question) {
+                renderPendingQuestionInArtifact(fu.pending_question);
+            }
+        }, 600);
+    }
     if (data.show_exit_ticket && data.exit_ticket) {
         exitTicketData = data.exit_ticket;
         setTimeout(() => showExitTicket(), 1000);

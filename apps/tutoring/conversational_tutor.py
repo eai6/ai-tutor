@@ -3284,6 +3284,95 @@ Keep it to 2-3 sentences."""
         self._save_turn("tutor", clean_response, metadata=turn_metadata)
         self.conversation.append({"role": "assistant", "content": clean_response})
 
+        # 2026-05-17 (task #182) — MOVE-ON SPLIT.
+        # When this turn is a WRONG-answer turn AND the LLM also posed
+        # a NEW bank question in the same response, split the rendered
+        # output into TWO TutorMessages:
+        #   bubble A = text BEFORE the bank-rendered stem (ack / hint /
+        #              concept re-explanation)
+        #   bubble B = the bank stem + options + any short lead-in
+        # Why: keeps the leak detector's context coherent (bubble A is
+        # judged against the OLD question's canonical, bubble B is the
+        # NEW question's stem — they no longer mix). Also reads better
+        # in chat — student sees acknowledgement first, then the new Q.
+        # Frontend renders the follow_up as a second tutor bubble.
+        _bg_split = getattr(self, '_pending_bank_grade', None)
+        _bg_correct_split = getattr(_bg_split, 'is_correct', None) if _bg_split else None
+        _bank_rendered_text = getattr(self, '_last_bank_rendered_text', '') or ''
+        if (
+            turn_metadata.get('bank_rendered') is True
+            and _bg_correct_split is False
+            and _bank_rendered_text
+            and len(_bank_rendered_text.strip()) > 10
+        ):
+            # Locate the bank-rendered text inside clean_response. The
+            # bank stem is rendered verbatim by the pose_question handler,
+            # so the first ~40 chars of _bank_rendered_text should appear
+            # somewhere in the combined text. Match the longest stable
+            # prefix to avoid false positives on common words.
+            _anchor = _bank_rendered_text.strip().split('\n')[0].strip()[:80]
+            _split_at = clean_response.find(_anchor) if _anchor else -1
+            if _split_at > 20:  # leave at least 20 chars for bubble A
+                _bubble_a = clean_response[:_split_at].rstrip()
+                _bubble_b = clean_response[_split_at:].strip()
+                # Strip trailing transitional sentences from A that
+                # would dangle without B ("Now let's…", "Here's another…")
+                if _bubble_a and _bubble_b:
+                    logger.info(
+                        "[MoveOnSplit] session=%s splitting wrong-answer "
+                        "turn into 2 bubbles: A=%d chars, B=%d chars",
+                        self.session.id, len(_bubble_a), len(_bubble_b),
+                    )
+                    # Save bubble B as a SECOND tutor turn so resume +
+                    # transcripts stay coherent. Bubble A was already
+                    # saved above with the full content — rewrite it.
+                    # Pull the just-saved turn and update its content.
+                    try:
+                        from apps.tutoring.models import SessionTurn as _ST
+                        _last_saved = (
+                            _ST.objects
+                            .filter(session=self.session, role='tutor')
+                            .order_by('-id')
+                            .first()
+                        )
+                        if _last_saved is not None:
+                            _last_saved.content = _bubble_a
+                            _last_saved.save(update_fields=['content'])
+                    except Exception as _exc:
+                        logger.warning(
+                            "[MoveOnSplit] failed to rewrite bubble-A "
+                            "turn content: %s: %s",
+                            type(_exc).__name__, _exc,
+                        )
+                    # Save bubble B as its own turn.
+                    _b_meta = {
+                        'bank_question_ref': turn_metadata.get('bank_question_ref'),
+                        'bank_rendered': True,
+                        'move_on_split_bubble': 'B',
+                        'parent_turn_role': 'follow_up',
+                    }
+                    self._save_turn("tutor", _bubble_b, metadata=_b_meta)
+                    # Adjust the in-memory conversation: replace the
+                    # single full-content message with two separate
+                    # assistant messages so subsequent LLM calls see
+                    # the same shape the DB has.
+                    if (
+                        self.conversation
+                        and self.conversation[-1].get('role') == 'assistant'
+                    ):
+                        self.conversation[-1]['content'] = _bubble_a
+                        self.conversation.append(
+                            {"role": "assistant", "content": _bubble_b}
+                        )
+                    # Build the two TutorMessages.
+                    _main_msg = self._create_message(_bubble_a, media=media)
+                    _follow_msg = self._create_message(_bubble_b, media=[])
+                    # Strip bank-Q payload off the main message — the
+                    # pending question belongs on the follow-up.
+                    _main_msg.pending_question = None
+                    _main_msg.follow_up = _follow_msg
+                    return _main_msg
+
         return self._create_message(clean_response, media=media)
 
     def _prepare_response(self, student_input: str) -> Optional[Dict]:
