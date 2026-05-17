@@ -91,6 +91,17 @@ ISSUE_ANSWER_LEAK = "answer_leak"
 # — Jaccard signature match + LLM judge on borderline). Triggers
 # regen with a "rephrase from a different angle or advance" directive.
 ISSUE_REPEATED_QUESTION = "repeated_question"
+# Tutor posed a NEW question in prose without using pose_question /
+# pose_inline_question. The engine has no way to track or grade
+# untooled prose questions, which produces stale-awaiting bugs
+# (grader graded against the wrong question). Pilot 2026-05-17 task
+# #197: re-enabled pose_inline_question with optional answer_key,
+# made tools mandatory for new question posing. Detected only when
+# `_awaiting_answer is None` (no active Q being scaffolded) AND
+# `tool_use_count == 0` AND an MCQ pattern (A) ... B) ... C) ... D))
+# is present in the response. Hint-probes inside a hint don't count —
+# they're scoped to an active awaiting record.
+ISSUE_NO_QUESTION_TOOL = "no_question_tool"
 
 # Deictic figure references — phrases that strongly imply "I am
 # pointing at a visual right now". Used by the figure-ref-without-signal
@@ -169,6 +180,11 @@ class ValidationResult:
         # student is left without direction. Pilot directive 2026-05-17:
         # every turn must hand the floor back with an explicit next step.
         ISSUE_NO_QUESTION,
+        # Tutor posed a new question in prose without using the
+        # pose_question / pose_inline_question tool. Regen instructs
+        # the LLM to re-pose via a tool so the engine state is
+        # authoritative (task #197).
+        ISSUE_NO_QUESTION_TOOL,
     })
 
     @property
@@ -188,6 +204,15 @@ class ValidationResult:
 # Socratic approach is valid — but it should always be expressed as
 # an actual question.
 _QUESTION_RE = re.compile(r"\?")
+
+# Mirrors `_INLINE_MCQ_RE` in apps/tutoring/conversational_tutor.py —
+# detects a multi-choice question authored in prose (two consecutive
+# lettered options on their own lines). Used by the
+# NO_QUESTION_TOOL check to flag clear "LLM typed an MCQ instead of
+# calling pose_inline_question" violations.
+_PROSE_MCQ_RE = re.compile(
+    r'(?m)^\s*A[\.\)]\s+\S.*(?:\r?\n|\r)\s*B[\.\)]\s+\S',
+)
 
 # Heuristic: a response is "info-dumpy" when it contains many distinct
 # named concepts (proper nouns, acronyms, numbers) without any question
@@ -261,6 +286,8 @@ def validate_tutor_response(
     bank_signal_used: Optional[bool] = None,
     combined_result=None,
     media_attached: bool = True,
+    tool_use_count: int = 0,
+    awaiting_answer_is_set: bool = True,
 ) -> ValidationResult:
     """Run V1+V2 validator layers over a tutor response.
 
@@ -323,6 +350,21 @@ def validate_tutor_response(
     elif high_conf_verdict and is_correct is False and _POSITIVE_VERDICT_RE.search(content):
         issues.append(ISSUE_VERDICT_MISMATCH)
         extra_meta["verdict_mismatch_direction"] = "tutor_said_right_was_wrong"
+
+    # NO_QUESTION_TOOL — tutor authored a new question in prose without
+    # using pose_question / pose_inline_question. Only fires when no
+    # active awaiting record (a question already in flight scopes any
+    # `?` in the response as a hint/probe, not a new question). Uses
+    # the deterministic MCQ-in-prose pattern for high precision —
+    # a non-MCQ false-positive on a probing rhetorical `?` would be
+    # too costly. Catches the common case (LLM types out A/B/C/D in
+    # prose) without overfiring on hint phrases. Task #197.
+    if (
+        not awaiting_answer_is_set
+        and tool_use_count == 0
+        and _PROSE_MCQ_RE.search(content)
+    ):
+        issues.append(ISSUE_NO_QUESTION_TOOL)
 
     # Figure reference without |||MEDIA:N||| signal: tutor said "the
     # diagram"/"in the figure" but no media was attached for this turn.

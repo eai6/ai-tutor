@@ -441,6 +441,32 @@ def _violation_line(issue: str, meta: Dict) -> str:
             "rough figure is?\""
         )
 
+    if issue == "no_question_tool":
+        # Task #197 — LLM typed an MCQ in prose instead of using a tool.
+        # Engine has no way to grade un-tooled prose questions, so we
+        # force a re-pose via tool.
+        return (
+            "- NO_QUESTION_TOOL: you posed a NEW question in your prose "
+            "response (multiple-choice options A/B/C/D detected) instead "
+            "of using a tool call. The engine cannot track or grade "
+            "questions that aren't tool-posed — the student's reply will "
+            "get graded against the wrong question.\n"
+            "  Fix: remove the prose question from your response text, "
+            "then re-pose it via a tool call. Use pose_question if the "
+            "question is in the lesson bank (preferred — canonical "
+            "curriculum coverage). Otherwise use pose_inline_question "
+            "with the question text, optional answer_key (supply for "
+            "objective questions like numeric / true-false / fact-recall; "
+            "omit for conceptual / open-ended), and the appropriate "
+            "type. The tool RENDERS the question into the chat bubble — "
+            "you do NOT need to also type it in prose.\n"
+            "  Allowed in prose: hints, explanations, probing rhetorical "
+            "questions tied to the active question ('what made you pick "
+            "A?'). NOT allowed in prose: any new multi-choice / "
+            "fact-recall / short-answer question the student is "
+            "expected to answer."
+        )
+
     if issue == "no_question":
         # The handoff LLM judge surfaces a specific reason via
         # validation.metadata['handoff_reason'] when it flags

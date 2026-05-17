@@ -2792,6 +2792,13 @@ Keep it to 2-3 sentences."""
                 rule_check=(combined_judge_result is None),
                 # Used by the figure-ref-without-signal check.
                 media_attached=bool(media),
+                # NO_QUESTION_TOOL check (task #197): catches the LLM
+                # typing a fresh MCQ in prose instead of using
+                # pose_question / pose_inline_question.
+                tool_use_count=int(turn_metadata.get('tool_use_count', 0) or 0),
+                awaiting_answer_is_set=isinstance(
+                    getattr(self, '_awaiting_answer', None), dict,
+                ),
             )
             if _audit_span is not None:
                 _audit_span['payload'] = {
@@ -3636,6 +3643,10 @@ Keep it to 2-3 sentences."""
                 student_input=student_input,
                 bank_stems=self._current_bank_stems(),
                 media_attached=bool(media),
+                tool_use_count=int(turn_metadata.get('tool_use_count', 0) or 0),
+                awaiting_answer_is_set=isinstance(
+                    getattr(self, '_awaiting_answer', None), dict,
+                ),
             )
             if _audit_span is not None:
                 _audit_span['payload'] = {
@@ -4609,6 +4620,23 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
             return False
         return True
 
+    def _scaffolding_in_progress(self) -> bool:
+        """True when a question is in flight and the tutor must keep
+        hinting on it (not pivot to a new question). The gate used by
+        `_build_pose_question_tool` and `_build_pose_inline_question_tool`
+        to hide the pose tools mid-scaffold.
+
+        Active when `_awaiting_answer` is set AND wrong_attempts is in
+        [0, reveal_threshold). At/above the threshold the tutor is
+        explicitly allowed to move on to an easier related Q (no reveal
+        policy), so the pose tools come back.
+        """
+        aa = getattr(self, '_awaiting_answer', None)
+        if not isinstance(aa, dict):
+            return False
+        wrong_attempts = int(aa.get('wrong_attempts', 0) or 0)
+        return wrong_attempts < self._reveal_threshold()
+
     def _reveal_threshold(self) -> int:
         """Number of wrong attempts at which move-on becomes allowed
         (no reveal — pivot to easier same-concept Q). Difficulty-tiered
@@ -5540,19 +5568,21 @@ Follow the current step; this concept will be covered in sequence."""
                 if hasattr(self.llm_client, 'generate_with_tools')
                 else None
             )
-            # pose_inline_question was tried 2026-05-16 to allow the
-            # tutor to author check/scaffolding questions with an
-            # answer key. REVERTED same day: the LLM supplied bad
-            # answer keys (numeric '85' for a conceptual "set up the
-            # equation" question), grader graded against the bad key,
-            # student marked wrong, downstream gates fired → empty
-            # turn. Net: tutor-authored questions are unreliable. Stick
-            # with bank-only. When the bank has no fit AND the LLM
-            # still authors in chat, the chat-authored fallback grader
-            # (no-key, LLM-derived) handles it without the bad-key
-            # trap. Per user direction 2026-05-16: "this is why I did
-            # not want to allow the tutor to pose its own question."
-            inline_tool = None
+            # pose_inline_question — re-enabled 2026-05-17 (task #197)
+            # with answer_key made OPTIONAL. The 2026-05-16 bad-key trap
+            # (numeric '85' for a conceptual "set up the equation"
+            # question → false-NEG → empty turn) is addressed by routing
+            # keyless authored Qs through the chat-authored grounded
+            # grader via Question.has_canonical (False → grade_chat_
+            # authored_question). When the LLM supplies a key, the
+            # bank grader uses it; when omitted (conceptual probes),
+            # the grounded grader handles it without the bad-key trap.
+            # See `_build_pose_inline_question_tool`.
+            inline_tool = (
+                self._build_pose_inline_question_tool()
+                if hasattr(self.llm_client, 'generate_with_tools')
+                else None
+            )
 
             if tool is not None or inline_tool is not None:
                 # Tool-capable client → tool-use path. The LLM can pose
@@ -5727,24 +5757,39 @@ Follow the current step; this concept will be covered in sequence."""
             "\n   otherwise. Probing on every correct reply reads as interrogation,"
             "\n   not teaching."
             "\n"
-            "\n2. ALWAYS END WITH A QUESTION. The tutor leads the session —"
-            "\n   you are not waiting for the student to drive the next move."
-            "\n   EVERY turn must end with a question that moves the student"
-            "\n   forward. No exceptions except the final wrap-up turn after the"
-            "\n   student has demonstrated mastery of the lesson objective."
-            "\n   Two tools are available for posing questions:"
+            "\n2. ALWAYS END WITH A QUESTION — AND POSE IT VIA A TOOL."
+            "\n   The tutor leads the session — you are not waiting for the"
+            "\n   student to drive the next move. EVERY turn (except the"
+            "\n   final wrap-up after demonstrated mastery) must hand the"
+            "\n   floor back with a question that moves the student forward."
+            "\n   When you pose a new question, you MUST use a tool. Two"
+            "\n   tools are available — pick one:"
             "\n     - pose_question(slot): pull a CANONICAL question from the"
-            "\n       lesson bank (curriculum-aligned practice + exit-ticket items)."
-            "\n       Prefer this when a fitting slot exists."
+            "\n       lesson bank (curriculum-aligned practice + exit-ticket"
+            "\n       items). PREFER THIS — bank Qs already have verified"
+            "\n       answer keys. Use it whenever a fitting slot exists."
             "\n     - pose_inline_question(question, answer_key, type, ...):"
-            "\n       AUTHOR your own check / scaffolding question with an"
-            "\n       answer key the grader will use. Use this when no bank"
-            "\n       slot fits — quick comprehension checks, simpler"
-            "\n       sub-steps, rephrased versions for struggling students."
-            "\n   For non-numerical free-prose questions (\"why does that"
-            "\n   work?\"), it's still OK to end with the question in your"
-            "\n   text — never end with a colon or fragment like \"Quick"
-            "\n   check:\" without a question following."
+            "\n       AUTHOR your own question with a REQUIRED answer_key"
+            "\n       the grader will use as ground truth. Examples: "
+            "\n       numeric ('240°'), true/false ('true'), short fact-"
+            "\n       recall ('legend'), key concept words for short-answer."
+            "\n       The grader is generous on phrasing but it MUST have"
+            "\n       a defensible canonical to compare against."
+            "\n   If you can't write a clear answer_key for an authored"
+            "\n   question, DO NOT use pose_inline_question. Either pick a"
+            "\n   bank slot via pose_question OR skip posing a new question"
+            "\n   this turn (stay on the active Q / shift to teach-back)."
+            "\n   Fabricated keys produce false-negative grades — student"
+            "\n   marked wrong when they're actually right — which damages"
+            "\n   trust. Empty / vague keys are worse than no question."
+            "\n   Hint-probes inside a hint (\"what made you pick A?\")"
+            "\n   are NOT new questions — they're rhetorical, scoped to the"
+            "\n   active question, and don't need a tool. NEW questions"
+            "\n   (anything the student is expected to answer + have"
+            "\n   graded) MUST use a tool. Typing a new question in your"
+            "\n   prose response — MCQs (A/B/C/D in text), T/F prompts,"
+            "\n   fact-recall, conceptual probes — gets flagged"
+            "\n   NO_QUESTION_TOOL and triggers regen."
             "\n"
             "\n3. ONE NEW IDEA AT A TIME. Do not list 5 facts in a single turn."
             "\n   Introduce one concept, ask the student to engage with it, then"
@@ -6650,6 +6695,27 @@ Follow the current step; this concept will be covered in sequence."""
                 "[QuestionTool] build_tool: SKIP — empty id_map (non-math or empty bank)"
             )
             return None
+        # Scaffolding gate (2026-05-17): when a question is in flight
+        # and still under the move-on threshold, the tutor must keep
+        # hinting on it, not pivot to a new question. Hide the tool so
+        # the LLM can't pose a new bank Q over an unresolved one.
+        # Pilot 540 session 54 turn 919 — after wrong 'C' on Q3104
+        # (wrong=1, threshold=3), LLM called pose_question(Q3107) →
+        # stem never rendered, awaiting_answer overwritten then cleared,
+        # shown_question_ids polluted. Move-on (>= threshold) still
+        # legal because that's an intentional pivot to an easier
+        # related question per the no-reveal policy.
+        if self._scaffolding_in_progress():
+            aa = getattr(self, '_awaiting_answer', None) or {}
+            logger.info(
+                "[QuestionTool] build_tool: SKIP — question in flight "
+                "(kind=%s id=%s wrong_attempts=%d threshold=%d) — "
+                "tutor must keep scaffolding, not pose a new Q",
+                aa.get('kind'), aa.get('question_id'),
+                int(aa.get('wrong_attempts', 0) or 0),
+                self._reveal_threshold(),
+            )
+            return None
 
         slot_keys = sorted(id_map.keys())
         max_slot = max(slot_keys)
@@ -6762,33 +6828,55 @@ Follow the current step; this concept will be covered in sequence."""
     def _build_pose_inline_question_tool(self) -> Optional[dict]:
         """Build the Anthropic tool definition for pose_inline_question.
 
-        Returns the tool dict, or None if tool offering is disabled
-        (currently never None — this tool is always available since
-        it doesn't depend on a bank). The LLM must supply an answer
+        Returns the tool dict, or None when scaffolding is in progress
+        (see `_scaffolding_in_progress`). The LLM must supply an answer
         key alongside the question so the grader has ground truth.
         """
+        if self._scaffolding_in_progress():
+            aa = getattr(self, '_awaiting_answer', None) or {}
+            logger.info(
+                "[InlineQuestionTool] build_tool: SKIP — question in flight "
+                "(kind=%s id=%s wrong_attempts=%d) — keep scaffolding",
+                aa.get('kind'), aa.get('question_id'),
+                int(aa.get('wrong_attempts', 0) or 0),
+            )
+            return None
         return {
             "name": self.POSE_INLINE_QUESTION_TOOL_NAME,
             "description": (
-                "Use this tool when you want to author your OWN check "
-                "question — a quick comprehension probe, a simpler "
-                "scaffolding step, or any question that isn't in the "
-                "lesson's bank. You MUST supply the answer key so the "
-                "system can reliably grade the student's response.\n\n"
+                "Use this tool when you want to author your OWN question — "
+                "a check, comprehension probe, scaffolding sub-step, "
+                "warmup, or any question that isn't in the lesson's bank.\n\n"
+                "REQUIRED: every question you pose to the student MUST go "
+                "through a tool call (either pose_question for bank items "
+                "or this one for authored items). Do NOT type a question "
+                "in your prose response — the engine has no way to grade "
+                "it. Hint-probes inside a hint ('What made you pick A?') "
+                "are NOT new questions and don't need a tool.\n\n"
                 "When to PREFER this over pose_question:\n"
-                "  - You want to ask a quick check before moving on "
-                "(\"What's 360 - 90?\") that isn't in the bank.\n"
-                "  - You're scaffolding a multi-step problem and need a "
-                "sub-question.\n"
-                "  - You're echoing/rephrasing for a struggling student.\n"
+                "  - Quick check before moving on (\"What's 360 - 90?\")\n"
+                "  - Sub-question while scaffolding a multi-step problem\n"
+                "  - Warmup / fact-recall (\"What feature of a map tells "
+                "you what symbols mean?\")\n"
+                "  - Rephrasing a struggling student's question\n"
                 "When to use pose_question INSTEAD:\n"
                 "  - The lesson bank has a question that fits — pull from "
                 "the bank for canonical curriculum coverage.\n"
                 "  - Practice / exit-ticket items belong to the bank.\n\n"
-                "The question text goes INTO the chat bubble (the student "
-                "answers in the regular chat input). The answer_key is "
-                "kept server-side and fed to the grader, never shown to "
-                "the student."
+                "`answer_key` is REQUIRED — supply the canonical correct "
+                "answer the grader will use as ground truth. The grader "
+                "is generous on phrasing (matches synonyms / equivalent "
+                "answers) but it needs SOMETHING to compare against.\n\n"
+                "If you can't write a clear, defensible answer_key — DO "
+                "NOT pose with this tool. Two safer alternatives:\n"
+                "  (a) Pick a fitting slot from pose_question (bank) "
+                "instead — bank Qs already have verified keys.\n"
+                "  (b) Don't pose a new question this turn — continue "
+                "scaffolding the active question, or shift to "
+                "explanation / teach-back mode.\n"
+                "Fabricated keys produce false-negative grades (student "
+                "marked wrong when they're actually right) which damages "
+                "trust. Empty / vague keys are worse than no question."
             ),
             "input_schema": {
                 "type": "object",
@@ -6807,12 +6895,21 @@ Follow the current step; this concept will be covered in sequence."""
                     "answer_key": {
                         "type": "string",
                         "description": (
-                            "The canonical correct answer. For numeric "
-                            "questions give the value with unit "
-                            "('240°' or '240'). For short-answer give "
-                            "the key concept/keywords the student must "
-                            "convey ('full rotation' / 'sum equals 360'). "
-                            "Used as ground truth by the LLM grader."
+                            "REQUIRED canonical correct answer. Examples: "
+                            "numeric ('240°' or '240'), true/false "
+                            "('true'), short fact-recall ('legend'), key "
+                            "concept words for short-answer ('relative "
+                            "location' / 'sum equals 360'). The grader "
+                            "matches synonyms + equivalent phrasings, so "
+                            "it doesn't have to be word-perfect — but it "
+                            "MUST be a defensible canonical answer.\n"
+                            "Do NOT fabricate keys for open-ended questions "
+                            "where there's no single right answer (\"why "
+                            "do you think...?\", \"in your own words...\"). "
+                            "Instead, either pick a bank slot via "
+                            "pose_question or skip posing a new question "
+                            "this turn (stay on the active Q or shift to "
+                            "teach-back)."
                         ),
                     },
                     "type": {
@@ -7062,7 +7159,8 @@ Follow the current step; this concept will be covered in sequence."""
                         logger.warning(
                             "[QuestionTool] pose_inline_question: "
                             "MISSING_FIELDS question=%r answer_key=%r — "
-                            "skipping render",
+                            "skipping render (both required, task #197 "
+                            "v2 — answer_key MUST be supplied)",
                             bool(q_text), bool(a_key),
                         )
                         continue
@@ -7563,15 +7661,24 @@ Follow the current step; this concept will be covered in sequence."""
         return None
 
     def _grade_against_last_bank_question(self, student_input: str):
-        """If the most recent tutor turn rendered a bank question, run
-        the deterministic grader (apps.tutoring.bank_grader) on the
-        student's reply. Sets self._pending_bank_grade for the
-        upcoming LLM call's evaluation_signal block.
+        """Grade the student's reply against whatever question was last
+        posed. Sets self._pending_bank_grade for the upcoming LLM call's
+        evaluation_signal block.
 
-        Returns the BankGradeResult, or None when no bank question was
-        in flight or grading was skipped.
+        Phase 2b (2026-05-17): collapsed kind-dispatch into a single
+        Question.grade() call. The underlying grader fns
+        (grade_bank_response / grade_chat_authored_question /
+        grade_lesson_step_response) are unchanged — only the engine-
+        side dispatch is gone.
         """
         from apps.tutoring.models import SessionTurn
+        from apps.tutoring.question import (
+            Question as _Q,
+            _DuckQuestion,
+            SOURCE_INLINE_AUTHORED,
+            SOURCE_CHAT_AUTHORED,
+        )
+
         last_tutor_turn = (
             SessionTurn.objects
             .filter(session=self.session, role='tutor')
@@ -7580,271 +7687,157 @@ Follow the current step; this concept will be covered in sequence."""
         )
         if last_tutor_turn is None:
             return None
-        ref = (last_tutor_turn.metadata or {}).get('bank_question_ref') or {}
-        kind = ref.get('kind')
-        ref_id = ref.get('id')
 
-        # 2026-05-17 (task #171) — bank link persistence across hint
-        # turns. The previous logic only looked at the most-recent
-        # tutor turn's bank_question_ref. But pose_question only fires
-        # on the turn that posts the question; subsequent hint turns
-        # (after wrong#1, wrong#2, regen-rewrites...) carry no
-        # bank_question_ref, so the grader fell through to the
-        # chat-authored path and LLM-guessed the single-letter reply.
-        # Lesson 540 session 47 turn 828: 'D' graded True against a
-        # regen-rewritten stem despite correct=B.
-        #
-        # Fix: when the bank question is still active (self._awaiting_answer
-        # set with a bank-Q kind), the BANK grader is authoritative —
-        # regardless of which tutor turn rendered it. The last-turn
-        # metadata is the cheap path; self._awaiting_answer is the
-        # cross-turn anchor.
+        # 1) Build a Question from whatever source applies.
         aa = getattr(self, '_awaiting_answer', None) or {}
-        aa_kind = aa.get('kind')
-        aa_qid = aa.get('question_id')
-        if (
-            not kind  # no bank_question_ref on the last turn
-            and aa_kind in ('lesson_step', 'exit_ticket_question')
-            and aa_qid
-        ):
-            kind = aa_kind
-            ref_id = aa_qid
-            logger.info(
-                "[BankGrade] reusing _awaiting_answer link (kind=%s id=%s) "
-                "— last tutor turn had no bank_question_ref (hint/regen turn)",
-                kind, ref_id,
-            )
-        # Fallback path 2026-05-16: no bank_question_ref but the previous
-        # tutor turn ended in a question — likely a tutor-authored
-        # question without an answer key. Use the no-key LLM grader so
-        # the student isn't stranded. This is what makes removing the
-        # strip safe: we don't need to enforce "no authoring" because
-        # we can grade the authored question anyway.
-        #
-        # 2026-05-17 (task #173) — also fire when the previous tutor
-        # turn rendered an inline MCQ pattern (A) ... B) ... C) ... D))
-        # even without a ?-terminator. Lesson 540 session 48: tutor
-        # authored "Which feature explains symbols? A) Scale B) Legend
-        # C) Title D) Grid" inline, ending in "D) Grid" (no ?). Fallback
-        # didn't fire, no wrong_attempts tracking, tutor revealed on
-        # attempt #2. Detect the MCQ pattern + grade the whole stem+
-        # options block so the LLM grader has options context for bare
-        # letter replies.
-        if not kind:
+        q = _Q.from_engine_state(aa)
+
+        # Hydrate inline_authored stem from posing turn metadata when the
+        # engine_state record only has placeholders.
+        if q is not None and not q.stem and aa.get('kind') == 'inline_authored':
+            ia = (last_tutor_turn.metadata or {}).get(
+                'inline_authored_question', {},
+            ) or {}
+            if ia:
+                q = _Q.from_inline_authored(ia)
+                q.wrong_attempts = int(aa.get('wrong_attempts', 0) or 0)
+                q.turn_index = aa.get('turn_index')
+                q.posed_at = aa.get('posed_at') or ""
+
+        # Stale-awaiting freshness check (formerly task #196) — REMOVED
+        # 2026-05-17 by task #197. With pose_inline_question re-enabled
+        # and answer_key optional, the LLM is now required to use a tool
+        # for every new question (prose questions trigger the
+        # NO_QUESTION_TOOL validator → regen). Engine state is
+        # authoritative — no need for the grader to second-guess the
+        # awaiting record by re-extracting from tutor content.
+
+        # When awaiting_answer didn't yield a usable Question, try the
+        # last tutor turn's bank_question_ref (task #171 fallback path
+        # for hint/regen turns that carry no fresh ref).
+        if q is None or not q.stem:
+            ref = (last_tutor_turn.metadata or {}).get('bank_question_ref') or {}
+            kind = ref.get('kind')
+            ref_id = ref.get('id')
+            if kind == 'lesson_step' and ref_id:
+                from apps.curriculum.models import LessonStep
+                step = LessonStep.objects.filter(id=ref_id).first()
+                if step is not None:
+                    q = _Q.from_lesson_step(step)
+            elif kind == 'exit_ticket_question' and ref_id:
+                from apps.tutoring.models import ExitTicketQuestion
+                etq = ExitTicketQuestion.objects.filter(id=ref_id).first()
+                if etq is not None:
+                    q = _Q.from_exit_ticket(etq)
+            elif kind == 'inline_authored':
+                ia = (last_tutor_turn.metadata or {}).get(
+                    'inline_authored_question', {},
+                ) or {}
+                if ia.get('answer_key'):
+                    q = _Q.from_inline_authored(ia)
+
+        # Chat-authored bootstrap from tutor turn content (LLM typed a
+        # question in prose without calling pose_question / pose_inline).
+        bootstrap_mcq = False
+        if q is None or not q.stem:
             tutor_content = (last_tutor_turn.content or '').strip()
             mcq_match = _INLINE_MCQ_RE.search(tutor_content) if tutor_content else None
             has_q = bool(tutor_content) and (
                 tutor_content.endswith('?') or mcq_match is not None
             )
-            if has_q:
-                if mcq_match is not None:
-                    # Extract the MCQ block — find the last sentence
-                    # before the options that ends with '?', then take
-                    # everything from there to the end of the message.
-                    mcq_start = mcq_match.start()
-                    preamble = tutor_content[:mcq_start].rstrip()
-                    pre_sentences = re.split(r'(?<=[.!?])\s+', preamble)
-                    stem = next(
-                        (s for s in reversed(pre_sentences) if s.strip().endswith('?')),
-                        preamble.split('\n')[-1] if preamble else '',
-                    ).strip()
-                    options_block = tutor_content[mcq_start:].strip()
-                    question_text = (
-                        f"{stem}\n\n{options_block}"
-                        if stem else options_block
-                    )
-                else:
-                    # Plain ?-terminated text — old behavior.
-                    sentences = re.split(r'(?<=[.!?])\s+', tutor_content)
-                    question_text = next(
-                        (s for s in reversed(sentences) if s.strip().endswith('?')),
-                        tutor_content,
-                    ).strip()
-                from apps.tutoring.bank_grader import (
-                    grade_chat_authored_question,
+            if not has_q:
+                return None
+            if mcq_match is not None:
+                bootstrap_mcq = True
+                mcq_start = mcq_match.start()
+                preamble = tutor_content[:mcq_start].rstrip()
+                pre_sentences = re.split(r'(?<=[.!?])\s+', preamble)
+                stem = next(
+                    (s for s in reversed(pre_sentences) if s.strip().endswith('?')),
+                    preamble.split('\n')[-1] if preamble else '',
+                ).strip()
+                options_block = tutor_content[mcq_start:].strip()
+                question_text = (
+                    f"{stem}\n\n{options_block}"
+                    if stem else options_block
                 )
-                is_math = (
-                    self.lesson.unit.course.is_math
-                    if self.lesson.unit and self.lesson.unit.course
-                    else False
-                )
-                # Pull relevant KB chunks so the grader has the
-                # curriculum context (not just LLM parametric
-                # knowledge). Pilot 2026-05-16: niche / local facts
-                # (Seychelles geography, etc.) need curriculum
-                # grounding to be judged correctly. The grader also
-                # uses Google search grounding on top via the
-                # two-call pattern.
-                kb_ctx = ''
-                try:
-                    kb_ctx = self._get_knowledge_context(student_input) or ''
-                except Exception as _exc:
-                    logger.debug(
-                        f"[ChatAuthored] KB context fetch failed: {_exc}"
-                    )
-                result = grade_chat_authored_question(
-                    question_text=question_text,
-                    student_response=student_input,
-                    llm_client=self.judge_client,
-                    is_math=is_math,
-                    kb_context=kb_ctx,
-                    use_grounding=True,
-                )
-                self._pending_bank_grade = result
-                self._pending_bank_question = None
-                # Track wrong_attempts on the awaiting_answer record
-                # so the hint-vs-reveal threshold also fires on
-                # chat-authored questions. Without this, attempts
-                # via chat-authored grading don't accumulate and
-                # the reveal-after-N gate never opens.
-                #
-                # Task #173 (2026-05-17): bootstrap _awaiting_answer
-                # for chat-authored / inline-MCQ questions when the
-                # LLM didn't call pose_question. Otherwise the
-                # transient record never exists and wrong_attempts
-                # never accumulates across hint turns.
-                if (
-                    result is not None
-                    and getattr(result, 'is_correct', None) is False
-                ):
-                    if not isinstance(getattr(self, '_awaiting_answer', None), dict):
-                        from django.utils import timezone as _tz
-                        self._awaiting_answer = {
-                            'kind': 'inline_mcq' if mcq_match else 'inline_authored',
-                            'question_id': None,
-                            'question_type': 'mcq' if mcq_match else 'short_answer',
-                            'turn_index': len(self.conversation),
-                            'posed_at': _tz.now().isoformat(),
-                            'wrong_attempts': 0,
-                            'authored_question_text': question_text[:600],
-                        }
-                    cur = int(self._awaiting_answer.get('wrong_attempts', 0) or 0)
-                    self._awaiting_answer['wrong_attempts'] = cur + 1
-                if result is not None and getattr(result, 'is_correct', None) is True:
-                    self._clear_awaiting_answer()
-                logger.info(
-                    "[BankGrade/ChatAuthored] session=%s is_correct=%s "
-                    "q=%r reply=%r",
-                    self.session.id, result.is_correct,
-                    question_text[:80], student_input[:60],
-                )
-                return result
-            return None
-        if not ref_id and kind not in ('inline_authored',):
+                q = _Q.from_chat_authored(question_text, question_type='mcq')
+            else:
+                sentences = re.split(r'(?<=[.!?])\s+', tutor_content)
+                question_text = next(
+                    (s for s in reversed(sentences) if s.strip().endswith('?')),
+                    tutor_content,
+                ).strip()
+                q = _Q.from_chat_authored(question_text)
+
+        if q is None or not q.stem.strip():
             return None
 
-        # Resolve the question record + grade with the right shape.
-        # LessonStep and ExitTicketQuestion have different field shapes
-        # (LessonStep uses answer_type/expected_answer; ExitTicketQuestion
-        # uses question_type/correct_answer/option_a..d). Dispatch by
-        # kind so we don't silently fall into the MCQ default — that's
-        # what produced [BankGrade] is_correct=None expected=None
-        # student=None for every slot-0 turn in Martin's session.
-        from apps.tutoring.bank_grader import (
-            grade_bank_response,
-            grade_lesson_step_response,
+        # 2) Single grade call — Question.grade() picks the right grader
+        # internally based on has_canonical. Graders themselves unchanged.
+        is_math = (
+            self.lesson.unit.course.is_math
+            if self.lesson.unit and self.lesson.unit.course
+            else False
         )
-        question = None
-        if kind == 'lesson_step':
-            from apps.curriculum.models import LessonStep
-            question = LessonStep.objects.filter(id=ref_id).first()
-            if question is None:
-                return None
-            result = grade_lesson_step_response(question, student_input)
-        elif kind == 'exit_ticket_question':
-            from apps.tutoring.models import ExitTicketQuestion
-            question = ExitTicketQuestion.objects.filter(id=ref_id).first()
-            if question is None:
-                return None
-            # Pass the judge_client so text-content question types
-            # (short_answer, non-numeric FIB, matching) route through
-            # the same LLM batch grader the exit ticket uses.
-            # Deterministic types (MCQ, numeric short_numeric) still
-            # short-circuit. Pilot directive 2026-05-16: mid-lesson
-            # grading must match exit-ticket grading exactly.
-            is_math = (
-                self.lesson.unit.course.is_math
-                if self.lesson.unit and self.lesson.unit.course
-                else False
-            )
-            result = grade_bank_response(
-                question, student_input,
-                llm_client=self.judge_client,
-                is_math=is_math,
-            )
-        elif kind == 'inline_authored':
-            # NEW 2026-05-16: tutor authored its own question via
-            # pose_inline_question. The question + answer_key are on
-            # the previous tutor turn's metadata. Build a duck-typed
-            # object with the same shape ExitTicketQuestion has so
-            # grade_bank_response can grade it the same way.
-            ia = (last_tutor_turn.metadata or {}).get(
-                'inline_authored_question', {},
-            ) or {}
-            if not ia.get('answer_key'):
-                logger.warning(
-                    "[BankGrade] inline_authored: no answer_key on "
-                    "previous turn metadata; skipping grade"
-                )
-                return None
-            q_type = ia.get('question_type') or 'short_answer'
-            answer_key = ia.get('answer_key', '')
-            alternatives = ia.get('alternatives', []) or []
-            keywords_for_grader = [answer_key] + list(alternatives)
-            duck = _InlineAuthoredQuestion(
-                question_text=ia.get('question', ''),
-                question_type=q_type,
-                correct_answer=answer_key,
-                answer_data={
-                    'model_answer': answer_key,
-                    'keywords': keywords_for_grader,
-                },
-            )
-            is_math = (
-                self.lesson.unit.course.is_math
-                if self.lesson.unit and self.lesson.unit.course
-                else False
-            )
-            result = grade_bank_response(
-                duck, student_input,
-                llm_client=self.judge_client,
-                is_math=is_math,
-            )
-            question = duck
-        else:
+        kb_ctx = ''
+        if not q.has_canonical:
+            try:
+                kb_ctx = self._get_knowledge_context(student_input) or ''
+            except Exception as _exc:
+                logger.debug(f"[Grade] KB context fetch failed: {_exc}")
+
+        result = q.grade(
+            student_input,
+            llm_client=self.judge_client,
+            kb_context=kb_ctx,
+            is_math=is_math,
+        )
+        if result is None:
             return None
+
+        # 3) Common post-processing.
         self._pending_bank_grade = result
-        # Increment wrong_attempts on the awaiting_answer record when
-        # this verdict is False. The active_bank_question system block
-        # reads wrong_attempts to decide whether the tutor may finally
-        # reveal the answer (>= 3 attempts) or must keep giving hints.
-        if (
-            result is not None
-            and getattr(result, 'is_correct', None) is False
-            and isinstance(getattr(self, '_awaiting_answer', None), dict)
-        ):
+        # Downstream blocks (post-regen leak check, _build_bank_grade_
+        # signal_block, _build_regen_bank_context) read .explanation /
+        # .correct_answer / .question_text off this. Use a duck-typed
+        # wrapper so the same shape works for every source; chat-authored
+        # without a canonical answer stays None.
+        self._pending_bank_question = _DuckQuestion(q) if q.has_canonical else None
+
+        # Track wrong_attempts. Bootstrap _awaiting_answer for
+        # chat-authored / inline-MCQ when the LLM didn't call
+        # pose_question — without this the hint-vs-reveal threshold
+        # never opens (task #173).
+        if getattr(result, 'is_correct', None) is False:
+            if not isinstance(getattr(self, '_awaiting_answer', None), dict):
+                from django.utils import timezone as _tz
+                self._awaiting_answer = {
+                    'kind': 'inline_mcq' if bootstrap_mcq else (
+                        'inline_authored' if q.source == SOURCE_CHAT_AUTHORED
+                        else q.source
+                    ),
+                    'question_id': q.source_id,
+                    'question_type': q.question_type,
+                    'turn_index': len(self.conversation),
+                    'posed_at': _tz.now().isoformat(),
+                    'wrong_attempts': 0,
+                    'authored_question_text': q.stem[:600] if q.source in (
+                        SOURCE_CHAT_AUTHORED, SOURCE_INLINE_AUTHORED,
+                    ) else '',
+                }
             cur = int(self._awaiting_answer.get('wrong_attempts', 0) or 0)
             self._awaiting_answer['wrong_attempts'] = cur + 1
-        # Stash the full question so the next-turn prompt builder can
-        # surface the canonical explanation / step-by-step working —
-        # the tutor uses it to scaffold remediation after a wrong
-        # answer (rather than re-deriving the math itself).
-        self._pending_bank_question = question
-        # Keep awaiting_answer populated through the NEXT tutor turn so
-        # the system prompt's <active_bank_question> block renders with
-        # student_status='answered_correct' / 'answered_wrong' — that's
-        # how the LLM knows the student replied and the result. Without
-        # this, the LLM saw no signal that the previous question got
-        # answered, and re-asked the same question on the next turn
-        # (e2e 2026-05-16, session 32 turn 6 repeated "If angles around
-        # a point are 45°, 90°, 135°, and x, what is x?"). The next
-        # pose_question / pose_inline_question call naturally overwrites
-        # _awaiting_answer with the new question, so it doesn't
-        # accumulate across many turns.
+        elif getattr(result, 'is_correct', None) is True:
+            self._clear_awaiting_answer()
+
         logger.info(
-            "[BankGrade] session=%s ref=%s:%s is_correct=%s expected=%r student=%r",
-            self.session.id, kind, ref_id,
-            result.is_correct, result.expected, result.student_parsed,
+            "[BankGrade] session=%s source=%s id=%s is_correct=%s "
+            "expected=%r student=%r",
+            self.session.id, q.source, q.source_id,
+            result.is_correct,
+            getattr(result, 'expected', None),
+            getattr(result, 'student_parsed', None),
         )
         return result
 
