@@ -624,6 +624,17 @@ class TutorMessage:
     # and serialises it. None when no question is in flight.
     pending_question: Optional[Dict] = None
 
+    # 2026-05-17 (task #182): optional second tutor bubble emitted on
+    # the same HTTP response. Used by the move-on flow (wrong_attempts
+    # reached threshold) to split (a) brief acknowledgement / concept
+    # re-explanation from (b) the new bank question posed via
+    # pose_question — so leak-detection runs on each bubble's context
+    # independently and the chat doesn't show one bubble that mixes
+    # both. When non-None, the frontend renders this AFTER the main
+    # `content` as a second tutor message. The backend persists it as
+    # its own SessionTurn so resume + transcripts stay coherent.
+    follow_up: Optional['TutorMessage'] = None
+
 
 # Strip "thinking leakage" — opening sentences where the LLM narrates
 # its own plan instead of just executing it. Triggered by phrases like

@@ -1131,6 +1131,20 @@ def chat_respond(request, session_id):
         # never reaches the student; only student input is flagged
         # for /dashboard/flagged/.
 
+        # 2026-05-17 (task #182): optional follow-up TutorMessage —
+        # emitted as a second tutor bubble when the move-on flow splits
+        # acknowledgement from new-question pose. Frontend renders
+        # follow_up_message after the main content.
+        _follow_up = getattr(result, 'follow_up', None)
+        _follow_up_payload = None
+        if _follow_up is not None:
+            _follow_up_payload = {
+                "message": _follow_up.content,
+                "media": _follow_up.media,
+                "pending_question": getattr(_follow_up, 'pending_question', None),
+                "is_correct": _follow_up.is_correct,
+            }
+
         return JsonResponse({
             "message": result.content,
             "phase": result.phase,
@@ -1154,6 +1168,8 @@ def chat_respond(request, session_id):
             # widget instead of relying on inline prose. None when no
             # question is in flight.
             "pending_question": getattr(result, 'pending_question', None),
+            # 2026-05-17 (task #182): second bubble for move-on split.
+            "follow_up_message": _follow_up_payload,
         })
     except Exception as e:
         logger.error(f"[respond] Failed: {e}", exc_info=True)
