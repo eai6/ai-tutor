@@ -9688,6 +9688,26 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
                 self.current_topic_index = len(self.steps)
                 self._step_just_advanced = True
 
+            # When the step advances, any pending bank-Q awaiting answer
+            # is now stale — the engine has moved past it (either via
+            # correct answer which already cleared, or via reveal-on-
+            # threshold which doesn't clear). Without this clear, the
+            # next student reply gets graded against the OLD question
+            # via the bank-link-preservation fallback (task #171), even
+            # though the tutor has authored a new MCQ on this turn.
+            # Pilot 2026-05-17 lesson 540 session 48 turn 847: 'C' to
+            # scale Q graded against legend-evaluate Q3113 (correct=B).
+            if getattr(self, '_step_just_advanced', False):
+                _aa = getattr(self, '_awaiting_answer', None) or {}
+                if _aa and int(_aa.get('wrong_attempts', 0) or 0) > 0:
+                    logger.info(
+                        "[ClearAwaiting] step advanced — clearing stale "
+                        "awaiting_answer (kind=%s id=%s wrong=%d)",
+                        _aa.get('kind'), _aa.get('question_id'),
+                        int(_aa.get('wrong_attempts', 0) or 0),
+                    )
+                    self._clear_awaiting_answer()
+
         # Build metadata dict for tutor-turn persistence (M4).
         metadata: Dict = {
             'is_correct': bool(is_correct),
