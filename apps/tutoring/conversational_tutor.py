@@ -1370,41 +1370,55 @@ class ConversationalTutor:
             + "\n</time_awareness>"
         )
 
-    # Duration → step-count map. Reduced 2026-05-14 alongside the
-    # lesson-generation reduction (10 → 5 steps; see commit refs in
-    # content_generator.py max_steps comment). 25-min lesson is the
-    # max; older 10-step lessons are still supported but get clamped
-    # to 5 steps maximum.
+    # Duration → step-count map. 2026-05-17 pilot directive: NO MORE
+    # 3-step sessions, 20 minutes is the minimum supported lesson
+    # duration. 4 steps is the floor — enough to cover the 4 active
+    # 5E phases (engage, explore, explain, practice; evaluate goes
+    # to the exit ticket). 25-min lessons get 5 steps. Anything above
+    # 25 clamps to MAX_STEPS_PER_SESSION.
+    #
+    # If a lesson is created with estimated_minutes < 20, the budget
+    # derivation below still floors step count at 4 — but lesson
+    # generation should refuse short estimates. See content_generator
+    # validation.
     DURATION_TO_STEP_COUNT = {
-        15: 3,
         20: 4,
         25: 5,
     }
     MAX_STEPS_PER_SESSION = 5
+    MIN_STEPS_PER_SESSION = 4
+
+    # 5E phase coverage order. The phase-aware selector ensures at
+    # least one step is picked from each phase present in the lesson
+    # before back-filling slots within phases by priority+order.
+    # Order matches the 5E flow so the picked-set reads coherently.
+    _FIVE_E_PHASES = ('engage', 'explore', 'explain', 'practice', 'evaluate')
 
     def _select_steps_for_duration(self, all_steps: List, target_minutes: int) -> List:
         """Pick the subset of steps that fits the target duration.
 
-        Algorithm:
-          - Look up target_count from DURATION_TO_STEP_COUNT (15/20/25
-            → 3/4/5). For unmapped durations, derive: 1 step per ~5
-            minutes, clamped to [3, MAX_STEPS_PER_SESSION].
-          - If we have fewer steps than the target, return everything.
-          - Otherwise:
-            * Always include the FIRST step (the engage hook).
-            * Fill the remaining slots from the rest by ascending
-              (priority, order_index) — required steps come in first,
-              then core, then enrichment. Ties broken by natural
-              lesson order so the 5E flow stays coherent.
-          - Re-sort the picked set by order_index so the lesson
-            progression is preserved.
+        Phase-aware algorithm (2026-05-17 — pilot session 52 surfaced
+        that the prior priority-only sort dropped the explain +
+        practice phases when all steps share priority=1, leaving the
+        tutor with only engage/explore steps to work with):
 
-        Note: previously the LAST step was also always-included
-        because it was the QUIZ. Since the 5-step structure dropped
-        the internal QUIZ (exit ticket is separate now), we don't
-        force-include the last step anymore — priority does all the
-        work. Existing 10-step lessons still work: their last step
-        will be picked via priority if it's REQUIRED.
+          1. Look up target_count from DURATION_TO_STEP_COUNT
+             (15/20/25 → 4/4/5). Unmapped durations derive: 1 step
+             per ~5 min, clamped to [3, MAX_STEPS_PER_SESSION].
+          2. If lesson has ≤ target_count steps, return everything.
+          3. PHASE COVERAGE PASS: for each 5E phase present in the
+             lesson (engage / explore / explain / practice /
+             evaluate), pick the FIRST step in that phase by
+             (priority asc, order_index asc). One per phase. Stops
+             when target_count is reached.
+          4. BACK-FILL PASS: if slots remain after phase coverage,
+             fill from the rest by ascending (priority, order_index).
+          5. Re-sort the picked set by order_index so the lesson
+             progression is preserved.
+
+        This guarantees the tutor sees the actual teaching content
+        (explain phase) and bank-Q steps (practice phase), not just
+        the discovery-prompt steps (engage/explore).
 
         See memory/max_depth_lesson_steps_plan.md.
         """
@@ -1413,28 +1427,57 @@ class ConversationalTutor:
 
         target_count = self.DURATION_TO_STEP_COUNT.get(target_minutes)
         if target_count is None:
-            target_count = max(3, min(self.MAX_STEPS_PER_SESSION, target_minutes // 5))
+            # Floor at MIN_STEPS_PER_SESSION (4) so we never drop
+            # below the 5E-phase coverage threshold. Pilot directive
+            # 2026-05-17: no 3-step sessions.
+            target_count = max(
+                self.MIN_STEPS_PER_SESSION,
+                min(self.MAX_STEPS_PER_SESSION, target_minutes // 5),
+            )
         if len(all_steps) <= target_count:
             return list(all_steps)
 
-        # Always include the engage hook (first step).
-        first_idx = 0
-        must_include = {first_idx}
+        # Index lesson steps by phase. Each phase bucket sorted by
+        # (priority asc, order_index asc) so the FIRST step in each
+        # bucket is the highest-priority earliest-ordered one.
+        by_phase: Dict[str, List[tuple]] = {p: [] for p in self._FIVE_E_PHASES}
+        for i, s in enumerate(all_steps):
+            phase = (getattr(s, 'phase', '') or '').lower().strip()
+            if phase in by_phase:
+                by_phase[phase].append((i, s))
+            # Unknown phases fall through to the back-fill pool below.
+        for phase in by_phase:
+            by_phase[phase].sort(key=lambda pair: (
+                getattr(pair[1], 'priority', 1),
+                pair[1].order_index,
+            ))
 
-        rest = [
-            (i, s) for i, s in enumerate(all_steps) if i not in must_include
-        ]
-        # Sort by (priority asc, order_index asc): priority-1 first,
-        # ties broken by lesson order.
-        rest.sort(key=lambda pair: (
-            getattr(pair[1], 'priority', 1),
-            pair[1].order_index,
-        ))
+        # PASS 1 — phase coverage. One step per 5E phase that exists.
+        chosen_indices: set = set()
+        for phase in self._FIVE_E_PHASES:
+            if len(chosen_indices) >= target_count:
+                break
+            bucket = by_phase.get(phase) or []
+            if bucket:
+                chosen_indices.add(bucket[0][0])
 
-        slots_to_fill = max(0, target_count - len(must_include))
-        chosen_indices = set(must_include) | {
-            i for i, _ in rest[:slots_to_fill]
-        }
+        # PASS 2 — back-fill. Remaining slots filled from un-picked
+        # steps by (priority asc, order_index asc). Includes any steps
+        # whose phase wasn't in the 5E set (defensive — shouldn't
+        # happen on lessons generated by the platform, but supports
+        # legacy / imported lessons).
+        if len(chosen_indices) < target_count:
+            rest = [
+                (i, s) for i, s in enumerate(all_steps)
+                if i not in chosen_indices
+            ]
+            rest.sort(key=lambda pair: (
+                getattr(pair[1], 'priority', 1),
+                pair[1].order_index,
+            ))
+            slots_to_fill = target_count - len(chosen_indices)
+            chosen_indices |= {i for i, _ in rest[:slots_to_fill]}
+
         return [all_steps[i] for i in sorted(chosen_indices)]
 
     def _load_enabling_objectives(self) -> List[Dict]:
