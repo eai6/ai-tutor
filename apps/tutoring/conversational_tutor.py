@@ -818,6 +818,17 @@ def _looks_like_authored_question(lead_in: str) -> bool:
 # math content so the simple split is fine.
 _SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])\s+')
 
+# Detect an inline MCQ pattern in a tutor turn (the LLM authored MCQ
+# options instead of calling pose_question). Anchored on the
+# "A) ... B) ..." or "A. ... B. ..." run — requires at least two
+# consecutive lettered options so a single throwaway "A) ..." in prose
+# doesn't false-match. Used by the chat-authored grader fallback so a
+# letter-only student reply gets graded against the full stem + options
+# instead of being stranded with no anchor (task #173, 2026-05-17).
+_INLINE_MCQ_RE = re.compile(
+    r'(?m)^\s*A[\.\)]\s+\S.*(?:\r?\n|\r)\s*B[\.\)]\s+\S',
+)
+
 
 def _strip_authored_numeric_questions(text: str) -> Tuple[str, int]:
     """Remove sentences that look like authored numeric questions.
@@ -1629,6 +1640,14 @@ class ConversationalTutor:
         self.cognitive_load = state.get('cognitive_load', 0.5)
         self.consecutive_wrong = state.get('consecutive_wrong', 0)
         self.consecutive_correct_streak = state.get('consecutive_correct_streak', 0)
+        # Auto-difficulty (2026-05-17 pilot directive). Tracks
+        # consecutive first-try-correct answers so the engine can bump
+        # difficulty up after 2 in a row. Reset when verdict is wrong
+        # or when the student needed >0 wrong attempts before getting
+        # the answer (i.e., it wasn't a first-try correct).
+        self.consecutive_first_try_correct = state.get(
+            'consecutive_first_try_correct', 0,
+        )
 
         # Bare-answer count per step (M9 — pedagogy layer 4). Keys stringified
         # because JSON object keys are strings; we coerce on read.
@@ -1734,6 +1753,9 @@ class ConversationalTutor:
             'cognitive_load': getattr(self, 'cognitive_load', 0.5),
             'consecutive_wrong': getattr(self, 'consecutive_wrong', 0),
             'consecutive_correct_streak': getattr(self, 'consecutive_correct_streak', 0),
+            'consecutive_first_try_correct': getattr(
+                self, 'consecutive_first_try_correct', 0,
+            ),
             # Bare-answer counts per step (M9). JSON requires string keys.
             'bare_answer_counts_by_step': {
                 str(k): v for k, v in getattr(self, 'bare_answer_counts_by_step', {}).items()
@@ -4478,10 +4500,14 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         rec = getattr(self, '_awaiting_answer', None)
         if not rec:
             return ""
-        # inline_authored has no question_id (the question lives only
-        # on the previous tutor turn's metadata). Allow it through;
-        # the kind-dispatch below will read from turn metadata.
-        if not rec.get('question_id') and rec.get('kind') != 'inline_authored':
+        # inline_authored / inline_mcq have no question_id (the question
+        # lives only on the previous tutor turn's metadata or on the
+        # awaiting_answer record itself). Allow them through; the
+        # kind-dispatch below reads from turn metadata / the record.
+        if (
+            not rec.get('question_id')
+            and rec.get('kind') not in ('inline_authored', 'inline_mcq')
+        ):
             return ""
 
         # Resolve student_status from the most-recent grade verdict
@@ -4582,6 +4608,27 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
                     lines.append(
                         f"  reference_working: {(ia.get('working') or '')[:300]}"
                     )
+            elif kind == 'inline_mcq':
+                # Task #173 (2026-05-17). The LLM authored MCQ options
+                # inline (no pose_question, no answer key in the bank).
+                # We don't know the canonical answer programmatically;
+                # the chat-authored grader's LLM judges each reply. All
+                # this block does is surface the wrong_attempts +
+                # student_status to the tutor so the hint-vs-reveal
+                # gating still works.
+                lines = [
+                    "[ACTIVE INLINE-AUTHORED MCQ]",
+                    "You authored an MCQ in chat narrative on a prior",
+                    "turn (no answer key in the bank). The chat-authored",
+                    "grader's LLM judges each reply; wrong_attempts is",
+                    "tracked on this record so the hint-vs-reveal threshold",
+                    "still applies.",
+                    "",
+                    f"  kind: inline_mcq",
+                    f"  question_type: mcq",
+                    f"  stem: {(rec.get('authored_question_text') or '')[:600]}",
+                    f"  student_status: {status}",
+                ]
             else:
                 return ""
         except Exception as exc:
@@ -7387,17 +7434,46 @@ Follow the current step; this concept will be covered in sequence."""
         # the student isn't stranded. This is what makes removing the
         # strip safe: we don't need to enforce "no authoring" because
         # we can grade the authored question anyway.
+        #
+        # 2026-05-17 (task #173) — also fire when the previous tutor
+        # turn rendered an inline MCQ pattern (A) ... B) ... C) ... D))
+        # even without a ?-terminator. Lesson 540 session 48: tutor
+        # authored "Which feature explains symbols? A) Scale B) Legend
+        # C) Title D) Grid" inline, ending in "D) Grid" (no ?). Fallback
+        # didn't fire, no wrong_attempts tracking, tutor revealed on
+        # attempt #2. Detect the MCQ pattern + grade the whole stem+
+        # options block so the LLM grader has options context for bare
+        # letter replies.
         if not kind:
             tutor_content = (last_tutor_turn.content or '').strip()
-            if tutor_content and tutor_content.endswith('?'):
-                # Extract the last question sentence as the prompt.
-                # The grader takes the whole tutor turn; we only
-                # extract the tail so the grader prompt is tight.
-                sentences = re.split(r'(?<=[.!?])\s+', tutor_content)
-                question_text = next(
-                    (s for s in reversed(sentences) if s.strip().endswith('?')),
-                    tutor_content,
-                ).strip()
+            mcq_match = _INLINE_MCQ_RE.search(tutor_content) if tutor_content else None
+            has_q = bool(tutor_content) and (
+                tutor_content.endswith('?') or mcq_match is not None
+            )
+            if has_q:
+                if mcq_match is not None:
+                    # Extract the MCQ block — find the last sentence
+                    # before the options that ends with '?', then take
+                    # everything from there to the end of the message.
+                    mcq_start = mcq_match.start()
+                    preamble = tutor_content[:mcq_start].rstrip()
+                    pre_sentences = re.split(r'(?<=[.!?])\s+', preamble)
+                    stem = next(
+                        (s for s in reversed(pre_sentences) if s.strip().endswith('?')),
+                        preamble.split('\n')[-1] if preamble else '',
+                    ).strip()
+                    options_block = tutor_content[mcq_start:].strip()
+                    question_text = (
+                        f"{stem}\n\n{options_block}"
+                        if stem else options_block
+                    )
+                else:
+                    # Plain ?-terminated text — old behavior.
+                    sentences = re.split(r'(?<=[.!?])\s+', tutor_content)
+                    question_text = next(
+                        (s for s in reversed(sentences) if s.strip().endswith('?')),
+                        tutor_content,
+                    ).strip()
                 from apps.tutoring.bank_grader import (
                     grade_chat_authored_question,
                 )
@@ -7434,12 +7510,28 @@ Follow the current step; this concept will be covered in sequence."""
                 # so the hint-vs-reveal threshold also fires on
                 # chat-authored questions. Without this, attempts
                 # via chat-authored grading don't accumulate and
-                # the reveal-after-3 gate never opens.
+                # the reveal-after-N gate never opens.
+                #
+                # Task #173 (2026-05-17): bootstrap _awaiting_answer
+                # for chat-authored / inline-MCQ questions when the
+                # LLM didn't call pose_question. Otherwise the
+                # transient record never exists and wrong_attempts
+                # never accumulates across hint turns.
                 if (
                     result is not None
                     and getattr(result, 'is_correct', None) is False
-                    and isinstance(getattr(self, '_awaiting_answer', None), dict)
                 ):
+                    if not isinstance(getattr(self, '_awaiting_answer', None), dict):
+                        from django.utils import timezone as _tz
+                        self._awaiting_answer = {
+                            'kind': 'inline_mcq' if mcq_match else 'inline_authored',
+                            'question_id': None,
+                            'question_type': 'mcq' if mcq_match else 'short_answer',
+                            'turn_index': len(self.conversation),
+                            'posed_at': _tz.now().isoformat(),
+                            'wrong_attempts': 0,
+                            'authored_question_text': question_text[:600],
+                        }
                     cur = int(self._awaiting_answer.get('wrong_attempts', 0) or 0)
                     self._awaiting_answer['wrong_attempts'] = cur + 1
                 if result is not None and getattr(result, 'is_correct', None) is True:
@@ -9421,6 +9513,62 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
             self.consecutive_wrong = getattr(self, 'consecutive_wrong', 0) + 1
             # Increase load (student is struggling)
             self.cognitive_load = min(1.0, self.cognitive_load + 0.15)
+
+        # First-try-correct counter (separate from consecutive_correct_streak
+        # which counts any correct verdict). "First try" = correct AND the
+        # awaiting_answer record showed 0 wrong attempts on this Q. Used by
+        # the auto-difficulty bumper below.
+        if verdict_correct:
+            _aa_for_first_try = getattr(self, '_awaiting_answer', None) or {}
+            _prior_wrongs = int(_aa_for_first_try.get('wrong_attempts', 0) or 0)
+            # _awaiting_answer is updated AFTER grading by the bank/chat
+            # grader to either clear (on correct) or increment (on wrong).
+            # On a correct verdict we read the count BEFORE that update,
+            # so 0 here means truly first-try.
+            if _prior_wrongs == 0:
+                self.consecutive_first_try_correct = getattr(
+                    self, 'consecutive_first_try_correct', 0,
+                ) + 1
+            else:
+                # Correct, but only after wrong attempts — streak resets.
+                self.consecutive_first_try_correct = 0
+        elif verdict_wrong:
+            self.consecutive_first_try_correct = 0
+
+        # Auto-difficulty adjustment (2026-05-17 pilot directive).
+        # Personalize per-student per-lesson without manual button mash:
+        #   - 2 consecutive wrong answers → drop to easy (-1) if not lower
+        #   - 2 consecutive first-try-correct → bump to hard (+1) if not higher
+        # Manual Too hard? / Too easy? buttons still override and clamp.
+        # Once the adjustment fires, reset the counter so we don't bump
+        # repeatedly on the same streak (re-arm only after the opposite
+        # outcome breaks the streak).
+        if (
+            verdict_wrong
+            and getattr(self, 'consecutive_wrong', 0) >= 2
+            and int(getattr(self, 'difficulty_level', 0) or 0) > -1
+        ):
+            _prev = self.difficulty_level
+            self.difficulty_level = -1
+            self.consecutive_wrong = 0  # re-arm
+            logger.info(
+                "[AutoDifficulty] session=%s dropping difficulty %+d → -1 "
+                "(2 consecutive wrong)",
+                self.session.id, _prev,
+            )
+        elif (
+            verdict_correct
+            and getattr(self, 'consecutive_first_try_correct', 0) >= 2
+            and int(getattr(self, 'difficulty_level', 0) or 0) < 1
+        ):
+            _prev = self.difficulty_level
+            self.difficulty_level = 1
+            self.consecutive_first_try_correct = 0  # re-arm
+            logger.info(
+                "[AutoDifficulty] session=%s bumping difficulty %+d → +1 "
+                "(2 consecutive first-try-correct)",
+                self.session.id, _prev,
+            )
 
         # Confusion signals increase load
         if any(signal in input_lower for signal in confusion_signals):
