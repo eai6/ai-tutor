@@ -3047,62 +3047,92 @@ Keep it to 2-3 sentences."""
                 self.session.id, validation.issues,
             )
             from apps.tutoring.regen import run_regen_ensemble
+            from django.conf import settings as _dj_settings
 
             # Carry session_id into validation metadata for log
-            # correlation in run_regen_ensemble.
+            # correlation in run_regen_ensemble / self-retry.
             validation.metadata = dict(validation.metadata or {})
             validation.metadata.setdefault('session_id', self.session.id)
 
-            with emit_span('regen', 'ensemble') as _regen_span:
-                ensemble_result = run_regen_ensemble(
-                    previous_response=clean_response,
-                    validation=validation,
-                    lesson=self.lesson,
-                    step_context=self._build_step_eval_context(
-                        student_input, clean_response,
-                        math_check=turn_math_check,
-                    ),
-                    bank_stems=self._current_bank_full_render(),
-                    media_catalog_text=getattr(self, '_last_media_catalog_text', '') or '',
-                    attached_media=attached_media_list,
-                    regen_clients=self.regen_clients,
-                    judge_client=self.judge_client,
-                    vision_client=self.judge_client,
-                    image_reader=self._read_image_for_vision,
-                    subject_is_math=subject_is_math,
-                    bank_offered=bool(getattr(self, '_question_id_map', None)),
-                    student_input=student_input,
-                    answer_was_bare=turn_bare_answer,
-                    answer_was_wrong=(
-                        turn_math_check is not None
-                        and turn_math_check.is_correct is False
-                    ),
-                    conversation_history=prior_conversation,
-                    # Pass the bank's ground truth to the regen LLM
-                    # so it can't contradict the explanation when
-                    # rewriting. Pilot 2026-05-16: regen was
-                    # inventing answers (e.g. "cultural geography"
-                    # for a Human-geography question that the
-                    # student got right) because it had no ground
-                    # truth in its prompt.
-                    #
-                    # W3 leak-aware regen: when the regen was
-                    # triggered by ISSUE_ANSWER_LEAK, suppress the
-                    # canonical answer from the context — the
-                    # rewrite LLM literally cannot leak it again if
-                    # it doesn't have it. The regen prompt also gets
-                    # a stricter "concept-hint only" directive via
-                    # the bank_context.suppress_reason field.
-                    bank_context=self._build_regen_bank_context(
-                        suppress_canonical=(
-                            'answer_leak' in (validation.issues or [])
+            # Phase 1 (task #198, memory/tutor_self_retry_plan.md):
+            # when TUTOR_SELF_RETRY_ENABLED, re-invoke the tutor's own
+            # generate_with_tools with judge feedback prepended. Tool
+            # calls in the retry update bank_question_ref + awaiting
+            # state via the same handler the initial call uses — engine
+            # state stays consistent with screen (fixes task #176
+            # bank-ref drift). Falls back to the text-only ensemble
+            # when flag is off or client lacks tool support.
+            _use_self_retry = (
+                bool(getattr(_dj_settings, 'TUTOR_SELF_RETRY_ENABLED', False))
+                and hasattr(self.llm_client, 'generate_with_tools')
+            )
+
+            with emit_span(
+                'regen',
+                'self_retry' if _use_self_retry else 'ensemble',
+            ) as _regen_span:
+                if _use_self_retry:
+                    ensemble_result = self._dispatch_self_retry(
+                        previous_response=clean_response,
+                        validation=validation,
+                        combined_judge_result=combined_judge_result,
+                        turn_metadata=turn_metadata,
+                        student_input=student_input,
+                        attached_media=attached_media_list,
+                        subject_is_math=subject_is_math,
+                        prior_conversation=prior_conversation,
+                    )
+                else:
+                    ensemble_result = run_regen_ensemble(
+                        previous_response=clean_response,
+                        validation=validation,
+                        lesson=self.lesson,
+                        step_context=self._build_step_eval_context(
+                            student_input, clean_response,
+                            math_check=turn_math_check,
                         ),
-                    ),
-                )
+                        bank_stems=self._current_bank_full_render(),
+                        media_catalog_text=getattr(self, '_last_media_catalog_text', '') or '',
+                        attached_media=attached_media_list,
+                        regen_clients=self.regen_clients,
+                        judge_client=self.judge_client,
+                        vision_client=self.judge_client,
+                        image_reader=self._read_image_for_vision,
+                        subject_is_math=subject_is_math,
+                        bank_offered=bool(getattr(self, '_question_id_map', None)),
+                        student_input=student_input,
+                        answer_was_bare=turn_bare_answer,
+                        answer_was_wrong=(
+                            turn_math_check is not None
+                            and turn_math_check.is_correct is False
+                        ),
+                        conversation_history=prior_conversation,
+                        # Pass the bank's ground truth to the regen LLM
+                        # so it can't contradict the explanation when
+                        # rewriting. Pilot 2026-05-16: regen was
+                        # inventing answers (e.g. "cultural geography"
+                        # for a Human-geography question that the
+                        # student got right) because it had no ground
+                        # truth in its prompt.
+                        #
+                        # W3 leak-aware regen: when the regen was
+                        # triggered by ISSUE_ANSWER_LEAK, suppress the
+                        # canonical answer from the context — the
+                        # rewrite LLM literally cannot leak it again if
+                        # it doesn't have it. The regen prompt also gets
+                        # a stricter "concept-hint only" directive via
+                        # the bank_context.suppress_reason field.
+                        bank_context=self._build_regen_bank_context(
+                            suppress_canonical=(
+                                'answer_leak' in (validation.issues or [])
+                            ),
+                        ),
+                    )
                 if _regen_span is not None:
                     _regen_span['payload'] = {
+                        'mechanism': 'self_retry' if _use_self_retry else 'ensemble',
                         'picked_model': str(getattr(ensemble_result, 'picked_model', '') or '')[:80],
-                        'cycles': int(getattr(ensemble_result, 'cycles', 0) or 0),
+                        'cycles_run': int(getattr(ensemble_result, 'cycles_run', 0) or 0),
                         'clean': bool(getattr(ensemble_result, 'clean', False)),
                         'fallback_used': bool(getattr(ensemble_result, 'fallback_used', False)),
                     }
@@ -3134,12 +3164,20 @@ Keep it to 2-3 sentences."""
             # text preview + judge breakdown so annotators can see
             # what each regen attempt looked like. Without this the
             # ensemble's per-cycle judge_result objects are dropped
-            # once respond() returns.
+            # once respond() returns. Dispatch by mechanism so
+            # self-retry vs ensemble both render correctly.
             try:
-                from apps.tutoring.regen import summarise_regen_cycles
-                turn_metadata['regen_audit'] = summarise_regen_cycles(
-                    ensemble_result,
-                )
+                _mech = getattr(ensemble_result, 'mechanism', 'ensemble')
+                if _mech == 'self_retry':
+                    from apps.tutoring.regen.self_retry import summarise_self_retry
+                    turn_metadata['regen_audit'] = summarise_self_retry(
+                        ensemble_result,
+                    )
+                else:
+                    from apps.tutoring.regen import summarise_regen_cycles
+                    turn_metadata['regen_audit'] = summarise_regen_cycles(
+                        ensemble_result,
+                    )
             except Exception as exc:
                 logger.warning("[Regen] audit capture failed: %s", exc)
 
@@ -7424,6 +7462,118 @@ Follow the current step; this concept will be covered in sequence."""
         state['rendered_bank_ids'] = rendered[-30:]  # cap so JSON stays small
         self.session.engine_state = state
         return clean_text, question
+
+    def _dispatch_self_retry(
+        self,
+        *,
+        previous_response: str,
+        validation,
+        combined_judge_result,
+        turn_metadata: Dict,
+        student_input: str,
+        attached_media: Optional[List[Dict]],
+        subject_is_math: bool,
+        prior_conversation: List[Dict],
+    ):
+        """Build the args for run_tutor_self_retry and invoke it.
+
+        Phase 1 entry point (task #198) — re-invokes the tutor's own
+        generate_with_tools call with judge feedback prepended. Tool
+        calls in the retry update bank_question_ref + _awaiting_answer
+        the same way the initial call did, so engine state stays
+        consistent with what's on screen (the bug task #176 surfaced).
+
+        Returns a SelfRetryResult that mirrors RegenResult fields so
+        the caller can read .text / .clean / .cycles_run /
+        .picked_model / .fallback_used / .elapsed_seconds without
+        branching.
+        """
+        from apps.tutoring.regen.self_retry import (
+            DEFAULT_MAX_CYCLES,
+            run_tutor_self_retry,
+        )
+        from apps.tutoring.regen.score import score_candidate
+        from apps.tutoring.judges import run_all_judges
+        from apps.tutoring.judges._prompt_meta import prompt_fingerprint
+
+        # Rebuild system prompt + tools fresh — these are deterministic
+        # per current engine state and the initial call already built
+        # them. Re-building is cheaper than threading them down via
+        # extra args + risks no drift.
+        base_system_prompt = self._build_system_prompt()
+        # The turn directive used at initial generation isn't on hand
+        # here, but the feedback message itself carries the per-turn
+        # repair instructions, so an empty turn_directive is fine for
+        # the retry. The base system prompt has all the standing
+        # rules (tools, scaffolding policy, etc.).
+        system_prompt = base_system_prompt
+        try:
+            _ph, _pc = prompt_fingerprint(system_prompt)
+            self._last_tutor_prompt_meta = {'hash': _ph, 'chars': _pc}
+        except Exception:
+            pass
+
+        # Tools: same selection rules as initial generation.
+        tool = (
+            self._build_pose_question_tool()
+            if hasattr(self.llm_client, 'generate_with_tools')
+            else None
+        )
+        inline_tool = (
+            self._build_pose_inline_question_tool()
+            if hasattr(self.llm_client, 'generate_with_tools')
+            else None
+        )
+        tools = [t for t in (tool, inline_tool) if t is not None]
+
+        # Messages: the conversation as it stood when the initial
+        # generation ran. The student's latest input is already the
+        # trailing user turn (added by _prepare_response before
+        # _generate_response was called).
+        messages = list(self.conversation)
+        if not messages:
+            messages = [{"role": "user", "content": "Begin the lesson."}]
+        if messages and messages[-1].get("role") == "assistant":
+            messages.append({"role": "user", "content": "Continue."})
+
+        # Judge runner — re-runs the full concurrent judge fan-out on
+        # each candidate. Mirrors what _respond_impl does for the
+        # initial response.
+        def _judge_runner(candidate_text: str):
+            return run_all_judges(
+                response_text=candidate_text,
+                student_input=student_input or "",
+                conversation_history=list(prior_conversation or []),
+                bank_stems=self._current_bank_stems(),
+                step_context=self._build_step_eval_context(
+                    student_input or "", candidate_text,
+                    math_check=None,
+                ),
+                lesson=self.lesson,
+                llm_client=self.judge_client,
+                vision_client=self.judge_client,
+                attached_media=attached_media or [],
+                image_reader=self._read_image_for_vision,
+                subject_is_math=subject_is_math,
+                bank_offered=bool(getattr(self, '_question_id_map', None)),
+            )
+
+        result = run_tutor_self_retry(
+            self,
+            previous_response=previous_response,
+            validation=validation,
+            combined_judge_result=combined_judge_result,
+            turn_metadata=turn_metadata,
+            student_input=student_input or "",
+            system_prompt=system_prompt,
+            messages=messages,
+            tools=tools,
+            judge_runner=_judge_runner,
+            score_fn=score_candidate,
+            max_cycles=DEFAULT_MAX_CYCLES,
+            max_tokens=2048,
+        )
+        return result
 
     def _current_bank_stems(self) -> List[str]:
         """Flatten the active question_id_map to a list of stem strings.

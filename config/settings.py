@@ -188,6 +188,18 @@ CONTENT_REGEN_ENABLED = (
     not in ('0', 'false', 'no', 'off', '')
 )
 
+# Tutor self-retry — replace the text-only regen ensemble with a
+# tool-aware retry that re-invokes the tutor's own generate path with
+# judge feedback prepended. Fixes bank_question_ref/render drift
+# caused by regen producing prose that doesn't match the original
+# tool call (task #176, memory/tutor_self_retry_plan.md). Default OFF
+# in production until E2E validates; ON in dev for testing.
+# Flip via env: TUTOR_SELF_RETRY_ENABLED=1 to enable.
+TUTOR_SELF_RETRY_ENABLED = (
+    os.getenv('TUTOR_SELF_RETRY_ENABLED', '1' if DEBUG else '0').lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
 # Q4 exit_question content judge — runs POST-gen on every newly-generated
 # MCQ exit-ticket question. Verdict persists to
 # ExitTicketQuestion.judge_outputs.exit_question and surfaces as a
