@@ -34,9 +34,25 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from enum import Enum
+from typing import List, Optional, Sequence, Union
 
 logger = logging.getLogger(__name__)
+
+
+class JudgmentType(str, Enum):
+    """The unified grader supports multiple judgment kinds. Each shares
+    the same LLM client + retry + structured-output infrastructure.
+
+    Added 2026-05-17 per memory/hint_vs_reveal_guards_plan.md W6 —
+    extracting a single grading codepath so exit-ticket grading,
+    mid-lesson grading, leak detection, repeat detection, and intent
+    classification all flow through one implementation.
+    """
+    GRADE_CORRECTNESS = "grade_correctness"  # existing — is student answer right?
+    JUDGE_LEAK        = "judge_leak"         # W1 — did tutor reveal canonical answer?
+    JUDGE_REPEAT      = "judge_repeat"       # W14 — did tutor re-ask an earlier question?
+    CLASSIFY_INTENT   = "classify_intent"    # W9 — attempt / confusion / off_topic
 
 
 @dataclass
@@ -144,6 +160,21 @@ _GRADE_SYSTEM = (
     "merit, not the question's overall pass/fail.\n"
     "  - When in doubt and the student is in the right ballpark, "
     "favour CORRECT — students shouldn't be penalised for phrasing.\n"
+    "\n"
+    "ACCEPTABLE PARAPHRASES (mark correct):\n"
+    "  Expected: 'Geography studies Earth and its inhabitants.'\n"
+    "  Student:  'Geography is about Earth and the things that live on it.' ✓\n"
+    "  Student:  'The study of our planet and its people.' ✓\n"
+    "  Student:  'Earth and the people / animals on it.' ✓\n"
+    "  Expected: 'Use it to determine which direction you need to travel.'\n"
+    "  Student:  'It tells you which way to go.' ✓\n"
+    "  Student:  'For figuring out direction.' ✓\n"
+    "\n"
+    "UNACCEPTABLE (mark wrong even if related):\n"
+    "  Expected: 'Geography studies Earth and its inhabitants.'\n"
+    "  Student:  'Geography is a school subject.' ✗ — too narrow\n"
+    "  Student:  'It studies maps.' ✗ — partial / missing inhabitants\n"
+    "  Student:  'The study of countries.' ✗ — too narrow\n"
     "\n"
     "Output JSON ARRAY ONLY (no prose, no code fence) — one object per "
     "input item, in the same order as input. For most items:\n"
@@ -381,3 +412,413 @@ def grade_written_responses_batch(
         correct_count, len(out),
     )
     return out
+
+
+# =============================================================================
+# JUDGE_LEAK — did the tutor reveal the canonical answer?  (W1)
+# =============================================================================
+
+@dataclass
+class BatchLeakItem:
+    """One leak-detection input. Used by W1's LLM judge layer.
+
+    For chat-authored questions where there's no canonical bank entry,
+    pass the LLM grader's best understanding of the expected answer
+    as `canonical_answer` (it becomes the reference the judge checks
+    against)."""
+    index: int
+    question_text: str
+    canonical_answer: str
+    response: str
+    options: Optional[dict] = None  # {'A': '...', 'B': '...', ...} for MCQ
+    # Arbiter mode (set when det + LLM disagreed and we need tie-break):
+    arbiter: bool = False
+    det_verdict: Optional[bool] = None
+    det_reason: Optional[str] = None
+    llm_verdict: Optional[bool] = None
+    llm_reason: Optional[str] = None
+
+
+@dataclass
+class BatchLeakResult:
+    index: int
+    leaked: bool
+    reason: str = ""
+
+
+_LEAK_SYSTEM = (
+    "You judge whether a tutor's response REVEALED the correct answer "
+    "to a student during a tutoring session.\n"
+    "\n"
+    "REVEAL means the tutor:\n"
+    "  - Stated the correct option letter ('the answer is B').\n"
+    "  - Stated the correct answer text verbatim.\n"
+    "  - PARAPHRASED the correct answer in different words so the\n"
+    "    student can copy / pick it. E.g. if option B says 'Use it\n"
+    "    to determine which direction you need to travel', then 'It\n"
+    "    helps you figure out which direction to travel' IS a reveal.\n"
+    "\n"
+    "NOT a reveal (concept-level hints — these are OK):\n"
+    "  - Naming what the question is testing without stating the answer.\n"
+    "    'Think about what a compass rose actually shows on a map.' ✓\n"
+    "  - Asking a Socratic question that narrows the option space\n"
+    "    without giving the answer. 'What's the key thing you need to\n"
+    "    know about your route?' ✓\n"
+    "  - Eliminating wrong options without naming the right one.\n"
+    "    'Two of these options are about distance, not direction.' ✓\n"
+    "\n"
+    "Output JSON ARRAY ONLY — one object per input item, in input order:\n"
+    "[\n"
+    '  {"index": <int>, "leaked": <true|false>, '
+    '"reason": "<short why, <=200 chars>"}\n'
+    "]\n"
+)
+
+
+_LEAK_ARBITER_SYSTEM = (
+    "Two detectors disagreed about whether a tutor response leaked the "
+    "answer. Resolve the disagreement.\n"
+    "\n"
+    "REVEAL = stated the answer (letter or text), or paraphrased the\n"
+    "canonical so the student can copy it.\n"
+    "\n"
+    "NOT REVEAL = concept-level hint, Socratic question, eliminating\n"
+    "wrong options without naming the right one.\n"
+    "\n"
+    "Weigh both detectors' reasoning. Pick the verdict that better\n"
+    "fits the actual response. Output JSON ARRAY ONLY:\n"
+    "[\n"
+    '  {"index": <int>, "leaked": <true|false>, '
+    '"reason": "<short why, <=300 chars>"}\n'
+    "]\n"
+)
+
+
+def _build_leak_user_prompt(items: Sequence['BatchLeakItem']) -> str:
+    payload = []
+    for it in items:
+        entry = {
+            "index": it.index,
+            "question": (it.question_text or "")[:500],
+            "canonical_answer": (it.canonical_answer or "")[:400],
+            "tutor_response": (it.response or "")[:1500],
+        }
+        if it.options:
+            entry["options"] = {
+                k: str(v)[:200] for k, v in it.options.items() if v
+            }
+        if it.arbiter:
+            entry["detector_a_verdict"] = it.det_verdict
+            entry["detector_a_reason"] = (it.det_reason or "")[:300]
+            entry["detector_b_verdict"] = it.llm_verdict
+            entry["detector_b_reason"] = (it.llm_reason or "")[:300]
+        payload.append(entry)
+    return (
+        "Judge each item below. Reply with ONLY the JSON array — no "
+        "prose, no code fence.\n\n"
+        f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
+    )
+
+
+# =============================================================================
+# JUDGE_REPEAT — did the tutor re-ask a question already asked?  (W14)
+# =============================================================================
+
+@dataclass
+class BatchRepeatItem:
+    """One repeat-detection input. Used by W14's optional LLM judge layer
+    on borderline Jaccard cases (0.45–0.7)."""
+    index: int
+    new_question: str
+    previous_questions: List[str] = field(default_factory=list)
+
+
+@dataclass
+class BatchRepeatResult:
+    index: int
+    repeated: bool
+    reason: str = ""
+
+
+_REPEAT_SYSTEM = (
+    "You judge whether a tutor's NEW question is a REPEAT of a question "
+    "they (or the bank) already asked the student.\n"
+    "\n"
+    "REPEAT = the NEW question is substantively the same as one in the\n"
+    "previous list — asking literally the same thing in different words.\n"
+    "Examples: 'What does a compass rose show?' and 'What is the\n"
+    "function of a compass rose?' are repeats.\n"
+    "\n"
+    "NOT a repeat: same topic but DIFFERENT angle. Examples:\n"
+    "  - 'What does a compass rose show?' vs 'Why is a compass rose\n"
+    "    essential on a navigation map?' — different angles, not repeat.\n"
+    "  - 'What is a legend?' vs 'How would you use a legend to find\n"
+    "    a forest on a map?' — different angles, not repeat.\n"
+    "\n"
+    "Output JSON ARRAY ONLY:\n"
+    "[\n"
+    '  {"index": <int>, "repeated": <true|false>, '
+    '"reason": "<short why, <=200 chars>"}\n'
+    "]\n"
+)
+
+
+def _build_repeat_user_prompt(items: Sequence['BatchRepeatItem']) -> str:
+    payload = []
+    for it in items:
+        payload.append({
+            "index": it.index,
+            "new_question": (it.new_question or "")[:400],
+            "previous_questions": [
+                (q or "")[:300] for q in (it.previous_questions or [])[:10]
+            ],
+        })
+    return (
+        "Judge each item below. Reply with ONLY the JSON array — no "
+        "prose, no code fence.\n\n"
+        f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
+    )
+
+
+# =============================================================================
+# CLASSIFY_INTENT — attempt / confusion / off_topic  (W9)
+# =============================================================================
+
+@dataclass
+class BatchIntentItem:
+    """One intent-classification input. Used by W9 to decide whether a
+    student reply was an attempt vs a confusion signal vs off-topic."""
+    index: int
+    question_text: str
+    student_input: str
+
+
+@dataclass
+class BatchIntentResult:
+    index: int
+    intent: str  # 'attempt' | 'confusion' | 'off_topic'
+    reason: str = ""
+
+
+_INTENT_SYSTEM = (
+    "You classify a student's reply during a tutoring session. The "
+    "student was just asked a question by the tutor.\n"
+    "\n"
+    "Categories:\n"
+    "  - attempt: they tried to answer. Right OR wrong both count.\n"
+    "    Even a half-answer ('I think it's A but not sure') is an\n"
+    "    attempt.\n"
+    "  - confusion: they explicitly signalled they don't know / are\n"
+    "    stuck / asking for help WITHOUT attempting. Examples:\n"
+    "    'I don't know', 'no clue', 'help me', 'what's this about?',\n"
+    "    'I'm not sure', 'stuck'.\n"
+    "  - off_topic: their reply is unrelated to the question (chit-chat,\n"
+    "    a different question, a meta comment about the lesson).\n"
+    "\n"
+    "Output JSON ARRAY ONLY:\n"
+    "[\n"
+    '  {"index": <int>, "intent": "<attempt|confusion|off_topic>", '
+    '"reason": "<short why, <=80 chars>"}\n'
+    "]\n"
+)
+
+
+def _build_intent_user_prompt(items: Sequence['BatchIntentItem']) -> str:
+    payload = []
+    for it in items:
+        payload.append({
+            "index": it.index,
+            "question": (it.question_text or "")[:400],
+            "student_reply": (it.student_input or "")[:400],
+        })
+    return (
+        "Classify each item. Reply with ONLY the JSON array — no "
+        "prose, no code fence.\n\n"
+        f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
+    )
+
+
+# =============================================================================
+# Unified dispatcher
+# =============================================================================
+
+# Map each judgment type to its (system_prompt, user_builder, result_parser).
+_JUDGMENT_CONFIG = {
+    # GRADE_CORRECTNESS uses the existing infrastructure — handled inline
+    # in run_grading_batch (kept here as a sentinel so the dispatcher
+    # can recognise it).
+    JudgmentType.GRADE_CORRECTNESS: None,
+    JudgmentType.JUDGE_LEAK:        (_LEAK_SYSTEM, _build_leak_user_prompt, 'leak'),
+    JudgmentType.JUDGE_REPEAT:      (_REPEAT_SYSTEM, _build_repeat_user_prompt, 'repeat'),
+    JudgmentType.CLASSIFY_INTENT:   (_INTENT_SYSTEM, _build_intent_user_prompt, 'intent'),
+}
+
+
+def _parse_leak_results(items, data) -> List[BatchLeakResult]:
+    by_idx = {}
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            idx = int(entry.get("index", -1))
+        except (TypeError, ValueError):
+            continue
+        if idx < 0:
+            continue
+        by_idx[idx] = BatchLeakResult(
+            index=idx,
+            leaked=bool(entry.get("leaked", False)),
+            reason=str(entry.get("reason") or "")[:400],
+        )
+    return [
+        by_idx.get(it.index, BatchLeakResult(index=it.index, leaked=False))
+        for it in items
+    ]
+
+
+def _parse_repeat_results(items, data) -> List[BatchRepeatResult]:
+    by_idx = {}
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            idx = int(entry.get("index", -1))
+        except (TypeError, ValueError):
+            continue
+        if idx < 0:
+            continue
+        by_idx[idx] = BatchRepeatResult(
+            index=idx,
+            repeated=bool(entry.get("repeated", False)),
+            reason=str(entry.get("reason") or "")[:400],
+        )
+    return [
+        by_idx.get(it.index, BatchRepeatResult(index=it.index, repeated=False))
+        for it in items
+    ]
+
+
+def _parse_intent_results(items, data) -> List[BatchIntentResult]:
+    by_idx = {}
+    valid_intents = {'attempt', 'confusion', 'off_topic'}
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            idx = int(entry.get("index", -1))
+        except (TypeError, ValueError):
+            continue
+        if idx < 0:
+            continue
+        raw_intent = str(entry.get("intent", "")).strip().lower()
+        intent = raw_intent if raw_intent in valid_intents else 'attempt'
+        by_idx[idx] = BatchIntentResult(
+            index=idx,
+            intent=intent,
+            reason=str(entry.get("reason") or "")[:200],
+        )
+    return [
+        by_idx.get(it.index, BatchIntentResult(index=it.index, intent='attempt'))
+        for it in items
+    ]
+
+
+def run_grading_batch(
+    items: Sequence,
+    *,
+    judgment_type: JudgmentType,
+    llm_client,
+    max_tokens: int = 1024,
+    arbiter: bool = False,
+) -> List:
+    """Unified entry point for batched LLM judgments.
+
+    Dispatches on judgment_type:
+      GRADE_CORRECTNESS → delegates to grade_written_responses_batch
+                          (preserves existing behavior + back-compat).
+      JUDGE_LEAK        → answer-leak detector (W1).
+                          Set arbiter=True for the disagreement
+                          tie-break call (uses arbiter prompt + reads
+                          det/llm verdict+reason from each item).
+      JUDGE_REPEAT      → repeated-question detector (W14).
+      CLASSIFY_INTENT   → attempt / confusion / off_topic (W9).
+
+    Returns a list of the appropriate result type, in input order.
+    Fail-soft: on LLM error, returns conservative defaults (not leaked,
+    not repeated, intent='attempt').
+    """
+    if not items:
+        return []
+
+    # GRADE_CORRECTNESS goes through the legacy path (it's the most
+    # complex — per-element parts, fill_in_blank/matching breakdowns).
+    # Keeping it separate avoids re-implementing.
+    if judgment_type == JudgmentType.GRADE_CORRECTNESS:
+        return grade_written_responses_batch(
+            list(items), llm_client=llm_client, max_tokens=max_tokens,
+        )
+
+    config = _JUDGMENT_CONFIG.get(judgment_type)
+    if config is None:
+        logger.warning(
+            "[Grader] unknown judgment_type=%s — returning empty",
+            judgment_type,
+        )
+        return []
+    system_prompt, build_user, result_kind = config
+
+    # Leak arbiter uses a different system prompt.
+    if judgment_type == JudgmentType.JUDGE_LEAK and arbiter:
+        system_prompt = _LEAK_ARBITER_SYSTEM
+
+    if llm_client is None:
+        logger.info(
+            "[Grader] no llm_client for judgment_type=%s — returning defaults",
+            judgment_type.value,
+        )
+        return _default_results(items, result_kind)
+
+    user_prompt = build_user(items)
+    logger.info(
+        "[Grader] %s%s: %d items",
+        judgment_type.value, " (arbiter)" if arbiter else "", len(items),
+    )
+
+    try:
+        resp = llm_client.generate(
+            messages=[{"role": "user", "content": user_prompt}],
+            system_prompt=system_prompt,
+            max_tokens=max_tokens,
+        )
+        raw = (resp.content or "").strip()
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+        data = json.loads(raw)
+        if not isinstance(data, list):
+            raise ValueError("expected JSON array")
+    except Exception as e:
+        logger.warning(
+            "[Grader] %s call failed: %s — returning defaults",
+            judgment_type.value, e,
+        )
+        return _default_results(items, result_kind)
+
+    if result_kind == 'leak':
+        return _parse_leak_results(items, data)
+    if result_kind == 'repeat':
+        return _parse_repeat_results(items, data)
+    if result_kind == 'intent':
+        return _parse_intent_results(items, data)
+    return []
+
+
+def _default_results(items, kind: str) -> List:
+    """Conservative defaults when the LLM call fails. Defaults are
+    chosen so a failed call doesn't TRIGGER regen — better to miss a
+    leak than to fire regen on every wrong turn during an outage."""
+    if kind == 'leak':
+        return [BatchLeakResult(index=it.index, leaked=False) for it in items]
+    if kind == 'repeat':
+        return [BatchRepeatResult(index=it.index, repeated=False) for it in items]
+    if kind == 'intent':
+        return [BatchIntentResult(index=it.index, intent='attempt') for it in items]
+    return []
