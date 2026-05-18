@@ -590,11 +590,17 @@ def _instructor_structured_call(
     return call.verdict
 
 
-def _run_fill_in_blank_judge_for_qs(lesson, qs):
+def _run_fill_in_blank_judge_for_qs(lesson, qs, *, force_model_config=None):
     """Fan out the fill_in_blank content judge + regen across
     newly-persisted FIB rows. Mirrors `_run_exit_question_judge_for_mcqs`
     (concurrent ThreadPoolExecutor + fail-soft per question +
     auto-regen on REJECT).
+
+    Args:
+        force_model_config: Optional ModelConfig override (task #228).
+            Forwarded to the underlying judge so the dashboard model
+            picker / bulk-review force-rerun routes non-MCQ questions
+            through the same model as MCQs.
     """
     if not qs:
         return
@@ -626,6 +632,7 @@ def _run_fill_in_blank_judge_for_qs(lesson, qs):
                 step_concept_tag=q.concept_tag or '',
                 enabling_objective=q.enabling_objective or '',
                 exclude_provider=exclude_provider,
+                force_model_config=force_model_config,
             )
         except Exception as exc:
             print(
@@ -759,9 +766,13 @@ def _regen_one_fib(q, lesson, verdict_dict: dict):
         )
 
 
-def _run_short_answer_judge_for_qs(lesson, qs):
+def _run_short_answer_judge_for_qs(lesson, qs, *, force_model_config=None):
     """Fan out the short_answer content judge + regen across
     newly-persisted SA rows.
+
+    Args:
+        force_model_config: Optional ModelConfig override (task #228) —
+            see _run_fill_in_blank_judge_for_qs for the pattern.
     """
     if not qs:
         return
@@ -793,6 +804,7 @@ def _run_short_answer_judge_for_qs(lesson, qs):
                 step_concept_tag=q.concept_tag or '',
                 enabling_objective=q.enabling_objective or '',
                 exclude_provider=exclude_provider,
+                force_model_config=force_model_config,
             )
         except Exception as exc:
             print(
@@ -925,9 +937,13 @@ def _regen_one_sa(q, lesson, verdict_dict: dict):
         )
 
 
-def _run_matching_judge_for_qs(lesson, qs):
+def _run_matching_judge_for_qs(lesson, qs, *, force_model_config=None):
     """Fan out the matching content judge + regen across
     newly-persisted matching rows.
+
+    Args:
+        force_model_config: Optional ModelConfig override (task #228) —
+            see _run_fill_in_blank_judge_for_qs for the pattern.
     """
     if not qs:
         return
@@ -959,6 +975,7 @@ def _run_matching_judge_for_qs(lesson, qs):
                 step_concept_tag=q.concept_tag or '',
                 enabling_objective=q.enabling_objective or '',
                 exclude_provider=exclude_provider,
+                force_model_config=force_model_config,
             )
         except Exception as exc:
             print(

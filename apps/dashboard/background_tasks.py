@@ -1567,6 +1567,9 @@ def review_unreviewed_content_async(
     from apps.curriculum.content_generator import (
         _run_content_judges_for_steps,
         _run_exit_question_judge_for_mcqs,
+        _run_fill_in_blank_judge_for_qs,
+        _run_short_answer_judge_for_qs,
+        _run_matching_judge_for_qs,
     )
     from apps.llm.models import ModelConfig
 
@@ -1693,18 +1696,59 @@ def review_unreviewed_content_async(
                     )
 
             if unreviewed_exit_qs:
-                try:
-                    _run_exit_question_judge_for_mcqs(
-                        lesson, unreviewed_exit_qs,
-                        force_model_config=force_model_config,
-                    )
-                    exit_qs_reviewed += len(unreviewed_exit_qs)
-                except Exception as exc:
-                    log(f"   ⚠️ exit-Q judges crashed: {exc}")
-                    logger.exception(
-                        "review_unreviewed_content_async exit-Q judges failed "
-                        "for lesson %s", lesson.id,
-                    )
+                # Dispatch by question_type — there are 4 separate judge
+                # functions and the old code only called the MCQ one,
+                # so FIB / short_answer / matching rows were silently
+                # skipped (MCQ judge runs with empty option_a-d and
+                # returns skipped=True → status stays UNREVIEWED). Fix
+                # 2026-05-18, task #228.
+                from apps.tutoring.models import ExitTicketQuestion as _ETQ
+                _QT = _ETQ.QuestionType
+                # short_numeric is legacy data not in the QuestionType enum;
+                # the production grader treats it as short_answer
+                # (exit_ticket_grader.py:302) so route it through the same
+                # judge here.
+                _TYPE_ALIAS = {'short_numeric': _QT.SHORT_ANSWER}
+                by_type = {}
+                for q in unreviewed_exit_qs:
+                    qt = q.question_type or _QT.MCQ
+                    qt = _TYPE_ALIAS.get(qt, qt)
+                    by_type.setdefault(qt, []).append(q)
+
+                # (type_value, judge_function) pairs
+                dispatch = [
+                    (_QT.MCQ, _run_exit_question_judge_for_mcqs),
+                    (_QT.FILL_IN_BLANK, _run_fill_in_blank_judge_for_qs),
+                    (_QT.SHORT_ANSWER, _run_short_answer_judge_for_qs),
+                    (_QT.MATCHING, _run_matching_judge_for_qs),
+                ]
+                for qtype, judge_fn in dispatch:
+                    group = by_type.get(qtype) or []
+                    if not group:
+                        continue
+                    try:
+                        judge_fn(
+                            lesson, group,
+                            force_model_config=force_model_config,
+                        )
+                        exit_qs_reviewed += len(group)
+                    except Exception as exc:
+                        log(f"   ⚠️ {qtype} judge crashed: {exc}")
+                        logger.exception(
+                            "review_unreviewed_content_async %s judge failed "
+                            "for lesson %s", qtype, lesson.id,
+                        )
+
+                # Warn about any unhandled types (e.g. data_interpretation
+                # has no judge wired up yet) so they show up in the log
+                # instead of silently never getting reviewed.
+                handled = {qt for qt, _ in dispatch}
+                for qtype, group in by_type.items():
+                    if qtype not in handled and group:
+                        log(
+                            f"   ⚠️ {len(group)} {qtype} question(s) — "
+                            "no judge wired up for this type; left unreviewed"
+                        )
 
         log("")
         log(
