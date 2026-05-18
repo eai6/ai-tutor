@@ -7,6 +7,14 @@
     .settings-page { max-width: 640px; margin: 0 auto; padding: 0; }
     .settings-page h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.25rem; }
     .settings-page .lead { color: var(--text-muted); margin-bottom: 1.5rem; }
+    .settings-page .back-link {
+        color: #6b7280;
+        font-size: 0.85rem;
+        text-decoration: none;
+        margin-bottom: 1rem;
+        display: inline-block;
+    }
+    .settings-page .back-link:hover { color: #5b21b6; }
 
     .panel {
         background: var(--bg-card);
@@ -116,6 +124,9 @@
 
 {% block content %}
 <div class="settings-page">
+    <a href="{% url 'tutoring:catalog' %}"
+       class="back-link"
+       onclick="if (document.referrer && document.referrer !== window.location.href) { history.back(); return false; }">← Back</a>
     <h1>Settings</h1>
     <p class="lead">Manage your account.</p>
 
