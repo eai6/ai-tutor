@@ -293,6 +293,83 @@ class ModelConfig(models.Model):
             config = cls.objects.filter(is_active=True).first()
         return config
 
+    # ------------------------------------------------------------------
+    # Runtime override helper (task #216 — dashboard provider picker)
+    # ------------------------------------------------------------------
+    # Default env-var lookup table for each provider. Mirrors what's in
+    # the seeded ModelConfig rows so an in-memory override can resolve
+    # credentials without DB writes.
+    _PROVIDER_API_KEY_ENV = {
+        'anthropic': 'ANTHROPIC_API_KEY',
+        'openai': 'OPENAI_API_KEY',
+        'google': 'GOOGLE_API_KEY',
+        'azure_openai': 'AZURE_OPENAI_API_KEY',
+    }
+
+    @classmethod
+    def resolve_runtime(cls, provider: str, model_name: str):
+        """Return a ModelConfig suitable for an ad-hoc run with a
+        specific (provider, model_name) pair — without writing to the
+        database.
+
+        Lookup order:
+          1. An existing active ModelConfig matching the exact pair
+             (any institution / any purpose). Reuses its
+             api_key_env_var + api_key_encrypted + max_tokens.
+          2. An in-memory ModelConfig assembled from defaults, with
+             api_key_env_var inferred from `_PROVIDER_API_KEY_ENV`.
+
+        Used by the dashboard "Run AI review" + "Generate pending
+        images" buttons so a teacher can pick a model per-run without
+        promoting it to the active config.
+
+        Returns None when `provider` is unknown or the inferred env
+        var is missing. Callers fall back to the default chain.
+        """
+        provider = (provider or '').strip().lower()
+        model_name = (model_name or '').strip()
+        if not provider or not model_name:
+            return None
+
+        existing = (
+            cls.objects.filter(
+                is_active=True,
+                provider=provider,
+                model_name=model_name,
+            ).first()
+            or cls.objects.filter(
+                provider=provider, model_name=model_name,
+            ).first()
+        )
+        if existing is not None:
+            return existing
+
+        env_var = cls._PROVIDER_API_KEY_ENV.get(provider)
+        if not env_var:
+            return None
+
+        # Build an unsaved instance — never call .save() on this.
+        # institution is required at the FK level, so we attach the
+        # global institution if available; that fact is purely for
+        # field validity and isn't persisted.
+        try:
+            from apps.accounts.models import Institution as _Inst
+            inst = _Inst.get_global()
+        except Exception:
+            inst = None
+        return cls(
+            institution=inst,
+            name=f"Runtime override — {provider}/{model_name}",
+            provider=provider,
+            model_name=model_name,
+            api_key_env_var=env_var,
+            api_key_encrypted='',
+            max_tokens=2048,
+            temperature=0.0,
+            purpose=cls.Purpose.JUDGE,
+            is_active=False,
+        )
+
 
 class MobileInferenceModel(models.Model):
     """Catalog of on-device LLMs available to the React Native mobile app.

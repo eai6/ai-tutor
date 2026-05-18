@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
-def _run_content_judges_for_steps(lesson, steps):
+def _run_content_judges_for_steps(lesson, steps, *, force_model_config=None):
     """Fan out the factual_step content judge across newly-persisted
     LessonStep rows.
 
@@ -30,6 +30,13 @@ def _run_content_judges_for_steps(lesson, steps):
     fail-soft: if a judge errors / skips for one step, the others still
     persist their verdicts. Verdicts land on step.judge_outputs[<judge>]
     via a single DB save per step.
+
+    Args:
+        force_model_config: Optional ModelConfig override (task #216 —
+            dashboard provider picker). When set, EVERY judge in this
+            run uses this single config instead of the configured chain.
+            Pass an in-memory `ModelConfig.resolve_runtime(...)` from
+            the bulk-review view.
     """
     if not steps:
         return
@@ -72,6 +79,7 @@ def _run_content_judges_for_steps(lesson, steps):
                     run_factual_step_judge,
                     step.teacher_script or '',
                     lesson=lesson, exclude_provider=exclude_provider,
+                    force_model_config=force_model_config,
                 ): 'factual_step',
             }
             if pedagogy_enabled:
@@ -82,6 +90,7 @@ def _run_content_judges_for_steps(lesson, steps):
                     step_objective=step.enabling_objective or '',
                     step_concept_tag=step.concept_tag or '',
                     exclude_provider=exclude_provider,
+                    force_model_config=force_model_config,
                 )] = 'pedagogy_step'
             if safety_enabled:
                 futures[pex.submit(
@@ -89,6 +98,7 @@ def _run_content_judges_for_steps(lesson, steps):
                     step.teacher_script or '',
                     lesson=lesson,
                     exclude_provider=exclude_provider,
+                    force_model_config=force_model_config,
                 )] = 'safety_content'
 
             for fut in concurrent.futures.as_completed(futures):
@@ -282,7 +292,7 @@ def _regen_one_step(step, lesson, judge_results: dict):
         )
 
 
-def _run_exit_question_judge_for_mcqs(lesson, mcqs):
+def _run_exit_question_judge_for_mcqs(lesson, mcqs, *, force_model_config=None):
     """Fan out the exit_question content judge across newly-persisted
     MCQ rows. Mirrors _run_content_judges_for_steps from Q1.8 — same
     ThreadPoolExecutor + fail-soft pattern.
@@ -291,6 +301,14 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
     REJECTs trigger a bounded regen ensemble (run_exit_question_regen)
     that rewrites + re-judges up to DEFAULT_MAX_CYCLES times. Only
     questions that REJECT after every cycle land in auto_flagged.
+
+    Args:
+        force_model_config: Optional ModelConfig override (task #216).
+            Same semantics as _run_content_judges_for_steps — when set,
+            the judge uses this single config instead of the chain.
+            The regen path uses the lesson's normal regen config —
+            override doesn't bleed into regen by design (regen quality
+            depends on its own tuning).
     """
     if not mcqs:
         return
@@ -327,6 +345,7 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
                 step_concept_tag=q.concept_tag or '',
                 enabling_objective=q.enabling_objective or '',
                 exclude_provider=exclude_provider,
+                force_model_config=force_model_config,
             )
         except Exception as exc:
             print(

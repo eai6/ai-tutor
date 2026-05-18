@@ -284,6 +284,7 @@ def run_factual_step_judge(
     judge_purpose: str = "content_judge_factual_step",
     max_tokens: int = 3500,
     _evidence_override: Optional[str] = None,
+    force_model_config=None,
 ) -> JudgeResult:
     """Verify factual claims in a generated lesson step.
 
@@ -364,6 +365,7 @@ def run_factual_step_judge(
 
     providers = get_judge_provider_chain(
         judge_purpose, exclude_provider=exclude_provider,
+        force_model_config=force_model_config,
     )
     if not providers:
         logger.warning(

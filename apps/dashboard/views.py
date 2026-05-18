@@ -6286,15 +6286,26 @@ def course_generate_all(request, course_id):
 @teacher_required
 @require_POST
 def course_generate_media(request, course_id):
-    """Generate media for all lessons in a course."""
+    """Generate media for all lessons in a course.
+
+    Task #216 — accepts an optional `image_provider` POST field
+    ('openai' | 'gemini' | '') that forces ImageGenerationService to
+    use that provider instead of the configured default.
+    """
     from apps.dashboard.background_tasks import run_async, generate_media_async
     from apps.dashboard.models import CurriculumUpload
-    
+
     institution = request.staff_ctx['institution']
     course = get_scoped_object_or_404(Course, institution, id=course_id)
 
     # Check if force regenerate was requested
     force_regenerate = request.POST.get('force', '') == '1'
+
+    # Optional image-provider override from the picker. Sanitise to the
+    # supported set so a typo doesn't propagate.
+    image_provider = (request.POST.get('image_provider') or '').strip().lower()
+    if image_provider not in ('', 'openai', 'gemini'):
+        image_provider = ''
 
     # Create a new processing record for progress tracking
     upload = CurriculumUpload.objects.create(
@@ -6307,14 +6318,21 @@ def course_generate_media(request, course_id):
         file_path='',
         processing_log='',
     )
-    
+
     upload.add_log(f"🖼️ Starting media generation for {course.title}...")
     upload.add_log(f"   Force regenerate: {force_regenerate}")
+    if image_provider:
+        upload.add_log(f"   Image provider override: {image_provider}")
     upload.save()
-    
+
     # Start async generation
-    run_async(generate_media_async, course_id=course.id, upload_id=upload.id, force_regenerate=force_regenerate)
-    
+    run_async(
+        generate_media_async,
+        course_id=course.id, upload_id=upload.id,
+        force_regenerate=force_regenerate,
+        image_provider=image_provider,
+    )
+
     return redirect('dashboard:media_progress', upload_id=upload.id)
 
 
@@ -6327,6 +6345,11 @@ def course_review_unreviewed(request, course_id):
     Strictly idempotent — already-audited content is skipped. Use the
     per-item / per-lesson regen buttons to re-run judges on something
     that's already been reviewed.
+
+    Task #216 — accepts an optional `judge_model` POST field
+    (format: 'provider:model_name', e.g. 'anthropic:claude-opus-4-7')
+    that forces every judge in the run to use that single model
+    instead of the configured chain.
     """
     from apps.dashboard.background_tasks import (
         run_async, review_unreviewed_content_async,
@@ -6335,6 +6358,16 @@ def course_review_unreviewed(request, course_id):
 
     institution = request.staff_ctx['institution']
     course = get_scoped_object_or_404(Course, institution, id=course_id)
+
+    # Parse the optional model picker. Empty string = use the default
+    # chain; "provider:model_name" = forced override.
+    raw = (request.POST.get('judge_model') or '').strip()
+    judge_provider = ''
+    judge_model = ''
+    if raw and ':' in raw:
+        judge_provider, judge_model = raw.split(':', 1)
+        judge_provider = judge_provider.strip().lower()
+        judge_model = judge_model.strip()
 
     upload = CurriculumUpload.objects.create(
         institution=course.institution,
@@ -6349,11 +6382,16 @@ def course_review_unreviewed(request, course_id):
     upload.add_log(
         f"🔍 Running AI review on unreviewed content in {course.title}..."
     )
+    if judge_provider and judge_model:
+        upload.add_log(
+            f"🤖 Model override requested: {judge_provider}/{judge_model}"
+        )
     upload.save()
 
     run_async(
         review_unreviewed_content_async,
         course_id=course.id, upload_id=upload.id,
+        judge_provider=judge_provider, judge_model=judge_model,
     )
     return redirect('dashboard:content_progress', upload_id=upload.id)
 

@@ -603,14 +603,24 @@ def generate_single_lesson_async(lesson_id: int):
     return result
 
 
-def generate_media_async(course_id: int, upload_id: int = None, force_regenerate: bool = False):
+def generate_media_async(
+    course_id: int,
+    upload_id: int = None,
+    force_regenerate: bool = False,
+    *,
+    image_provider: str = "",
+):
     """
     Generate media for all lessons in a course (runs in background with progress logging).
-    
+
     Args:
         course_id: Course to generate media for
         upload_id: CurriculumUpload record for progress tracking
         force_regenerate: If True, regenerate even if images already have URLs
+        image_provider: Optional override picked from the dashboard
+            picker (task #216). One of '' (default config), 'openai',
+            'gemini'. Passed through to ImageGenerationService's
+            per-call `model_override` kwarg.
     """
     from apps.curriculum.models import Course, Lesson
     from apps.dashboard.models import CurriculumUpload
@@ -640,8 +650,10 @@ def generate_media_async(course_id: int, upload_id: int = None, force_regenerate
     try:
         lessons = Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
         total_lessons = lessons.count()
-        
+
         log(f"📊 Found {total_lessons} lessons to process")
+        if image_provider:
+            log(f"🖼️ Forced image provider: {image_provider} (override; default config bypassed)")
         log(f"")
         
         results = {
@@ -701,7 +713,8 @@ def generate_media_async(course_id: int, upload_id: int = None, force_regenerate
                             prompt=description,
                             category=img.get('type', 'diagram'),
                             prefer_existing=not force_regenerate,
-                            generate_only=force_regenerate
+                            generate_only=force_regenerate,
+                            model_override=(image_provider or None),
                         )
                         
                         if result and result.get('url'):
@@ -1517,7 +1530,13 @@ def _detect_figure_category(prompt: str) -> str:
 # content_quality_status (per Q1.8 / Q4.3) — this helper just gates
 # them on the unreviewed filter.
 
-def review_unreviewed_content_async(course_id: int, upload_id: int = None):
+def review_unreviewed_content_async(
+    course_id: int,
+    upload_id: int = None,
+    *,
+    judge_provider: str = "",
+    judge_model: str = "",
+):
     """Iterate every LessonStep + ExitTicketQuestion in the course
     whose content_quality_status is 'unreviewed' and whose
     judge_outputs is empty; run the appropriate content judges; let
@@ -1527,6 +1546,13 @@ def review_unreviewed_content_async(course_id: int, upload_id: int = None):
     course detail view's "Run AI review on unreviewed content" button.
     Progress is logged to the CurriculumUpload row pointed to by
     upload_id (same pattern as generate_media_async).
+
+    Args:
+        judge_provider / judge_model: Optional pair from the dashboard
+            picker (task #216). When both are set, every judge in this
+            run uses that single (provider, model). Otherwise judges
+            use their configured chain. Resolved via
+            ModelConfig.resolve_runtime — never writes to the DB.
     """
     from apps.curriculum.models import Course, Lesson, LessonStep
     from apps.tutoring.models import ExitTicketQuestion
@@ -1535,9 +1561,17 @@ def review_unreviewed_content_async(course_id: int, upload_id: int = None):
         _run_content_judges_for_steps,
         _run_exit_question_judge_for_mcqs,
     )
+    from apps.llm.models import ModelConfig
 
     logger.info(f"Starting async unreviewed-content review for course {course_id}")
     course = Course.objects.get(id=course_id)
+
+    # Resolve the optional model override into an in-memory ModelConfig.
+    force_model_config = None
+    if judge_provider and judge_model:
+        force_model_config = ModelConfig.resolve_runtime(
+            judge_provider, judge_model,
+        )
 
     upload = None
     if upload_id:
@@ -1551,6 +1585,19 @@ def review_unreviewed_content_async(course_id: int, upload_id: int = None):
         if upload:
             upload.add_log(message)
             upload.save()
+
+    if force_model_config is not None:
+        log(
+            f"🤖 Using forced judge model: "
+            f"{force_model_config.provider}/{force_model_config.model_name} "
+            f"(override; the default chain is bypassed for this run)"
+        )
+    elif judge_provider or judge_model:
+        log(
+            f"⚠️ Forced model lookup failed for "
+            f"provider={judge_provider!r} model={judge_model!r} — "
+            f"falling back to the default judge chain."
+        )
 
     UNREVIEWED = LessonStep.ContentQualityStatus.UNREVIEWED
     EXIT_UNREVIEWED = ExitTicketQuestion.ContentQualityStatus.UNREVIEWED
@@ -1618,7 +1665,10 @@ def review_unreviewed_content_async(course_id: int, upload_id: int = None):
 
             if unreviewed_steps:
                 try:
-                    _run_content_judges_for_steps(lesson, unreviewed_steps)
+                    _run_content_judges_for_steps(
+                        lesson, unreviewed_steps,
+                        force_model_config=force_model_config,
+                    )
                     steps_reviewed += len(unreviewed_steps)
                 except Exception as exc:
                     log(f"   ⚠️ step judges crashed: {exc}")
@@ -1629,7 +1679,10 @@ def review_unreviewed_content_async(course_id: int, upload_id: int = None):
 
             if unreviewed_exit_qs:
                 try:
-                    _run_exit_question_judge_for_mcqs(lesson, unreviewed_exit_qs)
+                    _run_exit_question_judge_for_mcqs(
+                        lesson, unreviewed_exit_qs,
+                        force_model_config=force_model_config,
+                    )
                     exit_qs_reviewed += len(unreviewed_exit_qs)
                 except Exception as exc:
                     log(f"   ⚠️ exit-Q judges crashed: {exc}")

@@ -285,6 +285,7 @@ def run_exit_question_judge(
     exclude_provider: Optional[str] = None,
     judge_purpose: str = "content_judge_exit_question",
     max_tokens: int = 3500,
+    force_model_config=None,
 ) -> JudgeResult:
     """Verify an MCQ exit-ticket question.
 
@@ -350,6 +351,7 @@ def run_exit_question_judge(
 
     providers = get_judge_provider_chain(
         judge_purpose, exclude_provider=exclude_provider,
+        force_model_config=force_model_config,
     )
     if not providers:
         logger.warning(

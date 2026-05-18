@@ -638,23 +638,52 @@ can_regenerate_courses.
     <span style="font-size: 1.25rem;">🧹</span>
     <div style="flex: 1; min-width: 240px;">
         <strong style="color: #0369a1;">Catch up on pending work</strong>
-        <div style="font-size: 0.8rem; color: #0c4a6e;">Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped.</div>
+        <div style="font-size: 0.8rem; color: #0c4a6e;">Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped. You can pick a specific provider/model per run (task #216).</div>
     </div>
-    <form method="post" action="{% url 'dashboard:course_generate_media' course.id %}" style="display:inline;">
+    {% comment %}
+    Images form: provider dropdown + button. The selected option is
+    passed to ImageGenerationService.get_or_generate_image via the
+    model_override kwarg. Empty = default config (gpt-image-2 per
+    project memory).
+    {% endcomment %}
+    <form method="post" action="{% url 'dashboard:course_generate_media' course.id %}"
+          style="display:flex; gap:0.4rem; align-items:center;"
+          onsubmit="return confirm('Generate every pending image in {{ course.title }}' + (this.image_provider.value ? ' using ' + this.image_provider.options[this.image_provider.selectedIndex].text : '') + '? Runs in the background — already-generated images are skipped.');">
         {% csrf_token %}
+        <select name="image_provider" title="Force a specific image provider for this run"
+                style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid #7dd3fc; border-radius:6px; color:#0369a1; background:#fff;">
+            <option value="">Default</option>
+            <option value="openai">OpenAI gpt-image-2</option>
+            <option value="gemini">Gemini Flash Image</option>
+        </select>
         <button type="submit" class="btn btn-secondary btn-sm"
                 style="border-color:#7dd3fc; color:#0369a1;"
-                title="Generate any image whose URL is empty. Doesn't touch images that already rendered (use per-lesson regenerate for those)."
-                onclick="return confirm('Generate every pending image in {{ course.title }}? Runs in the background — already-generated images are skipped.');">
+                title="Generate any image whose URL is empty. Doesn't touch images that already rendered (use per-lesson regenerate for those).">
             🖼️ Generate pending images
         </button>
     </form>
-    <form method="post" action="{% url 'dashboard:course_review_unreviewed' course.id %}" style="display:inline;">
+    {% comment %}
+    Review form: judge model dropdown (provider:model_name pair).
+    Selected pair is parsed in the view and resolved via
+    ModelConfig.resolve_runtime — never written to DB.
+    {% endcomment %}
+    <form method="post" action="{% url 'dashboard:course_review_unreviewed' course.id %}"
+          style="display:flex; gap:0.4rem; align-items:center;"
+          onsubmit="return confirm('Run AI review on every unreviewed step + exit-ticket question in {{ course.title }}' + (this.judge_model.value ? ' using ' + this.judge_model.options[this.judge_model.selectedIndex].text : '') + '? Already-reviewed content is skipped.');">
         {% csrf_token %}
+        <select name="judge_model" title="Force a specific judge model for this run (default = use configured chain)"
+                style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid #7dd3fc; border-radius:6px; color:#0369a1; background:#fff;">
+            <option value="">Default (configured chain)</option>
+            <option value="anthropic:claude-opus-4-7">Claude Opus 4.7</option>
+            <option value="anthropic:claude-sonnet-4-6">Claude Sonnet 4.6</option>
+            <option value="anthropic:claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+            <option value="openai:gpt-4o">OpenAI GPT-4o</option>
+            <option value="google:gemini-3-pro-preview">Gemini 3 Pro</option>
+            <option value="google:gemini-3-flash-preview">Gemini 3 Flash</option>
+        </select>
         <button type="submit" class="btn btn-secondary btn-sm"
                 style="border-color:#7dd3fc; color:#0369a1;"
-                title="Run content judges (factual, pedagogy, safety, exit-question) on every step and exit-ticket question whose judge_outputs is empty."
-                onclick="return confirm('Run AI review on every unreviewed step + exit-ticket question in {{ course.title }}? Already-reviewed content is skipped.');">
+                title="Run content judges (factual, pedagogy, safety, exit-question) on every step and exit-ticket question whose judge_outputs is empty.">
             🔍 Run AI review on unreviewed content
         </button>
     </form>

@@ -70,6 +70,7 @@ def get_judge_provider_chain(
     judge_purpose: str,
     *,
     exclude_provider: Optional[str] = None,
+    force_model_config=None,
 ) -> List[JudgeProvider]:
     """Return ordered list of providers to try for a judge.
 
@@ -86,6 +87,12 @@ def get_judge_provider_chain(
             generator's provider (e.g. 'openai' for images generated
             by OpenAI) so the judge can't be the same model that
             produced the artefact.
+        force_model_config: Optional ModelConfig (saved or in-memory)
+            to use as the SINGLE provider for this run. When set,
+            short-circuits the purpose lookup + the exclude_provider
+            filter and returns a one-item chain. Used by the dashboard
+            "Run AI review" picker (task #216) so a teacher can pick
+            "use Opus for this run" without DB edits.
 
     Returns:
         Ordered list of JudgeProvider. May be empty if no providers
@@ -93,6 +100,27 @@ def get_judge_provider_chain(
     """
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
+
+    # Forced override — bypass the purpose chain entirely. Used by
+    # the dashboard provider picker (task #216).
+    if force_model_config is not None:
+        try:
+            client = get_llm_client(force_model_config)
+        except Exception as exc:
+            logger.warning(
+                "Could not instantiate forced judge client "
+                "provider=%s model=%s: %s",
+                force_model_config.provider,
+                force_model_config.model_name,
+                exc,
+            )
+            return []
+        return [JudgeProvider(
+            name=str(force_model_config.provider or ''),
+            model_name=force_model_config.model_name or '',
+            client=client,
+            config=force_model_config,
+        )]
 
     seen_providers = set()
     chain: List[JudgeProvider] = []

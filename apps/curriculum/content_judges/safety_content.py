@@ -185,6 +185,7 @@ def run_safety_content_judge(
     exclude_provider: Optional[str] = None,
     judge_purpose: str = "content_judge_safety_content",
     max_tokens: int = 3500,
+    force_model_config=None,
 ) -> JudgeResult:
     """Safety + cultural-appropriateness verdict on generated step text.
 
@@ -231,6 +232,7 @@ def run_safety_content_judge(
 
     providers = get_judge_provider_chain(
         judge_purpose, exclude_provider=exclude_provider,
+        force_model_config=force_model_config,
     )
     if not providers:
         logger.warning(
