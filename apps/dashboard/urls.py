@@ -38,6 +38,10 @@ urlpatterns = [
     path('curriculum/course/<int:course_id>/change-institution/', views.course_change_institution, name='course_change_institution'),
     path('curriculum/course/<int:course_id>/delete/', views.course_delete, name='course_delete'),
     path('curriculum/course/<int:course_id>/regenerate-all/', views.course_regenerate_all, name='course_regenerate_all'),
+    # Task #215 — bulk-review-unreviewed-content button on the course detail page.
+    # Reuses course_generate_media (force=0) for the "generate pending images" button.
+    path('curriculum/course/<int:course_id>/review-unreviewed/',
+         views.course_review_unreviewed, name='course_review_unreviewed'),
     path('curriculum/course/<int:course_id>/set-duration/', views.course_set_default_duration, name='course_set_default_duration'),
     path('curriculum/course/<int:course_id>/publish-all/', views.course_publish_all, name='course_publish_all'),
     path('curriculum/course/<int:course_id>/unpublish-all/', views.course_unpublish_all, name='course_unpublish_all'),
@@ -74,9 +78,14 @@ urlpatterns = [
     path('curriculum/step/<int:step_id>/edit/', views.step_edit, name='step_edit'),
     path('curriculum/step/<int:step_id>/regen/', views.lesson_step_regenerate, name='lesson_step_regenerate'),
     path('curriculum/step/<int:step_id>/save-regen/', views.lesson_step_save_regen, name='lesson_step_save_regen'),
+    # Task #215 — mark flagged step / exit-Q as human-reviewed.
+    path('curriculum/step/<int:step_id>/mark-reviewed/',
+         views.lesson_step_mark_reviewed, name='lesson_step_mark_reviewed'),
     path('curriculum/exit-question/<int:question_id>/edit/', views.exit_question_edit, name='exit_question_edit'),
     path('curriculum/exit-question/<int:question_id>/regen/', views.exit_question_regenerate, name='exit_question_regenerate'),
     path('curriculum/exit-question/<int:question_id>/save-regen/', views.exit_question_save_regen, name='exit_question_save_regen'),
+    path('curriculum/exit-question/<int:question_id>/mark-reviewed/',
+         views.exit_ticket_question_mark_reviewed, name='exit_ticket_question_mark_reviewed'),
     path('curriculum/exit-question/<int:question_id>/inplace-regen/', views.exit_question_inplace_regen, name='exit_question_inplace_regen'),
     # Content-quality benchmark (Q5)
     path('content-edits/', views.content_edit_events_list, name='content_edit_events_list'),

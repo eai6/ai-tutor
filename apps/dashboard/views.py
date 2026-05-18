@@ -6319,6 +6319,123 @@ def course_generate_media(request, course_id):
 
 
 @teacher_required
+@require_POST
+def course_review_unreviewed(request, course_id):
+    """Run content judges on every LessonStep + ExitTicketQuestion in
+    the course whose content_quality_status is 'unreviewed'. Task #215.
+
+    Strictly idempotent — already-audited content is skipped. Use the
+    per-item / per-lesson regen buttons to re-run judges on something
+    that's already been reviewed.
+    """
+    from apps.dashboard.background_tasks import (
+        run_async, review_unreviewed_content_async,
+    )
+    from apps.dashboard.models import CurriculumUpload
+
+    institution = request.staff_ctx['institution']
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
+
+    upload = CurriculumUpload.objects.create(
+        institution=course.institution,
+        created_course=course,
+        status='processing',
+        subject_name=course.title,
+        grade_level=course.grade_level or '',
+        original_filename='unreviewed_review',
+        file_path='',
+        processing_log='',
+    )
+    upload.add_log(
+        f"🔍 Running AI review on unreviewed content in {course.title}..."
+    )
+    upload.save()
+
+    run_async(
+        review_unreviewed_content_async,
+        course_id=course.id, upload_id=upload.id,
+    )
+    return redirect('dashboard:content_progress', upload_id=upload.id)
+
+
+@teacher_required
+@require_POST
+def lesson_step_mark_reviewed(request, step_id):
+    """Mark a flagged LessonStep as human-reviewed. Task #215.
+
+    Flips content_quality_status to HUMAN_APPROVED and stamps
+    reviewed_by / reviewed_at. Idempotent — no-op if already approved.
+    """
+    from apps.curriculum.models import LessonStep
+    from django.utils import timezone
+
+    institution = request.staff_ctx['institution']
+    step = get_object_or_404(
+        LessonStep.objects.select_related('lesson__unit__course'),
+        id=step_id,
+    )
+    # Institution scoping — the step's course must match the staff's
+    # institution (or be platform-global).
+    course = step.lesson.unit.course
+    if institution is not None and course.institution_id not in (institution.id, None):
+        return HttpResponseForbidden(
+            "You don't have permission to review this step."
+        )
+
+    step.content_quality_status = LessonStep.ContentQualityStatus.HUMAN_APPROVED
+    step.reviewed_by = request.user
+    step.reviewed_at = timezone.now()
+    step.save(update_fields=[
+        'content_quality_status', 'reviewed_by', 'reviewed_at',
+    ])
+    messages.success(
+        request, f"Step {step.order_index + 1} marked as reviewed."
+    )
+    return redirect(
+        request.META.get('HTTP_REFERER')
+        or reverse('dashboard:lesson_detail', kwargs={'lesson_id': step.lesson_id})
+    )
+
+
+@teacher_required
+@require_POST
+def exit_ticket_question_mark_reviewed(request, question_id):
+    """Mark a flagged ExitTicketQuestion as human-reviewed. Task #215."""
+    from apps.tutoring.models import ExitTicketQuestion
+    from django.utils import timezone
+
+    institution = request.staff_ctx['institution']
+    q = get_object_or_404(
+        ExitTicketQuestion.objects.select_related(
+            'exit_ticket__lesson__unit__course',
+        ),
+        id=question_id,
+    )
+    course = q.exit_ticket.lesson.unit.course
+    if institution is not None and course.institution_id not in (institution.id, None):
+        return HttpResponseForbidden(
+            "You don't have permission to review this question."
+        )
+
+    q.content_quality_status = ExitTicketQuestion.ContentQualityStatus.HUMAN_APPROVED
+    q.reviewed_by = request.user
+    q.reviewed_at = timezone.now()
+    q.save(update_fields=[
+        'content_quality_status', 'reviewed_by', 'reviewed_at',
+    ])
+    messages.success(
+        request, f"Exit-ticket question {q.order_index + 1} marked as reviewed."
+    )
+    return redirect(
+        request.META.get('HTTP_REFERER')
+        or reverse(
+            'dashboard:lesson_detail',
+            kwargs={'lesson_id': q.exit_ticket.lesson_id},
+        )
+    )
+
+
+@teacher_required
 def media_progress(request, upload_id):
     """Show media generation progress."""
     from apps.dashboard.models import CurriculumUpload

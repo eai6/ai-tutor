@@ -619,6 +619,44 @@ class ExitTicketQuestion(models.Model):
         help_text="Content-judge verdicts keyed by judge name (exit_question, ...)"
     )
 
+    # Quality-gate state machine — mirrors LessonStep.ContentQualityStatus
+    # so the dashboard / quality views can treat steps + exit-Qs the
+    # same way. Added 2026-05-18 (task #215) so bulk-review +
+    # mark-reviewed flows have a single field to read/write rather
+    # than spelunking the judge_outputs JSON.
+    class ContentQualityStatus(models.TextChoices):
+        UNREVIEWED = 'unreviewed', 'Unreviewed'
+        AUTO_OK = 'auto_ok', 'Auto-approved by judges'
+        AUTO_FLAGGED = 'auto_flagged', 'Needs human review'
+        HUMAN_APPROVED = 'human_approved', 'Human-approved'
+        HUMAN_EDITED = 'human_edited', 'Human-edited'
+
+    content_quality_status = models.CharField(
+        max_length=20,
+        choices=ContentQualityStatus.choices,
+        default=ContentQualityStatus.UNREVIEWED,
+        help_text=(
+            "Quality gate state for this question. Populated from "
+            "judge_outputs by the exit_question judge at content-gen "
+            "time and updated by the 'Mark as Reviewed' flow."
+        ),
+    )
+    # Per-item human-review audit trail. Set when a teacher uses the
+    # "Mark as Reviewed" button on a flagged exit-Q.
+    reviewed_by = models.ForeignKey(
+        'auth.User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        help_text="Teacher who marked this question as reviewed.",
+    )
+    reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the question was marked as reviewed by a human.",
+    )
+
     enabling_objective = models.CharField(
         max_length=500,
         blank=True,

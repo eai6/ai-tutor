@@ -628,6 +628,40 @@
 {% endif %}
 
 {% comment %}
+Bulk-pending-images + bulk-AI-review (task #215). Gated on
+can_edit_content (same as Generate All Content) so teachers can
+sweep up after a partial generation without needing
+can_regenerate_courses.
+{% endcomment %}
+{% if can_edit_content %}
+<div class="bulk-actions" style="background: #f0f9ff; border: 1px solid #bae6fd; margin-top: 0.75rem; flex-wrap: wrap;">
+    <span style="font-size: 1.25rem;">🧹</span>
+    <div style="flex: 1; min-width: 240px;">
+        <strong style="color: #0369a1;">Catch up on pending work</strong>
+        <div style="font-size: 0.8rem; color: #0c4a6e;">Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped.</div>
+    </div>
+    <form method="post" action="{% url 'dashboard:course_generate_media' course.id %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary btn-sm"
+                style="border-color:#7dd3fc; color:#0369a1;"
+                title="Generate any image whose URL is empty. Doesn't touch images that already rendered (use per-lesson regenerate for those)."
+                onclick="return confirm('Generate every pending image in {{ course.title }}? Runs in the background — already-generated images are skipped.');">
+            🖼️ Generate pending images
+        </button>
+    </form>
+    <form method="post" action="{% url 'dashboard:course_review_unreviewed' course.id %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary btn-sm"
+                style="border-color:#7dd3fc; color:#0369a1;"
+                title="Run content judges (factual, pedagogy, safety, exit-question) on every step and exit-ticket question whose judge_outputs is empty."
+                onclick="return confirm('Run AI review on every unreviewed step + exit-ticket question in {{ course.title }}? Already-reviewed content is skipped.');">
+            🔍 Run AI review on unreviewed content
+        </button>
+    </form>
+</div>
+{% endif %}
+
+{% comment %}
 Course-level regenerate is gated separately from can_edit_content
 so the pilot can let teachers edit lessons but block destructive
 regeneration.

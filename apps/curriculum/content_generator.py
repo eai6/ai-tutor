@@ -360,15 +360,20 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
             }
             outputs = dict(q.judge_outputs or {})
             outputs['exit_question'] = verdict_dict
-            update_fields = ['judge_outputs']
-            # ExitTicketQuestion has no content_quality_status field —
-            # flagged vs ok is implicit in judge_outputs.exit_question.passed.
+            update_fields = ['judge_outputs', 'content_quality_status']
+            # Map verdict → content_quality_status (mirrors the
+            # LessonStep logic above; added 2026-05-18 per task #215
+            # so the dashboard has a single field to drive
+            # flagged-content surfaces + bulk-review filters).
+            from apps.tutoring.models import ExitTicketQuestion as _ETQ
+            _STATUS = _ETQ.ContentQualityStatus
+            new_status = q.content_quality_status or _STATUS.UNREVIEWED
 
             if verdict.skipped:
-                # Couldn't verify — nothing to do.
+                # Couldn't verify — leave whatever status it had.
                 pass
             elif verdict.passed:
-                pass  # already clean; no regen needed
+                new_status = _STATUS.AUTO_OK
             elif regen_enabled:
                 regen_result = _regen_one_exit_q(q, lesson, verdict_dict)
                 outputs['regen_audit'] = {
@@ -396,12 +401,13 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
                         'option_c', 'option_d', 'correct_answer',
                         'explanation',
                     ]
+                    new_status = _STATUS.AUTO_OK
                     regenerated += 1
                 else:
-                    # Regen exhausted — flag is implicit (judge_outputs
-                    # carries passed=False). Persist the best partial
-                    # rewrite + its verdict so the teacher sees the
-                    # most recent attempt.
+                    # Regen exhausted — surface as AUTO_FLAGGED so the
+                    # dashboard "Needs Human Review" badge fires.
+                    # Persist the best partial rewrite + its verdict so
+                    # the teacher sees the most recent attempt.
                     if regen_result.question_text:
                         q.question_text = regen_result.question_text
                         q.option_a = regen_result.option_a
@@ -417,11 +423,14 @@ def _run_exit_question_judge_for_mcqs(lesson, mcqs):
                         ]
                     if regen_result.final_judge_result:
                         outputs['exit_question'] = dict(regen_result.final_judge_result)
+                    new_status = _STATUS.AUTO_FLAGGED
                     flagged += 1
             else:
+                new_status = _STATUS.AUTO_FLAGGED
                 flagged += 1
 
             q.judge_outputs = outputs
+            q.content_quality_status = new_status
             try:
                 q.save(update_fields=list(set(update_fields)))
                 persisted += 1

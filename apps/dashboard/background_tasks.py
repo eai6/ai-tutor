@@ -1497,3 +1497,176 @@ def _detect_figure_category(prompt: str) -> str:
     if any(kw in prompt_lower for kw in ['map', 'geographic', 'contour', 'relief']):
         return 'map'
     return 'diagram'
+
+
+# =============================================================================
+# Task #215 — bulk-review-unreviewed-content
+# =============================================================================
+#
+# Course-scoped background helper for the dashboard "Run AI review on
+# unreviewed content" button. Strictly idempotent: only touches
+# LessonStep / ExitTicketQuestion rows whose content_quality_status is
+# 'unreviewed' AND whose judge_outputs JSON is empty. Anything already
+# audited (auto_ok / auto_flagged / human_*) is skipped — re-judging is
+# a separate (future) "Re-run all" button.
+#
+# Wraps the existing per-lesson judge entrypoints from
+# apps/curriculum/content_generator.py so we don't reinvent the judge
+# orchestration. The wrapping LessonStep / ExitTicketQuestion saves
+# performed inside those functions already set judge_outputs +
+# content_quality_status (per Q1.8 / Q4.3) — this helper just gates
+# them on the unreviewed filter.
+
+def review_unreviewed_content_async(course_id: int, upload_id: int = None):
+    """Iterate every LessonStep + ExitTicketQuestion in the course
+    whose content_quality_status is 'unreviewed' and whose
+    judge_outputs is empty; run the appropriate content judges; let
+    the existing pipeline write back status + verdict.
+
+    Background work — invoked via run_async() from the dashboard
+    course detail view's "Run AI review on unreviewed content" button.
+    Progress is logged to the CurriculumUpload row pointed to by
+    upload_id (same pattern as generate_media_async).
+    """
+    from apps.curriculum.models import Course, Lesson, LessonStep
+    from apps.tutoring.models import ExitTicketQuestion
+    from apps.dashboard.models import CurriculumUpload
+    from apps.curriculum.content_generator import (
+        _run_content_judges_for_steps,
+        _run_exit_question_judge_for_mcqs,
+    )
+
+    logger.info(f"Starting async unreviewed-content review for course {course_id}")
+    course = Course.objects.get(id=course_id)
+
+    upload = None
+    if upload_id:
+        try:
+            upload = CurriculumUpload.objects.get(id=upload_id)
+        except CurriculumUpload.DoesNotExist:
+            upload = None
+
+    def log(message: str):
+        logger.info(message)
+        if upload:
+            upload.add_log(message)
+            upload.save()
+
+    UNREVIEWED = LessonStep.ContentQualityStatus.UNREVIEWED
+    EXIT_UNREVIEWED = ExitTicketQuestion.ContentQualityStatus.UNREVIEWED
+
+    try:
+        lessons = (
+            Lesson.objects
+            .filter(unit__course=course)
+            .order_by('unit__order_index', 'order_index')
+        )
+        total_lessons = lessons.count()
+        log(f"📊 Course has {total_lessons} lessons — scanning for unreviewed content")
+        log("")
+
+        steps_reviewed = 0
+        steps_skipped = 0
+        exit_qs_reviewed = 0
+        exit_qs_skipped = 0
+        lessons_touched = 0
+
+        for idx, lesson in enumerate(lessons, start=1):
+            # Steps: filter to unreviewed-AND-empty so we never
+            # double-judge content. The per-step judge entry handles
+            # writing back status + verdict per Q1.8 / Q2.3.
+            unreviewed_steps = list(
+                lesson.steps.filter(
+                    content_quality_status=UNREVIEWED,
+                ).order_by('order_index')
+            )
+            # Defence-in-depth: also exclude any step that somehow has
+            # judge_outputs populated but status not flipped (legacy
+            # rows from before Q2.1 added the status enum).
+            unreviewed_steps = [
+                s for s in unreviewed_steps
+                if not (s.judge_outputs or {})
+            ]
+
+            # Exit-ticket Qs: filter the same way.
+            exit_ticket = getattr(lesson, 'exit_ticket', None)
+            unreviewed_exit_qs = []
+            if exit_ticket is not None:
+                qs = list(
+                    exit_ticket.questions.filter(
+                        content_quality_status=EXIT_UNREVIEWED,
+                    ).order_by('order_index')
+                )
+                unreviewed_exit_qs = [
+                    q for q in qs
+                    if not (q.judge_outputs or {})
+                ]
+
+            if not unreviewed_steps and not unreviewed_exit_qs:
+                steps_skipped += lesson.steps.count()
+                exit_qs_skipped += (
+                    exit_ticket.questions.count() if exit_ticket else 0
+                )
+                continue
+
+            lessons_touched += 1
+            log(
+                f"[{idx}/{total_lessons}] {lesson.title} — "
+                f"{len(unreviewed_steps)} step(s) + "
+                f"{len(unreviewed_exit_qs)} exit-Q(s) to review"
+            )
+
+            if unreviewed_steps:
+                try:
+                    _run_content_judges_for_steps(lesson, unreviewed_steps)
+                    steps_reviewed += len(unreviewed_steps)
+                except Exception as exc:
+                    log(f"   ⚠️ step judges crashed: {exc}")
+                    logger.exception(
+                        "review_unreviewed_content_async step judges failed "
+                        "for lesson %s", lesson.id,
+                    )
+
+            if unreviewed_exit_qs:
+                try:
+                    _run_exit_question_judge_for_mcqs(lesson, unreviewed_exit_qs)
+                    exit_qs_reviewed += len(unreviewed_exit_qs)
+                except Exception as exc:
+                    log(f"   ⚠️ exit-Q judges crashed: {exc}")
+                    logger.exception(
+                        "review_unreviewed_content_async exit-Q judges failed "
+                        "for lesson %s", lesson.id,
+                    )
+
+        log("")
+        log(
+            f"✅ Review done — touched {lessons_touched}/{total_lessons} "
+            f"lessons · {steps_reviewed} steps reviewed · "
+            f"{exit_qs_reviewed} exit-Qs reviewed · "
+            f"{steps_skipped} steps + {exit_qs_skipped} exit-Qs already audited (skipped)"
+        )
+
+        if upload:
+            upload.status = CurriculumUpload.Status.COMPLETED
+            from django.utils import timezone as _tz
+            upload.completed_at = _tz.now()
+            upload.save()
+
+        return {
+            'lessons_touched': lessons_touched,
+            'steps_reviewed': steps_reviewed,
+            'exit_qs_reviewed': exit_qs_reviewed,
+            'steps_skipped': steps_skipped,
+            'exit_qs_skipped': exit_qs_skipped,
+        }
+    except Exception as exc:
+        logger.exception(
+            "review_unreviewed_content_async crashed for course %s", course_id,
+        )
+        if upload:
+            upload.status = CurriculumUpload.Status.FAILED
+            upload.processing_log = (
+                (upload.processing_log or "") + f"\n❌ Crashed: {exc}"
+            )
+            upload.save()
+        raise

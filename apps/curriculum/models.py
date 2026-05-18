@@ -570,6 +570,24 @@ class LessonStep(models.Model):
         ),
     )
 
+    # Per-item human-review audit trail (task #215, 2026-05-18). Set
+    # when a teacher uses the "Mark as Reviewed" button on a flagged
+    # step. Used to show who approved + when in the quality dashboard
+    # and to filter out approved items from "unreviewed" counts.
+    reviewed_by = models.ForeignKey(
+        'auth.User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        help_text="Teacher who marked this step as reviewed.",
+    )
+    reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the step was marked as reviewed by a human.",
+    )
+
     class Meta:
         ordering = ['order_index']
 

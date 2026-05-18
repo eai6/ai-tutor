@@ -721,6 +721,27 @@
                         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.5rem;">
                             Reviewed by {{ fs.provider }}/{{ fs.model_name }}{% if fs.violations %} — codes: {{ fs.violations|join:", " }}{% endif %}
                         </div>
+                        {% comment %}
+                        Task #215 — "Mark as Reviewed" button on auto-flagged steps.
+                        Lets a teacher clear the flag after eyeballing the content
+                        and deciding the judges over-fired.
+                        {% endcomment %}
+                        {% if step.content_quality_status == 'auto_flagged' and can_edit_content %}
+                        <form method="post" action="{% url 'dashboard:lesson_step_mark_reviewed' step.id %}"
+                              style="margin-top: 0.5rem; display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-secondary btn-sm"
+                                    style="border-color:#93c5fd; color:#1d4ed8; background:#eff6ff;"
+                                    onclick="return confirm('Mark this step as reviewed? The flag will clear and the step will be tagged as human-approved.');">
+                                ✓ Mark as Reviewed
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% if step.reviewed_by and step.reviewed_at %}
+                        <div style="font-size: 0.75rem; color: #1d4ed8; margin-top: 0.5rem;">
+                            👤 Approved by {{ step.reviewed_by.username }} on {{ step.reviewed_at|date:"M j, Y H:i" }}
+                        </div>
+                        {% endif %}
                     </div>
                     {% endif %}
                     {% endwith %}
@@ -939,9 +960,31 @@
                               title="Auto-rewritten by regen ensemble — {{ ra.cycles_run }} cycle(s), final model {{ ra.picked_model }}">🔄 Auto-fixed</span>
                     {% endif %}
                     {% endwith %}
+                    {% if question.content_quality_status == 'human_approved' %}
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe; color: #1d4ed8;"
+                              {% if question.reviewed_by %}title="Approved by {{ question.reviewed_by.username }}{% if question.reviewed_at %} on {{ question.reviewed_at|date:'M j, Y H:i' }}{% endif %}"{% endif %}>👤 Approved</span>
+                    {% endif %}
                     {% endwith %}
                     {% endwith %}
                 </div>
+
+                {% comment %}
+                Task #215 — "Mark as Reviewed" button on flagged exit-Qs.
+                Shown when the question is auto-flagged AND the teacher has
+                edit rights. Idempotent — clicking sets HUMAN_APPROVED and
+                records reviewer/timestamp.
+                {% endcomment %}
+                {% if question.content_quality_status == 'auto_flagged' and can_edit_content %}
+                <form method="post" action="{% url 'dashboard:exit_ticket_question_mark_reviewed' question.id %}"
+                      style="margin-bottom: 0.75rem; display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary btn-sm"
+                            style="border-color:#93c5fd; color:#1d4ed8; background:#eff6ff;"
+                            onclick="return confirm('Mark this exit-ticket question as reviewed? The flag will clear and it will be tagged as human-approved.');">
+                        ✓ Mark as Reviewed
+                    </button>
+                </form>
+                {% endif %}
 
                 <!-- Full teaching objective shown below the stem so
                      teachers can see the complete reference without
