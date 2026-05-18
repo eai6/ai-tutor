@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # yields chain [Gemini, OpenAI] — full 2-vendor judge fallback even
 # under generator-side outage.
 _FALLBACK_PURPOSES = (
-    'generation', 'judge', 'judge_fallback', 'tutoring', 'exit_tickets',
+    'judge', 'judge_fallback', 'generation', 'tutoring', 'exit_tickets',
 )
 
 
@@ -64,6 +64,13 @@ class JudgeCallResult:
     model_name: str = ""
     error_class: str = ""
     error_detail: str = ""
+    # Token + cache telemetry (populated on success, when provider
+    # exposes them). Used by unified.py to surface cache-hit rates
+    # in the [UnifiedJudge] log line.
+    tokens_in: int = 0
+    tokens_out: int = 0
+    cache_creation_tokens: int = 0
+    cache_read_tokens: int = 0
 
 
 def get_judge_provider_chain(
@@ -229,6 +236,10 @@ def call_judge_with_fallback(
             success=True,
             provider=provider.name,
             model_name=provider.model_name,
+            tokens_in=getattr(response, 'tokens_in', 0) or 0,
+            tokens_out=getattr(response, 'tokens_out', 0) or 0,
+            cache_creation_tokens=getattr(response, 'cache_creation_tokens', 0) or 0,
+            cache_read_tokens=getattr(response, 'cache_read_tokens', 0) or 0,
         )
 
     return last_result if last_result else JudgeCallResult(

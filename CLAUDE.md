@@ -29,6 +29,8 @@ Azure commands require `az account set --subscription "Pixel Design Labs LLC"` f
 
 **Session state, not phase.** The `ConversationPhase` enum was removed. Use `SessionState` (TUTORING, EXIT_TICKET, COMPLETED). Display-level 5E phase comes from each step's `phase` field. Don't reintroduce phase-based flow control in `apps/tutoring/conversational_tutor.py`.
 
+**Unified judge is the default (2026-05-18).** `apps/tutoring/combined_judge.run_combined_judge` dispatches to `apps/tutoring/judges/unified.run_unified_judge` — a single multi-axis LLM call (10 dimensions) that replaces the 7-specialist concurrent fan-out. Kill-switch: `UNIFIED_JUDGE=off` env var falls back to `run_all_judges`. Specialists in `apps/tutoring/judges/{factual,rule,coherence,handoff,safety,step_eval,figure_ref,figure_vision}.py` are deprecated — scheduled for removal once shadow data confirms parity. The unified judge uses `get_judge_provider_chain('judge')` so Gemini 503s cascade to the `judge_fallback` ModelConfig (currently Haiku 4.5). See `memory/unified_judge_rollout_plan.md` and `memory/deepmind_unified_judge_v3_interpretation.md`.
+
 **Media signal format.** The tutor appends `|||MEDIA:N|||` as the LAST line of its response (N is 1-based index into the catalog in the system prompt). Parse and strip BEFORE saving to DB; the frontend also sanitizes defensively. Never use the legacy `[SHOW_MEDIA:title]` format — the fuzzy matcher was deleted.
 
 **Azure Container Apps constraints.**

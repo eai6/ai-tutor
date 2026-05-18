@@ -483,6 +483,34 @@ def run_combined_judge(
     `attached_media` for the coherence / figure_ref / figure_vision
     judges. All optional — judges skip gracefully when missing.
     """
+    # Feature-flag dispatch: when UNIFIED_JUDGE=on, route to the
+    # single-call multi-axis judge (apps/tutoring/judges/unified.py).
+    # Default OFF — production behavior is the 7-specialist fan-out.
+    # See memory/unified_judge_rollout_plan.md for the rollout phases.
+    if _use_unified_judge():
+        from apps.tutoring.judges.unified import run_unified_judge
+        return run_unified_judge(
+            response_text,
+            lesson=lesson,
+            llm_client=llm_client,
+            vision_client=vision_client,
+            image_reader=image_reader,
+            attached_media=attached_media,
+            bank_stems=bank_stems,
+            student_input=student_input,
+            answer_was_bare=answer_was_bare,
+            answer_was_wrong=answer_was_wrong,
+            step_context=step_context,
+            subject_is_math=subject_is_math,
+            bank_offered=bank_offered,
+            conversation_history=conversation_history,
+            history_turns=history_turns,
+            bank_question=bank_question,
+            chat_authored_q=chat_authored_q,
+            wrong_attempts=wrong_attempts,
+            reveal_threshold=reveal_threshold,
+        )
+
     from apps.tutoring.judges import run_all_judges
     return run_all_judges(
         response_text,
@@ -505,6 +533,30 @@ def run_combined_judge(
         wrong_attempts=wrong_attempts,
         reveal_threshold=reveal_threshold,
     )
+
+
+def _use_unified_judge() -> bool:
+    """Feature flag for the unified judge. **Default ON as of 2026-05-18.**
+
+    The unified judge replaces the 7-specialist concurrent fan-out with
+    a single multi-axis LLM call. See memory/unified_judge_rollout_plan.md.
+
+    Precedence:
+      1. env var UNIFIED_JUDGE in {'off', '0', 'false'} → use specialists
+         (kill-switch — keep until specialists are fully removed)
+      2. env var UNIFIED_JUDGE in {'on', '1', 'true'} → unified (explicit)
+      3. Default → unified
+
+    Specialists in apps/tutoring/judges/{factual,rule,coherence,...} are
+    deprecated and scheduled for removal once shadow data confirms parity
+    in prod (target 2026-06).
+    """
+    import os
+    val = os.getenv('UNIFIED_JUDGE', '').strip().lower()
+    if val in ('off', '0', 'false'):
+        return False
+    # Anything else (including '', 'on', '1', 'true') → unified
+    return True
 
 
 def _run_combined_judge_legacy_monolithic(

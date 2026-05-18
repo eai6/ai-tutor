@@ -33,6 +33,16 @@ class LLMResponse:
     tokens_out: int
     model: str
     stop_reason: Optional[str] = None
+    # Prompt-cache telemetry. Populated when the provider supports
+    # prompt caching and the call hit / wrote a cache.
+    # - cache_creation_tokens: input tokens that wrote to the cache
+    #   (charged at premium rate on Anthropic; informational on Gemini)
+    # - cache_read_tokens: input tokens served from cache
+    #   (charged at ~10% of normal input rate on Anthropic; ~25% on Gemini)
+    # tokens_in is the TOTAL input tokens (uncached + cache_read);
+    # subtract cache_read to get the "fresh" billed portion.
+    cache_creation_tokens: int = 0
+    cache_read_tokens: int = 0
 
 
 class BaseLLMClient(ABC):
@@ -173,12 +183,72 @@ class AnthropicClient(BaseLLMClient):
             return False
         return True
 
+    # Anthropic prompt caching threshold: ephemeral cache is only
+    # worth writing when the prompt is large enough to amortize the
+    # cache-write premium. Anthropic recommends ≥1024 tokens for Opus /
+    # Sonnet and ≥2048 for Haiku. Use char-length proxy: ~4 chars/token.
+    _CACHE_MIN_CHARS = 4096
+
+    # Sentinel that callers (e.g. conversational_tutor._build_system_prompt)
+    # insert to split a system prompt into a STABLE cacheable prefix and
+    # a DYNAMIC per-turn suffix. Without it the whole prompt is treated
+    # as one cache block — fine for short stable prompts (judges), bad
+    # for tutor prompts that have per-turn-mutating tails that bust the
+    # cache prefix on every call.
+    CACHE_BREAK_MARKER = "<!--CACHE_BREAK-->"
+
+    def _build_system_for_cache(
+        self, system_prompt: str, cacheable: bool,
+    ) -> str | list[dict]:
+        """Convert system_prompt to either a plain string (no cache)
+        or a structured cache-control block (ephemeral, 5-min TTL).
+
+        Three modes:
+          1. Cacheable + has CACHE_BREAK_MARKER → split into 2 blocks,
+             cache only the prefix (stable session-level content).
+             Per-turn dynamic suffix stays uncached.
+          2. Cacheable + no marker, prompt ≥ threshold → cache whole prompt
+             as one block. Right for stable prompts like judges.
+          3. Otherwise → plain string, no caching.
+
+        Anthropic prompt caching docs: cached input is billed at 10%
+        of normal input rate on cache HIT; cache WRITE is 1.25× normal.
+        Net win is ~7× on stable per-session prompts. See
+        memory/deepmind_cost_analysis.md Reduction 1.
+        """
+        if not cacheable or not system_prompt:
+            return system_prompt
+        # Mode 1: explicit split via marker
+        if self.CACHE_BREAK_MARKER in system_prompt:
+            prefix, suffix = system_prompt.split(self.CACHE_BREAK_MARKER, 1)
+            if len(prefix) < self._CACHE_MIN_CHARS:
+                # Prefix too small to bother caching — strip marker and
+                # send everything as plain string.
+                return prefix + suffix
+            blocks: list[dict] = [{
+                "type": "text",
+                "text": prefix,
+                "cache_control": {"type": "ephemeral"},
+            }]
+            if suffix:
+                blocks.append({"type": "text", "text": suffix})
+            return blocks
+        # Mode 2: whole prompt cached
+        if len(system_prompt) < self._CACHE_MIN_CHARS:
+            return system_prompt
+        return [{
+            "type": "text",
+            "text": system_prompt,
+            "cache_control": {"type": "ephemeral"},
+        }]
+
     def _stream_kwargs(self, max_tokens: int, system_prompt: str, messages: list[dict],
-                       temperature: float | None = None) -> dict:
+                       temperature: float | None = None,
+                       cacheable_system: bool = True) -> dict:
         kwargs = dict(
             model=self.config.model_name,
             max_tokens=max_tokens,
-            system=system_prompt,
+            system=self._build_system_for_cache(system_prompt, cacheable_system),
             messages=messages,
         )
         if self._supports_temperature():
@@ -217,12 +287,19 @@ class AnthropicClient(BaseLLMClient):
                         full_content += text
                     final_message = stream.get_final_message()
 
+                # Cache metrics — Anthropic reports them on usage when
+                # prompt caching is engaged. Absent → zero (no cache).
+                usage = final_message.usage
+                cache_create = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+                cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
                 return LLMResponse(
                     content=full_content,
-                    tokens_in=final_message.usage.input_tokens,
-                    tokens_out=final_message.usage.output_tokens,
+                    tokens_in=usage.input_tokens,
+                    tokens_out=usage.output_tokens,
                     model=final_message.model,
                     stop_reason=final_message.stop_reason,
+                    cache_creation_tokens=cache_create,
+                    cache_read_tokens=cache_read,
                 )
 
             except (anthropic.RateLimitError, anthropic.InternalServerError) as e:
@@ -306,7 +383,11 @@ class AnthropicClient(BaseLLMClient):
         kwargs = dict(
             model=self.config.model_name,
             max_tokens=resolved_max_tokens,
-            system=system_prompt,
+            # Prompt caching: tutor system prompt is ~30KB and stable
+            # across all turns of a session. Cache it ephemerally so
+            # every call after the first reads at 10% the input rate.
+            # See memory/deepmind_cost_analysis.md Reduction 1.
+            system=self._build_system_for_cache(system_prompt, True),
             messages=messages,
             tools=tools,
         )
@@ -337,12 +418,18 @@ class AnthropicClient(BaseLLMClient):
                         block_summary.append(f"text({text_len}c)")
                     else:
                         block_summary.append(btype)
+                # Surface cache hits so we can see prompt-caching
+                # working in the live log. See Reduction 1 in
+                # memory/deepmind_cost_analysis.md.
+                _cache_create = getattr(message.usage, 'cache_creation_input_tokens', 0) or 0
+                _cache_read = getattr(message.usage, 'cache_read_input_tokens', 0) or 0
                 logger.info(
                     "[QuestionTool] llm_response: stop_reason=%s in=%d out=%d "
-                    "blocks=[%s]",
+                    "cache_read=%d cache_write=%d blocks=[%s]",
                     message.stop_reason,
                     message.usage.input_tokens,
                     message.usage.output_tokens,
+                    _cache_read, _cache_create,
                     ", ".join(block_summary),
                 )
                 return message
@@ -640,8 +727,14 @@ class GeminiClient(BaseLLMClient):
             config=types.GenerateContentConfig(**config_kwargs),
         )
 
-        tokens_in = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
-        tokens_out = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+        usage = response.usage_metadata
+        tokens_in = getattr(usage, 'prompt_token_count', 0) or 0
+        tokens_out = getattr(usage, 'candidates_token_count', 0) or 0
+        # Gemini 2.5+ has implicit caching — when consecutive calls share
+        # a stable prefix (system_instruction is the obvious one), the
+        # cache_token_count reports the fraction served from cache.
+        # Cached input is billed at ~25% of normal rate.
+        cache_read = getattr(usage, 'cached_content_token_count', 0) or 0
 
         return LLMResponse(
             content=response.text or '',
@@ -649,6 +742,9 @@ class GeminiClient(BaseLLMClient):
             tokens_out=tokens_out,
             model=self.config.model_name,
             stop_reason='stop',
+            cache_read_tokens=cache_read,
+            # cache_creation is N/A for Gemini implicit caching (no
+            # explicit write step; cache is populated by the request itself).
         )
 
     def generate_stream(

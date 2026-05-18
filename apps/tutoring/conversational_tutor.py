@@ -5927,14 +5927,12 @@ Follow the current step; this concept will be covered in sequence."""
         # Append media catalog so the LLM knows what figures are available
         system_prompt += self._build_media_catalog()
 
-        # Append figure_facts — structured visual ground truth for any
-        # figure attached to the current step. Replaces "imagine" with
-        # "look at the figure". See memory/figure_facts_plan.md.
-        system_prompt += self._build_figure_facts_block()
-
         # Append question bank — math-only. Forces the tutor to pose
         # only verified questions, never author its own. See
         # memory/tutor_no_authoring_plan.md.
+        # NOTE: stays in stable prefix — bank pool is per-lesson and
+        # mostly stable across turns. Slot consumption is reflected in
+        # per-turn signals (bank_grade_signal etc.) in the dynamic suffix.
         system_prompt += self._build_question_bank_block()
 
         # A.4 — walkthrough hint guidance. When the student is in
@@ -5945,8 +5943,89 @@ Follow the current step; this concept will be covered in sequence."""
         # to the retry-counter cap in _maybe_advance_walkthrough.
         system_prompt += self._build_walkthrough_hint_block()
 
+        # ─── STABLE TRAILER ──────────────────────────────────────────────
+        # mobile_response_format + final_reminder used to sit at the
+        # very end (line 6029+, 6050+). Moved here (before the dynamic
+        # suffix) on 2026-05-18 so the stable cacheable prefix ends at
+        # a clean boundary. They're static per-session ("rule"-shaped),
+        # so the cache hit is worth more than the trailing-position
+        # salience. Per-turn situational signals (eval, bank_grade,
+        # working_analysis) still appear AFTER these in the dynamic
+        # suffix and so are still last-read by the LLM.
+
+        # Mobile clients pass X-Client-Form-Factor: mobile so we can keep
+        # responses short.
+        if getattr(self, 'client_form_factor', 'web') == 'mobile':
+            system_prompt += (
+                "\n\n<mobile_response_format>"
+                "\nThe student is on a phone. Keep responses SHORT:"
+                "\n- 1–3 short sentences per paragraph, max 2 paragraphs."
+                "\n- One question at a time, never multi-part."
+                "\n- Skip preamble like \"Great question!\" or restating what the student said."
+                "\n- Use simple plain prose. Avoid headers, long bullet lists, and tables."
+                "\n- ~80 words total per turn unless the student explicitly asks for more."
+                "\n</mobile_response_format>"
+            )
+
+        # Per-turn structural reminder — math only. Was previously
+        # appended last for "highest-salience position"; now sits at
+        # the end of the stable prefix. Per-turn dynamic signals in
+        # the suffix still come after this — so the situational
+        # context is still last-read, but the static rule is still
+        # the last-read STATIC block.
+        try:
+            is_math_final = self.lesson.unit.course.is_math
+        except Exception:
+            is_math_final = False
+        if is_math_final:
+            system_prompt += (
+                "\n\n<final_reminder>"
+                "\nMATH RULE — to ask a numerical question this turn,"
+                "\ncall a TOOL. You have two options:"
+                "\n  1. pose_question(slot): pull from the canonical"
+                "\n     lesson bank. Use this when a bank slot fits."
+                "\n  2. pose_inline_question(question, answer_key, type):"
+                "\n     AUTHOR your own question with an answer key the"
+                "\n     grader will use. Use this for check / scaffolding"
+                "\n     questions that aren't in the bank."
+                "\n"
+                "\nDo NOT type a numerical question in your text response"
+                "\nwithout calling a tool. If you author a question in"
+                "\nfree prose without supplying an answer_key, the grader"
+                "\ncan't verify the student's response — the post-response"
+                "\njudge will flag NO_AUTHORING and regen. Use"
+                "\npose_inline_question if you want to author."
+                "\nEmit tool calls as real tool_use blocks, never as text."
+                "\n"
+                "\nIf the bank has no question that fits (e.g. you want"
+                "\na warmup recap from the previous lesson and no"
+                "\n\"previous lesson recap\" slot is listed), do a"
+                "\nCONCEPTUAL warmup instead — \"What rule did we learn"
+                "\nlast time about angles around a point?\" — never"
+                "\ninvent specific numerical values."
+                "\n</final_reminder>"
+            )
+
+        # ─── CACHE BREAKPOINT ────────────────────────────────────────────
+        # Anthropic prompt caching split — everything ABOVE this marker
+        # is the stable per-session prefix (rules, lesson context, tool
+        # specs). Everything BELOW changes per turn (figure_facts on
+        # step transitions, eval signals, time, bank grade). The
+        # AnthropicClient splits on this marker into two cache blocks:
+        # the prefix gets `cache_control=ephemeral` (cached for 5 min,
+        # reads at 10% input price); the suffix is uncached.
+        # See apps/llm/client.py::_build_system_for_cache.
+        from apps.llm.client import AnthropicClient as _AC
+        system_prompt += _AC.CACHE_BREAK_MARKER
+
+        # Append figure_facts — structured visual ground truth for the
+        # current step's attached figure. CHANGES on every step
+        # transition, so kept in the dynamic suffix to preserve the
+        # stable cache prefix across step boundaries.
+        system_prompt += self._build_figure_facts_block()
+
         # Regeneration constraint (V3) — appended when retrying after a
-        # validator hard-fail. Highest-priority block.
+        # validator hard-fail. Per-turn, can mutate per regen cycle.
         regen = getattr(self, '_pending_regen_constraint', None)
         if regen:
             system_prompt += regen
@@ -6023,58 +6102,13 @@ Follow the current step; this concept will be covered in sequence."""
                 working_analysis,
             )
 
-        # Mobile clients pass X-Client-Form-Factor: mobile so we can keep
-        # responses short (small screens, typing on a phone). The view
-        # sets self.client_form_factor before calling start/respond/resume.
-        if getattr(self, 'client_form_factor', 'web') == 'mobile':
-            system_prompt += (
-                "\n\n<mobile_response_format>"
-                "\nThe student is on a phone. Keep responses SHORT:"
-                "\n- 1–3 short sentences per paragraph, max 2 paragraphs."
-                "\n- One question at a time, never multi-part."
-                "\n- Skip preamble like \"Great question!\" or restating what the student said."
-                "\n- Use simple plain prose. Avoid headers, long bullet lists, and tables."
-                "\n- ~80 words total per turn unless the student explicitly asks for more."
-                "\n</mobile_response_format>"
-            )
-
-        # Per-turn structural reminder — math only. Repeated last so it
-        # sits in the highest-salience position of the prompt every turn,
-        # regardless of how long the conversation has grown. The prose
-        # rules above dilute as context expands; this block is the
-        # short, machine-checked line of defense the validator enforces.
-        try:
-            is_math_final = self.lesson.unit.course.is_math
-        except Exception:
-            is_math_final = False
-        if is_math_final:
-            system_prompt += (
-                "\n\n<final_reminder>"
-                "\nMATH RULE — to ask a numerical question this turn,"
-                "\ncall a TOOL. You have two options:"
-                "\n  1. pose_question(slot): pull from the canonical"
-                "\n     lesson bank. Use this when a bank slot fits."
-                "\n  2. pose_inline_question(question, answer_key, type):"
-                "\n     AUTHOR your own question with an answer key the"
-                "\n     grader will use. Use this for check / scaffolding"
-                "\n     questions that aren't in the bank."
-                "\n"
-                "\nDo NOT type a numerical question in your text response"
-                "\nwithout calling a tool. If you author a question in"
-                "\nfree prose without supplying an answer_key, the grader"
-                "\ncan't verify the student's response — the post-response"
-                "\njudge will flag NO_AUTHORING and regen. Use"
-                "\npose_inline_question if you want to author."
-                "\nEmit tool calls as real tool_use blocks, never as text."
-                "\n"
-                "\nIf the bank has no question that fits (e.g. you want"
-                "\na warmup recap from the previous lesson and no"
-                "\n\"previous lesson recap\" slot is listed), do a"
-                "\nCONCEPTUAL warmup instead — \"What rule did we learn"
-                "\nlast time about angles around a point?\" — never"
-                "\ninvent specific numerical values."
-                "\n</final_reminder>"
-            )
+        # mobile_response_format and final_reminder moved into the
+        # STABLE PREFIX (above the CACHE_BREAK_MARKER) on 2026-05-18 so
+        # the cacheable prefix ends at a clean boundary. The dynamic
+        # per-turn signals above (eval, time, bank_grade,
+        # bare_answer, working_analysis) still come after them in this
+        # combined prompt — so per-turn situational context is still
+        # last-read, but the static rule is still the last STATIC block.
 
         return system_prompt
 
