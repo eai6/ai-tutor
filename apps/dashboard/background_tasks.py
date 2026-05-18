@@ -1536,6 +1536,7 @@ def review_unreviewed_content_async(
     *,
     judge_provider: str = "",
     judge_model: str = "",
+    force_rejudge: bool = False,
 ):
     """Iterate every LessonStep + ExitTicketQuestion in the course
     whose content_quality_status is 'unreviewed' and whose
@@ -1553,6 +1554,12 @@ def review_unreviewed_content_async(
             run uses that single (provider, model). Otherwise judges
             use their configured chain. Resolved via
             ModelConfig.resolve_runtime — never writes to the DB.
+        force_rejudge: When True (task #217 "Re-do already-done"
+            checkbox), drops the UNREVIEWED filter and re-judges every
+            step + exit-Q in the course. New verdicts overwrite the
+            existing judge_outputs entry per judge type. Use this to
+            re-verify a course with a stronger model (e.g. Opus
+            override) after the original pass used the default chain.
     """
     from apps.curriculum.models import Course, Lesson, LessonStep
     from apps.tutoring.models import ExitTicketQuestion
@@ -1598,6 +1605,12 @@ def review_unreviewed_content_async(
             f"provider={judge_provider!r} model={judge_model!r} — "
             f"falling back to the default judge chain."
         )
+    if force_rejudge:
+        log(
+            "♻️ FORCE RE-JUDGE: ignoring 'unreviewed' filter — every "
+            "step + exit-Q in the course will be re-judged. Existing "
+            "judge_outputs entries will be overwritten."
+        )
 
     UNREVIEWED = LessonStep.ContentQualityStatus.UNREVIEWED
     EXIT_UNREVIEWED = ExitTicketQuestion.ContentQualityStatus.UNREVIEWED
@@ -1619,35 +1632,37 @@ def review_unreviewed_content_async(
         lessons_touched = 0
 
         for idx, lesson in enumerate(lessons, start=1):
-            # Steps: filter to unreviewed-AND-empty so we never
-            # double-judge content. The per-step judge entry handles
-            # writing back status + verdict per Q1.8 / Q2.3.
-            unreviewed_steps = list(
-                lesson.steps.filter(
-                    content_quality_status=UNREVIEWED,
-                ).order_by('order_index')
-            )
-            # Defence-in-depth: also exclude any step that somehow has
-            # judge_outputs populated but status not flipped (legacy
-            # rows from before Q2.1 added the status enum).
-            unreviewed_steps = [
-                s for s in unreviewed_steps
-                if not (s.judge_outputs or {})
-            ]
+            # Steps: by default, filter to unreviewed-AND-empty so we
+            # never double-judge content. When force_rejudge is True
+            # (task #217 — teacher wants to re-verify with a stronger
+            # model), include EVERYTHING; new verdicts overwrite the
+            # existing judge_outputs per judge type.
+            steps_qs = lesson.steps.order_by('order_index')
+            if not force_rejudge:
+                steps_qs = steps_qs.filter(content_quality_status=UNREVIEWED)
+            unreviewed_steps = list(steps_qs)
+            if not force_rejudge:
+                # Defence-in-depth: also exclude any step that somehow has
+                # judge_outputs populated but status not flipped (legacy
+                # rows from before Q2.1 added the status enum).
+                unreviewed_steps = [
+                    s for s in unreviewed_steps
+                    if not (s.judge_outputs or {})
+                ]
 
-            # Exit-ticket Qs: filter the same way.
+            # Exit-ticket Qs: same logic.
             exit_ticket = getattr(lesson, 'exit_ticket', None)
             unreviewed_exit_qs = []
             if exit_ticket is not None:
-                qs = list(
-                    exit_ticket.questions.filter(
-                        content_quality_status=EXIT_UNREVIEWED,
-                    ).order_by('order_index')
-                )
-                unreviewed_exit_qs = [
-                    q for q in qs
-                    if not (q.judge_outputs or {})
-                ]
+                qs = exit_ticket.questions.order_by('order_index')
+                if not force_rejudge:
+                    qs = qs.filter(content_quality_status=EXIT_UNREVIEWED)
+                unreviewed_exit_qs = list(qs)
+                if not force_rejudge:
+                    unreviewed_exit_qs = [
+                        q for q in unreviewed_exit_qs
+                        if not (q.judge_outputs or {})
+                    ]
 
             if not unreviewed_steps and not unreviewed_exit_qs:
                 steps_skipped += lesson.steps.count()

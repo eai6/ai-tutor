@@ -641,14 +641,16 @@ can_regenerate_courses.
         <div style="font-size: 0.8rem; color: #0c4a6e;">Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped. You can pick a specific provider/model per run (task #216).</div>
     </div>
     {% comment %}
-    Images form: provider dropdown + button. The selected option is
-    passed to ImageGenerationService.get_or_generate_image via the
-    model_override kwarg. Empty = default config (gpt-image-2 per
-    project memory).
+    Images form: provider dropdown + force checkbox + button. The
+    selected provider is passed to ImageGenerationService via the
+    model_override kwarg; the force checkbox (task #217) tells the
+    backend to regenerate EVERY image, not just pending ones —
+    overwriting URLs. Useful to re-render a course with a different
+    provider after the original pass.
     {% endcomment %}
     <form method="post" action="{% url 'dashboard:course_generate_media' course.id %}"
-          style="display:flex; gap:0.4rem; align-items:center;"
-          onsubmit="return confirm('Generate every pending image in {{ course.title }}' + (this.image_provider.value ? ' using ' + this.image_provider.options[this.image_provider.selectedIndex].text : '') + '? Runs in the background — already-generated images are skipped.');">
+          style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;"
+          onsubmit="var pv=this.image_provider.value?(' using ' + this.image_provider.options[this.image_provider.selectedIndex].text):''; var msg = this.force.checked ? ('FORCE re-generate ALL images in {{ course.title }}'+pv+'? This will OVERWRITE every existing image URL — much higher cost. Continue?') : ('Generate every pending image in {{ course.title }}'+pv+'? Runs in the background — already-generated images are skipped.'); return confirm(msg);">
         {% csrf_token %}
         <select name="image_provider" title="Force a specific image provider for this run"
                 style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid #7dd3fc; border-radius:6px; color:#0369a1; background:#fff;">
@@ -656,20 +658,27 @@ can_regenerate_courses.
             <option value="openai">OpenAI gpt-image-2</option>
             <option value="gemini">Gemini Flash Image</option>
         </select>
+        <label style="font-size:0.72rem; color:#0c4a6e; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
+               title="When checked: re-generate every image, overwriting existing URLs. Otherwise: only fill in images whose URL is empty.">
+            <input type="checkbox" name="force" value="1" style="accent-color:#0369a1;">
+            Re-do already-done
+        </label>
         <button type="submit" class="btn btn-secondary btn-sm"
                 style="border-color:#7dd3fc; color:#0369a1;"
-                title="Generate any image whose URL is empty. Doesn't touch images that already rendered (use per-lesson regenerate for those).">
-            🖼️ Generate pending images
+                title="Generate any image whose URL is empty. With 'Re-do already-done' checked: regenerate every image.">
+            🖼️ Generate images
         </button>
     </form>
     {% comment %}
-    Review form: judge model dropdown (provider:model_name pair).
-    Selected pair is parsed in the view and resolved via
-    ModelConfig.resolve_runtime — never written to DB.
+    Review form: judge model dropdown (provider:model_name pair) +
+    force checkbox. Selected pair is resolved via
+    ModelConfig.resolve_runtime — never written to DB. Force checkbox
+    (task #217) lets a teacher re-judge already-audited content with
+    a stronger model.
     {% endcomment %}
     <form method="post" action="{% url 'dashboard:course_review_unreviewed' course.id %}"
-          style="display:flex; gap:0.4rem; align-items:center;"
-          onsubmit="return confirm('Run AI review on every unreviewed step + exit-ticket question in {{ course.title }}' + (this.judge_model.value ? ' using ' + this.judge_model.options[this.judge_model.selectedIndex].text : '') + '? Already-reviewed content is skipped.');">
+          style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;"
+          onsubmit="var jm=this.judge_model.value?(' using ' + this.judge_model.options[this.judge_model.selectedIndex].text):''; var msg = this.force.checked ? ('FORCE re-judge ALL steps + exit-Qs in {{ course.title }}'+jm+'? This will OVERWRITE every existing judge verdict — much higher cost than the unreviewed-only sweep. Continue?') : ('Run AI review on every unreviewed step + exit-ticket question in {{ course.title }}'+jm+'? Already-reviewed content is skipped.'); return confirm(msg);">
         {% csrf_token %}
         <select name="judge_model" title="Force a specific judge model for this run (default = use configured chain)"
                 style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid #7dd3fc; border-radius:6px; color:#0369a1; background:#fff;">
@@ -681,10 +690,15 @@ can_regenerate_courses.
             <option value="google:gemini-3-pro-preview">Gemini 3 Pro</option>
             <option value="google:gemini-3-flash-preview">Gemini 3 Flash</option>
         </select>
+        <label style="font-size:0.72rem; color:#0c4a6e; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
+               title="When checked: re-judge every step + exit-Q, overwriting existing verdicts. Otherwise: only judge content whose judge_outputs is empty.">
+            <input type="checkbox" name="force" value="1" style="accent-color:#0369a1;">
+            Re-do already-done
+        </label>
         <button type="submit" class="btn btn-secondary btn-sm"
                 style="border-color:#7dd3fc; color:#0369a1;"
-                title="Run content judges (factual, pedagogy, safety, exit-question) on every step and exit-ticket question whose judge_outputs is empty.">
-            🔍 Run AI review on unreviewed content
+                title="Run content judges (factual, pedagogy, safety, exit-question). Pending: only unreviewed. With 'Re-do already-done' checked: re-judge everything (overwrite).">
+            🔍 Run AI review
         </button>
     </form>
 </div>

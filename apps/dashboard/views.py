@@ -6369,6 +6369,12 @@ def course_review_unreviewed(request, course_id):
         judge_provider = judge_provider.strip().lower()
         judge_model = judge_model.strip()
 
+    # Task #217 — "Re-do already-done" checkbox: when set, force the
+    # review to re-run on EVERY step + exit-Q, not just unreviewed ones.
+    # Used to re-verify with a stronger model (typically combined with
+    # the judge_model picker — "re-judge everything with Opus").
+    force_rejudge = request.POST.get('force', '') == '1'
+
     upload = CurriculumUpload.objects.create(
         institution=course.institution,
         created_course=course,
@@ -6379,8 +6385,9 @@ def course_review_unreviewed(request, course_id):
         file_path='',
         processing_log='',
     )
+    label = "ALL content (force re-judge)" if force_rejudge else "unreviewed content"
     upload.add_log(
-        f"🔍 Running AI review on unreviewed content in {course.title}..."
+        f"🔍 Running AI review on {label} in {course.title}..."
     )
     if judge_provider and judge_model:
         upload.add_log(
@@ -6392,6 +6399,7 @@ def course_review_unreviewed(request, course_id):
         review_unreviewed_content_async,
         course_id=course.id, upload_id=upload.id,
         judge_provider=judge_provider, judge_model=judge_model,
+        force_rejudge=force_rejudge,
     )
     return redirect('dashboard:content_progress', upload_id=upload.id)
 
