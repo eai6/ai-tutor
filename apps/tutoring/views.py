@@ -84,6 +84,16 @@ def check_lesson_prerequisites(student, lesson):
     Fails open -- returns (True, []) if the check itself fails.
     """
     try:
+        # Teacher-controlled per-course override (Course.prerequisites_enabled).
+        # When the course disables gating, every lesson is unlocked
+        # regardless of LessonPrerequisite rows. Used for review courses,
+        # exam-prep collections, demo content, etc.
+        try:
+            if lesson.unit and lesson.unit.course and not lesson.unit.course.prerequisites_enabled:
+                return True, []
+        except Exception:
+            pass
+
         from apps.tutoring.skills_models import LessonPrerequisite
 
         prerequisites = LessonPrerequisite.objects.filter(
@@ -307,11 +317,15 @@ def lesson_catalog(request):
                     competency_pct = round((progress.best_score or 0.0) * 100)
                     attempts_count = progress.attempts_count or 0
 
-                # Check prerequisites
-                unmet = [
-                    pr for pr in prereq_map.get(lesson.id, [])
-                    if pr.id not in mastered_ids
-                ]
+                # Check prerequisites — short-circuit when the course
+                # has prerequisites_enabled=False (teacher opt-out).
+                if not course.prerequisites_enabled:
+                    unmet = []
+                else:
+                    unmet = [
+                        pr for pr in prereq_map.get(lesson.id, [])
+                        if pr.id not in mastered_ids
+                    ]
 
                 unit_lessons.append({
                     'id': lesson.id,

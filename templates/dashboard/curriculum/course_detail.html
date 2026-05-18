@@ -265,6 +265,16 @@
                             When off, the AI tutor sees no images and cannot reference figures. Useful for text-only courses or when image generation isn't appropriate.
                         </div>
                     </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label style="display:inline-flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                            <input type="checkbox" name="prerequisites_enabled" value="1"
+                                   {% if course.prerequisites_enabled %}checked{% endif %}>
+                            <span class="form-label" style="margin:0;">Enforce lesson prerequisites</span>
+                        </label>
+                        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
+                            When off, every lesson is unlocked from the start — students can take them in any order. Use for review courses, exam-prep collections, and demo content.
+                        </div>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
                     <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>

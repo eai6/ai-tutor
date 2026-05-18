@@ -148,6 +148,21 @@ class Course(models.Model):
         ),
     )
 
+    # 2026-05-18 — teachers opt OUT of LessonPrerequisite gating for
+    # courses where students should be free to jump around (review
+    # courses, exam-prep collections, demo content). When False,
+    # check_lesson_prerequisites short-circuits to "met" and the
+    # catalog renders every lesson as unlocked. Default on — preserves
+    # existing curriculum behavior.
+    prerequisites_enabled = models.BooleanField(
+        default=True,
+        help_text=(
+            "Whether lessons in this course enforce LessonPrerequisite "
+            "gating. Off = all lessons unlocked regardless of prior "
+            "mastery. Default on."
+        ),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

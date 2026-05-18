@@ -6868,6 +6868,9 @@ def course_edit(request, course_id):
         and 'subject_code' in request.POST  # canonical edit form marker
     )
     tutoring_images_enabled = bool(request.POST.get('tutoring_images_enabled'))
+    # Same gate as tutoring_images_enabled — only update from the canonical
+    # edit form, not the reparse form (which doesn't include the checkbox).
+    prerequisites_enabled = bool(request.POST.get('prerequisites_enabled'))
 
     if not title:
         messages.error(request, "Course title cannot be empty.")
@@ -6905,6 +6908,9 @@ def course_edit(request, course_id):
     if images_enabled_posted:
         course.tutoring_images_enabled = tutoring_images_enabled
         update_fields.append('tutoring_images_enabled')
+        # prerequisites_enabled rides on the same gate (canonical edit form only)
+        course.prerequisites_enabled = prerequisites_enabled
+        update_fields.append('prerequisites_enabled')
 
     course.save(update_fields=update_fields)
 
