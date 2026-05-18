@@ -7386,6 +7386,35 @@ Follow the current step; this concept will be covered in sequence."""
                         'blocked_rotates_on_wrong', 0,
                     )
                     turn_metadata['blocked_rotates_on_wrong'] += 1
+                    # Re-render the in-flight question so the student
+                    # can see what they're being asked to retry.
+                    # Without this the chat bubble carries only the
+                    # LLM's scaffolding hint and the artifact panel is
+                    # empty — session 266 (2026-05-18) stranded a
+                    # student for 5 turns asking "where's the question".
+                    if not bank_rendered:
+                        _in_flight = self._lookup_awaiting_entry(_awaiting)
+                        if _in_flight is not None:
+                            _re_rendered = render_question_to_prose(_in_flight)
+                            if _re_rendered:
+                                _lead = ((getattr(block, 'input', {}) or {})
+                                         .get('lead_in') or '').strip()
+                                if _lead and not _looks_like_authored_question(_lead):
+                                    text_parts.append(_lead)
+                                text_parts.append(_re_rendered)
+                                bank_rendered = True
+                                self._bank_signal_used_this_turn = True
+                                logger.info(
+                                    "[QuestionTool] re-render in-flight: %s id=%s chars=%d",
+                                    _awaiting.get('kind'),
+                                    _awaiting.get('id'),
+                                    len(_re_rendered),
+                                )
+                            else:
+                                logger.warning(
+                                    "[QuestionTool] re-render in-flight: EMPTY for %s id=%s",
+                                    _awaiting.get('kind'), _awaiting.get('id'),
+                                )
                     continue
                 tool_input = getattr(block, 'input', {}) or {}
                 slot = tool_input.get('slot')
@@ -7892,6 +7921,37 @@ Follow the current step; this concept will be covered in sequence."""
             if full and full.strip():
                 out.append(full.strip())
         return out
+
+    def _lookup_awaiting_entry(self, awaiting):
+        """Resolve the _awaiting_answer dict to the ORM object so we can
+        re-render its question text. Returns None when the kind isn't
+        bankable (inline_authored / chat_authored — those live only in
+        chat history, not the DB) or the row has gone missing.
+
+        Used by the BLOCKED_ROTATE_ON_WRONG branch to redisplay the
+        in-flight question on retry turns (fix for session 266 — a
+        student got stranded for 5 turns after a wrong answer because
+        the gate refused to rotate but never re-rendered the original
+        question).
+        """
+        if not isinstance(awaiting, dict):
+            return None
+        kind = awaiting.get('kind')
+        obj_id = awaiting.get('id')
+        if not obj_id or kind not in ('lesson_step', 'exit_ticket_question'):
+            return None
+        try:
+            if kind == 'exit_ticket_question':
+                from apps.tutoring.models import ExitTicketQuestion
+                return ExitTicketQuestion.objects.get(id=obj_id)
+            from apps.curriculum.models import LessonStep
+            return LessonStep.objects.get(id=obj_id)
+        except Exception as exc:
+            logger.warning(
+                "[QuestionTool] _lookup_awaiting_entry failed kind=%s id=%s: %s",
+                kind, obj_id, exc,
+            )
+            return None
 
     def _record_bank_question_on_turn(self, turn_metadata: Dict, entry) -> None:
         """When a tutor turn renders a bank question, write the entry's
