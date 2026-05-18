@@ -14,7 +14,6 @@ from apps.tutoring.validator import (
     validate_tutor_response,
     ISSUE_NO_QUESTION,
     ISSUE_UNFOUNDED_PRAISE_STRIPPED,
-    ISSUE_INFO_DUMP,
 )
 
 
@@ -47,18 +46,6 @@ class StructuralLayerTest(unittest.TestCase):
             is_correct=None, bare_answer=False, step_type='summary',
         )
         self.assertNotIn(ISSUE_NO_QUESTION, result.issues)
-
-    def test_info_dump_warning(self):
-        # Many named concepts + numbers, no question = info-dump
-        text = (
-            "MEDC and LEDC are classifications. BRICS is a separate group. "
-            "Seychelles ranks 67th out of 189 with HDI 0.796 and GNP $1.59 billion."
-        )
-        result = validate_tutor_response(
-            text, is_correct=None, bare_answer=False, step_type='teach',
-        )
-        self.assertIn(ISSUE_INFO_DUMP, result.issues)
-
 
 class PedagogicalLayerTest(unittest.TestCase):
     """Praise-stripping was disabled 2026-05-06 because the post-process
@@ -100,26 +87,17 @@ class PedagogicalLayerTest(unittest.TestCase):
         self.assertNotIn(ISSUE_UNFOUNDED_PRAISE_STRIPPED, result.issues)
 
     def test_passed_property(self):
-        # Only info_dump is "soft" — everything else fails.
         clean = validate_tutor_response(
             "Tell me what you think happens next?",
             is_correct=True, bare_answer=False, step_type='practice',
         )
         self.assertTrue(clean.passed)
 
-        with_dump = validate_tutor_response(
-            "Tell me your thoughts on MEDC vs LEDC and BRICS and HDI 0.796 ranking 67/189?",
-            is_correct=True, bare_answer=False, step_type='practice',
-        )
-        # info_dump is the only issue → still passed
-        self.assertEqual(set(with_dump.issues) - {ISSUE_INFO_DUMP}, set())
-        self.assertTrue(with_dump.passed)
-
-        with_praise_strip = validate_tutor_response(
+        with_no_question = validate_tutor_response(
             "Brilliant! Now let's move on to the next topic without asking anything.",
             is_correct=False, bare_answer=False, step_type='practice',
         )
-        self.assertFalse(with_praise_strip.passed)
+        self.assertFalse(with_no_question.passed)
 
 
 class RegenerationTriggerTest(unittest.TestCase):

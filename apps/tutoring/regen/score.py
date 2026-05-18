@@ -6,8 +6,8 @@ highest-scoring overall when no cycle produces a clean one.
 
 `clean` means zero hard issues (the kind that would re-trigger regen
 under the current validator policy). A "scored but not clean" candidate
-might still have soft issues (info_dump, unverified claims) — those
-don't force another retry but do affect the score.
+might still have soft issues (unverified claims) — those don't force
+another retry but do affect the score.
 """
 
 from __future__ import annotations

@@ -6,7 +6,7 @@ student. Issues are either soft-fixed (strip the offending fragment)
 or logged for teacher visibility.
 
 V1 layers (this module):
-  L1 STRUCTURAL — does the response end with a question? info-dump score?
+  L1 STRUCTURAL — does the response end with a question (on practice/quiz)?
   L2 PEDAGOGICAL — praise present + correctness signal said wrong/bare?
                    strip the praise (extends the math-only fix to ALL
                    subjects).
@@ -31,7 +31,6 @@ from apps.tutoring.fact_verifier import verify_response, FactCheckResult
 # into SessionTurn.metadata JSONField.
 ISSUE_NO_QUESTION = "no_question"
 ISSUE_UNFOUNDED_PRAISE_STRIPPED = "unfounded_praise_stripped"
-ISSUE_INFO_DUMP = "info_dump_warning"
 ISSUE_NUMERIC_CLAIM_UNVERIFIED = "numeric_claim_unverified"
 ISSUE_NUMERIC_CLAIM_CONTRADICTED = "numeric_claim_contradicted"
 # P5 — rule-compliance violations (LLM-as-judge). See
@@ -131,7 +130,6 @@ class ValidationResult:
     # the LLM judge often defaults to "unverified" when retrieved
     # evidence is sparse, not because the tutor is wrong.
     _SOFT_ISSUES = frozenset({
-        ISSUE_INFO_DUMP,
         ISSUE_NUMERIC_CLAIM_UNVERIFIED,
     })
 
@@ -215,12 +213,6 @@ _PROSE_MCQ_RE = re.compile(
     r'(?m)^\s*A[\.\)]\s+\S.*(?:\r?\n|\r)\s*B[\.\)]\s+\S',
 )
 
-# Heuristic: a response is "info-dumpy" when it contains many distinct
-# named concepts (proper nouns, acronyms, numbers) without any question
-# at the end. Cheap and biased toward false negatives — meant to flag
-# obvious lectures, not all rich responses.
-_NAMED_CONCEPT_RE = re.compile(r"\b[A-Z]{2,5}\b|\b\d+(?:\.\d+)?(?:%|st|nd|rd|th)?\b")
-
 # Verdict-mismatch detection (ISSUE_VERDICT_MISMATCH).
 # Phrases the tutor uses to tell the student they got it WRONG:
 _NEGATIVE_VERDICT_RE = re.compile(
@@ -262,14 +254,6 @@ def _ends_with_question(text: str) -> bool:
 # other judges and semantically classifies whether the turn hands
 # the floor back to the student. The validator consumes its verdict
 # below via combined_result.handed_off.
-
-
-def _info_dump_score(text: str) -> int:
-    """Return number of named concepts (acronyms, numbers, percentages)
-    that appear in the response. >= 5 is the threshold for an info dump."""
-    if not text:
-        return 0
-    return len(_NAMED_CONCEPT_RE.findall(text))
 
 
 def validate_tutor_response(
@@ -341,9 +325,6 @@ def validate_tutor_response(
     if step_type in {"practice", "quiz"} and not awaiting_answer_is_set:
         if not _ends_with_question(content):
             issues.append(ISSUE_NO_QUESTION)
-    info_score = _info_dump_score(content)
-    if info_score >= 6 and not _ends_with_question(content):
-        issues.append(ISSUE_INFO_DUMP)
 
     # Verdict-mismatch — only fires when we have a high-confidence
     # verdict (deterministic numeric / mcq) and the tutor's text
@@ -634,7 +615,6 @@ def validate_tutor_response(
         issues=issues,
         layers_run=layers_run,
         metadata={
-            "info_concept_count": info_score,
             "ends_with_question": _ends_with_question(content),
             **extra_meta,
         },

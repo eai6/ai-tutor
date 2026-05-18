@@ -519,16 +519,6 @@ def _violation_line(issue: str, meta: Dict) -> str:
             "What part trips you up most?\""
         )
 
-    if issue == "info_dump_warning":
-        return (
-            "- INFO_DUMP_WARNING: the response packed too many named "
-            "concepts / too much prose. Fix: trim to ONE core point + "
-            "ONE question. Aim for ≤4 sentences total.\n"
-            "  Example: BEFORE: a 5-sentence paragraph explaining "
-            "three rules. AFTER: name ONE rule, give ONE concrete "
-            "feel for it, then ask one targeted question."
-        )
-
     if issue == "multi_paragraph":
         return (
             "- MULTI_PARAGRAPH: response had multiple paragraphs when "

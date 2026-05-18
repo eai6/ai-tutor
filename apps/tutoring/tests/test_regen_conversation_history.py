@@ -147,10 +147,6 @@ class RepairInstructionsHaveExamplesTest(SimpleTestCase):
         self.assertIn("Example:", out)
         self.assertIn("?", out)
 
-    def test_info_dump_warning_has_example(self):
-        out = self._build("info_dump_warning")
-        self.assertIn("Example:", out)
-
     def test_new_coverage_multi_paragraph(self):
         out = self._build("multi_paragraph")
         self.assertIn("MULTI_PARAGRAPH", out)
@@ -189,7 +185,7 @@ class RegenEnsemblePassesHistoryThroughTest(SimpleTestCase):
         from apps.tutoring.regen import run_regen_ensemble
 
         validation = MagicMock()
-        validation.issues = ["info_dump_warning"]
+        validation.issues = ["no_question"]
         validation.metadata = {}
 
         regen_client = MagicMock()
