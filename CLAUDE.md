@@ -38,7 +38,7 @@ Azure commands require `az account set --subscription "Pixel Design Labs LLC"` f
 
 **LLM JSON robustness.** Content-generation models sometimes return single-quoted Python dicts, not JSON. `apps/curriculum/content_generator.py::_try_fix_json` handles this; the 3-attempt retry loop with correction prompt catches the rest. Don't bypass either.
 
-**Math tutoring.** For math lessons, the tutor must NOT evaluate a bare numeric answer. Teach via named subskills + named tips; use a rung-based complexity ladder. If touching `conversational_tutor.py` math paths, read `~/.claude/projects/-Users-edwardamoah-Documents-GitHub-ai-tutor/memory/feedback_math_tutoring.md` first.
+**Math tutoring — bare-answer handling.** For math lessons: a **correct bare answer** gets confirmed with a one-line "because…" and we advance — no probing. A **wrong bare answer** triggers a single ask-for-working as diagnosis. The blanket "never evaluate a bare numeric answer" rule was reversed 2026-05-17 (created friction without learning signal on items the student clearly had). Working-request is a diagnostic for wrong answers, not a default gate. Still applies: teach via named subskills + named tips, use a rung-based complexity ladder. If touching `conversational_tutor.py` math paths, read `~/.claude/projects/-Users-edwardamoah-Documents-GitHub-ai-tutor/memory/feedback_math_tutoring.md` first.
 
 **Temperature controls (runtime invariants).** Enforced by `ModelConfig.effective_temperature` and the resolved `temperature` parameter on `BaseLLMClient.generate()`. Do not bypass.
 - **JUDGE** purpose: always **0** for evaluation consistency. The stored DB value is ignored at runtime.
