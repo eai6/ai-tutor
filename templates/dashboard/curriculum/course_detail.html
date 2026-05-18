@@ -613,6 +613,13 @@
         Falls back to the "— pick a duration —" placeholder only when
         the course has no lessons (or none with a duration set yet).
         {% endcomment %}
+        {% comment %}
+        Cap of 5 steps per lesson today — the 6 / 8 / 10-step options
+        that used to live here were removed (2026-05-18). The view
+        clamps current_lesson_duration to {15, 20, 25} so a course
+        whose lessons predate the cap surfaces the placeholder
+        instead of trying to auto-select a now-removed option.
+        {% endcomment %}
         <select name="lesson_duration" {% if not current_lesson_duration %}required{% endif %} style="font-size:0.78rem; padding:0.25rem 0.4rem; border:1px solid #6ee7b7; border-radius:6px; color:#047857; background:#fff;">
             {% if not current_lesson_duration %}
             <option value="" disabled selected>— pick a duration —</option>
@@ -620,9 +627,6 @@
             <option value="15" {% if current_lesson_duration == 15 %}selected{% endif %}>15 min · 3 steps</option>
             <option value="20" {% if current_lesson_duration == 20 %}selected{% endif %}>20 min · 4 steps</option>
             <option value="25" {% if current_lesson_duration == 25 %}selected{% endif %}>25 min · 5 steps</option>
-            <option value="30" {% if current_lesson_duration == 30 %}selected{% endif %}>30 min · 6 steps</option>
-            <option value="40" {% if current_lesson_duration == 40 %}selected{% endif %}>40 min · 8 steps</option>
-            <option value="50" {% if current_lesson_duration == 50 %}selected{% endif %}>50 min · 10 steps</option>
         </select>
         <label style="font-size:0.78rem; color:#065f46; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="When unchecked, the chat-page picker is hidden and every session uses the default duration.">
             <input type="checkbox" name="allow_student_override" value="1" {% if course.allow_student_duration_override %}checked{% endif %} style="accent-color:#059669;">

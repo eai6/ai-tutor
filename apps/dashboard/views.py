@@ -1046,14 +1046,22 @@ def course_detail(request, course_id):
     # without having to look it up elsewhere. Uses the mode (most common
     # value) across this course's lessons so a one-off custom duration
     # on a single lesson doesn't shift the default. None when no lessons.
+    #
+    # Bound to the supported dropdown options — lessons are currently
+    # capped at 5 steps (25 min), so values above that come from a
+    # legacy course generated before the cap. We surface those as
+    # "no current value" so the placeholder + required-attr re-engage,
+    # forcing the teacher to pick a supported duration on save.
     from collections import Counter as _Counter
+    _SUPPORTED_DURATIONS = {15, 20, 25}
     _durations = [
         l.estimated_minutes for l in course_lessons
         if l.estimated_minutes
     ]
-    current_lesson_duration = (
+    _mode = (
         _Counter(_durations).most_common(1)[0][0] if _durations else None
     )
+    current_lesson_duration = _mode if _mode in _SUPPORTED_DURATIONS else None
 
     context = {
         **request.staff_ctx,
