@@ -1041,6 +1041,20 @@ def course_detail(request, course_id):
         Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
     )
 
+    # Pre-select the duration dropdown with the course's currently-dominant
+    # estimated_minutes value so the teacher sees "what's set today"
+    # without having to look it up elsewhere. Uses the mode (most common
+    # value) across this course's lessons so a one-off custom duration
+    # on a single lesson doesn't shift the default. None when no lessons.
+    from collections import Counter as _Counter
+    _durations = [
+        l.estimated_minutes for l in course_lessons
+        if l.estimated_minutes
+    ]
+    current_lesson_duration = (
+        _Counter(_durations).most_common(1)[0][0] if _durations else None
+    )
+
     context = {
         **request.staff_ctx,
         'course': course,
@@ -1074,6 +1088,8 @@ def course_detail(request, course_id):
         # Weekly assignment block
         'weekly_assignments': weekly_assignments,
         'course_lessons': course_lessons,
+        # Default duration dropdown auto-select (current dominant value)
+        'current_lesson_duration': current_lesson_duration,
     }
 
     return render(request, 'dashboard/curriculum/course_detail.html', context)
