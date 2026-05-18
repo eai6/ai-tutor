@@ -17,6 +17,9 @@ design/LOCAL_TESTING_GUIDE.md
 # macOS metadata
 .DS_Store
 
+# Local dev database (production uses Postgres). Each developer gets
+# their own SQLite via `manage.py migrate` — no value in version control.
+db.sqlite3
 # SQLite WAL/SHM (transient — written when the dev server holds db.sqlite3)
 *.sqlite3-shm
 *.sqlite3-wal
@@ -25,3 +28,18 @@ design/LOCAL_TESTING_GUIDE.md
 research/
 # Annotator-agent run transcripts — large JSONL audit trails, regenerable
 ops/annotator_agent/transcripts/
+# Annotator-agent runtime metric log — regenerable from transcripts
+ops/annotator_agent/metrics_history.jsonl
+
+# Claude Code local state. .claude/skills/* IS tracked (project-level
+# skill definitions); everything else under .claude/ is local user state.
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+
+# Scratch debug screenshots — root-level only. Real images live under
+# media/ or static/. Curated UI screenshots that document a feature go
+# under screenshots/ (also ignored — re-take from current code if needed).
+/*.png
+/screenshots/
+/test-files/
