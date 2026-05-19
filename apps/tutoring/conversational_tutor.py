@@ -85,6 +85,16 @@ class ConceptCoverageResult(BaseModel):
 # SYSTEM PROMPTS
 # =============================================================================
 
+# Escape-valve cap on the exit-ticket hold gate (session 268 fix,
+# 2026-05-19). The hold gate at _can_trigger_exit_ticket() blocks the
+# TUTORING → EXIT_TICKET transition while a bank Q is unresolved. When
+# the LLM has stopped asking about that bank Q and the student keeps
+# struggling on a different (chat-authored) question, the gate would
+# hold forever. Once this many consecutive HOLD cycles fire, the
+# engine force-releases _awaiting_answer and lets the exit ticket
+# transition through.
+MAX_EXIT_TICKET_HOLD_CYCLES = 5
+
 TUTOR_SYSTEM_PROMPT_TEMPLATE = """<system_prompt>
 
 <identity>
@@ -1757,6 +1767,17 @@ class ConversationalTutor:
         self.exit_ticket_hold_until_exchange: int = int(
             state.get('exit_ticket_hold_until_exchange', 0) or 0
         )
+        # Escape-valve counter for the hold gate (session 268 fix,
+        # 2026-05-19). Increments each consecutive turn the hold fires;
+        # once it crosses MAX_EXIT_TICKET_HOLD_CYCLES the engine
+        # force-releases _awaiting_answer + _pending_bank_grade and
+        # fires the exit ticket, breaking the LLM-vs-engine question
+        # divergence stall. Resets to 0 the moment a HOLD check
+        # succeeds (correct answer arrives, gate clears naturally) or
+        # the exit ticket transitions.
+        self.exit_ticket_hold_count: int = int(
+            state.get('exit_ticket_hold_count', 0) or 0
+        )
 
         # Restore exit concept coverage status
         covered_concept_ids = state.get('covered_concept_ids', [])
@@ -1850,6 +1871,9 @@ class ConversationalTutor:
             # on the same turn as a reveal or right after a wrong answer.
             'exit_ticket_hold_until_exchange': int(
                 getattr(self, 'exit_ticket_hold_until_exchange', 0) or 0
+            ),
+            'exit_ticket_hold_count': int(
+                getattr(self, 'exit_ticket_hold_count', 0) or 0
             ),
             # Enabling objective coverage (P1.2)
             'covered_objectives': [
@@ -3271,13 +3295,42 @@ Keep it to 2-3 sentences."""
                 # Hold the trigger; mark the hold window so the next
                 # student turn clears it once acknowledgement happens.
                 self.exit_ticket_hold_until_exchange = self.exchange_count + 1
+                self.exit_ticket_hold_count = int(
+                    getattr(self, 'exit_ticket_hold_count', 0) or 0
+                ) + 1
+                if self.exit_ticket_hold_count >= MAX_EXIT_TICKET_HOLD_CYCLES:
+                    # Escape valve — the gate has been held for too many
+                    # consecutive turns. Force-clear awaiting state and
+                    # fire the exit ticket. Session 268 trap.
+                    logger.warning(
+                        "[ExitTicket] RELEASE session=%s after %d HOLD "
+                        "cycles — force-clearing _awaiting_answer + "
+                        "_pending_bank_grade so the exit ticket fires "
+                        "(student stalled on in-flight bank Q the tutor "
+                        "had abandoned).",
+                        self.session.id, self.exit_ticket_hold_count,
+                    )
+                    self._awaiting_answer = None
+                    self._pending_bank_grade = None
+                    self.exit_ticket_hold_count = 0
+                    self.session_state = SessionState.EXIT_TICKET
+                    self._save_state()
+                    self._save_turn(
+                        "tutor", clean_response, metadata=turn_metadata,
+                    )
+                    self.conversation.append({
+                        "role": "assistant", "content": clean_response,
+                    })
+                    return self._handle_exit_ticket()
                 logger.info(
                     "[ExitTicket] HOLD session=%s — current bank Q not "
                     "yet answered correctly / reveal in progress (next "
-                    "trigger eligible at exchange %d)",
+                    "trigger eligible at exchange %d, hold_count=%d/%d)",
                     self.session.id, self.exit_ticket_hold_until_exchange,
+                    self.exit_ticket_hold_count, MAX_EXIT_TICKET_HOLD_CYCLES,
                 )
             else:
+                self.exit_ticket_hold_count = 0
                 self.session_state = SessionState.EXIT_TICKET
                 self._save_state()
                 # Save tutor response first, then return exit ticket
@@ -3692,12 +3745,32 @@ Keep it to 2-3 sentences."""
                 and not getattr(self, 'is_remediation', False)):
             if not self._can_trigger_exit_ticket():
                 self.exit_ticket_hold_until_exchange = self.exchange_count + 1
-                logger.info(
-                    "[ExitTicket] HOLD session=%s (alt-path) — wrong/"
-                    "reveal in progress; eligible at exchange %d",
-                    self.session.id, self.exit_ticket_hold_until_exchange,
-                )
+                self.exit_ticket_hold_count = int(
+                    getattr(self, 'exit_ticket_hold_count', 0) or 0
+                ) + 1
+                if self.exit_ticket_hold_count >= MAX_EXIT_TICKET_HOLD_CYCLES:
+                    logger.warning(
+                        "[ExitTicket] RELEASE session=%s (alt-path) after "
+                        "%d HOLD cycles — force-clearing _awaiting_answer "
+                        "+ _pending_bank_grade so the exit ticket fires.",
+                        self.session.id, self.exit_ticket_hold_count,
+                    )
+                    self._awaiting_answer = None
+                    self._pending_bank_grade = None
+                    self.exit_ticket_hold_count = 0
+                    self.session_state = SessionState.EXIT_TICKET
+                    show_exit_ticket = True
+                else:
+                    logger.info(
+                        "[ExitTicket] HOLD session=%s (alt-path) — wrong/"
+                        "reveal in progress; eligible at exchange %d, "
+                        "hold_count=%d/%d",
+                        self.session.id, self.exit_ticket_hold_until_exchange,
+                        self.exit_ticket_hold_count,
+                        MAX_EXIT_TICKET_HOLD_CYCLES,
+                    )
             else:
+                self.exit_ticket_hold_count = 0
                 self.session_state = SessionState.EXIT_TICKET
                 show_exit_ticket = True
 
