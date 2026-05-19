@@ -565,6 +565,8 @@ class OpenAIClient(BaseLLMClient):
         system_prompt: str,
         tools: list[dict],
         max_tokens: int | None = None,
+        *,
+        tool_choice: dict | str | None = None,
     ):
         """OpenAI function-calling wrapper.
 
@@ -574,6 +576,16 @@ class OpenAIClient(BaseLLMClient):
         raw ChatCompletion response so the caller can introspect
         choices[0].message.tool_calls (list of tool calls, each with
         .function.name and .function.arguments JSON-string).
+
+        `tool_choice` — accepts the same Anthropic-style values the
+        tutor engine passes, mapped to OpenAI's native parameter
+        (Phase 2b of task #229 — was raising TypeError on the engine's
+        regen path):
+          - {"type": "tool", "name": "X"} → {"type": "function",
+            "function": {"name": "X"}} — force this specific tool
+          - "required" / "any" → "required" (force ANY tool)
+          - "none" → "none" (disable tools entirely)
+          - "auto" / None → omitted (OpenAI default = auto)
         """
         openai_tools = []
         for t in tools or []:
@@ -594,6 +606,34 @@ class OpenAIClient(BaseLLMClient):
             messages=openai_messages,
             tools=openai_tools,
         )
+
+        # Translate tool_choice from the Anthropic-shaped value the
+        # engine passes to OpenAI's native shape.
+        if tool_choice is not None:
+            if isinstance(tool_choice, dict):
+                # Anthropic: {"type": "tool", "name": "X"}
+                # OpenAI:    {"type": "function", "function": {"name": "X"}}
+                if tool_choice.get("type") == "tool" and tool_choice.get("name"):
+                    kwargs["tool_choice"] = {
+                        "type": "function",
+                        "function": {"name": tool_choice["name"]},
+                    }
+                elif tool_choice.get("type") in ("any", "required"):
+                    kwargs["tool_choice"] = "required"
+                elif tool_choice.get("type") == "none":
+                    kwargs["tool_choice"] = "none"
+                elif tool_choice.get("type") == "auto":
+                    pass  # omit → OpenAI default = auto
+            elif isinstance(tool_choice, str):
+                # Plain strings ("auto", "none", "required") pass through;
+                # OpenAI accepts the same vocab.
+                low = tool_choice.strip().lower()
+                if low == "any":
+                    kwargs["tool_choice"] = "required"
+                elif low in ("required", "none"):
+                    kwargs["tool_choice"] = low
+                elif low == "auto":
+                    pass  # omit
         # Reasoning models (o1/o3 family) reject `max_tokens` — they
         # use `max_completion_tokens` and ignore `temperature`. Fall back
         # gracefully on TypeError so we don't have to maintain a list.
@@ -796,6 +836,8 @@ class GeminiClient(BaseLLMClient):
         system_prompt: str,
         tools: list[dict],
         max_tokens: int | None = None,
+        *,
+        tool_choice: dict | str | None = None,
     ):
         """Gemini function-calling wrapper.
 
@@ -803,6 +845,16 @@ class GeminiClient(BaseLLMClient):
         input_schema} and converts to Gemini's FunctionDeclaration shape.
         Returns the raw GenerateContentResponse so the caller can
         introspect candidates[0].content.parts for FunctionCall blocks.
+
+        `tool_choice` — accepts the same Anthropic-style values the
+        tutor engine passes, mapped to Gemini's
+        `tool_config.function_calling_config` (Phase 2b of task #229 —
+        was raising TypeError on the engine's regen path):
+          - {"type": "tool", "name": "X"} → mode="ANY" +
+            allowed_function_names=["X"]
+          - "required" / "any" → mode="ANY" (force ANY tool)
+          - "none" → mode="NONE" (disable tools entirely)
+          - "auto" / None → mode="AUTO" (default; omitted)
         """
         from google.genai import types
 
@@ -825,6 +877,40 @@ class GeminiClient(BaseLLMClient):
         )
         if gemini_tools:
             config_kwargs["tools"] = gemini_tools
+
+        # Translate tool_choice from Anthropic-shaped value to Gemini's
+        # tool_config. None / "auto" / {"type": "auto"} → omit (AUTO).
+        fcc_mode = None
+        allowed_names: list[str] | None = None
+        if isinstance(tool_choice, dict):
+            t_type = tool_choice.get("type")
+            if t_type == "tool" and tool_choice.get("name"):
+                fcc_mode = "ANY"
+                allowed_names = [tool_choice["name"]]
+            elif t_type in ("any", "required"):
+                fcc_mode = "ANY"
+            elif t_type == "none":
+                fcc_mode = "NONE"
+            elif t_type == "auto":
+                pass  # omit
+        elif isinstance(tool_choice, str):
+            low = tool_choice.strip().lower()
+            if low in ("required", "any"):
+                fcc_mode = "ANY"
+            elif low == "none":
+                fcc_mode = "NONE"
+            elif low == "auto":
+                pass  # omit
+
+        if fcc_mode is not None:
+            fcc_kwargs: dict = {"mode": fcc_mode}
+            if allowed_names:
+                fcc_kwargs["allowed_function_names"] = allowed_names
+            config_kwargs["tool_config"] = types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(
+                    **fcc_kwargs,
+                ),
+            )
 
         response = self.client.models.generate_content(
             model=self.config.model_name,
