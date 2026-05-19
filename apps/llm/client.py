@@ -16,8 +16,8 @@ import json
 import time
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Optional, Generator
+from dataclasses import dataclass, field
+from typing import Optional, Generator, List, Union
 import anthropic
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,203 @@ class LLMResponse:
     # subtract cache_read to get the "fresh" billed portion.
     cache_creation_tokens: int = 0
     cache_read_tokens: int = 0
+
+
+# -- Cross-provider response-shape adapter (task #245) -----------------
+# The tutor engine + SelfRetry walk Anthropic Message objects:
+#   message.content → list of blocks
+#   block.type      → 'text' | 'tool_use'
+#   block.text      → str (text blocks)
+#   block.name      → str (tool name)
+#   block.input     → dict (tool args)
+#
+# Gemini returns google.genai.types.GenerateContentResponse and OpenAI
+# returns openai.types.chat.ChatCompletion. Both fail the
+# `isinstance(message.content, list)` shape check at
+# `apps/tutoring/regen/self_retry.py:368-374`, raising TypeError on
+# every regen attempt. The dataclasses below are duck-typed Anthropic
+# Message stand-ins; the per-provider adapter functions translate the
+# native response into one.
+
+@dataclass
+class AdaptedTextBlock:
+    text: str = ''
+    type: str = 'text'
+
+
+@dataclass
+class AdaptedToolUseBlock:
+    name: str = ''
+    input: dict = field(default_factory=dict)
+    id: str = ''
+    type: str = 'tool_use'
+
+
+@dataclass
+class AdaptedUsage:
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
+
+
+@dataclass
+class AdaptedMessage:
+    """Anthropic-Message-shaped adapter for cross-provider tool calls.
+
+    Built by `_adapt_gemini_response` / `_adapt_openai_response`. Lets
+    the tutor engine + SelfRetry consume Gemini / OpenAI tool responses
+    through the same `.content[block].{type,text,name,input}` contract
+    as the Anthropic SDK.
+    """
+    content: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = field(
+        default_factory=list,
+    )
+    stop_reason: str = 'end_turn'
+    usage: AdaptedUsage = field(default_factory=AdaptedUsage)
+    model: str = ''
+
+
+def _adapt_gemini_response(response, *, model_name: str = '') -> AdaptedMessage:
+    """Adapt google.genai GenerateContentResponse → AdaptedMessage.
+
+    Walks `candidates[0].content.parts`. Each part is either:
+      - text part: `.text` set
+      - function_call part: `.function_call.name` + `.function_call.args`
+    Mirrors Anthropic block order (text first, tool_use after — matches
+    Gemini's own ordering when both are emitted).
+    """
+    blocks: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = []
+    stop_reason = 'end_turn'
+
+    candidates = getattr(response, 'candidates', None) or []
+    if candidates:
+        cand = candidates[0]
+        finish = getattr(cand, 'finish_reason', None)
+        finish_name = (
+            getattr(finish, 'name', None) if finish is not None else None
+        ) or (finish if isinstance(finish, str) else None)
+        if finish_name == 'MAX_TOKENS':
+            stop_reason = 'max_tokens'
+        elif finish_name in ('SAFETY', 'RECITATION'):
+            stop_reason = 'stop_sequence'
+
+        content = getattr(cand, 'content', None)
+        parts = getattr(content, 'parts', None) or [] if content else []
+        for idx, part in enumerate(parts):
+            fc = getattr(part, 'function_call', None)
+            fc_name = getattr(fc, 'name', '') if fc is not None else ''
+            if fc is not None and fc_name:
+                args = getattr(fc, 'args', None) or {}
+                if not isinstance(args, dict):
+                    try:
+                        args = dict(args)
+                    except Exception:
+                        try:
+                            args = json.loads(
+                                json.dumps(args, default=str)
+                            )
+                        except Exception:
+                            args = {}
+                blocks.append(AdaptedToolUseBlock(
+                    id=f'gemini_tool_{idx}',
+                    name=fc_name,
+                    input=args,
+                ))
+                if stop_reason == 'end_turn':
+                    stop_reason = 'tool_use'
+                continue
+            text = getattr(part, 'text', None)
+            if text:
+                blocks.append(AdaptedTextBlock(text=text))
+
+    usage = AdaptedUsage()
+    usage_meta = getattr(response, 'usage_metadata', None)
+    if usage_meta is not None:
+        usage.input_tokens = (
+            getattr(usage_meta, 'prompt_token_count', 0) or 0
+        )
+        usage.output_tokens = (
+            getattr(usage_meta, 'candidates_token_count', 0) or 0
+        )
+        # Gemini implicit caching: cached_content_token_count.
+        usage.cache_read_input_tokens = (
+            getattr(usage_meta, 'cached_content_token_count', 0) or 0
+        )
+
+    return AdaptedMessage(
+        content=blocks,
+        stop_reason=stop_reason,
+        usage=usage,
+        model=model_name or getattr(response, 'model_version', '') or '',
+    )
+
+
+def _adapt_openai_response(response, *, model_name: str = '') -> AdaptedMessage:
+    """Adapt openai ChatCompletion → AdaptedMessage.
+
+    Walks `choices[0].message`: `.content` (text or None) and
+    `.tool_calls` (list with .id, .function.name, .function.arguments
+    as JSON string).
+    """
+    blocks: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = []
+    stop_reason = 'end_turn'
+
+    choices = getattr(response, 'choices', None) or []
+    if choices:
+        choice = choices[0]
+        finish = getattr(choice, 'finish_reason', None)
+        if finish == 'length':
+            stop_reason = 'max_tokens'
+        elif finish == 'tool_calls':
+            stop_reason = 'tool_use'
+        elif finish == 'content_filter':
+            stop_reason = 'stop_sequence'
+
+        msg = getattr(choice, 'message', None)
+        text_content = getattr(msg, 'content', None) if msg else None
+        if text_content:
+            blocks.append(AdaptedTextBlock(text=text_content))
+        tool_calls = (
+            getattr(msg, 'tool_calls', None) or [] if msg else []
+        )
+        for tc in tool_calls:
+            fn = getattr(tc, 'function', None)
+            if fn is None:
+                continue
+            name = getattr(fn, 'name', '') or ''
+            raw_args = getattr(fn, 'arguments', '') or ''
+            try:
+                args = json.loads(raw_args) if raw_args else {}
+            except (ValueError, TypeError):
+                args = {}
+            blocks.append(AdaptedToolUseBlock(
+                id=getattr(tc, 'id', '') or f'openai_tool_{len(blocks)}',
+                name=name,
+                input=args,
+            ))
+
+    usage = AdaptedUsage()
+    usage_obj = getattr(response, 'usage', None)
+    if usage_obj is not None:
+        usage.input_tokens = (
+            getattr(usage_obj, 'prompt_tokens', 0) or 0
+        )
+        usage.output_tokens = (
+            getattr(usage_obj, 'completion_tokens', 0) or 0
+        )
+        details = getattr(usage_obj, 'prompt_tokens_details', None)
+        if details is not None:
+            usage.cache_read_input_tokens = (
+                getattr(details, 'cached_tokens', 0) or 0
+            )
+
+    return AdaptedMessage(
+        content=blocks,
+        stop_reason=stop_reason,
+        usage=usage,
+        model=model_name or getattr(response, 'model', '') or '',
+    )
 
 
 class BaseLLMClient(ABC):
@@ -717,7 +914,13 @@ class OpenAIClient(BaseLLMClient):
             response.choices[0].finish_reason,
             len(response.choices[0].message.tool_calls or []),
         )
-        return response
+        # Wrap in cross-provider adapter so the tutor engine + SelfRetry
+        # can walk .content/.type/.text/.name/.input uniformly across
+        # all three providers (task #245). The raw ChatCompletion fails
+        # the engine's isinstance(.content, list) shape check.
+        return _adapt_openai_response(
+            response, model_name=self.config.model_name,
+        )
 
 
 class GeminiClient(BaseLLMClient):
@@ -1041,7 +1244,13 @@ class GeminiClient(BaseLLMClient):
             function_call_count,
             text_chars,
         )
-        return response
+        # Wrap in cross-provider adapter so the tutor engine + SelfRetry
+        # can walk .content/.type/.text/.name/.input uniformly across
+        # all three providers (task #245). The raw GenerateContentResponse
+        # fails the engine's isinstance(.content, list) shape check.
+        return _adapt_gemini_response(
+            response, model_name=self.config.model_name,
+        )
 
 
 class MockLLMClient(BaseLLMClient):
