@@ -4637,6 +4637,44 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         wrong_attempts = int(aa.get('wrong_attempts', 0) or 0)
         return wrong_attempts < self._reveal_threshold()
 
+    def _build_scaffolding_directive_block(self) -> str:
+        """Per-turn directive: when the pose tools are hidden by the
+        scaffolding gate, the LLM otherwise improvises a chat-authored
+        question to fill the void. That strands the student answering
+        a ghost question while the engine keeps holding on the original
+        in-flight Q (session 268 trap, 2026-05-19).
+
+        This block tells the LLM explicitly what scaffolding mode means
+        — text hint only, do not author a new question, the in-flight
+        question is visible to the student in the artifact panel.
+        """
+        if not self._scaffolding_in_progress():
+            return ""
+        aa = getattr(self, '_awaiting_answer', None) or {}
+        wrong = int(aa.get('wrong_attempts', 0) or 0)
+        return (
+            "\n\n<scaffolding_mode>\n"
+            "There is a question already in flight that the student is "
+            f"looking at in the artifact panel (wrong_attempts={wrong}). "
+            "Your job this turn is to SCAFFOLD that question — NOT to "
+            "pose a new one.\n"
+            "Rules for this turn:\n"
+            "- Do NOT author a new question. The pose_question and "
+            "pose_inline_question tools are intentionally hidden "
+            "because the student should retry the existing in-flight "
+            "question.\n"
+            "- Give a TEXT HINT only — name the misconception, break "
+            "the problem into a smaller piece, or remind the student "
+            "of the relevant concept.\n"
+            "- Do NOT restate the full in-flight question stem — the "
+            "student can see it. Refer to it briefly (e.g. 'for the "
+            "question above…') if you need to anchor.\n"
+            "- End with a short prompt to retry (e.g. 'try again with "
+            "that in mind') — this is an invitation, not a new "
+            "question.\n"
+            "</scaffolding_mode>"
+        )
+
     def _reveal_threshold(self) -> int:
         """Number of wrong attempts at which move-on becomes allowed
         (no reveal — pivot to easier same-concept Q). Difficulty-tiered
@@ -6070,6 +6108,15 @@ Follow the current step; this concept will be covered in sequence."""
         bank_grade = getattr(self, '_pending_bank_grade', None)
         if bank_grade is not None and bank_grade.is_correct is not None:
             system_prompt += self._build_bank_grade_signal_block(bank_grade)
+
+        # Scaffolding-mode directive (session 268 fix, 2026-05-19).
+        # When a question is in flight, the pose tools are hidden
+        # (see _scaffolding_in_progress + build_tool SKIP). Without
+        # an explicit instruction the LLM tends to chat-author its
+        # own question to fill the void, which strands the student
+        # answering ghost questions while the engine keeps holding
+        # on the original.
+        system_prompt += self._build_scaffolding_directive_block()
 
         if pending_check is None and getattr(self, '_pending_bare_answer', False):
             # Bare numeric answer on a math practice/quiz step but no
@@ -8406,6 +8453,7 @@ Follow the current step; this concept will be covered in sequence."""
             # turn after turn (gpt-4o was looping "Welcome, Edward! Today
             # we're learning…" with each rephrasing).
             already_delivered = self.step_exchange_count > 0
+            phase = (getattr(step, 'phase', '') or '').lower()
             if already_delivered:
                 parts.append(
                     "YOUR TASK: The teaching content has ALREADY been delivered "
@@ -8430,7 +8478,37 @@ Follow the current step; this concept will be covered in sequence."""
                     "  4. End with a question that moves forward — never with "
                     "the SAME comprehension check you already asked."
                 )
+                parts.append(f"\nCONTENT TO TEACH (for reference, do NOT re-recite verbatim):\n{teacher_script}")
+            elif phase == 'explain':
+                # Explain-phase steps are the lesson's content-delivery
+                # moments. The teacher_script was authored for this
+                # specific student/lesson — the tutor should deliver
+                # it as the script, not paraphrase it down to a few
+                # sentences. Prior framing ("CONTENT TO TEACH … do NOT
+                # re-recite verbatim") combined with the (now-removed)
+                # info_dump_warning rule trained the model to
+                # systematically under-deliver substantive content.
+                parts.append(
+                    "YOUR TASK: Deliver the script below as the lesson "
+                    "content for this step. Read through the whole script — "
+                    "preserve the structure, examples, and key terms. You "
+                    "may lightly adapt phrasing for natural conversational "
+                    "flow, but do NOT summarise, skip sections, or "
+                    "compress to a few sentences. Then ask one "
+                    "comprehension check that the student has not "
+                    "answered yet."
+                )
+                parts.append(
+                    "IMPORTANT: Your comprehension check must be a "
+                    "complete, self-contained question. Never say 'which "
+                    "of these' or reference options you haven't listed."
+                )
+                parts.append(f"\nSCRIPT TO DELIVER (read this as written, lightly adapted for natural flow):\n{teacher_script}")
             else:
+                # Non-explain teach phases (engage / explore / etc) keep
+                # the lighter "explain clearly + check" framing — those
+                # phases are about provoking curiosity, not script
+                # delivery.
                 parts.append(
                     "YOUR TASK: Deliver this teaching content. Explain clearly, "
                     "then ask a comprehension check that the student has not "
@@ -8441,7 +8519,7 @@ Follow the current step; this concept will be covered in sequence."""
                     "self-contained question. Never say 'which of these' or "
                     "reference options you haven't listed."
                 )
-            parts.append(f"\nCONTENT TO TEACH (for reference, do NOT re-recite verbatim):\n{teacher_script}")
+                parts.append(f"\nCONTENT TO TEACH (for reference, adapt for natural delivery):\n{teacher_script}")
         elif step.step_type == 'worked_example':
             if self.current_topic_index in self.shown_worked_example_indices and self.step_exchange_count > 0:
                 parts.append(
