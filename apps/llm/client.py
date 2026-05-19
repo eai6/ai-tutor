@@ -302,7 +302,18 @@ class AnthropicClient(BaseLLMClient):
                     cache_read_tokens=cache_read,
                 )
 
-            except (anthropic.RateLimitError, anthropic.InternalServerError) as e:
+            except (
+                anthropic.RateLimitError,
+                anthropic.InternalServerError,
+                anthropic.APIStatusError,  # catches 529 OverloadedError
+            ) as e:
+                # Only retry on retryable statuses (429, 5xx). Re-raise
+                # auth / validation errors immediately.
+                status = getattr(e, 'status_code', None)
+                if status is not None and status < 429:
+                    raise
+                if status is not None and 400 <= status < 500 and status != 429:
+                    raise
                 if attempt >= self.MAX_RETRIES:
                     raise
                 wait = self.RETRY_BACKOFF[attempt]
@@ -433,7 +444,18 @@ class AnthropicClient(BaseLLMClient):
                     ", ".join(block_summary),
                 )
                 return message
-            except (anthropic.RateLimitError, anthropic.InternalServerError) as e:
+            except (
+                anthropic.RateLimitError,
+                anthropic.InternalServerError,
+                anthropic.APIStatusError,  # catches 529 OverloadedError
+            ) as e:
+                # Only retry on retryable statuses (429, 5xx). Re-raise
+                # auth / validation errors immediately.
+                status = getattr(e, 'status_code', None)
+                if status is not None and status < 429:
+                    raise
+                if status is not None and 400 <= status < 500 and status != 429:
+                    raise
                 if attempt >= self.MAX_RETRIES:
                     raise
                 wait = self.RETRY_BACKOFF[attempt]
@@ -701,6 +723,16 @@ class OpenAIClient(BaseLLMClient):
 class GeminiClient(BaseLLMClient):
     """Client for Google's Gemini API."""
 
+    # Retry policy for transient Google capacity issues (Phase 2b of
+    # task #229). 503 UNAVAILABLE is common during peak hours; 429
+    # is per-project quota; 5xx are server-side. The judge fallback
+    # chain handles judge calls when the retries exhaust, but the
+    # tutor path has no fallback so retries are the only defense.
+    MAX_RETRIES = 3
+    RETRY_BACKOFF = [2, 5, 12]  # seconds — shorter than Anthropic's
+                                # since Google capacity recovers faster
+    _RETRYABLE_GEMINI_STATUSES = (429, 500, 502, 503, 504)
+
     def __init__(self, config: ModelConfig):
         super().__init__(config)
         if not self.api_key:
@@ -713,6 +745,39 @@ class GeminiClient(BaseLLMClient):
             self.client = genai.Client(api_key=self.api_key)
         except ImportError:
             raise ImportError("google-genai package not installed. Run: pip install google-genai")
+
+    def _call_with_retry(self, fn, *, label: str = "call"):
+        """Execute `fn()` with retry-with-backoff on transient Google
+        API errors (429, 500/502/503/504). Re-raises non-retryable
+        errors immediately.
+
+        Use this wrapper for any `client.models.generate_content` /
+        `generate_content_stream` call so the tutor doesn't error out
+        on peak-hour 503s.
+        """
+        from google.genai import errors as genai_errors
+
+        last_exc = None
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                return fn()
+            except (genai_errors.ServerError, genai_errors.ClientError) as e:
+                last_exc = e
+                status = getattr(e, 'code', None) or getattr(e, 'status_code', None)
+                if status not in self._RETRYABLE_GEMINI_STATUSES:
+                    raise
+                if attempt >= self.MAX_RETRIES:
+                    raise
+                wait = self.RETRY_BACKOFF[attempt]
+                logger.warning(
+                    "[GeminiRetry] %s status=%s attempt=%d/%d wait=%ds model=%s",
+                    label, status, attempt + 1, self.MAX_RETRIES + 1,
+                    wait, self.config.model_name,
+                )
+                time.sleep(wait)
+        # Unreachable but keeps mypy happy
+        if last_exc:
+            raise last_exc
 
     def _build_contents(self, messages):
         """Map chat messages to Gemini Content objects, supporting multimodal."""
@@ -793,10 +858,13 @@ class GeminiClient(BaseLLMClient):
         if tools:
             config_kwargs['tools'] = tools
 
-        response = self.client.models.generate_content(
-            model=self.config.model_name,
-            contents=gemini_contents,
-            config=types.GenerateContentConfig(**config_kwargs),
+        response = self._call_with_retry(
+            lambda: self.client.models.generate_content(
+                model=self.config.model_name,
+                contents=gemini_contents,
+                config=types.GenerateContentConfig(**config_kwargs),
+            ),
+            label="_generate_impl",
         )
 
         usage = response.usage_metadata
@@ -944,10 +1012,13 @@ class GeminiClient(BaseLLMClient):
                 ),
             )
 
-        response = self.client.models.generate_content(
-            model=self.config.model_name,
-            contents=gemini_contents,
-            config=types.GenerateContentConfig(**config_kwargs),
+        response = self._call_with_retry(
+            lambda: self.client.models.generate_content(
+                model=self.config.model_name,
+                contents=gemini_contents,
+                config=types.GenerateContentConfig(**config_kwargs),
+            ),
+            label="generate_with_tools",
         )
         # Summary log
         function_call_count = 0
