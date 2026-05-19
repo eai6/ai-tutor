@@ -1789,6 +1789,34 @@ class ConversationalTutor:
         current_guidance = self._get_current_guidance()
         media_catalog = self._build_media_catalog()
 
+        # No-reveal guard for resume: if the student left mid-question
+        # with wrong attempts logged against a bank Q, the welcome-back
+        # turn previously summarised "where you were" by quoting the
+        # canonical answer ("The answer is B: ..."). The resume prompt
+        # doesn't go through _build_bank_grade_signal_block, so the
+        # main no-reveal directive doesn't reach it. Local e2e
+        # 2026-05-19: session 122 turn 7 leaked "the answer is B" on
+        # the welcome-back even though the move-on path itself didn't.
+        _aa = getattr(self, '_awaiting_answer', None) or {}
+        _aa_wrong = int(_aa.get('wrong_attempts', 0) or 0)
+        _aa_kind = _aa.get('kind') if isinstance(_aa, dict) else None
+        _has_unanswered_bank_q = (
+            _aa_kind in ('lesson_step', 'exit_ticket_question', 'inline_authored')
+            and _aa_wrong > 0
+        )
+        no_reveal_clause = ""
+        if _has_unanswered_bank_q:
+            no_reveal_clause = (
+                "\n\nSTRICT — the student left mid-question with "
+                f"{_aa_wrong} wrong attempt(s) on the in-flight bank "
+                "question. DO NOT reveal the correct answer in any "
+                "form (no 'the answer is X', no 'it was X', no "
+                "paraphrase of the canonical option text). Just "
+                "remind them what the question was about and invite "
+                "them to try again. The engine will keep them on the "
+                "same question until they answer correctly."
+            )
+
         prompt = f"""The student is returning to continue the lesson.
 
 Last message in conversation: {last_exchange['content'][:200] if last_exchange else 'None'}
@@ -1803,7 +1831,7 @@ Generate a brief, warm welcome back message that:
 3. Asks a question to re-engage them
 4. Only show media if your text directly references the figure (e.g. "the diagram below shows…"). Otherwise omit |||MEDIA:N|||.
 
-Keep it to 1-2 sentences + question, ~60 words max."""
+Keep it to 1-2 sentences + question, ~60 words max.{no_reveal_clause}"""
 
         response = self._generate_response(prompt, fallback_context="resume")
 
