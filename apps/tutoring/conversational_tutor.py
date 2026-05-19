@@ -5408,13 +5408,20 @@ Follow the current step; this concept will be covered in sequence."""
                 prompt_pack.tutor_system_prompt.strip())
             else None
         )
-        # Subject pack: derive from Course.is_math. Geography /
-        # history / language arts all use the 'general' default
-        # (empty injection). Future: extend with Course.subject_pack
-        # enum if more subjects need bespoke rules.
-        subject_pack = (
-            'math' if bool(getattr(course, 'is_math', False)) else 'general'
-        )
+        # Subject pack: prefer the canonical Course.subject_code
+        # (mathematics / geography / physics / chemistry / biology /
+        # english / french / history / computer_science / other) — same
+        # field used for teaching-material cross-institution sharing.
+        # Fall back to is_math for legacy rows where subject_code
+        # hasn't been backfilled yet (per
+        # `python manage.py backfill_course_subjects`).
+        subject_code = (getattr(course, 'subject_code', '') or '').strip().lower()
+        if subject_code:
+            subject_pack = subject_code
+        elif bool(getattr(course, 'is_math', False)):
+            subject_pack = 'mathematics'
+        else:
+            subject_pack = 'general'
         system_prompt = get_prompt_builder(provider).build_stable_prefix(
             ctx,
             prompt_pack_override=prompt_pack_override,
