@@ -66,6 +66,8 @@ class TutorPromptBuilder(ABC):
         self,
         ctx: StablePrefixContext,
         prompt_pack_override: Optional[str] = None,
+        *,
+        subject_pack: str = 'general',
     ) -> str:
         """Return the stable per-session prefix.
 
@@ -75,7 +77,13 @@ class TutorPromptBuilder(ABC):
                 place of the provider's default template. PromptPack
                 lets institutions override the tutor system prompt;
                 that override is provider-agnostic raw text and is
-                passed through after light interpolation.
+                passed through after light interpolation. When set,
+                subject_pack is IGNORED (the override is assumed to
+                be a complete prompt).
+            subject_pack: Subject-specific injection key. Currently
+                'general' (empty default) or 'math'. Threaded from
+                Course.is_math at the caller. Future subjects:
+                'science', 'language_arts', etc.
 
         Returns:
             The stable prefix as a string. Caller appends per-turn

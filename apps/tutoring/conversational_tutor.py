@@ -5381,12 +5381,12 @@ Follow the current step; this concept will be covered in sequence."""
         if prompt_pack and prompt_pack.safety_prompt and prompt_pack.safety_prompt.strip():
             safety_prompt = prompt_pack.safety_prompt
 
-        # Phase 1 of task #229 — provider dispatch. The Anthropic
-        # builder preserves the historical TUTOR_SYSTEM_PROMPT_TEMPLATE
-        # behaviour exactly (XML tags, format_map, defaultdict fallback).
-        # Gemini + OpenAI builders ship in later phases; until then,
-        # unknown providers fall back to the Anthropic builder via
-        # get_prompt_builder.
+        # Phase 1 + 2c of task #229 — provider dispatch + subject
+        # injection. The Anthropic / Gemini / OpenAI builders share
+        # a common signature; the dispatcher picks the right one by
+        # provider. Subject-specific rules (currently 'math' only)
+        # attach as an injection AFTER the base prompt when the
+        # course is tagged.
         from apps.tutoring.prompts import (
             StablePrefixContext, get_prompt_builder,
         )
@@ -5408,8 +5408,17 @@ Follow the current step; this concept will be covered in sequence."""
                 prompt_pack.tutor_system_prompt.strip())
             else None
         )
+        # Subject pack: derive from Course.is_math. Geography /
+        # history / language arts all use the 'general' default
+        # (empty injection). Future: extend with Course.subject_pack
+        # enum if more subjects need bespoke rules.
+        subject_pack = (
+            'math' if bool(getattr(course, 'is_math', False)) else 'general'
+        )
         system_prompt = get_prompt_builder(provider).build_stable_prefix(
-            ctx, prompt_pack_override=prompt_pack_override,
+            ctx,
+            prompt_pack_override=prompt_pack_override,
+            subject_pack=subject_pack,
         )
 
         # Inject tutor personality modifier if student has one selected
