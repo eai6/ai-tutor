@@ -4730,45 +4730,50 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
             "There is a question already in flight that the student is "
             f"looking at in the artifact panel (wrong_attempts={wrong}). "
             "Your job this turn is to SCAFFOLD that question — NOT to "
-            "pose a new one.\n"
-            "Rules for this turn:\n"
-            "- Do NOT author a new question. The pose_question and "
-            "pose_inline_question tools are intentionally hidden "
-            "because the student should retry the existing in-flight "
-            "question.\n"
-            "- Give a TEXT HINT only — name the misconception, break "
-            "the problem into a smaller piece, or remind the student "
-            "of the relevant concept.\n"
-            "- Do NOT restate the full in-flight question stem — the "
-            "student can see it. Refer to it briefly (e.g. 'for the "
-            "question above…') if you need to anchor.\n"
-            "- End with a short prompt to retry (e.g. 'try again with "
-            "that in mind') — this is an invitation, not a new "
-            "question.\n"
+            "pose a new one, NOT to paraphrase it, NOT to simplify it.\n"
+            "Strict rules for this turn:\n"
+            "1. NO QUESTIONS of any kind in your response. Not a new "
+            "question. Not a simpler version of the in-flight question. "
+            "Not a paraphrase of it. Not 'a smaller piece' of it. Not "
+            "an open-ended 'what do you think?' reflection. Your "
+            "response must contain ZERO question marks.\n"
+            "2. The in-flight question stays VERBATIM on the student's "
+            "screen — do NOT restate it, paraphrase it, simplify it, or "
+            "split it into sub-questions. The student will retry the "
+            "exact question that is already in flight.\n"
+            "3. Give a HINT AS A STATEMENT — name the misconception "
+            "directly, or remind the student of the relevant concept. "
+            "Frame as: 'X is about Y, not Z.' or 'Remember that…' — "
+            "never as a question.\n"
+            "4. Close with a retry invitation phrased as a STATEMENT "
+            "(e.g. 'Try again with that in mind.', 'Give it another "
+            "shot.', 'Pick again from the options above.'). Never as "
+            "a question.\n"
+            "Why this matters: the engine is waiting for the student "
+            "to answer the SPECIFIC in-flight question. If you author "
+            "a different question, the student answers your new question "
+            "but the grader scores it against the in-flight one — "
+            "they always get marked wrong and lose faith.\n"
             "</scaffolding_mode>"
         )
 
     def _reveal_threshold(self) -> int:
         """Number of wrong attempts at which move-on becomes allowed
-        (no reveal — pivot to easier same-concept Q). Difficulty-tiered
-        (decision 2026-05-17, revised same day — hard dropped 4→3 per
-        pilot directive: only 4 MCQ choices total, so 4 hints exceeds
-        the option count and is excessive):
+        (no reveal — pivot to easier same-concept Q).
 
-          easy (-2, -1) → 2  (1 hint, move-on at 2nd wrong)
-          medium (0)    → 3  (2 hints, move-on at 3rd wrong)
-          hard  (+1,+2) → 3  (2 hints — same count as medium, but
-                              difficulty differentiated by hint
-                              OBVIOUSNESS in _build_hint_calibration_block;
-                              hard hints stay subtle/inferential)
+        Pilot directive 2026-05-19: uniform threshold of 3 for ALL
+        difficulty levels. Earlier tiering (easy=2, others=3) caused
+        easy-mode students whose auto-difficulty had been dropped by
+        recent wrongs to hit move-on after only 2 attempts, often
+        before they'd seen enough scaffolding. Three attempts gives
+        every student two genuine hint rounds before the engine
+        pivots to a different angle.
 
-        Lower-performing students get to canonical faster; higher-
-        performing students get more productive struggle time via
-        less-obvious hint phrasing rather than more hint cycles.
+        Difficulty still steers hint OBVIOUSNESS via
+        `_build_hint_calibration_block` — easy students get more
+        explicit hints; hard students get subtler/inferential ones —
+        but the COUNT of attempts before move-on is the same.
         """
-        level = int(getattr(self, 'difficulty_level', 0) or 0)
-        if level <= -1:
-            return 2
         return 3
 
     def _build_hint_calibration_block(
@@ -9336,19 +9341,42 @@ Follow the current step; this concept will be covered in sequence."""
         elif reveal_allowed:
             guidance = (
                 f"The student has now missed this question "
-                f"{wrong_attempts} times (move-on threshold: "
-                f"{_reveal_at}). MOVE ON — do NOT reveal the correct "
-                "answer. Acknowledge their attempt gently ('that's a "
-                "tricky one — let's try a different angle'). In ONE "
-                "or TWO short sentences, RE-EXPLAIN the underlying "
-                "concept the question was testing WITHOUT naming the "
-                "correct option letter and WITHOUT paraphrasing the "
-                "canonical answer text. Then immediately pose a "
-                "DIFFERENT question on the SAME concept (or an "
-                "easier related one) via the pose_question tool — "
-                "ideally one tagged easy or with simpler wording. "
-                "NEVER state 'the correct answer is X' or describe "
-                "the canonical option."
+                f"{wrong_attempts} times (threshold: {_reveal_at}). "
+                "The engine will NOT advance the step on a wrong "
+                "answer — competency on this sub-objective is gated "
+                "by a CORRECT answer. Your job is to keep the "
+                "student on this concept with a DIFFERENT question.\n"
+                "What TO do (in this order, ONE short response):\n"
+                "  1. Acknowledge briefly — 'that one was tricky — "
+                "let's try a different angle' or similar. Do NOT use "
+                "the words 'correct', 'right', or 'exactly'.\n"
+                "  2. In ONE or TWO short sentences, EXPLAIN the "
+                "underlying concept the question was testing. Frame "
+                "as a teaching statement about the IDEA, not the "
+                "answer. Use canonical_explanation below as a guide "
+                "for WHICH concept to surface, but describe it in "
+                "your own words about the concept generally.\n"
+                "  3. Pose a DIFFERENT bank question on the SAME "
+                "concept (or an easier related one) via the "
+                "pose_question tool. The new question must be "
+                "substantively different from the missed one — not "
+                "a paraphrase.\n"
+                "ABSOLUTELY FORBIDDEN (will trigger leak detector "
+                "and regen):\n"
+                "  - Naming the correct option letter ('The answer "
+                "is B', 'It was B', 'The correct option is B', 'B "
+                "is right', 'B) <text>').\n"
+                "  - Paraphrasing or restating the canonical option "
+                "text in any form.\n"
+                "  - Walking through the canonical solution.\n"
+                "  - Saying 'the right answer was...' / 'the "
+                "answer you missed was...' / equivalent.\n"
+                "  - Skipping straight to a new concept — the "
+                "engine WILL keep the student on this step.\n"
+                "If the bank pool is exhausted on this concept, "
+                "explain the concept in plain prose and let the "
+                "engine handle advancement via the hard cap. Do "
+                "NOT author a free-text question to fill the gap."
             )
         else:
             guidance = (
@@ -9395,8 +9423,13 @@ Follow the current step; this concept will be covered in sequence."""
         # obviousness directive when reveal is NOT yet allowed.
         # Resolves the canonical option letter + text when MCQ so the
         # forbidden list quotes the actual canonical text.
+        # 2026-05-19: render the FORBIDDEN/ACCEPTABLE list on EVERY
+        # wrong-grade turn, not just pre-reveal. At move-on time the
+        # prose directive alone was getting rationalised past ("the
+        # answer is B" doesn't quite match "the correct answer is X");
+        # the concrete forbidden examples close that gap.
         calibration_block = ""
-        if not grade.is_correct and not reveal_allowed:
+        if not grade.is_correct:
             _opt_letter: Optional[str] = None
             _opt_text: Optional[str] = None
             try:
@@ -9421,7 +9454,7 @@ Follow the current step; this concept will be covered in sequence."""
             calib = self._build_hint_calibration_block(
                 correct_option_letter=_opt_letter,
                 correct_option_text=_opt_text,
-                reveal_allowed=False,
+                reveal_allowed=reveal_allowed,
             )
             if calib:
                 calibration_block = "\n" + calib
@@ -10741,32 +10774,26 @@ asks for a specific item (e.g. "which is smallest"), the answer must identify th
             )
             return True
 
-        # 1.5 — Reveal-on-threshold advance (2026-05-17). If the bank
-        # Q on the current step reached the difficulty-tiered reveal
-        # threshold AND the just-graded verdict was wrong, the tutor
-        # has revealed the canonical answer — the step is "done" via
-        # reveal, not via a correct verdict. Without this, the step
-        # gets stuck because is_correct=False can't trip the
-        # deterministic fast-path, and the LLM step_complete judge
-        # tends to stay False after a wrong verdict.
-        # Pilot 2026-05-17 lesson 540 session 49: step 0 stuck after
-        # reveal on the population-density Q; tutor authored a new
-        # MCQ inline but engine didn't advance, so the next reply
-        # routed back to qid=3103 via the bank-link fallback.
-        _aa_advance = getattr(self, '_awaiting_answer', None) or {}
-        _wrong_attempts_advance = int(_aa_advance.get('wrong_attempts', 0) or 0)
-        _reveal_at = self._reveal_threshold()
-        if (
-            is_correct is False
-            and _wrong_attempts_advance >= _reveal_at
-        ):
-            logger.info(
-                "[StepAdvance] REVEAL_ON_THRESHOLD step=%d type=%s "
-                "wrong_attempts=%d >= reveal_threshold=%d → advance",
-                self.current_topic_index, step_type,
-                _wrong_attempts_advance, _reveal_at,
-            )
-            return True
+        # 1.5 — REMOVED 2026-05-19. Previously this branch advanced
+        # the step when wrong_attempts >= reveal_threshold AND verdict
+        # was wrong. That conflated "give up on this question" with
+        # "advance the step", which violated the competency-gated
+        # advancement principle: the student should stay on the same
+        # step (with a different bank Q on the same concept) until
+        # they demonstrate competency (is_correct=True) or hit the
+        # hard cap below.
+        #
+        # When wrong_attempts >= reveal_threshold, the engine now
+        # keeps the student on the step. The bank_grade signal
+        # directs the tutor to pose a DIFFERENT bank Q on the same
+        # concept via pose_question. No reveal, no advance. If the
+        # student stays stuck, the hard cap (10 exchanges) is the
+        # safety valve.
+        #
+        # Earlier pilot bug this branch was fixing (lesson 540
+        # session 49 step 0 stuck after reveal) is now addressed by
+        # the no-reveal directive itself — there's no "post-reveal
+        # stuck" state because there's no reveal.
 
         # 2. Min exchange floor before any advancement decision fires.
         min_exchanges = self._STEP_EVAL_MIN_EXCHANGES.get(step_type, 1)
