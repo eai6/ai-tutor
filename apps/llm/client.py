@@ -516,6 +516,15 @@ class OllamaClient(BaseLLMClient):
 class OpenAIClient(BaseLLMClient):
     """Client for OpenAI's GPT API."""
 
+    # Model-name prefixes whose Chat Completions endpoint requires
+    # `max_completion_tokens` instead of `max_tokens` and rejects
+    # `temperature` (Phase 2b of task #229 — validation slice
+    # surfaced this on GPT-5).
+    #   - gpt-5, gpt-5.1, gpt-5.2, gpt-5.3-*  (GPT-5 family)
+    #   - o1, o3, o4, o5  (o-series reasoning models)
+    # GPT-4 family + GPT-4o + GPT-4.1 still use the legacy params.
+    _NEW_GEN_PREFIXES = ("gpt-5", "o1", "o3", "o4", "o5")
+
     def __init__(self, config: ModelConfig):
         super().__init__(config)
         if not self.api_key:
@@ -527,6 +536,38 @@ class OpenAIClient(BaseLLMClient):
             self.client = openai.OpenAI(api_key=self.api_key)
         except ImportError:
             raise ImportError("openai package not installed. Run: pip install openai")
+
+    def _is_new_generation(self, model_name: str | None = None) -> bool:
+        """True when the target model uses Chat Completions' newer
+        max_completion_tokens (instead of max_tokens) and rejects
+        custom temperature (reasoning-internal models)."""
+        name = (model_name or self.config.model_name or "").strip().lower()
+        return any(name.startswith(p) for p in self._NEW_GEN_PREFIXES)
+
+    def _build_completion_kwargs(
+        self,
+        *,
+        max_tokens: int | None,
+        temperature: float | None,
+    ) -> dict:
+        """Return the kwargs to pass to chat.completions.create that
+        match the target model's expectations:
+          - new-gen (GPT-5+, o-series): max_completion_tokens, no
+            temperature override (model reasons internally)
+          - legacy: max_tokens + temperature
+        """
+        resolved_max = max_tokens or self.config.max_tokens
+        if self._is_new_generation():
+            # New-gen — only max_completion_tokens, no temperature.
+            return {"max_completion_tokens": resolved_max}
+        # Legacy: max_tokens + temperature
+        resolved_temp = (
+            temperature if temperature is not None else self.config.temperature
+        )
+        return {
+            "max_tokens": resolved_max,
+            "temperature": resolved_temp,
+        }
 
     def _generate_impl(
         self,
@@ -542,15 +583,16 @@ class OpenAIClient(BaseLLMClient):
         openai_messages = [{"role": "system", "content": system_prompt}]
         openai_messages.extend(messages)
 
-        resolved_temp = temperature if temperature is not None else self.config.temperature
+        completion_kwargs = self._build_completion_kwargs(
+            max_tokens=max_tokens, temperature=temperature,
+        )
 
         response = self.client.chat.completions.create(
             model=self.config.model_name,
-            max_tokens=max_tokens or self.config.max_tokens,
-            temperature=resolved_temp,
             messages=openai_messages,
+            **completion_kwargs,
         )
-        
+
         return LLMResponse(
             content=response.choices[0].message.content,
             tokens_in=response.usage.prompt_tokens,
@@ -634,27 +676,17 @@ class OpenAIClient(BaseLLMClient):
                     kwargs["tool_choice"] = low
                 elif low == "auto":
                     pass  # omit
-        # Reasoning models (o1/o3 family) reject `max_tokens` — they
-        # use `max_completion_tokens` and ignore `temperature`. Fall back
-        # gracefully on TypeError so we don't have to maintain a list.
-        max_t = max_tokens or self.config.max_tokens
-        try:
-            response = self.client.chat.completions.create(
-                **kwargs,
-                max_tokens=max_t,
-                temperature=self.config.temperature,
-            )
-        except Exception as e:
-            msg = str(e).lower()
-            if "max_tokens" in msg or "temperature" in msg:
-                # Reasoning model — retry with the supported params only.
-                logger.info(
-                    "[OpenAITools] retrying without max_tokens/temperature for %s",
-                    self.config.model_name,
-                )
-                response = self.client.chat.completions.create(**kwargs)
-            else:
-                raise
+        # Pick the right token / temperature kwargs per model
+        # generation — GPT-5+ and o-series use max_completion_tokens
+        # and reject temperature; legacy GPT-4* uses max_tokens +
+        # temperature (Phase 2b of task #229).
+        completion_kwargs = self._build_completion_kwargs(
+            max_tokens=max_tokens, temperature=None,
+        )
+        response = self.client.chat.completions.create(
+            **kwargs,
+            **completion_kwargs,
+        )
         logger.info(
             "[OpenAITools] response: model=%s in=%d out=%d finish=%s tool_calls=%d",
             response.model,
