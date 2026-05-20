@@ -2005,6 +2005,13 @@ Keep it to 2-3 sentences."""
         This is the main conversation loop.
         Media selection: LLM signals via |||MEDIA:N||| tail-line, parsed before saving.
         """
+        # Latency instrumentation — stamped at the top of every turn
+        # and emitted via the TurnSummary payload. Per-component
+        # breakdown comes from grepping the `[GeminiTools]` /
+        # `[QuestionTool] llm_response` / `[SelfRetry]` log lines
+        # which already carry their own wall times.
+        import time as _t_latency
+        self._turn_t0 = _t_latency.monotonic()
         self._step_just_advanced = False
 
         # Snapshot awaiting_answer's turn_index so we can detect at the
@@ -2381,6 +2388,14 @@ Keep it to 2-3 sentences."""
                 rule_check=(combined_judge_result is None),
                 # Used by the figure-ref-without-signal check.
                 media_attached=bool(media),
+                # Gate the deictic-figure check on whether this step
+                # actually has media — prevents firing on "the map" in
+                # a geography lesson without figures (2026-05-20 audit
+                # showed this was 57% of all regen triggers).
+                step_has_media=bool(
+                    (getattr(self, '_step_media_ids', {}) or {})
+                    .get(self.current_topic_index)
+                ),
                 # NO_QUESTION_TOOL check (task #197): catches the LLM
                 # typing a fresh MCQ in prose instead of using
                 # pose_question / pose_inline_question.
@@ -3226,6 +3241,10 @@ Keep it to 2-3 sentences."""
                 student_input=student_input,
                 bank_stems=self._current_bank_stems(),
                 media_attached=bool(media),
+                step_has_media=bool(
+                    (getattr(self, '_step_media_ids', {}) or {})
+                    .get(self.current_topic_index)
+                ),
                 tool_use_count=int(turn_metadata.get('tool_use_count', 0) or 0),
                 awaiting_answer_is_set=isinstance(
                     getattr(self, '_awaiting_answer', None), dict,
@@ -7548,6 +7567,10 @@ Follow the current step; this concept will be covered in sequence."""
                 fact_check=False,
                 rule_check=False,
                 media_attached=False,
+                # Welcome turn isn't pinned to a step — assume no media
+                # context. Anti-figure-ref suppression won't fire either
+                # way since the welcome rarely mentions specific figures.
+                step_has_media=False,
                 tool_use_count=int(turn_metadata.get('tool_use_count', 0) or 0),
                 awaiting_answer_is_set=isinstance(
                     getattr(self, '_awaiting_answer', None), dict,
@@ -12139,6 +12162,14 @@ Which concept numbers were meaningfully covered?"""
                 "regeneration_reason": list(metadata.get('regeneration_reason', []) or []),
                 # Step eval (combined judge CHECK 4)
                 "step_complete": metadata.get('step_complete'),
+                # End-to-end turn wall time (seconds). Component
+                # breakdown derives from per-call `[GeminiTools]`
+                # / `[QuestionTool] llm_response` / `[SelfRetry]`
+                # log lines that already carry per-LLM-call timings.
+                "turn_wall_s": (
+                    round(__import__('time').monotonic() - self._turn_t0, 2)
+                    if hasattr(self, '_turn_t0') else None
+                ),
             }
             # JSON-safe single line. Use logger.info — Azure picks it up.
             logger.info("[TurnSummary] %s", _json.dumps(payload, default=str))

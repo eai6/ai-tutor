@@ -310,6 +310,7 @@ def validate_tutor_response(
     bank_signal_used: Optional[bool] = None,
     combined_result=None,
     media_attached: bool = True,
+    step_has_media: bool = True,
     tool_use_count: int = 0,
     awaiting_answer_is_set: bool = False,
 ) -> ValidationResult:
@@ -410,9 +411,15 @@ def validate_tutor_response(
     # diagram"/"in the figure" but no media was attached for this turn.
     # The student sees a deictic reference to a visual that isn't there
     # ("Looking at the diagram, you can see…" → "where is the diagram?").
-    # Soft issue for now — surfaced in [TurnSummary] without triggering
-    # regen, so we can quantify before deciding to escalate.
-    if not media_attached and _FIGURE_DEICTIC_RE.search(content):
+    #
+    # 2026-05-20: Gated on `step_has_media` after audit found this was
+    # the dominant false-positive trigger — 57% of all regens, 144 of
+    # those on L540 alone where the lesson is ABOUT maps so "the map"
+    # matches the deictic regex constantly but there's no figure for
+    # the step. Only fire when the step actually has a figure that
+    # COULD have been signaled; otherwise "the map" is a conceptual
+    # reference, not a deictic pointer at a visual.
+    if step_has_media and not media_attached and _FIGURE_DEICTIC_RE.search(content):
         issues.append(ISSUE_FIGURE_REF_WITHOUT_SIGNAL)
 
     # L2 — pedagogical praise gate (universal; previously math-only)
