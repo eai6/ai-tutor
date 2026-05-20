@@ -76,8 +76,8 @@ _LEAKED_TOOL_FN_RE = re.compile(
 # Detect-and-discard the cycle so the retry loop tries again rather
 # than shipping the markup verbatim.
 _LEAKED_TOOL_MARKUP_RE = re.compile(
-    r'\|{2,}\s*tool[_ ]?(?:call|use)\s*:'
-    r'|\btool[_ ]?(?:call|use)\s*:\s*pose_(?:inline_)?question\b',
+    r'\|{2,}\s*tool[_ ]?(?:call|use|code)\s*:'
+    r'|\btool[_ ]?(?:call|use|code)\s*:\s*pose_(?:inline_)?question\b',
     re.IGNORECASE,
 )
 

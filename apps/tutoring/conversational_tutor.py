@@ -5298,7 +5298,24 @@ Follow the current step; this concept will be covered in sequence."""
                 messages=messages,
                 system_prompt=system_prompt,
             )
-            return response.content.strip()
+            # Defensive strip: when scaffolding (no tools offered) Gemini
+            # still occasionally invents tool-call markup in prose
+            # ("tool_code: pose_question(slot=N)", "|||tool_call:...|||").
+            # The tool-message path strips inside
+            # _handle_pose_question_message; this path needs the same
+            # treatment so the markup never reaches the student. The
+            # validator below catches what survives and triggers regen.
+            text_path_raw = response.content.strip()
+            text_path_cleaned, _leak_chars = self._strip_leaked_tool_call_syntax(
+                text_path_raw,
+            )
+            if _leak_chars:
+                logger.warning(
+                    "[QuestionTool] TEXT_PATH LEAKED_TOOL_SYNTAX — "
+                    "stripped %d chars from scaffolding response",
+                    _leak_chars,
+                )
+            return text_path_cleaned
 
         except Exception as e:
             logger.error(
@@ -6760,17 +6777,17 @@ Follow the current step; this concept will be covered in sequence."""
     # markup).
     _LEAKED_TOOL_CALL_RE = re.compile(
         # Fence form: |||tool_call:NAME{...}||| (and trailing |||)
-        r"\|{2,}\s*tool[_ ]?(?:call|use)\s*:\s*\w+\s*\{[^}]*\}\s*\|{2,}"
+        r"\|{2,}\s*tool[_ ]?(?:call|use|code)\s*:\s*\w+\s*\{[^}]*\}\s*\|{2,}"
         # Bare function form: pose_question(slot=N[, lead_in="..."])
         r"|\bpose_(?:inline_)?question\s*\(\s*slot\s*=\s*\d+\s*"
         r"(?:,\s*lead_in\s*=\s*[\"'][^\"']*[\"']\s*)?\)"
         # Inline-question full form: pose_inline_question(question="...", ...)
         r"|\bpose_inline_question\s*\([^)]*\)"
         # Prefix form: "tool_use:" / "tool_call:" followed by a pose call
-        r"|\btool[_ ]?(?:call|use)\s*:\s*pose_(?:inline_)?question[^.\n]*"
+        r"|\btool[_ ]?(?:call|use|code)\s*:\s*pose_(?:inline_)?question[^.\n]*"
         # Lone fence form (sometimes Gemini emits |||tool_call:pose_question|||
         # without a body): also strip
-        r"|\|{2,}\s*tool[_ ]?(?:call|use)\s*:[^|]*\|{2,}",
+        r"|\|{2,}\s*tool[_ ]?(?:call|use|code)\s*:[^|]*\|{2,}",
         re.IGNORECASE,
     )
 

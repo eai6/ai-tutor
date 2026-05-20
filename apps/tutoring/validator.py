@@ -238,11 +238,11 @@ _PROSE_MCQ_RE = re.compile(
 # (shipping raw markup) breaks the UI.
 _TOOL_CALL_LEAK_RE = re.compile(
     # Triple-pipe fence form: |||tool_call:NAME{...}||| or |||tool_use:NAME(...)|||
-    r'\|{2,}\s*tool[_ ]?(?:call|use)\s*:\s*\w+'
+    r'\|{2,}\s*tool[_ ]?(?:call|use|code)\s*:\s*\w+'
     # Prefix-and-call form: "tool_use:" or "tool_call:" followed by a
     # function-style invocation (`pose_question(`, `pose_inline_question(`,
     # generic `name(`).
-    r'|\btool[_ ]?(?:call|use)\s*:\s*pose_(?:inline_)?question\b'
+    r'|\btool[_ ]?(?:call|use|code)\s*:\s*pose_(?:inline_)?question\b'
     # Bare function-call form for our pose tools (matches the
     # self-retry detector pattern). Covers e.g. `pose_question(slot=N)`
     # that escaped the engine's narrower strip regex.
