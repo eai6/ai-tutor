@@ -763,6 +763,62 @@ class OpenAIClient(BaseLLMClient):
         name = (model_name or self.config.model_name or "").strip().lower()
         return any(name.startswith(p) for p in self._NEW_GEN_PREFIXES)
 
+    def _translate_messages_for_openai(self, messages: list[dict]) -> list[dict]:
+        """Convert Anthropic-shaped content blocks to OpenAI's
+        Chat Completions shape.
+
+        The tutor engine builds multimodal user messages in Anthropic
+        shape: `content` is either a string or a list of blocks
+        `{"type":"text","text":...}` / `{"type":"image","source":{...}}`.
+        OpenAI Chat Completions accepts `{"type":"text",...}` verbatim
+        but rejects `{"type":"image",...}` — it requires
+        `{"type":"image_url","image_url":{"url":"data:<mime>;base64,<b64>"}}`.
+
+        Block-by-block translation, idempotent (already-translated
+        blocks pass through). String contents and non-image blocks
+        are untouched. Math L638 (figures) was failing every
+        OpenAI tutor call until this landed (task #247).
+        """
+        translated: list[dict] = []
+        for msg in messages or []:
+            content = msg.get('content')
+            if not isinstance(content, list):
+                # Plain-string content — OpenAI accepts as-is.
+                translated.append(msg)
+                continue
+            new_blocks: list[dict] = []
+            for block in content:
+                if not isinstance(block, dict):
+                    new_blocks.append(block)
+                    continue
+                btype = block.get('type')
+                if btype == 'image':
+                    src = block.get('source') or {}
+                    media_type = src.get('media_type') or 'image/png'
+                    if src.get('type') == 'base64':
+                        data = src.get('data') or ''
+                        url = f"data:{media_type};base64,{data}"
+                    elif src.get('type') == 'url':
+                        url = src.get('url') or ''
+                    else:
+                        # Unknown shape — drop the image quietly rather
+                        # than crashing the whole request.
+                        logger.warning(
+                            "[OpenAITranslate] unknown image source "
+                            "type=%s — dropping block", src.get('type'),
+                        )
+                        continue
+                    new_blocks.append({
+                        "type": "image_url",
+                        "image_url": {"url": url},
+                    })
+                else:
+                    # text / image_url / anything else OpenAI knows
+                    # passes through verbatim.
+                    new_blocks.append(block)
+            translated.append({**msg, 'content': new_blocks})
+        return translated
+
     def _build_completion_kwargs(
         self,
         *,
@@ -800,7 +856,9 @@ class OpenAIClient(BaseLLMClient):
 
         # OpenAI uses system message in the messages array
         openai_messages = [{"role": "system", "content": system_prompt}]
-        openai_messages.extend(messages)
+        openai_messages.extend(
+            self._translate_messages_for_openai(messages)
+        )
 
         completion_kwargs = self._build_completion_kwargs(
             max_tokens=max_tokens, temperature=temperature,
@@ -860,7 +918,9 @@ class OpenAIClient(BaseLLMClient):
             })
 
         openai_messages = [{"role": "system", "content": system_prompt}]
-        openai_messages.extend(messages)
+        openai_messages.extend(
+            self._translate_messages_for_openai(messages)
+        )
 
         kwargs = dict(
             model=self.config.model_name,
