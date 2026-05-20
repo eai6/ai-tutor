@@ -2403,10 +2403,24 @@ Keep it to 2-3 sentences."""
         # bank grader verdict was correct (no leak possible), or when
         # wrong_attempts has reached the reveal-allowed threshold (>=3).
         # See memory/hint_vs_reveal_guards_plan.md W1.
+        #
+        # 2026-05-20: Disabled by default. The unified judge already
+        # covers answer-leak detection as dimension 10 (single multi-
+        # axis call, no extra LLM round-trip). Keeping this as a
+        # gated path so we can flip it back on if the unified judge's
+        # leak detection turns out to miss the deterministic edge
+        # cases this detector handled (string-match anchored to
+        # bank.correct_answer, chat-authored Q synthesis from
+        # grader.expected, wrong_attempts gating).
+        # Kill-switch: LEGACY_ANSWER_LEAK_DETECTOR=on
+        import os as _os_leak
+        _legacy_leak_enabled = _os_leak.getenv(
+            'LEGACY_ANSWER_LEAK_DETECTOR', '',
+        ).strip().lower() in ('on', '1', 'true')
         try:
             _bank_grade_for_leak = getattr(self, '_pending_bank_grade', None)
             _bank_verdict_for_leak = getattr(_bank_grade_for_leak, 'is_correct', None) if _bank_grade_for_leak else None
-            if _bank_verdict_for_leak is False:
+            if _legacy_leak_enabled and _bank_verdict_for_leak is False:
                 # Only fire leak check when the student JUST got wrong.
                 from apps.tutoring.answer_leak import detect_answer_leak
                 from apps.tutoring.validator import ISSUE_ANSWER_LEAK
