@@ -65,10 +65,27 @@ MODELS: list[ModelSpec] = [
     # naming the seeded rows have.
     ModelSpec('gemini-3-pro', 'Gemini 3.1 Pro', 'google',
               'gemini-3.1-pro-preview', 'best'),
-    ModelSpec('gemini-3-flash', 'Gemini 3.1 Flash', 'google',
-              'gemini-3.1-flash-preview', 'mid'),
+    # 2026-05-19: was 'gemini-3.1-flash-preview' (404s — doesn't exist).
+    # The real Gemini 3 Flash preview lives at this id.
+    ModelSpec('gemini-3-flash', 'Gemini 3 Flash Preview', 'google',
+              'gemini-3-flash-preview', 'mid'),
     ModelSpec('gemini-25-flash', 'Gemini 2.5 Flash', 'google',
               'gemini-2.5-flash', 'small'),
+    # Added 2026-05-19 — focused Gemini Flash re-evaluation after the
+    # original 'gemini-3.1-flash-preview' returned 404 on the matrix
+    # run. These 4 ids are all confirmed available + tool-calling on
+    # smoke tests; pick winner via this experiment.
+    ModelSpec('gemini-35-flash', 'Gemini 3.5 Flash', 'google',
+              'gemini-3.5-flash', 'mid'),
+    ModelSpec('gemini-31-flash-lite', 'Gemini 3.1 Flash Lite', 'google',
+              'gemini-3.1-flash-lite', 'small'),
+    ModelSpec('gemini-31-flash-lite-preview', 'Gemini 3.1 Flash Lite Preview',
+              'google', 'gemini-3.1-flash-lite-preview', 'small'),
+    # Custom-tools-tuned Pro variant — hypothesis is this fixes the
+    # 3-pro answer-leak regression (3 leaks vs 0 for Opus/Sonnet on
+    # the same matrix).
+    ModelSpec('gemini-31-pro-customtools', 'Gemini 3.1 Pro Custom Tools',
+              'google', 'gemini-3.1-pro-preview-customtools', 'best'),
     # OpenAI — GPT-5 if reachable; otherwise GPT-4o as best-tier.
     ModelSpec('gpt-5', 'GPT-5', 'openai',
               'gpt-5', 'best'),
