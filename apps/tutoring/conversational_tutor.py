@@ -6771,13 +6771,35 @@ Follow the current step; this concept will be covered in sequence."""
             'question_type': 'mcq',
         }
         # Engine-state awaiting_answer for the grader to find.
+        # Initialize wrong_attempts explicitly so the grader's
+        # increment (line 8068) has a numeric base — previously the
+        # missing field caused `wrong_attempts` to stay None through
+        # the entire session (session 196 stuck-loop bug 2026-05-20).
         record = {
             'kind': 'inline_authored',
             'question_id': None,
             'question_type': 'mcq',
             'turn_index': int(turn_index),
             'posed_at': posed_at_iso,
+            'wrong_attempts': 0,
+            # Stash the canonical answer so the grader can resolve
+            # against this record even when turn_metadata lookup
+            # later in the session loses the inline_authored payload
+            # (the second arm of the state-drift bug — without this
+            # the grader falls back to a stale ExitTicketQuestion).
+            'correct_answer': (correct_answer or '').strip().upper(),
         }
+        # Preserve accumulated wrong_attempts when the LLM re-poses
+        # the SAME question (scaffolding gate is supposed to prevent
+        # this but defends-in-depth against pose-loops where the
+        # counter would otherwise reset to 0 every turn).
+        prev_aa = getattr(self, '_awaiting_answer', None)
+        if (
+            isinstance(prev_aa, dict)
+            and prev_aa.get('kind') == 'inline_authored'
+            and (prev_aa.get('correct_answer') or '').upper() == record['correct_answer']
+        ):
+            record['wrong_attempts'] = int(prev_aa.get('wrong_attempts', 0) or 0)
         if not hasattr(self, '_turn_questions') or self._turn_questions is None:
             self._turn_questions = {}
         self._turn_questions[str(turn_index)] = record
@@ -8047,8 +8069,43 @@ Follow the current step; this concept will be covered in sequence."""
         # chat-authored / inline-MCQ when the LLM didn't call
         # pose_question — without this the hint-vs-reveal threshold
         # never opens (task #173).
+        #
+        # 2026-05-20 (session 196 root cause): also re-sync
+        # _awaiting_answer when the grader resolved to a question
+        # that DIFFERS from the active awaiting record. Previously
+        # the increment would land on a stale inline_authored dict
+        # while the grader graded against a different
+        # ExitTicketQuestion (state drift) — wrong_attempts never
+        # accumulated on the question the student was actually
+        # answering, so the move-on threshold never fired.
         if getattr(result, 'is_correct', None) is False:
-            if not isinstance(getattr(self, '_awaiting_answer', None), dict):
+            aa_now = getattr(self, '_awaiting_answer', None)
+            aa_kind = aa_now.get('kind') if isinstance(aa_now, dict) else None
+            aa_qid = aa_now.get('question_id') if isinstance(aa_now, dict) else None
+            graded_kind = q.source
+            graded_id = q.source_id
+            drift = (
+                isinstance(aa_now, dict)
+                and aa_kind != graded_kind
+                # treat inline_authored↔inline_mcq as same family
+                and not (
+                    {aa_kind, graded_kind}
+                    <= {'inline_authored', 'inline_mcq', SOURCE_CHAT_AUTHORED}
+                )
+            ) or (
+                isinstance(aa_now, dict)
+                and aa_kind == graded_kind
+                and aa_qid is not None
+                and graded_id is not None
+                and aa_qid != graded_id
+            )
+            if drift:
+                logger.warning(
+                    "[GraderDrift] session=%s aa=(%s,%s) graded=(%s,%s) — "
+                    "resync awaiting to graded question",
+                    self.session.id, aa_kind, aa_qid, graded_kind, graded_id,
+                )
+            if not isinstance(aa_now, dict) or drift:
                 from django.utils import timezone as _tz
                 self._awaiting_answer = {
                     'kind': 'inline_mcq' if bootstrap_mcq else (
@@ -8059,7 +8116,12 @@ Follow the current step; this concept will be covered in sequence."""
                     'question_type': q.question_type,
                     'turn_index': len(self.conversation),
                     'posed_at': _tz.now().isoformat(),
-                    'wrong_attempts': 0,
+                    # Preserve accumulated wrong_attempts on drift so
+                    # we don't reset the student's strike counter when
+                    # the engine re-syncs to the actually-graded Q.
+                    'wrong_attempts': int(
+                        (aa_now or {}).get('wrong_attempts', 0) or 0
+                    ) if drift else 0,
                     'authored_question_text': q.stem[:600] if q.source in (
                         SOURCE_CHAT_AUTHORED, SOURCE_INLINE_AUTHORED,
                     ) else '',
