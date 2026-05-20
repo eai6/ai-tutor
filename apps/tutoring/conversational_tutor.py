@@ -6743,13 +6743,34 @@ Follow the current step; this concept will be covered in sequence."""
     # one clean retry, then ship the regen output as-is. No surgery.
 
     # Defensive strip for leaked tool-call syntax in text blocks.
-    # Some turns the LLM types the literal `pose_question(slot=N)`
-    # syntax instead of emitting a real tool_use block — the student
-    # then sees those characters as raw text. We strip them.
-    # Conservative: only matches the exact pose_question(slot=...)
-    # shape, not other text containing parens or "pose_question".
+    # Multiple LLMs invent multiple markup forms; cover the observed
+    # variants so the student never sees raw protocol syntax.
+    # Observed forms (in production / browser e2e):
+    #   - pose_question(slot=N) / pose_question(slot=N, lead_in="...")
+    #     — original Anthropic-style leak
+    #   - |||tool_call:pose_question{slot: 1}|||
+    #     — Gemini 3.5 Flash fence form (curly braces, colon)
+    #   - tool_use: pose_question(slot=4) / tool_call: pose_inline_question(...)
+    #     — Gemini 3.1 Flash Lite Preview prefix form
+    #   - pose_inline_question(question="...", answer_key="...")
+    #     — explicit function-call form for inline questions
+    # The corresponding ISSUE_TOOL_CALL_LEAK in apps/tutoring/validator.py
+    # triggers regen when these survive the strip (which can happen
+    # when the strip leaves orphan punctuation that still looks like
+    # markup).
     _LEAKED_TOOL_CALL_RE = re.compile(
-        r"\bpose_question\s*\(\s*slot\s*=\s*\d+\s*(?:,\s*lead_in\s*=\s*[\"'][^\"']*[\"']\s*)?\)",
+        # Fence form: |||tool_call:NAME{...}||| (and trailing |||)
+        r"\|{2,}\s*tool[_ ]?(?:call|use)\s*:\s*\w+\s*\{[^}]*\}\s*\|{2,}"
+        # Bare function form: pose_question(slot=N[, lead_in="..."])
+        r"|\bpose_(?:inline_)?question\s*\(\s*slot\s*=\s*\d+\s*"
+        r"(?:,\s*lead_in\s*=\s*[\"'][^\"']*[\"']\s*)?\)"
+        # Inline-question full form: pose_inline_question(question="...", ...)
+        r"|\bpose_inline_question\s*\([^)]*\)"
+        # Prefix form: "tool_use:" / "tool_call:" followed by a pose call
+        r"|\btool[_ ]?(?:call|use)\s*:\s*pose_(?:inline_)?question[^.\n]*"
+        # Lone fence form (sometimes Gemini emits |||tool_call:pose_question|||
+        # without a body): also strip
+        r"|\|{2,}\s*tool[_ ]?(?:call|use)\s*:[^|]*\|{2,}",
         re.IGNORECASE,
     )
 

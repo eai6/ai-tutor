@@ -68,16 +68,31 @@ _LEAKED_TOOL_FN_RE = re.compile(
     r'\bpose_(?:inline_)?question\s*\(',
     re.IGNORECASE,
 )
+# Browser-e2e variants surfaced 2026-05-20 with the Gemini Flash
+# family — protocol markup the LLM invents in prose instead of
+# emitting a real tool_use block:
+#   - "|||tool_call:pose_question{slot: 1}|||"   (3.5 Flash)
+#   - "tool_use: pose_question(slot=4)"          (Flash Lite Preview)
+# Detect-and-discard the cycle so the retry loop tries again rather
+# than shipping the markup verbatim.
+_LEAKED_TOOL_MARKUP_RE = re.compile(
+    r'\|{2,}\s*tool[_ ]?(?:call|use)\s*:'
+    r'|\btool[_ ]?(?:call|use)\s*:\s*pose_(?:inline_)?question\b',
+    re.IGNORECASE,
+)
 
 
 def _detect_leaked_tool_call(text: str) -> Optional[str]:
     """Return a short reason string if `text` contains a leaked
-    tool-call syntax (XML or function-call form). Otherwise None.
+    tool-call syntax (XML / function-call / Gemini markup forms).
+    Otherwise None.
     """
     if not text:
         return None
     if _LEAKED_TOOL_XML_RE.search(text):
         return "xml_tool_use_block"
+    if _LEAKED_TOOL_MARKUP_RE.search(text):
+        return "gemini_tool_markup"
     if _LEAKED_TOOL_FN_RE.search(text):
         return "function_call_syntax"
     return None

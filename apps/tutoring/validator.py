@@ -102,6 +102,14 @@ ISSUE_REPEATED_QUESTION = "repeated_question"
 # is present in the response. Hint-probes inside a hint don't count —
 # they're scoped to an active awaiting record.
 ISSUE_NO_QUESTION_TOOL = "no_question_tool"
+# Literal tool-call markup leaked into the rendered tutor text.
+# Observed 2026-05-20 in browser e2e of Gemini Flash family:
+#   - "|||tool_call:pose_question{slot: 1}|||"  (3.5 Flash variant)
+#   - "tool_use: pose_question(slot=4)"         (Flash Lite Preview)
+# The student sees raw protocol markup instead of a real tool call —
+# breaks the affordance + confuses the UI. Detected by a single
+# regex; triggers regen (the candidate is unsalvageable as text).
+ISSUE_TOOL_CALL_LEAK = "tool_call_leak"
 
 # Deictic figure references — phrases that strongly imply "I am
 # pointing at a visual right now". Used by the figure-ref-without-signal
@@ -184,6 +192,11 @@ class ValidationResult:
         # the LLM to re-pose via a tool so the engine state is
         # authoritative (task #197).
         ISSUE_NO_QUESTION_TOOL,
+        # Tutor typed literal tool-call markup into the response
+        # ("|||tool_call:pose_question{...}|||", "tool_use: pose_..."
+        # etc.). Surfaced by the Gemini Flash family in browser e2e
+        # 2026-05-20. Always regen — markup must never reach UI.
+        ISSUE_TOOL_CALL_LEAK,
     })
 
     @property
@@ -211,6 +224,32 @@ _QUESTION_RE = re.compile(r"\?")
 # calling pose_inline_question" violations.
 _PROSE_MCQ_RE = re.compile(
     r'(?m)^\s*A[\.\)]\s+\S.*(?:\r?\n|\r)\s*B[\.\)]\s+\S',
+)
+
+# Tool-call markup leak — the LLM types protocol syntax into prose
+# instead of emitting a real tool_use block. The student sees the
+# raw markup. Observed variants from Gemini Flash family 2026-05-20:
+#   - "|||tool_call:pose_question{slot: 1}|||"     (3.5 Flash)
+#   - "tool_use: pose_question(slot=4)"            (Flash Lite Preview)
+#   - "<tool_use><invoke name='...'>"              (earlier 2026-05-17)
+#   - "pose_inline_question(question=...)"         (earlier function form)
+# Triggers ISSUE_TOOL_CALL_LEAK + regen. Kept broad — false positives
+# here are cheap (regen produces a clean turn) and the alternative
+# (shipping raw markup) breaks the UI.
+_TOOL_CALL_LEAK_RE = re.compile(
+    # Triple-pipe fence form: |||tool_call:NAME{...}||| or |||tool_use:NAME(...)|||
+    r'\|{2,}\s*tool[_ ]?(?:call|use)\s*:\s*\w+'
+    # Prefix-and-call form: "tool_use:" or "tool_call:" followed by a
+    # function-style invocation (`pose_question(`, `pose_inline_question(`,
+    # generic `name(`).
+    r'|\btool[_ ]?(?:call|use)\s*:\s*pose_(?:inline_)?question\b'
+    # Bare function-call form for our pose tools (matches the
+    # self-retry detector pattern). Covers e.g. `pose_question(slot=N)`
+    # that escaped the engine's narrower strip regex.
+    r'|\bpose_(?:inline_)?question\s*\('
+    # XML-tag form (kept for parity with self-retry detector).
+    r'|<\s*(?:tool_use|invoke|antml:function_calls|function_calls)\b',
+    re.IGNORECASE,
 )
 
 # Verdict-mismatch detection (ISSUE_VERDICT_MISMATCH).
@@ -359,6 +398,13 @@ def validate_tutor_response(
         and _PROSE_MCQ_RE.search(content)
     ):
         issues.append(ISSUE_NO_QUESTION_TOOL)
+
+    # TOOL_CALL_LEAK — literal protocol markup in the rendered text
+    # (e.g. "|||tool_call:pose_question{slot: 1}|||" or
+    # "tool_use: pose_question(slot=4)"). Always a defect — the
+    # student should never see protocol syntax. Regen.
+    if _TOOL_CALL_LEAK_RE.search(content):
+        issues.append(ISSUE_TOOL_CALL_LEAK)
 
     # Figure reference without |||MEDIA:N||| signal: tutor said "the
     # diagram"/"in the figure" but no media was attached for this turn.
