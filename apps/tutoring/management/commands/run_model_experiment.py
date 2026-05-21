@@ -119,6 +119,13 @@ class CellResult:
     lesson_label: str
     persona: str
 
+    # Regen-sweep mode only: which regen model this cell used (the
+    # tutor model is held fixed in that mode). Empty in the standard
+    # tutor-model matrix.
+    regen_model_key: str = ''
+    regen_model_label: str = ''
+    regen_model_name: str = ''
+
     # Session outcome
     session_id: Optional[int] = None
     reason: str = ''             # 'completed' / 'exit_ticket' / 'deadlock' / 'max_turns' / 'error'
@@ -156,6 +163,11 @@ class CellResult:
 REPORT_PATH = Path('memory/deepmind_model_experiment_results.md')
 RESULTS_JSONL = Path('memory/.deepmind_model_experiment_results.jsonl')
 
+# Regen-sweep mode writes here instead — kept separate so it never
+# collides with the standard tutor-model matrix above.
+REGEN_SWEEP_REPORT_PATH = Path('memory/deepmind_regen_sweep_results.md')
+REGEN_SWEEP_JSONL = Path('memory/.deepmind_regen_sweep_results.jsonl')
+
 
 class Command(BaseCommand):
     help = "Run cross-provider tutor quality experiment for the DeepMind meeting."
@@ -175,8 +187,18 @@ class Command(BaseCommand):
                             help='Skip cells already present in the JSONL log.')
         parser.add_argument('--force', action='store_true',
                             help='Re-run cells already in the JSONL log (overrides --skip-existing).')
+        parser.add_argument('--regen-model', default='',
+                            help='REGEN-SWEEP MODE: comma-separated ModelSpec.key(s) '
+                                 'to use as the regen ensemble model. When set, the '
+                                 'tutor model is held fixed (--models, single key; '
+                                 'default gemini-31-flash-lite-preview) and the regen '
+                                 'model becomes the varied axis. Isolates regen-model '
+                                 'quality. Writes a separate report '
+                                 '(deepmind_regen_sweep_results.md).')
 
     def handle(self, *args, **opts):
+        if opts.get('regen_model'):
+            return self._handle_regen_sweep(opts)
         models = self._filter(MODELS, opts['models'], lambda m: m.key)
         lessons = self._filter(LESSONS, opts['lessons'], lambda l: str(l[0]))
         personas = (
@@ -279,27 +301,28 @@ class Command(BaseCommand):
         return [it for it in items if keyfn(it) in keep]
 
     @staticmethod
-    def _existing_keys() -> set:
-        if not RESULTS_JSONL.exists():
+    def _existing_keys(path: Path = RESULTS_JSONL, *, regen: bool = False) -> set:
+        if not path.exists():
             return set()
         seen = set()
-        with RESULTS_JSONL.open() as f:
+        with path.open() as f:
             for line in f:
                 try:
                     r = json.loads(line)
-                    seen.add(f"{r['model_key']}|{r['lesson_id']}|{r['persona']}")
+                    axis = r['regen_model_key'] if regen else r['model_key']
+                    seen.add(f"{axis}|{r['lesson_id']}|{r['persona']}")
                 except Exception:
                     pass
         return seen
 
     @staticmethod
-    def _append_result(result: CellResult):
-        with RESULTS_JSONL.open('a') as f:
+    def _append_result(result: CellResult, path: Path = RESULTS_JSONL):
+        with path.open('a') as f:
             f.write(json.dumps(asdict(result)) + '\n')
 
     def _run_one(
         self, spec: ModelSpec, lesson_id: int, lesson_label: str,
-        persona: str, *, max_turns: int,
+        persona: str, *, max_turns: int, regen_spec: Optional[ModelSpec] = None,
     ) -> CellResult:
         from apps.tutoring.student_sim.driver import simulate_session
         from apps.tutoring.models import TutorSession
@@ -310,6 +333,10 @@ class Command(BaseCommand):
             lesson_id=lesson_id, lesson_label=lesson_label,
             persona=persona,
         )
+        if regen_spec is not None:
+            result.regen_model_key = regen_spec.key
+            result.regen_model_label = regen_spec.label
+            result.regen_model_name = regen_spec.model_name
         t0 = time.monotonic()
         try:
             sim = simulate_session(
@@ -458,4 +485,308 @@ class Command(BaseCommand):
         REPORT_PATH.write_text('\n'.join(lines))
         self.stdout.write(self.style.SUCCESS(
             f"Wrote report → {REPORT_PATH}"
+        ))
+
+    # ------------------------------------------------------------------
+    # Regen-sweep mode
+    # ------------------------------------------------------------------
+    def _handle_regen_sweep(self, opts):
+        """Sweep the regen ensemble model with the tutor held fixed.
+
+        The standard matrix varies the TUTORING ModelConfig and reads
+        regen-clean rates as a side metric — but the regen model is a
+        constant there, so those numbers say nothing about regen-model
+        quality. This mode inverts it: tutor fixed, regen varied.
+
+        Two patch points are needed. The tutor model resolves via
+        `ModelConfig.get_for('tutoring')`, but the regen ensemble
+        resolves via the `ConversationalTutor.regen_clients` property
+        (a direct `ModelConfig.objects.filter(purpose='regen')` query),
+        so `get_for` alone does not reach it.
+        """
+        regen_specs = self._filter(MODELS, opts['regen_model'], lambda m: m.key)
+        if not regen_specs:
+            self.stderr.write(self.style.ERROR(
+                f"--regen-model matched no known ModelSpec keys. "
+                f"Known: {', '.join(m.key for m in MODELS)}"
+            ))
+            return
+
+        # Tutor model held fixed. Default to the production tutor.
+        tutor_candidates = self._filter(MODELS, opts['models'], lambda m: m.key)
+        if opts['models'] and len(tutor_candidates) != 1:
+            self.stderr.write(self.style.ERROR(
+                "In regen-sweep mode --models must resolve to exactly one "
+                "key (it is the fixed tutor model)."
+            ))
+            return
+        if opts['models'] and tutor_candidates:
+            tutor_spec = tutor_candidates[0]
+        else:
+            tutor_spec = next(
+                (m for m in MODELS if m.key == 'gemini-31-flash-lite-preview'),
+                MODELS[0],
+            )
+
+        lessons = self._filter(LESSONS, opts['lessons'], lambda l: str(l[0]))
+        personas = (
+            [p.strip() for p in opts['personas'].split(',') if p.strip()]
+            if opts['personas'] else PERSONAS
+        )
+        cells = [
+            (rs, l, p) for rs in regen_specs for l in lessons for p in personas
+        ]
+        self.stdout.write(self.style.SUCCESS(
+            f"REGEN SWEEP — tutor fixed at {tutor_spec.key} "
+            f"({tutor_spec.provider}/{tutor_spec.model_name}); "
+            f"{len(regen_specs)} regen model(s) × {len(lessons)} lessons "
+            f"× {len(personas)} personas = {len(cells)} cells."
+        ))
+        for rs in regen_specs:
+            self.stdout.write(f"  regen: {rs.key:24} → {rs.provider}/{rs.model_name}")
+        self.stdout.write('')
+
+        if opts['dry_run']:
+            return
+
+        REGEN_SWEEP_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        existing = (
+            self._existing_keys(REGEN_SWEEP_JSONL, regen=True)
+            if not opts['force'] else set()
+        )
+        if existing:
+            self.stdout.write(self.style.WARNING(
+                f"Skipping {len(existing)} already-completed cell(s) "
+                f"(use --force to re-run)."
+            ))
+
+        from django.conf import settings as dj_settings
+        from apps.llm.models import ModelConfig
+        from apps.tutoring.conversational_tutor import ConversationalTutor
+
+        # --- Patch 0: force the ensemble regen path ---
+        # When TUTOR_SELF_RETRY_ENABLED is on (the dev default, since
+        # DEBUG=True), regen re-invokes the *tutor's own* llm_client and
+        # never touches `regen_clients` — so a regen-model swap would be
+        # a no-op. Production runs with it OFF (DEBUG=False), using the
+        # `run_regen_ensemble` path that DOES resolve `regen_clients`.
+        # Force it off here so the sweep measures the production path.
+        original_self_retry = getattr(
+            dj_settings, 'TUTOR_SELF_RETRY_ENABLED', False)
+        dj_settings.TUTOR_SELF_RETRY_ENABLED = False
+
+        # --- Patch 1: hold the tutor model fixed via get_for ---
+        original_get_for = ModelConfig.get_for
+
+        @classmethod
+        def patched_get_for(cls, purpose: str):
+            if purpose != cls.Purpose.TUTORING.value:
+                return original_get_for(purpose)
+            cfg = ModelConfig.resolve_runtime(
+                tutor_spec.provider, tutor_spec.model_name)
+            if cfg is not None:
+                cfg.temperature = tutor_spec.temperature
+                cfg.max_tokens = 1024
+            return cfg
+
+        # --- Patch 2: swap the regen ensemble model ---
+        # `regen_clients` is a @property; replace it with one that
+        # returns a single-model ensemble built from the override spec.
+        regen_holder: dict = {'spec': None}
+        original_regen_prop = ConversationalTutor.regen_clients
+
+        def patched_regen_clients(inst):
+            spec: Optional[ModelSpec] = regen_holder['spec']
+            if spec is None:
+                return original_regen_prop.fget(inst)
+            cached = getattr(inst, '_regen_sweep_clients', None)
+            if cached is not None:
+                return cached
+            from apps.llm.client import get_llm_client
+            cfg = ModelConfig.resolve_runtime(spec.provider, spec.model_name)
+            if cfg is None:
+                raise RuntimeError(
+                    f"resolve_runtime returned None for regen model "
+                    f"{spec.provider}/{spec.model_name} — missing API key "
+                    f"env var?"
+                )
+            cfg.temperature = 0.2
+            cfg.max_tokens = 900
+            inst._regen_sweep_clients = [get_llm_client(cfg)]
+            return inst._regen_sweep_clients
+
+        ModelConfig.get_for = patched_get_for
+        ConversationalTutor.regen_clients = property(patched_regen_clients)
+
+        completed = failed = 0
+        try:
+            for regen_spec, (lesson_id, lesson_label), persona in cells:
+                key = f"{regen_spec.key}|{lesson_id}|{persona}"
+                if key in existing:
+                    continue
+                self.stdout.write(self.style.HTTP_INFO(
+                    f"\n[{completed + failed + 1}/{len(cells) - len(existing)}] "
+                    f"regen={regen_spec.key} × L{lesson_id} × {persona} "
+                    f"(tutor={tutor_spec.key})"
+                ))
+                regen_holder['spec'] = regen_spec
+                result = self._run_one(
+                    tutor_spec, lesson_id, lesson_label, persona,
+                    max_turns=opts['max_turns'], regen_spec=regen_spec,
+                )
+                self._append_result(result, REGEN_SWEEP_JSONL)
+                if result.error:
+                    failed += 1
+                    self.stdout.write(self.style.ERROR(
+                        f"  ↳ error → {result.error[:100]}"
+                    ))
+                else:
+                    completed += 1
+                    self.stdout.write(self.style.SUCCESS(
+                        f"  ↳ ok: {result.turns} turns, regen clean cycle-1 "
+                        f"{result.regen_clean_first_cycle}/{result.regen_triggered_turns}, "
+                        f"any-cycle {result.regen_clean_any_cycle}, "
+                        f"shipped-dirty {result.regen_cycles_exhausted}, "
+                        f"{result.wall_seconds:.1f}s"
+                    ))
+                regen_holder['spec'] = None
+        finally:
+            ModelConfig.get_for = original_get_for
+            ConversationalTutor.regen_clients = original_regen_prop
+            dj_settings.TUTOR_SELF_RETRY_ENABLED = original_self_retry
+
+        self.stdout.write('')
+        self.stdout.write(self.style.SUCCESS(
+            f"Regen sweep done: {completed} cells ok, {failed} failed."
+        ))
+        self._write_regen_report()
+
+    def _write_regen_report(self):
+        """Compile the regen-sweep JSONL into a markdown report."""
+        if not REGEN_SWEEP_JSONL.exists():
+            return
+        results: list[dict] = []
+        with REGEN_SWEEP_JSONL.open() as f:
+            for line in f:
+                try:
+                    results.append(json.loads(line))
+                except Exception:
+                    pass
+        if not results:
+            return
+
+        model_order = {m.key: i for i, m in enumerate(MODELS)}
+        persona_order = {p: i for i, p in enumerate(PERSONAS)}
+        results.sort(key=lambda r: (
+            model_order.get(r.get('regen_model_key', ''), 999),
+            r['lesson_id'],
+            persona_order.get(r['persona'], 999),
+        ))
+
+        lines: list[str] = []
+        lines.append('# Regen-model sweep — tutor held fixed')
+        lines.append('')
+        lines.append('Generated by `run_model_experiment --regen-model ...`. '
+                     'The tutor `ModelConfig` is held fixed; the **regen '
+                     'ensemble** model is the varied axis (single-model regen '
+                     'per cell). This isolates regen-model quality — the '
+                     'standard matrix in `deepmind_model_experiment_results.md` '
+                     'instead varies the tutor and holds regen constant.')
+        lines.append('')
+        tutors = sorted({f"`{r['provider']}/{r['model_name']}`" for r in results})
+        lines.append(f"Fixed tutor model: {', '.join(tutors)}")
+        lines.append('')
+
+        # Aggregate per regen model — the headline.
+        agg: dict = {}
+        for r in results:
+            if r.get('error'):
+                continue
+            k = r.get('regen_model_label') or r.get('regen_model_key') or '—'
+            a = agg.setdefault(k, {'cells': 0, 'trig': 0, 'c1': 0,
+                                   'any': 0, 'dirty': 0, 'wall': 0.0})
+            a['cells'] += 1
+            a['trig'] += r['regen_triggered_turns']
+            a['c1'] += r['regen_clean_first_cycle']
+            a['any'] += r['regen_clean_any_cycle']
+            a['dirty'] += r['regen_cycles_exhausted']
+            a['wall'] += r['wall_seconds']
+        lines.append('## Aggregate per regen model')
+        lines.append('')
+        lines.append('| regen model | cells | regen-triggered | cycle-1 clean '
+                     '| any-cycle clean | shipped dirty | any-cycle rate '
+                     '| mean wall (s) |')
+        lines.append('|---|---:|---:|---:|---:|---:|---:|---:|')
+        for k, a in agg.items():
+            rate = (a['any'] / a['trig']) if a['trig'] else 0.0
+            c1rate = (a['c1'] / a['trig']) if a['trig'] else 0.0
+            mwall = (a['wall'] / a['cells']) if a['cells'] else 0.0
+            lines.append(
+                f"| {k} | {a['cells']} | {a['trig']} "
+                f"| {a['c1']} ({c1rate:.0%}) | {a['any']} ({rate:.0%}) "
+                f"| {a['dirty']} | {rate:.0%} | {mwall:.1f} |"
+            )
+        lines.append('')
+
+        # Per-cell summary table.
+        lines.append('## Per-cell summary')
+        lines.append('')
+        lines.append('| regen model | lesson | persona | turns | reason '
+                     '| regen-triggered | clean cycle-1 | any-cycle clean '
+                     '| shipped dirty | leak | wall (s) |')
+        lines.append('|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|')
+        for r in results:
+            rl = r.get('regen_model_label') or r.get('regen_model_key') or '—'
+            if r.get('error'):
+                lines.append(
+                    f"| {rl} | L{r['lesson_id']} | {r['persona']} "
+                    f"| {r['turns']} | **ERROR** | — | — | — | — | — "
+                    f"| {r['wall_seconds']:.1f} |"
+                )
+                continue
+            lines.append(
+                f"| {rl} | L{r['lesson_id']} | {r['persona']} "
+                f"| {r['turns']} | {r['reason']} "
+                f"| {r['regen_triggered_turns']} "
+                f"| {r['regen_clean_first_cycle']} "
+                f"| {r['regen_clean_any_cycle']} "
+                f"| {r['regen_cycles_exhausted']} "
+                f"| {r['answer_leak_incidents']} "
+                f"| {r['wall_seconds']:.1f} |"
+            )
+        lines.append('')
+
+        # Per-cell details — validator-issue distribution is where the
+        # "which issues regen could not clean" insight lives.
+        lines.append('## Per-cell details')
+        lines.append('')
+        for r in results:
+            rl = r.get('regen_model_label') or r.get('regen_model_key') or '—'
+            lines.append(f"### {rl} (regen) × L{r['lesson_id']} × {r['persona']}")
+            lines.append('')
+            lines.append(f"- session_id: {r.get('session_id') or '—'}")
+            lines.append(f"- tutor (fixed): `{r['provider']}/{r['model_name']}`")
+            lines.append(f"- regen model: `{r.get('regen_model_name') or '—'}`")
+            lines.append(f"- reason: `{r['reason']}` after {r['turns']} student "
+                         f"turns (wall {r['wall_seconds']:.1f}s)")
+            if r.get('error'):
+                lines.append(f"- ⚠️ error: `{r['error']}`")
+                lines.append('')
+                continue
+            lines.append(f"- regen: triggered on {r['regen_triggered_turns']} "
+                         f"turn(s); cycle-1 clean on {r['regen_clean_first_cycle']}; "
+                         f"any-cycle clean on {r['regen_clean_any_cycle']}; "
+                         f"shipped dirty on {r['regen_cycles_exhausted']}")
+            lines.append(f"- tool-use rate: {r['tool_use_rate']:.0%} "
+                         f"({r['tutor_turns_with_tool']}/{r['tutor_turns']})")
+            if r['validator_issue_counts']:
+                top = sorted(r['validator_issue_counts'].items(),
+                             key=lambda kv: -kv[1])[:8]
+                joined = ', '.join(f"`{k}`={v}" for k, v in top)
+                lines.append(f"- validator-issue distribution: {joined}")
+            lines.append('')
+
+        REGEN_SWEEP_REPORT_PATH.write_text('\n'.join(lines))
+        self.stdout.write(self.style.SUCCESS(
+            f"Wrote regen-sweep report → {REGEN_SWEEP_REPORT_PATH}"
         ))
