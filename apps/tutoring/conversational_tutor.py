@@ -9760,6 +9760,13 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         # Floor met — also require that the concepts we're remediating got re-covered
         failed_ids = {fq['id'] for fq in getattr(self, 'failed_exit_questions', [])}
         if failed_ids:
+            # Audit v3 R3: the per-turn keyword check over-counts coverage
+            # (mentioning the concept term ≠ teaching it). The remediation
+            # gate is load-bearing, so verify with the LLM before letting
+            # the `covered` flag promote the student back to the exit
+            # ticket. Any concept the LLM disagrees on is un-marked here,
+            # forcing remediation to continue.
+            self._verify_keyword_coverage_with_llm(failed_ids)
             uncovered_failed = [
                 c for c in self.exit_ticket_concepts
                 if c['id'] in failed_ids and not c.get('covered')
@@ -10639,7 +10646,110 @@ Which concept numbers were meaningfully covered?"""
         except Exception as e:
             logger.warning(f"LLM concept coverage check failed, using keyword fallback: {e}")
             self._keyword_concept_coverage_check(conversation_text)
-    
+
+    def _recent_conversation_text(self, limit: int = 12) -> str:
+        """Concatenate the last `limit` SessionTurns for coverage analysis.
+
+        Used by `_verify_keyword_coverage_with_llm` — the per-turn
+        `combined_text` window is too short (one student msg + one tutor
+        msg) to tell whether a concept was meaningfully *taught* vs
+        merely *mentioned* in passing.
+        """
+        try:
+            turns = (
+                SessionTurn.objects
+                .filter(session=self.session)
+                .exclude(role=SessionTurn.Role.SYSTEM)
+                .order_by('-created_at')[:limit]
+            )
+            chunks = []
+            for t in reversed(list(turns)):
+                who = 'STUDENT' if t.role == SessionTurn.Role.STUDENT else 'TUTOR'
+                chunks.append(f"{who}: {(t.content or '')[:300]}")
+            return "\n".join(chunks)
+        except Exception:
+            return ""
+
+    def _verify_keyword_coverage_with_llm(self, concept_ids: set) -> None:
+        """Audit v3 R3: verify keyword-marked coverage with the LLM.
+
+        The per-turn `_keyword_concept_coverage_check` is a cheap signal
+        — it sets `concept['covered'] = True` on ≥30% keyword overlap.
+        That over-counts (mentioning the concept term ≠ teaching it),
+        which would be OK if `covered` were only used for hints, but
+        commit `5d6cbd7` made it load-bearing for the remediation gate.
+
+        This method re-checks the keyword-marked-covered subset with an
+        LLM and *un-marks* any the LLM disagrees on, forcing remediation
+        to continue. Called only at gating decision points (rare event,
+        small candidate set) — cheap relative to per-turn invocation.
+
+        Fail-soft: any error keeps the keyword decision so a transient
+        LLM outage cannot block remediation indefinitely.
+        """
+        if not self.instructor_client or not concept_ids:
+            return
+
+        candidates = [
+            c for c in self.exit_ticket_concepts
+            if c.get('id') in concept_ids and c.get('covered')
+        ]
+        if not candidates:
+            return
+
+        text = self._recent_conversation_text(limit=12)
+        if not text:
+            return
+
+        descriptions = [
+            f"{i+1}. {c['question'][:140]}" for i, c in enumerate(candidates)
+        ]
+        prompt = (
+            "We are deciding whether the student got a real re-teaching of "
+            "concepts they previously failed on the exit ticket.\n\n"
+            "CONVERSATION (recent turns):\n"
+            f"{text[:1500]}\n\n"
+            "CANDIDATE CONCEPTS (currently flagged covered by keyword match):\n"
+            f"{chr(10).join(descriptions)}\n\n"
+            "Return ONLY the numbers of concepts that were MEANINGFULLY "
+            "taught or practiced in this conversation. A concept is "
+            "meaningfully covered when the conversation walked through "
+            "the underlying idea or worked an example — NOT when the "
+            "concept term merely appeared in passing."
+        )
+
+        try:
+            create_kwargs = dict(
+                response_model=ConceptCoverageResult,
+                messages=[
+                    {"role": "system", "content": (
+                        "You are an educational assessment assistant. "
+                        "Identify which concepts were meaningfully taught "
+                        "or practiced (not just mentioned)."
+                    )},
+                    {"role": "user", "content": prompt},
+                ],
+                max_retries=2,
+            )
+            if getattr(self, '_instructor_provider', None) == 'google':
+                create_kwargs['generation_config'] = {'max_tokens': 512}
+            else:
+                create_kwargs['max_tokens'] = 512
+            result = self.instructor_client.chat.completions.create(**create_kwargs)
+            confirmed = set(result.covered_indices or [])
+            for i, c in enumerate(candidates):
+                if (i + 1) not in confirmed:
+                    c['covered'] = False
+                    logger.info(
+                        "[Coverage R3] LLM unmarked: %s",
+                        (c.get('question') or '')[:60],
+                    )
+        except Exception as e:
+            logger.warning(
+                "[Coverage R3] LLM verification failed; keeping keyword "
+                "decision: %s", e,
+            )
+
     # =========================================================================
     # EXIT TICKET
     # =========================================================================

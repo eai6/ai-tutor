@@ -54,6 +54,17 @@ class IsRealCorrectionTest(SimpleTestCase):
         self.assertFalse(_is_real_correction("14", "14", "5y = 70"))
         self.assertFalse(_is_real_correction("9", "5", "x + 5 = 14"))
 
+    def test_substituted_arithmetic_kept(self):
+        # Audit v3 H4: after substitution, "3x = 28" (where x was
+        # previously established as 8) is a real arithmetic claim
+        # the verifier MUST catch — 3·8 is 24, not 28. The filter
+        # previously dropped this because "3x" matched the algebraic
+        # regex; now it only drops when '=' AND a variable both appear.
+        # A bare "3x" with no equation context should pass through.
+        self.assertTrue(_is_real_correction("28", "24", "3x"))
+        self.assertTrue(_is_real_correction("28", "24", "3 × 8"))
+        self.assertTrue(_is_real_correction("28", "24", "3·8"))
+
     def test_units_kept_as_arithmetic(self):
         # "kg" and "km" are multi-letter — should NOT trigger the
         # algebraic-variable filter.
