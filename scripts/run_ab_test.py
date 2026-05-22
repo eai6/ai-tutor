@@ -1,6 +1,12 @@
 """A/B test runner — drives the AB_TESTING_PLAN matrix.
 
-3 mid-tier models × 2 lessons × 2 personas = 12 cells.
+Purpose: generate transcripts the judge can mine for *recommendations to
+improve the tutoring system prompt*. Models are a robustness axis, not
+the unit of evaluation — see `design/AB_TESTING_PLAN.md`.
+
+Matrix: 2 supported models (Anthropic Claude, Google Gemini) × 2 lessons
+× 2 personas = 8 cells per prompt variant. OpenAI/GPT is out of scope.
+
 Saves transcripts + metrics under ab-test-reports/.
 
 Run with:  venv/bin/python scripts/run_ab_test.py
@@ -37,7 +43,6 @@ class ModelSpec:
 MODELS = [
     ModelSpec('sonnet-4', 'Claude Sonnet 4', 'anthropic', 'claude-sonnet-4-20250514', 0.2),
     ModelSpec('gemini-3-flash', 'Gemini 3 Flash', 'google', 'gemini-3-flash-preview', 0.2),
-    ModelSpec('gpt-4o-mini', 'GPT-4o mini', 'openai', 'gpt-4o-mini', 0.2),
 ]
 
 LESSONS = [

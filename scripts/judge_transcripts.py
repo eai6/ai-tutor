@@ -1,11 +1,20 @@
-"""LLM-as-judge scorer for A/B test transcripts.
+"""LLM-as-judge scorer + recommender for A/B test transcripts.
 
 Reads each transcript from ab-test-reports/raw_transcripts/, sends it to
-Claude Opus 4.7 (temp=0) with the 10-principle science-of-learning rubric
-from .claude/skills/evaluate-tutor/SKILL.md, parses the structured score
-output, and writes:
+Claude Opus 4.7 (temp=0). The judge serves two roles in a single pass:
 
-  ab-test-reports/judge_scores/<cell_key>.json     (per-cell scores)
+  1. Score the transcript 0-5 against the 10 science-of-learning
+     principles (rubric from .claude/skills/evaluate-tutor/SKILL.md).
+  2. Produce structured, evidence-anchored recommendations to improve
+     the tutoring system prompt — plus secondary recommendations on
+     engine flow and student experience.
+
+The recommendations are the **primary** artefact. The scores are
+inputs to the synthesis, not the headline.
+
+Outputs:
+
+  ab-test-reports/judge_scores/<cell_key>.json     (per-cell scores + recs)
   ab-test-reports/judge_scores/_all_scores.jsonl   (aggregated)
 
 Run with:  venv/bin/python scripts/judge_transcripts.py
@@ -43,7 +52,7 @@ RUBRIC_PATH = Path('ab-test-reports/judge_rubric.md')
 
 JUDGE_MODEL = 'claude-opus-4-7'
 JUDGE_TEMP = 0.0
-JUDGE_MAX_TOKENS = 4096
+JUDGE_MAX_TOKENS = 8192
 
 PRINCIPLES = [
     ('active_learning',
@@ -74,7 +83,16 @@ def build_prompt(transcript: str, lesson_label: str, persona: str) -> str:
     principles_block = '\n'.join(f"- **{key}**: {desc}" for key, desc in PRINCIPLES)
     return f"""You are an expert evaluator of AI tutoring quality, grounded in the science of learning.
 
-You will score ONE tutoring session transcript against the 10 distilled principles below.
+Your job has two parts. **Both are required.**
+
+1. **Score** ONE tutoring session transcript against the 10 distilled principles below.
+2. **Prescribe** concrete, evidence-anchored recommendations to improve the tutoring
+   **system prompt** (primary), plus secondary recommendations on engine flow and
+   student experience.
+
+The recommendations are the primary deliverable — they feed directly into the next
+revision of the tutoring system prompt. Scores are inputs to that synthesis, not the
+end goal. Do not skip or thin out the recommendations.
 
 ## Context
 - Lesson: {lesson_label}
@@ -87,17 +105,46 @@ You will score ONE tutoring session transcript against the 10 distilled principl
 
 ## Your task
 
-1. Read the transcript carefully.
-2. For each of the 10 principles, assign an integer score 0-5:
-   - 0 = principle clearly violated (e.g. answer leaked, no practice, no retrieval)
-   - 1 = mostly absent
-   - 2 = weak / inconsistent
-   - 3 = adequate
-   - 4 = strong
-   - 5 = exemplary
+### Part A — Score
 
-3. For each principle, give a one-sentence justification quoting or citing evidence from specific turns.
-4. Also identify the 1-2 strongest tutor behaviors and the 1-2 weakest behaviors observed.
+For each of the 10 principles, assign an integer score 0-5:
+- 0 = principle clearly violated (e.g. answer leaked, no practice, no retrieval)
+- 1 = mostly absent
+- 2 = weak / inconsistent
+- 3 = adequate
+- 4 = strong
+- 5 = exemplary
+
+For each principle, give a one-sentence justification quoting or citing evidence
+from specific turns. Also identify the 1-2 strongest and 1-2 weakest tutor behaviors.
+
+### Part B — Recommendations (primary deliverable)
+
+Produce three lists of recommendations, each item evidence-anchored to the transcript:
+
+- `prompt_recommendations`: changes to the tutoring **system prompt** itself
+  (wording, rules, examples, ordering, forbidden patterns, etc.). This is the
+  most important list.
+- `flow_recommendations`: changes to engine logic / orchestration / scaffolding flow
+  that the system prompt alone cannot fix (e.g. judge cycle caps, retry policy,
+  prerequisite routing, exit-ticket gating).
+- `experience_recommendations`: changes to what the student sees / feels (pacing,
+  encouragement frequency, media placement, error-message tone).
+
+Each recommendation must include:
+- `title`: short imperative (e.g. "Forbid two consecutive teach blocks without a student turn")
+- `rationale`: WHY — which principle it serves, which failure pattern it fixes
+- `evidence_quote`: a verbatim excerpt from the transcript (≤ 240 chars)
+- `evidence_turn`: which turn / section the quote came from (e.g. "TUTOR turn id=42")
+- `suggested_prompt_edit` (prompt_recommendations only — use empty string elsewhere):
+  the actual language to add, remove, or replace in the system prompt
+- `expected_effect`: what specific, observable change in tutor behavior this should produce
+- `severity`: "high" if this is fixing a frequent or load-bearing failure;
+  "medium" if it's an improvement on top of acceptable behavior; "low" otherwise
+
+Aim for 3–8 prompt recommendations per transcript. Fewer is fine if the transcript
+genuinely doesn't surface that many. Do not invent issues to pad the list — but do
+not under-report either; small qualitative wins matter when aggregated across cells.
 
 ## Output format
 
@@ -118,6 +165,39 @@ Return ONLY a single JSON object, no prose around it, no markdown fences. Schema
   }},
   "strongest_behaviors": [str, str],
   "weakest_behaviors": [str, str],
+  "prompt_recommendations": [
+    {{
+      "title": str,
+      "rationale": str,
+      "evidence_quote": str,
+      "evidence_turn": str,
+      "suggested_prompt_edit": str,
+      "expected_effect": str,
+      "severity": "high"|"medium"|"low"
+    }}
+  ],
+  "flow_recommendations": [
+    {{
+      "title": str,
+      "rationale": str,
+      "evidence_quote": str,
+      "evidence_turn": str,
+      "suggested_prompt_edit": "",
+      "expected_effect": str,
+      "severity": "high"|"medium"|"low"
+    }}
+  ],
+  "experience_recommendations": [
+    {{
+      "title": str,
+      "rationale": str,
+      "evidence_quote": str,
+      "evidence_turn": str,
+      "suggested_prompt_edit": "",
+      "expected_effect": str,
+      "severity": "high"|"medium"|"low"
+    }}
+  ],
   "overall_summary": str
 }}
 
@@ -182,6 +262,9 @@ def score_transcript(client: Anthropic, transcript_path: Path) -> dict:
         'scores': parsed.get('scores', {}),
         'strongest_behaviors': parsed.get('strongest_behaviors', []),
         'weakest_behaviors': parsed.get('weakest_behaviors', []),
+        'prompt_recommendations': parsed.get('prompt_recommendations', []),
+        'flow_recommendations': parsed.get('flow_recommendations', []),
+        'experience_recommendations': parsed.get('experience_recommendations', []),
         'overall_summary': parsed.get('overall_summary', ''),
         'wall_seconds': elapsed,
         'tokens_in': resp.usage.input_tokens,
@@ -193,11 +276,23 @@ def main():
     SCORES_DIR.mkdir(parents=True, exist_ok=True)
     # Save the rubric for reproducibility
     RUBRIC_PATH.write_text(
-        '# LLM-as-judge rubric used for A/B scoring\n\n'
+        '# LLM-as-judge rubric used for A/B runs\n\n'
+        '> **Judge role**: score transcripts against the 10 science-of-learning\n'
+        '> principles **and** produce evidence-anchored recommendations to improve\n'
+        '> the tutoring system prompt, engine flow, and student experience. The\n'
+        '> recommendations are the primary deliverable — scores are inputs to the\n'
+        '> synthesis. See `design/AB_TESTING_PLAN.md`.\n\n'
         f'Judge model: `{JUDGE_MODEL}`, temperature={JUDGE_TEMP}, max_tokens={JUDGE_MAX_TOKENS}\n\n'
         '## 10 Science-of-Learning principles\n\n'
         + '\n'.join(f'- **{k}**: {d}' for k, d in PRINCIPLES) + '\n\n'
         '## Scoring scale\n\n0=violated · 1=mostly absent · 2=weak · 3=adequate · 4=strong · 5=exemplary\n\n'
+        '## Recommendation buckets\n\n'
+        '- `prompt_recommendations` — edits to the tutoring system prompt (primary).\n'
+        '- `flow_recommendations` — engine / orchestration changes.\n'
+        '- `experience_recommendations` — student-facing UX changes.\n\n'
+        'Each recommendation must cite an `evidence_quote` and `evidence_turn`,\n'
+        'state its `rationale`, `expected_effect`, and a `severity` of high/medium/low.\n'
+        'Prompt recommendations additionally include a `suggested_prompt_edit`.\n\n'
         '## Judge prompt template\n\n```\n' + build_prompt('<TRANSCRIPT>', '<LESSON>', '<PERSONA>') + '\n```\n'
     )
 

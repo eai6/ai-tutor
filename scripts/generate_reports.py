@@ -1,14 +1,18 @@
-"""Aggregate A/B test cell results + judge scores into final reports.
+"""Aggregate A/B test cell results + judge output into the final report.
 
 Reads:
-  ab-test-reports/cell_results.jsonl        — programmatic metrics per cell
-  ab-test-reports/judge_scores/_all_scores.jsonl — LLM-as-judge scores per cell
+  ab-test-reports/cell_results.jsonl              — programmatic metrics per cell
+  ab-test-reports/judge_scores/_all_scores.jsonl  — judge scores + recommendations per cell
 
 Writes:
-  ab-test-reports/per_cell/<cell_key>.md    — full transcript + scores + metrics
-  ab-test-reports/summary.md                — pivot tables + winner
+  ab-test-reports/per_cell/<cell_key>.md    — full transcript + scores + recommendations + metrics
+  ab-test-reports/summary.md                — pivot tables (rubric scores, programmatic counts)
   ab-test-reports/cost_latency.md           — token/wall-time breakdown
-  ab-test-reports/FINAL_REPORT.md           — high-level overall narrative
+  ab-test-reports/FINAL_REPORT.md           — consolidated, ranked recommendations for
+                                              improving the tutoring system prompt
+
+The report headline is the ranked recommendation list, NOT a model ranking. See
+`design/AB_TESTING_PLAN.md` — models are a robustness axis, not the unit of evaluation.
 
 Run with:  venv/bin/python scripts/generate_reports.py
 """
@@ -30,6 +34,22 @@ PRINCIPLES = [
     'mastery_learning', 'cognitive_load', 'layering', 'non_interference',
     'interleaving', 'testing_effect', 'targeted_remediation',
 ]
+
+REC_BUCKETS = [
+    ('prompt_recommendations', 'System-prompt edits'),
+    ('flow_recommendations', 'Engine / flow changes'),
+    ('experience_recommendations', 'Student-experience changes'),
+]
+
+SEVERITY_WEIGHT = {'high': 3, 'medium': 2, 'low': 1}
+
+
+def _norm_title(s: str) -> str:
+    """Normalise a recommendation title for clustering — lowercase, alnum + spaces, collapsed."""
+    out = []
+    for ch in (s or '').lower():
+        out.append(ch if ch.isalnum() or ch.isspace() else ' ')
+    return ' '.join(''.join(out).split())
 
 
 def _load_jsonl(path: Path) -> list[dict]:
@@ -134,8 +154,29 @@ def write_per_cell(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
                     for b in score['weakest_behaviors']:
                         lines.append(f'- {b}')
                     lines.append('')
+
+                for bucket_key, bucket_label in REC_BUCKETS:
+                    recs = score.get(bucket_key) or []
+                    if not recs:
+                        continue
+                    lines.append(f'### {bucket_label} ({bucket_key})')
+                    lines.append('')
+                    for r in recs:
+                        title = r.get('title', '(untitled)')
+                        sev = r.get('severity', '?')
+                        lines.append(f"- **[{sev}] {title}**")
+                        if r.get('rationale'):
+                            lines.append(f"  - Rationale: {r['rationale']}")
+                        if r.get('evidence_quote'):
+                            q = r['evidence_quote'].replace('\n', ' ')
+                            lines.append(f"  - Evidence ({r.get('evidence_turn', '?')}): \"{q}\"")
+                        if r.get('suggested_prompt_edit'):
+                            lines.append(f"  - Suggested edit: {r['suggested_prompt_edit']}")
+                        if r.get('expected_effect'):
+                            lines.append(f"  - Expected effect: {r['expected_effect']}")
+                    lines.append('')
         else:
-            lines += ["## LLM-as-judge scores", "", "_(not yet scored)_", ""]
+            lines += ["## LLM-as-judge scores + recommendations", "", "_(not yet scored)_", ""]
 
         if transcript_text:
             lines += ["## Transcript", "", "```", transcript_text, "```", ""]
@@ -219,10 +260,13 @@ def write_summary(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
             lines.append(f"| {model} | " + ' | '.join(cells_str) + f" | **{overall:.2f}** |")
         lines.append('')
         ranking.sort(key=lambda r: -r[1])
-        lines.append('### Ranking by overall mean')
+        lines.append('### Per-model overall mean (robustness check, not a ranking)')
         lines.append('')
-        for i, (m, v) in enumerate(ranking, 1):
-            lines.append(f"{i}. **{m}** — overall {v:.2f}/5")
+        lines.append('_Use these numbers to detect whether a prompt change is model-robust. '
+                     'They are **not** a model evaluation — see `design/AB_TESTING_PLAN.md`._')
+        lines.append('')
+        for m, v in ranking:
+            lines.append(f"- **{m}** — overall {v:.2f}/5")
         lines.append('')
 
     # Pivot: model × persona programmatic
@@ -301,14 +345,64 @@ def write_cost_latency(cells: list[dict], scores_by_key: dict[str, dict]) -> Non
     (OUT / 'cost_latency.md').write_text('\n'.join(lines))
 
 
-def write_final(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
-    per_model = mean_per_principle(scores_by_key)
-    ranking = sorted(
-        ((m, mean(d.values())) for m, d in per_model.items() if d),
-        key=lambda r: -r[1],
-    )
-    winner = ranking[0][0] if ranking else 'no scores available'
+def aggregate_recommendations(scores_by_key: dict[str, dict]) -> dict[str, list[dict]]:
+    """Cluster recommendations across cells by normalised title.
 
+    Returns {bucket_key: [cluster, ...]} where each cluster is:
+      {
+        'title': str (representative — first seen),
+        'count': int (how many cells surfaced it),
+        'cells': [cell_key, ...],
+        'severity_score': int (sum of severity weights across cells),
+        'top_severity': 'high'|'medium'|'low',
+        'examples': [recommendation dict, ...] (first 3 raw items),
+      }
+    Sorted by (severity_score desc, count desc) within each bucket.
+    """
+    out: dict[str, list[dict]] = {}
+    for bucket_key, _label in REC_BUCKETS:
+        clusters: dict[str, dict] = {}
+        for cell_key, sc in scores_by_key.items():
+            if 'error' in sc:
+                continue
+            recs = sc.get(bucket_key) or []
+            for r in recs:
+                norm = _norm_title(r.get('title', ''))
+                if not norm:
+                    continue
+                sev = (r.get('severity') or 'medium').lower()
+                weight = SEVERITY_WEIGHT.get(sev, 2)
+                c = clusters.setdefault(norm, {
+                    'title': r.get('title', '(untitled)'),
+                    'count': 0,
+                    'cells': [],
+                    'severity_score': 0,
+                    'severities': [],
+                    'examples': [],
+                })
+                c['count'] += 1
+                c['cells'].append(cell_key)
+                c['severity_score'] += weight
+                c['severities'].append(sev)
+                if len(c['examples']) < 3:
+                    c['examples'].append(r)
+        # Resolve top_severity
+        for c in clusters.values():
+            if 'high' in c['severities']:
+                c['top_severity'] = 'high'
+            elif 'medium' in c['severities']:
+                c['top_severity'] = 'medium'
+            else:
+                c['top_severity'] = 'low'
+            del c['severities']
+        out[bucket_key] = sorted(
+            clusters.values(),
+            key=lambda x: (-x['severity_score'], -x['count']),
+        )
+    return out
+
+
+def write_final(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
     total_cells = len(cells)
     errored = sum(1 for c in cells if c.get('error'))
     completed = total_cells - errored
@@ -316,33 +410,93 @@ def write_final(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
     total_student_tokens_in = sum(c['student_tokens_in'] for c in cells if not c.get('error'))
     total_student_tokens_out = sum(c['student_tokens_out'] for c in cells if not c.get('error'))
 
+    models_seen = sorted({c.get('model_label', '?') for c in cells})
+    personas_seen = sorted({c.get('persona', '?') for c in cells})
+    lessons_seen = sorted({f"L{c.get('lesson_id')}" for c in cells})
+
+    rec_clusters = aggregate_recommendations(scores_by_key)
+
     lines = [
-        '# A/B Test — Final Report',
+        '# A/B Run — Recommendations to Improve the Tutoring System Prompt',
         '',
-        'Companion to `design/AB_TESTING_PLAN.md`. This report compares 3 tutoring models '
-        'across 2 lessons × 2 personas (12 cells). Programmatic metrics + Claude Opus '
-        'LLM-as-judge scoring against the 10 science-of-learning principles.',
+        'Companion to `design/AB_TESTING_PLAN.md`. **This is not a model bake-off.** '
+        'The purpose of this run is to surface evidence-anchored recommendations for '
+        'improving the tutoring system prompt (primary), engine flow (secondary), and '
+        'student experience (secondary). Models are a robustness axis, not the unit '
+        'of evaluation.',
         '',
         '## Setup',
         '',
-        '- **Models tested**: Claude Sonnet 4 (Anthropic), Gemini 3 Flash Preview (Google), GPT-4o mini (OpenAI)',
-        '- **Lessons**: L1137 (Math — Angles around a point) · L1425 (Geography — Map Scale and Map Types)',
-        '- **Personas**: `struggler`, `capable` (synthetic LLM students, Sonnet 4 driving)',
-        '- **Content source**: prod_content_dump.sql loaded into local Postgres (Docker)',
-        '- **Matrix**: 3 × 2 × 2 = 12 cells',
+        f'- **Models (robustness axis)**: {", ".join(models_seen)}',
+        f'- **Lessons**: {", ".join(lessons_seen)}',
+        f'- **Personas**: {", ".join(personas_seen)} (synthetic LLM students)',
+        '- **Content source**: prod_content_dump.sql loaded into local Postgres',
         '- **Tutor model swap**: in-memory monkey-patch on `ModelConfig.get_for`, no DB writes',
-        '- **Judge**: Claude Opus (temperature=0), 10-principle rubric',
+        '- **Judge**: Claude Opus (temperature=0), 10-principle rubric + structured recommendations',
+        '- **Scope**: OpenAI/GPT explicitly excluded — see `design/AB_TESTING_PLAN.md`',
         '',
-        '## Headline result',
+        '## Headline — Top recommendations (ranked across all cells)',
         '',
-        f'**Winner by judge mean: `{winner}`**',
+        'Ranked by aggregated severity (high=3, medium=2, low=1) summed across the cells '
+        'where the recommendation appeared, then by frequency. Use this list to drive the '
+        'next revision of the tutoring system prompt.',
         '',
-        '| Rank | Model | Overall mean (0-5) |',
-        '|---:|---|---:|',
     ]
-    for i, (m, v) in enumerate(ranking, 1):
-        lines.append(f"| {i} | {m} | **{v:.2f}** |")
-    lines.append('')
+    for bucket_key, bucket_label in REC_BUCKETS:
+        clusters = rec_clusters.get(bucket_key) or []
+        lines.append(f'### {bucket_label}')
+        lines.append('')
+        if not clusters:
+            lines.append('_No recommendations in this bucket._')
+            lines.append('')
+            continue
+        for i, c in enumerate(clusters[:10], 1):
+            lines.append(
+                f"**{i}. [{c['top_severity']}] {c['title']}** "
+                f"— surfaced in {c['count']} cell(s), severity score {c['severity_score']}"
+            )
+            if c['examples']:
+                ex = c['examples'][0]
+                if ex.get('rationale'):
+                    lines.append(f"   - Rationale: {ex['rationale']}")
+                if ex.get('suggested_prompt_edit'):
+                    lines.append(f"   - Suggested edit: {ex['suggested_prompt_edit']}")
+                if ex.get('expected_effect'):
+                    lines.append(f"   - Expected effect: {ex['expected_effect']}")
+                if ex.get('evidence_quote'):
+                    q = ex['evidence_quote'].replace('\n', ' ')[:240]
+                    lines.append(f"   - Example evidence ({ex.get('evidence_turn', '?')}): \"{q}\"")
+            lines.append(f"   - Cells: {', '.join(c['cells'])}")
+            lines.append('')
+        if len(clusters) > 10:
+            lines.append(f'_…{len(clusters) - 10} additional recommendation(s) in `summary.md` and per-cell files._')
+            lines.append('')
+
+    # Cross-model robustness check
+    per_model = mean_per_principle(scores_by_key)
+    if per_model:
+        lines += [
+            '## Cross-model robustness check (not a ranking)',
+            '',
+            'Mean rubric scores per model — used only to decide whether a prompt change '
+            'should be considered model-robust or model-specific. **Do not read this as a '
+            'model evaluation.** A large gap here means the prompt change holds differently '
+            'across providers; a small gap means it generalises.',
+            '',
+            '| Model | Overall mean (0-5) | Cells scored |',
+            '|---|---:|---:|',
+        ]
+        for model in sorted(per_model):
+            vals = list(per_model[model].values())
+            valid = [v for v in vals if v == v]
+            if not valid:
+                continue
+            ncells = sum(
+                1 for k, sc in scores_by_key.items()
+                if k.split('_L')[0] == model and 'error' not in sc
+            )
+            lines.append(f"| {model} | {mean(valid):.2f} | {ncells} |")
+        lines.append('')
 
     lines += [
         '## Run statistics',
@@ -353,6 +507,8 @@ def write_final(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
         f'- Synthetic-student tokens (in/out): {total_student_tokens_in:,} / {total_student_tokens_out:,}',
         '',
         '## Programmatic failure-mode counts (aggregated)',
+        '',
+        'Supplementary signal; the judge\'s recommendations remain the headline.',
         '',
         '| Model | Answer leaks | Repeated Q | No question | Regen shipped dirty |',
         '|---|---:|---:|---:|---:|',
@@ -375,9 +531,9 @@ def write_final(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
         '',
         '- `summary.md` — full pivot tables (model × principle, model × persona)',
         '- `cost_latency.md` — wall-time + token spend breakdown',
-        '- `per_cell/<key>.md` — per-cell transcript + programmatic metrics + judge scores',
+        '- `per_cell/<key>.md` — per-cell transcript + programmatic metrics + judge scores + recommendations',
         '- `raw_transcripts/<key>.md` — raw transcript only',
-        '- `judge_scores/<key>.json` — per-cell judge JSON output',
+        '- `judge_scores/<key>.json` — per-cell judge JSON output (scores + recommendations)',
         '- `judge_rubric.md` — exact judge prompt + rubric for reproducibility',
         '- `cell_results.jsonl` — raw programmatic metrics (one cell per line)',
         '',
@@ -386,8 +542,8 @@ def write_final(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
         '- **Synthetic-student personas, not real students** — broad strokes (struggler/capable). '
         'Real student long-tail misconceptions not represented.',
         '- **Single run per cell** — no variance estimate. A 3-run-per-cell sweep would tighten signal.',
-        '- **Cross-model only, not cross-prompt** — the AB_TESTING_PLAN R2 question (v3 vs current '
-        'prompt on same model) is a separate follow-up.',
+        '- **Cross-prompt is the canonical comparison** — cross-model variation here is a robustness '
+        'check on prompt changes, not a model evaluation. See `design/AB_TESTING_PLAN.md`.',
         '- **20-turn cap per cell** — sessions that would naturally run longer are truncated.',
         '',
     ]

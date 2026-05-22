@@ -1,29 +1,57 @@
-# A/B Testing Plan: Validating Science-of-Learning Improvements
+# A/B Testing Plan: Generating Recommendations to Improve the Tutoring System Prompt
 
-> Companion to `SCIENCE_LEARNING_AUDIT_v3.md`. Defines what we need to run
-> empirically-grounded `(prompt × model)` experiments locally, and where
-> deployed-system access is and isn't required.
-
----
-
-## Why this document exists
-
-The v3 audit recommends several changes whose impact is *qualitative*
-(prompt rewrites, model swaps, scaffolding fades). Unit tests verify
-they don't break the engine; they don't verify the *student-facing
-quality* improves. For that we need a transcript-level A/B harness.
-
-The infrastructure for this already exists in the repo
-(`apps/tutoring/management/commands/simulate_session.py` and
-`run_model_experiment.py`). What's missing is the **data** and the
-**scoring layer** — neither of which require deployed-system access in
-the conventional sense.
+> Companion to `SCIENCE_LEARNING_AUDIT_v3.md`. Defines an empirical loop
+> for **improving the tutoring system prompt** (and adjacent flow /
+> experience choices) by running `(prompt × model × lesson × persona)`
+> cells locally and harvesting prescriptive recommendations from a
+> structured LLM-as-judge.
 
 ---
 
-## What we need for a valid A/B test
+## What this exercise is — and is **not**
 
-Three independent requirements. Only one is a real bottleneck.
+**This A/B harness exists to produce prescriptive recommendations for
+improving the tutoring system prompt.** Read this twice; it's the
+single most-violated rule in past runs.
+
+- ✅ The **unit of variation** is the *system prompt* (current vs. v3
+  vs. proposed future variants). Running multiple models is a
+  *robustness check* — does a prompt improvement hold across
+  providers? — not a model bake-off.
+- ✅ The **primary artefact** is a ranked, actionable list of changes
+  to the system prompt, plus secondary recommendations on flow,
+  scaffolding, and student experience. The science-of-learning rubric
+  scores are inputs to that synthesis, not the output.
+- ❌ This is **not** a model evaluation. We are not picking a "winner"
+  among Anthropic / Google / etc. Model selection is governed by
+  `apps/llm/models.py::ModelConfig` for production reasons (cost,
+  latency, capability per purpose) that have nothing to do with this
+  harness.
+- ❌ Per-model rankings ("model X scored 2.98, model Y scored 2.93") in
+  the final report are **not** the headline result and should not be
+  framed as such. They exist only to detect whether a prompt change
+  is model-robust or model-specific.
+
+If a future run produces a "FINAL_REPORT.md" whose headline is "Winner
+by judge mean: model X", it has misread this document.
+
+---
+
+## Why this matters now
+
+`SCIENCE_LEARNING_AUDIT_v3.md` recommends a slim v3 system prompt (R2)
+plus several adjacent flow changes (R6+ — interleaving, prereq
+routing, daily review). These recommendations are *informed* by
+manual transcript review but not *validated* at scale. The harness
+closes the loop: produce transcripts → judge them against the
+science-of-learning rubric **and** extract prescriptive edits → feed
+those back into the next prompt revision.
+
+---
+
+## What we need for a valid A/B run
+
+Three independent requirements.
 
 ### Requirement 1 — Realistic lesson content in the local DB
 
@@ -54,60 +82,99 @@ Three ways to get rich content locally, ranked by cost / realism:
 | **Hand-curate** 2 lessons with full content | days | $0 | ★★★ |
 
 **Recommended**: production DB dump. It needs no deploy access — just a
-read query against the production DB scoped to a few tables (Section 2
+read query against the production DB scoped to a few tables (Section
 below).
 
 ### Requirement 2 — API keys for the models under test
 
-Whatever models we want to compare must have credentials in the local
-environment:
+The supported model providers for this harness are **Anthropic** and
+**Google**. OpenAI is explicitly out of scope (see "Removed: OpenAI"
+below).
 
 | Model | Env var | Status |
 |-------|---------|--------|
 | Anthropic Claude (Opus 4.7, Sonnet 4) | `ANTHROPIC_API_KEY` | ✅ in `.env` |
-| Google Gemini (Flash, Flash Lite, Pro) | `GOOGLE_API_KEY` | ❌ missing |
-| OpenAI (optional, if expanding scope) | `OPENAI_API_KEY` | ❌ missing |
+| Google Gemini (Flash, Flash Lite, Pro) | `GOOGLE_API_KEY` | required if running Gemini cells |
 
-**Important**: the most informative *first* comparison is **current
-prompt vs v3 prompt on the same model**. That isolates the prompt
-effect from the model effect, which is the question audit v3 H2
-actually asks. This comparison needs only `ANTHROPIC_API_KEY`.
+The most informative comparison is **current prompt vs v3 prompt on
+the same model** — it isolates the prompt effect, which is the only
+variable we can actually act on. Cross-model runs come second, as a
+robustness check on prompt changes.
 
-Adding `GOOGLE_API_KEY` (free tier at https://aistudio.google.com,
-~5 minutes) unlocks the cross-model comparison the audit's H1
-discussed. Now that H1 is invalidated (regression predates the
-2026-05-20 model swap), the cross-model comparison is lower priority
-than the cross-prompt one.
+#### Removed: OpenAI
 
-### Requirement 3 — A scorer for the transcripts
+OpenAI / GPT models are not part of this testing plan. Reasons:
 
-The harness produces transcripts; converting them to a comparable
-score requires a rubric:
+1. The recent GPT-4o-mini cells failed with 0% tool-use rate
+   (structural incompatibility between this engine's tool-calling
+   shape and the OpenAI path) — the cells produced no usable signal.
+2. Production tutoring is dispatched through `ModelConfig` to
+   Anthropic and Google providers; GPT is not on the deployment path
+   for this purpose.
+3. Including GPT cells dilutes the budget for the comparison that
+   actually matters (cross-prompt within the deployed providers).
 
-| Option | What it is | Best for |
-|--------|-----------|----------|
-| **`evaluate-tutor` skill** in `.claude/skills/evaluate-tutor/` | Designed exactly for this. Scores transcripts against science-of-learning principles. | The qualitative principle compliance |
-| **LLM-as-judge inline script** (~60 lines of Python) | Asks Opus/Sonnet to score 0-5 per principle on a transcript, returns JSON | Custom rubrics, batch scoring |
-| **Programmatic counters** | Math-error rate (via `audit_math_false_positives`), turn-length distribution, % turns ending with a question | The hard metrics |
+If OpenAI re-enters the tutoring path in future, treat that as a
+separate, scoped exercise — debug `apps/llm/client.py` OpenAI tool
+schema first, then add it back here.
 
-The right answer is a mix: programmatic for the hard metrics that have
-deterministic ground truth (math accuracy, turn lengths, tool-use
-compliance), and LLM-as-judge for the soft ones (active-learning
-ratio, scaffolding quality, layering frequency).
+### Requirement 3 — A structured-recommendation judge
+
+The harness produces transcripts; converting them to *recommendations*
+requires a judge that does two things in one pass:
+
+1. **Scores** the transcript 0–5 on each of the 10 science-of-learning
+   principles (rubric from `.claude/skills/evaluate-tutor/SKILL.md`).
+2. **Prescribes** changes — concrete, actionable recommendations for
+   improving the system prompt, flow, and experience, each grounded
+   in a quoted transcript turn.
+
+The judge output schema is **non-negotiable** — downstream aggregation
+depends on it. See `scripts/judge_transcripts.py::build_prompt` for
+the authoritative template; high-level shape:
+
+```jsonc
+{
+  "scores": { "<principle>": { "score": 0-5, "evidence": "…" }, … },
+  "strongest_behaviors": [str, …],
+  "weakest_behaviors": [str, …],
+  "prompt_recommendations": [
+    {
+      "title": "Short imperative ('Forbid two consecutive teach blocks')",
+      "rationale": "Why — tied to which principle/failure mode",
+      "evidence_quote": "Verbatim excerpt from the transcript",
+      "evidence_turn": "TUTOR turn id or section reference",
+      "suggested_prompt_edit": "Concrete language to add/change in the system prompt",
+      "expected_effect": "What measurable behavior should improve",
+      "severity": "high|medium|low"
+    }
+  ],
+  "flow_recommendations":      [ /* same schema, fixes target engine/flow, not the prompt */ ],
+  "experience_recommendations":[ /* same schema, fixes target student UX/scaffolding */ ],
+  "overall_summary": "2-3 sentences"
+}
+```
+
+The aggregator (`scripts/generate_reports.py`) clusters
+recommendations across cells, deduplicates near-duplicates, and ranks
+by (frequency × severity) so the final report leads with the most
+load-bearing prompt edits.
+
+Programmatic counters (math-error rate, turn-length distribution,
+% turns ending with a question, regen-cycles-exhausted) remain
+captured as supplementary inputs but are **not** the report headline.
 
 ---
 
 ## Do we need access to the deployed main backend?
 
-**For running the experiment itself: no.** `run_model_experiment.py`
+**For running the experiment itself: no.** The runner (`scripts/run_ab_test.py`)
 runs entirely locally — it talks to the LLM APIs directly, writes
-transcripts to `memory/`, and never touches production.
+transcripts to `ab-test-reports/`, and never touches production.
 
 **For getting representative lesson content: yes — but only DB *read*
-access, not *deploy* access.** This is the single ask of the deployed
-system. A `pg_dump` (or Django `dumpdata` equivalent) of 5-10 lessons,
-scoped to a handful of tables, is enough. No code is being shipped,
-no traffic is routed, no service is restarted.
+access, not *deploy* access.** A `pg_dump` (or Django `dumpdata`
+equivalent) of 5-10 lessons, scoped to a handful of tables, is enough.
 
 The minimum scope:
 
@@ -125,60 +192,83 @@ pg_dump --data-only \
 
 …then filter to ~5-10 representative lesson IDs by hand (a mix of
 S1-S5, math + geography, varied step types). Resulting dump is
-~10-50 MB. Drop it into the local SQLite via the equivalent
-`loaddata` command after light SQL massaging (pg→sqlite type
-differences are minor for content tables).
-
-**For grounding the scorer against a real-world baseline: optional.**
-Exporting 20-50 recent `SessionTurn` + `TutorSession` rows gives the
-scorer a reference for "what does today's tutor actually produce on
-real student inputs?" Useful for calibration but not blocking.
+~10-50 MB.
 
 ---
 
-## The simple, quick path
+## The run loop (one cycle = one prompt iteration)
 
-Two days. One external dependency (a teammate running one `pg_dump`).
+Each cycle of the loop revises the tutoring system prompt once.
 
-| Day | Step | Output |
-|-----|------|--------|
-| 1 AM | Request the content dump (Section 2). Verify locally that `manage.py loaddata` or psql import works. | `db.sqlite3` with 5-10 real lessons |
-| 1 PM | Run `manage.py simulate_session --lesson <id> --persona struggler` once with the current prompt to confirm the pipeline works end-to-end against real content. Fix any environment issues. | One working baseline transcript |
-| 2 AM | Add v3 prompt as a feature-flagged alternate (env var or DB flag). Run `manage.py run_model_experiment --models opus-current-prompt,opus-v3-prompt --lessons <5-10 IDs> --personas struggler,bright,careless`. | ~30 transcripts saved under `memory/` |
-| 2 PM | Score every transcript with the `evaluate-tutor` skill + programmatic counters. Aggregate: `prompt × persona × principle → mean score`. Decide on R2 based on the table. | A before/after comparison committed to `design/AB_RESULTS_<DATE>.md` |
+| Phase | Step | Output |
+|-------|------|--------|
+| 1. **Baseline** | Run matrix with the *current* system prompt across both supported models, the chosen lessons, both personas. | `ab-test-reports/cell_results.jsonl` + transcripts |
+| 2. **Score & prescribe** | Run `scripts/judge_transcripts.py` to score every transcript and extract structured recommendations. | `judge_scores/<key>.json` per cell |
+| 3. **Synthesise** | Run `scripts/generate_reports.py` to cluster recommendations across cells, rank by (frequency × severity), and emit `FINAL_REPORT.md`. | Ranked recommendation list |
+| 4. **Triage** | Human reviewer picks the top 3–5 recommendations to apply. Document the rationale; note which were deferred and why. | A prompt patch + a deferred-items list |
+| 5. **Apply** | Edit the tutoring system prompt with the chosen recommendations. Commit the new prompt as a named variant (e.g., `v4`). | Updated prompt in source |
+| 6. **Re-run** | Re-run the matrix with the new prompt variant. Compare aggregate principle scores and recommendation counts to baseline. | Did the targeted principles improve? Did new failure modes emerge? |
 
-**Compute cost estimate**: ~30 transcripts × ~30 turns × ~$0.05/turn
-(Opus) ≈ ~$45. Scoring: ~30 × $0.10 ≈ $3. **Total under $50.**
+Two passes through the loop is the typical floor; three is realistic
+for a prompt revision that materially moves the rubric.
 
-**What this gives**: a defensible answer to *"does the v3 prompt
-improve science-of-learning compliance on real lesson content?"*, in
-two days, with one external dependency.
+**Compute cost estimate per cycle**: ~8 cells × ~30 turns × ~$0.05/turn
+≈ ~$12. Judging: ~8 cells × ~$0.10 ≈ $1. **Under $15 per cycle.**
 
-**What this does NOT give**:
+---
 
-- *Long-horizon effects* — SM-2 spaced repetition only pays off across
-  multi-day sessions. Local synthetic runs verify the schedule is
-  written correctly but not that retention improves.
+## The matrix
+
+After removing OpenAI:
+
+- **Models** (robustness axis, not evaluation): Anthropic Claude
+  Sonnet 4, Google Gemini 3 Flash.
+- **Lessons** (subject coverage): L1137 (Math — Angles around a
+  point), L1425 (Geography — Map Scale and Map Types). Expand as
+  needed.
+- **Personas** (student variation): `struggler`, `capable`.
+
+Default cell count: 2 × 2 × 2 = **8 cells per prompt variant**. Two
+prompt variants per cycle (current vs. proposed) → 16 cells per
+cycle.
+
+---
+
+## What this loop gives us — and what it doesn't
+
+**Gives**:
+
+- A ranked, actionable list of system-prompt edits each cycle,
+  grounded in transcript evidence.
+- A measurable signal on whether a prompt change moves the
+  science-of-learning rubric in the targeted direction.
+- A cross-model robustness check on each prompt edit.
+
+**Doesn't give**:
+
+- *Long-horizon effects* — SM-2 spaced repetition only pays off
+  across multi-day sessions. Local synthetic runs verify the schedule
+  is written correctly but not that retention improves.
 - *Real-student distribution of misconceptions* — synthetic personas
-  cover the broad strokes (struggler, bright, careless) but real
-  students fail in long-tail ways. Cloud canary remains the final
-  check before broad rollout.
+  cover the broad strokes (struggler, capable) but real students fail
+  in long-tail ways. Cloud canary remains the final check before
+  broad rollout.
 - *Mobile UX regressions* — runs through the engine, not the rendered
   chat. Browser-load testing per `LOCAL_TESTING_GUIDE.md §5` is still
   needed for any UI-touching change.
 
 ---
 
-## Which v3 recommendations need this A/B before shipping
+## Which v3 audit items run through this harness
 
-| Recommendation | Needs A/B? | Why |
-|----------------|-----------|-----|
+| Recommendation | Use this harness? | Why |
+|----------------|------------------|-----|
 | R1 — Roll back tutoring to Opus 4.7 | No | Code change is a data migration with a clear reverse. Risk is *production traffic cost / latency*, not quality. |
-| R2 — Slim v3 system prompt | **YES** | Quality is the whole point. Cannot be verified by unit tests alone. |
+| R2 — Slim v3 system prompt | **YES — this is the canonical case** | Quality is the whole point. Recommendations from the judge feed directly into the next prompt revision. |
 | R3 — LLM concept coverage on per-turn path | No | Unit tests verify the gate logic. Cost is bounded (rare event). |
 | R4 — `Course.subject_code` backfill | No | Pure data-correctness change. |
 | R5 — Tighter algebra filter | No | Unit tests cover the regex change. |
-| R6+ — Tier 2/3 items (automaticity, daily review, etc.) | Per item | Most are new features, not behavior changes — ship with feature tests, validate quality post-rollout. |
+| R6+ — Tier 2/3 items (automaticity, interleaving, daily review, prereq routing) | **YES** for the prompt-side pieces; **partly** for the flow pieces (the judge's `flow_recommendations` block is the input) | Anything that changes what the tutor *says* to the student needs the harness. |
 
 **Decision rule**: behavior changes that affect what the tutor *says*
 to the student need this A/B. Plumbing changes that affect *what data
@@ -188,12 +278,6 @@ the engine sees* don't.
 
 ## Next step
 
-Identify someone with production DB read access and request the dump
-described in Section 2. While waiting, ship `feature/science-learning-tier1-v3`
-(R1+R3+R4+R5) since none of those need this A/B. Open the R2 PR as a
-follow-up after the 2-day experiment lands.
-
-If a Google API key is added at any point, re-run the experiment with
-`--models opus-current-prompt,opus-v3-prompt,gemini-flash-v3-prompt`
-to revisit H1 with empirical data rather than the speculation that
-just got walked back.
+Run one full cycle against the current prompt to populate baseline
+recommendations. Apply the top-ranked subset, ship as v4, re-run.
+Track cycle-over-cycle delta in `design/AB_RESULTS_<DATE>.md`.
