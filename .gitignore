@@ -43,3 +43,12 @@ ops/annotator_agent/metrics_history.jsonl
 /*.png
 /screenshots/
 /test-files/
+
+# A/B test outputs — transcripts, judge scores, and final reports.
+# Regenerable from scripts/run_ab_test.py + scripts/judge_transcripts.py.
+ab-test-reports/
+
+# Production content dump used for local A/B testing — contains real
+# lesson content + may include institution-scoped data. Loaded into the
+# Dockerized Postgres at test time; not tracked.
+prod_content_dump.sql
