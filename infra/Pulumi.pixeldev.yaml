@@ -1,0 +1,16 @@
+encryptionsalt: v1:c5GjKTTXcRQ=:v1:+18FbQy0eiWkOZED:QXvEKGq+2TYHCTazBg/Ef043QPVqiA==
+config:
+  azure-native:location: centralus
+  azure-native:subscriptionId: 656f4091-746b-44ef-8add-6d94eb4a7612
+  aitutor:db-password:
+    secure: v1:0gs2KTS3GbF6t8OJ:xyRA00lHQ75KWjC0IJ7XQ4KFEYum/89xZ1VTXnfcupSU3ZWaD6ug6vxFC7LssFIQ
+  aitutor:django-secret-key:
+    secure: v1:+CKE7bt9Bbo10ex1:YneY62Ue9QGtG1EO6IIG7sBsOQcGQmv4SUznQ2uctcY8Ffe+7DneJ6LBCc4NI3rYnkX36iRTsPVBviFpzB1kJntG
+  aitutor:anthropic-api-key:
+    secure: v1:T5KjHXcXBTGyRjWu:eHkXVjulCAOaKAG3lDYqfSOP08dsM7n/ax1Sc5Rwcx+kfXc6fGKtYf208idKhJyeTzwtmRCfVJkAIHb4BWG7Qx+od1n0+6GGlgag/TrOpMOrc/TYQGQN2f3Ipe+3Tu6WXp15eqHmWD5Uzf7vHcvUi3I1Q+pVnJ8fbMYLHQ==
+  aitutor:openai-api-key:
+    secure: v1:Ms3iNKTm8sQFNJZK:b5nA1aNNgw4lsq6A96oNEXUipukfdA0V
+  aitutor:google-api-key:
+    secure: v1:Dq6yxglAbuMrVUdv:UB38gouE9Njlla4rEb+LGR1ygxlF
+  aitutor:elevenlabs-api-key:
+    secure: v1:VJ4s7Ss5o7GRkBWK:8TIEVAPo7JAs5Dm6ph5MQC2GyrfK4jIKEDP+0l+RXiXjOcQ/ZqeDbCSqpkNqq7ldm8sj9y0JIJ0cVLoYWxdteMC5oA==
