@@ -43,7 +43,7 @@ def _partial_rollback(apps, schema_editor):
         api_key_env_var='ANTHROPIC_API_KEY',
         api_key_encrypted='',
     )
-    print(f"  [llm.0029] tutoring → anthropic/claude-opus-4-7 ({n} row(s))")
+    print(f"  [llm.0031] tutoring → anthropic/claude-opus-4-7 ({n} row(s))")
 
     # regen → Sonnet 4 @ 0.2 (the pre-0028 production config; cheaper
     # than Opus and historically the regen tier when the tutor is Opus)
@@ -54,7 +54,7 @@ def _partial_rollback(apps, schema_editor):
         api_key_env_var='ANTHROPIC_API_KEY',
         api_key_encrypted='',
     )
-    print(f"  [llm.0029] regen → anthropic/claude-sonnet-4-20250514 ({n} row(s))")
+    print(f"  [llm.0031] regen → anthropic/claude-sonnet-4-20250514 ({n} row(s))")
 
     # judge stays on Gemini 3.1 Flash Lite — small task, latency win
     # is real, and the math-error class we're trying to fix is a tutor
@@ -85,7 +85,13 @@ def _reapply_gemini_stack(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('llm', '0028_swap_runtime_to_gemini_3_1_flash_lite'),
+        # Renamed from 0029 -> 0031 at merge time (2026-05-23) to resolve
+        # collision with main's 0029_widen_purpose_judge_fallback_tiers.
+        # Dependency advanced from 0028 -> 0030 so this runs AFTER the
+        # main-side judge-chain widening + Opus revert. Net effect: this
+        # migration only changes `regen` (Opus -> Sonnet 4); `tutoring`
+        # stays on Opus 4.7 (no-op since 0030 already set it).
+        ('llm', '0030_revert_runtime_to_claude_widen_judge_chain'),
     ]
 
     operations = [

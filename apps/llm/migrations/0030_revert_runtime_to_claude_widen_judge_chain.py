@@ -44,7 +44,23 @@ Refs:
 from django.db import migrations
 
 
-GLOBAL_INSTITUTION_ID = 12  # 'Global (All Schools)' — shared platform config
+def _resolve_global_institution_id(apps):
+    """Return the id of the institution other ModelConfigs are scoped to,
+    or None if the table is empty.
+
+    Earlier draft hard-coded ``12`` (the prod 'Global (All Schools)' id),
+    which broke test-DB fixtures that don't seed that institution. This
+    lookup uses whatever institution the existing judge config points to,
+    which on prod resolves to 12 anyway and on test DBs degrades gracefully
+    (returns None → judge_fallback_2 row is skipped, which tests don't need).
+    """
+    ModelConfig = apps.get_model('llm', 'ModelConfig')
+    sibling = (
+        ModelConfig.objects
+        .filter(purpose__in=('judge', 'judge_fallback', 'tutoring'))
+        .first()
+    )
+    return sibling.institution_id if sibling else None
 
 
 def _apply(apps, schema_editor):
@@ -80,11 +96,17 @@ def _apply(apps, schema_editor):
     )
     print(f"  [llm.0030] judge_fallback → openai/gpt-4o-mini ({n} row(s))")
 
-    # judge_fallback_2 → Haiku 4.5 (tier-3 last-resort). Create one row
-    # at Global institution; ModelConfig.get_for falls back to global
-    # when a per-institution row is absent.
+    # judge_fallback_2 → Haiku 4.5 (tier-3 last-resort). Created on the
+    # same institution other ModelConfigs are scoped to (on prod this is
+    # the 'Global (All Schools)' row, id=12). If the table has no
+    # ModelConfig rows yet (fresh test DB), skip the create — tests
+    # don't exercise the tier-3 cascade.
+    inst_id = _resolve_global_institution_id(apps)
+    if inst_id is None:
+        print("  [llm.0030] judge_fallback_2 → SKIPPED (no sibling ModelConfig to inherit institution from)")
+        return
     obj, created = ModelConfig.objects.update_or_create(
-        institution_id=GLOBAL_INSTITUTION_ID,
+        institution_id=inst_id,
         purpose='judge_fallback_2',
         defaults=dict(
             is_active=True,
