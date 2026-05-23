@@ -42,7 +42,7 @@ on:
         type: boolean
         default: false
       eval_matrix_mode:
-        description: 'Eval matrix size when run: deploy=4 cells (1 model, ~$5), full=8 cells (~$15)'
+        description: 'Eval matrix size: deploy=4 cells (Sonnet+Gemini × 2 lessons × error_prone, ~$15, ~25 min) · full=24 cells (Sonnet+Gemini × 4 lessons × all 3 personas, ~$60, ~100 min)'
         required: false
         type: choice
         default: 'deploy'
@@ -140,8 +140,15 @@ jobs:
   # Science-of-Learning rubric, and commits a markdown report to the
   # long-lived `eval-reports` branch under `runs/<sha>/`.
   #
-  # `deploy` matrix mode = 1 model x 2 lessons x 2 personas = 4 cells.
-  # `full` matrix mode = 2 models x 2 lessons x 2 personas = 8 cells.
+  # `deploy` matrix mode (default): {Sonnet 4, Gemini 3 Flash} × 2
+  #   lessons (1 math + 1 geo) × `error_prone` persona = 4 cells,
+  #   ~25 min, ~$15/run. Optimised for BEA signal per dollar:
+  #   error_prone produces 12-17 BEA in-scope turns per cell where
+  #   struggler/capable gave only 0-3. Both prod-tier models so we
+  #   catch cross-model regressions on every deploy.
+  # `full` matrix mode (ad-hoc): 2 models × 4 lessons × 3 personas
+  #   = 24 cells, ~100 min, ~$60. Use for comprehensive sweeps when
+  #   making a prompt-variant decision.
   #
   # Pre-requisites (one-time setup before this job can run green):
   #   - Repo secrets ANTHROPIC_API_KEY, GOOGLE_API_KEY, OPENAI_API_KEY

@@ -33,7 +33,7 @@ from apps.curriculum.models import Course, Lesson, LessonStep, Unit  # noqa: E40
 from apps.tutoring.models import ExitTicket, ExitTicketQuestion  # noqa: E402
 
 
-LESSON_IDS = [1137, 1425]
+LESSON_IDS = [1137, 1138, 1425, 540]  # 2 math + 2 geo — covers both deploy + full matrix modes
 
 
 def main():

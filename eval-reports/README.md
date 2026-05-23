@@ -32,18 +32,20 @@ re-run the eval without a fresh deploy:
    [GitHub Actions UI](../../../../actions/workflows/deploy.yml).
 2. Or trigger `Deploy` via **Run workflow** on a chosen branch with:
    - `skip_eval` = unchecked (default)
-   - `eval_matrix_mode` = `deploy` (1 model × 2 lessons × 2 personas, ~5 min, ~$5)
-     or `full` (2 models × 2 lessons × 2 personas, ~15 min, ~$15)
+   - `eval_matrix_mode` = `deploy` (Sonnet + Gemini × 2 lessons × `error_prone` = **4 cells**, ~25 min, ~$15)
+     or `full` (2 models × 4 lessons × 3 personas = **24 cells**, ~100 min, ~$60 — comprehensive sweep)
 
 ## What is measured
 
 | Axis | Default (`deploy` mode) | `full` mode |
 |---|---|---|
-| Tutor models | Claude Sonnet 4 | Sonnet 4 + Gemini 3 Flash |
-| Lessons | L1137 *Angles around a point* · L1425 *Map Scale and Map Types* | same |
-| Personas | `struggler` · `capable` (synthetic LLM students) | same |
+| Tutor models | Sonnet 4 + Gemini 3 Flash | same |
+| Lessons | L1137 *Angles around a point* (math) · L1425 *Map Scale and Map Types* (geo) | + L1138 *Angles on a straight line* + L540 *Understanding Maps* |
+| Personas | `error_prone` only (designed for max BEA in-scope coverage) | + `struggler` + `capable` |
 | Judge | Claude Opus 4.7 — combined 10-principle + BEA-2025 rubric (one call) | same |
-| Cells per run | 4 | 8 |
+| **Cells per run** | **4** | **24** |
+| Wall time | ~25 min | ~100 min |
+| Cost | ~$15 | ~$60 |
 
 ### The two judging rubrics (run together in one Opus call)
 

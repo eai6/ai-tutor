@@ -40,40 +40,47 @@ class ModelSpec:
     temperature: float = 0.2
 
 
-MODELS_FULL = [
-    ModelSpec('sonnet-4', 'Claude Sonnet 4', 'anthropic', 'claude-sonnet-4-20250514', 0.2),
-    ModelSpec('gemini-3-flash', 'Gemini 3 Flash', 'google', 'gemini-3-flash-preview', 0.2),
-]
+_MATRIX_MODE = os.environ.get('EVAL_MATRIX_MODE', 'deploy').lower()
 
-# Deploy-mode matrix (post-deploy CI eval): one model, cheaper run.
-# Set EVAL_MATRIX_MODE=full to get the 2-model robustness sweep.
-MODELS_DEPLOY = MODELS_FULL[:1]
+# Two matrix modes (2026-05-23 cost-optimised redesign):
+#
+# `deploy` (default; runs on every push to main via CI):
+#   2 models × 2 lessons × 1 persona = **4 cells**
+#   {Sonnet 4, Gemini 3 Flash} × {L1137 math, L1425 geo} × error_prone
+#   Wall: ~25 min. Cost: ~$15. BEA in-scope: ~50-70 turns / run.
+#   Both prod-tier models so we catch cross-model regressions on every
+#   deploy. error_prone consistently produces 12-17 BEA in-scope turns
+#   per cell; struggler/capable produced only 0-3 in-scope turns each
+#   in prior runs and are excluded from the lean matrix.
+#
+# `full` (manual workflow_dispatch with eval_matrix_mode=full):
+#   2 models × 4 lessons × 3 personas = **24 cells**
+#   Adds Gemini for robustness + struggler/capable for persona variance
+#   + 2 more lessons for content coverage.
+#   Wall: ~100 min. Cost: ~$60. Use for ad-hoc comprehensive sweeps.
 
-_MATRIX_MODE = os.environ.get('EVAL_MATRIX_MODE', 'full').lower()
-MODELS = MODELS_DEPLOY if _MATRIX_MODE == 'deploy' else MODELS_FULL
-
-# Lessons used in the eval matrix. The CI deploy-mode workflow uses
-# the first two (one math, one geo); the full-mode local sweep uses all
-# four. Each lesson is loaded from `eval-fixtures/baseline.json` in CI
-# (the fixture currently includes only L1137 + L1425 — regenerate the
-# fixture with the extra lessons before turning on full mode in CI).
-LESSONS_DEPLOY = [
-    (1137, 'Math — Angles around a point'),
-    (1425, 'Geography — Map Scale and Map Types'),
-]
-LESSONS_FULL = LESSONS_DEPLOY + [
-    (1138, 'Math — Angles on a straight line'),
-    (540,  'Geography — Understanding Maps'),
-]
-LESSONS = LESSONS_DEPLOY if _MATRIX_MODE == 'deploy' else LESSONS_FULL
-
-# Personas. `error_prone` was added 2026-05-23 to lift BEA in-scope
-# coverage (the BEA-2025 rubric only scores tutor turns after a student
-# mistake; struggler + capable rarely produce enough mistakes for a
-# statistically meaningful BEA pass rate on small N).
-PERSONAS = ['struggler', 'capable'] if _MATRIX_MODE == 'deploy' else [
-    'struggler', 'capable', 'error_prone',
-]
+if _MATRIX_MODE == 'full':
+    MODELS = [
+        ModelSpec('sonnet-4', 'Claude Sonnet 4', 'anthropic', 'claude-sonnet-4-20250514', 0.2),
+        ModelSpec('gemini-3-flash', 'Gemini 3 Flash', 'google', 'gemini-3-flash-preview', 0.2),
+    ]
+    LESSONS = [
+        (1137, 'Math — Angles around a point'),
+        (1138, 'Math — Angles on a straight line'),
+        (1425, 'Geography — Map Scale and Map Types'),
+        (540,  'Geography — Understanding Maps'),
+    ]
+    PERSONAS = ['struggler', 'capable', 'error_prone']
+else:  # deploy (lean)
+    MODELS = [
+        ModelSpec('sonnet-4', 'Claude Sonnet 4', 'anthropic', 'claude-sonnet-4-20250514', 0.2),
+        ModelSpec('gemini-3-flash', 'Gemini 3 Flash', 'google', 'gemini-3-flash-preview', 0.2),
+    ]
+    LESSONS = [
+        (1137, 'Math — Angles around a point'),
+        (1425, 'Geography — Map Scale and Map Types'),
+    ]
+    PERSONAS = ['error_prone']
 
 OUT_DIR = Path(os.environ.get('AB_REPORT_DIR', 'ab-test-reports'))
 RESULTS_JSONL = OUT_DIR / 'cell_results.jsonl'
