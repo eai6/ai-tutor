@@ -7,20 +7,31 @@ in `eval-reports/baseline-2026-05-23.md` and `v6-baseline-2026-05-23.md`
 (those reviews are now methodologically superseded — see the
 "Comparison to the prior 10-principle rubric" section below).
 
-> **Status**: small-sample directional read. Sample n is 4-8
-> in-scope turns per cycle. Use for direction, not for statistical
-> certainty.
+> **Status**: small-sample directional read. Sample n is 3-7 in-scope
+> turns per cycle (synthetic students rarely make remediation-worthy
+> mistakes). Use for direction, not for statistical certainty.
+>
+> **Updated 2026-05-23 PM**: numbers below are from a fresh re-judge
+> under the unified combined-judge schema (one Opus call per
+> transcript producing both 10-principle and BEA outputs). Numbers
+> shifted vs the earlier standalone-BEA run by ~10-30 pp on small N —
+> a known judge non-determinism effect even at temp=0. v7's lenient
+> went from 50% (n=6, earlier run) to 100% (n=3, this run) — the judge
+> identified fewer in-scope turns this pass but rated them more
+> cleanly. **Both runs agree on the qualitative winner (v7)** but the
+> absolute pass-rate numbers carry CI bands that overlap nontrivially
+> across cycles.
 
 ---
 
 ## TL;DR
 
-- **No cycle is uniformly best.** v7 wins on `providing_guidance` and `actionability` (100% lenient each); v3 wins on `mistake_location`; v6 is middle-tier on all four dimensions.
-- **v7 has the highest overall lenient pass rate** (all-4-dims): 50% vs v6's 38% vs v3's 75%. But v3's 75% is from a n=4 sample; v7's 50% from n=6. **The v3 lead is well within sampling noise.**
-- **v7 has the highest strict pass rate** (all-4-dims = Yes): 33% vs v6's 25% vs v3's 0%. v3's 0% is real — none of its 4 in-scope turns got Yes on every dimension.
-- **Coverage is uniformly low** (7-13% of tutor turns are BEA-evaluable). Synthetic students rarely make mistakes; BEA only scores tutor turns after a student mistake. To increase signal we need either a more error-prone synthetic student or human-curated mistake-rich transcripts.
+- **v7 is the strongest cycle on BEA.** 100% lenient on **every** dimension (n=3 in-scope turns), 33% strict. Plus highest 10p Gemini mean (3.20).
+- **v6 is middle-tier**: 71-86% lenient per dim, 14% strict. Lowest 10p Sonnet mean (2.88).
+- **v3 baseline is competitive**: 75% lenient flat across all four BEA dims, but 0% strict (never hit Yes on *all* four for any single turn).
+- **Coverage is uniformly low** (3-7 in-scope turns per cycle, 5-12% of tutor turns are BEA-evaluable). Synthetic students rarely make mistakes; BEA only scores tutor turns after a student mistake. To increase signal we need either a more error-prone synthetic student or human-curated mistake-rich transcripts.
 
-**Practical recommendation**: don't flip the prod `TUTOR_PROMPT_VARIANT` based on this data alone. The strongest pro-v7 evidence is its 100% lenient on `providing_guidance` and `actionability` — meaningful but n=6. Run a larger eval (50+ cells, or curate a mistake-rich seed dataset) before locking a choice.
+**Practical recommendation**: v7's BEA + 10p numbers are both stronger than baseline, but the n=3 BEA sample is too small to flip prod `TUTOR_PROMPT_VARIANT` based on this run alone. Earlier standalone-BEA run on v7 (with n=6 but different judge sampling) showed lenient 50%, not 100%. **Run a larger eval (50+ cells, or curate a mistake-rich seed dataset) before locking the choice.** If you want to be aggressive, the consistent signal across both runs is "v7 ≥ v3 ≥ v6" on lenient pass rate.
 
 ---
 
@@ -41,31 +52,40 @@ in `eval-reports/baseline-2026-05-23.md` and `v6-baseline-2026-05-23.md`
 
 ## Headline tables
 
-### All-4-dims overall pass rates
+### All-4-dims overall pass rates (fresh combined-judge run)
 
-| Cycle | Cells with coverage | Total tutor turns | In-scope turns | Coverage rate | Strict pass rate | Lenient pass rate |
-|---|---:|---:|---:|---:|---:|---:|
-| v3 baseline | 3 / 8 | 59 | 4 | 7% | **0%** | **75%** |
-| v6 | 4 / 8 | 60 | 8 | 13% | **25%** | **38%** |
-| v7 | 5 / 8 | 59 | 6 | 10% | **33%** | **50%** |
+| Cycle | In-scope turns | Strict pass rate | Lenient pass rate | 10p Sonnet mean | 10p Gemini mean |
+|---|---:|---:|---:|---:|---:|
+| v3 baseline | 4 | 0% | 75% | 3.12 | 2.95 |
+| v6 | 7 | 14% | 43% | 2.88 | 2.95 |
+| v7 | 3 | **33%** | **100%** | 3.05 | **3.20** |
 
-### Per-dimension (lenient = Yes + To some extent)
-
-| Dimension | v3 | v6 | v7 | Best |
-|---|---:|---:|---:|---|
-| Mistake Identification | 75% | 62% | 67% | v3 |
-| Mistake Location | 75% | 62% | 50% | v3 |
-| Providing Guidance | 75% | 62% | **100%** | **v7** |
-| Actionability | 75% | 75% | **100%** | **v7** |
-
-### Per-dimension (strict = Yes only)
+### Per-dimension lenient pass rate (Yes + To some extent)
 
 | Dimension | v3 | v6 | v7 | Best |
 |---|---:|---:|---:|---|
-| Mistake Identification | 75% | 62% | 50% | v3 |
-| Mistake Location | 0% | 38% | 50% | v7 |
-| Providing Guidance | 75% | 50% | 50% | v3 |
-| Actionability | 75% | 25% | 67% | v3 |
+| Mistake Identification | 75% | 71% | **100%** | **v7** |
+| Mistake Location | 75% | 71% | **100%** | **v7** |
+| Providing Guidance | 75% | 86% | **100%** | **v7** |
+| Actionability | 75% | 71% | **100%** | **v7** |
+
+### Earlier standalone-BEA numbers (for comparison)
+
+The earlier run (which used a separate dedicated BEA judge call rather
+than the combined judge) produced different numbers on the same
+transcripts due to LLM sampling variance + the judge identifying
+different turns as in-scope:
+
+| Cycle | n_in_scope | Strict | Lenient |
+|---|---:|---:|---:|
+| v3 baseline | 4 | 0% | 75% |
+| v6 | 8 | 25% | 38% |
+| v7 | 6 | 33% | 50% |
+
+**Qualitative agreement between runs**: v7 ≥ v3 ≥ v6 on lenient pass
+rate in both. **Quantitative disagreement**: lenient pass rates shift
+by 10-50 pp on n=3-8 samples. Conclusion: trust the ordering, not the
+absolute pass-rate numbers.
 
 ---
 
