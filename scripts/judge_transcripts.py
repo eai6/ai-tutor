@@ -1,23 +1,69 @@
-"""LLM-as-judge scorer + recommender for A/B test transcripts.
+"""Combined tutor-transcript judge — 10-principle + BEA-2025.
 
-Reads each transcript from ab-test-reports/raw_transcripts/, sends it to
-Claude Opus 4.7 (temp=0). The judge serves two roles in a single pass:
+Single Opus 4.7 call per transcript that produces BOTH:
 
-  1. Score the transcript 0-5 against the 10 science-of-learning
-     principles (rubric from .claude/skills/evaluate-tutor/SKILL.md).
-  2. Produce structured, evidence-anchored recommendations to improve
-     the tutoring system prompt — plus secondary recommendations on
-     engine flow and student experience.
+1. **Per-session 10-principle scoring** (0-5 per principle) plus structured
+   prompt-edit / engine-flow / experience recommendations. This is the
+   prompt-engineering deliverable inherited from PR #7's A/B harness — used
+   to surface concrete edits like "Forbid referencing a diagram unless one
+   is rendered".
 
-The recommendations are the **primary** artefact. The scores are
-inputs to the synthesis, not the headline.
+2. **Per-tutor-turn BEA-2025 evaluation** (Maurya et al. 2025, NAACL).
+   Four dimensions × three classes (``Yes`` / ``To some extent`` / ``No``)
+   applied only to tutor turns whose preceding student turn contains a
+   mistake or expresses confusion. This is the paper-aligned metric
+   directly comparable to the BEA-2025 Shared Task framework.
 
-Outputs:
+The two are merged into a single LLM call (one round trip, cheaper and
+more internally consistent than running two judges).
 
-  ab-test-reports/judge_scores/<cell_key>.json     (per-cell scores + recs)
-  ab-test-reports/judge_scores/_all_scores.jsonl   (aggregated)
+Output schema (one JSON object per transcript):
 
-Run with:  venv/bin/python scripts/judge_transcripts.py
+  {
+    "scores": {                 # 10-principle (per-session)
+      "<principle>": {"score": int, "evidence": str},
+      ...
+    },
+    "strongest_behaviors": [str, str],
+    "weakest_behaviors":  [str, str],
+    "prompt_recommendations":     [Recommendation, ...],
+    "flow_recommendations":       [Recommendation, ...],
+    "experience_recommendations": [Recommendation, ...],
+    "overall_summary": str,
+
+    "bea_evaluations": [        # BEA (per tutor turn after a mistake)
+      {
+        "tutor_turn_id": str,
+        "preceding_student_turn_id": str | null,
+        "student_made_mistake": bool,
+        "skip_reason": str | null,
+        "mistake_description": str | null,
+        "tutor_excerpt": str | null,
+        "mistake_identification": "Yes" | "To some extent" | "No" | null,
+        "mistake_location":       "Yes" | "To some extent" | "No" | null,
+        "providing_guidance":     "Yes" | "To some extent" | "No" | null,
+        "actionability":          "Yes" | "To some extent" | "No" | null,
+        "rationale": str | null
+      },
+      ...
+    ]
+  }
+
+Cost: ~$0.50-1 per transcript (one Opus call, ~3-5k tokens in / ~3-6k
+tokens out). Same cost as the previous 10-principle-only judge.
+
+Run with:
+
+    AB_REPORT_DIR=<dir> python scripts/judge_transcripts.py
+
+Idempotent: skips transcripts whose <stem>.json already exists in
+``judge_scores/``. Delete the score file to force re-judge.
+
+Refs:
+  - BEA 2025 Shared Task: https://sig-edu.org/sharedtask/2025
+  - Maurya et al. 2025 (dataset paper). "Unifying AI Tutor Evaluation:
+    An Evaluation Taxonomy for Pedagogical Ability Assessment of
+    LLM-Powered AI Tutors". NAACL 2025.
 """
 from __future__ import annotations
 
@@ -27,12 +73,14 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import List, Tuple
 
 import django
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
-# Load .env manually since Anthropic SDK reads ANTHROPIC_API_KEY from environ.
+# Load .env manually — Anthropic SDK reads ANTHROPIC_API_KEY from os.environ.
 _env = Path(__file__).resolve().parents[1] / '.env'
 if _env.exists():
     for _line in _env.read_text().splitlines():
@@ -49,13 +97,16 @@ _REPORT_DIR = Path(os.environ.get('AB_REPORT_DIR', 'ab-test-reports'))
 TRANSCRIPTS_DIR = _REPORT_DIR / 'raw_transcripts'
 SCORES_DIR = _REPORT_DIR / 'judge_scores'
 ALL_SCORES = SCORES_DIR / '_all_scores.jsonl'
-RUBRIC_PATH = _REPORT_DIR / 'judge_rubric.md'
 
 JUDGE_MODEL = 'claude-opus-4-7'
-JUDGE_TEMP = 0.0
-JUDGE_MAX_TOKENS = 8192
+JUDGE_MAX_TOKENS = 16384
+# Note: `temperature` is deprecated for Opus 4.7 and rejected with 400.
+# The model is deterministic-ish by default; we omit the kwarg entirely.
 
-PRINCIPLES = [
+
+# ─── 10-principle rubric ────────────────────────────────────────────────
+
+PRINCIPLES: List[Tuple[str, str]] = [
     ('active_learning',
      'Active Learning — minimum effective dose of explanation; majority of session is student doing, not reading.'),
     ('direct_instruction_active_practice',
@@ -79,34 +130,45 @@ PRINCIPLES = [
 ]
 
 
+# ─── BEA constants (also used by aggregator + reporters) ────────────────
+
+BEA_DIMENSIONS = (
+    'mistake_identification',
+    'mistake_location',
+    'providing_guidance',
+    'actionability',
+)
+BEA_YES = 'Yes'
+BEA_SOMEWHAT = 'To some extent'
+BEA_NO = 'No'
+_BEA_VALID_LABELS = frozenset({BEA_YES, BEA_SOMEWHAT, BEA_NO})
+
+
+# ─── Prompt assembly ────────────────────────────────────────────────────
+
 def build_prompt(transcript: str, lesson_label: str, persona: str) -> str:
-    """Return the user-turn prompt for the judge."""
     principles_block = '\n'.join(f"- **{key}**: {desc}" for key, desc in PRINCIPLES)
-    return f"""You are an expert evaluator of AI tutoring quality, grounded in the science of learning.
-
-Your job has two parts. **Both are required.**
-
-1. **Score** ONE tutoring session transcript against the 10 distilled principles below.
-2. **Prescribe** concrete, evidence-anchored recommendations to improve the tutoring
-   **system prompt** (primary), plus secondary recommendations on engine flow and
-   student experience.
-
-The recommendations are the primary deliverable — they feed directly into the next
-revision of the tutoring system prompt. Scores are inputs to that synthesis, not the
-end goal. Do not skip or thin out the recommendations.
+    return f"""You are an expert evaluator of AI tutoring quality. You will produce TWO
+complementary evaluations of the same tutoring transcript in a single response.
+The two evaluations live alongside each other in one JSON object; do not skip
+either part.
 
 ## Context
 - Lesson: {lesson_label}
 - Student persona: {persona}
 - Curriculum: Seychelles National Curriculum (S3 = Form 3, ~age 13-14)
 
+---
+
+# Part A — Per-session 10-principle scoring + prompt-edit recommendations
+
+(Unit of analysis: the WHOLE session.)
+
 ## The 10 principles
 
 {principles_block}
 
-## Your task
-
-### Part A — Score
+## A.1 Score
 
 For each of the 10 principles, assign an integer score 0-5:
 - 0 = principle clearly violated (e.g. answer leaked, no practice, no retrieval)
@@ -116,40 +178,89 @@ For each of the 10 principles, assign an integer score 0-5:
 - 4 = strong
 - 5 = exemplary
 
-For each principle, give a one-sentence justification quoting or citing evidence
-from specific turns. Also identify the 1-2 strongest and 1-2 weakest tutor behaviors.
+For each principle, give a one-sentence justification quoting or citing
+evidence from specific turns. Also identify the 1-2 strongest and 1-2
+weakest tutor behaviors.
 
-### Part B — Recommendations (primary deliverable)
+## A.2 Recommendations
 
-Produce three lists of recommendations, each item evidence-anchored to the transcript:
+Produce three lists of recommendations, each item evidence-anchored to
+the transcript:
 
-- `prompt_recommendations`: changes to the tutoring **system prompt** itself
-  (wording, rules, examples, ordering, forbidden patterns, etc.). This is the
-  most important list.
-- `flow_recommendations`: changes to engine logic / orchestration / scaffolding flow
-  that the system prompt alone cannot fix (e.g. judge cycle caps, retry policy,
-  prerequisite routing, exit-ticket gating).
-- `experience_recommendations`: changes to what the student sees / feels (pacing,
-  encouragement frequency, media placement, error-message tone).
+- `prompt_recommendations`: changes to the tutoring SYSTEM PROMPT
+  (wording, rules, examples, ordering, forbidden patterns). PRIMARY list.
+- `flow_recommendations`: changes to engine logic / orchestration /
+  scaffolding flow that the system prompt alone cannot fix (judge cycle
+  caps, retry policy, prerequisite routing, exit-ticket gating).
+- `experience_recommendations`: changes to what the student sees / feels
+  (pacing, encouragement frequency, media placement, error-message tone).
 
-Each recommendation must include:
-- `title`: short imperative (e.g. "Forbid two consecutive teach blocks without a student turn")
-- `rationale`: WHY — which principle it serves, which failure pattern it fixes
-- `evidence_quote`: a verbatim excerpt from the transcript (≤ 240 chars)
-- `evidence_turn`: which turn / section the quote came from (e.g. "TUTOR turn id=42")
-- `suggested_prompt_edit` (prompt_recommendations only — use empty string elsewhere):
-  the actual language to add, remove, or replace in the system prompt
-- `expected_effect`: what specific, observable change in tutor behavior this should produce
-- `severity`: "high" if this is fixing a frequent or load-bearing failure;
-  "medium" if it's an improvement on top of acceptable behavior; "low" otherwise
+Each recommendation requires: `title`, `rationale`, `evidence_quote`
+(≤240 chars verbatim), `evidence_turn`, `suggested_prompt_edit`
+(prompt_recommendations only; empty string for the other two lists),
+`expected_effect`, `severity` (high/medium/low).
 
-Aim for 3–8 prompt recommendations per transcript. Fewer is fine if the transcript
-genuinely doesn't surface that many. Do not invent issues to pad the list — but do
-not under-report either; small qualitative wins matter when aggregated across cells.
+Aim for 3-8 prompt recommendations. Fewer is fine if the transcript
+doesn't surface that many. Do not invent issues; do not under-report.
 
-## Output format
+---
 
-Return ONLY a single JSON object, no prose around it, no markdown fences. Schema:
+# Part B — Per-turn BEA-2025 evaluation
+
+(Unit of analysis: ONE TUTOR TURN at a time, BEA-2025 Shared Task
+taxonomy, Maurya et al. 2025.)
+
+For each TUTOR turn in the transcript:
+
+1. Look at the IMMEDIATELY PRECEDING STUDENT turn.
+
+2. If that student turn contains a clear mistake OR expresses confusion
+   that calls for remediation, the tutor turn is IN SCOPE: evaluate it
+   on all four BEA dimensions below.
+
+3. If the student turn is correct, off-topic, or non-substantive filler
+   ("ok", "yes", "got it", a single character that doesn't engage), the
+   tutor turn is OUT OF SCOPE — set `student_made_mistake: false`, fill
+   `skip_reason`, leave the four scoring fields null.
+
+4. The very first tutor turn (no preceding student turn) is also out of
+   scope.
+
+## B.1 The four BEA dimensions
+
+Each dimension is scored as one of: `Yes` / `To some extent` / `No`.
+
+**Mistake Identification** — did the tutor recognize the mistake?
+- `Yes`: clearly identified / recognized.
+- `To some extent`: suggests there may be a mistake but sounds uncertain.
+- `No`: does not recognize (e.g., simply provides the answer or moves on).
+
+**Mistake Location** — does the tutor accurately point to WHERE the
+mistake is and WHAT it is?
+- `Yes`: clearly points to the exact location of a genuine mistake.
+- `To some extent`: some awareness but vague, unclear, or easy to
+  misunderstand.
+- `No`: no details about mistake location.
+
+**Providing Guidance** — does the tutor offer correct and relevant
+guidance (hint, explanation, supporting question)?
+- `Yes`: guidance is correct AND relevant to the mistake.
+- `To some extent`: guidance provided but partially incorrect,
+  incomplete, or misleading.
+- `No`: no guidance, or guidance is irrelevant or factually wrong.
+
+**Actionability** — is it clear what the student should do next?
+- `Yes`: clear suggestions on the next action.
+- `To some extent`: indicates something needs to be done but unclear
+  what exactly.
+- `No`: no suggested action (e.g., simply reveals the final answer).
+
+---
+
+# Output format
+
+Return ONLY a single JSON object, no preamble, no markdown fences,
+no commentary around it. Schema:
 
 {{
   "scores": {{
@@ -165,41 +276,34 @@ Return ONLY a single JSON object, no prose around it, no markdown fences. Schema
     "targeted_remediation": {{"score": int, "evidence": str}}
   }},
   "strongest_behaviors": [str, str],
-  "weakest_behaviors": [str, str],
-  "prompt_recommendations": [
+  "weakest_behaviors":  [str, str],
+  "prompt_recommendations":     [Recommendation, ...],
+  "flow_recommendations":       [Recommendation, ...],
+  "experience_recommendations": [Recommendation, ...],
+  "overall_summary": str,
+
+  "bea_evaluations": [
     {{
-      "title": str,
-      "rationale": str,
-      "evidence_quote": str,
-      "evidence_turn": str,
-      "suggested_prompt_edit": str,
-      "expected_effect": str,
-      "severity": "high"|"medium"|"low"
-    }}
-  ],
-  "flow_recommendations": [
-    {{
-      "title": str,
-      "rationale": str,
-      "evidence_quote": str,
-      "evidence_turn": str,
-      "suggested_prompt_edit": "",
-      "expected_effect": str,
-      "severity": "high"|"medium"|"low"
-    }}
-  ],
-  "experience_recommendations": [
-    {{
-      "title": str,
-      "rationale": str,
-      "evidence_quote": str,
-      "evidence_turn": str,
-      "suggested_prompt_edit": "",
-      "expected_effect": str,
-      "severity": "high"|"medium"|"low"
-    }}
-  ],
-  "overall_summary": str
+      "tutor_turn_id": str,
+      "preceding_student_turn_id": str | null,
+      "student_made_mistake": bool,
+      "skip_reason": str | null,
+      "mistake_description": str | null,
+      "tutor_excerpt": str | null,
+      "mistake_identification": "Yes" | "To some extent" | "No" | null,
+      "mistake_location":       "Yes" | "To some extent" | "No" | null,
+      "providing_guidance":     "Yes" | "To some extent" | "No" | null,
+      "actionability":          "Yes" | "To some extent" | "No" | null,
+      "rationale": str | null
+    }},
+    ...
+  ]
+}}
+
+where Recommendation = {{
+  "title": str, "rationale": str, "evidence_quote": str,
+  "evidence_turn": str, "suggested_prompt_edit": str,
+  "expected_effect": str, "severity": "high"|"medium"|"low"
 }}
 
 ## Transcript
@@ -208,137 +312,183 @@ Return ONLY a single JSON object, no prose around it, no markdown fences. Schema
 """
 
 
+# ─── Transcript metadata parsing ────────────────────────────────────────
+
+_TURN_HEADER_RE = re.compile(r'^---\s+(TUTOR|STUDENT)\s+\(id=(\d+)', re.MULTILINE)
+_TRANSCRIPT_HEADER_RE = re.compile(r'^# Transcript .*?lesson=(\d+)\s+persona=(\w+)', re.MULTILINE)
+
+
+def _parse_transcript_meta(text: str) -> Tuple[str, str]:
+    m = _TRANSCRIPT_HEADER_RE.search(text)
+    if m:
+        return m.group(1), m.group(2)
+    return '?', '?'
+
+
+def _count_tutor_turns(text: str) -> int:
+    return sum(1 for m in _TURN_HEADER_RE.finditer(text) if m.group(1) == 'TUTOR')
+
+
+# ─── JSON parsing (forgiving) ───────────────────────────────────────────
+
 def parse_json_loose(raw: str) -> dict:
-    """Strip code fences and parse JSON; raise if invalid.
+    raw = raw.strip()
+    if raw.startswith('```'):
+        raw = re.sub(r'^```(?:json)?\s*\n', '', raw)
+        raw = re.sub(r'\n```\s*$', '', raw)
+    start = raw.find('{')
+    if start < 0:
+        raise ValueError(f"No JSON object in response (first 200 chars): {raw[:200]!r}")
+    depth = 0
+    for i, ch in enumerate(raw[start:], start):
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                return json.loads(raw[start:i + 1])
+    raise ValueError("Unbalanced JSON braces in response")
 
-    Also strips trailing commas before } or ] which Opus sometimes emits.
-    """
-    s = raw.strip()
-    if s.startswith('```'):
-        s = re.sub(r'^```[a-zA-Z]*\n?', '', s)
-        s = re.sub(r'\n?```$', '', s)
-    start = s.find('{')
-    if start >= 0:
-        s = s[start:]
-    end = s.rfind('}')
-    if end >= 0:
-        s = s[:end + 1]
-    # Strip trailing commas (json strict, Opus sometimes lenient)
-    s = re.sub(r',(\s*[}\]])', r'\1', s)
-    return json.loads(s)
 
+# ─── Aggregates ─────────────────────────────────────────────────────────
+
+def _aggregate_bea(evaluations: List[dict]) -> dict:
+    in_scope = [e for e in evaluations if e.get('student_made_mistake')]
+    out: dict = {
+        'n_total_tutor_turns': len(evaluations),
+        'n_in_scope': len(in_scope),
+        'coverage_rate': (len(in_scope) / len(evaluations)) if evaluations else 0.0,
+    }
+    if not in_scope:
+        for dim in BEA_DIMENSIONS:
+            out[f'{dim}_exact'] = None
+            out[f'{dim}_lenient'] = None
+        out['overall_exact_pass_rate'] = None
+        out['overall_lenient_pass_rate'] = None
+        out['strict_pass_rate'] = None
+        out['lenient_pass_rate'] = None
+        return out
+
+    n = len(in_scope)
+    for dim in BEA_DIMENSIONS:
+        labels = [e.get(dim) for e in in_scope]
+        out[f'{dim}_exact'] = sum(1 for l in labels if l == BEA_YES) / n
+        out[f'{dim}_lenient'] = sum(1 for l in labels if l in (BEA_YES, BEA_SOMEWHAT)) / n
+
+    out['overall_exact_pass_rate'] = sum(out[f'{d}_exact'] for d in BEA_DIMENSIONS) / 4
+    out['overall_lenient_pass_rate'] = sum(out[f'{d}_lenient'] for d in BEA_DIMENSIONS) / 4
+    out['strict_pass_rate'] = sum(
+        1 for e in in_scope if all(e.get(d) == BEA_YES for d in BEA_DIMENSIONS)
+    ) / n
+    out['lenient_pass_rate'] = sum(
+        1 for e in in_scope if all(e.get(d) in (BEA_YES, BEA_SOMEWHAT) for d in BEA_DIMENSIONS)
+    ) / n
+    return out
+
+
+# ─── Per-cell judging ───────────────────────────────────────────────────
 
 def score_transcript(client: Anthropic, transcript_path: Path) -> dict:
     text = transcript_path.read_text()
-    # Pull lesson + persona from header line
-    header = text.splitlines()[0]
-    m = re.search(r'lesson=(\S+)\s+persona=(\S+)', header)
-    lesson_label = m.group(1) if m else '?'
-    persona = m.group(2) if m else '?'
-    prompt = build_prompt(text, lesson_label, persona)
+    lesson_label, persona = _parse_transcript_meta(text)
 
-    t0 = time.monotonic()
-    resp = client.messages.create(
+    t0 = time.time()
+    response = client.messages.create(
         model=JUDGE_MODEL,
         max_tokens=JUDGE_MAX_TOKENS,
-        messages=[{'role': 'user', 'content': prompt}],
+        messages=[{'role': 'user', 'content': build_prompt(text, lesson_label, persona)}],
     )
-    elapsed = time.monotonic() - t0
-    raw = ''.join(b.text for b in resp.content if hasattr(b, 'text'))
-    try:
-        parsed = parse_json_loose(raw)
-    except Exception as exc:
-        return {
-            'transcript': transcript_path.name,
-            'error': f'parse: {exc}',
-            'raw_output': raw[:2000],
-            'wall_seconds': elapsed,
-            'tokens_in': resp.usage.input_tokens,
-            'tokens_out': resp.usage.output_tokens,
-        }
-    return {
+    wall = time.time() - t0
+    raw = response.content[0].text if response.content else ''
+
+    base = {
         'transcript': transcript_path.name,
         'lesson_label': lesson_label,
         'persona': persona,
-        'scores': parsed.get('scores', {}),
-        'strongest_behaviors': parsed.get('strongest_behaviors', []),
-        'weakest_behaviors': parsed.get('weakest_behaviors', []),
-        'prompt_recommendations': parsed.get('prompt_recommendations', []),
-        'flow_recommendations': parsed.get('flow_recommendations', []),
-        'experience_recommendations': parsed.get('experience_recommendations', []),
-        'overall_summary': parsed.get('overall_summary', ''),
-        'wall_seconds': elapsed,
-        'tokens_in': resp.usage.input_tokens,
-        'tokens_out': resp.usage.output_tokens,
+        'judge_model': JUDGE_MODEL,
+        'wall_seconds': wall,
+        'tokens_in': response.usage.input_tokens,
+        'tokens_out': response.usage.output_tokens,
+        'n_tutor_turns_in_transcript': _count_tutor_turns(text),
     }
 
+    try:
+        parsed = parse_json_loose(raw)
+    except Exception as exc:
+        return {**base,
+                'parse_error': f'{type(exc).__name__}: {exc}',
+                'raw_response_head': raw[:500]}
+
+    # Validate BEA labels; null out anything off-vocabulary.
+    bea_evaluations = parsed.get('bea_evaluations') or []
+    bad_labels: List[str] = []
+    for e in bea_evaluations:
+        for dim in BEA_DIMENSIONS:
+            v = e.get(dim)
+            if v is None or v in _BEA_VALID_LABELS:
+                continue
+            bad_labels.append(f"{e.get('tutor_turn_id')}/{dim}={v!r}")
+            e[dim] = None
+
+    out = {**base, **parsed}
+    out['bea_aggregates'] = _aggregate_bea(bea_evaluations)
+    if bad_labels:
+        out['bea_bad_labels'] = bad_labels
+    return out
+
+
+# ─── Main ────────────────────────────────────────────────────────────────
 
 def main():
     SCORES_DIR.mkdir(parents=True, exist_ok=True)
-    # Save the rubric for reproducibility
-    RUBRIC_PATH.write_text(
-        '# LLM-as-judge rubric used for A/B runs\n\n'
-        '> **Judge role**: score transcripts against the 10 science-of-learning\n'
-        '> principles **and** produce evidence-anchored recommendations to improve\n'
-        '> the tutoring system prompt, engine flow, and student experience. The\n'
-        '> recommendations are the primary deliverable — scores are inputs to the\n'
-        '> synthesis. See `design/AB_TESTING_PLAN.md`.\n\n'
-        f'Judge model: `{JUDGE_MODEL}`, temperature={JUDGE_TEMP}, max_tokens={JUDGE_MAX_TOKENS}\n\n'
-        '## 10 Science-of-Learning principles\n\n'
-        + '\n'.join(f'- **{k}**: {d}' for k, d in PRINCIPLES) + '\n\n'
-        '## Scoring scale\n\n0=violated · 1=mostly absent · 2=weak · 3=adequate · 4=strong · 5=exemplary\n\n'
-        '## Recommendation buckets\n\n'
-        '- `prompt_recommendations` — edits to the tutoring system prompt (primary).\n'
-        '- `flow_recommendations` — engine / orchestration changes.\n'
-        '- `experience_recommendations` — student-facing UX changes.\n\n'
-        'Each recommendation must cite an `evidence_quote` and `evidence_turn`,\n'
-        'state its `rationale`, `expected_effect`, and a `severity` of high/medium/low.\n'
-        'Prompt recommendations additionally include a `suggested_prompt_edit`.\n\n'
-        '## Judge prompt template\n\n```\n' + build_prompt('<TRANSCRIPT>', '<LESSON>', '<PERSONA>') + '\n```\n'
-    )
-
-    api_key = os.getenv('ANTHROPIC_API_KEY')
-    if not api_key:
-        sys.exit('ANTHROPIC_API_KEY missing')
-    client = Anthropic(api_key=api_key)
-
     transcripts = sorted(TRANSCRIPTS_DIR.glob('*.md'))
-    # If --retry-failed-only or default behavior: keep transcripts whose
-    # existing score file has 'error' (or no score file).
-    only_failed = '--retry-failed' in sys.argv
-    if only_failed:
-        keep = []
-        for tp in transcripts:
-            existing = SCORES_DIR / (tp.stem + '.json')
-            if not existing.exists():
-                keep.append(tp); continue
-            try:
-                obj = json.loads(existing.read_text())
-                if 'error' in obj:
-                    keep.append(tp)
-            except Exception:
-                keep.append(tp)
-        transcripts = keep
-        print(f'(retry-only) Re-scoring {len(transcripts)} transcript(s)')
-    else:
-        if ALL_SCORES.exists():
-            ALL_SCORES.unlink()
+    if not transcripts:
+        print(f"[judge] no transcripts in {TRANSCRIPTS_DIR}", file=sys.stderr)
+        sys.exit(1)
 
-    print(f'Scoring {len(transcripts)} transcript(s) with {JUDGE_MODEL}...')
+    client = Anthropic()
+    print(f"[judge] {len(transcripts)} transcripts in {TRANSCRIPTS_DIR}", file=sys.stderr)
 
-    for i, tp in enumerate(transcripts, 1):
-        print(f'[{i}/{len(transcripts)}] {tp.name}')
-        score = score_transcript(client, tp)
+    all_records: List[dict] = []
+    for tp in transcripts:
         per_cell = SCORES_DIR / (tp.stem + '.json')
-        per_cell.write_text(json.dumps(score, indent=2))
-        if not only_failed:
-            with ALL_SCORES.open('a') as f:
-                f.write(json.dumps(score) + '\n')
-        if 'error' in score:
-            print(f'  ↳ ERROR: {score["error"]}')
+        if per_cell.exists():
+            print(f"  [skip] {tp.name} — already scored", file=sys.stderr)
+            all_records.append(json.loads(per_cell.read_text()))
+            continue
+
+        print(f"  [judge] {tp.name}", file=sys.stderr)
+        result = score_transcript(client, tp)
+        per_cell.write_text(json.dumps(result, indent=2))
+        all_records.append(result)
+
+        if 'parse_error' in result:
+            print(f"    ↳ PARSE ERROR: {result['parse_error']}", file=sys.stderr)
+            continue
+
+        scores = result.get('scores') or {}
+        mean_score = (sum(s['score'] for s in scores.values()) / len(scores)) if scores else None
+        agg = result.get('bea_aggregates') or {}
+        bea_n = agg.get('n_in_scope', 0)
+        bits = []
+        if mean_score is not None:
+            bits.append(f"10p={mean_score:.2f}/5")
+        if bea_n:
+            bits.append(
+                f"bea n={bea_n} strict={agg.get('strict_pass_rate'):.0%} "
+                f"lenient={agg.get('lenient_pass_rate'):.0%}"
+            )
         else:
-            mean = sum(s['score'] for s in score['scores'].values()) / max(1, len(score['scores']))
-            print(f'  ↳ mean={mean:.2f} tok_out={score["tokens_out"]} {score["wall_seconds"]:.1f}s')
+            bits.append("bea n=0")
+        bits.append(f"{result['wall_seconds']:.1f}s")
+        bits.append(f"{result['tokens_in']}/{result['tokens_out']} tok")
+        print(f"    ↳ {'  '.join(bits)}", file=sys.stderr)
+
+    with ALL_SCORES.open('w') as f:
+        for rec in all_records:
+            f.write(json.dumps(rec) + '\n')
+
+    print(f"\n[judge] wrote {len(all_records)} per-cell + {ALL_SCORES}", file=sys.stderr)
 
 
 if __name__ == '__main__':
