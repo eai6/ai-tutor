@@ -52,12 +52,28 @@ MODELS_DEPLOY = MODELS_FULL[:1]
 _MATRIX_MODE = os.environ.get('EVAL_MATRIX_MODE', 'full').lower()
 MODELS = MODELS_DEPLOY if _MATRIX_MODE == 'deploy' else MODELS_FULL
 
-LESSONS = [
+# Lessons used in the eval matrix. The CI deploy-mode workflow uses
+# the first two (one math, one geo); the full-mode local sweep uses all
+# four. Each lesson is loaded from `eval-fixtures/baseline.json` in CI
+# (the fixture currently includes only L1137 + L1425 — regenerate the
+# fixture with the extra lessons before turning on full mode in CI).
+LESSONS_DEPLOY = [
     (1137, 'Math — Angles around a point'),
     (1425, 'Geography — Map Scale and Map Types'),
 ]
+LESSONS_FULL = LESSONS_DEPLOY + [
+    (1138, 'Math — Angles on a straight line'),
+    (540,  'Geography — Understanding Maps'),
+]
+LESSONS = LESSONS_DEPLOY if _MATRIX_MODE == 'deploy' else LESSONS_FULL
 
-PERSONAS = ['struggler', 'capable']
+# Personas. `error_prone` was added 2026-05-23 to lift BEA in-scope
+# coverage (the BEA-2025 rubric only scores tutor turns after a student
+# mistake; struggler + capable rarely produce enough mistakes for a
+# statistically meaningful BEA pass rate on small N).
+PERSONAS = ['struggler', 'capable'] if _MATRIX_MODE == 'deploy' else [
+    'struggler', 'capable', 'error_prone',
+]
 
 OUT_DIR = Path(os.environ.get('AB_REPORT_DIR', 'ab-test-reports'))
 RESULTS_JSONL = OUT_DIR / 'cell_results.jsonl'

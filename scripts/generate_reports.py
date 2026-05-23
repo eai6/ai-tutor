@@ -204,6 +204,10 @@ def write_per_cell(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
                 lines.append("|---|---:|---|")
                 for p in PRINCIPLES:
                     item = score.get('scores', {}).get(p, {})
+                    if not isinstance(item, dict):
+                        # LLM occasionally returns a string in place of the dict
+                        lines.append(f"| {p} | ? | (malformed: {str(item)[:80]}) |")
+                        continue
                     sc = item.get('score', '?')
                     ev = (item.get('evidence', '') or '').replace('\n', ' ')[:200]
                     lines.append(f"| {p} | {sc} | {ev} |")
@@ -318,7 +322,10 @@ def mean_per_principle(scores_by_key: dict[str, dict]) -> dict[str, dict[str, fl
             continue
         model = key.split('_L')[0]
         for p in PRINCIPLES:
-            v = sc['scores'].get(p, {}).get('score')
+            item = sc['scores'].get(p, {})
+            if not isinstance(item, dict):
+                continue
+            v = item.get('score')
             if isinstance(v, (int, float)):
                 by_model[model][p].append(v)
     return {
@@ -352,7 +359,9 @@ def write_summary(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
         key = _cell_key(c['model_key'], c['lesson_id'], c['persona'])
         sc = scores_by_key.get(key, {})
         if sc and 'error' not in sc and sc.get('scores'):
-            jm = mean(v['score'] for v in sc['scores'].values() if isinstance(v.get('score'), (int, float)))
+            valid = [v['score'] for v in sc['scores'].values()
+                     if isinstance(v, dict) and isinstance(v.get('score'), (int, float))]
+            jm = mean(valid) if valid else float('nan')
             jm_s = f"{jm:.2f}"
         else:
             jm_s = '—'

@@ -467,7 +467,13 @@ def main():
             continue
 
         scores = result.get('scores') or {}
-        mean_score = (sum(s['score'] for s in scores.values()) / len(scores)) if scores else None
+        # Some LLM outputs return a string in place of the per-principle
+        # dict — guard with isinstance() so the loop doesn't crash mid-run.
+        valid_scores = [
+            s['score'] for s in scores.values()
+            if isinstance(s, dict) and isinstance(s.get('score'), (int, float))
+        ]
+        mean_score = (sum(valid_scores) / len(valid_scores)) if valid_scores else None
         agg = result.get('bea_aggregates') or {}
         bea_n = agg.get('n_in_scope', 0)
         bits = []
