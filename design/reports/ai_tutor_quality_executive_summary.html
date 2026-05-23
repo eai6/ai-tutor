@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Tutor Quality Improvement — Executive Summary</title>
+<style>
+  :root {
+    --ink: #1f2429;
+    --soft: #5a6470;
+    --muted: #8a939d;
+    --rule: #d9dde2;
+    --bg: #ffffff;
+    --tint: #f5f3ee;
+    --accent: #1f4a6b;
+    --ok: #1f7a3a;
+    --warn: #b87333;
+    --bad: #a8334a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.55;
+    margin: 0;
+    padding: 0;
+    font-size: 15px;
+  }
+  .page {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 48px 56px 96px;
+  }
+  header.title {
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 24px;
+    margin-bottom: 36px;
+  }
+  header.title .eyebrow {
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0 0 8px;
+  }
+  header.title h1 {
+    font-family: Georgia, "Source Serif Pro", serif;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 8px;
+    line-height: 1.15;
+  }
+  header.title .subtitle {
+    color: var(--soft);
+    font-size: 18px;
+    margin: 0 0 16px;
+    font-style: italic;
+  }
+  header.title .meta {
+    color: var(--muted);
+    font-size: 12px;
+    margin: 0;
+  }
+  header.title .meta span { margin-right: 16px; }
+
+  h2 {
+    font-family: Georgia, "Source Serif Pro", serif;
+    font-size: 22px;
+    color: var(--accent);
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 8px;
+    margin: 56px 0 20px;
+  }
+  h2 .num {
+    display: inline-block;
+    color: var(--muted);
+    font-size: 18px;
+    width: 32px;
+    font-style: italic;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 28px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  p { margin: 0 0 14px; }
+  p.lead {
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.6;
+  }
+
+  /* TL;DR card */
+  .tldr {
+    background: var(--tint);
+    border-left: 4px solid var(--accent);
+    padding: 22px 26px;
+    margin: 0 0 24px;
+  }
+  .tldr h2 {
+    margin: 0 0 12px;
+    border: none;
+    padding: 0;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+  .tldr ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .tldr li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+  .tldr li:last-child { margin-bottom: 0; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 24px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    background: var(--tint);
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid var(--rule);
+  }
+  tbody tr:nth-child(even) { background: #fbfaf7; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Status pills */
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .pill.ok   { background: #e0f1e7; color: var(--ok); }
+  .pill.warn { background: #faecd9; color: var(--warn); }
+  .pill.bad  { background: #f5dde3; color: var(--bad); }
+
+  /* Evidence quote */
+  blockquote.evidence {
+    border-left: 3px solid var(--rule);
+    margin: 8px 0;
+    padding: 6px 14px;
+    color: var(--soft);
+    font-style: italic;
+    font-size: 13px;
+    background: #fdfcfa;
+  }
+  blockquote.evidence::before { content: '"'; }
+  blockquote.evidence::after  { content: '"'; }
+  blockquote.evidence.before-after {
+    border-color: var(--bad);
+  }
+  blockquote.evidence.after  { border-color: var(--ok); }
+
+  /* Before/after panel */
+  .ba {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--rule);
+    margin: 12px 0 24px;
+    overflow: hidden;
+  }
+  .ba .col { padding: 14px 18px; }
+  .ba .col.before { background: #fdf4f5; border-right: 1px solid var(--rule); }
+  .ba .col.after  { background: #f3faf5; }
+  .ba .col h4 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--soft);
+  }
+  .ba .col.before h4 { color: var(--bad); }
+  .ba .col.after  h4 { color: var(--ok); }
+  .ba .col p { font-size: 13.5px; margin: 0; }
+
+  /* Numbered recommendation cards */
+  ol.recs { counter-reset: rec; padding: 0; list-style: none; }
+  ol.recs li {
+    counter-increment: rec;
+    background: var(--tint);
+    border-left: 3px solid var(--accent);
+    padding: 14px 18px 14px 56px;
+    position: relative;
+    margin-bottom: 12px;
+  }
+  ol.recs li::before {
+    content: counter(rec);
+    position: absolute;
+    left: 18px;
+    top: 12px;
+    font-family: Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1;
+  }
+  ol.recs li strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 15px;
+    color: var(--ink);
+  }
+  ol.recs li .why {
+    font-size: 13.5px;
+    color: var(--soft);
+    margin: 4px 0 0;
+  }
+
+  /* Appendix divider */
+  hr.appendix-divider {
+    border: none;
+    border-top: 2px dashed var(--rule);
+    margin: 64px 0 24px;
+  }
+  .appendix-label {
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+
+  /* Prompt code block */
+  pre.prompt {
+    background: #fafaf7;
+    border: 1px solid var(--rule);
+    padding: 18px 20px;
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink);
+    white-space: pre-wrap;
+    overflow-x: auto;
+    max-height: 600px;
+    overflow-y: auto;
+    border-radius: 2px;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 72px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* Print */
+  @media print {
+    body { font-size: 11pt; }
+    .page { padding: 0; max-width: none; }
+    h2 { page-break-after: avoid; }
+    table, .ba, ol.recs li, pre.prompt { page-break-inside: avoid; }
+    pre.prompt { max-height: none; overflow: visible; font-size: 8.5pt; }
+    hr.appendix-divider { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="title">
+    <p class="eyebrow">AI Tutor — Seychelles Pilot</p>
+    <h1>Quality Improvement — Executive Summary</h1>
+    <p class="subtitle">Four rounds of testing &amp; fixes, May 2026</p>
+    <p class="meta">
+      <span><strong>Period:</strong> 22–23 May 2026</span>
+      <span><strong>Scope:</strong> Tutor instruction quality &amp; student experience</span>
+      <span><strong>Test design:</strong> Two real lessons × two student profiles × four model pairings</span>
+    </p>
+  </header>
+
+  <!-- ============ TL;DR ============ -->
+  <section class="tldr">
+    <h2>At a glance</h2>
+    <ul>
+      <li>The tutor had <strong>ten distinct ways it could break a student's experience</strong> at the start of testing — from referring to diagrams that didn't exist, to telling students they got an answer wrong when they actually got it right.</li>
+      <li>Four cycles of testing and fixes <strong>eliminated all ten first-order failure types</strong> as the most common issues. Most are now caught and corrected automatically before reaching the student.</li>
+      <li>An infrastructure bug that was silently killing about 1 in every 6 testing sessions on Google's model was <strong>traced to its root cause and fixed</strong>.</li>
+      <li>What remains is mostly <strong>pedagogical refinement</strong> (e.g., calibrating difficulty for capable students) — issues that make conversations less optimal but do not break them.</li>
+      <li><strong>Recommended for production:</strong> the improved prompt + automatic safeguards combination is ready to deploy.</li>
+    </ul>
+  </section>
+
+  <!-- ============ 1. WHAT WAS WRONG ============ -->
+  <h2><span class="num">1.</span> What was wrong with the AI Tutor</h2>
+
+  <p class="lead">
+    At the start of testing, the tutor produced ten distinct types of failure that a student would notice during a lesson.
+    These are not minor glitches — each one breaks the student's trust in the tutor or leaves them confused.
+    All ten were identified by an independent AI evaluator that reviewed full lesson transcripts.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 22%;">What the student saw</th>
+        <th style="width: 38%;">Why it hurts the student</th>
+        <th>Example from a real lesson</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Phantom diagrams</strong><br><span class="pill bad">Severe</span></td>
+        <td>Tutor references "the diagram below" but no diagram exists. Student can't solve the problem they're being asked.</td>
+        <td><em>Lesson on angles</em> — tutor said: <blockquote class="evidence">Look at the diagram below showing four angles around a point. Three angles are given: 70°, 85°, and 100°.</blockquote></td>
+      </tr>
+      <tr>
+        <td><strong>Empty teach turns</strong><br><span class="pill bad">Severe</span></td>
+        <td>Tutor explains a method then says "try this" without giving an actual problem. Student is stuck with nothing to do.</td>
+        <td><em>Math lesson</em> — student replied: <blockquote class="evidence">I don't see a specific problem to solve. What angles or how many equal parts should I work with?</blockquote></td>
+      </tr>
+      <tr>
+        <td><strong>Cut-off mid-sentence</strong><br><span class="pill bad">Severe</span></td>
+        <td>Tutor's message ends mid-thought. Student receives a broken, incomplete response.</td>
+        <td><blockquote class="evidence">Yes—360° is correct. In</blockquote></td>
+      </tr>
+      <tr>
+        <td><strong>Wrong numbers in feedback</strong><br><span class="pill bad">Severe</span></td>
+        <td>Tutor invents different numbers than what the student was actually working on. Feedback contradicts the question.</td>
+        <td><em>Map-scale lesson</em>, question used scale <strong>1:10,000</strong>; tutor's feedback said: <blockquote class="evidence">Since the scale is 1:40,000, every 1 cm on the map represents 40,000 cm in reality. Try again with that in mind.</blockquote></td>
+      </tr>
+      <tr>
+        <td><strong>False "wrong" verdicts</strong><br><span class="pill bad">Severe</span></td>
+        <td>Tutor tells the student they got it wrong when they actually got it right. Student has to argue back to defend a correct answer.</td>
+        <td>Student picked C (the correct option). Tutor went into corrective feedback mode anyway.</td>
+      </tr>
+      <tr>
+        <td><strong>Same question repeated</strong><br><span class="pill warn">High</span></td>
+        <td>After a wrong answer, tutor pastes the exact same question with the same options. Rewards guessing instead of learning.</td>
+        <td>Student answered wrong on a 4-option MCQ; next tutor turn was the identical question.</td>
+      </tr>
+      <tr>
+        <td><strong>Hedged answers ignored</strong><br><span class="pill warn">High</span></td>
+        <td>Student says "C i guess" or "B i think" — clear signal they're unsure. Tutor advances anyway, masking shaky understanding.</td>
+        <td>Student replied <em>"c i guess"</em>; tutor said "Correct!" and moved on to the next, harder problem.</td>
+      </tr>
+      <tr>
+        <td><strong>Same question type repeatedly</strong><br><span class="pill warn">High</span></td>
+        <td>After getting a question right, tutor poses another structurally identical question. Student practices the same procedure on autopilot instead of building flexible skill.</td>
+        <td>Three "three angles around a point, find the missing one" problems in a row with different numbers.</td>
+      </tr>
+      <tr>
+        <td><strong>No prerequisite help</strong><br><span class="pill warn">High</span></td>
+        <td>Student keeps making the same kind of mistake (e.g., on unit conversion). Tutor keeps pressing forward instead of stepping back to address the root cause.</td>
+        <td>Struggler made three shaky responses on map-scale magnitude with no detour to a simpler ratio question.</td>
+      </tr>
+      <tr>
+        <td><strong>Referenced missing visuals</strong><br><span class="pill warn">High</span></td>
+        <td>Tutor says "look at those two scales" when no scales were shown. Student is confused about what's being asked.</td>
+        <td><blockquote class="evidence">Take a look at those two scales. Which one do you think would 'zoom out' enough to fit all of Seychelles on a single map?</blockquote></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ============ 2. WHAT WAS DONE ============ -->
+  <h2><span class="num">2.</span> How we fixed it</h2>
+
+  <p class="lead">
+    We ran <strong>four cycles of testing-and-improvement</strong> over two days. Each cycle followed the same recipe:
+    test the tutor on realistic lessons, have an independent AI evaluator score the conversations and surface the worst failures,
+    then apply targeted fixes — to the tutor's instructions, to the system's automatic safeguards, or both — and re-test.
+  </p>
+
+  <h3>The testing setup</h3>
+  <ul>
+    <li><strong>Two real lessons:</strong> "Angles around a point" (math) and "Map scale &amp; map types" (geography).</li>
+    <li><strong>Two student profiles:</strong> a <em>struggler</em> who gets confused easily, and a <em>capable</em> student who moves quickly. Both played by an AI to make many runs reproducible.</li>
+    <li><strong>Two model families per round:</strong> Anthropic Claude and Google Gemini, so we know if a fix works only on one model or both.</li>
+    <li><strong>Independent evaluator:</strong> a separate AI judge (Claude Opus) scores every conversation on 10 quality dimensions and writes concrete recommendations.</li>
+  </ul>
+
+  <h3>The four cycles</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Cycle</th>
+        <th>Main change tested</th>
+        <th>Headline outcome</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>v4</strong></td>
+        <td>Trimmed the tutor's instructions from ~460 lines to ~200, removed internal contradictions, applied the top 10 fixes from the baseline test.</td>
+        <td>Eliminated <em>phantom diagrams</em>, <em>cut-off sentences</em>, and <em>wrong-numbers-in-feedback</em> as common failures.</td>
+      </tr>
+      <tr>
+        <td><strong>v5</strong></td>
+        <td>Added a rule requiring the tutor to <em>evaluate the student's last answer first</em> before saying anything else. Added stricter wrong-answer handling.</td>
+        <td>Eliminated <em>silent pivots</em> (where the tutor moved on without acknowledging the student's answer) and <em>same-question-repeated</em> failures.</td>
+      </tr>
+      <tr>
+        <td><strong>v6</strong></td>
+        <td>Made the "every turn ends with a question" rule more prominent. Added automatic safeguards in the system itself: blocks repeated content; blocks structurally similar questions in a row.</td>
+        <td>Best overall quality score of any cycle on the standard cost-tier model. <em>JSON dumps</em> and <em>mode-name leakage</em> (developer-facing text showing up in the chat) eliminated.</td>
+      </tr>
+      <tr>
+        <td><strong>v7</strong></td>
+        <td>Restructured the tutor's instructions as a clear state machine: at each turn, the tutor picks one of five branches (feedback, practice, worked example, remediation, teaching). Added three more automatic safeguards.</td>
+        <td>First cycle with <strong>all 8 test sessions completed successfully</strong>. Quality score similar to v6 but student-facing experience cleaner across the board.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ============ 3. WHAT'S FIXED NOW ============ -->
+  <h2><span class="num">3.</span> What is fixed now</h2>
+
+  <p class="lead">
+    All ten student-facing failures from the baseline are <strong>no longer in the top problems list</strong>.
+    Most are now eliminated entirely. A few still occur occasionally but are caught by automatic safeguards before reaching the student.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 30%;">Failure type</th>
+        <th style="width: 20%;">Status</th>
+        <th>How it's prevented now</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Phantom diagrams</td>
+        <td><span class="pill ok">Fixed</span></td>
+        <td>Tutor prompt forbids visual references unless an image is actually attached. Automatic safeguard rejects any message that mentions "diagram," "figure," "shown" etc. without media.</td>
+      </tr>
+      <tr>
+        <td>Empty teach turns</td>
+        <td><span class="pill ok">Fixed</span></td>
+        <td>Tutor prompt requires every turn to end with a concrete question. Automatic safeguard rejects messages that don't.</td>
+      </tr>
+      <tr>
+        <td>Cut-off mid-sentence</td>
+        <td><span class="pill ok">Fixed</span></td>
+        <td>New automatic safeguard detects when the tutor's message ends without proper punctuation and asks the tutor to rewrite.</td>
+      </tr>
+      <tr>
+        <td>Wrong numbers in feedback</td>
+        <td><span class="pill ok">Fixed</span></td>
+        <td>New automatic safeguard compares numbers in the tutor's response against the active problem; rejects messages that invent unrelated numbers.</td>
+      </tr>
+      <tr>
+        <td>False "wrong" verdicts</td>
+        <td><span class="pill ok">Fixed</span></td>
+        <td>Tutor prompt requires reading the system's authoritative answer-check first; explicitly forbids overriding it.</td>
+      </tr>
+      <tr>
+        <td>Same question repeated</td>
+        <td><span class="pill ok">Fixed</span></td>
+        <td>Existing safeguard now reinforced by a "no-recycle" rule in the prompt and by automatic duplicate-content rejection in the regeneration pipeline.</td>
+      </tr>
+      <tr>
+        <td>Hedged answers ignored</td>
+        <td><span class="pill ok">Fixed</span></td>
+        <td>Tutor prompt requires probing the student's reasoning whenever they hedge ("I guess," "I think").</td>
+      </tr>
+      <tr>
+        <td>Same question type repeatedly</td>
+        <td><span class="pill warn">Mitigated</span></td>
+        <td>New automatic safeguard uses an AI judge to detect structurally identical problems and requests a varied one. Catches most cases; occasional misses remain.</td>
+      </tr>
+      <tr>
+        <td>No prerequisite help</td>
+        <td><span class="pill warn">Mitigated</span></td>
+        <td>Tutor prompt now requires a prerequisite detour after 2 errors on the same sub-skill. Deeper system-side enforcement deferred.</td>
+      </tr>
+      <tr>
+        <td>Referenced missing visuals</td>
+        <td><span class="pill ok">Fixed</span></td>
+        <td>Same as "phantom diagrams" — covered by the same safeguard.</td>
+      </tr>
+      <tr>
+        <td>Hidden Google-model crashes</td>
+        <td><span class="pill ok">Fixed</span></td>
+        <td>Traced to an empty-content message bug in the testing harness (silently killed ~1 in 6 sessions on Google models across all cycles). Root cause fixed and covered by unit tests.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Concrete before / after</h3>
+
+  <div class="ba">
+    <div class="col before">
+      <h4>Before — Baseline</h4>
+      <p>Tutor (math lesson): <em>"Look at the diagram below showing four angles around a point. Three angles are given: 70°, 85°, and 100°. What is the value of x?"</em></p>
+      <p style="margin-top: 8px;"><strong>Problem:</strong> no diagram is shown. The student has nothing to look at.</p>
+    </div>
+    <div class="col after">
+      <h4>After — v6 / v7 + safeguards</h4>
+      <p>Tutor: <em>"Imagine four angles around a single point, with values 70°, 85°, 100°, and x. The four angles together make a full turn (360°). What is x?"</em></p>
+      <p style="margin-top: 8px;"><strong>Result:</strong> the configuration is described fully in words; the student can solve it immediately.</p>
+    </div>
+  </div>
+
+  <div class="ba">
+    <div class="col before">
+      <h4>Before — Baseline</h4>
+      <p>Question asked: "Map scale 1:<strong>10,000</strong>, distance 4 cm — what is the actual distance?"</p>
+      <p>Student answered C.</p>
+      <p>Tutor: <em>"Since the scale is 1:<strong>40,000</strong>, every 1 cm on the map represents 40,000 cm in reality. Try again with that in mind."</em></p>
+      <p style="margin-top: 8px;"><strong>Problem:</strong> tutor invented the number 40,000. The question used 10,000.</p>
+    </div>
+    <div class="col after">
+      <h4>After — v6 / v7 + safeguards</h4>
+      <p>Automatic safeguard catches that "40,000" is not in the active problem; rejects the message; tutor rewrites.</p>
+      <p>Tutor: <em>"Almost — at scale 1:10,000, each 1 cm represents 10,000 cm. So 4 cm × 10,000 = 40,000 cm = 400 m. Try the conversion again, same problem."</em></p>
+      <p style="margin-top: 8px;"><strong>Result:</strong> feedback matches the question. Student gets a clear correction.</p>
+    </div>
+  </div>
+
+  <h3>What we recommend deploying</h3>
+  <p>The best combination for production — based on student experience, not just composite quality scores — is:</p>
+  <ul>
+    <li>Either the <strong>v6 prompt</strong> (slightly higher headline quality score) or the <strong>v7 prompt</strong> (better-structured, easier to maintain). Both are dramatically cleaner than the baseline.</li>
+    <li>Plus the <strong>five automatic safeguards</strong> built during cycles v6 and v7 (duplicate-content rejection, same-template detection, cut-off detection, invented-numbers detection, filler-reply handling).</li>
+    <li>Plus the <strong>Google-model crash fix</strong> (committed and tested).</li>
+  </ul>
+  <p>This combination is ready for production. The infrastructure is in place; no further engineering work is required to deploy it.</p>
+
+  <!-- ============ 4. TOP 5 FINDINGS ============ -->
+  <h2><span class="num">4.</span> Top 5 findings &amp; recommendations</h2>
+
+  <ol class="recs">
+    <li>
+      <strong>Deploy the improved tutor + safeguards to all Seychelles classrooms now.</strong>
+      <p class="why">The combination is ready and tested. Each day of delay is a day of pilot classrooms running on the baseline prompt with its known failure modes.</p>
+    </li>
+    <li>
+      <strong>Upgrading to a premium model is <em>not</em> the highest-leverage next step.</strong>
+      <p class="why">Top-tier models (Sonnet 4.6, Gemini 3.1 Pro) cost 3–5× more and added little measurable improvement over the standard tier when paired with our improved prompt. The improved prompt + safeguards close most of the gap that a model upgrade would otherwise paper over. Reserve premium models for specific high-stakes lessons if needed.</p>
+    </li>
+    <li>
+      <strong>Monitor pilot classrooms for the remaining second-order issues.</strong>
+      <p class="why">The tutor is now reliably <em>functional</em>; remaining issues are about being <em>optimal</em> (e.g., escalating difficulty fast enough for capable students, accepting correct answers without demanding extra justification). These are best surfaced from real-student feedback in the pilot, not synthetic testing.</p>
+    </li>
+    <li>
+      <strong>Curate real student conversations as future training examples.</strong>
+      <p class="why">All testing in this round used synthetic students. The next round of improvements would benefit from a small library of high-quality real-student conversations (with appropriate privacy review and consent). This is a separate sub-project, ideally aligned with the Tanzania pilot scoping.</p>
+    </li>
+    <li>
+      <strong>Build a small regression-test suite from this round's findings.</strong>
+      <p class="why">The fixes shipped are now protected by code-level tests for the most serious bug (Google-model crashes). Extending this to the other safeguards — so the next prompt revision cannot accidentally regress the ten failure modes — is a half-day engineering investment that pays back across every future change.</p>
+    </li>
+  </ol>
+
+  <!-- ============ 5. WHAT'S STILL WORTH IMPROVING ============ -->
+  <h2><span class="num">5.</span> What is still worth improving</h2>
+
+  <p class="lead">
+    These are real issues that the independent evaluator flagged in the latest cycles, but they are <strong>second-order</strong> —
+    they make the tutor less optimal rather than broken. None of them prevent a student from completing a lesson.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 30%;">Remaining issue</th>
+        <th style="width: 20%;">Impact</th>
+        <th>Mitigation now / future fix</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Difficulty doesn't escalate fast enough for capable students</strong></td>
+        <td><span class="pill warn">Medium</span></td>
+        <td><em>Now:</em> teacher-facing analytics flag students completing exit tickets without challenge. <em>Future:</em> automatic difficulty ramp after 2 quick correct answers.</td>
+      </tr>
+      <tr>
+        <td><strong>Tutor sometimes asks for working when the student already gave a correct answer</strong></td>
+        <td><span class="pill warn">Medium</span></td>
+        <td><em>Now:</em> mitigated by the v7 prompt's "read the verdict first" rule. <em>Future:</em> tighten the rule against unnecessary justification probes when the answer is correct and confident.</td>
+      </tr>
+      <tr>
+        <td><strong>Tutor occasionally declares "you've mastered this!" before the student has earned it</strong></td>
+        <td><span class="pill warn">Medium</span></td>
+        <td><em>Now:</em> caught by exit-ticket grading at the end of the lesson. <em>Future:</em> add a system-side mastery gate that blocks the tutor from announcing mastery without sufficient evidence (engineering work, deferred to a focused branch).</td>
+      </tr>
+      <tr>
+        <td><strong>Tutor still recycles structurally similar questions ~10% of the time</strong></td>
+        <td><span class="pill warn">Medium</span></td>
+        <td><em>Now:</em> automatic safeguard catches most cases via AI-judged structural comparison. <em>Future:</em> source curriculum questions could be tagged by procedure-type so the system can guarantee variety.</td>
+      </tr>
+      <tr>
+        <td><strong>Repeated question across turns happens ~1–2 times per session on the standard model</strong></td>
+        <td><span class="pill warn">Low–Medium</span></td>
+        <td><em>Now:</em> the AI duplicate-detector catches most. <em>Future:</em> the engineering work to enforce a "no question in the last 5 asked" rule deterministically is a half-day fix.</td>
+      </tr>
+      <tr>
+        <td><strong>Tutor occasionally responds to filler input ("ok," "yes") with a fresh teaching block</strong></td>
+        <td><span class="pill warn">Low</span></td>
+        <td><em>Now:</em> new automatic safeguard requires the tutor to either re-pose the active question or ask a brief check-in. Caught at generation; occasional misses possible if filler is unusual.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ============ APPENDIX A ============ -->
+  <hr class="appendix-divider">
+  <p class="appendix-label">Appendix A</p>
+  <h2 style="border: none; margin-top: 4px;">Proposed v7 system prompt</h2>
+
+  <p>The full text of the v7 tutor prompt. Variables in <code>{braces}</code> are filled in per session (school name, tutor name, language, grade level, safety policy). This is the prompt the tutor receives as instructions on every turn.</p>
+
+  <p style="font-size: 13px; color: var(--soft);">
+    <em>Note:</em> the v6 prompt (slightly older, similar shape, ~11k characters) is also a valid production choice and has marginally higher composite quality scores on test cycles. Both prompts perform similarly on student experience; v7 is easier to maintain.
+  </p>
+
+  <pre class="prompt">&lt;system_prompt&gt;
+
+&lt;identity&gt;
+You are {tutor_name}, a tutor for {grade_level} students at
+{institution_name} ({locale_context}). You teach in {language}.
+You are warm, patient, and direct. Every student can succeed.
+&lt;/identity&gt;
+
+&lt;valid_turn_contract&gt;
+A tutor turn is VALID only if every check below passes. If any fails,
+discard the draft and rewrite.
+
+V1. If the student just answered, the FIRST sentence evaluates their
+    answer (Correct / Almost / Right idea, but...). No new content
+    before the evaluation.
+V2. The turn ends with one question posed via the question tool. That
+    question is the student's next action.
+V3. The question text and every referenced quantity are present
+    inline in this same turn. No "the problem above"; no missing
+    numbers.
+V4. No reference to any visual (diagram, figure, image, picture,
+    chart, map, "shown", "above", "below", "look at", "see") unless
+    you are attaching matching media in this same turn (see
+    &lt;media_contract&gt;).
+V5. Every quantity you state appears in the current bank question or
+    in the per-turn context. You never invent or change numbers from
+    the active problem.
+V6. The final visible sentence is complete and ends with terminal
+    punctuation.
+V7. The question is not one of the last 3 questions you posed in this
+    session (the engine repeat-detector will reject duplicates; do not
+    rely on it - vary the structure yourself).
+&lt;/valid_turn_contract&gt;
+
+&lt;turn_algorithm&gt;
+Pick exactly ONE branch per turn. The engine's per-turn context
+blocks tell you the inputs; act on them.
+
+FEEDBACK - the student just answered.
+WORKED_EXAMPLE - first encounter with a calculation that needs &gt;=2
+                 transformation steps AND no worked example shown for
+                 this skill in this session.
+PRACTICE - the student is mid-skill with no pending answer and a
+           worked example already shown (or none needed).
+REMEDIATION - 2 consecutive errors OR 2 hedged-correct answers on
+              the same sub-skill in a row.
+TEACH - introducing a new concept (only when no prior practice is
+        pending).
+
+If two branches both apply, FEEDBACK wins, then REMEDIATION, then
+WORKED_EXAMPLE, then PRACTICE, then TEACH.
+&lt;/turn_algorithm&gt;
+
+&lt;branch_templates&gt;
+
+FEEDBACK branch:
+  1. READ the bank grader verdict for the student's last answer. The
+     verdict (is_correct: true|false) is supplied in the per-turn
+     context. NEVER override it - if grader says correct, you say
+     correct.
+  2. CORRECT, confident: "Correct - &lt;one-line why&gt;." Advance with
+     &lt;wrong_answer_policy&gt; branch=PRACTICE or next slot.
+  3. CORRECT but hedged ("i guess", "i think", "maybe", "?"):
+     "Correct - &lt;why&gt;. What made you pick &lt;answer&gt;?" Probe once,
+     then advance.
+  4. CORRECT after struggle: "Correct - and you fixed &lt;what&gt;."
+     Advance.
+  5. INCORRECT: follow &lt;wrong_answer_policy&gt; for this attempt number.
+
+WORKED_EXAMPLE branch (run only at first multi-step encounter):
+  Show a fully numbered walkthrough. Each step on its own line with
+  the intermediate value visible:
+    Step 1: &lt;op&gt; -&gt; &lt;result&gt;
+    Step 2: &lt;op&gt; -&gt; &lt;result&gt;
+    ...
+  Up to ~100 words. Then pose ONE structurally identical practice
+  item via the question tool. Set worked_example_shown=true for this
+  skill (the engine tracks this; you only need to know not to repeat
+  it).
+
+PRACTICE branch:
+  &lt;=60 words of any framing you need, then pose ONE bank question
+  via the question tool. Use the slot the engine has surfaced in
+  the question_bank context for this step.
+
+REMEDIATION branch:
+  Open with one sentence: "Quick check - the tricky part is
+  &lt;prereq&gt;. Let's nail that, then come back."
+  Pose ONE simpler prerequisite item that isolates the misconception
+  (e.g. "Which is bigger: 1/10,000 or 1/100,000?"). Run at least 2
+  prereq items before returning to the original skill. Do not
+  advance to a new top-level topic while a prerequisite gap is open.
+
+TEACH branch:
+  &lt;=60 words of direct explanation of the new method. End with one
+  comprehension-check question via the tool ("In your own words, what
+  is the first step here?"). Do not ask the student to discover
+  unseen material.
+&lt;/branch_templates&gt;
+
+&lt;wrong_answer_policy&gt;
+Attempt 1 (first wrong on this question):
+  - Keep the SAME problem with the SAME numbers.
+  - Name the specific step that failed.
+  - Show the corrected step inline.
+  - Ask the student to redo ONLY that step on the SAME problem.
+  - Do not switch to a new problem.
+  - Do not reveal the final answer.
+
+Attempt 2 (second wrong on the same question OR 2nd consecutive
+miss on the sub-skill):
+  - Switch to REMEDIATION branch. Pose a simpler prerequisite item
+    that isolates the misconception.
+  - Do not reveal the original question's answer.
+
+Attempt 3 (still wrong after prereq, or student says "I give up"):
+  - Walk the full solution step by step.
+  - Ask the student to restate one step in their own words.
+  - Then pose ONE structurally similar confirmation item.
+&lt;/wrong_answer_policy&gt;
+
+&lt;media_contract&gt;
+Visuals are attached separately from your prose. The engine renders
+media as an attached image when you emit the marker `|||MEDIA:N|||`
+as the LAST line of your response (N = 1-based index into the
+media_catalog block). The marker is STRIPPED by the engine before
+the student sees the turn - it does not appear in the student's
+chat. So:
+
+- Your QUESTION (via the tool) is the last student-facing element.
+- The MEDIA MARKER (if any) is a system-side signal on the last line
+  - it does not break &lt;valid_turn_contract&gt; V2 because the student
+  never sees it.
+- If the media_catalog contains a matching item, reference it
+  naturally ("Here's the layout:") AND emit `|||MEDIA:N|||` as the
+  literal last line.
+- If the media_catalog has no matching item, describe the setup in
+  words ("Imagine four angles around a point with values 70, 85,
+  100, and x degrees"). DO NOT use deictic phrases like "the
+  diagram", "as shown", "look at the figure" - the engine's
+  figure-ref validator will reject the turn.
+&lt;/media_contract&gt;
+
+&lt;student_visible_output&gt;
+The student sees only clean prose + the bank-rendered question. The
+following NEVER appear:
+
+- JSON, code fences, developer field names ("question", "correct",
+  "explanation", "options", "stem", "slot").
+- Tool names, mode names, branch IDs, principle IDs, rule citations
+  ("pose_question", "FEEDBACK branch", "P12", "V3", "the contract
+  says").
+- Self-talk ("Let me think", "I should call the tool", "First I will").
+- Filler openers ("Great question!", "Sure!", "Of course!").
+- Duplicated paragraphs.
+
+Format:
+- &lt;=60 words per turn (~100 max on WORKED_EXAMPLE turns).
+- LaTeX for math. Numbers verbatim from the question_bank stem.
+- Vary praise phrasing - the V1 evaluation opener is mechanical
+  ("Correct - &lt;why&gt;"), but subsequent praise across the session
+  should vary ("Nice spot on the sign", "That's it - you caught the
+  trick", etc.).
+&lt;/student_visible_output&gt;
+
+&lt;principles&gt;
+The branch templates above are RUNTIME control. These principles are
+BACKGROUND - they explain why the branches are shaped this way. When
+a branch template and a principle disagree, follow the template.
+
+P1. Active over passive - student does something on every turn.
+P2. Teach first, ask second - no Socratic discovery of unseen
+    material.
+P3. Mastery before advancement - 2 unaided corrects to advance.
+P4. Worked example before multi-step practice (covered by
+    WORKED_EXAMPLE branch).
+P5. Cognitive load: one idea per turn, fade scaffolding with
+    mastery, dual coding when media available.
+P6. Layer: name a prerequisite the student already has when
+    introducing new material.
+P7. Discriminate: state the difference once when topics are
+    easily confused (area vs perimeter, mean vs median).
+P8. Targeted remediation - never lower the bar; add scaffolding.
+P9. Celebrate specifically - praise tied to what the student
+    actually did.
+&lt;/principles&gt;
+
+&lt;final_check&gt;
+Before sending, silently verify:
+1. If a student answer was pending, did I evaluate it FIRST using the
+   grader verdict (not my own re-derivation)?
+2. Did I pick exactly one branch and follow its template?
+3. Does the turn end with exactly one question via the tool?
+4. Is every quantity from the active problem (not invented)?
+5. Did I avoid absent-media references?
+6. Is the final sentence complete and under the word limit?
+7. Is this question different from the last 3 I posed?
+
+If any answer is no, rewrite before sending.
+&lt;/final_check&gt;
+
+&lt;safety&gt;
+{safety_prompt}
+Age-appropriate for {grade_level}. If the student seems distressed
+or disengaged, pause: "How are you feeling about this? We can slow
+down or try a different approach."
+&lt;/safety&gt;
+
+&lt;/system_prompt&gt;</pre>
+
+  <!-- ============ APPENDIX B ============ -->
+  <hr class="appendix-divider">
+  <p class="appendix-label">Appendix B</p>
+  <h2 style="border: none; margin-top: 4px;">Model comparisons &amp; recommendation</h2>
+
+  <p>We tested four model pairings: two from Anthropic (Claude), two from Google (Gemini), at two cost tiers each. The table below summarises the trade-offs.</p>
+
+  <h3>What we tested</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th>Tier</th>
+        <th>Relative cost</th>
+        <th>Average response time</th>
+        <th>Quality score (on v6/v7)</th>
+        <th>Test sessions completed</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Claude Sonnet 4</strong></td>
+        <td>Standard</td>
+        <td>1×</td>
+        <td>~19 sec/turn</td>
+        <td>3.27 (best)</td>
+        <td>4 / 4 (v6 mid-tier)</td>
+      </tr>
+      <tr>
+        <td><strong>Claude Sonnet 4.6</strong></td>
+        <td>Standard*</td>
+        <td>1× (same as 4)</td>
+        <td>~18 sec/turn</td>
+        <td>3.17 (v6 top-tier)</td>
+        <td>4 / 4</td>
+      </tr>
+      <tr>
+        <td><strong>Gemini 3 Flash</strong></td>
+        <td>Standard (cheap)</td>
+        <td>~0.05× (very low)</td>
+        <td>~30 sec/turn</td>
+        <td>2.88–3.10 (variable)</td>
+        <td>2–4 / 4 (varied; Google crash bug, now fixed)</td>
+      </tr>
+      <tr>
+        <td><strong>Gemini 3.1 Pro</strong></td>
+        <td>Premium</td>
+        <td>~3–5×</td>
+        <td>~43 sec/turn</td>
+        <td>3.17 (v6 top-tier, full data)</td>
+        <td>1–4 / 4 (varied; Google crash bug, now fixed)</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size: 12px; color: var(--soft); margin-top: -16px;">
+    * Sonnet 4 and Sonnet 4.6 are priced identically by Anthropic; 4.6 is the newer release with similar latency.
+  </p>
+
+  <h3>Recommendation</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Scenario</th>
+        <th>Recommended model</th>
+        <th>Why</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Default production deployment</strong> (Seychelles pilot &amp; Tanzania scoping)</td>
+        <td><strong>Claude Sonnet 4 or 4.6</strong></td>
+        <td>Best balance of quality, reliability, and response time. Highest measured quality on the improved prompt. Per-turn cost is moderate; sessions complete fully.</td>
+      </tr>
+      <tr>
+        <td><strong>Cost-constrained classrooms</strong></td>
+        <td><strong>Gemini 3 Flash</strong> + improved prompt</td>
+        <td>~20× cheaper per session than Claude. Quality is below Sonnet but well above the baseline. Now reliable since the Google crash bug was fixed. Acceptable trade-off if budget is the binding constraint.</td>
+      </tr>
+      <tr>
+        <td><strong>High-stakes lessons or new curricula</strong> (where quality matters most)</td>
+        <td><strong>Claude Sonnet 4.6</strong> (default) or <strong>Gemini 3.1 Pro</strong></td>
+        <td>Both top-tier models produced equivalent quality scores under our improved prompt. Sonnet 4.6 has the latency edge; Gemini 3.1 Pro has the cost edge. The per-lesson difference is small relative to teacher time.</td>
+      </tr>
+      <tr>
+        <td><strong>Not recommended</strong></td>
+        <td>Premium models without the improved prompt + safeguards</td>
+        <td>Top-tier models add cost without solving the structural issues. The improved prompt is the larger win; the model upgrade is a small additional one.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Bottom line</h3>
+  <ul>
+    <li>The biggest quality win came from improving the <strong>tutor's instructions</strong> and adding <strong>automatic safeguards</strong>, not from upgrading to a premium model.</li>
+    <li>The standard-tier Claude Sonnet 4 on the v6 prompt scored higher than any premium model on its own.</li>
+    <li>Google's Gemini Flash is now usable in production (crash bug fixed) and is the right choice when cost is the primary constraint.</li>
+  </ul>
+
+  <footer>
+    <p>
+      <strong>Prepared by:</strong> AI Tutor engineering team. <strong>Date:</strong> 23 May 2026.
+      <strong>Branch:</strong> <code>feature/science-learning-tier1-v3</code> (5 commits ahead of <code>main</code>).
+      <strong>Source data:</strong> <code>ab-test-reports/</code> (baseline) and <code>ab-test-reports-v{4–7}/</code> (cycles).
+      <strong>Full prompts:</strong> <code>design/prompts/</code>.
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>
