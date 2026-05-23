@@ -285,9 +285,50 @@ class ModelConfig(models.Model):
             return os.getenv(self.api_key_env_var, '')
         return ''
 
+    # Deploy-time tutoring-model override via env var. Mirrors the
+    # UNIFIED_JUDGE kill-switch pattern (apps/tutoring/combined_judge.py
+    # :555). Format: "provider/model_name", e.g.
+    # "anthropic/claude-sonnet-4-6" or "google/gemini-3.1-pro-preview".
+    # Empty / unset = use the DB-active config (current production
+    # behaviour). Scoped to purpose='tutoring' only -- judge / regen /
+    # generation purposes keep their DB-active config so an operator
+    # accidentally setting the env var doesn't quietly retarget every
+    # LLM call in the system.
+    _TUTOR_MODEL_OVERRIDE_ENV = 'TUTOR_MODEL_OVERRIDE'
+
     @classmethod
     def get_for(cls, purpose: str):
-        """Get active config for a specific purpose, with fallback to any active config."""
+        """Get active config for a specific purpose, with fallback to any active config.
+
+        For purpose='tutoring', TUTOR_MODEL_OVERRIDE env var takes
+        precedence (format "provider/model_name"). See
+        `_TUTOR_MODEL_OVERRIDE_ENV` docstring above. On unknown
+        provider/model, logs a warning and falls through to the
+        DB-active config -- fail-soft so a typo doesn't break tutoring.
+        """
+        if purpose == cls.Purpose.TUTORING.value:
+            raw = (os.getenv(cls._TUTOR_MODEL_OVERRIDE_ENV, '') or '').strip()
+            if raw:
+                if '/' not in raw:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "[ModelConfig] %s=%r is malformed (expected "
+                        "'provider/model_name'); falling back to DB-active",
+                        cls._TUTOR_MODEL_OVERRIDE_ENV, raw,
+                    )
+                else:
+                    provider, model_name = raw.split('/', 1)
+                    runtime = cls.resolve_runtime(provider, model_name)
+                    if runtime is not None:
+                        return runtime
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "[ModelConfig] %s=%r did not resolve to a "
+                        "ModelConfig (unknown provider or missing API "
+                        "key env var); falling back to DB-active",
+                        cls._TUTOR_MODEL_OVERRIDE_ENV, raw,
+                    )
+
         config = cls.objects.filter(is_active=True, purpose=purpose).first()
         if not config:
             config = cls.objects.filter(is_active=True).first()

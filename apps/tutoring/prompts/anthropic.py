@@ -525,7 +525,16 @@ class AnthropicTutorPromptBuilder(TutorPromptBuilder):
             template = prompt_pack_override
             injection = ""
         else:
-            template = TUTOR_SYSTEM_PROMPT_TEMPLATE
+            # Deploy-time variant selection via TUTOR_PROMPT_VARIANT env
+            # var. Unset / 'baseline' / 'v3' returns the production
+            # TUTOR_SYSTEM_PROMPT_TEMPLATE unchanged (current behaviour);
+            # 'v6' / 'v7' substitute the unified template from
+            # apps/tutoring/prompts/variants.py. See variants.py for
+            # the full registry + selection rules.
+            from .variants import get_active_variant_template
+            template = get_active_variant_template(
+                baseline=TUTOR_SYSTEM_PROMPT_TEMPLATE,
+            )
             from .injections import get_subject_injection
             injection = get_subject_injection(subject_pack, "anthropic")
 

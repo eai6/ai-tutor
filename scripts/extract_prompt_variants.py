@@ -125,7 +125,7 @@ SPECS: list[VariantSpec] = [
     ),
     VariantSpec(
         out_filename='v6.md',
-        src_path='scripts/run_ab_v6_cycle.py',
+        src_path='apps/tutoring/prompts/variants.py',
         constant='V6_TUTOR_SYSTEM_PROMPT_TEMPLATE',
         title=(
             'v6 -- figure-ref + must-end-with-question extracted to standalone '
@@ -151,7 +151,7 @@ SPECS: list[VariantSpec] = [
     ),
     VariantSpec(
         out_filename='v7.md',
-        src_path='scripts/run_ab_v7_cycle.py',
+        src_path='apps/tutoring/prompts/variants.py',
         constant='V7_TUTOR_SYSTEM_PROMPT_TEMPLATE',
         title=(
             'v7 -- structural restructure: valid-turn contract + branch '

@@ -1,8 +1,41 @@
 name: Deploy
 
 on:
+  # Auto-deploy on merge to main. The active prompt + model are read
+  # from repo variables (configured under Settings -> Secrets and
+  # variables -> Actions -> Variables) so the PR reviewer can flip
+  # them without editing this file. Empty values fall through to the
+  # current production behaviour (baseline prompt + DB-active model).
   push:
     branches: [main]
+
+  # Manual trigger for ad-hoc revisions (rollback, hotfix, prompt
+  # variant flip without a code change). The dropdowns below are
+  # surfaced in the GitHub Actions UI when the operator clicks
+  # "Run workflow".
+  workflow_dispatch:
+    inputs:
+      tutor_prompt_variant:
+        description: 'Tutor prompt variant'
+        required: false
+        type: choice
+        default: 'baseline'
+        options:
+          - baseline      # current production per-provider template
+          - v6            # highest measured composite quality score
+          - v7            # branch-template restructure (smaller, cleaner)
+      tutor_model_override:
+        description: 'Tutor model override (provider/model_name); leave blank to use DB-active'
+        required: false
+        type: choice
+        default: ''
+        options:
+          - ''                                            # use DB-active config
+          - 'anthropic/claude-sonnet-4-20250514'          # Sonnet 4 (standard)
+          - 'anthropic/claude-sonnet-4-6'                 # Sonnet 4.6 (standard, newer)
+          - 'anthropic/claude-opus-4-7'                   # Opus 4.7 (premium)
+          - 'google/gemini-3-flash-preview'               # Flash (cheapest)
+          - 'google/gemini-3.1-pro-preview'               # Pro (premium)
 
 env:
   ACR: ${{ secrets.ACR_LOGIN_SERVER }}
@@ -48,9 +81,37 @@ jobs:
             --resource-group $RG \
             --mode single
 
+      # Resolve the prompt-variant + model-override values from
+      # (1) workflow_dispatch inputs if present, else
+      # (2) repo variables (`vars.TUTOR_PROMPT_VARIANT`,
+      #     `vars.TUTOR_MODEL_OVERRIDE`), else
+      # (3) defaults that preserve current production behaviour
+      #     (baseline prompt, no model override).
+      # Empty strings on either knob mean "use whatever's in the DB /
+      # built-in" — set explicitly so `az containerapp update` does
+      # not leave a stale value on the previous revision.
+      - name: Resolve deploy-time config
+        id: cfg
+        run: |
+          PROMPT_VARIANT="${{ github.event.inputs.tutor_prompt_variant || vars.TUTOR_PROMPT_VARIANT || 'baseline' }}"
+          MODEL_OVERRIDE="${{ github.event.inputs.tutor_model_override || vars.TUTOR_MODEL_OVERRIDE || '' }}"
+          echo "prompt_variant=$PROMPT_VARIANT" >> $GITHUB_OUTPUT
+          echo "model_override=$MODEL_OVERRIDE" >> $GITHUB_OUTPUT
+          echo "::notice title=Deploy config::TUTOR_PROMPT_VARIANT=$PROMPT_VARIANT  TUTOR_MODEL_OVERRIDE=$MODEL_OVERRIDE"
+
       - name: Deploy to Container App
         run: |
+          # --set-env-vars writes the env vars onto the new revision.
+          # Both knobs are always written (even when empty) so the new
+          # revision does not inherit a stale value from a prior one.
+          # Reading order in the app:
+          #   * apps/tutoring/prompts/variants.py reads TUTOR_PROMPT_VARIANT
+          #   * apps/llm/models.py::ModelConfig.get_for reads
+          #     TUTOR_MODEL_OVERRIDE (purpose=tutoring only)
           az containerapp update \
             --name $APP \
             --resource-group $RG \
-            --image $ACR/aitutor:${{ github.sha }}
+            --image $ACR/aitutor:${{ github.sha }} \
+            --set-env-vars \
+              "TUTOR_PROMPT_VARIANT=${{ steps.cfg.outputs.prompt_variant }}" \
+              "TUTOR_MODEL_OVERRIDE=${{ steps.cfg.outputs.model_override }}"

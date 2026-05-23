@@ -236,7 +236,18 @@ class GeminiTutorPromptBuilder(TutorPromptBuilder):
             template = prompt_pack_override
             injection = ""
         else:
-            template = GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE
+            # Deploy-time variant selection via TUTOR_PROMPT_VARIANT env
+            # var. Unset / 'baseline' / 'v3' returns the production
+            # GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE unchanged (current
+            # behaviour, markdown-formatted ~6k chars); 'v6' / 'v7'
+            # substitute the unified template from
+            # apps/tutoring/prompts/variants.py (XML-tagged ~9-11k
+            # chars -- A/B-tested as Gemini-compatible). See
+            # variants.py for the full registry + selection rules.
+            from .variants import get_active_variant_template
+            template = get_active_variant_template(
+                baseline=GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE,
+            )
             from .injections import get_subject_injection
             injection = get_subject_injection(subject_pack, "google")
 
