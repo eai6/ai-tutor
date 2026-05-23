@@ -45,10 +45,11 @@ django.setup()
 from anthropic import Anthropic  # noqa: E402
 
 
-TRANSCRIPTS_DIR = Path('ab-test-reports/raw_transcripts')
-SCORES_DIR = Path('ab-test-reports/judge_scores')
+_REPORT_DIR = Path(os.environ.get('AB_REPORT_DIR', 'ab-test-reports'))
+TRANSCRIPTS_DIR = _REPORT_DIR / 'raw_transcripts'
+SCORES_DIR = _REPORT_DIR / 'judge_scores'
 ALL_SCORES = SCORES_DIR / '_all_scores.jsonl'
-RUBRIC_PATH = Path('ab-test-reports/judge_rubric.md')
+RUBRIC_PATH = _REPORT_DIR / 'judge_rubric.md'
 
 JUDGE_MODEL = 'claude-opus-4-7'
 JUDGE_TEMP = 0.0

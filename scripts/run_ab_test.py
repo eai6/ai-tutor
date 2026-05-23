@@ -52,7 +52,7 @@ LESSONS = [
 
 PERSONAS = ['struggler', 'capable']
 
-OUT_DIR = Path('ab-test-reports')
+OUT_DIR = Path(os.environ.get('AB_REPORT_DIR', 'ab-test-reports'))
 RESULTS_JSONL = OUT_DIR / 'cell_results.jsonl'
 TRANSCRIPTS_DIR = OUT_DIR / 'raw_transcripts'
 

@@ -46,7 +46,11 @@ ops/annotator_agent/metrics_history.jsonl
 
 # A/B test outputs — transcripts, judge scores, and final reports.
 # Regenerable from scripts/run_ab_test.py + scripts/judge_transcripts.py.
+# Covers the baseline `ab-test-reports/` and per-variant sibling dirs
+# (`ab-test-reports-v4/`, `-v5/`, `-v6/`, `-v6-top-tier/`, etc.) written
+# by the wrappers in scripts/run_ab_v{N}_cycle.py.
 ab-test-reports/
+ab-test-reports-*/
 
 # Production content dump used for local A/B testing — contains real
 # lesson content + may include institution-scoped data. Loaded into the

@@ -23,7 +23,8 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import mean
 
-OUT = Path('ab-test-reports')
+import os as _os
+OUT = Path(_os.environ.get('AB_REPORT_DIR', 'ab-test-reports'))
 CELL_RESULTS = OUT / 'cell_results.jsonl'
 JUDGE_ALL = OUT / 'judge_scores' / '_all_scores.jsonl'
 PER_CELL_DIR = OUT / 'per_cell'
