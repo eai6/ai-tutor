@@ -130,6 +130,14 @@ class ModelConfig(models.Model):
         # so a 5x cheaper / 2x faster Sonnet model dramatically cuts
         # per-turn latency without compromising rule enforcement.
         JUDGE = 'judge', 'Post-response Judge'
+        # Judge fallback tiers — get_judge_provider_chain walks
+        # (judge, judge_fallback, judge_fallback_2, generation, tutoring,
+        # exit_tickets) and picks DISTINCT providers. Tier 2 = cross-vendor
+        # primary fallback (typically OpenAI). Tier 3 = last-resort
+        # (typically Anthropic Haiku 4.5). See
+        # apps/curriculum/content_judges/_providers.py.
+        JUDGE_FALLBACK = 'judge_fallback', 'Post-response Judge — Tier 2 Fallback'
+        JUDGE_FALLBACK_2 = 'judge_fallback_2', 'Post-response Judge — Tier 3 Fallback'
         # Regen ensemble — when the validator decides a tutor turn
         # needs to be rewritten, the engine fans out to N concurrent
         # `REGEN` configs (configurable: 1 / 2 / 3 models). Judges
