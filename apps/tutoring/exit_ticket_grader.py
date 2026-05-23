@@ -52,6 +52,7 @@ class JudgmentType(str, Enum):
     GRADE_CORRECTNESS = "grade_correctness"  # existing — is student answer right?
     JUDGE_LEAK        = "judge_leak"         # W1 — did tutor reveal canonical answer?
     JUDGE_REPEAT      = "judge_repeat"       # W14 — did tutor re-ask an earlier question?
+    JUDGE_TEMPLATE_REPEAT = "judge_template_repeat"  # rec #9 — same template, different numbers
     CLASSIFY_INTENT   = "classify_intent"    # W9 — attempt / confusion / off_topic
 
 
@@ -625,6 +626,73 @@ def _build_repeat_user_prompt(items: Sequence['BatchRepeatItem']) -> str:
 
 
 # =============================================================================
+# JUDGE_TEMPLATE_REPEAT — same structural template, different surface details
+# (engine rec #9 from ab-test-reports-v5/FINAL_REPORT.md)
+# =============================================================================
+
+_TEMPLATE_REPEAT_SYSTEM = (
+    "You judge whether a tutor's NEW question reuses the same STRUCTURAL\n"
+    "TEMPLATE as any of the PREVIOUS questions in the list — even when\n"
+    "the surface details (numbers, names, units, places, objects) differ.\n"
+    "\n"
+    "TEMPLATE_REPEAT = the NEW question and a previous one share the\n"
+    "same question shape, the same reasoning path, and ask for the same\n"
+    "kind of unknown. The student would apply the same procedure to\n"
+    "solve both.\n"
+    "\n"
+    "Examples that ARE template repeats:\n"
+    "  - 'Three angles around a point are 80°, 80°, and y°. Find y.' vs\n"
+    "    'Three angles around a point are 70°, 90°, and z°. Find z.'\n"
+    "    (same: subtract two knowns from 360 to get missing angle.)\n"
+    "  - 'Anna has 5 mangoes; she gives 2 to Sam. How many left?' vs\n"
+    "    'Tom has 8 oranges; he gives 3 to Lia. How many left?'\n"
+    "    (same: subtraction word problem with names + objects.)\n"
+    "  - 'A 1:50,000 map shows 4 cm between two points. What is the\n"
+    "    actual distance?' vs 'On a 1:100,000 map, 2 cm represents what\n"
+    "    real distance?' (same: scale × map-distance.)\n"
+    "\n"
+    "NOT template repeats — same concept, different STRUCTURE:\n"
+    "  - 'Three angles around a point are 80°, 80°, and y°. Find y.'\n"
+    "    vs 'A pie is cut into 6 equal slices. What angle does each\n"
+    "    slice make at the center?' (different shape: missing-angle\n"
+    "    subtraction vs equal division.)\n"
+    "  - 'What is the function of a compass rose?' vs 'Why is a\n"
+    "    compass rose especially important for inter-island navigation?'\n"
+    "    (different angle on the same concept.)\n"
+    "  - 'Solve 3x + 5 = 14 for x.' vs 'Express x = 5 as a substitution\n"
+    "    in 3x + 5; show the result.' (different unknown / direction.)\n"
+    "\n"
+    "Be CONSERVATIVE: only flag when the underlying procedure and\n"
+    "question shape are clearly identical. Surface-level shared concept\n"
+    "alone is NOT enough.\n"
+    "\n"
+    "Output JSON ARRAY ONLY:\n"
+    "[\n"
+    '  {"index": <int>, "repeated": <true|false>, '
+    '"reason": "<short why, <=200 chars>"}\n'
+    "]\n"
+)
+
+
+def _build_template_repeat_user_prompt(items: Sequence['BatchRepeatItem']) -> str:
+    # Reuses BatchRepeatItem; payload shape identical to JUDGE_REPEAT.
+    payload = []
+    for it in items:
+        payload.append({
+            "index": it.index,
+            "new_question": (it.new_question or "")[:400],
+            "previous_questions": [
+                (q or "")[:300] for q in (it.previous_questions or [])[:10]
+            ],
+        })
+    return (
+        "Judge each item below. Reply with ONLY the JSON array — no "
+        "prose, no code fence.\n\n"
+        f"INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
+    )
+
+
+# =============================================================================
 # CLASSIFY_INTENT — attempt / confusion / off_topic  (W9)
 # =============================================================================
 
@@ -694,6 +762,7 @@ _JUDGMENT_CONFIG = {
     JudgmentType.GRADE_CORRECTNESS: None,
     JudgmentType.JUDGE_LEAK:        (_LEAK_SYSTEM, _build_leak_user_prompt, 'leak'),
     JudgmentType.JUDGE_REPEAT:      (_REPEAT_SYSTEM, _build_repeat_user_prompt, 'repeat'),
+    JudgmentType.JUDGE_TEMPLATE_REPEAT: (_TEMPLATE_REPEAT_SYSTEM, _build_template_repeat_user_prompt, 'repeat'),
     JudgmentType.CLASSIFY_INTENT:   (_INTENT_SYSTEM, _build_intent_user_prompt, 'intent'),
 }
 

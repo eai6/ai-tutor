@@ -2576,11 +2576,191 @@ Keep it to 2-3 sentences."""
                 if _sig and _sig not in self.recent_tutor_question_sigs:
                     self.recent_tutor_question_sigs.append(_sig)
             self.recent_tutor_question_sigs = self.recent_tutor_question_sigs[-10:]
+
+            # Template-repeat detection (ab-test-reports-v5 engine rec
+            # #9). Only runs when the cross-turn repeat check above
+            # came up clean — they're complementary: that one catches
+            # same-prose paraphrase, this one catches same-procedure
+            # with different surface details. Pulls the last 3 tutor
+            # turns' raw question text for the LLM judge to compare
+            # against. Skipped when no judge_client is wired.
+            if _repeat_verdict is None and self.judge_client is not None:
+                from apps.tutoring.repeated_question import detect_template_repeat
+                from apps.tutoring.validator import ISSUE_SAME_TEMPLATE_REPEAT
+                _recent_tutor_qs: List[str] = []
+                try:
+                    from apps.tutoring.models import SessionTurn as _ST
+                    _prior_turns = list(
+                        _ST.objects
+                        .filter(session=self.session, role='tutor')
+                        .order_by('-created_at')
+                        .values_list('content', flat=True)[:3]
+                    )
+                    for _txt in _prior_turns:
+                        _recent_tutor_qs.extend(extract_questions(_txt or ''))
+                except Exception:
+                    _recent_tutor_qs = []
+
+                if _recent_tutor_qs:
+                    _tmpl_verdict = detect_template_repeat(
+                        response=clean_response,
+                        recent_tutor_questions=_recent_tutor_qs,
+                        llm_client=self.judge_client,
+                    )
+                    if _tmpl_verdict is not None:
+                        issues_set = set(validation.issues)
+                        issues_set.add(ISSUE_SAME_TEMPLATE_REPEAT)
+                        validation.issues = list(issues_set)
+                        validation.metadata['template_repeat_reason'] = _tmpl_verdict.reason
+                        validation.metadata['template_repeat_matched'] = _tmpl_verdict.matched_question[:200]
+                        validation.metadata['template_repeat_ms'] = _tmpl_verdict.elapsed_ms
+                        logger.info(
+                            "[TemplateRepeat] FLAGGED session=%s reason=%r",
+                            self.session.id, _tmpl_verdict.reason[:200],
+                        )
         except Exception as _exc:
             logger.warning(
                 "[RepeatDetect] guard crashed: %s: %s — continuing without regen flag",
                 type(_exc).__name__, _exc,
             )
+
+        # ------------------------------------------------------------------
+        # Engine wins from ab-test-reports-v6 + v7 (post-iteration review).
+        # All three run AFTER the existing validator + repeat-detect path
+        # so they layer cleanly on top. Each is independent + fail-soft.
+        # ------------------------------------------------------------------
+
+        # GUARD A: truncation -- model prose cut off mid-sentence.
+        # ab-test-reports-v6 engine rec #1 + v7-top-tier engine rec #1.
+        # We strip the trailing bank-rendered tail (which legitimately
+        # may not end in terminal punctuation, e.g. "D) Marine") and
+        # check whether the model's prose portion ends with terminal
+        # punctuation. Empty prose is fine (turn = bank Q only).
+        try:
+            from apps.tutoring.validator import (
+                ISSUE_TRUNCATED, ends_with_terminal_punctuation,
+            )
+            _bank_tail = str(getattr(self, '_last_bank_rendered_text', '') or '').strip()
+            _prose = clean_response
+            if _bank_tail and _bank_tail in _prose:
+                _prose = _prose.replace(_bank_tail, '').rstrip()
+            if _prose.strip() and not ends_with_terminal_punctuation(_prose):
+                issues_set = set(validation.issues)
+                issues_set.add(ISSUE_TRUNCATED)
+                validation.issues = list(issues_set)
+                validation.metadata['truncated_tail'] = _prose.rstrip()[-80:]
+                logger.info(
+                    "[Validator] truncated session=%s tail=%r",
+                    getattr(self.session, 'id', '?'),
+                    _prose.rstrip()[-80:],
+                )
+        except Exception as _exc:
+            logger.debug("[Validator] truncation guard crashed: %s", _exc)
+
+        # GUARD B: numeric mutation -- candidate introduces a number
+        # not present in the active problem stem. ab-test-reports-v6
+        # engine rec #6 (and its v3-v5 lineage on "1:40,000 invented
+        # when stem was 1:10,000"). We pull the active problem text
+        # from _pending_bank_question or _awaiting_answer, extract
+        # its numeric tokens + a set of permissive intermediate-calc
+        # results from the cleaned response itself (so the model can
+        # show its work without false-positive), then flag any
+        # candidate numbers with no provenance.
+        try:
+            from apps.tutoring.validator import (
+                ISSUE_NUMERIC_MUTATION, extract_numbers,
+            )
+            _active_problem_text = ""
+            _bq = getattr(self, '_pending_bank_question', None)
+            if _bq is not None:
+                _active_problem_text = (
+                    getattr(_bq, 'question_text', '')
+                    or getattr(_bq, 'stem', '')
+                    or ''
+                )
+            if not _active_problem_text:
+                _aa = getattr(self, '_awaiting_answer', None) or {}
+                _active_problem_text = str(
+                    _aa.get('chat_authored_q')
+                    or _aa.get('stem')
+                    or ''
+                )
+            # Also pull numbers from the LAST tutor turn's prose --
+            # legitimate when the tutor showed a worked-example step
+            # and the new turn references its intermediate result.
+            _prev_tutor_numbers: set = set()
+            try:
+                from apps.tutoring.models import SessionTurn as _ST
+                _prev = (_ST.objects
+                         .filter(session=self.session, role='tutor')
+                         .order_by('-created_at').first())
+                if _prev is not None:
+                    _prev_tutor_numbers = extract_numbers(_prev.content or '')
+            except Exception:
+                pass
+            # Numbers the tutor MAY use freely: from the active stem,
+            # from MCQ option text (which renders as part of the bank
+            # block), and from the previous tutor turn (worked steps).
+            _allowed = (
+                extract_numbers(_active_problem_text)
+                | extract_numbers(str(getattr(self, '_last_bank_rendered_text', '') or ''))
+                | _prev_tutor_numbers
+            )
+            # Numbers the model produced.
+            _produced = extract_numbers(clean_response)
+            # Filter: a number ≤2 chars (single-digit / "10") is too
+            # common to flag (1., 2., A., 1st, etc.). Keep this loose
+            # to avoid false positives on prose enumerations.
+            _suspicious = {
+                n for n in _produced
+                if n not in _allowed and len(n) >= 3
+            }
+            if _suspicious and _active_problem_text:
+                issues_set = set(validation.issues)
+                issues_set.add(ISSUE_NUMERIC_MUTATION)
+                validation.issues = list(issues_set)
+                validation.metadata['numeric_mutation_invented'] = list(_suspicious)[:6]
+                validation.metadata['numeric_mutation_stem'] = _active_problem_text[:160]
+                logger.info(
+                    "[Validator] numeric_mutation session=%s invented=%s",
+                    getattr(self.session, 'id', '?'),
+                    sorted(_suspicious)[:6],
+                )
+        except Exception as _exc:
+            logger.debug("[Validator] numeric_mutation guard crashed: %s", _exc)
+
+        # GUARD C: filler-reply teach. If the student turn was filler
+        # ("ok", "yes") the tutor should either re-pose the active
+        # question or do a short check-in -- NOT emit a fresh teach
+        # block. ab-test-reports-v7-top-tier engine rec #1.
+        try:
+            from apps.tutoring.validator import (
+                ISSUE_FILLER_REPLY_TEACH, is_filler_reply,
+            )
+            if is_filler_reply(student_input):
+                # Acceptable responses: tool_use_count > 0 (re-posed
+                # via the question tool, including the active one),
+                # OR the prose contains a check-in / continue signal.
+                _tool_used = int(turn_metadata.get('tool_use_count', 0) or 0) > 0
+                _checkin_re = re.compile(
+                    r"\b(?:ready to continue|shall we (?:move on|continue)|"
+                    r"want to try (?:another|the next)|"
+                    r"any questions before|let me know when)\b",
+                    re.IGNORECASE,
+                )
+                _has_checkin = bool(_checkin_re.search(clean_response))
+                if not _tool_used and not _has_checkin:
+                    issues_set = set(validation.issues)
+                    issues_set.add(ISSUE_FILLER_REPLY_TEACH)
+                    validation.issues = list(issues_set)
+                    validation.metadata['filler_reply_input'] = (student_input or '')[:60]
+                    logger.info(
+                        "[Validator] filler_reply_teach session=%s input=%r",
+                        getattr(self.session, 'id', '?'),
+                        (student_input or '')[:60],
+                    )
+        except Exception as _exc:
+            logger.debug("[Validator] filler_reply guard crashed: %s", _exc)
 
         if validation.issues:
             turn_metadata['validator_issues'] = list(validation.issues)

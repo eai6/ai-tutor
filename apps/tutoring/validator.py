@@ -110,6 +110,45 @@ ISSUE_NO_QUESTION_TOOL = "no_question_tool"
 # breaks the affordance + confuses the UI. Detected by a single
 # regex; triggers regen (the candidate is unsalvageable as text).
 ISSUE_TOOL_CALL_LEAK = "tool_call_leak"
+# Tutor posed a question that is structurally the same as one of the
+# last 2 tutor turns' questions (same template stem with only the
+# numeric values varying). Surfaced in ab-test-reports-v5/FINAL_REPORT
+# engine rec #9: even when the prompt asks for interleaving, mid-tier
+# models recycle the same template. Detection is template-signature
+# based (digits normalised to "N", whitespace squashed); the issue
+# triggers regen with the existing "rephrase from a different angle
+# or advance" feedback. Set by the call site in conversational_tutor,
+# not by validate_tutor_response itself (the validator has no access
+# to prior-turn text).
+ISSUE_SAME_TEMPLATE_REPEAT = "same_template_repeat"
+# Tutor's model-generated prose ends mid-sentence (no terminal
+# punctuation on the last non-empty line of the prose portion).
+# Observed across cycles whenever stop_reason='max_tokens' fires AND
+# the cut lands inside a sentence. Examples surfaced in
+# ab-test-reports-v4 rec #3 ("Yes--360 deg is correct. In") and again
+# in v7 (ab-test-reports-v7-top-tier engine rec #1). Detection is
+# done at the call site in conversational_tutor (the validator has
+# no access to bank-rendered tail text, which legitimately may not
+# end in terminal punctuation -- e.g. "D) Marine"). The call site
+# strips the bank-rendered block and checks only the model's prose.
+ISSUE_TRUNCATED = "truncated"
+# Tutor introduced a numeric value not present in the active problem
+# stem (or in any prior tutor turn's accepted intermediate result).
+# Surfaced in v3-v5 cycles (1:40,000 invented when stem was 1:10,000)
+# and reiterated in ab-test-reports-v6 engine rec #6. The validator
+# can't see the active problem; the call site computes the diff and
+# flags this issue when a number appears in the candidate that has
+# no provenance.
+ISSUE_NUMERIC_MUTATION = "numeric_mutation"
+# Tutor responded to a non-answer student input ("ok", "yes", "got
+# it", "...") by emitting a fresh teach block instead of either re-
+# posing the active question or doing a short check-in. Surfaced in
+# ab-test-reports-v7-top-tier engine rec #1. The engine already
+# flags non_answer_input on the student turn (see [Eval] forcing
+# is_correct=None messages); the call site reads that flag, sees
+# whether the candidate response either re-poses the active question
+# or asks a check-in question, and otherwise flags this.
+ISSUE_FILLER_REPLY_TEACH = "filler_reply_teach"
 
 # Deictic figure references — phrases that strongly imply "I am
 # pointing at a visual right now". Used by the figure-ref-without-signal
@@ -197,6 +236,20 @@ class ValidationResult:
         # etc.). Surfaced by the Gemini Flash family in browser e2e
         # 2026-05-20. Always regen — markup must never reach UI.
         ISSUE_TOOL_CALL_LEAK,
+        # Tutor recycled the same question template (same stem modulo
+        # numeric values) as a recent turn. Regen with directive to
+        # pose a structurally different problem on the same concept
+        # or advance.
+        ISSUE_SAME_TEMPLATE_REPEAT,
+        # Tutor prose cut off mid-sentence (no terminal punctuation
+        # on the last non-empty line of the model's text portion).
+        ISSUE_TRUNCATED,
+        # Tutor introduced a numeric value with no provenance in the
+        # active problem stem or accepted intermediate calc results.
+        ISSUE_NUMERIC_MUTATION,
+        # Tutor ignored a filler reply ("ok", "yes") and emitted a
+        # fresh teach block instead of re-posing or checking in.
+        ISSUE_FILLER_REPLY_TEACH,
     })
 
     @property
@@ -283,6 +336,78 @@ def _ends_with_question(text: str) -> bool:
     # Look at last sentence-ish chunk.
     tail = text.strip().splitlines()[-1] if "\n" in text else text.strip()
     return bool(_QUESTION_RE.search(tail))
+
+
+# Terminal punctuation that legitimately closes a tutor sentence.
+# Includes the basic three (. ! ?), curly variants, and tail wrappers
+# (closing quote / paren / bracket) that may follow the terminal char.
+# We check by inspecting the last *non-whitespace* character of the
+# prose portion.
+_TERMINAL_PUNCT = set('.!?…。！？"”\')]}>')
+
+
+def ends_with_terminal_punctuation(text: str) -> bool:
+    """Return True when the last non-whitespace char is a sentence
+    terminator (or a closing wrapper that typically follows one).
+
+    Used by the truncation guard. Empty / whitespace-only input
+    returns True (nothing to be truncated)."""
+    if not text or not text.strip():
+        return True
+    stripped = text.rstrip()
+    return stripped[-1] in _TERMINAL_PUNCT
+
+
+# Numeric extraction for the numeric-mutation guard. Captures integers,
+# decimals, negative numbers, and scale-style ratios written as "N:N".
+# Currency / percent suffixes are stripped before comparison so "70°"
+# and "70" match. We deliberately ignore numbers inside common boiler-
+# plate (turn-counter "1.", list "2)") at the call site, not here.
+_NUMERIC_TOKEN_RE = re.compile(r'-?\d+(?:[\.,:]\d+)*')
+
+
+def extract_numbers(text: str) -> set[str]:
+    """Return the set of normalised numeric tokens in text.
+
+    Normalisation: strip thousands separators, collapse comma/dot
+    to a single canonical form. "1,000" and "1000" compare equal.
+    Returns a set so duplicates collapse."""
+    if not text:
+        return set()
+    out: set[str] = set()
+    for m in _NUMERIC_TOKEN_RE.finditer(text):
+        tok = m.group(0).replace(',', '')
+        out.add(tok)
+    return out
+
+
+# Filler / non-answer student replies. Matches the set the engine's
+# eval layer uses to set is_correct=None ("non_answer_input"). Kept
+# as a small set — additions should mirror what the eval layer treats
+# as filler.
+_FILLER_REPLIES = frozenset({
+    'ok', 'okay', 'k', 'ok.',
+    'yes', 'yeah', 'yep', 'y',
+    'sure', 'right', 'got it', 'i see', 'understood',
+    'cool', 'continue', 'next', 'go on', 'more',
+    '...', '..', '.',
+})
+
+
+def is_filler_reply(student_text: Optional[str]) -> bool:
+    """True when the student turn is content-free filler that should
+    not be treated as an answer attempt. Matched case-insensitively
+    on the stripped, punctuation-light form."""
+    if not student_text:
+        return False
+    s = student_text.strip().lower()
+    if not s:
+        return False
+    # Strip trailing punctuation cluster for matching.
+    s_clean = s.rstrip('.!?,;:')
+    return s_clean in _FILLER_REPLIES or s in _FILLER_REPLIES
+
+
 
 
 # 2026-05-17 — call-to-action regex + _has_call_to_action helper
