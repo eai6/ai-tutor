@@ -40,10 +40,17 @@ class ModelSpec:
     temperature: float = 0.2
 
 
-MODELS = [
+MODELS_FULL = [
     ModelSpec('sonnet-4', 'Claude Sonnet 4', 'anthropic', 'claude-sonnet-4-20250514', 0.2),
     ModelSpec('gemini-3-flash', 'Gemini 3 Flash', 'google', 'gemini-3-flash-preview', 0.2),
 ]
+
+# Deploy-mode matrix (post-deploy CI eval): one model, cheaper run.
+# Set EVAL_MATRIX_MODE=full to get the 2-model robustness sweep.
+MODELS_DEPLOY = MODELS_FULL[:1]
+
+_MATRIX_MODE = os.environ.get('EVAL_MATRIX_MODE', 'full').lower()
+MODELS = MODELS_DEPLOY if _MATRIX_MODE == 'deploy' else MODELS_FULL
 
 LESSONS = [
     (1137, 'Math — Angles around a point'),
