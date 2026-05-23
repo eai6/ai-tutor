@@ -44,6 +44,76 @@ REC_BUCKETS = [
 
 SEVERITY_WEIGHT = {'high': 3, 'medium': 2, 'low': 1}
 
+# BEA-2025 rubric (Maurya et al. 2025). Lives in the same judge output
+# JSON as the 10-principle scores; rendered alongside them in the
+# per-cell and summary reports.
+BEA_DIMENSIONS = [
+    'mistake_identification',
+    'mistake_location',
+    'providing_guidance',
+    'actionability',
+]
+BEA_YES = 'Yes'
+BEA_SOMEWHAT = 'To some extent'
+
+
+def _bea_cell_summary(score: dict) -> str:
+    """Return a one-line BEA pass-rate cell for the per-cell summary table."""
+    agg = score.get('bea_aggregates') or {}
+    n = agg.get('n_in_scope') or 0
+    if not n:
+        return 'n=0'
+    strict = agg.get('strict_pass_rate')
+    lenient = agg.get('lenient_pass_rate')
+    return f"n={n} {strict:.0%}/{lenient:.0%}" if strict is not None else f"n={n}"
+
+
+def _aggregate_bea_across_cells(scores_by_key: dict[str, dict]) -> dict:
+    """Pool BEA evaluations across all cells; return cross-cycle aggregates."""
+    in_scope: list[dict] = []
+    for sc in scores_by_key.values():
+        for e in (sc.get('bea_evaluations') or []):
+            if e.get('student_made_mistake'):
+                in_scope.append(e)
+    n = len(in_scope)
+    if not n:
+        return {'n_in_scope_total': 0}
+    out: dict = {'n_in_scope_total': n}
+    for dim in BEA_DIMENSIONS:
+        labels = [e.get(dim) for e in in_scope]
+        out[f'{dim}_exact'] = sum(1 for l in labels if l == BEA_YES) / n
+        out[f'{dim}_lenient'] = sum(1 for l in labels if l in (BEA_YES, BEA_SOMEWHAT)) / n
+    out['overall_exact'] = sum(out[f'{d}_exact'] for d in BEA_DIMENSIONS) / 4
+    out['overall_lenient'] = sum(out[f'{d}_lenient'] for d in BEA_DIMENSIONS) / 4
+    out['strict_pass_rate'] = sum(
+        1 for e in in_scope if all(e.get(d) == BEA_YES for d in BEA_DIMENSIONS)
+    ) / n
+    out['lenient_pass_rate'] = sum(
+        1 for e in in_scope if all(e.get(d) in (BEA_YES, BEA_SOMEWHAT) for d in BEA_DIMENSIONS)
+    ) / n
+    return out
+
+
+def _bea_per_model_lenient(scores_by_key: dict[str, dict]) -> dict[str, dict[str, float]]:
+    """Per-model, per-dimension lenient pass rate. Returns {model: {dim: rate}}."""
+    by_model: dict[str, list[dict]] = defaultdict(list)
+    for key, sc in scores_by_key.items():
+        model = key.split('_L')[0]
+        for e in (sc.get('bea_evaluations') or []):
+            if e.get('student_made_mistake'):
+                by_model[model].append(e)
+    result: dict[str, dict[str, float]] = {}
+    for model, evs in by_model.items():
+        if not evs:
+            continue
+        n = len(evs)
+        result[model] = {
+            dim: sum(1 for e in evs if e.get(dim) in (BEA_YES, BEA_SOMEWHAT)) / n
+            for dim in BEA_DIMENSIONS
+        }
+        result[model]['_n'] = n
+    return result
+
 
 def _norm_title(s: str) -> str:
     """Normalise a recommendation title for clustering — lowercase, alnum + spaces, collapsed."""
@@ -179,6 +249,61 @@ def write_per_cell(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
         else:
             lines += ["## LLM-as-judge scores + recommendations", "", "_(not yet scored)_", ""]
 
+        # ── BEA-2025 per-turn evaluations ──────────────────────────────
+        bea_evals = (score or {}).get('bea_evaluations') or []
+        bea_agg = (score or {}).get('bea_aggregates') or {}
+        if bea_evals or bea_agg:
+            lines += [
+                '## BEA-2025 per-turn evaluation',
+                '',
+                '_Maurya et al. 2025. Per-tutor-turn 3-class scoring on 4 dimensions._',
+                '',
+            ]
+            n_in = bea_agg.get('n_in_scope', 0)
+            n_total = bea_agg.get('n_total_tutor_turns', 0)
+            if n_total:
+                cov = (n_in / n_total) if n_total else 0.0
+                lines.append(f"- **Coverage**: {n_in} in-scope of {n_total} tutor turns ({cov:.0%})")
+            if n_in:
+                sr = bea_agg.get('strict_pass_rate')
+                lr = bea_agg.get('lenient_pass_rate')
+                if sr is not None and lr is not None:
+                    lines.append(f"- **All-4-dims strict pass**: {sr:.0%}  ·  **lenient**: {lr:.0%}")
+                lines.append('')
+                lines.append('| Dimension | Exact (Yes) | Lenient (Yes + Somewhat) |')
+                lines.append('|---|---:|---:|')
+                for dim in BEA_DIMENSIONS:
+                    ex = bea_agg.get(f'{dim}_exact')
+                    le = bea_agg.get(f'{dim}_lenient')
+                    if ex is None or le is None:
+                        continue
+                    lines.append(f"| {dim} | {ex:.0%} | {le:.0%} |")
+                lines.append('')
+                lines.append('### Per-turn verdicts')
+                lines.append('')
+                for e in bea_evals:
+                    if not e.get('student_made_mistake'):
+                        continue
+                    tid = e.get('tutor_turn_id', '?')
+                    excerpt = (e.get('tutor_excerpt') or '').replace('\n', ' ')[:120]
+                    desc = (e.get('mistake_description') or '').replace('\n', ' ')[:200]
+                    lines.append(f"- **turn {tid}** — mistake: _{desc}_")
+                    lines.append(
+                        f"  - MI: `{e.get('mistake_identification', '?')}`  "
+                        f"· ML: `{e.get('mistake_location', '?')}`  "
+                        f"· PG: `{e.get('providing_guidance', '?')}`  "
+                        f"· Act: `{e.get('actionability', '?')}`"
+                    )
+                    if excerpt:
+                        lines.append(f"  - Tutor: \"{excerpt}\"")
+                    if e.get('rationale'):
+                        lines.append(f"  - Rationale: {e['rationale']}")
+                lines.append('')
+            else:
+                lines.append('')
+                lines.append('_No in-scope turns — synthetic student did not make a remediation-worthy mistake._')
+                lines.append('')
+
         if transcript_text:
             lines += ["## Transcript", "", "```", transcript_text, "```", ""]
 
@@ -212,14 +337,16 @@ def write_summary(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
         '',
         '## Per-cell programmatic + judge mean',
         '',
-        '| Model | Lesson | Persona | Turns | Reason | Tool-use | Leak | RepeatQ | NoQ | Wall (s) | Judge mean |',
-        '|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|',
+        '_BEA column format: `n=<in-scope> <strict>/<lenient>` pass rates._',
+        '',
+        '| Model | Lesson | Persona | Turns | Reason | Tool-use | Leak | RepeatQ | NoQ | Wall (s) | Judge mean | BEA |',
+        '|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|---|',
     ]
     for c in cells:
         if c.get('error'):
             lines.append(
                 f"| {c['model_label']} | L{c['lesson_id']} | {c['persona']} | "
-                f"{c['turns']} | **ERROR** | — | — | — | — | {c['wall_seconds']:.1f} | — |"
+                f"{c['turns']} | **ERROR** | — | — | — | — | {c['wall_seconds']:.1f} | — | — |"
             )
             continue
         key = _cell_key(c['model_key'], c['lesson_id'], c['persona'])
@@ -229,11 +356,12 @@ def write_summary(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
             jm_s = f"{jm:.2f}"
         else:
             jm_s = '—'
+        bea_s = _bea_cell_summary(sc) if sc else '—'
         lines.append(
             f"| {c['model_label']} | L{c['lesson_id']} | {c['persona']} | "
             f"{c['turns']} | `{c['reason']}` | {c['tool_use_rate']:.0%} | "
             f"{c['answer_leak_incidents']} | {c['repeated_question_incidents']} | "
-            f"{c['no_question_incidents']} | {c['wall_seconds']:.1f} | {jm_s} |"
+            f"{c['no_question_incidents']} | {c['wall_seconds']:.1f} | {jm_s} | {bea_s} |"
         )
     lines.append('')
 
@@ -291,6 +419,67 @@ def write_summary(cells: list[dict], scores_by_key: dict[str, dict]) -> None:
             f"{mean(r['wall_seconds'] for r in rows):.1f} |"
         )
     lines.append('')
+
+    # ── BEA-2025 cross-cell aggregates ─────────────────────────────────
+    bea_overall = _aggregate_bea_across_cells(scores_by_key)
+    n_total_in_scope = bea_overall.get('n_in_scope_total', 0)
+    if n_total_in_scope:
+        lines += [
+            '## BEA-2025 cross-cell pass rates',
+            '',
+            f"_Per-tutor-turn BEA scoring pooled across **{n_total_in_scope} in-scope turns**_  "
+            f"_(BEA-2025 Shared Task, Maurya et al. 2025 — only fires on tutor turns where the "
+            f"preceding student turn contained a mistake or confusion.)_",
+            '',
+            '### All-4-dims pass rates',
+            '',
+            '| Metric | Rate |',
+            '|---|---:|',
+            f"| Strict pass (all 4 dims = `Yes`) | {bea_overall['strict_pass_rate']:.0%} |",
+            f"| Lenient pass (all 4 dims = `Yes` or `To some extent`) | {bea_overall['lenient_pass_rate']:.0%} |",
+            '',
+            '### Per-dimension pass rates',
+            '',
+            '| Dimension | Exact (Yes) | Lenient (Yes + Somewhat) |',
+            '|---|---:|---:|',
+        ]
+        for dim in BEA_DIMENSIONS:
+            ex = bea_overall.get(f'{dim}_exact', 0)
+            le = bea_overall.get(f'{dim}_lenient', 0)
+            lines.append(f"| {dim} | {ex:.0%} | {le:.0%} |")
+        lines.append('')
+
+        # Per-model breakdown (lenient only — exact has small-N noise)
+        per_model_bea = _bea_per_model_lenient(scores_by_key)
+        if per_model_bea:
+            lines += [
+                '### Model × BEA-dimension (lenient pass rate)',
+                '',
+                '| Model | n_in_scope | ' + ' | '.join(BEA_DIMENSIONS) + ' |',
+                '|---|---:|' + '|'.join(['---:'] * len(BEA_DIMENSIONS)) + '|',
+            ]
+            for model in sorted(per_model_bea):
+                row = per_model_bea[model]
+                n = int(row.get('_n', 0))
+                cells_str = ' | '.join(f"{row.get(dim, 0):.0%}" for dim in BEA_DIMENSIONS)
+                lines.append(f"| {model} | {n} | {cells_str} |")
+            lines.append('')
+
+        lines += [
+            '> **Coverage caveat**: synthetic students rarely make remediation-worthy mistakes, '
+            'so n_in_scope is typically small (single-digit per cell). Treat these pass rates '
+            'as directional; pair with the 10-principle tables above for prompt-tuning signal.',
+            '',
+        ]
+    else:
+        lines += [
+            '## BEA-2025 cross-cell pass rates',
+            '',
+            '_(no in-scope tutor turns — synthetic students did not make any remediation-worthy '
+            'mistakes in this run; BEA pass rates not computable)_',
+            '',
+        ]
+
     (OUT / 'summary.md').write_text('\n'.join(lines))
 
 

@@ -42,8 +42,17 @@ re-run the eval without a fresh deploy:
 | Tutor models | Claude Sonnet 4 | Sonnet 4 + Gemini 3 Flash |
 | Lessons | L1137 *Angles around a point* · L1425 *Map Scale and Map Types* | same |
 | Personas | `struggler` · `capable` (synthetic LLM students) | same |
-| Judge | Claude Opus 4.7 @ T=0, 10-principle Science-of-Learning rubric | same |
+| Judge | Claude Opus 4.7 — combined 10-principle + BEA-2025 rubric (one call) | same |
 | Cells per run | 4 | 8 |
+
+### The two judging rubrics (run together in one Opus call)
+
+| Rubric | Unit of analysis | Scale | What it's for |
+|---|---|---|---|
+| **10-principle Science-of-Learning** | Per session (whole transcript) | 0-5 per principle | Produces structured `prompt_recommendations` / `flow_recommendations` / `experience_recommendations`. Drives prompt-engineering iteration (think "Forbid X / Mandate Y" style edits). Inherited from PR #7's A/B harness; rubric in `.claude/skills/evaluate-tutor/SKILL.md`. |
+| **BEA-2025 Shared Task** | Per tutor turn (after a student mistake/confusion) | 3-class: `Yes` / `To some extent` / `No` on 4 dimensions | Paper-aligned + leaderboard-comparable pass-rate metric. The 4 dimensions are Mistake Identification, Mistake Location, Providing Guidance, Actionability (Maurya et al. 2025, NAACL). Strict pass = `Yes` on all 4; lenient pass = `Yes` or `To some extent` on all 4. |
+
+Both rubrics are emitted by a single Opus 4.7 call per transcript (see `scripts/judge_transcripts.py`), so we get the prompt-edit recommendations AND the paper-aligned pass rate without doubling judge cost.
 
 The fixture used is `eval-fixtures/baseline.json` — a 94-row Django
 fixture covering the two lessons, their unit + course parents, their
@@ -70,5 +79,6 @@ after loading a fresh prod dump.
 - Runtime engine: `apps/tutoring/conversational_tutor.py`
 - Validator + judges: `apps/tutoring/validator.py`, `apps/tutoring/judges/`
 - A/B harness: `scripts/run_ab_test.py`, `scripts/judge_transcripts.py`, `scripts/generate_reports.py`
-- Rubric: `.claude/skills/evaluate-tutor/SKILL.md`
+- Rubric (10-principle): `.claude/skills/evaluate-tutor/SKILL.md`
+- Rubric (BEA-2025): [BEA Shared Task page](https://sig-edu.org/sharedtask/2025) — Maurya et al. 2025, "Unifying AI Tutor Evaluation: An Evaluation Taxonomy for Pedagogical Ability Assessment of LLM-Powered AI Tutors", NAACL 2025
 - Active redesign plan that will obsolete several validator guards over time: `memory/tutor_engine_redesign_plan.md`
