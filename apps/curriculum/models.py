@@ -169,7 +169,13 @@ class Course(models.Model):
     class Meta:
         ordering = ['title']
 
-    MATH_KEYWORDS = ('math', 'maths', 'mathematics', 'algebra', 'geometry', 'calculus')
+    MATH_KEYWORDS = (
+        'math', 'maths', 'mathematics',
+        'algebra', 'geometry', 'calculus', 'trigonometry',
+        'arithmetic', 'fraction', 'fractions', 'decimal', 'decimals',
+        'percentage', 'percentages',
+        'probability', 'statistics',
+    )
 
     @property
     def is_math(self):

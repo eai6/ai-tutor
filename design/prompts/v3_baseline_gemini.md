@@ -1,58 +1,25 @@
-"""Gemini-native tutor prompt builder.
+# v3 baseline -- Gemini (production)
 
-Phase 2 of task #229. The Anthropic builder (sibling `anthropic.py`)
-preserves the original XML-tagged template that Claude was tuned
-against. This Gemini builder reshapes the same pedagogical content
-for Gemini 3's preferences:
+## Provenance
 
-- **Markdown headers, not XML tags.** Gemini 3 tolerates XML but is
-  idiomatic with markdown. The structural signal is the same; the
-  delimiter is what Gemini was trained on.
+- **Source**: `apps/tutoring/prompts/gemini.py:55`
+- **Constant**: `GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE`
+- **Size**: 6,279 chars  ~1,569 tokens  156 lines
 
-- **Factual role, no persona priming.** Google docs warn Gemini 3
-  underperforms with flowery role-play. "Tutor for secondary school
-  students" beats "You are a friendly, encouraging tutor".
+## What this is
 
-- **Positive framing for rules where possible.** Google warns
-  Gemini 3 over-indexes on negative instructions ("do NOT guess")
-  and breaks arithmetic. Negative-only rules that have a clear
-  positive form are rewritten.
+Gemini-native variant of the production prompt -- markdown-style rather than XML-tagged. The two providers run different prompts in production; A/B cycles v4-v6 unify them by patching both with the same template.
 
-- **Query at the end.** Per the long-context rule, critical
-  instructions / directives end the prompt with an anchor phrase
-  pointing the model at the student's message.
+## Notes
 
-- **Consolidated principles.** The Anthropic template has 16
-  separate `<principle>` blocks. Gemini 3 prefers dense,
-  thematic sections — pedagogy is consolidated into five blocks.
+Subject-pack injection (e.g. `injections/math.py`) is appended after this template by the Gemini builder -- not shown here.
 
-- **No `CACHE_BREAK_MARKER`.** Gemini uses implicit caching only;
-  there's nothing to split on. The whole text is the stable prefix
-  passed as `system_instruction` on every call.
+## Template
 
-The whole returned string is intended to be passed as the
-`system_instruction` parameter on `GeminiClient.generate()`. The
-existing `_generate_impl` at apps/llm/client.py:717 already routes
-the `system_prompt` argument into `system_instruction`, so no
-client-side change is needed for this Phase.
+Interpolation tokens (single `{braces}`) are substituted at session start: `{tutor_name}`, `{institution_name}`, `{locale_context}`, `{language}`, `{grade_level}`, `{safety_prompt}`. Unknown tokens render as empty strings via `defaultdict(str)`.
 
-Per the gemini-tutor-prompt skill (companion doc), Gemini-native
-tutoring also needs:
-  - Temperature default 1.0 (NOT the Anthropic [0.1, 0.3] clamp).
-    Handled at ModelConfig level, not here.
-  - `tool_config.function_calling_config.mode = ANY/NONE` for tool
-    forcing / hiding. Phase 2b — not in this module.
-  - OpenAPI subset for tool schemas. Phase 2b.
-"""
-
-from __future__ import annotations
-
-from typing import Optional
-
-from .base import StablePrefixContext, TutorPromptBuilder
-
-
-GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE = """## Role
+```text
+## Role
 
 You are {tutor_name}, an AI tutor for secondary school students at
 {institution_name} ({locale_context}). You teach in {language} at
@@ -207,61 +174,5 @@ CURRENT STEP block. Don't predict or jump ahead.
 ---
 
 Based on the rules and the per-turn context above, respond to the
-student's message that follows."""
-
-
-class GeminiTutorPromptBuilder(TutorPromptBuilder):
-    """Gemini-native tutor prompt builder.
-
-    Returns the stable prefix as a single string. The caller (the
-    tutor engine) passes the returned string as `system_prompt` to
-    `GeminiClient.generate()`, which routes it to Gemini's
-    `system_instruction` parameter — exactly the separation Google
-    documents as best practice.
-
-    PromptPack overrides (institution-scoped custom prompts) take
-    precedence when present. The override is treated as
-    provider-agnostic raw text — same as the Anthropic builder — so
-    institutions don't have to maintain a separate Gemini variant.
-    """
-
-    def build_stable_prefix(
-        self,
-        ctx: StablePrefixContext,
-        prompt_pack_override: Optional[str] = None,
-        *,
-        subject_pack: str = 'general',
-    ) -> str:
-        if prompt_pack_override and prompt_pack_override.strip():
-            template = prompt_pack_override
-            injection = ""
-        else:
-            # Deploy-time variant selection via TUTOR_PROMPT_VARIANT env
-            # var. Unset / 'baseline' / 'v3' returns the production
-            # GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE unchanged (current
-            # behaviour, markdown-formatted ~6k chars); 'v6' / 'v7'
-            # substitute the unified template from
-            # apps/tutoring/prompts/variants.py (XML-tagged ~9-11k
-            # chars -- A/B-tested as Gemini-compatible). See
-            # variants.py for the full registry + selection rules.
-            from .variants import get_active_variant_template
-            template = get_active_variant_template(
-                baseline=GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE,
-            )
-            from .injections import get_subject_injection
-            injection = get_subject_injection(subject_pack, "google")
-
-        # Same interpolation behaviour as the Anthropic builder so
-        # PromptPack overrides written against {placeholder} tokens
-        # work uniformly across providers. Missing tokens render as
-        # empty strings instead of raising.
-        from collections import defaultdict
-        template_vars = defaultdict(str, {
-            "institution_name": ctx.institution_name,
-            "locale_context": ctx.locale_context,
-            "tutor_name": ctx.tutor_name,
-            "language": ctx.language,
-            "grade_level": ctx.grade_level,
-            "safety_prompt": ctx.safety_prompt,
-        })
-        return template.format_map(template_vars) + injection
+student's message that follows.
+```

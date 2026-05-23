@@ -1,37 +1,25 @@
-"""Anthropic-shaped tutor prompt builder.
+# v3 baseline -- Anthropic (production)
 
-Holds the XML-tagged system prompt template that Claude (Opus 4.7 in
-production) was tuned against. The shape preserves what was previously
-inlined in `apps.tutoring.conversational_tutor`:
+## Provenance
 
-- `{placeholder}` tokens interpolated via `str.format_map` against a
-  `defaultdict(str, ...)` so missing fields render as empty strings
-  instead of raising.
-- The whole block is the STABLE prefix for Anthropic prompt caching;
-  the dynamic per-turn suffix (figure_facts, regen, bank_grade,
-  scaffolding directive, etc.) is appended by the caller AFTER the
-  `CACHE_BREAK_MARKER` sentinel.
+- **Source**: `apps/tutoring/prompts/anthropic.py:34`
+- **Constant**: `TUTOR_SYSTEM_PROMPT_TEMPLATE`
+- **Size**: 23,084 chars  ~5,771 tokens  460 lines
 
-Per the provider-specific tutor prompt system plan
-(`memory/provider_specific_prompt_system_plan.md`, task #229), this
-module is paired with sibling `gemini.py` and `openai.py` builders
-that ship later.
+## What this is
 
-Phase 1: extracted from `conversational_tutor.py:98-605`. Behaviour
-preserved bit-for-bit. The re-export in `conversational_tutor.py`
-keeps `from apps.tutoring.conversational_tutor import TUTOR_SYSTEM_PROMPT_TEMPLATE`
-working for legacy tests + apps/llm/prompts.py.
-"""
+The production Claude-shaped prompt currently shipping on `main`. ~460 lines of XML-tagged constraints with internal contradictions (40-word cap vs worked-example scaffolding) -- see `design/SCIENCE_LEARNING_AUDIT_v3.md` H2. This is the prompt v4 was a rewrite of, and the implicit "control" against which v4/v5/v6 are compared in the A/B cycles.
 
-from __future__ import annotations
+## Notes
 
-from collections import defaultdict
-from typing import Optional
+Subject-pack injection (`apps/tutoring/prompts/injections/math.py` or `general.py`) is appended after this template by the builder -- not shown here.
 
-from .base import StablePrefixContext, TutorPromptBuilder
+## Template
 
+Interpolation tokens (single `{braces}`) are substituted at session start: `{tutor_name}`, `{institution_name}`, `{locale_context}`, `{language}`, `{grade_level}`, `{safety_prompt}`. Unknown tokens render as empty strings via `defaultdict(str)`.
 
-TUTOR_SYSTEM_PROMPT_TEMPLATE = """<system_prompt>
+```text
+<system_prompt>
 
 <identity>
 You are a friendly, encouraging tutor for secondary school students at
@@ -490,60 +478,5 @@ a different approach -- no rush."
   list them explicitly or rephrase as an open-ended question instead.
 </format_rules>
 
-</system_prompt>"""
-
-
-class AnthropicTutorPromptBuilder(TutorPromptBuilder):
-    """Anthropic builder — preserves the historical
-    `TUTOR_SYSTEM_PROMPT_TEMPLATE` shape exactly.
-
-    The XML tags, persona priming, negative phrasings, and rule
-    structure all stay verbatim. Phase 1 is a pure extraction — the
-    Gemini and OpenAI builders that ship later reshape this content
-    for their providers.
-    """
-
-    def build_stable_prefix(
-        self,
-        ctx: StablePrefixContext,
-        prompt_pack_override: Optional[str] = None,
-        *,
-        subject_pack: str = 'general',
-    ) -> str:
-        """Interpolate the stable prefix template + append the
-        subject-specific injection.
-
-        PromptPack override (institution-scoped raw prompt) takes
-        precedence over the default template when present and
-        SUPPRESSES the subject injection (the override is assumed
-        to be a complete prompt). Missing interpolation tokens
-        render as empty strings via `defaultdict(str, ...)` —
-        preserves the behaviour of the original
-        `_build_system_prompt` call site.
-        """
-        if prompt_pack_override and prompt_pack_override.strip():
-            template = prompt_pack_override
-            injection = ""
-        else:
-            # Deploy-time variant selection via TUTOR_PROMPT_VARIANT env
-            # var. Unset / 'baseline' / 'v3' returns the production
-            # TUTOR_SYSTEM_PROMPT_TEMPLATE unchanged (current behaviour);
-            # 'v6' / 'v7' substitute the unified template from
-            # apps/tutoring/prompts/variants.py. See variants.py for
-            # the full registry + selection rules.
-            from .variants import get_active_variant_template
-            template = get_active_variant_template(
-                baseline=TUTOR_SYSTEM_PROMPT_TEMPLATE,
-            )
-            from .injections import get_subject_injection
-            injection = get_subject_injection(subject_pack, "anthropic")
-
-        template_vars = defaultdict(str, {
-            "institution_name": ctx.institution_name,
-            "locale_context": ctx.locale_context,
-            "tutor_name": ctx.tutor_name,
-            "language": ctx.language,
-            "grade_level": ctx.grade_level,
-            "safety_prompt": ctx.safety_prompt,
-        })
-        return template.format_map(template_vars) + injection
+</system_prompt>
+```

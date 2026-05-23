@@ -181,7 +181,7 @@ class Command(BaseCommand):
         Membership.objects.update_or_create(
             user=teacher,
             institution=institution,
-            defaults={'role': Membership.Role.TEACHER, 'is_active': True}
+            defaults={'role': Membership.Role.STAFF, 'is_active': True}
         )
         
         # Student
