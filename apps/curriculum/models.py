@@ -726,6 +726,129 @@ class SeychellesContext(models.Model):
         return f"[{self.get_category_display()}] {self.title}"
 
 
+# ─── Curriculum knowledge base — pgvector replacement for ChromaDB ─────
+# Each row is a chunk (curriculum text, exam question, figure caption,
+# teaching material excerpt) with a sentence-transformers embedding
+# stored in a pgvector ``vector(384)`` column on Postgres (TEXT on
+# SQLite). See memory/pgvector_migration_plan.md for the full design.
+import hashlib  # noqa: E402
+
+from apps.curriculum.vector_field import VectorField  # noqa: E402
+
+
+class CurriculumChunk(models.Model):
+    """One semantically-searchable curriculum chunk.
+
+    Backs ``CurriculumKnowledgeBase`` on Postgres + pgvector. Replaces
+    the per-institution ChromaDB collections that lived under
+    ``media/vectordb/institution_<N>/``.
+
+    Embedding model: sentence-transformers ``all-MiniLM-L6-v2`` (384 d).
+    Distance metric: cosine (HNSW index built with ``vector_cosine_ops``
+    in the migration). Same model + metric as the pre-migration
+    ChromaDB, so existing vectors carry over without re-embedding.
+
+    Multi-tenancy: every chunk has ``institution_id``. ``0`` is the
+    normalised "platform-wide" bucket (matches the
+    ``GLOBAL_INSTITUTION_ID = 0`` convention used by the previous
+    ChromaDB path layout). The KB layer's two-tier query
+    (``query_with_global_fallback``) unions per-institution + global
+    hits, weights, and dedupes by content hash.
+    """
+
+    # ── Content + embedding ──────────────────────────────────────────
+    content = models.TextField(
+        help_text="The chunk text. Used as the source for embeddings + as the retrieved evidence string."
+    )
+    embedding = VectorField(
+        dimensions=384,
+        help_text="sentence-transformers all-MiniLM-L6-v2 vector. ``text`` column on SQLite (no vector ops)."
+    )
+    # SHA-256 of content. Combined with institution_id forms the dedup
+    # key — re-indexing the same source file replaces (rather than
+    # duplicates) existing chunks.
+    content_hash = models.CharField(max_length=64, db_index=True)
+
+    # ── Scoping ──────────────────────────────────────────────────────
+    institution_id = models.IntegerField(
+        db_index=True,
+        help_text="0 = platform-wide (normalised). Otherwise an accounts.Institution PK. Not a FK — kept loose so chunks survive institution deletes."
+    )
+
+    # ── Common chunk metadata (set on every chunk) ───────────────────
+    subject = models.CharField(max_length=100, blank=True, default='')
+    grade_level = models.CharField(max_length=64, blank=True, default='')
+    section = models.CharField(max_length=512, blank=True, default='')
+    chunk_type = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text="content / objective / teaching_strategy / assessment / general / exam_question / marking_scheme / figure_description"
+    )
+    source_file = models.CharField(max_length=512, blank=True, default='')
+    upload_id = models.IntegerField(
+        null=True, blank=True, db_index=True,
+        help_text="dashboard.TeachingMaterialUpload or curriculum.CurriculumUpload PK. Loose link."
+    )
+
+    # ── Teaching-material extras ─────────────────────────────────────
+    source_type = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text="teaching_material / question_bank / curriculum"
+    )
+    material_type = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text="textbook / worksheet / question_bank / reference / notes / other"
+    )
+    material_title = models.CharField(max_length=512, blank=True, default='')
+
+    # ── Question-bank extras ─────────────────────────────────────────
+    question_number = models.IntegerField(null=True, blank=True)
+    question_type = models.CharField(max_length=32, blank=True, default='')
+    has_answers = models.BooleanField(default=False)
+    year = models.CharField(max_length=16, blank=True, default='')
+    paper_number = models.CharField(max_length=64, blank=True, default='')
+
+    # ── Figure extras ────────────────────────────────────────────────
+    figure_type = models.CharField(max_length=64, blank=True, default='')
+    figure_page = models.IntegerField(null=True, blank=True)
+    figure_number = models.CharField(max_length=64, blank=True, default='')
+    figure_image_url = models.URLField(max_length=1024, blank=True, default='')
+
+    # ── Timestamps ───────────────────────────────────────────────────
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            # Re-indexing the same content for the same institution
+            # updates instead of inserting. Aligned with ChromaDB's
+            # upsert-by-id semantics in the previous implementation.
+            models.UniqueConstraint(
+                fields=['institution_id', 'content_hash'],
+                name='curriculum_chunk_unique_per_institution',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['institution_id', 'chunk_type'],
+                         name='cchunk_inst_type_idx'),
+            models.Index(fields=['institution_id', 'subject', 'grade_level'],
+                         name='cchunk_inst_subj_grade_idx'),
+            # HNSW index on ``embedding`` is added in a follow-up RunSQL
+            # operation in the migration — Django's index DSL can't
+            # express pgvector's ``USING hnsw (... vector_cosine_ops)``
+            # form, and the index must be skipped on SQLite anyway.
+        ]
+
+    def __str__(self):
+        return (
+            f"CurriculumChunk(inst={self.institution_id} "
+            f"type={self.chunk_type!r} len={len(self.content)})"
+        )
+
+    @staticmethod
+    def compute_hash(content: str) -> str:
+        return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+
 # ─── Content-quality benchmark models (Q5) ─────────────────────────────
 # Lives in a separate module for clarity but imported here so Django
 # discovers it via the curriculum app's models package.
