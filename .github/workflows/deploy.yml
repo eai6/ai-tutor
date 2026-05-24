@@ -179,10 +179,12 @@ jobs:
           # GitHub rejecting the first commit.
           fetch-depth: 0
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          # Match Dockerfile (python:3.12-slim) — requirements.txt pins
+          # Django 6.0.2 which requires Python >= 3.12.
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Install Python deps
