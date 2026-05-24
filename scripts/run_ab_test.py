@@ -82,6 +82,13 @@ else:  # deploy (lean)
     ]
     PERSONAS = ['error_prone']
 
+# Optional env-var override for personas — useful for ad-hoc focused
+# runs like "all lessons × error_prone only" without editing constants.
+# Set EVAL_PERSONAS=error_prone (or comma-separated list) to narrow.
+_personas_override = os.environ.get('EVAL_PERSONAS', '').strip()
+if _personas_override:
+    PERSONAS = [p.strip() for p in _personas_override.split(',') if p.strip()]
+
 OUT_DIR = Path(os.environ.get('AB_REPORT_DIR', 'ab-test-reports'))
 RESULTS_JSONL = OUT_DIR / 'cell_results.jsonl'
 TRANSCRIPTS_DIR = OUT_DIR / 'raw_transcripts'
