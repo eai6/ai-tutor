@@ -107,11 +107,33 @@ ORM approach: two `.annotate(distance=CosineDistance('embedding', query_vec))` q
 - Compare BEA + 10p numbers to last known good (`eval-reports/larger-eval-2026-05-23.md`). Within ±10pp lenient is OK.
 
 ### Phase 9 — Ship + monitor (Task #9)
-- Open PR. Get approval, admin-merge.
-- After deploy: shell into Container App, run `port_chromadb_to_pgvector` against `/app/media/vectordb`.
+- Open PR. Get approval (Roy review), admin-merge.
+- After deploy: shell into Container App, run `port_chromadb_to_pgvector` against `/app/media/vectordb`. Note: this command imports chromadb at runtime, so the running container needs chromadb temporarily reinstalled, OR run the port from a one-off image with `chromadb==1.5.0` pinned.
 - Verify `CurriculumChunk.objects.count()` matches expected (~470+).
 - Trigger one manual tutor session via dashboard, confirm RAG retrieval returns results.
+- Watch `[KB] inheritance OK` log lines in containerapp logs from live sessions.
 - Watch the post-deploy-eval workflow output for the next commit.
+
+### Phase 10 — Recover uploads with lost vectors
+
+The ChromaDB `/tmp/vectordb` workaround silently lost writes on container restart since the last good snapshot in `/app/media/vectordb`. After the port:
+
+1. **Audit coverage** — read-only report:
+   ```bash
+   python manage.py audit_kb_coverage
+   ```
+   Compares each `TeachingMaterialUpload.chunks_created` (Postgres, durable) against `CurriculumChunk.objects.filter(upload_id=u.id).count()` (post-port). Flags any upload with `actual/expected < 0.5`.
+
+2. **Reset row state** — flip flagged uploads back to `status='pending'`:
+   ```bash
+   python manage.py reset_lost_materials --dry-run
+   python manage.py reset_lost_materials  # write
+   ```
+   Does NOT re-run the indexer. Just resets row state so the existing dashboard "Process materials" button picks them up. Source files (PDF/DOCX) live on the persistent Azure Files mount so they're still re-processable.
+
+3. **Trigger from the dashboard** — open each affected course in the dashboard and click "Process materials". The well-tested job-dispatch / mode-routing / progress-tracking path handles the re-index. Local embeddings → zero API cost.
+
+Rationale for the "reset state, don't auto-re-index" choice: the platform-button path is the well-tested orchestration. Avoiding a parallel CLI re-runner keeps observability and audit-log integrity in the existing flow. See `auto-memory/feedback_prefer_state_reset_over_cli_automation.md`.
 
 ## Acceptance criteria
 
