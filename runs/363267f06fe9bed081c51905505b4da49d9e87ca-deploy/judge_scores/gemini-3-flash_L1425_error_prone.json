@@ -1,0 +1,536 @@
+{
+  "transcript": "gemini-3-flash_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 108.14925360679626,
+  "tokens_in": 7915,
+  "tokens_out": 9101,
+  "n_tutor_turns_in_transcript": 27,
+  "scores": {
+    "active_learning": {
+      "score": 3,
+      "evidence": "Session is mostly MCQ practice with brief tutor explanations; student is doing more than reading, e.g., turns 182, 186, 188, 190."
+    },
+    "direct_instruction_active_practice": {
+      "score": 3,
+      "evidence": "Each explanation is followed by a new question (e.g., turn 158 explanation \u2192 new MCQ), though some turns stack two tutor messages back-to-back (149\u2192150, 152\u2192153)."
+    },
+    "deliberate_practice": {
+      "score": 2,
+      "evidence": "On repeated student errors (turns 161, 163, 165, 167), tutor recycles essentially the same MCQ with reshuffled options instead of varying the skill demand."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "Tutor jumped from scale-identification to scale-calculation (turn 179) even though student had only just gotten one correct answer (174); later remediation in 191 is good."
+    },
+    "cognitive_load": {
+      "score": 3,
+      "evidence": "Turn 187 nicely breaks 120,000 cm \u2192 km into two steps, but earlier turns mixed scale denominator + detail + zoom metaphor simultaneously."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Calculation segment (179+) layers on the scale-detail concept just mastered, linking 'large/small scale' to numeric scale ratios."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "Large-scale vs small-scale (easily confused) are treated together but tutor explicitly contrasts them (turn 173: 'small-scale maps are the opposite')."
+    },
+    "interleaving": {
+      "score": 2,
+      "evidence": "Most of session is the same 'which map shows most detail' template repeated (flags: same_template_repeat at 160, 164); little variation until turn 179."
+    },
+    "testing_effect": {
+      "score": 3,
+      "evidence": "Tutor asks before telling and avoids leaking answers in most turns (e.g., 162, 168 give metaphor not answer)."
+    },
+    "targeted_remediation": {
+      "score": 2,
+      "evidence": "After many wrong answers on scale/detail, tutor recycles near-identical MCQs (turns 160, 164, 166) rather than diagnosing the prereq confusion about 'large/small scale' terminology."
+    }
+  },
+  "strongest_behaviors": [
+    "Decomposing the unit-conversion error into two smaller steps in turn 187 (120,000 cm \u2192 m \u2192 km).",
+    "Consistent use of concrete metaphors ('zoom in', 'camera', 'magnifying glass') to anchor scale concepts."
+  ],
+  "weakest_behaviors": [
+    "Recycling the same MCQ template repeatedly after errors instead of diagnosing the underlying 'large vs small scale' vocabulary confusion.",
+    "Treating student's off-script questions (e.g., turn 151, 157, 177, 180) as if the student were the tutor \u2014 tutor answers them rather than redirecting to the current learning goal."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid recycling near-identical MCQs after errors",
+      "rationale": "After turns 161, 163, 165 wrong answers, the tutor reposted essentially the same question with reshuffled options, which is not deliberate practice.",
+      "evidence_quote": "Which of these maps would show the most detail, such as individual buildings and street names? A) A large-scale map of Victoria city ...",
+      "evidence_turn": "166",
+      "suggested_prompt_edit": "After a wrong answer, you MUST diagnose the specific misconception (e.g., 'large-scale' vocabulary) and present a DIFFERENT question type (definition recall, true/false, or worked example) rather than reshuffling the same MCQ options.",
+      "expected_effect": "Breaks loops; targets the actual prereq gap rather than guessing.",
+      "severity": "high"
+    },
+    {
+      "title": "Handle role-reversal student turns",
+      "rationale": "Multiple times the student posts a question (151, 157, 177, 180) as if they were the tutor; the tutor answers it instead of redirecting.",
+      "evidence_quote": "Which part of a map helps you find out which direction is North?",
+      "evidence_turn": "151",
+      "suggested_prompt_edit": "If the student's turn is itself a question or echoes a tutor-style prompt, do NOT answer it. Acknowledge briefly and redirect: 'Good question \u2014 but first, let's finish: [restate current question].'",
+      "expected_effect": "Keeps session on the learning objective; prevents derailment.",
+      "severity": "high"
+    },
+    {
+      "title": "Diagnose vocabulary confusion explicitly",
+      "rationale": "Student repeatedly fails on 'large-scale' vs 'small-scale' (turns 154, 159, 161, 163, 167, 172). Tutor never pauses to teach the term directly.",
+      "evidence_quote": "Not quite\u2014a hiking trail is a small area, so it's \"zoomed in\" and shows lots of detail.",
+      "evidence_turn": "173",
+      "suggested_prompt_edit": "After 2 errors on the same vocabulary, pause MCQs and present a worked definition with two contrasting examples side-by-side, then ask the student to state the definition back before resuming MCQs.",
+      "expected_effect": "Resolves the terminological bottleneck causing the loop.",
+      "severity": "high"
+    },
+    {
+      "title": "Gate progression on mastery, not turn count",
+      "rationale": "After only one correct identification (174), tutor jumped to scale calculations (179), a much harder skill.",
+      "evidence_quote": "If a map scale is 1:50,000 and the straight-line distance between two villages is 8 cm on the map, calculate the actual distance ...",
+      "evidence_turn": "179",
+      "suggested_prompt_edit": "Require at least 2 consecutive correct answers on the current sub-skill before introducing a new sub-skill type (identification \u2192 calculation).",
+      "expected_effect": "Prevents premature difficulty escalation.",
+      "severity": "medium"
+    },
+    {
+      "title": "Avoid double tutor turns",
+      "rationale": "Tutor frequently emits an explanation turn immediately followed by a separate MCQ turn (149\u2192150, 152\u2192153, 155\u2192156, 175\u2192176), splitting instruction from practice.",
+      "evidence_quote": "On a map of the whole world, a city like Victoria is just a tiny dot! ... Try this:",
+      "evidence_turn": "149",
+      "suggested_prompt_edit": "Each tutor turn must contain BOTH the feedback/explanation AND the next question in a single message. Never emit two consecutive tutor messages.",
+      "expected_effect": "Cleaner pacing; one idea \u2192 one student action.",
+      "severity": "medium"
+    },
+    {
+      "title": "Calibrate hints \u2014 don't reveal full method on first try",
+      "rationale": "On the very first calculation (180), tutor solved the entire problem rather than letting student attempt.",
+      "evidence_quote": "To find the real distance, multiply the map distance by the scale number: 5 cm \u00d7 1000 = 5000 cm. Since 100 cm = 1 meter, the road is 50 meters long!",
+      "evidence_turn": "181",
+      "suggested_prompt_edit": "When the student poses a question or offers a worked example, prompt them to attempt first; only give the method, not the numeric answer, on first response.",
+      "expected_effect": "Restores retrieval practice and avoids answer reveals.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect and break MCQ repetition loops",
+      "rationale": "Engine flagged same_template_repeat at 160 and 164 but kept going.",
+      "evidence_quote": "[flags: truncated,same_template_repeat]",
+      "evidence_turn": "164",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Forces a router switch to a different question type or prereq remediation after N repeats.",
+      "severity": "high"
+    },
+    {
+      "title": "Prereq routing on persistent error",
+      "rationale": "Three+ consecutive errors on 'detail vs scale' should route to a definition micro-lesson, not another MCQ.",
+      "evidence_quote": "a map of the entire indian ocean",
+      "evidence_turn": "167",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Targeted remediation instead of recycled items.",
+      "severity": "high"
+    },
+    {
+      "title": "Truncation handling",
+      "rationale": "Many tutor turns are flagged truncated (147, 155, 162, 168, 183), sometimes cutting off the actual question.",
+      "evidence_quote": "[flags: truncated]",
+      "evidence_turn": "183",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Ensures the student actually sees the practice item.",
+      "severity": "high"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Acknowledge student's persistence",
+      "rationale": "Student visibly works through confusion in turn 170 ('ohh, wait what?...') with no warm acknowledgement.",
+      "evidence_quote": "ohh, wait what? the indian ocean is big.",
+      "evidence_turn": "170",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Sustains motivation for an error-prone learner.",
+      "severity": "low"
+    },
+    {
+      "title": "Shorter, friendlier error feedback",
+      "rationale": "Some error responses are dense paragraphs; brief, gentle correction works better for repeated errors.",
+      "evidence_quote": "Think of it like a camera: if you take a photo of the whole of Africa from space...",
+      "evidence_turn": "162",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces affective load when student is already struggling.",
+      "severity": "low"
+    }
+  ],
+  "overall_summary": "The session covers map scale and detail with MCQ practice and reasonable metaphors, but is undermined by a long loop where the tutor recycles the same 'which map shows most detail' question after each wrong answer instead of diagnosing the student's 'large/small scale' vocabulary confusion. The tutor also fails to handle role-reversal turns (student posing tutor-style questions), answers a student-posed problem outright instead of prompting retrieval, and escalates to scale calculations before mastery. The strongest moment is decomposing the cm\u2192m\u2192km conversion into two steps in turn 187. Key fixes are forbidding template repetition, adding role-reversal handling, and gating progression on demonstrated mastery.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "145",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn, no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "147",
+      "preceding_student_turn_id": "146",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 146 is filler/non-answer ('i will wait for the student's response').",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "149",
+      "preceding_student_turn_id": "148",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student picked 'a map of the whole world' for most detail; opposite of correct.",
+      "tutor_excerpt": "On a map of the whole world, a city like Victoria is just a tiny dot!",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Identifies the wrong choice and explains why; next action implied ('Try this:') but the follow-up question is in a separate turn."
+    },
+    {
+      "tutor_turn_id": "150",
+      "preceding_student_turn_id": "148",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Same as 148 \u2014 second tutor turn following one student error.",
+      "tutor_excerpt": "A street map of Victoria (scale 1:5,000) and a national map of Seychelles ...",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "This turn just poses a new (harder) MCQ without addressing the mistake itself; actionable but doesn't locate or identify the prior error."
+    },
+    {
+      "tutor_turn_id": "152",
+      "preceding_student_turn_id": "151",
+      "student_made_mistake": false,
+      "skip_reason": "Student asked an off-topic question rather than making a mistake on the current item.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "153",
+      "preceding_student_turn_id": "151",
+      "student_made_mistake": false,
+      "skip_reason": "Follow-on MCQ to an off-topic student question; not addressing a mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "155",
+      "preceding_student_turn_id": "154",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 'a map of the indian ocean' for characteristic of a large-scale map.",
+      "tutor_excerpt": "Not quite\u2014the Indian Ocean is a huge area, so a map of it would be small-scale and show very little detail.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Clearly identifies and explains; truncated and follow-up question split to next turn."
+    },
+    {
+      "tutor_turn_id": "156",
+      "preceding_student_turn_id": "154",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Same student error \u2014 second consecutive tutor turn.",
+      "tutor_excerpt": "What does a map scale of 1:25,000 tell us?",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "Yes",
+      "rationale": "Just a new MCQ with no link to the previous mistake."
+    },
+    {
+      "tutor_turn_id": "158",
+      "preceding_student_turn_id": "157",
+      "student_made_mistake": false,
+      "skip_reason": "Student posed a question rather than answered; tutor treats it as a correct response.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "160",
+      "preceding_student_turn_id": "159",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 'a thematic map of global rainfall' instead of 'a large-scale map of a hiking trail'.",
+      "tutor_excerpt": "A global map covers the whole Earth, so it can't show small details like trees or paths.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Addresses the wrong choice and presents next item, though same template."
+    },
+    {
+      "tutor_turn_id": "162",
+      "preceding_student_turn_id": "161",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student picked 'continent of Africa' for most detail.",
+      "tutor_excerpt": "Think of it like a camera: if you take a photo of the whole of Africa from space, you can't see any houses.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Good metaphor and follow-up question; doesn't diagnose recurring confusion though."
+    },
+    {
+      "tutor_turn_id": "164",
+      "preceding_student_turn_id": "163",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student again chose 'whole world' for most detail.",
+      "tutor_excerpt": "On a world map, the whole of Seychelles is just a tiny speck\u2014you definitely couldn't see any streets!",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Guidance is correct but essentially the same as previous corrections; doesn't escalate to prereq remediation."
+    },
+    {
+      "tutor_turn_id": "166",
+      "preceding_student_turn_id": "165",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 165 is filler ('i will wait for the student's response') \u2014 not a substantive answer.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "168",
+      "preceding_student_turn_id": "167",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 'entire Indian Ocean' for most detail.",
+      "tutor_excerpt": "The Indian Ocean is so big that a house would be too small to see on a map of it!",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Identifies the error and gives metaphor; truncated and follow-up MCQ in separate turn."
+    },
+    {
+      "tutor_turn_id": "169",
+      "preceding_student_turn_id": "167",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Continuation of same student error in 167.",
+      "tutor_excerpt": "If you are planning to navigate between islands in the Seychelles ...",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Poses a new contextual MCQ but doesn't add diagnosis of the mistake."
+    },
+    {
+      "tutor_turn_id": "171",
+      "preceding_student_turn_id": "170",
+      "student_made_mistake": false,
+      "skip_reason": "Student in 170 reasons aloud and arrives at the correct answer (large-scale map of Victoria city); tutor affirms.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "173",
+      "preceding_student_turn_id": "172",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose a hiking trail (small area, large-scale) as a small-scale map.",
+      "tutor_excerpt": "Not quite\u2014a hiking trail is a small area, so it's \"zoomed in\" and shows lots of detail. Remember: small-scale maps are the opposite ...",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Strong identification, contrast, and clear next step (try again with same options)."
+    },
+    {
+      "tutor_turn_id": "175",
+      "preceding_student_turn_id": "174",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (B world map = small-scale).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "176",
+      "preceding_student_turn_id": "174",
+      "student_made_mistake": false,
+      "skip_reason": "Correct prior answer; this turn moves to a new question.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "178",
+      "preceding_student_turn_id": "177",
+      "student_made_mistake": false,
+      "skip_reason": "Student in 177 posed their own MCQ; tutor incorrectly treats it as if student had answered the prior question.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "179",
+      "preceding_student_turn_id": "177",
+      "student_made_mistake": false,
+      "skip_reason": "New question turn following off-script student turn; not addressing a mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "181",
+      "preceding_student_turn_id": "180",
+      "student_made_mistake": false,
+      "skip_reason": "Student didn't make a mistake \u2014 they posed their own problem; tutor answers it (worth noting as a coaching issue but not a BEA mistake-remediation case).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "183",
+      "preceding_student_turn_id": "182",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 600 cm instead of 6000 cm \u2014 multiplication error (3 \u00d7 2000).",
+      "tutor_excerpt": "Not quite\u2014check your multiplication. You need to multiply the 3 cm on the map by the full 2,000 from the scale.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clearly points to the multiplication step and what to do."
+    },
+    {
+      "tutor_turn_id": "185",
+      "preceding_student_turn_id": "184",
+      "student_made_mistake": false,
+      "skip_reason": "Student self-corrected and then posed a new problem; tutor confirms and moves on.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "187",
+      "preceding_student_turn_id": "186",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 12 km instead of 1.2 km \u2014 conversion error from cm to km.",
+      "tutor_excerpt": "Close! You correctly found 120,000 cm. Let's break the conversion into two smaller steps to make it easier.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Excellent: locates the step that went wrong and scaffolds it into smaller steps."
+    },
+    {
+      "tutor_turn_id": "189",
+      "preceding_student_turn_id": "188",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (1,200 m).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "191",
+      "preceding_student_turn_id": "190",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 12 km instead of 1.2 km for converting 1,200 m to km.",
+      "tutor_excerpt": "Not quite. Remember, 1,000 meters makes exactly 1 kilometer. Since 1,200 is just a little bit more than 1,000, the answer should be just a little bit more than 1.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Strong estimation hint plus a clear retry with the same question."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 27,
+    "n_in_scope": 13,
+    "coverage_rate": 0.48148148148148145,
+    "mistake_identification_exact": 0.7692307692307693,
+    "mistake_identification_lenient": 0.7692307692307693,
+    "mistake_location_exact": 0.7692307692307693,
+    "mistake_location_lenient": 0.7692307692307693,
+    "providing_guidance_exact": 0.6923076923076923,
+    "providing_guidance_lenient": 0.9230769230769231,
+    "actionability_exact": 0.7692307692307693,
+    "actionability_lenient": 1.0,
+    "overall_exact_pass_rate": 0.75,
+    "overall_lenient_pass_rate": 0.8653846153846154,
+    "strict_pass_rate": 0.46153846153846156,
+    "lenient_pass_rate": 0.7692307692307693
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "transcript": "sonnet-4_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 146.38600707054138,
+  "tokens_in": 9662,
+  "tokens_out": 12107,
+  "n_tutor_turns_in_transcript": 36,
+  "parse_error": "JSONDecodeError: Expecting ',' delimiter: line 37 column 69 (char 4764)",
+  "raw_response_head": "{\n  \"scores\": {\n    \"active_learning\": {\"score\": 3, \"evidence\": \"Session is mostly MCQ-based with student responses, but the student frequently hijacks the flow by asking their own questions (turns 56, 63, 72, 75, 78, 81, 89, 95, 98) and the tutor answers them rather than insisting student does the work.\"},\n    \"direct_instruction_active_practice\": {\"score\": 3, \"evidence\": \"Tutor generally pairs explanation with a follow-up MCQ (e.g., turns 54\u219255, 82\u219283), but several tutor turns provide explanat"
+}
