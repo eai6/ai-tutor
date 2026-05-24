@@ -36,6 +36,19 @@ on:
           - 'anthropic/claude-opus-4-7'                   # Opus 4.7 (premium)
           - 'google/gemini-3-flash-preview'               # Flash (cheapest)
           - 'google/gemini-3.1-pro-preview'               # Pro (premium)
+      skip_eval:
+        description: 'Skip the post-deploy tutor evaluation (saves ~$5 and ~15 min)'
+        required: false
+        type: boolean
+        default: false
+      eval_matrix_mode:
+        description: 'Eval matrix size: deploy=4 cells (Sonnet+Gemini × 2 lessons × error_prone, ~$15, ~25 min) · full=24 cells (Sonnet+Gemini × 4 lessons × all 3 personas, ~$60, ~100 min)'
+        required: false
+        type: choice
+        default: 'deploy'
+        options:
+          - deploy
+          - full
 
 env:
   ACR: ${{ secrets.ACR_LOGIN_SERVER }}
@@ -115,3 +128,136 @@ jobs:
             --set-env-vars \
               "TUTOR_PROMPT_VARIANT=${{ steps.cfg.outputs.prompt_variant }}" \
               "TUTOR_MODEL_OVERRIDE=${{ steps.cfg.outputs.model_override }}"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Post-deploy tutor evaluation
+  # ─────────────────────────────────────────────────────────────────
+  #
+  # Runs after a successful deploy: spins up a fresh local SQLite,
+  # loads a frozen curriculum fixture (L1137 math + L1425 geography),
+  # drives the synthetic-student simulator against the tutor engine,
+  # judges every transcript with Opus 4.7 against the 10-principle
+  # Science-of-Learning rubric, and commits a markdown report to the
+  # long-lived `eval-reports` branch under `runs/<sha>/`.
+  #
+  # `deploy` matrix mode (default): {Sonnet 4, Gemini 3 Flash} × 2
+  #   lessons (1 math + 1 geo) × `error_prone` persona = 4 cells,
+  #   ~25 min, ~$15/run. Optimised for BEA signal per dollar:
+  #   error_prone produces 12-17 BEA in-scope turns per cell where
+  #   struggler/capable gave only 0-3. Both prod-tier models so we
+  #   catch cross-model regressions on every deploy.
+  # `full` matrix mode (ad-hoc): 2 models × 4 lessons × 3 personas
+  #   = 24 cells, ~100 min, ~$60. Use for comprehensive sweeps when
+  #   making a prompt-variant decision.
+  #
+  # Pre-requisites (one-time setup before this job can run green):
+  #   - Repo secrets ANTHROPIC_API_KEY, GOOGLE_API_KEY, OPENAI_API_KEY
+  #   - `eval-fixtures/baseline.json` committed (regenerate with
+  #     `python scripts/extract_eval_fixture.py`)
+  #
+  # Skip via workflow_dispatch input `skip_eval=true`.
+  post_deploy_eval:
+    name: Post-deploy tutor evaluation
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: ${{ success() && github.event.inputs.skip_eval != 'true' }}
+    timeout-minutes: 30
+    continue-on-error: true  # eval failures must not mark the deploy as failed
+    permissions:
+      contents: write  # push to the eval-reports branch
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_API_KEY:    ${{ secrets.GOOGLE_API_KEY }}
+      OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
+      EVAL_MATRIX_MODE:  ${{ github.event.inputs.eval_matrix_mode || 'deploy' }}
+      AB_REPORT_DIR:     /tmp/eval-out
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need full history so the orphan-branch push works without
+          # GitHub rejecting the first commit.
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Migrate fresh local SQLite + seed eval data
+        run: |
+          python manage.py migrate --no-input
+          python manage.py loaddata eval-fixtures/baseline.json
+          python scripts/seed_eval_modelconfig.py
+
+      - name: Run simulator (matrix mode = ${{ env.EVAL_MATRIX_MODE }})
+        run: python scripts/run_ab_test.py
+
+      - name: Run Opus 4.7 judge
+        run: python scripts/judge_transcripts.py
+
+      - name: Generate aggregate report
+        run: python scripts/generate_reports.py
+
+      - name: Commit report to eval-reports branch
+        env:
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          REL_DIR="runs/${SHA}-${EVAL_MATRIX_MODE}"
+
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+
+          # Switch to (or create) the eval-reports branch. The branch
+          # is long-lived and has no protection so CI can push directly.
+          if git ls-remote --exit-code --heads origin eval-reports >/dev/null 2>&1; then
+            git fetch origin eval-reports
+            git checkout -B eval-reports origin/eval-reports
+          else
+            git checkout --orphan eval-reports
+            git rm -rf . >/dev/null 2>&1 || true
+            cat <<'README' > README.md
+          # Eval reports — CI-generated tutor evaluations
+
+          Each commit on this branch is a tutor evaluation run captured by
+          `.github/workflows/deploy.yml::post_deploy_eval`. The run is
+          identified by the commit SHA of the main-branch deploy that
+          triggered it plus the matrix mode.
+
+          Layout:
+
+              runs/<sha>-<mode>/
+              ├── FINAL_REPORT.md      ← ranked prompt-edit recommendations
+              ├── summary.md           ← per-cell + per-principle tables
+              ├── cell_results.jsonl   ← raw programmatic metrics
+              ├── cost_latency.md
+              ├── per_cell/            ← full transcripts + judge evidence
+              └── judge_scores/        ← structured judge output
+
+          Run manually: GitHub Actions -> Deploy -> Run workflow
+          (uncheck `skip_eval`, optionally set `eval_matrix_mode=full`).
+
+          Companion human-written reviews live on `main` under
+          `eval-reports/`.
+          README
+            git add README.md
+            git commit -m "[post-deploy-eval] init eval-reports branch"
+          fi
+
+          mkdir -p "$REL_DIR"
+          cp -r "$AB_REPORT_DIR"/* "$REL_DIR"/
+
+          git add "$REL_DIR"
+          if git diff --staged --quiet; then
+            echo "::notice title=No eval changes::Nothing to commit"
+          else
+            git commit -m "[post-deploy-eval] ${SHA} mode=${EVAL_MATRIX_MODE}"
+            git push -u origin eval-reports
+            echo "::notice title=Eval report committed::eval-reports branch ${REL_DIR}"
+          fi
