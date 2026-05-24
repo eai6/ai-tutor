@@ -822,19 +822,38 @@ class CurriculumKnowledgeBase:
         subject: str,
         n_results: int = 5,
         grade_level: str = "",
+        course=None,
+        institution_boost: float = 0.7,
     ) -> List[Dict]:
-        """
-        Query ChromaDB for figure descriptions related to a topic.
+        """Retrieve figure descriptions matching ``topic`` from the institution
+        KB AND the global KB, merged by distance.
+
+        Inheritance model (parity with ``query_with_global_fallback``):
+        every school inherits the global figure library by default. The
+        institution's own indexed figures are **additive** — they layer on
+        top and are preferred by ``institution_boost`` (lower distance
+        multiplier ⇒ higher rank), but the global library is queried
+        unconditionally so a school that has no locally indexed figures
+        still sees platform-wide figures for the subject + grade.
+
+        Dedupe key: ``figure_image_url`` (same image re-indexed at both
+        tiers collapses to the institution copy).
 
         Args:
             topic: Topic to search for (e.g., lesson title)
             subject: Subject name for filtering
-            n_results: Max results to return
+            n_results: Max results to return after merge
             grade_level: Grade level for filtering (e.g., "S1"). Empty = all.
+            course: Optional Course context — when set with subject_code +
+                grade_levels, the global tier is restricted to chunks from
+                platform-wide courses matching that subject + grade. Same
+                semantics as ``query_with_global_fallback(course=...)``.
+            institution_boost: Multiplier on institution distances. < 1.0
+                prefers institution figures in the post-merge ranking.
 
         Returns:
-            List of dicts with description, figure_type, figure_number,
-            image_url, source_file
+            List of dicts with keys: description, figure_type, figure_number,
+            image_url, source_file, figure_page, source_tier.
         """
         if not self._storage_available:
             return []
@@ -852,34 +871,96 @@ class CurriculumKnowledgeBase:
                 grade_match = grade_list + ([grade_level] if len(grade_list) > 1 else []) + ['']
                 where_conditions.append({"grade_level": {"$in": grade_match}})
 
+        base_filter = {"$and": where_conditions}
+
+        from apps.curriculum.kb_storage import query_chunks
+
+        # --- Institution tier ---
         try:
-            from apps.curriculum.kb_storage import query_chunks
-            results = query_chunks(
+            inst_results = query_chunks(
                 institution_id=self.institution_id,
                 query_text=topic,
                 n_results=n_results,
-                where_filter={"$and": where_conditions},
+                where_filter=base_filter,
             )
         except Exception as e:
-            logger.warning(f"Figure description query failed: {e}")
-            return []
+            logger.warning(f"Figure description query (institution) failed: {e}")
+            inst_results = None
 
-        if not results or not results.get('documents') or not results['documents'][0]:
-            return []
+        merged: List[Dict] = []
+        seen_urls = set()
 
-        figures = []
-        for i, doc in enumerate(results['documents'][0]):
-            meta = results['metadatas'][0][i] if results.get('metadatas') else {}
-            figures.append({
+        def _append(doc: str, meta: Dict, raw_dist: float, tier: str, boost: float):
+            url = (meta or {}).get('figure_image_url', '')
+            if url and url in seen_urls:
+                return
+            if url:
+                seen_urls.add(url)
+            merged.append({
                 'description': doc,
-                'figure_type': meta.get('figure_type', ''),
-                'figure_number': meta.get('figure_number', ''),
-                'image_url': meta.get('figure_image_url', ''),
-                'source_file': meta.get('source_file', ''),
-                'figure_page': meta.get('figure_page', 0),
+                'figure_type': (meta or {}).get('figure_type', ''),
+                'figure_number': (meta or {}).get('figure_number', ''),
+                'image_url': url,
+                'source_file': (meta or {}).get('source_file', ''),
+                'figure_page': (meta or {}).get('figure_page', 0),
+                'distance': raw_dist * boost,
+                'raw_distance': raw_dist,
+                'source_tier': tier,
             })
 
-        return figures
+        if inst_results and inst_results.get('documents') and inst_results['documents'][0]:
+            docs = inst_results['documents'][0]
+            metas = inst_results.get('metadatas', [[]])[0] or [{}] * len(docs)
+            dists = inst_results.get('distances', [[]])[0] or [1.0] * len(docs)
+            for doc, meta, dist in zip(docs, metas, dists):
+                _append(doc, meta, dist, 'institution', institution_boost)
+
+        # --- Global tier (always merged when caller is a school) ---
+        # Mirrors query_with_global_fallback semantics: global is the
+        # baseline, institution is additive. Skipped only when self IS
+        # the global KB.
+        if self.institution_id != self.GLOBAL_INSTITUTION_ID:
+            try:
+                global_filter = self._build_global_filter(base_filter, course)
+                global_results = query_chunks(
+                    institution_id=self.GLOBAL_INSTITUTION_ID,
+                    query_text=topic,
+                    n_results=n_results,
+                    where_filter=global_filter,
+                )
+            except Exception as e:
+                logger.warning(f"Figure description query (global) failed: {e}")
+                global_results = None
+
+            if global_results and global_results.get('documents') and global_results['documents'][0]:
+                docs = global_results['documents'][0]
+                metas = global_results.get('metadatas', [[]])[0] or [{}] * len(docs)
+                dists = global_results.get('distances', [[]])[0] or [1.0] * len(docs)
+                for doc, meta, dist in zip(docs, metas, dists):
+                    _append(doc, meta, dist, 'global', 1.0)
+
+        merged.sort(key=lambda x: x['distance'])
+        final = merged[:n_results]
+
+        # Observability: same shape as query_with_global_fallback's log.
+        if self.institution_id != self.GLOBAL_INSTITUTION_ID:
+            inst_hits = sum(1 for r in final if r.get('source_tier') == 'institution')
+            global_hits = sum(1 for r in final if r.get('source_tier') == 'global')
+            if global_hits == 0:
+                logger.warning(
+                    "[KB figures] inheritance MISS: institution_id=%s subject=%s "
+                    "grade=%s — %s institution + 0 global figures. Global figure "
+                    "library may be empty for this subject/grade.",
+                    self.institution_id, subject, grade_level or '*', inst_hits,
+                )
+            else:
+                logger.info(
+                    "[KB figures] inheritance hit: institution_id=%s subject=%s "
+                    "— %s institution + %s global (post-merge top-%s)",
+                    self.institution_id, subject, inst_hits, global_hits, n_results,
+                )
+
+        return final
 
     # ========================================================================
     # STEP 3: GENERATE LESSONS (Query for structure)
@@ -1222,19 +1303,29 @@ class CurriculumKnowledgeBase:
         institution_boost: float = 0.7,
         course=None,
     ) -> List[Dict]:
-        """
-        Query institution KB AND global KB in parallel, merge results.
+        """Two-tier retrieval: global baseline + institution additive.
 
-        Behavior change (R2.2 — memory/curriculum_material_sharing_plan.md):
-        Previously this method only queried global KB when the institution
-        result set was thin (< FALLBACK_THRESHOLD). That meant a school's
-        course with even ONE indexed material never benefited from the
-        platform-wide textbooks. New behavior: ALWAYS merge global results
-        when the calling KB is a school KB.
+        Inheritance model (canonical):
+        - **Global KB is the baseline** every school inherits unconditionally.
+          It is queried on EVERY call regardless of whether the institution
+          KB returned hits. There is no threshold gate.
+        - **Institution KB is purely additive.** When a school has its own
+          indexed materials they layer on top of the global baseline and
+          are preferred in the post-merge ranking via ``institution_boost``
+          (< 1.0 multiplier on distance ⇒ higher rank). Empty institution
+          KB ⇒ caller transparently sees global results only.
 
-        Method name kept for back-compat with the 6 existing call sites.
-        Per-batch behavior, distance ranking, source_tier labels — all
-        unchanged.
+        Dedupe: identical content across tiers collapses to the
+        institution copy (a school that re-indexes a platform-wide PDF
+        locally shouldn't double-count).
+
+        History: a prior version of this method gated the global query
+        behind a FALLBACK_THRESHOLD ("only query global when institution
+        results are thin"). That regressed inheritance for any school
+        with even one indexed material. Removed R2.2 — see
+        memory/curriculum_material_sharing_plan.md. The method name is
+        retained for back-compat; ``query_with_global_merge`` is the
+        canonical alias.
 
         Args:
             query_text: The search query
@@ -1279,11 +1370,13 @@ class CurriculumKnowledgeBase:
                     "source_tier": "institution",
                 })
 
-        # --- Always-merge global KB ---
+        # --- Global tier (baseline — queried on every call) ---
+        # Global is the default knowledge surface every school inherits.
+        # Institution results above are additive, not a replacement.
         # Skipped only when the caller IS the global KB (would double-count
-        # the same chunks). FALLBACK_THRESHOLD gate intentionally removed:
-        # platform-wide materials should be visible to every school course
-        # that matches by subject + grade.
+        # the same chunks). No threshold gate — the previous FALLBACK_THRESHOLD
+        # behavior was reverted because it broke inheritance the moment a
+        # school had even one indexed material.
         if self.institution_id != self.GLOBAL_INSTITUTION_ID:
             try:
                 # Build the global filter. Preferred path (when caller
@@ -1324,26 +1417,28 @@ class CurriculumKnowledgeBase:
         merged.sort(key=lambda x: x["distance"])
         final = merged[:n_results]
 
-        # Observable inheritance: every query logs the split so a "global
-        # KB silently empty" regression is visible in containerapp logs
-        # immediately, not days later. Critical because the upstream
+        # Observable inheritance: every query logs the global/institution
+        # split so a "global baseline silently empty" regression is visible
+        # in containerapp logs immediately. Critical because the upstream
         # default of routing "All Schools" uploads to id=12 (vs the KB's
         # canonical 0) caused exactly this silent failure in prod.
         inst_hits = sum(1 for r in final if r.get('source_tier') == 'institution')
         global_hits = sum(1 for r in final if r.get('source_tier') == 'global')
         if self.institution_id != self.GLOBAL_INSTITUTION_ID:
             if global_hits == 0:
+                # The baseline (global) returned 0 — every school query
+                # should see global by default, so this is a real signal.
                 logger.warning(
-                    "[KB] inheritance MISS: institution_id=%s query returned %s "
-                    "institution hits + 0 global hits. Global KB may be empty "
-                    "for this subject/grade — check that 'All Schools' uploads "
-                    "have been indexed.",
+                    "[KB] global-baseline MISS: institution_id=%s returned %s "
+                    "institution hits + 0 global. Global KB may be empty "
+                    "for this subject/grade — verify 'All Schools' uploads "
+                    "have been indexed and are filterable by this where.",
                     self.institution_id, inst_hits,
                 )
             else:
                 logger.info(
-                    "[KB] inheritance hit: institution_id=%s — %s institution + "
-                    "%s global hits (post-merge top-%s)",
+                    "[KB] inheritance OK: institution_id=%s — %s institution "
+                    "+ %s global (post-merge top-%s; global baseline present)",
                     self.institution_id, inst_hits, global_hits, n_results,
                 )
         return final
