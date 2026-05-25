@@ -3494,12 +3494,8 @@ Keep it to 2-3 sentences."""
         # Per-course image gate — when disabled, don't attach the step
         # figure to the multimodal context. Same gate as
         # _build_media_catalog so the LLM has zero image affordance.
-        try:
-            if self.lesson and self.lesson.unit and self.lesson.unit.course:
-                if not self.lesson.unit.course.tutoring_images_enabled:
-                    return None
-        except Exception:
-            pass
+        if not self._images_enabled():
+            return None
         media = self._get_step_media()
         if not media:
             return None
@@ -3887,6 +3883,14 @@ IMPORTANT: You are showing these images with your response.
                 "experiences the student can relate to"
             )
 
+        media_rule = (
+            "6. Only show media if your text directly references the figure"
+            " (e.g. \"the diagram shows…\"). A numeric warm-up question"
+            " with no visual reference should NOT attach a figure."
+            if self._images_enabled()
+            else "6. Images are DISABLED — do NOT reference figures, diagrams,"
+            " maps, or charts and do NOT emit |||MEDIA:N|||."
+        )
         prompt = f"""Generate an opening message for this tutoring session.
 
 {self.lesson_context}
@@ -3905,7 +3909,7 @@ Generate a warm, engaging opening that:
 {prior_instruction}
 4. If retrieval questions are provided above, present one as a warmup activity
 5. Otherwise, present a brief warm-up question related to today's topic
-6. Only show media if your text directly references the figure (e.g. "the diagram shows…"). A numeric warm-up question with no visual reference should NOT attach a figure.
+{media_rule}
 
 End with a question. Keep it to 2-3 sentences max.
 IMPORTANT: Any question you ask must be complete and self-contained. Never say "which of these" or reference options/choices you haven't listed."""
@@ -4939,19 +4943,30 @@ SCAFFOLDING TONE ({intensity} application):
             display_phase = self._get_display_phase().upper()
             step_progress = f"STEP PROGRESS: {step_num}/{total_steps} | Phase: {display_phase}"
 
-        # Build media reminder — always present so LLM never claims it can't show images
+        # Build media reminder — always present so LLM never claims it can't show images.
+        # When images are disabled for this course, replace the reminder
+        # with an explicit no-images directive so the LLM doesn't reach
+        # for figure language that was instructed (in cached prefix) but
+        # is no longer appropriate.
         media_reminder = ""
-        step_media_ids = getattr(self, '_step_media_ids', {}).get(self.current_topic_index, [])
-        if step_media_ids:
+        if not self._images_enabled():
             media_reminder = (
-                f"\n14. MEDIA AVAILABLE for this step — show it by writing "
-                f"|||MEDIA:{step_media_ids[0]}||| as the VERY LAST line of your response"
+                "\n14. Images are DISABLED for this course — do NOT reference"
+                " figures, diagrams, maps, or charts. Do NOT emit |||MEDIA:N|||."
+                " Teach with text only."
             )
         else:
-            media_reminder = (
-                "\n14. Only show images from the media catalog using |||MEDIA:N|||. "
-                "Do NOT reference figures or diagrams that are not in the catalog."
-            )
+            step_media_ids = getattr(self, '_step_media_ids', {}).get(self.current_topic_index, [])
+            if step_media_ids:
+                media_reminder = (
+                    f"\n14. MEDIA AVAILABLE for this step — show it by writing "
+                    f"|||MEDIA:{step_media_ids[0]}||| as the VERY LAST line of your response"
+                )
+            else:
+                media_reminder = (
+                    "\n14. Only show images from the media catalog using |||MEDIA:N|||. "
+                    "Do NOT reference figures or diagrams that are not in the catalog."
+                )
 
         # When omit_history=True, the conversation history flows
         # through as a proper messages array. The directive below
@@ -5000,7 +5015,7 @@ Generate your response following these rules:
 5. If correct: praise specifically, then continue the current step or prepare for the next
 6. If incorrect: encourage, give a hint from the HINT LADDER, ask again
 7. If confused: simplify, use an example from the step content
-8. If the student asks to see an image/figure/diagram, show one using |||MEDIA:N||| ONLY if one exists in the catalog. Otherwise describe it in text.
+8. If the student asks to see an image/figure/diagram: when images are enabled and a matching catalog entry exists, show it using |||MEDIA:N|||; otherwise describe it in text without inventing a figure that isn't there.
 9. Use KEY VOCABULARY terms naturally in your explanation — introduce and define them
 10. Watch for COMMON MISTAKES listed in the directive and address them proactively
 11. Weave in local Seychelles context where relevant to make the lesson relatable
@@ -5737,6 +5752,12 @@ Follow the current step; this concept will be covered in sequence."""
         # on the original.
         system_prompt += self._build_scaffolding_directive_block()
 
+        # Image gate (PR1, 2026-05-25). Lives in the dynamic suffix
+        # so it applies even when a custom PromptPack override
+        # bypasses template conditionals. No-op when images are
+        # enabled.
+        system_prompt += self._build_image_gate_block()
+
         if pending_check is None and getattr(self, '_pending_bare_answer', False):
             # Bare numeric answer on a math practice/quiz step but no
             # expected_answer to check against (i.e. the tutor invented
@@ -5835,6 +5856,50 @@ Follow the current step; this concept will be covered in sequence."""
             logger.warning(f"Failed to build Seychelles context block: {e}")
             return ""
 
+    def _images_enabled(self) -> bool:
+        """Centralized read of the per-course image toggle.
+
+        Returns True when images may be used (catalog populated, media
+        signals emitted, vision attachments allowed); False when the
+        course has tutoring_images_enabled=False. Failures default to
+        True so a transient ORM error does not silently turn images
+        off mid-session.
+        """
+        try:
+            return bool(
+                self.lesson
+                and self.lesson.unit
+                and self.lesson.unit.course
+                and self.lesson.unit.course.tutoring_images_enabled
+            )
+        except Exception:
+            return True
+
+    def _build_image_gate_block(self) -> str:
+        """Dynamic-suffix block enforcing the per-course image toggle.
+
+        Lives in the dynamic suffix (not the cacheable prefix) so that
+        a custom PromptPack override — which is rendered as-is and
+        skips template conditionals — still picks up the gate. When
+        images are enabled returns "" so this block is a no-op.
+        """
+        if self._images_enabled():
+            return ""
+        return (
+            "\n\n<no_images_mode>"
+            "\nImages are DISABLED for this course (teacher setting)."
+            "\nDo NOT reference figures, maps, diagrams, charts, photos, or"
+            " any visual element in your text — phrases like \"look at the"
+            " diagram\", \"as shown in the figure\", \"in the image above/below\""
+            " WILL CONFUSE the student because no visual will be displayed."
+            "\nDo NOT emit |||MEDIA:N||| signals — the catalog is empty and"
+            " any signal will be stripped."
+            "\nTeach with text only: describe shapes, processes, and"
+            " relationships in words; if a visual would normally be used,"
+            " replace it with a clear verbal description."
+            "\n</no_images_mode>"
+        )
+
     def _build_media_catalog(self) -> str:
         """Build a numbered catalog of available media for the LLM.
 
@@ -5849,14 +5914,21 @@ Follow the current step; this concept will be covered in sequence."""
         — the system prompt sees no media block, so the model cannot
         reference figures.
         """
-        # Per-course image gate
-        try:
-            if self.lesson and self.lesson.unit and self.lesson.unit.course:
-                if not self.lesson.unit.course.tutoring_images_enabled:
-                    self._media_id_map = {}
-                    return ""
-        except Exception:
-            pass   # If the chain fails, fall through to default behaviour
+        # Per-course image gate. Returning the explicit "disabled"
+        # guard (instead of "") ensures the LLM is actively told NOT
+        # to reference figures — an empty string left the prompt's
+        # |||MEDIA:N||| instructions intact while removing the catalog,
+        # so the model would invent figures to talk about.
+        if not self._images_enabled():
+            self._media_id_map = {}
+            return (
+                "\n\n<media_catalog>\n"
+                "Images are DISABLED for this course.\n"
+                "Do NOT reference figures, maps, or diagrams.\n"
+                "Do NOT emit |||MEDIA:N||| signals — there is no catalog.\n"
+                "Teach with text only.\n"
+                "</media_catalog>"
+            )
 
         from apps.llm.prompts import get_lesson_media
 
@@ -12092,6 +12164,12 @@ Which concept numbers were meaningfully covered?"""
         Returns (clean_text, media_dict or None). The signal is always
         stripped so nothing leaks into DB or student chat.
 
+        When images are disabled for this course, also scrub
+        sentence-leading deictic references to visuals (the LLM is
+        instructed not to write them, but this is the belt-and-
+        suspenders safety net so a stray "Looking at the diagram…"
+        never reaches the student when no visual will be shown).
+
         NOTE (2026-05-05): the |||GENERATE:category:description|||
         on-the-fly image-generation channel was REMOVED. The only
         media path is now showing existing entries from the catalog.
@@ -12103,10 +12181,72 @@ Which concept numbers were meaningfully covered?"""
             clean_text = text[:match.start()].rstrip()
             media_id = int(match.group(1))
             if media_id == 0:
+                clean_text = self._scrub_deictic_image_phrases(clean_text)
                 return clean_text, None
             media_id_map = getattr(self, '_media_id_map', {})
-            return clean_text, media_id_map.get(media_id)
-        return text, None
+            media_dict = media_id_map.get(media_id)
+            if media_dict is None:
+                # Signal references a non-existent catalog ID — strip any
+                # deictic prose for consistency with the disabled-images
+                # path. Catalog IDs are gated upstream.
+                clean_text = self._scrub_deictic_image_phrases(clean_text)
+            return clean_text, media_dict
+        return self._scrub_deictic_image_phrases(text), None
+
+    # Sentence-initial deictic figure references. Anchored at start-of-
+    # text or after sentence-ending punctuation. Each pattern matches
+    # the whole sentence (up to the next '.', '!', '?') so the scrubber
+    # drops the offending sentence cleanly rather than leaving a
+    # dangling clause whose subject has vanished. Explicit list — no
+    # fuzzy matching — per the PR1 plan.
+    _DEICTIC_IMAGE_PATTERNS = (
+        re.compile(
+            r'(?:(?<=^)|(?<=[.!?]\s))'
+            r'(?:Looking|Look|Notice|Note|Observe|See|Refer)\s+'
+            r'(?:(?:at|to)\s+)?(?:the|this|these|that|those)\s+'
+            r'(?:diagram|figure|chart|map|image|picture|graph|table|illustration|drawing|sketch|photo|photograph)'
+            r'[^.!?]*[.!?]\s*',
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r'(?:(?<=^)|(?<=[.!?]\s))'
+            r'As\s+(?:shown|you\s+can\s+see|depicted|illustrated)\s+'
+            r'(?:in|on|by)\s+(?:the|this|these|that|those)\s+'
+            r'(?:diagram|figure|chart|map|image|picture|graph|table|illustration|drawing|sketch|photo|photograph)'
+            r'[^.!?]*[.!?]\s*',
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r'(?:(?<=^)|(?<=[.!?]\s))'
+            r'In\s+(?:the|this|that)\s+'
+            r'(?:diagram|figure|chart|map|image|picture|graph|table|illustration|drawing|sketch|photo|photograph)'
+            r'\s+(?:above|below|on\s+(?:the\s+)?(?:left|right|screen))'
+            r'[^.!?]*[.!?]\s*',
+            re.IGNORECASE,
+        ),
+    )
+
+    def _scrub_deictic_image_phrases(self, text: str) -> str:
+        """Drop sentence-leading deictic figure references when images
+        are disabled. No-op when images are enabled.
+
+        Conservative by design: only matches sentence-initial clauses
+        anchored to a small explicit pattern set. Mid-sentence figure
+        words ("look at the bigger picture") are left intact.
+        """
+        if not text or self._images_enabled():
+            return text
+        original = text
+        for pat in self._DEICTIC_IMAGE_PATTERNS:
+            text = pat.sub('', text)
+        if text != original:
+            logger.warning(
+                "[ImageGate] scrubbed deictic figure reference "
+                "(images disabled). lesson_id=%s session_id=%s",
+                getattr(self.lesson, 'id', '?'),
+                getattr(self.session, 'id', '?'),
+            )
+        return text.strip()
 
     def _check_milestone(self) -> Optional[str]:
         """Check if the student hit a milestone worth celebrating."""
