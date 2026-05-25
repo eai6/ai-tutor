@@ -4,7 +4,26 @@
 
 import apps.curriculum.vector_field
 from django.db import migrations, models
-from pgvector.django import VectorExtension
+
+
+# 2026-05-25: replaced ``from pgvector.django import VectorExtension``
+# + ``VectorExtension()`` with the vendor-gated RunPython below. The
+# VectorExtension operation class is missing the ``hints`` attribute
+# Django 6.0.2 requires on migration operations, so it crashes the
+# migrate command on Postgres. We don't need its features (it only
+# runs CREATE EXTENSION IF NOT EXISTS) — RunPython gives us the same
+# behaviour without the broken class.
+def _enable_vector_extension(apps, schema_editor):
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    schema_editor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+
+
+def _drop_vector_extension(apps, schema_editor):
+    # Intentionally a no-op on reverse — dropping the extension would
+    # break every other table that has a vector column, and the
+    # extension is harmless to leave installed.
+    return
 
 
 # HNSW index: pgvector's similarity-search index using cosine distance.
@@ -49,9 +68,8 @@ class Migration(migrations.Migration):
 
     operations = [
         # ``CREATE EXTENSION IF NOT EXISTS vector;`` on Postgres; no-op
-        # on SQLite / MySQL. pgvector-django's VectorExtension already
-        # checks ``connection.vendor`` internally.
-        VectorExtension(),
+        # on SQLite / MySQL. Vendor-gated RunPython (see top of file).
+        migrations.RunPython(_enable_vector_extension, _drop_vector_extension),
         migrations.CreateModel(
             name='CurriculumChunk',
             fields=[
