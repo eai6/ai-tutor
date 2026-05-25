@@ -5,7 +5,18 @@
 
 import apps.curriculum.vector_field
 from django.db import migrations, models
-from pgvector.django import VectorExtension
+
+
+# See curriculum/0029_curriculumchunk.py for why VectorExtension() was
+# replaced with a vendor-gated RunPython.
+def _enable_vector_extension(apps, schema_editor):
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    schema_editor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+
+
+def _drop_vector_extension(apps, schema_editor):
+    return  # no-op; see curriculum/0029 for rationale
 
 
 _HNSW_INDEX_NAME = 'support_chunk_embedding_hnsw'
@@ -37,9 +48,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Idempotent on dev DBs; no-op on SQLite via VectorExtension's
-        # internal vendor check.
-        VectorExtension(),
+        # ``CREATE EXTENSION IF NOT EXISTS vector;`` on Postgres; no-op
+        # on SQLite. See top-of-file for the VectorExtension replacement.
+        migrations.RunPython(_enable_vector_extension, _drop_vector_extension),
         migrations.CreateModel(
             name='SupportChunk',
             fields=[
