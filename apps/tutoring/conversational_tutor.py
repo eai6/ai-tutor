@@ -2083,6 +2083,13 @@ Keep it to 2-3 sentences."""
         self.exchange_count += 1
         self.step_exchange_count += 1
 
+        # PR3 (2026-05-25): compute the turn intent up-front from
+        # student-input + engine state. Drives the dynamic prompt
+        # block AND the validator's regen decision so non-probe
+        # turns aren't forced through the "must end with question"
+        # funnel.
+        self._current_turn_intent = self._compute_turn_intent(student_input)
+
         # Check if exit ticket phase
         if self.session_state == SessionState.EXIT_TICKET:
             return self._handle_exit_ticket()
@@ -2443,6 +2450,7 @@ Keep it to 2-3 sentences."""
                 awaiting_answer_is_set=isinstance(
                     getattr(self, '_awaiting_answer', None), dict,
                 ),
+                turn_intent=getattr(self, '_current_turn_intent', 'probe'),
             )
             if _audit_span is not None:
                 _audit_span['payload'] = {
@@ -3479,6 +3487,7 @@ Keep it to 2-3 sentences."""
                 awaiting_answer_is_set=isinstance(
                     getattr(self, '_awaiting_answer', None), dict,
                 ),
+                turn_intent=getattr(self, '_current_turn_intent', 'probe'),
             )
             if _audit_span is not None:
                 _audit_span['payload'] = {
@@ -4513,11 +4522,32 @@ Prioritize uncovered objectives in your teaching. Ensure each is explicitly addr
         This block tells the LLM explicitly what scaffolding mode means
         — text hint only, do not author a new question, the in-flight
         question is visible to the student in the artifact panel.
+
+        PR3 (2026-05-25): when turn_intent is 'reveal' or 'clarify',
+        the strict "zero question marks" rule is suspended — the
+        reveal/clarify directive provides its own shape rule (reveal:
+        explain the answer; clarify: address the tangent) so layering
+        a contradictory "no question marks" instruction would confuse
+        the LLM.
         """
         if not self._scaffolding_in_progress():
             return ""
         aa = getattr(self, '_awaiting_answer', None) or {}
         wrong = int(aa.get('wrong_attempts', 0) or 0)
+        intent = getattr(self, '_current_turn_intent', 'probe')
+        # On reveal / clarify the turn_intent block is doing the
+        # heavy lifting — keep the in-flight context but drop the
+        # strict "no question marks" rule to avoid layered contradiction.
+        if intent in ('reveal', 'clarify'):
+            return (
+                "\n\n<scaffolding_mode>\n"
+                "There is a question already in flight (wrong_attempts="
+                f"{wrong}). The turn-intent directive above takes"
+                " precedence for shape. Do not author a NEW bank"
+                " question this turn — the in-flight question stays"
+                " active for the student.\n"
+                "</scaffolding_mode>"
+            )
         return (
             "\n\n<scaffolding_mode>\n"
             "There is a question already in flight that the student is "
@@ -6059,6 +6089,13 @@ Follow the current step; this concept will be covered in sequence."""
         # re-pose. Capped + truncated. No-op when nothing shown yet.
         system_prompt += self._build_asked_questions_block()
 
+        # Turn-intent directive (PR3, 2026-05-25). When the engine
+        # has resolved a non-probe intent (reveal / recap / clarify),
+        # inject the matching directive so the LLM can take the
+        # alternative shape without being regenned for "no question".
+        # No-op on probe (default).
+        system_prompt += self._build_turn_intent_block()
+
         if pending_check is None and getattr(self, '_pending_bare_answer', False):
             # Bare numeric answer on a math practice/quiz step but no
             # expected_answer to check against (i.e. the tutor invented
@@ -6175,6 +6212,132 @@ Follow the current step; this concept will be covered in sequence."""
             )
         except Exception:
             return True
+
+    # PR3 (2026-05-25): give-up detection — student explicitly asks
+    # to be told the answer or signals they can't continue. Combined
+    # with wrong_attempts >= 2 in _compute_turn_intent it triggers the
+    # 'reveal' intent, lifting the 3-attempt reveal floor for this
+    # turn only. Patterns are case-insensitive substring matches.
+    _GIVE_UP_PATTERN = re.compile(
+        r"\b("
+        r"i\s+don['’]?t\s+know"
+        r"|i\s+do\s+not\s+know"
+        r"|idk"
+        r"|no\s+idea"
+        r"|give\s+up"
+        r"|tell\s+me(?:\s+the\s+answer)?"
+        r"|what['’]?s\s+the\s+answer"
+        r"|just\s+tell\s+me"
+        r"|show\s+me\s+the\s+answer"
+        r"|i\s+can['’]?t\s+(?:do\s+this|figure\s+it\s+out)"
+        r")\b",
+        re.IGNORECASE,
+    )
+
+    def _compute_turn_intent(self, student_input: str) -> str:
+        """Resolve the turn-intent for the upcoming tutor response.
+
+        Default is 'probe' (current behaviour: tutor must end with a
+        tool-posed question). Non-probe intents suspend that rule via
+        ValidationResult.needs_regeneration so the tutor can take a
+        natural off-ramp.
+
+        Precedence (first match wins):
+          1. give-up keywords + wrong_attempts >= 2 → reveal
+          2. resume welcome-back path → handled in its own builder
+          3. (future) tangent signal from step_eval → clarify
+          4. default → probe
+        """
+        from apps.tutoring.validator import (
+            TURN_INTENT_PROBE, TURN_INTENT_REVEAL,
+        )
+        try:
+            if student_input and self._GIVE_UP_PATTERN.search(student_input):
+                aa = getattr(self, '_awaiting_answer', None) or {}
+                wrong = int(aa.get('wrong_attempts', 0) or 0)
+                if wrong >= 2:
+                    logger.info(
+                        "[TurnIntent] reveal: give-up keyword + "
+                        "wrong_attempts=%d on session=%s",
+                        wrong, self.session.id,
+                    )
+                    return TURN_INTENT_REVEAL
+        except Exception as exc:
+            logger.warning("[TurnIntent] compute failed: %s — defaulting probe", exc)
+        return TURN_INTENT_PROBE
+
+    def _build_turn_intent_block(self) -> str:
+        """Per-turn directive matching the engine's resolved turn_intent.
+
+        probe (the default) is a no-op — the existing socratic_rules
+        already enforce "always end with a question via tool". Other
+        intents inject explicit alternative directives so the LLM can
+        skip the question without being regenerated.
+
+        Designed to be the LAST opinionated block before the LLM call
+        so it takes priority over earlier rules.
+        """
+        from apps.tutoring.validator import (
+            TURN_INTENT_PROBE, TURN_INTENT_REVEAL, TURN_INTENT_RECAP,
+            TURN_INTENT_CLARIFY,
+        )
+        intent = getattr(self, '_current_turn_intent', TURN_INTENT_PROBE)
+        if intent == TURN_INTENT_PROBE:
+            return ""
+        if intent == TURN_INTENT_REVEAL:
+            return (
+                "\n\n<turn_intent_reveal>"
+                "\nThe student has explicitly given up on the in-flight"
+                " question after multiple wrong attempts. For THIS turn"
+                " ONLY the no-reveal rule is suspended:"
+                "\n  1. Tell the student the correct answer plainly."
+                "\n  2. Explain WHY in 1-2 sentences using the canonical"
+                " working / explanation if one is available."
+                "\n  3. You DO NOT need to end with a question, and you"
+                " DO NOT need to use the pose_question tool. A reveal"
+                " turn closes the loop on this question; the engine"
+                " will advance after."
+                "\n  4. You MAY write up to ~80 words on this turn"
+                " (the usual ~40-word cap is relaxed for a reveal)."
+                "\n  5. Do NOT scold, do NOT lecture about effort — be"
+                " warm and brief, then move on."
+                "\n</turn_intent_reveal>"
+            )
+        if intent == TURN_INTENT_RECAP:
+            return (
+                "\n\n<turn_intent_recap>"
+                "\nThe student is returning to a session where they"
+                " previously struggled. For THIS turn ONLY:"
+                "\n  1. Acknowledge their return warmly (one short sentence)."
+                "\n  2. Recap where they were without re-teaching the whole"
+                " concept and without revealing the in-flight answer."
+                "\n  3. You DO NOT need to end with a question or use a"
+                " pose tool — re-posing the in-flight question is handled"
+                " by the engine. Just hand the conversation back."
+                "\n  4. You MAY write up to ~80 words on this turn."
+                "\n</turn_intent_recap>"
+            )
+        if intent == TURN_INTENT_CLARIFY:
+            return (
+                "\n\n<turn_intent_clarify>"
+                "\nThe student's last message was off-topic or a clarifying"
+                " question. For THIS turn ONLY:"
+                "\n  1. Address what they actually asked in 1-2 short sentences."
+                "\n  2. Gently steer back to the lesson — but DO NOT pose"
+                " a new question. The in-flight question (if any) stays"
+                " active."
+                "\n  3. You DO NOT need to end with a question or use a"
+                " pose tool on a clarify turn."
+                "\n  4. You MAY write up to ~80 words on this turn."
+                "\n</turn_intent_clarify>"
+            )
+        # acknowledge / pivot / unknown — minimal directive
+        return (
+            "\n\n<turn_intent>"
+            f"\nintent={intent}: brief acknowledgment / status turn."
+            " The 'must end with question via tool' rule is suspended."
+            "\n</turn_intent>"
+        )
 
     def _build_asked_questions_block(self) -> str:
         """Surface the questions already posed in this session so the
@@ -7981,6 +8144,20 @@ Follow the current step; this concept will be covered in sequence."""
                 tool_use_count=int(turn_metadata.get('tool_use_count', 0) or 0),
                 awaiting_answer_is_set=isinstance(
                     getattr(self, '_awaiting_answer', None), dict,
+                ),
+                # Welcome / resume turn: if there's an in-flight bank Q
+                # with wrong attempts, treat as a recap (no question
+                # requirement) so the LLM can hand the floor back gently.
+                turn_intent=(
+                    'recap'
+                    if (
+                        isinstance(getattr(self, '_awaiting_answer', None), dict)
+                        and int(
+                            (getattr(self, '_awaiting_answer', None) or {})
+                            .get('wrong_attempts', 0) or 0
+                        ) >= 2
+                    )
+                    else 'probe'
                 ),
             )
 
