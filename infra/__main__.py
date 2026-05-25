@@ -77,7 +77,14 @@ elevenlabs_api_key = config.require_secret("elevenlabs-api-key")
 #   pulumi config set aitutor:file-share-quota-gb 20
 #   pulumi config set aitutor:postgres-sku Standard_B1ms
 workload_profile_type = config.get("workload-profile-type") or "D4"
-workload_profile_name = f"dedicated-{workload_profile_type.lower()}"
+# Naming convention: "Consumption" for serverless; "dedicated-d4" / etc.
+# for reserved-capacity profiles. The name must match what's used as
+# `workload_profile_name` on the ContainerApp + Job.
+workload_profile_name = (
+    "Consumption"
+    if workload_profile_type == "Consumption"
+    else f"dedicated-{workload_profile_type.lower()}"
+)
 container_cpu = float(config.get("container-cpu") or "4.0")
 container_memory = config.get("container-memory") or "8Gi"
 max_replicas = int(config.get("max-replicas") or "4")
@@ -149,11 +156,18 @@ env = app.ManagedEnvironment(
         ),
     ),
     workload_profiles=[
+        # Consumption profile = serverless (true scale-to-zero, $0
+        # when idle). Dedicated D* profiles reserve capacity and need
+        # minimum_count/maximum_count. The fields are NOT accepted by
+        # the Consumption SKU, so omit them in that branch.
         app.WorkloadProfileArgs(
             name=workload_profile_name,
             workload_profile_type=workload_profile_type,
-            minimum_count=1,
-            maximum_count=2,
+            **(
+                {"minimum_count": 1, "maximum_count": 2}
+                if workload_profile_type != "Consumption"
+                else {}
+            ),
         ),
     ],
 )
