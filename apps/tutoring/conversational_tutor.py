@@ -8263,6 +8263,69 @@ Follow the current step; this concept will be covered in sequence."""
                 out.append(full.strip())
         return out
 
+    def _get_or_commit_canonical(self, q, aa, kb_ctx):
+        """PR4: retrieve or commit a CanonicalCommitment for a
+        chat-authored question.
+
+        Reads ``aa.committed_canonical`` first so the canonical is
+        stable across wrong-attempt retry turns; falls through to a
+        fresh ``commit_canonical`` call when nothing is persisted yet,
+        and stashes the new commitment on ``self._pending_committed_canonical``
+        so the awaiting_answer bootstrap below can persist it.
+
+        Returns the CanonicalCommitment (possibly with ``skipped=True``
+        on failure, in which case the grader falls back to its legacy
+        derive-at-grade-time path).
+        """
+        from apps.tutoring.canonical_committer import (
+            CanonicalCommitment, commit_canonical,
+        )
+        aa_committed = (aa or {}).get('committed_canonical') if isinstance(aa, dict) else None
+        if aa_committed and isinstance(aa_committed, dict) and aa_committed.get('canonical'):
+            return CanonicalCommitment(
+                canonical=aa_committed.get('canonical', '') or '',
+                acceptable_variants=list(aa_committed.get('acceptable_variants') or []),
+                answer_type=aa_committed.get('answer_type', 'concept') or 'concept',
+                confidence=float(aa_committed.get('confidence', 0.0) or 0.0),
+                reasoning=aa_committed.get('reasoning', '') or '',
+            )
+        # Fresh commit on the first wrong-attempt turn (or the first
+        # grade of a chat-authored q that's never been wrong yet).
+        lesson_ctx = (
+            f"Lesson: {self.lesson.title}\n"
+            f"Objective: {self.lesson.objective or ''}"
+        )
+        committed = commit_canonical(
+            q.stem,
+            llm_client=self.judge_client,
+            lesson_context=lesson_ctx,
+            kb_chunks=kb_ctx or '',
+        )
+        # Stash for the awaiting_answer bootstrap to pick up. Even on
+        # a "skipped" commitment we set the marker so analytics / the
+        # SessionTurn metadata logger can see the attempt.
+        self._pending_committed_canonical = committed
+        return committed
+
+    def _committed_canonical_payload(self) -> Optional[Dict]:
+        """Serialise the pending CanonicalCommitment for storage on
+        ``_awaiting_answer`` / SessionTurn.metadata. Returns None when
+        no commitment was made this turn or the commitment was skipped.
+        """
+        cc = getattr(self, '_pending_committed_canonical', None)
+        if cc is None or getattr(cc, 'skipped', False):
+            return None
+        canonical = (getattr(cc, 'canonical', '') or '').strip()
+        if not canonical:
+            return None
+        return {
+            'canonical': canonical[:600],
+            'acceptable_variants': list(getattr(cc, 'acceptable_variants', []) or [])[:5],
+            'answer_type': getattr(cc, 'answer_type', 'concept'),
+            'confidence': float(getattr(cc, 'confidence', 0.0) or 0.0),
+            'reasoning': (getattr(cc, 'reasoning', '') or '')[:300],
+        }
+
     def _lookup_awaiting_entry(self, awaiting):
         """Resolve the _awaiting_answer dict to the ORM object so we can
         re-render its question text. Returns None when the kind isn't
@@ -8609,11 +8672,22 @@ Follow the current step; this concept will be covered in sequence."""
             except Exception as _exc:
                 logger.debug(f"[Grade] KB context fetch failed: {_exc}")
 
+        # PR4 (2026-05-25): chat-authored questions get a frozen
+        # canonical committed BEFORE the LLM grader sees them. Read
+        # from _awaiting_answer if previously committed (retry turns),
+        # else commit fresh and stash for persist on the bootstrap
+        # below. Bank-backed questions skip this entirely — they
+        # already have verified answer keys.
+        committed_canonical = None
+        if q.source == SOURCE_CHAT_AUTHORED:
+            committed_canonical = self._get_or_commit_canonical(q, aa, kb_ctx)
+
         result = q.grade(
             student_input,
             llm_client=self.judge_client,
             kb_context=kb_ctx,
             is_math=is_math,
+            committed_canonical=committed_canonical,
         )
         if result is None:
             return None
@@ -8690,8 +8764,17 @@ Follow the current step; this concept will be covered in sequence."""
                 }
             cur = int(self._awaiting_answer.get('wrong_attempts', 0) or 0)
             self._awaiting_answer['wrong_attempts'] = cur + 1
+            # PR4 (2026-05-25): persist the committed canonical so the
+            # NEXT wrong-attempt turn reuses it instead of re-committing.
+            # No-op when nothing was committed or the commit was skipped.
+            _cc_payload = self._committed_canonical_payload()
+            if _cc_payload is not None and 'committed_canonical' not in self._awaiting_answer:
+                self._awaiting_answer['committed_canonical'] = _cc_payload
         elif getattr(result, 'is_correct', None) is True:
             self._clear_awaiting_answer()
+        # Reset the per-turn stash regardless of verdict so a stale
+        # commitment can't bleed into the next question.
+        self._pending_committed_canonical = None
 
         logger.info(
             "[BankGrade] session=%s source=%s id=%s is_correct=%s "
@@ -10567,9 +10650,35 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         # lesson 538 session 40 turn 10: Q3725 'B' graded True by bank
         # but step-eval said False, blocking advancement). Trust the
         # bank for bank-backed turns.
+        #
+        # PR4 (2026-05-25): for chat-authored questions graded against
+        # a committed canonical (or the legacy LLM-derived path), the
+        # bank verdict is NOT more authoritative than the step
+        # evaluator — both are LLM calls. When they disagree, default
+        # to None (no signal) so the engine stays on the question and
+        # asks for working instead of forcing a verdict the system
+        # isn't sure about. Removes the "wrong answer marked correct"
+        # path the v3 benchmark surfaced (0% specificity on
+        # answer_correct dim).
         _bank_grade = getattr(self, '_pending_bank_grade', None)
         _bank_verdict = getattr(_bank_grade, 'is_correct', None) if _bank_grade else None
-        if _bank_verdict is True and is_correct is not True:
+        _bank_source = (
+            (getattr(_bank_grade, 'detail', None) or {}).get('source', '')
+            if _bank_grade else ''
+        )
+        _is_chat_authored_grade = isinstance(_bank_source, str) and (
+            _bank_source.startswith('committed_canonical')
+            or _bank_source.startswith('llm_chat_authored')
+        )
+        if _is_chat_authored_grade and _bank_verdict is not None and is_correct is not None and _bank_verdict != is_correct:
+            logger.info(
+                "[StepEval] CHAT_AUTHORED_DISAGREE: bank=%s eval=%s "
+                "→ None (require agreement on chat-authored questions)",
+                _bank_verdict, is_correct,
+            )
+            is_correct = None
+            eval_layer = 'chat_authored_disagree'
+        elif _bank_verdict is True and is_correct is not True:
             logger.info(
                 "[StepEval] BANK_OVERRIDE: is_correct=%s → True "
                 "(bank grader said True, eval_layer=%s)",

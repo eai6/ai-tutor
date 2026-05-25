@@ -205,6 +205,7 @@ def grade_chat_authored_question(
     is_math: bool = False,
     kb_context: str = '',
     use_grounding: bool = True,
+    committed_canonical=None,
 ) -> BankGradeResult:
     """LLM grades a tutor-authored question with NO answer key.
 
@@ -226,6 +227,13 @@ def grade_chat_authored_question(
     Falls back to the simple `grade_written_responses_batch` path
     when grounding is disabled / unavailable.
 
+    PR4 (2026-05-25): when ``committed_canonical`` is a trustworthy
+    ``CanonicalCommitment``, skip the grounded derive-at-grade-time
+    path entirely and grade against the frozen canonical. This
+    eliminates the v3 benchmark failure mode where the LLM derived a
+    canonical biased by the student's response and graded wrong
+    answers as correct.
+
     Returns BankGradeResult. Never raises; on LLM crash returns
     is_correct=None with skip_reason set.
     """
@@ -233,6 +241,18 @@ def grade_chat_authored_question(
         return BankGradeResult(
             is_correct=None,
             skip_reason="missing_input_or_client",
+        )
+
+    # PR4: pre-committed canonical short-circuit. When trustworthy,
+    # grade against the frozen answer; falls through to the legacy
+    # paths when the commitment was skipped / low-confidence.
+    if committed_canonical is not None and getattr(committed_canonical, 'trustworthy', False):
+        return _grade_against_committed_canonical(
+            question_text=question_text,
+            student_response=student_response,
+            committed=committed_canonical,
+            llm_client=llm_client,
+            is_math=is_math,
         )
 
     # Try the grounded path first (KB context + Google search).
@@ -308,6 +328,109 @@ def grade_chat_authored_question(
         detail={
             'source': 'llm_chat_authored_batch',
             'reasoning': (r.reasoning or '')[:300],
+        },
+    )
+
+
+def _grade_against_committed_canonical(
+    *,
+    question_text: str,
+    student_response: str,
+    committed,
+    llm_client,
+    is_math: bool = False,
+) -> BankGradeResult:
+    """Grade a student response against a pre-committed canonical
+    (``apps.tutoring.canonical_committer.CanonicalCommitment``).
+
+    Two-stage match:
+      1. Deterministic — normalised string match against the canonical
+         and each acceptable variant. Catches the easy cases without
+         spending an LLM call.
+      2. LLM batch judge — when deterministic doesn't match, ask the
+         grader whether the response is semantically equivalent to
+         the canonical (NOT whether it's "correct in general").
+
+    Returns BankGradeResult with detail.source='committed_canonical'.
+    Never raises.
+    """
+    canonical = committed.canonical.strip()
+    variants = [v.strip() for v in (committed.acceptable_variants or []) if v.strip()]
+    student_norm = _norm(student_response or '')
+
+    # 1. Deterministic match
+    candidates = [canonical] + variants
+    for cand in candidates:
+        if _norm(cand) == student_norm and student_norm:
+            return BankGradeResult(
+                is_correct=True,
+                expected=canonical,
+                student_parsed=student_response[:200],
+                detail={
+                    'source': 'committed_canonical_deterministic',
+                    'matched_variant': cand,
+                    'confidence': committed.confidence,
+                    'committer_reasoning': committed.reasoning,
+                },
+            )
+
+    # 2. LLM equivalence judge — phrase the grading question as
+    # "is the response equivalent to the canonical?" not "is the
+    # response correct?". This avoids the LLM smuggling its own
+    # opinion about correctness back in.
+    from apps.tutoring.exit_ticket_grader import (
+        BatchGradeItem,
+        grade_written_responses_batch,
+    )
+    framed_question = (
+        f"Did the student give an answer equivalent to: \"{canonical}\""
+        + (f" (also acceptable: {', '.join(variants)})" if variants else "")
+        + f"?\n\nORIGINAL QUESTION: {question_text.strip()[:600]}"
+    )
+    item = BatchGradeItem(
+        index=0,
+        question_text=framed_question,
+        q_type='short_answer',
+        expected=canonical,
+        keywords=variants[:5],
+        student_answer=student_response,
+        is_math=is_math,
+    )
+    try:
+        results = grade_written_responses_batch([item], llm_client=llm_client)
+    except Exception as exc:
+        logger.warning(
+            "[BankGrader] committed_canonical LLM equivalence judge crashed: %s",
+            exc,
+        )
+        return BankGradeResult(
+            is_correct=None,
+            skip_reason=f"llm_crash:{type(exc).__name__}",
+            expected=canonical,
+            detail={
+                'source': 'committed_canonical_llm_failed',
+                'confidence': committed.confidence,
+            },
+        )
+
+    if not results:
+        return BankGradeResult(
+            is_correct=None,
+            skip_reason="llm_no_results",
+            expected=canonical,
+            detail={'source': 'committed_canonical_llm_empty'},
+        )
+
+    r = results[0]
+    return BankGradeResult(
+        is_correct=bool(r.correct),
+        expected=canonical,
+        student_parsed=student_response[:200],
+        detail={
+            'source': 'committed_canonical_llm',
+            'reasoning': (r.reasoning or '')[:300],
+            'confidence': committed.confidence,
+            'committer_reasoning': committed.reasoning,
         },
     )
 
