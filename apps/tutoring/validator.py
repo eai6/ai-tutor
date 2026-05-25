@@ -27,6 +27,36 @@ from apps.tutoring.praise_filter import strip_praise_if_wrong, _PRAISE_RE
 from apps.tutoring.fact_verifier import verify_response, FactCheckResult
 
 
+# Turn-intent taxonomy (PR3, 2026-05-25). Drives which validator
+# constraints apply this turn. 'probe' is the default and matches the
+# pre-PR3 behaviour: every turn must end with a tool-posed question.
+# Other intents relax that rule so the tutor can acknowledge tangents,
+# recap on resume, or reveal a canonical when the student gives up —
+# instead of being regenned into the "must ask a question" funnel.
+TURN_INTENT_PROBE = "probe"            # default
+TURN_INTENT_CLARIFY = "clarify"        # off-topic / tangent — address + steer
+TURN_INTENT_RECAP = "recap"            # resume from prior struggle
+TURN_INTENT_REVEAL = "reveal"          # give-up → explain the canonical
+TURN_INTENT_ACKNOWLEDGE = "acknowledge"  # brief acknowledgment, no question
+TURN_INTENT_PIVOT = "pivot"            # advance to next concept
+VALID_TURN_INTENTS = frozenset({
+    TURN_INTENT_PROBE,
+    TURN_INTENT_CLARIFY,
+    TURN_INTENT_RECAP,
+    TURN_INTENT_REVEAL,
+    TURN_INTENT_ACKNOWLEDGE,
+    TURN_INTENT_PIVOT,
+})
+# Intents on which the "must end with a tool-posed question" rules are
+# suspended. probe keeps the original rule active.
+_INTENTS_WITHOUT_QUESTION_REQUIREMENT = frozenset({
+    TURN_INTENT_CLARIFY,
+    TURN_INTENT_RECAP,
+    TURN_INTENT_REVEAL,
+    TURN_INTENT_ACKNOWLEDGE,
+    TURN_INTENT_PIVOT,
+})
+
 # Issues we record. Strings rather than enums so they serialize cleanly
 # into SessionTurn.metadata JSONField.
 ISSUE_NO_QUESTION = "no_question"
@@ -124,6 +154,12 @@ class ValidationResult:
     issues: List[str] = field(default_factory=list)
     layers_run: List[str] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
+    # PR3 (2026-05-25): the engine's pre-computed intent for this
+    # turn. Defaults to "probe" so callers that haven't been updated
+    # keep the historical behaviour. needs_regeneration uses it to
+    # suspend NO_QUESTION / NO_QUESTION_TOOL on intents where the
+    # tutor is allowed to NOT end with a tool-posed question.
+    turn_intent: str = TURN_INTENT_PROBE
 
     # Issues considered "soft" — logged for teacher review but don't
     # flip `passed` to False. Numeric_claim_unverified is soft because
@@ -186,13 +222,32 @@ class ValidationResult:
         ISSUE_NO_QUESTION_TOOL,
     })
 
+    # Issues whose regen-trigger is suspended on non-probe intents.
+    # The tutor is intentionally NOT asking a question this turn
+    # (acknowledging a tangent, recapping after resume, revealing a
+    # canonical on give-up), so flagging it as a failure would just
+    # regen back into "must end with question" — the exact rigidity
+    # PR3 is fixing.
+    _QUESTION_REQUIRED_ISSUES = frozenset({
+        ISSUE_NO_QUESTION,
+        ISSUE_NO_QUESTION_TOOL,
+    })
+
     @property
     def passed(self) -> bool:
         return all(i in self._SOFT_ISSUES for i in self.issues)
 
     @property
     def needs_regeneration(self) -> bool:
-        return any(i in self._REGEN_ISSUES for i in self.issues)
+        suspended = (
+            self._QUESTION_REQUIRED_ISSUES
+            if self.turn_intent in _INTENTS_WITHOUT_QUESTION_REQUIREMENT
+            else frozenset()
+        )
+        return any(
+            i in self._REGEN_ISSUES and i not in suspended
+            for i in self.issues
+        )
 
 
 # A response qualifies as ending-in-question only when there's an
@@ -273,6 +328,7 @@ def validate_tutor_response(
     media_attached: bool = True,
     tool_use_count: int = 0,
     awaiting_answer_is_set: bool = False,
+    turn_intent: str = TURN_INTENT_PROBE,
 ) -> ValidationResult:
     """Run V1+V2 validator layers over a tutor response.
 
@@ -618,6 +674,11 @@ def validate_tutor_response(
             "ends_with_question": _ends_with_question(content),
             **extra_meta,
         },
+        turn_intent=(
+            turn_intent
+            if turn_intent in VALID_TURN_INTENTS
+            else TURN_INTENT_PROBE
+        ),
     )
 
 
