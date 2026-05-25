@@ -1243,18 +1243,27 @@ class ConversationalTutor:
         # Track ExitTicketQuestion IDs already posed in this session so
         # the bank picker doesn't recycle the same question after the
         # student answered it. Reset only at session start.
+        # PR2 (2026-05-25): also merge legacy rendered_bank_ids
+        # (formerly the |||QUESTION_EO:N||| path's separate list) so
+        # in-flight sessions get unified dedup state on first load.
         self.shown_question_ids: set = set(
             int(qid) for qid in (state.get('shown_question_ids', []) or [])
             if str(qid).lstrip('-').isdigit()
         )
+        for legacy_id in (state.get('rendered_bank_ids') or []):
+            if str(legacy_id).lstrip('-').isdigit():
+                self.shown_question_ids.add(int(legacy_id))
 
         # Track normalised signatures of the last N tutor questions —
         # used by the W14 repeated-question guard to catch cross-turn
-        # authored repeats. Cap at 10 (oldest dropped) to keep
-        # engine_state JSON compact. See apps/tutoring/repeated_question.py.
+        # authored repeats. PR2 (2026-05-25): cap raised from 10 to
+        # 50 because the 10-entry window let repeats older than ~10
+        # turns slip through; signatures are short (sorted bag of
+        # tokens) so 50 still keeps engine_state JSON compact.
+        # See apps/tutoring/repeated_question.py.
         self.recent_tutor_question_sigs: List[str] = list(
             state.get('recent_tutor_question_sigs', []) or []
-        )[-10:]
+        )[-50:]
 
         # Exit-ticket hold gate (2026-05-17, pilot directive). When the
         # tutor reveals a wrong-answered bank Q or the most recent grade
@@ -1359,12 +1368,12 @@ class ConversationalTutor:
             # excludes these so the tutor doesn't recycle the same
             # question after the student answered it.
             'shown_question_ids': sorted(getattr(self, 'shown_question_ids', set())),
-            # W14 — last 10 normalised signatures of tutor questions
+            # W14 — last 50 normalised signatures of tutor questions
             # so the repeated-question guard survives across turns +
-            # session resumes.
+            # session resumes. Cap raised from 10 in PR2.
             'recent_tutor_question_sigs': list(
                 getattr(self, 'recent_tutor_question_sigs', []) or []
-            )[-10:],
+            )[-50:],
             # Exit-ticket hold gate — prevent the trigger from firing
             # on the same turn as a reveal or right after a wrong answer.
             'exit_ticket_hold_until_exchange': int(
@@ -1806,15 +1815,46 @@ class ConversationalTutor:
         )
         no_reveal_clause = ""
         if _has_unanswered_bank_q:
+            # PR2 (2026-05-25): also surface the in-flight question
+            # stem so the LLM re-poses the SAME question instead of
+            # authoring a fresh one. Without this the welcome-back
+            # consistently generated a new question — the student
+            # then thought the prior one had gone away.
+            _aa_stem = ""
+            try:
+                _aa_entry = self._lookup_awaiting_entry(_aa)
+                if _aa_entry is not None:
+                    _aa_stem = (
+                        getattr(_aa_entry, 'question_text', '')
+                        or getattr(_aa_entry, 'teacher_script', '')
+                        or ''
+                    )
+                # Inline-authored questions live only in metadata,
+                # not in the DB — pull the stem from _awaiting_answer
+                # directly in that case.
+                if not _aa_stem:
+                    _aa_stem = _aa.get('authored_question_text', '') or ''
+            except Exception as _ex:
+                logger.warning(
+                    "[Resume] failed to resolve in-flight question stem: %s",
+                    _ex,
+                )
+            _stem_block = (
+                f"\n\nIN-FLIGHT QUESTION (re-pose verbatim — do NOT author a new one):"
+                f"\n{_aa_stem.strip()[:500]}"
+                if _aa_stem.strip() else ""
+            )
             no_reveal_clause = (
                 "\n\nSTRICT — the student left mid-question with "
                 f"{_aa_wrong} wrong attempt(s) on the in-flight bank "
                 "question. DO NOT reveal the correct answer in any "
                 "form (no 'the answer is X', no 'it was X', no "
-                "paraphrase of the canonical option text). Just "
-                "remind them what the question was about and invite "
-                "them to try again. The engine will keep them on the "
-                "same question until they answer correctly."
+                "paraphrase of the canonical option text). Re-pose the"
+                " SAME question they were answering (do NOT generate a"
+                " new one) and invite them to try again. The engine"
+                " will keep them on the same question until they"
+                " answer correctly."
+                + _stem_block
             )
 
         prompt = f"""The student is returning to continue the lesson.
@@ -2505,6 +2545,16 @@ Keep it to 2-3 sentences."""
                         .values_list('question_text', flat=True)
                     )
             except Exception:
+                # PR2 (2026-05-25): surface this instead of silently
+                # returning []. Empty bank stems disables a whole arm
+                # of the repeat guard — we want to know when it fails.
+                logger.warning(
+                    "[RepeatDetect] bank stems lookup failed for "
+                    "session=%s shown_ids=%s — continuing with empty list",
+                    self.session.id,
+                    list(getattr(self, 'shown_question_ids', set()) or [])[:10],
+                    exc_info=True,
+                )
                 _shown_bank_stems = []
             # Active bank stem — the question student is currently
             # trying to answer.
@@ -5758,6 +5808,11 @@ Follow the current step; this concept will be covered in sequence."""
         # enabled.
         system_prompt += self._build_image_gate_block()
 
+        # Already-asked questions (PR2, 2026-05-25). Surfaces shown
+        # bank question stems so the LLM doesn't re-author or
+        # re-pose. Capped + truncated. No-op when nothing shown yet.
+        system_prompt += self._build_asked_questions_block()
+
         if pending_check is None and getattr(self, '_pending_bare_answer', False):
             # Bare numeric answer on a math practice/quiz step but no
             # expected_answer to check against (i.e. the tutor invented
@@ -5874,6 +5929,56 @@ Follow the current step; this concept will be covered in sequence."""
             )
         except Exception:
             return True
+
+    def _build_asked_questions_block(self) -> str:
+        """Surface the questions already posed in this session so the
+        LLM does not re-author or re-pose them. Belt-and-suspenders to
+        the deterministic dedup in _build_question_bank_block + the
+        W14 Jaccard guard.
+
+        Capped at 30 entries (oldest dropped) to keep the prompt small.
+        Stems truncated to 60 chars each — enough to recognise without
+        re-teaching the question to the LLM.
+        """
+        shown = list(getattr(self, 'shown_question_ids', set()) or set())
+        if not shown:
+            return ""
+        try:
+            from apps.tutoring.models import ExitTicketQuestion
+            qs = (
+                ExitTicketQuestion.objects
+                .filter(id__in=shown)
+                .values_list('id', 'question_text')
+            )
+            stems_by_id = {q_id: (text or '') for q_id, text in qs}
+        except Exception as exc:
+            logger.warning(
+                "[AskedQuestions] block lookup failed (%s) — falling back to empty",
+                exc,
+            )
+            return ""
+        # Preserve insertion order (use shown_question_ids list order
+        # if persisted as list; set order otherwise). Limit to last 30.
+        ordered_ids = [qid for qid in shown if qid in stems_by_id][-30:]
+        if not ordered_ids:
+            return ""
+        lines = []
+        for qid in ordered_ids:
+            stem = stems_by_id[qid].strip().replace('\n', ' ')
+            if not stem:
+                continue
+            lines.append(f"  - {stem[:60]}{'…' if len(stem) > 60 else ''}")
+        if not lines:
+            return ""
+        return (
+            "\n\n<already_asked>"
+            "\nThese bank questions were already posed this session. Do NOT re-pose"
+            " them, do NOT paraphrase them, and do NOT author a new question whose"
+            " substance overlaps with any of these — pick a different angle or shift"
+            " to teach-back."
+            "\n" + "\n".join(lines) +
+            "\n</already_asked>"
+        )
 
     def _build_image_gate_block(self) -> str:
         """Dynamic-suffix block enforcing the per-course image toggle.
@@ -6296,13 +6401,26 @@ Follow the current step; this concept will be covered in sequence."""
 
         # Drop questions already posed in this session so the tutor
         # doesn't recycle the same question after the student answered
-        # it. If the filter empties the pool, fall back to the full
-        # pool — better to repeat than to ship an empty bank block.
+        # it. PR2 (2026-05-25): when the filter empties the pool, do
+        # NOT fall back to the full pool — that silently recycled
+        # already-answered questions and was the #1 driver of the
+        # "tutor keeps re-asking the same thing" complaint. Empty pool
+        # is fine: the LLM will see no bank slots, the socratic_rules
+        # path "skip posing this turn (stay on the active Q / shift
+        # to teach-back)" applies, and step advancement still happens
+        # via competency-gate + 10-exchange cap.
         shown = getattr(self, 'shown_question_ids', None) or set()
         if shown:
             unshown = [q for q in pool if q.id not in shown]
-            if unshown:
-                pool = unshown
+            pool = unshown
+            if not unshown:
+                logger.info(
+                    "[QuestionBank] pool exhausted for step %d — "
+                    "all %d questions already shown this session. "
+                    "Bank block will render empty; tutor falls back "
+                    "to teach-back. session=%s",
+                    self.current_topic_index, len(shown), self.session.id,
+                )
 
         # Match the bank candidates to the current step's enabling
         # objective (preferred), falling back to concept_tag, then to
@@ -7338,23 +7456,38 @@ Follow the current step; this concept will be covered in sequence."""
         eo_text = (eos[n - 1].get('objective') or '').strip()
         if not eo_text:
             return clean_text, None
-        # Exclude any bank question we've already rendered this session
-        # so the tutor doesn't re-pose the same item back-to-back.
-        already = (self.session.engine_state or {}).get('rendered_bank_ids', [])
+        # Exclude any bank question already shown in this session.
+        # PR2 (2026-05-25): unify with the bank picker by reading
+        # self.shown_question_ids (single source of truth). The legacy
+        # rendered_bank_ids field is still merged in for compatibility
+        # with in-flight sessions that have entries there but not in
+        # shown_question_ids; the merger eventually persists through
+        # _save_state so the legacy field becomes a no-op on next save.
+        shown = set(getattr(self, 'shown_question_ids', set()) or set())
+        legacy_rendered = (
+            (self.session.engine_state or {}).get('rendered_bank_ids') or []
+        )
+        already = list(shown | set(int(i) for i in legacy_rendered if str(i).lstrip('-').isdigit()))
         question = pick_question_for_eo(
             self.lesson, eo_text, exclude_ids=already,
         )
         if question is None:
             logger.info(
-                "[QuestionBank] no published bank question for EO %r",
-                eo_text[:80],
+                "[QuestionBank] no published bank question for EO %r "
+                "(excluded=%d)",
+                eo_text[:80], len(already),
             )
             return clean_text, None
-        # Track for future exclusion
+        # Write to BOTH the unified set (authoritative, persisted via
+        # _save_state) and the legacy engine_state field (in case
+        # anything else still reads it; can be retired once in-flight
+        # sessions roll over).
+        if isinstance(self.shown_question_ids, set):
+            self.shown_question_ids.add(int(question.id))
         state = self.session.engine_state or {}
         rendered = list(state.get('rendered_bank_ids') or [])
         rendered.append(question.id)
-        state['rendered_bank_ids'] = rendered[-30:]  # cap so JSON stays small
+        state['rendered_bank_ids'] = rendered[-30:]
         self.session.engine_state = state
         return clean_text, question
 
