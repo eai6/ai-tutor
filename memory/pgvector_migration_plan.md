@@ -108,7 +108,17 @@ ORM approach: two `.annotate(distance=CosineDistance('embedding', query_vec))` q
 
 ### Phase 9 — Ship + monitor (Task #9)
 - Open PR. Get approval (Roy review), admin-merge.
-- After deploy: shell into Container App, run `port_chromadb_to_pgvector` against `/app/media/vectordb`. Note: this command imports chromadb at runtime, so the running container needs chromadb temporarily reinstalled, OR run the port from a one-off image with `chromadb==1.5.0` pinned.
+- After deploy: run the **CI-driven port** by triggering the deploy workflow with `run_pgvector_port=true`. The post-deploy job runs on a GitHub runner:
+  1. Pip-installs chromadb on the runner only (image stays clean)
+  2. Opens a temporary Postgres firewall rule for the runner IP
+  3. azcopy downloads `/vectordb` from the share to the runner
+  4. Sets `DATABASE_URL` pointing at the target Postgres
+  5. Runs `python manage.py port_chromadb_to_pgvector --vectordb-path ./vectordb_snapshot/vectordb`
+  6. Runs `python manage.py audit_kb_coverage`
+  7. Closes the firewall rule
+  - Requires repo secret `PROD_DB_PASSWORD` (staging equivalent: `STAGING_DB_PASSWORD`).
+- Manual fallback (if the workflow flag isn't available yet): from a dev machine with chromadb installed, open Postgres firewall to your IP → azcopy the vectordb dir to local → run the same two commands with `DATABASE_URL` set to the target stack.
+- The port command is idempotent — re-running on an already-ported DB reports 0 new + N updated. Safe to retry.
 - Verify `CurriculumChunk.objects.count()` matches expected (~470+).
 - Trigger one manual tutor session via dashboard, confirm RAG retrieval returns results.
 - Watch `[KB] inheritance OK` log lines in containerapp logs from live sessions.
