@@ -1,0 +1,101 @@
+name: Deploy (staging)
+
+# Mirrors deploy.yml but targets the staging Container App on the
+# Pixel subscription. Triggered by pushes to the `dev` branch — that
+# branch is our integration/staging surface: PRs are merged into dev
+# first for external party testing, then promoted to main for prod.
+#
+# The post-deploy tutor evaluation is OFF by default on staging — it's
+# expensive (~$15/run) and we already run it on prod deploys. Enable
+# explicitly via workflow_dispatch if you want a staging eval pass.
+
+on:
+  push:
+    branches: [dev]
+
+  workflow_dispatch:
+    inputs:
+      tutor_prompt_variant:
+        description: 'Tutor prompt variant'
+        required: false
+        type: choice
+        default: 'baseline'
+        options:
+          - baseline
+          - v6
+          - v7
+      tutor_model_override:
+        description: 'Tutor model override (provider/model_name); leave blank to use DB-active'
+        required: false
+        type: choice
+        default: ''
+        options:
+          - ''
+          - 'anthropic/claude-sonnet-4-20250514'
+          - 'anthropic/claude-sonnet-4-6'
+          - 'anthropic/claude-opus-4-7'
+          - 'google/gemini-3-flash-preview'
+          - 'google/gemini-3.1-pro-preview'
+
+env:
+  ACR: ${{ secrets.STAGING_ACR_LOGIN_SERVER }}
+  RG:  ${{ secrets.STAGING_AZURE_RESOURCE_GROUP }}
+  APP: ${{ secrets.STAGING_CONTAINER_APP_NAME }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Free runner disk before the Docker build — same as prod workflow.
+      - name: Free Android-SDK disk space (runner only)
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          df -h /
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        run: az acr login --name ${ACR%%.*}
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t $ACR/aitutor:${{ github.sha }} -t $ACR/aitutor:latest .
+          docker push $ACR/aitutor:${{ github.sha }}
+          docker push $ACR/aitutor:latest
+
+      - name: Set revision mode to single (auto-deactivate old revisions)
+        run: |
+          az containerapp revision set-mode \
+            --name $APP \
+            --resource-group $RG \
+            --mode single
+
+      - name: Resolve deploy-time config
+        id: cfg
+        run: |
+          PROMPT_VARIANT="${{ github.event.inputs.tutor_prompt_variant || vars.STAGING_TUTOR_PROMPT_VARIANT || 'baseline' }}"
+          MODEL_OVERRIDE="${{ github.event.inputs.tutor_model_override || vars.STAGING_TUTOR_MODEL_OVERRIDE || '' }}"
+          echo "prompt_variant=$PROMPT_VARIANT" >> $GITHUB_OUTPUT
+          echo "model_override=$MODEL_OVERRIDE" >> $GITHUB_OUTPUT
+          echo "::notice title=Staging deploy config::TUTOR_PROMPT_VARIANT=$PROMPT_VARIANT  TUTOR_MODEL_OVERRIDE=$MODEL_OVERRIDE"
+
+      - name: Deploy to Container App (staging)
+        run: |
+          az containerapp update \
+            --name $APP \
+            --resource-group $RG \
+            --image $ACR/aitutor:${{ github.sha }} \
+            --set-env-vars \
+              "TUTOR_PROMPT_VARIANT=${{ steps.cfg.outputs.prompt_variant }}" \
+              "TUTOR_MODEL_OVERRIDE=${{ steps.cfg.outputs.model_override }}"
+
+      - name: Print staging URL
+        run: |
+          FQDN=$(az containerapp show --name $APP --resource-group $RG \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "::notice title=Staging deployed::https://$FQDN"

@@ -66,6 +66,33 @@ openai_api_key = config.require_secret("openai-api-key")
 google_api_key = config.require_secret("google-api-key")
 elevenlabs_api_key = config.require_secret("elevenlabs-api-key")
 
+# ── Sizing knobs (override per-stack for cheaper non-prod) ────────────────
+# Each knob falls back to the current prod default so the `pixel` stack
+# keeps its existing shape without any new config keys. Override in
+# Pulumi.<stack>.yaml to right-size staging or dev:
+#   pulumi config set aitutor:workload-profile-type D2
+#   pulumi config set aitutor:container-cpu 2.0
+#   pulumi config set aitutor:container-memory 4Gi
+#   pulumi config set aitutor:max-replicas 1
+#   pulumi config set aitutor:file-share-quota-gb 20
+#   pulumi config set aitutor:postgres-sku Standard_B1ms
+workload_profile_type = config.get("workload-profile-type") or "D4"
+workload_profile_name = f"dedicated-{workload_profile_type.lower()}"
+container_cpu = float(config.get("container-cpu") or "4.0")
+container_memory = config.get("container-memory") or "8Gi"
+max_replicas = int(config.get("max-replicas") or "4")
+min_replicas = int(config.get("min-replicas") or "1")
+file_share_quota_gb = int(config.get("file-share-quota-gb") or "100")
+postgres_sku = config.get("postgres-sku") or "Standard_B1ms"
+postgres_storage_gb = int(config.get("postgres-storage-gb") or "32")
+
+# Material-processor Job sizing — usually the same as the main app's
+# burst capacity, but a non-prod stack may not want to run heavy
+# textbook OCR at all (set material-job-cpu=0 to skip the Job entirely).
+material_job_cpu = float(config.get("material-job-cpu") or "2.0")
+material_job_memory = config.get("material-job-memory") or "4Gi"
+provision_material_job = material_job_cpu > 0
+
 # ── 1. Resource Group ───────────────────────────────────────────────────────
 rg = resources.ResourceGroup(
     f"aitutor-{stack}-rg",
@@ -123,8 +150,8 @@ env = app.ManagedEnvironment(
     ),
     workload_profiles=[
         app.WorkloadProfileArgs(
-            name="dedicated-d4",
-            workload_profile_type="D4",
+            name=workload_profile_name,
+            workload_profile_type=workload_profile_type,
             minimum_count=1,
             maximum_count=2,
         ),
@@ -187,7 +214,7 @@ file_share = storage.FileShare(
     # Long-term plan: migrate generated images to Azure Blob (see
     # memory/azure_blob_storage_plan.md) — keeps the platform
     # portable to other clouds + decouples from filesystem quotas.
-    share_quota=100,  # 100 GiB
+    share_quota=file_share_quota_gb,
 )
 
 storage_keys = pulumi.Output.all(rg.name, sa.name).apply(
@@ -224,10 +251,16 @@ pg_server = dbforpostgresql.Server(
     version=dbforpostgresql.PostgresMajorVersion.POSTGRES_MAJOR_VERSION_16,
     administrator_login="aitutoradmin",
     administrator_login_password=db_password,
-    storage=dbforpostgresql.StorageArgs(storage_size_gb=32),
+    storage=dbforpostgresql.StorageArgs(storage_size_gb=postgres_storage_gb),
     sku=dbforpostgresql.SkuArgs(
-        name="Standard_B1ms",
-        tier=dbforpostgresql.SkuTier.BURSTABLE,
+        name=postgres_sku,
+        # Burstable for B-series, GeneralPurpose for D-series; tier
+        # inferred from the SKU name prefix.
+        tier=(
+            dbforpostgresql.SkuTier.BURSTABLE
+            if postgres_sku.startswith("Standard_B")
+            else dbforpostgresql.SkuTier.GENERAL_PURPOSE
+        ),
     ),
 )
 
@@ -424,7 +457,7 @@ container_app = app.ContainerApp(
     container_app_name=container_app_name,
     resource_group_name=rg.name,
     managed_environment_id=env.id,
-    workload_profile_name="dedicated-d4",
+    workload_profile_name=workload_profile_name,
     # System-assigned managed identity — used by apps/dashboard/job_dispatch.py
     # to call ARM and start material-processor Job executions. Role assignment
     # below grants this identity the right to start the specific Job.
@@ -454,8 +487,8 @@ container_app = app.ContainerApp(
                 name="aitutor",
                 image=image,
                 resources=app.ContainerResourcesArgs(
-                    cpu=4.0,
-                    memory="8Gi",
+                    cpu=container_cpu,
+                    memory=container_memory,
                 ),
                 env=_build_app_env_vars(
                     csrf_origins=Output.concat(
@@ -506,8 +539,8 @@ container_app = app.ContainerApp(
             # large reindex, or run the write via a separate one-off
             # job. For the pilot the only writes happen during admin
             # content uploads, which are infrequent and serialisable.
-            min_replicas=1,
-            max_replicas=4,
+            min_replicas=min_replicas,
+            max_replicas=max_replicas,
             rules=[
                 app.ScaleRuleArgs(
                     name="http-concurrency",
@@ -551,56 +584,64 @@ container_app = app.ContainerApp(
 #   - On-demand only — zero idle cost
 #   - 24 h replica timeout means we never have to bump the limit for a
 #     larger textbook or a temporary rate-limit slowdown
+#
+# Set aitutor:material-job-cpu = 0 in Pulumi config to skip provisioning
+# (e.g. a non-prod stack that doesn't need to handle large textbook OCR).
 material_job_name = f"aitutor-{stack}-material-job"
-material_job = app.Job(
-    material_job_name,
-    job_name=material_job_name,
-    resource_group_name=rg.name,
-    environment_id=env.id,
-    workload_profile_name="dedicated-d4",
-    configuration=app.JobConfigurationArgs(
-        replica_timeout=86400,         # 24 h hard ceiling — never revisit
-        replica_retry_limit=2,         # auto-retry on container restart
-        trigger_type=app.TriggerType.MANUAL,
-        manual_trigger_config=app.JobConfigurationManualTriggerConfigArgs(
-            parallelism=1,
-            replica_completion_count=1,
+material_job = None
+if provision_material_job:
+    material_job = app.Job(
+        material_job_name,
+        job_name=material_job_name,
+        resource_group_name=rg.name,
+        environment_id=env.id,
+        workload_profile_name=workload_profile_name,
+        configuration=app.JobConfigurationArgs(
+            replica_timeout=86400,         # 24 h hard ceiling — never revisit
+            replica_retry_limit=2,         # auto-retry on container restart
+            trigger_type=app.TriggerType.MANUAL,
+            manual_trigger_config=app.JobConfigurationManualTriggerConfigArgs(
+                parallelism=1,
+                replica_completion_count=1,
+            ),
+            registries=shared_registries,
+            secrets=shared_secrets,
         ),
-        registries=shared_registries,
-        secrets=shared_secrets,
-    ),
-    template=app.JobTemplateArgs(
-        containers=[
-            app.ContainerArgs(
-                name="material-processor",
-                image=image,
-                # Smaller than main app — vision LLM is mostly outbound HTTP
-                # wait, not compute. 2 CPU / 4 Gi is plenty for 5-way
-                # concurrent vision requests.
-                resources=app.ContainerResourcesArgs(cpu=2.0, memory="4Gi"),
-                # Default command. Per-execution `args` override (the upload
-                # id) is supplied by the dispatcher (`az containerapp job
-                # start --args ...` or SDK equivalent).
-                command=["python", "manage.py", "process_material"],
-                env=_build_app_env_vars(csrf_origins=None),
-                volume_mounts=[
-                    app.VolumeMountArgs(
-                        volume_name="media-volume",
-                        mount_path="/app/media",
+        template=app.JobTemplateArgs(
+            containers=[
+                app.ContainerArgs(
+                    name="material-processor",
+                    image=image,
+                    # Smaller than main app — vision LLM is mostly outbound HTTP
+                    # wait, not compute. 2 CPU / 4 Gi is plenty for 5-way
+                    # concurrent vision requests on prod; staging can shrink.
+                    resources=app.ContainerResourcesArgs(
+                        cpu=material_job_cpu,
+                        memory=material_job_memory,
                     ),
-                ],
-            ),
-        ],
-        volumes=[
-            app.VolumeArgs(
-                name="media-volume",
-                storage_type=app.StorageType.AZURE_FILE,
-                storage_name="mediastorage",
-            ),
-        ],
-    ),
-    opts=pulumi.ResourceOptions(depends_on=[env_storage]),
-)
+                    # Default command. Per-execution `args` override (the upload
+                    # id) is supplied by the dispatcher (`az containerapp job
+                    # start --args ...` or SDK equivalent).
+                    command=["python", "manage.py", "process_material"],
+                    env=_build_app_env_vars(csrf_origins=None),
+                    volume_mounts=[
+                        app.VolumeMountArgs(
+                            volume_name="media-volume",
+                            mount_path="/app/media",
+                        ),
+                    ],
+                ),
+            ],
+            volumes=[
+                app.VolumeArgs(
+                    name="media-volume",
+                    storage_type=app.StorageType.AZURE_FILE,
+                    storage_name="mediastorage",
+                ),
+            ],
+        ),
+        opts=pulumi.ResourceOptions(depends_on=[env_storage]),
+    )
 
 # Grant the main Container App's managed identity permission to start
 # executions of this Job. "Container Apps Jobs Operator" role:
@@ -617,31 +658,33 @@ material_job = app.Job(
 # which action wasn't permitted.
 #
 # Scope is the Job itself (the identity can only touch this specific Job,
-# not any other resource in the RG).
-material_job_role_assignment = authorization.RoleAssignment(
-    f"aitutor-{stack}-app-material-job-operator",
-    role_assignment_name=Output.all(container_app.id, material_job.id).apply(
-        # Stable UUID derived from (principal, scope, role) so re-runs
-        # find the same assignment instead of creating duplicates. Bumping
-        # the role suffix on intentional role changes (e.g. operator →
-        # contributor) forces a new assignment.
-        lambda args: __import__("uuid").uuid5(
-            __import__("uuid").NAMESPACE_URL,
-            f"{args[0]}:{args[1]}:jobs-operator",
-        ).hex
-    ),
-    scope=material_job.id,
-    principal_id=container_app.identity.apply(
-        lambda i: i.principal_id if i and i.principal_id else ""
-    ),
-    principal_type=authorization.PrincipalType.SERVICE_PRINCIPAL,
-    role_definition_id=Output.concat(
-        "/subscriptions/",
-        az_config.require("subscriptionId"),
-        "/providers/Microsoft.Authorization/roleDefinitions/"
-        "b9a307c4-5aa3-4b52-ba60-2b17c136cd7b",   # Container Apps Jobs Operator
-    ),
-)
+# not any other resource in the RG). Skipped when the Job isn't provisioned
+# (set aitutor:material-job-cpu = 0 in stack config).
+if material_job is not None:
+    material_job_role_assignment = authorization.RoleAssignment(
+        f"aitutor-{stack}-app-material-job-operator",
+        role_assignment_name=Output.all(container_app.id, material_job.id).apply(
+            # Stable UUID derived from (principal, scope, role) so re-runs
+            # find the same assignment instead of creating duplicates. Bumping
+            # the role suffix on intentional role changes (e.g. operator →
+            # contributor) forces a new assignment.
+            lambda args: __import__("uuid").uuid5(
+                __import__("uuid").NAMESPACE_URL,
+                f"{args[0]}:{args[1]}:jobs-operator",
+            ).hex
+        ),
+        scope=material_job.id,
+        principal_id=container_app.identity.apply(
+            lambda i: i.principal_id if i and i.principal_id else ""
+        ),
+        principal_type=authorization.PrincipalType.SERVICE_PRINCIPAL,
+        role_definition_id=Output.concat(
+            "/subscriptions/",
+            az_config.require("subscriptionId"),
+            "/providers/Microsoft.Authorization/roleDefinitions/"
+            "b9a307c4-5aa3-4b52-ba60-2b17c136cd7b",   # Container Apps Jobs Operator
+        ),
+    )
 
 # ── Exports ─────────────────────────────────────────────────────────────────
 pulumi.export("app_url", container_app.configuration.apply(
@@ -669,7 +712,8 @@ pulumi.export("custom_domains_bound", custom_domains)
 pulumi.export("container_app_default_fqdn", container_app.configuration.apply(
     lambda c: c.ingress.fqdn if c and c.ingress and c.ingress.fqdn else "pending"
 ))
-pulumi.export("material_job_name", material_job.name)
+if material_job is not None:
+    pulumi.export("material_job_name", material_job.name)
 
 # Email outputs — see DNS records the user must add at their registrar.
 for key, value in email_dns_outputs.items():
