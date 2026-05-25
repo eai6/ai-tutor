@@ -49,6 +49,11 @@ on:
         options:
           - deploy
           - full
+      run_pgvector_port:
+        description: 'Run one-time ChromaDB→pgvector port + KB coverage audit after deploy (use after the PR #11 migration lands on this stack)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   ACR: ${{ secrets.ACR_LOGIN_SERVER }}
@@ -263,3 +268,116 @@ jobs:
             git push -u origin eval-reports
             echo "::notice title=Eval report committed::eval-reports branch ${REL_DIR}"
           fi
+
+  # ─────────────────────────────────────────────────────────────────
+  # One-time ChromaDB → pgvector port + KB coverage audit
+  # ─────────────────────────────────────────────────────────────────
+  #
+  # OPT-IN. Set `run_pgvector_port=true` on a workflow_dispatch run,
+  # AFTER the PR #11 (pgvector) deploy has rolled out cleanly on
+  # this stack. Idempotent — re-running is safe (existing chunks
+  # are upserted, count reports 0 new + N updated).
+  #
+  # Why this job runs on the runner (not in the deployed container):
+  #   - `az containerapp exec` requires interactive TTY → unusable in CI
+  #   - `chromadb` was deliberately dropped from requirements.txt in
+  #     Phase 7; we don't want to put it back permanently
+  #   - The runner can pip-install chromadb just for this one job,
+  #     download vectordb from the share via azcopy, and connect
+  #     directly to the target Postgres
+  #
+  # Pre-requisites:
+  #   - Repo secrets: PROD_DB_PASSWORD (the Pulumi-managed db-password
+  #     for this stack — see infra/Pulumi.pixel.yaml)
+  #   - AZURE_CREDENTIALS already grants the SP Contributor on the RG
+  post_deploy_pgvector_port:
+    name: Post-deploy ChromaDB → pgvector port + audit
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: ${{ success() && github.event.inputs.run_pgvector_port == 'true' }}
+    timeout-minutes: 30
+    env:
+      PG_SERVER: aitutor-pixel-pg
+      PG_FQDN: aitutor-pixel-pg.postgres.database.azure.com
+      STORAGE_ACCOUNT: aitutorpixelsa
+      DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install deps + chromadb (CI-only, transitional)
+        run: |
+          pip install -r requirements.txt
+          pip install chromadb==1.5.0
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install azcopy
+        run: |
+          curl -L https://aka.ms/downloadazcopy-v10-linux -o /tmp/azcopy.tgz
+          tar -xzf /tmp/azcopy.tgz -C /tmp
+          sudo mv /tmp/azcopy_linux_amd64_*/azcopy /usr/local/bin/azcopy
+          azcopy --version
+
+      - name: Open Postgres firewall to runner
+        id: fw
+        run: |
+          IP=$(curl -sS https://api.ipify.org)
+          RULE="ci-pgvector-port-${{ github.run_id }}"
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "rule=$RULE" >> $GITHUB_OUTPUT
+          az postgres flexible-server firewall-rule create \
+            --resource-group $RG \
+            --name $PG_SERVER \
+            --rule-name "$RULE" \
+            --start-ip-address $IP --end-ip-address $IP \
+            -o none
+
+      - name: Download vectordb snapshot from share
+        run: |
+          KEY=$(az storage account keys list \
+            --account-name $STORAGE_ACCOUNT --resource-group $RG \
+            --query '[0].value' -o tsv)
+          EXPIRY=$(date -u -d "+2 hour" +"%Y-%m-%dT%H:%MZ")
+          SAS=$(az storage share generate-sas \
+            --name media --account-name $STORAGE_ACCOUNT --account-key "$KEY" \
+            --permissions rl --expiry "$EXPIRY" -o tsv)
+          azcopy copy \
+            "https://${STORAGE_ACCOUNT}.file.core.windows.net/media/vectordb?${SAS}" \
+            ./vectordb_snapshot \
+            --recursive --log-level=ERROR
+          du -sh ./vectordb_snapshot
+
+      - name: Run port + audit
+        env:
+          DATABASE_URL: postgres://aitutoradmin:${{ env.DB_PASSWORD }}@${{ env.PG_FQDN }}:5432/aitutor?sslmode=require
+          SECRET_KEY: ci-port-job-not-secret
+          DEBUG: 'False'
+          ALLOWED_HOSTS: '*'
+          EMBEDDING_BACKEND: local
+        run: |
+          set -euo pipefail
+          echo "::group::ChromaDB → pgvector port"
+          python manage.py port_chromadb_to_pgvector --vectordb-path ./vectordb_snapshot/vectordb
+          echo "::endgroup::"
+          echo "::group::KB coverage audit"
+          python manage.py audit_kb_coverage
+          echo "::endgroup::"
+
+      - name: Close Postgres firewall
+        if: always() && steps.fw.outputs.rule != ''
+        run: |
+          az postgres flexible-server firewall-rule delete \
+            --resource-group $RG \
+            --name $PG_SERVER \
+            --rule-name "${{ steps.fw.outputs.rule }}" \
+            --yes -o none || true

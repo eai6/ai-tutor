@@ -141,3 +141,60 @@ class HelpAssistantToolCall(models.Model):
 
     def __str__(self):
         return f"{self.tool_name} [{self.status}]"
+
+
+# ─── Help-assistant KB chunk (pgvector) ────────────────────────────────
+# Replaces the ChromaDB-backed HelpKB at apps/support/kb.py. Same
+# embedding model (sentence-transformers all-MiniLM-L6-v2, 384 d)
+# and same audience metadata, but stored in Postgres so the index
+# survives container restarts. Previously HelpKB lived under
+# /tmp/vectordb/support which was wiped on every deploy + re-built
+# from source by ``python manage.py build_help_index`` in the
+# Dockerfile CMD — the rebuild masked the persistence bug, but at
+# the cost of a slow cold-start step that's now redundant.
+import hashlib  # noqa: E402
+
+from apps.curriculum.vector_field import VectorField  # noqa: E402
+
+
+class SupportChunk(models.Model):
+    """One chunk of help/admin documentation. pgvector-backed."""
+
+    # Stable chunk id — set by the indexer (e.g. 'help_faq:dashboard').
+    # The same id is reused across rebuilds so re-indexing updates in
+    # place instead of duplicating.
+    chunk_id = models.CharField(max_length=200, unique=True)
+
+    content = models.TextField()
+    embedding = VectorField(
+        dimensions=384,
+        help_text="sentence-transformers all-MiniLM-L6-v2 vector. text column on SQLite.",
+    )
+    content_hash = models.CharField(max_length=64, db_index=True)
+
+    source = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text="help_faq / admin_guide / dashboard / etc."
+    )
+    section_title = models.CharField(max_length=200, blank=True, default='')
+    audience = models.CharField(
+        max_length=32, default='all',
+        help_text="'all' (visible to students + teachers) or 'staff' (teachers + super_admins only)."
+    )
+    anchor = models.CharField(max_length=200, blank=True, default='')
+    extra = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['source', 'audience'], name='supportchunk_src_aud_idx'),
+        ]
+
+    def __str__(self):
+        return f"SupportChunk(id={self.chunk_id!r}, src={self.source!r}, aud={self.audience!r})"
+
+    @staticmethod
+    def compute_hash(content: str) -> str:
+        return hashlib.sha256(content.encode('utf-8')).hexdigest()

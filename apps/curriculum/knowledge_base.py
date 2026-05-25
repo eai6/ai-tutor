@@ -83,6 +83,15 @@ class CurriculumKnowledgeBase:
     Supports two-tier retrieval: institution-specific KB + global/platform KB (institution_id=0).
     """
 
+    # The canonical "platform-wide" bucket id. Every chunk that should
+    # be visible to every school's tutor lives at institution_id=0.
+    # Historical bug: many call sites used ``Institution.get_global().id``
+    # (= 12, the DB Institution row PK) thinking it was the same thing.
+    # It isn't — the KB never indexed there. The result was that
+    # "All Schools" uploads landed at id=12 while every per-institution
+    # query merged from id=0, which was empty → silent inheritance
+    # failure. ``__init__`` now defensively normalises 12 → 0 so we
+    # can't repeat that. New code should use this constant directly.
     GLOBAL_INSTITUTION_ID = 0
     # Minimum number of results from institution KB before we skip global fallback
     FALLBACK_THRESHOLD = 3
@@ -95,105 +104,94 @@ class CurriculumKnowledgeBase:
         """Get the global/platform-level knowledge base (OpenStax, shared resources)."""
         return cls(institution_id=cls.GLOBAL_INSTITUTION_ID)
 
-    def __init__(self, institution_id: int, persist_directory: str = None):
+    @classmethod
+    def _normalise_institution_id(cls, institution_id) -> int:
+        """Resolve any caller-supplied "Global" identifier to ``GLOBAL_INSTITUTION_ID``.
+
+        Accepts ``None`` (no course-institution), the canonical 0, or
+        the DB row PK of the ``Institution.get_global()`` row (= 12 in
+        prod). All three route to the same bucket. Anything else is
+        passed through unchanged (= a real per-school institution PK).
+
+        This is the safety net that prevents the inheritance failure
+        we hit in production: a teacher uploads under "All Schools",
+        the upload code resolves None to ``Institution.get_global().id``
+        (= 12), but the KB at runtime queries the global bucket at 0.
+        Without this normalisation those two values index different
+        buckets and the school-level query gets nothing back from
+        global. See memory/pgvector_migration_plan.md.
         """
-        Initialize the knowledge base.
-        
+        if institution_id is None:
+            return cls.GLOBAL_INSTITUTION_ID
+        if institution_id == cls.GLOBAL_INSTITUTION_ID:
+            return cls.GLOBAL_INSTITUTION_ID
+        # Resolve the "Global (All Schools)" Institution row's PK once
+        # and check against it. Cached at class level so we don't hit
+        # the DB on every KB instantiation.
+        try:
+            global_pk = getattr(cls, '_cached_global_pk', None)
+            if global_pk is None:
+                from apps.accounts.models import Institution
+                global_pk = Institution.get_global().id
+                cls._cached_global_pk = global_pk
+            if institution_id == global_pk:
+                logger.debug(
+                    "[KB] normalised Institution.get_global().id (%s) → "
+                    "GLOBAL_INSTITUTION_ID (%s). Caller should switch to "
+                    "the canonical constant; this normalisation is a "
+                    "defensive shim.",
+                    global_pk, cls.GLOBAL_INSTITUTION_ID,
+                )
+                return cls.GLOBAL_INSTITUTION_ID
+        except Exception:
+            # Don't let a DB failure here block KB init — fall back to
+            # the raw value.
+            pass
+        return institution_id
+
+    def __init__(self, institution_id: int, persist_directory: str = None):
+        """Initialize the knowledge base.
+
         Args:
             institution_id: ID of the institution (for data isolation)
-            persist_directory: Where to store the vector DB (default: MEDIA_ROOT/vectordb/)
+            persist_directory: Ignored (kept for back-compat with the
+                ChromaDB era). Storage is now in Postgres via
+                ``apps.curriculum.kb_storage`` — see
+                ``memory/pgvector_migration_plan.md``.
         """
-        self.institution_id = institution_id if institution_id is not None else self.GLOBAL_INSTITUTION_ID
-        
-        # Set up persistence directory
-        if persist_directory is None:
-            from django.conf import settings
-            persist_directory = os.path.join(
-                getattr(settings, 'VECTORDB_ROOT',
-                        os.path.join(getattr(settings, 'MEDIA_ROOT', '/tmp'), 'vectordb')),
-                f'institution_{self.institution_id}'
-            )
-        
-        self.persist_directory = persist_directory
-        os.makedirs(persist_directory, exist_ok=True)
-        
-        # Initialize ChromaDB
-        self._init_chromadb()
-        
-        # Collection name for this institution
-        self.collection_name = f"curriculum_{institution_id}"
-    
-    def _init_chromadb(self):
-        """Initialize ChromaDB client and embedding function."""
-        try:
-            import chromadb
-            from django.conf import settings as django_settings
+        # Defensive normalisation. Routes None and
+        # Institution.get_global().id (= 12) to the canonical 0.
+        # See ``_normalise_institution_id`` for why.
+        self.institution_id = self._normalise_institution_id(institution_id)
+        self.collection_name = f"curriculum_{self.institution_id}"
+        # ``persist_directory`` retained as an attribute purely so
+        # legacy log lines / debugging code that inspects it doesn't
+        # crash. It points nowhere real now.
+        self.persist_directory = persist_directory or f"<pgvector:institution_{self.institution_id}>"
 
-            # Use the new persistent client API
-            self.chroma_client = chromadb.PersistentClient(
-                path=self.persist_directory
+        # Storage backend availability: signal in the same shape the
+        # ChromaDB era exposed. Used by ``_index_chunks`` etc. to
+        # bail out cleanly on backends where vector storage isn't
+        # available (SQLite local dev / CI).
+        from django.db import connection
+        self._storage_available = connection.vendor == 'postgresql'
+        if not self._storage_available:
+            logger.info(
+                "[KB] storage backend=%s — vector ops are no-ops (SQLite local dev / CI)",
+                connection.vendor,
             )
 
-            # Reuse shared embedding function (load model only once across all instances)
-            if CurriculumKnowledgeBase._shared_embedding_fn is None:
-                from chromadb.utils import embedding_functions
-
-                embedding_backend = getattr(django_settings, 'EMBEDDING_BACKEND', 'local')
-
-                if embedding_backend == 'openai':
-                    api_key = getattr(django_settings, 'OPENAI_API_KEY', '')
-                    CurriculumKnowledgeBase._shared_embedding_fn = (
-                        embedding_functions.OpenAIEmbeddingFunction(
-                            api_key=api_key,
-                            model_name="text-embedding-3-small",
-                        )
-                    )
-                    logger.info("Using OpenAI embedding API (text-embedding-3-small)")
-                else:
-                    CurriculumKnowledgeBase._shared_embedding_fn = (
-                        embedding_functions.SentenceTransformerEmbeddingFunction(
-                            model_name="all-MiniLM-L6-v2"
-                        )
-                    )
-                    logger.info("Using local sentence-transformers embedding model")
-
-            self.embedding_fn = CurriculumKnowledgeBase._shared_embedding_fn
-
-            self._chromadb_available = True
-            logger.info(f"ChromaDB initialized at {self.persist_directory}")
-
-        except ImportError as e:
-            logger.warning(f"ChromaDB not available: {e}. Install with: pip install chromadb sentence-transformers")
-            self._chromadb_available = False
-            self.chroma_client = None
-            self.embedding_fn = None
-    
     def _get_collection(self):
-        """Get or create the curriculum collection."""
-        if not self._chromadb_available:
-            return None
+        """Back-compat shim — no longer returns a ChromaDB collection.
 
-        try:
-            return self.chroma_client.get_or_create_collection(
-                name=self.collection_name,
-                embedding_function=self.embedding_fn,
-                metadata={"institution_id": self.institution_id}
-            )
-        except Exception as e:
-            if 'embedding function' in str(e).lower() or 'conflict' in str(e).lower():
-                # Embedding function changed (e.g., openai -> sentence_transformer)
-                # Delete old collection and recreate with new embedding
-                logger.warning(f"Embedding conflict for {self.collection_name} — recreating collection: {e}")
-                try:
-                    self.chroma_client.delete_collection(name=self.collection_name)
-                except Exception:
-                    pass
-                return self.chroma_client.get_or_create_collection(
-                    name=self.collection_name,
-                    embedding_function=self.embedding_fn,
-                    metadata={"institution_id": self.institution_id}
-                )
-            raise
+        Returns a sentinel that's truthy when storage is available so
+        the legacy ``if collection is None`` guards in this file still
+        short-circuit correctly on SQLite. Direct calls to
+        ``collection.upsert`` / ``collection.query`` no longer exist;
+        every old call site has been ported to
+        ``apps.curriculum.kb_storage`` primitives.
+        """
+        return self if self._storage_available else None
     
     # ========================================================================
     # STEP 1 & 2: PARSE AND VECTORIZE
@@ -581,29 +579,22 @@ class CurriculumKnowledgeBase:
         return chunks
 
     def _index_chunks(self, chunks: List[CurriculumChunk]) -> Dict:
-        """Index chunks into the vector database."""
-        if not self._chromadb_available:
-            logger.warning("ChromaDB not available, skipping indexing")
-            return {"indexed": 0, "error": "ChromaDB not installed"}
-        
-        collection = self._get_collection()
-        
-        # Prepare data for ChromaDB
-        ids = [chunk.id for chunk in chunks]
-        documents = [chunk.content for chunk in chunks]
-        metadatas = [chunk.metadata for chunk in chunks]
-        
-        # Add to collection (upsert to handle duplicates)
-        collection.upsert(
-            ids=ids,
-            documents=documents,
-            metadatas=metadatas
-        )
-        
-        # PersistentClient auto-persists, no need to call persist()
-        
-        logger.info(f"Indexed {len(chunks)} chunks into ChromaDB")
-        return {"indexed": len(chunks)}
+        """Index chunks into pgvector.
+
+        Was ChromaDB ``collection.upsert(ids, documents, metadatas)``;
+        now routes through ``kb_storage.upsert_chunks`` which writes
+        to the ``CurriculumChunk`` Postgres model. Dedup key is
+        ``(institution_id, content_hash)`` — re-indexing the same
+        content updates in place.
+        """
+        if not self._storage_available:
+            logger.warning("[KB] _index_chunks: storage unavailable, skipping")
+            return {"indexed": 0, "error": "vector storage unavailable on this backend"}
+
+        from apps.curriculum.kb_storage import upsert_chunks
+        result = upsert_chunks(self.institution_id, chunks)
+        logger.info(f"[KB] Indexed {result.get('indexed', 0)} chunks via pgvector")
+        return result
     
     def index_teaching_material(
         self,
@@ -831,25 +822,40 @@ class CurriculumKnowledgeBase:
         subject: str,
         n_results: int = 5,
         grade_level: str = "",
+        course=None,
+        institution_boost: float = 0.7,
     ) -> List[Dict]:
-        """
-        Query ChromaDB for figure descriptions related to a topic.
+        """Retrieve figure descriptions matching ``topic`` from the institution
+        KB AND the global KB, merged by distance.
+
+        Inheritance model (parity with ``query_with_global_fallback``):
+        every school inherits the global figure library by default. The
+        institution's own indexed figures are **additive** — they layer on
+        top and are preferred by ``institution_boost`` (lower distance
+        multiplier ⇒ higher rank), but the global library is queried
+        unconditionally so a school that has no locally indexed figures
+        still sees platform-wide figures for the subject + grade.
+
+        Dedupe key: ``figure_image_url`` (same image re-indexed at both
+        tiers collapses to the institution copy).
 
         Args:
             topic: Topic to search for (e.g., lesson title)
             subject: Subject name for filtering
-            n_results: Max results to return
+            n_results: Max results to return after merge
             grade_level: Grade level for filtering (e.g., "S1"). Empty = all.
+            course: Optional Course context — when set with subject_code +
+                grade_levels, the global tier is restricted to chunks from
+                platform-wide courses matching that subject + grade. Same
+                semantics as ``query_with_global_fallback(course=...)``.
+            institution_boost: Multiplier on institution distances. < 1.0
+                prefers institution figures in the post-merge ranking.
 
         Returns:
-            List of dicts with description, figure_type, figure_number,
-            image_url, source_file
+            List of dicts with keys: description, figure_type, figure_number,
+            image_url, source_file, figure_page, source_tier.
         """
-        if not self._chromadb_available:
-            return []
-
-        collection = self._get_collection()
-        if collection is None:
+        if not self._storage_available:
             return []
 
         # Build filter — always require figure_description type + subject
@@ -865,32 +871,96 @@ class CurriculumKnowledgeBase:
                 grade_match = grade_list + ([grade_level] if len(grade_list) > 1 else []) + ['']
                 where_conditions.append({"grade_level": {"$in": grade_match}})
 
+        base_filter = {"$and": where_conditions}
+
+        from apps.curriculum.kb_storage import query_chunks
+
+        # --- Institution tier ---
         try:
-            results = collection.query(
-                query_texts=[topic],
+            inst_results = query_chunks(
+                institution_id=self.institution_id,
+                query_text=topic,
                 n_results=n_results,
-                where={"$and": where_conditions},
+                where_filter=base_filter,
             )
         except Exception as e:
-            logger.warning(f"Figure description query failed: {e}")
-            return []
+            logger.warning(f"Figure description query (institution) failed: {e}")
+            inst_results = None
 
-        if not results or not results.get('documents') or not results['documents'][0]:
-            return []
+        merged: List[Dict] = []
+        seen_urls = set()
 
-        figures = []
-        for i, doc in enumerate(results['documents'][0]):
-            meta = results['metadatas'][0][i] if results.get('metadatas') else {}
-            figures.append({
+        def _append(doc: str, meta: Dict, raw_dist: float, tier: str, boost: float):
+            url = (meta or {}).get('figure_image_url', '')
+            if url and url in seen_urls:
+                return
+            if url:
+                seen_urls.add(url)
+            merged.append({
                 'description': doc,
-                'figure_type': meta.get('figure_type', ''),
-                'figure_number': meta.get('figure_number', ''),
-                'image_url': meta.get('figure_image_url', ''),
-                'source_file': meta.get('source_file', ''),
-                'figure_page': meta.get('figure_page', 0),
+                'figure_type': (meta or {}).get('figure_type', ''),
+                'figure_number': (meta or {}).get('figure_number', ''),
+                'image_url': url,
+                'source_file': (meta or {}).get('source_file', ''),
+                'figure_page': (meta or {}).get('figure_page', 0),
+                'distance': raw_dist * boost,
+                'raw_distance': raw_dist,
+                'source_tier': tier,
             })
 
-        return figures
+        if inst_results and inst_results.get('documents') and inst_results['documents'][0]:
+            docs = inst_results['documents'][0]
+            metas = inst_results.get('metadatas', [[]])[0] or [{}] * len(docs)
+            dists = inst_results.get('distances', [[]])[0] or [1.0] * len(docs)
+            for doc, meta, dist in zip(docs, metas, dists):
+                _append(doc, meta, dist, 'institution', institution_boost)
+
+        # --- Global tier (always merged when caller is a school) ---
+        # Mirrors query_with_global_fallback semantics: global is the
+        # baseline, institution is additive. Skipped only when self IS
+        # the global KB.
+        if self.institution_id != self.GLOBAL_INSTITUTION_ID:
+            try:
+                global_filter = self._build_global_filter(base_filter, course)
+                global_results = query_chunks(
+                    institution_id=self.GLOBAL_INSTITUTION_ID,
+                    query_text=topic,
+                    n_results=n_results,
+                    where_filter=global_filter,
+                )
+            except Exception as e:
+                logger.warning(f"Figure description query (global) failed: {e}")
+                global_results = None
+
+            if global_results and global_results.get('documents') and global_results['documents'][0]:
+                docs = global_results['documents'][0]
+                metas = global_results.get('metadatas', [[]])[0] or [{}] * len(docs)
+                dists = global_results.get('distances', [[]])[0] or [1.0] * len(docs)
+                for doc, meta, dist in zip(docs, metas, dists):
+                    _append(doc, meta, dist, 'global', 1.0)
+
+        merged.sort(key=lambda x: x['distance'])
+        final = merged[:n_results]
+
+        # Observability: same shape as query_with_global_fallback's log.
+        if self.institution_id != self.GLOBAL_INSTITUTION_ID:
+            inst_hits = sum(1 for r in final if r.get('source_tier') == 'institution')
+            global_hits = sum(1 for r in final if r.get('source_tier') == 'global')
+            if global_hits == 0:
+                logger.warning(
+                    "[KB figures] inheritance MISS: institution_id=%s subject=%s "
+                    "grade=%s — %s institution + 0 global figures. Global figure "
+                    "library may be empty for this subject/grade.",
+                    self.institution_id, subject, grade_level or '*', inst_hits,
+                )
+            else:
+                logger.info(
+                    "[KB figures] inheritance hit: institution_id=%s subject=%s "
+                    "— %s institution + %s global (post-merge top-%s)",
+                    self.institution_id, subject, inst_hits, global_hits, n_results,
+                )
+
+        return final
 
     # ========================================================================
     # STEP 3: GENERATE LESSONS (Query for structure)
@@ -917,7 +987,7 @@ class CurriculumKnowledgeBase:
         Returns:
             QueryResult with relevant curriculum chunks
         """
-        if not self._chromadb_available:
+        if not self._storage_available:
             return QueryResult(
                 chunks=[],
                 context_summary="Vector database not available",
@@ -968,7 +1038,7 @@ class CurriculumKnowledgeBase:
         that can be analyzed by an LLM to produce standardized competency statements.
         This is format-agnostic — works regardless of document structure.
         """
-        if not self._chromadb_available:
+        if not self._storage_available:
             return QueryResult(chunks=[], context_summary="", teaching_strategies=[], objectives=[])
 
         query_text = (
@@ -1015,7 +1085,7 @@ class CurriculumKnowledgeBase:
         Returns:
             QueryResult with teaching strategies, objectives, and content
         """
-        if not self._chromadb_available:
+        if not self._storage_available:
             return QueryResult(
                 chunks=[],
                 context_summary="",
@@ -1074,7 +1144,7 @@ class CurriculumKnowledgeBase:
         Returns:
             QueryResult with relevant teaching strategies and content
         """
-        if not self._chromadb_available:
+        if not self._storage_available:
             return QueryResult(
                 chunks=[],
                 context_summary=f"Teaching {lesson.title}",
@@ -1139,7 +1209,7 @@ class CurriculumKnowledgeBase:
             Each dict represents a real exam question with available metadata
             (year, paper_number, question_type, has_answers, etc.)
         """
-        if not self._chromadb_available:
+        if not self._storage_available:
             return []
 
         query_text = f"{lesson_title} {lesson_objective} exam question assessment"
@@ -1233,19 +1303,29 @@ class CurriculumKnowledgeBase:
         institution_boost: float = 0.7,
         course=None,
     ) -> List[Dict]:
-        """
-        Query institution KB AND global KB in parallel, merge results.
+        """Two-tier retrieval: global baseline + institution additive.
 
-        Behavior change (R2.2 — memory/curriculum_material_sharing_plan.md):
-        Previously this method only queried global KB when the institution
-        result set was thin (< FALLBACK_THRESHOLD). That meant a school's
-        course with even ONE indexed material never benefited from the
-        platform-wide textbooks. New behavior: ALWAYS merge global results
-        when the calling KB is a school KB.
+        Inheritance model (canonical):
+        - **Global KB is the baseline** every school inherits unconditionally.
+          It is queried on EVERY call regardless of whether the institution
+          KB returned hits. There is no threshold gate.
+        - **Institution KB is purely additive.** When a school has its own
+          indexed materials they layer on top of the global baseline and
+          are preferred in the post-merge ranking via ``institution_boost``
+          (< 1.0 multiplier on distance ⇒ higher rank). Empty institution
+          KB ⇒ caller transparently sees global results only.
 
-        Method name kept for back-compat with the 6 existing call sites.
-        Per-batch behavior, distance ranking, source_tier labels — all
-        unchanged.
+        Dedupe: identical content across tiers collapses to the
+        institution copy (a school that re-indexes a platform-wide PDF
+        locally shouldn't double-count).
+
+        History: a prior version of this method gated the global query
+        behind a FALLBACK_THRESHOLD ("only query global when institution
+        results are thin"). That regressed inheritance for any school
+        with even one indexed material. Removed R2.2 — see
+        memory/curriculum_material_sharing_plan.md. The method name is
+        retained for back-compat; ``query_with_global_merge`` is the
+        canonical alias.
 
         Args:
             query_text: The search query
@@ -1261,17 +1341,18 @@ class CurriculumKnowledgeBase:
         Returns:
             List of dicts with keys: content, metadata, distance, source_tier
         """
-        if not self._chromadb_available:
+        if not self._storage_available:
             return []
 
+        from apps.curriculum.kb_storage import query_chunks
+
         # --- Query institution KB ---
-        collection = self._get_collection()
         try:
-            inst_results = collection.query(
-                query_texts=[query_text],
+            inst_results = query_chunks(
+                institution_id=self.institution_id,
+                query_text=query_text,
                 n_results=n_results,
-                where=where_filter,
-                include=["documents", "metadatas", "distances"]
+                where_filter=where_filter,
             )
         except Exception as e:
             logger.warning(f"Institution KB query failed: {e}")
@@ -1289,16 +1370,15 @@ class CurriculumKnowledgeBase:
                     "source_tier": "institution",
                 })
 
-        # --- Always-merge global KB ---
+        # --- Global tier (baseline — queried on every call) ---
+        # Global is the default knowledge surface every school inherits.
+        # Institution results above are additive, not a replacement.
         # Skipped only when the caller IS the global KB (would double-count
-        # the same chunks). FALLBACK_THRESHOLD gate intentionally removed:
-        # platform-wide materials should be visible to every school course
-        # that matches by subject + grade.
+        # the same chunks). No threshold gate — the previous FALLBACK_THRESHOLD
+        # behavior was reverted because it broke inheritance the moment a
+        # school had even one indexed material.
         if self.institution_id != self.GLOBAL_INSTITUTION_ID:
             try:
-                global_kb = CurriculumKnowledgeBase(institution_id=self.GLOBAL_INSTITUTION_ID)
-                global_collection = global_kb._get_collection()
-
                 # Build the global filter. Preferred path (when caller
                 # passed a Course with subject_code): look up matching
                 # platform-wide upload_ids and restrict the global query
@@ -1306,11 +1386,11 @@ class CurriculumKnowledgeBase:
                 # subject-string filter (the legacy behavior).
                 global_filter = self._build_global_filter(where_filter, course)
 
-                global_results = global_collection.query(
-                    query_texts=[query_text],
+                global_results = query_chunks(
+                    institution_id=self.GLOBAL_INSTITUTION_ID,
+                    query_text=query_text,
                     n_results=n_results,
-                    where=global_filter,
-                    include=["documents", "metadatas", "distances"]
+                    where_filter=global_filter,
                 )
 
                 if global_results and global_results.get('documents') and global_results['documents'][0]:
@@ -1335,7 +1415,33 @@ class CurriculumKnowledgeBase:
 
         # Sort by adjusted distance (lower = more relevant), take top N
         merged.sort(key=lambda x: x["distance"])
-        return merged[:n_results]
+        final = merged[:n_results]
+
+        # Observable inheritance: every query logs the global/institution
+        # split so a "global baseline silently empty" regression is visible
+        # in containerapp logs immediately. Critical because the upstream
+        # default of routing "All Schools" uploads to id=12 (vs the KB's
+        # canonical 0) caused exactly this silent failure in prod.
+        inst_hits = sum(1 for r in final if r.get('source_tier') == 'institution')
+        global_hits = sum(1 for r in final if r.get('source_tier') == 'global')
+        if self.institution_id != self.GLOBAL_INSTITUTION_ID:
+            if global_hits == 0:
+                # The baseline (global) returned 0 — every school query
+                # should see global by default, so this is a real signal.
+                logger.warning(
+                    "[KB] global-baseline MISS: institution_id=%s returned %s "
+                    "institution hits + 0 global. Global KB may be empty "
+                    "for this subject/grade — verify 'All Schools' uploads "
+                    "have been indexed and are filterable by this where.",
+                    self.institution_id, inst_hits,
+                )
+            else:
+                logger.info(
+                    "[KB] inheritance OK: institution_id=%s — %s institution "
+                    "+ %s global (post-merge top-%s; global baseline present)",
+                    self.institution_id, inst_hits, global_hits, n_results,
+                )
+        return final
 
     # Alias under the new name so future callers can use the more accurate
     # `query_with_global_merge` without changing every existing caller.
@@ -1553,50 +1659,39 @@ class CurriculumKnowledgeBase:
     
     def get_collection_stats(self) -> Dict:
         """Get statistics about the indexed curriculum."""
-        if not self._chromadb_available:
-            return {"error": "ChromaDB not available"}
-        
-        collection = self._get_collection()
-        count = collection.count()
-        
-        return {
-            "collection_name": self.collection_name,
-            "total_chunks": count,
-            "persist_directory": self.persist_directory,
-        }
-    
+        from apps.curriculum.kb_storage import collection_stats
+        return collection_stats(self.institution_id)
+
     def clear_collection(self):
         """Clear all indexed content for this institution."""
-        if not self._chromadb_available:
+        if not self._storage_available:
             return
-        
-        self.chroma_client.delete_collection(self.collection_name)
-        logger.info(f"Cleared collection: {self.collection_name}")
-    
+        from apps.curriculum.kb_storage import clear_institution
+        clear_institution(self.institution_id)
+        logger.info(f"Cleared chunks for institution_id={self.institution_id}")
+
     def search(self, query: str, n_results: int = 5, filters: Dict = None) -> List[Dict]:
-        """
-        Simple semantic search across the curriculum.
-        
+        """Simple semantic search across the curriculum.
+
         Args:
             query: Search query
             n_results: Number of results
             filters: Optional metadata filters
-        
+
         Returns:
             List of matching chunks
         """
-        if not self._chromadb_available:
+        if not self._storage_available:
             return []
-        
-        collection = self._get_collection()
-        
-        results = collection.query(
-            query_texts=[query],
+
+        from apps.curriculum.kb_storage import query_chunks
+        results = query_chunks(
+            institution_id=self.institution_id,
+            query_text=query,
             n_results=n_results,
-            where=filters,
-            include=["documents", "metadatas", "distances"]
+            where_filter=filters,
         )
-        
+
         output = []
         if results and results.get('documents') and results['documents'][0]:
             for i, doc in enumerate(results['documents'][0]):
@@ -1605,7 +1700,7 @@ class CurriculumKnowledgeBase:
                     "metadata": results['metadatas'][0][i] if results.get('metadatas') else {},
                     "distance": results['distances'][0][i] if results.get('distances') else None,
                 })
-        
+
         return output
 
 

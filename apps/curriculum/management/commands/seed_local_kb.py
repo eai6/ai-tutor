@@ -62,16 +62,17 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         from apps.curriculum.knowledge_base import get_knowledge_base
-        from django.conf import settings
 
+        # ``--reset`` used to rmtree ``VECTORDB_ROOT/institution_0``
+        # (the old ChromaDB on-disk path). Vectors now live in
+        # Postgres via pgvector — there's no on-disk path to remove;
+        # use the KB's public clear() instead.
         if opts.get("reset"):
-            persist_dir = Path(settings.VECTORDB_ROOT) / "institution_0"
-            if persist_dir.exists():
-                self.stdout.write(
-                    self.style.WARNING(f"Wiping {persist_dir} ...")
-                )
-                import shutil
-                shutil.rmtree(persist_dir, ignore_errors=True)
+            kb_for_reset = get_knowledge_base(0)
+            self.stdout.write(self.style.WARNING(
+                "Clearing institution_id=0 (Global) chunks from CurriculumChunk..."
+            ))
+            kb_for_reset.clear_collection()
 
         if opts.get("file"):
             docs = [{
