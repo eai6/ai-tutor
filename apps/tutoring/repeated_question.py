@@ -57,14 +57,23 @@ _STOPWORDS: Set[str] = {
 # is X's function?") which only score ~0.5 Jaccard despite being the
 # same question semantically. Strong threshold deliberately low; the
 # LLM judge filters false-positives in the borderline zone.
+# PR2 (2026-05-25): STRONG dropped from 0.55 → 0.45 so the deterministic
+# guard catches more paraphrase repeats without depending on the LLM
+# borderline check. False positives just cost an extra regen cycle;
+# false negatives ship the repeat to the student.
 JACCARD_EXACT_REPEAT     = 0.75   # near-identical signature → definite
-JACCARD_STRONG_REPEAT    = 0.55   # strong overlap → repeat
+JACCARD_STRONG_REPEAT    = 0.45   # strong overlap → repeat
 JACCARD_BORDERLINE_LOW   = 0.20   # below this → LLM not called (clean)
                                   # Low because short questions (3-5 sig
                                   # tokens) score low Jaccard despite
                                   # being semantically identical. LLM
                                   # filters false-positives.
 ACTIVE_PARAPHRASE_THRESH = 0.45   # paraphrase of CURRENT active bank Q
+
+# Max number of borderline pairs to send to the LLM judge per turn.
+# Each pair = one LLM call; cap prevents runaway cost when an authored
+# response touches many prior questions on borderline overlap.
+MAX_LLM_BORDERLINE_PAIRS = 3
 
 
 @dataclass
@@ -304,42 +313,51 @@ def detect_repeated_question(
     if not borderline or llm_client is None:
         return None
 
-    # Call the unified grader's JUDGE_REPEAT path with the first
-    # borderline pair (most ambiguous case).
+    # Call the unified grader's JUDGE_REPEAT path on up to
+    # MAX_LLM_BORDERLINE_PAIRS pairs. The previous version only checked
+    # borderline[0] — repeats in any later pair slipped through silently.
     from apps.tutoring.exit_ticket_grader import (
         BatchRepeatItem, JudgmentType, run_grading_batch,
     )
-    new_q, matched_text = borderline[0]
-    item = BatchRepeatItem(
-        index=0, new_question=new_q,
-        previous_questions=[matched_text],
-    )
+    pairs = borderline[:MAX_LLM_BORDERLINE_PAIRS]
+    items = [
+        BatchRepeatItem(
+            index=idx, new_question=new_q,
+            previous_questions=[matched_text],
+        )
+        for idx, (new_q, matched_text) in enumerate(pairs)
+    ]
     try:
         results = run_grading_batch(
-            [item], judgment_type=JudgmentType.JUDGE_REPEAT, llm_client=llm_client,
+            items, judgment_type=JudgmentType.JUDGE_REPEAT, llm_client=llm_client,
         )
     except Exception as exc:
         logger.warning("[RepeatDetect] LLM judge crash: %s", exc)
         return None
 
-    if not results or not results[0].repeated:
+    if not results:
         return None
-    r = results[0]
-    elapsed = int((time.monotonic() - t0) * 1000)
-    logger.info(
-        "[RepeatDetect] LLM flagged borderline — reason=%r — %d ms",
-        r.reason[:120], elapsed,
-    )
-    return RepeatVerdict(
-        repeated=True,
-        reason=r.reason or 'LLM judge flagged borderline overlap',
-        repeat_kind='cross_turn',
-        matched_question=matched_text[:200],
-        new_question=new_q,
-        jaccard=0.0,  # borderline — exact value irrelevant for LLM-driven
-        sources=['llm'],
-        elapsed_ms=elapsed,
-    )
+    # Return the first positive verdict (results match input order).
+    for r in results:
+        if not getattr(r, 'repeated', False):
+            continue
+        new_q, matched_text = pairs[r.index]
+        elapsed = int((time.monotonic() - t0) * 1000)
+        logger.info(
+            "[RepeatDetect] LLM flagged borderline pair %d/%d — reason=%r — %d ms",
+            r.index + 1, len(pairs), (r.reason or '')[:120], elapsed,
+        )
+        return RepeatVerdict(
+            repeated=True,
+            reason=r.reason or 'LLM judge flagged borderline overlap',
+            repeat_kind='cross_turn',
+            matched_question=matched_text[:200],
+            new_question=new_q,
+            jaccard=0.0,  # borderline — exact value irrelevant for LLM-driven
+            sources=['llm'],
+            elapsed_ms=elapsed,
+        )
+    return None
 
 
 # ---------------------------------------------------------------------
