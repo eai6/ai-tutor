@@ -395,6 +395,7 @@ class Question:
         llm_client=None,
         kb_context: str = "",
         is_math: bool = False,
+        committed_canonical=None,
     ):
         """Grade a student's input against this question.
 
@@ -405,6 +406,12 @@ class Question:
           - No canonical (chat-authored prose Qs) →
             grade_chat_authored_question (grounded LLM with KB + search)
         Both paths return the same BankGradeResult shape.
+
+        PR4 (2026-05-25): ``committed_canonical`` is a
+        ``CanonicalCommitment`` from ``apps.tutoring.canonical_committer``
+        — when present AND trustworthy, the chat-authored path skips
+        its on-the-fly LLM derivation and grades against the frozen
+        canonical instead. Has-canonical (bank) path ignores it.
         """
         from apps.tutoring.bank_grader import (
             BankGradeResult,
@@ -442,6 +449,7 @@ class Question:
             is_math=is_math,
             kb_context=kb_context,
             use_grounding=True,
+            committed_canonical=committed_canonical,
         )
 
     # ---------------------------------------------------------------
