@@ -819,6 +819,7 @@ def respond_for_view(session, user_input: str) -> dict:
     artifact_html, follow_up, etc.) default to safe values.
     """
     from apps.curriculum.models import LessonStep
+    from apps.tutoring.models import ExitTicketAttempt
 
     out = respond(session, user_input)
 
@@ -831,10 +832,6 @@ def respond_for_view(session, user_input: str) -> dict:
         .first()
     )
     total_steps = LessonStep.objects.filter(lesson=session.lesson).count()
-    phase = (
-        (getattr(step, 'phase', '') or '').lower()
-        if step else 'evaluate'
-    )
 
     # Extract is_correct from any record_answer verdict.
     is_correct = None
@@ -905,6 +902,29 @@ def respond_for_view(session, user_input: str) -> dict:
                 # No exit ticket attached → end the lesson here.
                 is_complete = True
 
+    # Phase + step number — match the rules in _project_start_payload
+    # so resume + respond render the same chip label and the step
+    # counter doesn't overshoot (the "Evaluate 6/5" bug).
+    last_attempt = (
+        ExitTicketAttempt.objects
+        .filter(session=session, completed_at__isnull=False)
+        .order_by('-completed_at')
+        .first()
+    )
+    has_failed_attempt = bool(last_attempt and not last_attempt.passed)
+    has_passed_attempt = bool(last_attempt and last_attempt.passed)
+    if has_failed_attempt:
+        phase = 'remediation'
+    elif has_passed_attempt:
+        phase = 'completed'
+    elif show_exit_ticket:
+        phase = 'exit_ticket'
+    elif step is not None:
+        phase = (getattr(step, 'phase', '') or '').lower() or 'evaluate'
+    else:
+        phase = 'evaluate'
+    step_number = min(current_idx + 1, total_steps) if total_steps else 1
+
     return {
         'message': out.get('content', ''),
         'phase': phase,
@@ -912,7 +932,7 @@ def respond_for_view(session, user_input: str) -> dict:
         'show_exit_ticket': show_exit_ticket,
         'exit_ticket': exit_ticket_payload,
         'is_complete': is_complete,
-        'step_number': current_idx + 1,
+        'step_number': step_number,
         'total_steps': total_steps,
         'is_correct': is_correct,
         'streak_count': None,                 # gamification not in v2 scope
@@ -1233,10 +1253,6 @@ def _project_start_payload(session, message: str) -> dict:
         .first()
     )
     total_steps = LessonStep.objects.filter(lesson=session.lesson).count()
-    phase = (
-        (getattr(step, 'phase', '') or '').lower()
-        if step else 'evaluate'
-    )
 
     steps_exhausted = step is None or current_idx >= total_steps
     has_in_flight = InFlightQuestion.objects.filter(session=session).exists()
@@ -1249,6 +1265,24 @@ def _project_start_payload(session, message: str) -> dict:
     has_passed_attempt = bool(last_attempt and last_attempt.passed)
     has_failed_attempt = bool(last_attempt and not last_attempt.passed)
     et_attached = ExitTicket.objects.filter(lesson=session.lesson).exists()
+
+    # Phase + step display — frontend hides the step counter when phase
+    # is exit_ticket / remediation / completed (templates/.../chat_tutor.html
+    # ~line 1470). Pick the phase that matches the lesson state, and
+    # clamp step_number so we never render "Evaluate 6/5" (the bug:
+    # current_idx incremented past total_steps when the engine advanced
+    # past the last lesson step).
+    if has_failed_attempt:
+        phase = 'remediation'
+    elif has_passed_attempt:
+        phase = 'completed'
+    elif steps_exhausted and et_attached:
+        phase = 'exit_ticket'
+    elif step is not None:
+        phase = (getattr(step, 'phase', '') or '').lower() or 'evaluate'
+    else:
+        phase = 'evaluate'
+    step_number = min(current_idx + 1, total_steps) if total_steps else 1
 
     if not steps_exhausted:
         # Still in lesson steps — definitely not complete.
@@ -1278,7 +1312,7 @@ def _project_start_payload(session, message: str) -> dict:
         'show_exit_ticket': False,
         'exit_ticket': None,
         'is_complete': is_complete,
-        'step_number': current_idx + 1,
+        'step_number': step_number,
         'total_steps': total_steps,
         'is_correct': None,
         'streak_count': None,
