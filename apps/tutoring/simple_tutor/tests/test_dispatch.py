@@ -245,3 +245,43 @@ class RespondForViewTest(DjangoTestCase):
         self.assertIn('questions', payload['exit_ticket'])
         self.assertIn('total', payload['exit_ticket'])
         self.assertIn('passing_score', payload['exit_ticket'])
+        # Default: MCQ-only, capped at 10. The fixture in
+        # apps/tutoring/simple_tutor/tests/test_tools.py creates 3 MCQ
+        # questions per ExitTicket, so total should be min(3, 10) = 3.
+        self.assertLessEqual(payload['exit_ticket']['total'], 10)
+        for q in payload['exit_ticket']['questions']:
+            self.assertEqual(q['question_type'], 'mcq')
+
+
+class ExitTicketEnvVarTest(DjangoTestCase):
+    """The MCQ filter + size cap are env-tunable so we can adjust
+    during the pilot without a code deploy.
+    """
+
+    def test_cap_override_env_var(self):
+        from apps.tutoring.simple_tutor import engine as _e
+        from unittest.mock import patch
+        with patch.dict('os.environ', {'EXIT_TICKET_MAX_QUESTIONS': '3'}):
+            self.assertEqual(_e._exit_ticket_cap(), 3)
+        with patch.dict('os.environ', {'EXIT_TICKET_MAX_QUESTIONS': '0'}):
+            # Invalid (≤0) falls back to default.
+            self.assertEqual(_e._exit_ticket_cap(), 10)
+        with patch.dict('os.environ', {'EXIT_TICKET_MAX_QUESTIONS': 'not-a-number'}):
+            self.assertEqual(_e._exit_ticket_cap(), 10)
+        # Unset → default
+        with patch.dict('os.environ', {}, clear=False):
+            import os as _os
+            _os.environ.pop('EXIT_TICKET_MAX_QUESTIONS', None)
+            self.assertEqual(_e._exit_ticket_cap(), 10)
+
+    def test_types_override_env_var(self):
+        from apps.tutoring.simple_tutor import engine as _e
+        from unittest.mock import patch
+        with patch.dict('os.environ', {'EXIT_TICKET_TYPES': 'mcq,short_answer'}):
+            self.assertEqual(
+                _e._exit_ticket_allowed_types(),
+                ('mcq', 'short_answer'),
+            )
+        with patch.dict('os.environ', {'EXIT_TICKET_TYPES': '  '}):
+            # Empty → default (mcq-only).
+            self.assertEqual(_e._exit_ticket_allowed_types(), ('mcq',))

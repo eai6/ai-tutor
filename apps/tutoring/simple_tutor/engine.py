@@ -33,6 +33,7 @@ Target: ≤ 600 lines including docstrings.
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
@@ -870,6 +871,41 @@ def respond_for_view(session, user_input: str) -> dict:
     }
 
 
+# Exit-ticket shape is env-tunable so we can flip filters during the
+# pilot without a code deploy. Defaults per 2026-05-26 directive:
+# 10 MCQ-only questions. Override via ``EXIT_TICKET_*`` env vars (the
+# loader uses ``os.environ`` on every call so a Container App
+# ``--set-env-vars`` flip takes effect without a process restart).
+DEFAULT_EXIT_TICKET_CAP = 10
+DEFAULT_EXIT_TICKET_TYPES = ('mcq',)
+
+
+def _exit_ticket_cap() -> int:
+    """Max number of questions on the exit ticket. Override via
+    ``EXIT_TICKET_MAX_QUESTIONS``. Values <1 fall back to the default.
+    """
+    raw = (os.environ.get('EXIT_TICKET_MAX_QUESTIONS') or '').strip()
+    if not raw:
+        return DEFAULT_EXIT_TICKET_CAP
+    try:
+        n = int(raw)
+        return n if n > 0 else DEFAULT_EXIT_TICKET_CAP
+    except ValueError:
+        return DEFAULT_EXIT_TICKET_CAP
+
+
+def _exit_ticket_allowed_types() -> tuple[str, ...]:
+    """Which ``ExitTicketQuestion.question_type`` values are eligible.
+    Override via ``EXIT_TICKET_TYPES`` (comma-separated, e.g.
+    ``mcq,short_answer``). Empty / unset → MCQ-only default.
+    """
+    raw = (os.environ.get('EXIT_TICKET_TYPES') or '').strip().lower()
+    if not raw:
+        return DEFAULT_EXIT_TICKET_TYPES
+    parts = tuple(p.strip() for p in raw.split(',') if p.strip())
+    return parts or DEFAULT_EXIT_TICKET_TYPES
+
+
 def _build_exit_ticket_payload(session) -> dict | None:
     """Build the same exit-ticket payload the legacy engine emits, so
     the existing chat UI can render the ticket without changes.
@@ -877,23 +913,51 @@ def _build_exit_ticket_payload(session) -> dict | None:
     Returns the dict shape ``{'questions': [...], 'total': N,
     'passing_score': N}``, or ``None`` when no exit ticket is attached
     to this lesson.
+
+    Filters by ``EXIT_TICKET_TYPES`` (default: MCQ-only) and caps at
+    ``EXIT_TICKET_MAX_QUESTIONS`` (default: 10) — shorter, gradable,
+    consistent format per pilot directive 2026-05-26.
     """
+    import random
     from apps.tutoring.models import ExitTicket, ExitTicketQuestion
 
     et = ExitTicket.objects.filter(lesson=session.lesson).first()
     if et is None:
         return None
 
-    questions = ExitTicketQuestion.objects.filter(exit_ticket=et)
-    if not questions.exists():
+    allowed_types = _exit_ticket_allowed_types()
+    eligible = list(
+        ExitTicketQuestion.objects.filter(
+            exit_ticket=et, question_type__in=allowed_types,
+        )
+    )
+    if not eligible:
         return None
 
-    # Use all questions in canonical order. Randomized sub-sampling is
-    # a v1-engine detail (``self.exit_ticket_concepts``) we can mirror
-    # later if pilot data shows long tickets hurt completion rates.
+    # Randomized sub-sample, deterministic per session for replay
+    # consistency within a session (same student reload → same items).
+    rng = random.Random(session.pk)
+    rng.shuffle(eligible)
+    selected = eligible[:_exit_ticket_cap()]
+
+    # Persist the selected IDs (in render order) so the legacy submit
+    # endpoint — which instantiates a fresh ConversationalTutor and
+    # reads ``engine_state['selected_exit_ticket_ids']`` via
+    # ``_load_exit_ticket_concepts`` — grades each answer against the
+    # SAME question that was rendered. Without this, the submit-side
+    # tutor would generate its own random selection and grade
+    # answer[i] against the wrong question. (Caught by M12.9 E2E:
+    # 1/10 score when answers were objectively correct.)
+    selected_ids = [q.id for q in selected]
+    es = dict(session.engine_state or {})
+    if es.get('selected_exit_ticket_ids') != selected_ids:
+        es['selected_exit_ticket_ids'] = selected_ids
+        session.engine_state = es
+        session.save(update_fields=['engine_state'])
+
     exit_questions = []
-    for i, q in enumerate(questions):
-        q_type = (q.question_type or 'mcq') or 'mcq'
+    for i, q in enumerate(selected):
+        q_type = (q.question_type or 'mcq')
         q_data = {
             'index': i,
             'question_type': q_type,
@@ -916,7 +980,7 @@ def _build_exit_ticket_payload(session) -> dict | None:
     return {
         'questions': exit_questions,
         'total': len(exit_questions),
-        'passing_score': et.passing_score or 8,
+        'passing_score': min(et.passing_score or 8, len(exit_questions)),
     }
 
 
