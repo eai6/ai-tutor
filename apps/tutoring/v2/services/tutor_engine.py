@@ -261,6 +261,7 @@ class TutorEngine:
         attached_media_count, figure_facts = self._media_counts_and_facts(
             attempt_text=attempt_text, catalog=media_catalog,
         )
+        lesson_has_media = bool(media_catalog)
         conf_result = self.conformance.run(
             candidate_response=attempt_text,
             verdict=verdict,
@@ -279,6 +280,7 @@ class TutorEngine:
             private_canonical=(verdict.private_canonical if verdict else ""),
             context=context,
             posed_via_tool=(first_resp.pending_pose is not None),
+            lesson_has_media=lesson_has_media,
         )
 
         fallback_used = False
@@ -315,6 +317,7 @@ class TutorEngine:
                 private_canonical=(verdict.private_canonical if verdict else ""),
                 context=context,
                 posed_via_tool=(retry_resp.pending_pose is not None),
+                lesson_has_media=lesson_has_media,
             )
             retry_conf.retry_used = True
 

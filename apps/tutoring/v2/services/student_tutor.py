@@ -54,6 +54,9 @@ from apps.tutoring.v2.tools.pose_question import (
     make_resolve_canonical_for_lesson,
     validate_pose,
 )
+from apps.tutoring.v2.utilities.tool_call_strip import (
+    strip_leaked_tool_call_syntax,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +204,19 @@ class StudentTutor:
                 system_prompt=system_prompt,
                 max_tokens=600,
             )
-            text = (response.content or "").strip()
+            raw_text = (response.content or "").strip()
+            # Defensive strip: when the system prompt instructs the LLM
+            # to use the pose_question tool but we invoked the text-only
+            # path (move not in POSE_CAPABLE_MOVES, or no posable slots
+            # remaining), the LLM can leak tool-call markup as prose.
+            # Observed v2 form: ``<tool_call>{...}</tool_call>``.
+            text, leaked_chars = strip_leaked_tool_call_syntax(raw_text)
+            if leaked_chars:
+                logger.warning(
+                    "[StudentTutor] LEAKED_TOOL_SYNTAX in text path "
+                    "(move=%s) — stripped %d chars",
+                    move, leaked_chars,
+                )
             if span is not None:
                 span["tokens_in"] = response.tokens_in
                 span["tokens_out"] = response.tokens_out
@@ -210,6 +225,7 @@ class StudentTutor:
                     "selected_move": move,
                     "tool_path": False,
                     "response_chars": len(text),
+                    "leaked_tool_call_chars": leaked_chars,
                 })
                 span["payload"] = payload
             return TutorResponse(text=text, pending_pose=None)
@@ -291,11 +307,17 @@ class StudentTutor:
         text_chunks: list[str] = []
         pending_pose: Optional[PendingPose] = None
         rendered_stem = ""
+        total_leaked_chars = 0
 
         for block in (message.content or []):
             btype = getattr(block, "type", None)
             if btype == "text":
-                text_chunks.append((getattr(block, "text", "") or "").strip())
+                raw_chunk = (getattr(block, "text", "") or "").strip()
+                cleaned, leaked = strip_leaked_tool_call_syntax(raw_chunk)
+                if leaked:
+                    total_leaked_chars += leaked
+                if cleaned:
+                    text_chunks.append(cleaned)
             elif btype == "tool_use":
                 name = getattr(block, "name", "") or ""
                 if name != POSE_QUESTION_LLM_TOOL_NAME:
@@ -311,6 +333,13 @@ class StudentTutor:
                 pending_pose, rendered_stem = self._handle_pose_tool_use(
                     block=block, slot_map=slot_map, context=context,
                 )
+
+        if total_leaked_chars:
+            logger.warning(
+                "[StudentTutor] LEAKED_TOOL_SYNTAX in tool-path text "
+                "blocks (move=%s) — stripped %d chars",
+                move, total_leaked_chars,
+            )
 
         if rendered_stem:
             # Combine LLM lead-in text + bank stem. The student sees:

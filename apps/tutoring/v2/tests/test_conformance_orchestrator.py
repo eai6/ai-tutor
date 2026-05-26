@@ -285,6 +285,78 @@ def test_no_claim_does_not_call_grader():
 
 
 # ──────────────────────────────────────────────────────────────────────
+# figure_ref skip on empty-catalog tool-posed turns
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_figure_ref_skipped_when_bank_stem_deictic_and_no_media():
+    """Bank stem mentions 'the diagram' but lesson has no media —
+    the deictic is curriculum-authored, not LLM-authored, so the
+    figure_ref gate must skip. Reproduces the GEO-S5 regression at
+    L1459 where step 4 ('Tributary X flows ... on the diagram')
+    blocked every tool-posed turn."""
+    fake = _FakeClient(_clean_labels_json())
+    cc = ConformanceCheck(classifier_client_factory=lambda: fake)
+    res = cc.run(
+        candidate_response=(
+            "Try this:\n\nIn a river system shown on the diagram, "
+            "classify each tributary by order."
+        ),
+        verdict=None,
+        runtime_state=_state_with_open_q(),
+        selected_move="pose_question",
+        open_question_stem="In a river system ...",
+        bank_stems=["In a river system shown on the diagram"],
+        recent_student_turns=[],
+        posed_via_tool=True,
+        lesson_has_media=False,
+    )
+    assert res.passed is True
+    assert not any("figure_ref" in v for v in res.violations)
+
+
+def test_figure_ref_still_fires_when_lesson_has_media_but_none_attached():
+    """When the lesson DOES have media available (just not attached
+    this turn), the gate still fires — the curriculum exists, the LLM
+    forgot to attach it."""
+    cc = ConformanceCheck()
+    res = cc.run(
+        candidate_response=(
+            "Try this:\n\nIn a river system shown on the diagram, "
+            "classify each tributary."
+        ),
+        verdict=None,
+        runtime_state=_state_with_open_q(),
+        selected_move="pose_question",
+        open_question_stem="What's shown?",
+        attached_media_count=0,
+        posed_via_tool=True,
+        lesson_has_media=True,
+    )
+    assert res.passed is False
+    assert any("figure_ref" in v for v in res.violations)
+
+
+def test_figure_ref_still_fires_for_llm_authored_deictic():
+    """When the candidate was NOT posed via the tool (LLM authored
+    the deictic in prose), the gate fires even on a media-less lesson
+    — keeps the LLM honest."""
+    cc = ConformanceCheck()
+    res = cc.run(
+        candidate_response="Have a look at the diagram and tell me what you see.",
+        verdict=None,
+        runtime_state=_state_with_open_q(),
+        selected_move="explain",
+        open_question_stem="",
+        attached_media_count=0,
+        posed_via_tool=False,
+        lesson_has_media=False,
+    )
+    assert res.passed is False
+    assert any("figure_ref" in v for v in res.violations)
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Result shape
 # ──────────────────────────────────────────────────────────────────────
 

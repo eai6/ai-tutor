@@ -100,6 +100,7 @@ class ConformanceCheck:
         private_canonical: str = "",
         context=None,  # TutoringContext — for tutor-claim adjudication
         posed_via_tool: bool = False,
+        lesson_has_media: bool = True,
     ) -> ConformanceResult:
         """Run one full conformance pass over the candidate.
 
@@ -129,11 +130,28 @@ class ConformanceCheck:
             return result
 
         # 3. Figure-ref (deictic + figure_facts quantitative claim guard).
-        gr = run_figure_ref_check(
-            candidate_response,
-            attached_media_count=attached_media_count,
-            figure_facts=figure_facts,
-        )
+        # When the lesson has zero media available AND the candidate
+        # was posed via the tool, any deictic phrase ("the diagram")
+        # is in the curriculum-authored bank stem — not LLM-authored.
+        # Failing conformance there strands the student on a question
+        # whose visual support the curriculum never published; the
+        # right scope of the figure_ref gate is LLM authorship, not
+        # curriculum content. The Layer-2 quantitative-claim check
+        # only fires when ``attached_media_count > 0``, so the
+        # short-circuit here is safe.
+        if posed_via_tool and not lesson_has_media:
+            gr = GateResult(
+                passed=True,
+                name="figure_ref",
+                skipped=True,
+                reason="bank_stem_deictic_no_media",
+            )
+        else:
+            gr = run_figure_ref_check(
+                candidate_response,
+                attached_media_count=attached_media_count,
+                figure_facts=figure_facts,
+            )
         if not self._record(gr, result):
             return result
 
