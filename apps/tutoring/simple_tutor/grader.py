@@ -799,14 +799,296 @@ def _grade_embedding_gate(question, student_answer: str) -> GradeResult | None:
 
 
 # ============================================================================
-# Tier 2 — Verifier LLM (M5, stub for now)
+# Tier 2 — Verifier LLM (M5)
 # ============================================================================
+#
+# Design (memory/grading_system_research.md + auto-memory/feedback_grading_design_rules.md):
+#
+# - Cross-family: tutor is Claude (anthropic) → verifier is Gemini (google).
+#   Excluded via get_judge_provider_chain(exclude_provider='anthropic').
+#   Self-preference bias is well-documented (FairJudge, Adaline 2026).
+#
+# - Context-free: verifier sees only (question, reference, student answer).
+#   No conversation history, no tutor reply. Avoids inherited sycophancy.
+#
+# - Temperature 0 + structured output. ModelConfig clamps temperature to 0
+#   for purpose='judge' at runtime (apps/llm/models.py::effective_temperature).
+#
+# - VERDICT-FIRST schema. Putting CoT before the verdict anchors the model
+#   on its own reasoning. Verdict-first forces commitment before
+#   rationalisation — counterintuitively more accurate per the literature.
+#
+# - Rubric decomposition: per-criterion scores + one-sentence justification.
+#
+# - Self-consistency n=3 only in the middle confidence band [0.5, 0.85].
+#   Calling 3× for every grade kills p95 latency.
 
 
-def _grade_verifier_llm(question, student_answer: str) -> GradeResult:
-    """M5 stub — implemented next milestone."""
-    raise NotImplementedError(
-        "Tier 2 verifier LLM lands in M5. Until then, short_answer / "
-        "data_interpretation / matching questions in the middle "
-        "embedding-similarity band fall through to here."
+# Pydantic schema — must keep this ordering. Verdict FIRST, justification LAST.
+try:
+    from pydantic import BaseModel, Field
+    from typing import Literal as _Literal
+
+    class VerifierResponse(BaseModel):
+        """Verifier LLM's structured output. Field ORDER is load-bearing.
+
+        Putting ``verdict`` first commits the model to a decision BEFORE
+        it has to justify; reversing the order anchors on rationale.
+        """
+        # 1. Verdict FIRST — model commits before rationalising
+        verdict: _Literal['correct', 'partial', 'incorrect'] = Field(
+            description=(
+                "Your overall verdict on the student's answer. 'correct' if "
+                "they captured the key idea, 'partial' if they got some "
+                "elements but missed key points, 'incorrect' if they got it "
+                "fundamentally wrong."
+            ),
+        )
+        # 2. Per-criterion scores (forces decomposition)
+        per_criterion_scores: dict[str, float] = Field(
+            default_factory=dict,
+            description=(
+                "Score in [0.0, 1.0] for each rubric criterion: "
+                "'correctness' (factual accuracy), 'completeness' (covered "
+                "the key points), 'reasoning' (showed understanding)."
+            ),
+        )
+        # 3. Confidence
+        confidence: float = Field(
+            ge=0.0, le=1.0,
+            description=(
+                "Your confidence in this verdict in [0.0, 1.0]. Use 0.95+ "
+                "when the answer is clearly right or clearly wrong; 0.5-0.85 "
+                "when ambiguous."
+            ),
+        )
+        # 4. Justification LAST — rationale after the decision
+        justification: str = Field(
+            description=(
+                "One short sentence explaining WHY this verdict — what "
+                "specifically the student got right or missed. Reference "
+                "the rubric criteria."
+            ),
+        )
+
+    _HAS_PYDANTIC = True
+except ImportError:
+    _HAS_PYDANTIC = False
+    VerifierResponse = None  # type: ignore
+
+
+# Self-consistency bands. See memory/grading_system_research.md.
+_VERIFIER_HIGH_CONFIDENCE = 0.85
+_VERIFIER_LOW_CONFIDENCE = 0.5
+
+
+def _build_verifier_system_prompt() -> str:
+    """The verifier's system prompt. Context-free (no tutoring history),
+    temperature-zero (enforced by the judge purpose clamp).
+    """
+    return """You are an impartial exam grader for secondary-school answers.
+
+You will be given:
+  - A question
+  - A reference answer (the canonical correct response)
+  - A student's answer
+
+Your job is to decide whether the student's answer matches the reference \
+in meaning. You must:
+  1. Output your VERDICT first (correct / partial / incorrect)
+  2. Then break down per-criterion scores
+  3. Then your confidence
+  4. Then a one-sentence justification
+
+Rules:
+  - Be impartial. A confident but wrong answer is INCORRECT, not partial.
+  - A long answer that misses the point is still incorrect.
+  - A short answer that captures the key idea is CORRECT.
+  - Do NOT defer to the student's confidence — judge the substance.
+  - Do NOT see this as helping the student. You are an EXAMINER.
+
+Rubric criteria (score each in [0.0, 1.0]):
+  - 'correctness': factual accuracy of what was stated
+  - 'completeness': did they cover the key points the reference identifies
+  - 'reasoning': did they show understanding (not just memorisation)
+"""
+
+
+def _build_verifier_user_prompt(question, student_answer: str) -> str:
+    """Build the user prompt with question + reference + student answer.
+
+    Context-free by design — no conversation history.
+    """
+    ad = getattr(question, 'answer_data', None) or {}
+    if not isinstance(ad, dict):
+        ad = {}
+    reference = (ad.get('model_answer') or '').strip()
+    if not reference:
+        reference = (getattr(question, 'correct_answer', '') or '').strip()
+    keywords = ad.get('keywords') or []
+    keywords_text = (
+        f"\nKey concepts the answer should mention (any {ad.get('min_keywords', 'most')}): "
+        f"{', '.join(keywords)}"
+        if keywords else ''
+    )
+    return f"""<question>
+{getattr(question, 'question_text', '') or '(no question text)'}
+</question>
+
+<reference_answer>
+{reference or '(no reference provided)'}
+</reference_answer>{keywords_text}
+
+<student_answer>
+{str(student_answer).strip()}
+</student_answer>
+
+Grade this answer per the rubric. Output VERDICT first.
+"""
+
+
+def _verifier_self_consistency(votes: list) -> tuple:
+    """Majority vote on verdict + mean confidence over the majority votes.
+
+    Returns (verdict, confidence, justification_summary).
+    """
+    from collections import Counter
+    if not votes:
+        return ('partial', 0.0, 'no verifier votes collected')
+    verdict_counts = Counter(v.verdict for v in votes)
+    majority_verdict, count = verdict_counts.most_common(1)[0]
+    majority_votes = [v for v in votes if v.verdict == majority_verdict]
+    mean_conf = sum(v.confidence for v in majority_votes) / len(majority_votes)
+    just = (
+        f'self-consistency {count}/{len(votes)} verdict={majority_verdict!r}: '
+        + majority_votes[0].justification
+    )[:300]
+    return (majority_verdict, mean_conf, just)
+
+
+def _grade_verifier_llm(
+    question,
+    student_answer: str,
+    *,
+    tutor_provider: str = 'anthropic',
+) -> GradeResult:
+    """Tier-2 cross-family verifier LLM grader.
+
+    Args:
+        question: question instance (must have question_text + answer_data
+            and/or correct_answer).
+        student_answer: text extracted by the tutor LLM (NOT raw chat
+            input). The verifier never sees the conversation history.
+        tutor_provider: 'anthropic' (Claude tutor) — excluded from the
+            verifier chain to enforce cross-family.
+
+    Returns:
+        ``GradeResult`` with tier='verifier_llm'. Confidence and
+        ``needs_followup`` reflect the verdict reliability.
+    """
+    if not _HAS_PYDANTIC or VerifierResponse is None:
+        return GradeResult(
+            verdict=Verdict.PARTIAL, confidence=0.0, tier='verifier_llm',
+            justification='pydantic unavailable; cannot use verifier',
+            needs_followup=True,
+        )
+
+    # Resolve verifier provider — cross-family from the tutor.
+    try:
+        from apps.curriculum.content_judges._providers import get_judge_provider_chain
+        from apps.tutoring.judges._instructor_helper import (
+            get_instructor_from_client, structured_completion,
+        )
+    except ImportError as e:
+        logger.warning("Verifier LLM infra import failed: %s", e)
+        return GradeResult(
+            verdict=Verdict.PARTIAL, confidence=0.0, tier='verifier_llm',
+            justification=f'verifier infra unavailable: {e}',
+            needs_followup=True,
+        )
+
+    chain = get_judge_provider_chain('judge', exclude_provider=tutor_provider)
+    if not chain:
+        # Fall back to any judge provider if cross-family unavailable.
+        chain = get_judge_provider_chain('judge')
+    if not chain:
+        return GradeResult(
+            verdict=Verdict.PARTIAL, confidence=0.0, tier='verifier_llm',
+            justification='no verifier provider available',
+            needs_followup=True,
+        )
+
+    provider = chain[0]
+    instructor_client = get_instructor_from_client(provider.client)
+    if instructor_client is None:
+        return GradeResult(
+            verdict=Verdict.PARTIAL, confidence=0.0, tier='verifier_llm',
+            justification='instructor wrap failed',
+            needs_followup=True,
+        )
+
+    system_prompt = _build_verifier_system_prompt()
+    user_prompt = _build_verifier_user_prompt(question, student_answer)
+    provider_str = str(provider.config.provider) if provider.config else ''
+
+    def _one_call():
+        return structured_completion(
+            instructor_client,
+            VerifierResponse,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            max_tokens=1500,
+            provider=provider_str,
+        )
+
+    try:
+        first = _one_call()
+    except Exception as e:
+        msg = str(e).strip().replace('\n', ' ')[:200]
+        logger.warning("Verifier LLM first call failed: %s: %s", type(e).__name__, msg)
+        return GradeResult(
+            verdict=Verdict.PARTIAL, confidence=0.0, tier='verifier_llm',
+            justification=f'verifier exception {type(e).__name__}: {msg}',
+            needs_followup=True,
+        )
+
+    # Self-consistency: ONLY if first call lands in the middle band [0.5, 0.85].
+    # Outside this band the verdict is clear-enough that 3 calls would just
+    # burn latency.
+    final_verdict = first.verdict
+    final_conf = first.confidence
+    final_just = first.justification
+    final_per_crit = dict(first.per_criterion_scores or {})
+
+    if _VERIFIER_LOW_CONFIDENCE <= first.confidence < _VERIFIER_HIGH_CONFIDENCE:
+        votes = [first]
+        for _ in range(2):
+            try:
+                votes.append(_one_call())
+            except Exception as e:
+                logger.debug("self-consistency vote failed: %s", e)
+        final_verdict, final_conf, final_just = _verifier_self_consistency(votes)
+
+    # Map verdict string → Verdict enum
+    try:
+        verdict = Verdict(final_verdict)
+    except ValueError:
+        # Verifier returned an unknown verdict label — defensive.
+        return GradeResult(
+            verdict=Verdict.PARTIAL, confidence=0.0, tier='verifier_llm',
+            justification=f'unknown verdict from verifier: {final_verdict!r}',
+            needs_followup=True,
+        )
+
+    # needs_followup: anywhere in the [0, HIGH) band — engine treats as
+    # remediation (low band) or follow-up question (middle band).
+    needs_followup = final_conf < _VERIFIER_HIGH_CONFIDENCE
+
+    return GradeResult(
+        verdict=verdict,
+        confidence=round(float(final_conf), 3),
+        tier='verifier_llm',
+        per_criterion_scores=final_per_crit,
+        justification=final_just[:300],
+        needs_followup=needs_followup,
     )

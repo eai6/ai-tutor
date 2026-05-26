@@ -211,8 +211,11 @@ class GradeAnswerDispatchTest(TestCase):
         self.assertEqual(r.verdict, Verdict.CORRECT)
 
     def test_unsupported_type_raises_not_implemented(self):
-        q = SimpleNamespace(question_type='short_answer')
-        with self.assertRaisesRegex(NotImplementedError, 'short_answer'):
+        # 'matching' has no Tier-1 grader and isn't yet routed to the
+        # verifier LLM; should raise NotImplementedError. Update this
+        # test if matching support lands.
+        q = SimpleNamespace(question_type='matching')
+        with self.assertRaisesRegex(NotImplementedError, 'matching'):
             grade_answer(question=q, student_answer='something')
 
     def test_math_type_routes_to_math_grader(self):
