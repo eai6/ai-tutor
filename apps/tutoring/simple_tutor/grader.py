@@ -108,12 +108,24 @@ def grade_answer(*, question, student_answer: str) -> GradeResult:
         # questions on AI Tutor — answer_data carries {computed, model_answer,
         # unit, parameters}. Routed to the math grader.
         return _grade_math(question, student_answer)
-    # Other question types route to embedding gate + verifier LLM in M4/M5.
+    if qtype == 'fill_in_blank':
+        # Deterministic blank-by-blank grading. If a math fill_in_blank
+        # (answer_data has 'computed'), route through math grader instead.
+        ad = getattr(question, 'answer_data', None) or {}
+        if isinstance(ad, dict) and ad.get('computed') is not None:
+            return _grade_math(question, student_answer)
+        return _grade_fill_in_blank(question, student_answer)
+    if qtype in ('short_answer', 'data_interpretation'):
+        # Tier 1.5 (embedding gate) handles high-similarity + low-similarity.
+        # Middle band falls through to Tier 2 verifier LLM (M5).
+        gate_result = _grade_embedding_gate(question, student_answer)
+        if gate_result is not None:
+            return gate_result
+        # M5 verifier LLM
+        return _grade_verifier_llm(question, student_answer)
+    # Other question types (matching) route to verifier LLM directly in M5.
     raise NotImplementedError(
-        f"grade_answer: question_type={qtype!r} not yet supported. "
-        "Implement Tier 1.5 (embedding gate) in M4 and Tier 2 "
-        "(verifier LLM) in M5 for fill_in_blank / matching / short_answer / "
-        "data_interpretation."
+        f"grade_answer: question_type={qtype!r} not yet supported."
     )
 
 
@@ -549,4 +561,252 @@ def _grade_math(question, student_answer: str) -> GradeResult:
             f'no math equivalence: ref_string={ref_string!r} '
             f'computed={ref_computed!r} student={student_str[:60]!r}'
         ),
+    )
+
+
+# ============================================================================
+# Tier 1 — Fill-in-the-blank grader (M4)
+# ============================================================================
+#
+# Production shape (geography-heavy):
+#   answer_data = {
+#       'blanks': ['education'],
+#       'text_template': 'The three main components of HDI are health, ___, and standard of living.',
+#       'accept_alternatives': [['Education', 'EDUCATION', 'school']],
+#   }
+#
+# Per-blank match: case-insensitive against ``blanks[i]`` + alternatives.
+# Multi-blank: all blanks correct → CORRECT; partial → PARTIAL; none → INCORRECT.
+
+
+def _parse_blank_list(student_answer) -> list[str]:
+    """Best-effort parse of student input into a list of blanks.
+
+    Acceptable input forms:
+    - List[str] (JSON-posted from a form)
+    - Comma-separated string: "education, school"
+    - Newline-separated string
+    - Single string (for one-blank questions)
+
+    Returns a list of stripped strings.
+    """
+    if student_answer is None:
+        return []
+    if isinstance(student_answer, list):
+        return [str(x).strip() for x in student_answer]
+    text = str(student_answer).strip()
+    if not text:
+        return []
+    # Newlines beat commas (more explicit). Otherwise comma-split.
+    if '\n' in text:
+        return [s.strip() for s in text.split('\n') if s.strip()]
+    if ',' in text:
+        return [s.strip() for s in text.split(',') if s.strip()]
+    return [text]
+
+
+def _blank_matches(given: str, expected: str, alternatives: list[str]) -> bool:
+    """Case-insensitive match of a student-supplied blank against the
+    expected value + accept_alternatives list.
+    """
+    if not given:
+        return False
+    given_norm = given.strip().lower()
+    if not given_norm:
+        return False
+    if given_norm == str(expected).strip().lower():
+        return True
+    for alt in alternatives or []:
+        if given_norm == str(alt).strip().lower():
+            return True
+    return False
+
+
+def _grade_fill_in_blank(question, student_answer) -> GradeResult:
+    """Tier-1 deterministic fill-in-the-blank grader.
+
+    All blanks must match (case-insensitive, alternatives considered)
+    for CORRECT. Otherwise:
+        ratio > 0  → PARTIAL with per-criterion-scores reflecting which
+                     blanks landed
+        ratio == 0 → INCORRECT
+    """
+    answer_data = getattr(question, 'answer_data', None) or {}
+    if not isinstance(answer_data, dict):
+        answer_data = {}
+
+    blanks = answer_data.get('blanks') or []
+    if not blanks:
+        raise ValueError(
+            f"_grade_fill_in_blank: question {getattr(question, 'pk', '?')} "
+            f"has no 'blanks' in answer_data."
+        )
+
+    alternatives = answer_data.get('accept_alternatives') or []
+
+    given = _parse_blank_list(student_answer)
+
+    if len(given) != len(blanks):
+        return GradeResult(
+            verdict=Verdict.INCORRECT,
+            confidence=1.0,
+            tier='fill_blank',
+            justification=(
+                f'expected {len(blanks)} blank(s), student provided '
+                f'{len(given)}'
+            ),
+        )
+
+    correct = 0
+    per_blank: dict[str, float] = {}
+    for i, (expected, supplied) in enumerate(zip(blanks, given)):
+        alt_list = alternatives[i] if i < len(alternatives) else []
+        ok = _blank_matches(supplied, expected, alt_list)
+        per_blank[f'blank_{i}'] = 1.0 if ok else 0.0
+        if ok:
+            correct += 1
+
+    ratio = correct / len(blanks)
+    if ratio == 1.0:
+        return GradeResult(
+            verdict=Verdict.CORRECT,
+            confidence=1.0,
+            tier='fill_blank',
+            per_criterion_scores=per_blank,
+            justification=f'{correct}/{len(blanks)} blanks correct',
+        )
+    if ratio > 0:
+        return GradeResult(
+            verdict=Verdict.PARTIAL,
+            confidence=0.9,
+            tier='fill_blank',
+            per_criterion_scores=per_blank,
+            justification=f'{correct}/{len(blanks)} blanks correct',
+            needs_followup=True,
+        )
+    return GradeResult(
+        verdict=Verdict.INCORRECT,
+        confidence=1.0,
+        tier='fill_blank',
+        per_criterion_scores=per_blank,
+        justification=f'0/{len(blanks)} blanks matched',
+    )
+
+
+# ============================================================================
+# Tier 1.5 — Embedding similarity gate (M4)
+# ============================================================================
+#
+# Used for short_answer and data_interpretation. Computes cosine
+# similarity between the student answer and the question's
+# ``answer_data['model_answer']`` (the reference). When confidence is
+# very high (>HIGH) we auto-CORRECT; very low (<LOW) we auto-INCORRECT;
+# in between we return None and the caller routes to the Tier 2
+# verifier LLM (M5).
+#
+# Tuning rationale (memory/grading_system_research.md):
+#   HIGH = 0.92  — empirical threshold from production-validated LLM-judge
+#                  literature; above this is near-paraphrase territory and
+#                  rarely a false positive
+#   LOW  = 0.35  — below this the answers are clearly unrelated
+#   Middle band: ~30-40% of free-text answers will land here; routed to
+#                Tier 2 for nuanced grading
+
+
+_EMBED_HIGH_SIMILARITY = 0.92
+_EMBED_LOW_SIMILARITY = 0.35
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Cosine similarity between two equal-length vectors. Returns 0.0
+    if either vector is zero-length or all-zero."""
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    import math
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _grade_embedding_gate(question, student_answer: str) -> GradeResult | None:
+    """Tier-1.5 embedding-similarity gate.
+
+    Returns ``GradeResult`` only when the similarity is clearly above
+    HIGH or clearly below LOW. Returns ``None`` in the middle band so
+    the caller can route to the Tier 2 verifier LLM.
+    """
+    if not student_answer or not str(student_answer).strip():
+        return GradeResult(
+            verdict=Verdict.INCORRECT,
+            confidence=1.0,
+            tier='embed_gate',
+            justification='empty answer',
+        )
+
+    answer_data = getattr(question, 'answer_data', None) or {}
+    if not isinstance(answer_data, dict):
+        answer_data = {}
+
+    reference = (answer_data.get('model_answer') or '').strip()
+    if not reference:
+        reference = (getattr(question, 'correct_answer', '') or '').strip()
+
+    if not reference:
+        # Can't grade without a reference. Defer to caller (will route to
+        # verifier LLM with whatever's available).
+        return None
+
+    try:
+        from apps.curriculum.kb_storage import embed
+    except ImportError:
+        return None
+
+    try:
+        vecs = embed([str(student_answer).strip(), reference])
+    except Exception as e:
+        logger.warning("_grade_embedding_gate: embed() failed: %s", e)
+        return None
+
+    if len(vecs) != 2:
+        return None
+
+    sim = _cosine_similarity(vecs[0], vecs[1])
+
+    if sim > _EMBED_HIGH_SIMILARITY:
+        return GradeResult(
+            verdict=Verdict.CORRECT,
+            confidence=round(sim, 3),
+            tier='embed_gate',
+            justification=f'high cosine similarity {sim:.3f} > {_EMBED_HIGH_SIMILARITY}',
+        )
+    if sim < _EMBED_LOW_SIMILARITY:
+        return GradeResult(
+            verdict=Verdict.INCORRECT,
+            confidence=round(1.0 - sim, 3),
+            tier='embed_gate',
+            justification=f'low cosine similarity {sim:.3f} < {_EMBED_LOW_SIMILARITY}',
+        )
+
+    # Middle band — caller routes to Tier 2 verifier LLM.
+    logger.debug(
+        "_grade_embedding_gate: middle band sim=%.3f, falling through to verifier",
+        sim,
+    )
+    return None
+
+
+# ============================================================================
+# Tier 2 — Verifier LLM (M5, stub for now)
+# ============================================================================
+
+
+def _grade_verifier_llm(question, student_answer: str) -> GradeResult:
+    """M5 stub — implemented next milestone."""
+    raise NotImplementedError(
+        "Tier 2 verifier LLM lands in M5. Until then, short_answer / "
+        "data_interpretation / matching questions in the middle "
+        "embedding-similarity band fall through to here."
     )
