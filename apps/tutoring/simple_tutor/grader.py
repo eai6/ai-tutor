@@ -623,6 +623,43 @@ def _blank_matches(given: str, expected: str, alternatives: list[str]) -> bool:
     return False
 
 
+_WORD_BOUNDARY_CHARS = " .,;:!?\t\n\r()[]{}-/\"'"
+
+
+def _blank_in_text(haystack_lower: str, expected: str, alternatives: list[str]) -> bool:
+    """Containment match: does the expected value (or any alternative)
+    appear as a discrete token inside the student's free-form answer?
+
+    Used as a fallback for fill-in-the-blank when the student answers
+    in prose ("1000 metres or 1 km") instead of slot-separated form.
+
+    A token "matches" when it appears in the haystack AND is bounded by
+    a word boundary (whitespace, punctuation) on either side — so "1"
+    doesn't spuriously match inside "1000", and "km" doesn't match
+    inside "kilometres". Pure-numeric expected values get a slightly
+    stricter check so we don't match "1 km" against blank='1' when the
+    student really meant "1" as a count-of-kilometres.
+    """
+    candidates = [str(expected).strip().lower()]
+    for alt in alternatives or []:
+        a = str(alt).strip().lower()
+        if a:
+            candidates.append(a)
+
+    for needle in candidates:
+        if not needle:
+            continue
+        idx = haystack_lower.find(needle)
+        while idx != -1:
+            before = haystack_lower[idx - 1] if idx > 0 else ' '
+            after_idx = idx + len(needle)
+            after = haystack_lower[after_idx] if after_idx < len(haystack_lower) else ' '
+            if before in _WORD_BOUNDARY_CHARS and after in _WORD_BOUNDARY_CHARS:
+                return True
+            idx = haystack_lower.find(needle, idx + 1)
+    return False
+
+
 def _grade_fill_in_blank(question, student_answer) -> GradeResult:
     """Tier-1 deterministic fill-in-the-blank grader.
 
@@ -647,25 +684,30 @@ def _grade_fill_in_blank(question, student_answer) -> GradeResult:
 
     given = _parse_blank_list(student_answer)
 
-    if len(given) != len(blanks):
-        return GradeResult(
-            verdict=Verdict.INCORRECT,
-            confidence=1.0,
-            tier='fill_blank',
-            justification=(
-                f'expected {len(blanks)} blank(s), student provided '
-                f'{len(given)}'
-            ),
-        )
-
+    # First try ORDERED slot-by-slot matching (handles "1000, 1" or list).
+    # Fall back to CONTAINMENT matching when slot counts don't line up —
+    # students often write free-form ("1000 metres or 1 km") rather than
+    # comma-separated.
     correct = 0
     per_blank: dict[str, float] = {}
-    for i, (expected, supplied) in enumerate(zip(blanks, given)):
-        alt_list = alternatives[i] if i < len(alternatives) else []
-        ok = _blank_matches(supplied, expected, alt_list)
-        per_blank[f'blank_{i}'] = 1.0 if ok else 0.0
-        if ok:
-            correct += 1
+    if len(given) == len(blanks):
+        for i, (expected, supplied) in enumerate(zip(blanks, given)):
+            alt_list = alternatives[i] if i < len(alternatives) else []
+            ok = _blank_matches(supplied, expected, alt_list)
+            per_blank[f'blank_{i}'] = 1.0 if ok else 0.0
+            if ok:
+                correct += 1
+    else:
+        # Containment fallback: a blank is "matched" when the expected
+        # value or any of its alternatives appears as a token inside the
+        # student's raw answer (case-insensitive, word-boundary-aware).
+        haystack = str(student_answer).lower()
+        for i, expected in enumerate(blanks):
+            alt_list = alternatives[i] if i < len(alternatives) else []
+            ok = _blank_in_text(haystack, expected, alt_list)
+            per_blank[f'blank_{i}'] = 1.0 if ok else 0.0
+            if ok:
+                correct += 1
 
     ratio = correct / len(blanks)
     if ratio == 1.0:

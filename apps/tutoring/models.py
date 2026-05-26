@@ -144,16 +144,30 @@ class TutorSession(models.Model):
         help_text="Which runtime engine handles this session. Locked at "
                   "creation; do not change mid-session.",
     )
-    # The question_id the simple-tutor LLM has currently posed via
-    # pose_question(). Set by tool handler; cleared by record_answer or
-    # advance_step. None means no specific question is currently in play —
-    # student input on the next turn should be treated as a clarification
-    # / open-ended response, not as an answer attempt.
-    # Unused on engine='v1'.
+    # The question_id the simple-tutor server has anchored to for the
+    # current turn. Set by pick_current_question; cleared by
+    # record_answer / advance_step / auto-grade. None means no specific
+    # question is in play — next student turn is treated as a
+    # clarification, not an answer attempt. Unused on engine='v1'.
     current_question_id = models.IntegerField(
         null=True, blank=True,
-        help_text="ExitTicketQuestion or LessonStep question id the simple "
-                  "tutor has currently posed. None = no active question.",
+        help_text="LessonStep or ExitTicketQuestion id the simple tutor "
+                  "has anchored to. Disambiguated by current_question_source.",
+    )
+    # Disambiguates which table current_question_id points to. LessonStep
+    # is primary (it carries the per-step question text + expected answer
+    # most lessons author). ExitTicketQuestion is the fallback for lessons
+    # whose steps lack their own question but have linked ticket rows.
+    class QuestionSource(models.TextChoices):
+        LESSON_STEP = 'lesson_step', 'LessonStep'
+        EXIT_TICKET = 'exit_ticket', 'ExitTicketQuestion'
+
+    current_question_source = models.CharField(
+        max_length=16,
+        choices=QuestionSource.choices,
+        null=True, blank=True,
+        help_text="Table current_question_id points to. None when "
+                  "current_question_id is None.",
     )
 
     @property

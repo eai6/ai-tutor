@@ -132,12 +132,25 @@ class MultiBlankTest(TestCase):
         r = _grade_fill_in_blank(q, 'abrasion, plucking')
         self.assertEqual(r.verdict, Verdict.INCORRECT)
 
-    def test_wrong_blank_count(self):
-        # Student provides only one when two expected
+    def test_wrong_blank_count_falls_back_to_containment(self):
+        """When the student supplies one blank but two were expected,
+        the grader falls back to containment matching — one match
+        scores PARTIAL credit rather than INCORRECT. Lets free-form
+        prose answers ("1000 metres or 1 km") get partial credit
+        instead of a blanket fail when the slot count is wrong.
+        """
         q = _fib(blanks=['corrosion', 'attrition'])
         r = _grade_fill_in_blank(q, 'corrosion')
-        self.assertEqual(r.verdict, Verdict.INCORRECT)
-        self.assertIn('expected 2', r.justification)
+        self.assertEqual(r.verdict, Verdict.PARTIAL)
+        self.assertIn('1/2', r.justification)
+
+    def test_all_blanks_appear_in_prose_answer(self):
+        """Containment fallback: student writes both expected values in
+        a single string instead of slot-separated form → CORRECT.
+        """
+        q = _fib(blanks=['1000', '1'])
+        r = _grade_fill_in_blank(q, '1000 metres or 1 km')
+        self.assertEqual(r.verdict, Verdict.CORRECT)
 
     def test_three_blank_with_alts(self):
         # Real-shape example: waves/winds/currents
