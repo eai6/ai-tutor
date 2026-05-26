@@ -15,7 +15,7 @@ Phase 2 wires it into the service-call assembly path.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from apps.tutoring.v2.contracts import (
@@ -83,7 +83,7 @@ class ContextManager:
 
         state = self.load_runtime_state()
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         ledger_entry = PosedQuestionLedgerEntry(
             source=pending.question_ref.source,
             id=pending.question_ref.id,

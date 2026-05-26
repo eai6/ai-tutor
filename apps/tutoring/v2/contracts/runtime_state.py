@@ -12,7 +12,7 @@ field for §2.1.1 bare-answer detection).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -78,7 +78,7 @@ class OpenQuestion(BaseModel):
     visible_context_at_pose: VisibleContextSnapshot = Field(
         default_factory=VisibleContextSnapshot
     )
-    posed_at: datetime = Field(default_factory=datetime.utcnow)
+    posed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class PosedQuestionLedgerEntry(BaseModel):
@@ -90,7 +90,7 @@ class PosedQuestionLedgerEntry(BaseModel):
     source: QuestionSource
     id: int
     jaccard_signature: str
-    posed_at: datetime = Field(default_factory=datetime.utcnow)
+    posed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ObjectiveProgress(BaseModel):
