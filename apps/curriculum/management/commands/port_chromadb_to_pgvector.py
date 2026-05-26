@@ -191,7 +191,15 @@ class Command(BaseCommand):
                 # rather than relying on kb_storage.upsert_chunks because
                 # the latter re-embeds from text; here we want to PRESERVE
                 # the existing embeddings byte-for-byte.
-                rows: List[CurriculumChunk] = []
+                #
+                # Dedupe within the collection by (institution_id,
+                # content_hash) — Postgres's ON CONFLICT can't affect the
+                # same target row twice in a single INSERT statement
+                # (CardinalityViolation). ChromaDB sometimes has duplicate
+                # content chunks per collection (e.g. re-indexed file).
+                # Last-write-wins matches what update_conflicts would do
+                # if the rows had landed in separate INSERTs anyway.
+                by_hash: Dict[str, CurriculumChunk] = {}
                 for i in range(n):
                     content = documents[i] or ''
                     if not content.strip():
@@ -201,13 +209,21 @@ class Command(BaseCommand):
                         continue
                     meta = (metadatas[i] or {}) if i < len(metadatas) else {}
                     fields = {k: meta[k] for k in _METADATA_KEYS if k in meta and meta[k] is not None}
-                    rows.append(CurriculumChunk(
+                    h = CurriculumChunk.compute_hash(content)
+                    by_hash[h] = CurriculumChunk(
                         institution_id=normalised_inst_id,
                         content=content,
-                        content_hash=CurriculumChunk.compute_hash(content),
+                        content_hash=h,
                         embedding=list(embeddings[i]) if i < len(embeddings) else [],
                         **fields,
-                    ))
+                    )
+                rows: List[CurriculumChunk] = list(by_hash.values())
+                if len(rows) < n - sum(1 for d in documents if not (d or '').strip()):
+                    dropped = n - len(rows) - sum(1 for d in documents if not (d or '').strip())
+                    self.stdout.write(
+                        f"  [dedup] {inst_dir.name}/{col.name}: collapsed "
+                        f"{dropped} duplicate content_hash row(s)"
+                    )
 
                 # Idempotent upsert. Same pattern as kb_storage.upsert_chunks.
                 if rows:

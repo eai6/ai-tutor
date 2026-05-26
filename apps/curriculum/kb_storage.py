@@ -142,17 +142,31 @@ def upsert_chunks(institution_id: int, chunks: List[Any]) -> Dict[str, int]:
     contents = [c.content for c in chunks]
     vectors = embed(contents)
 
-    rows = []
+    # Dedupe within this call by content_hash. Postgres ON CONFLICT DO
+    # UPDATE cannot affect the same target row twice in a single INSERT
+    # statement (CardinalityViolation). Last-write-wins matches what
+    # update_conflicts would do across separate INSERTs anyway. Duplicate
+    # content is realistic — e.g. a question paper chunk and its marking-
+    # scheme chunk can share boilerplate text.
+    by_hash = {}
     for c, vec in zip(chunks, vectors):
         content_hash = Chunk.compute_hash(c.content)
         fields = _metadata_to_fields(c.metadata or {})
-        rows.append(Chunk(
+        by_hash[content_hash] = Chunk(
             institution_id=institution_id,
             content=c.content,
             content_hash=content_hash,
             embedding=vec,
             **fields,
-        ))
+        )
+    rows = list(by_hash.values())
+    dropped = len(chunks) - len(rows)
+    if dropped:
+        logger.info(
+            "[KB] upsert_chunks: institution_id=%s — collapsed %s duplicate "
+            "content_hash row(s) before bulk_create",
+            institution_id, dropped,
+        )
 
     # Idempotent: rely on the (institution_id, content_hash)
     # UniqueConstraint + update_conflicts. Django 4.1+ syntax.
