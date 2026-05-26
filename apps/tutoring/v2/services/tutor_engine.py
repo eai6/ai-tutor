@@ -116,14 +116,17 @@ class TutorEngine:
             "fallback_used": False,
             "retry_used": False,
         }
+        pending_pose = None
         try:
-            response_text = self.tutor.respond(
+            tutor_resp = self.tutor.respond(
                 context=context,
                 verdict=None,
                 move=move,
                 media_catalog=media_catalog,
                 student_input="",
             )
+            response_text = tutor_resp.text
+            pending_pose = tutor_resp.pending_pose
         except Exception as exc:
             logger.warning(
                 "[TutorEngine] start_session tutor.respond raised %s",
@@ -135,6 +138,22 @@ class TutorEngine:
                 next_action_text="Let's get started together.",
             )
             v2_trace["fallback_used"] = True
+
+        # Phase B commit (if a tool-call PendingPose came back).
+        # ``start_session`` skips conformance — the opening message
+        # has no verdict to gate. We still commit because the LLM
+        # used the tool channel; the bank stem is verbatim from a
+        # validated step.
+        if pending_pose is not None:
+            try:
+                runtime_state = self.context_manager.commit_pending_pose(
+                    pending_pose,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[TutorEngine] start_session commit_pending_pose raised %s",
+                    type(exc).__name__,
+                )
 
         # Persist state — opening turn updates counters, no verdict.
         runtime_state.current_move = move
@@ -225,13 +244,15 @@ class TutorEngine:
         )
 
         # 3. Tutor → first attempt.
-        attempt_text = self._invoke_tutor_or_fallback(
+        first_resp = self._invoke_tutor_or_fallback(
             context=context,
             verdict=verdict,
             move=selected_move,
             media_catalog=media_catalog,
             student_input=student_input,
         )
+        attempt_text = first_resp.text
+        committed_pose = first_resp.pending_pose
 
         # 4. Conformance check.
         prior_student_turn = self._prior_student_turn(context)
@@ -257,13 +278,14 @@ class TutorEngine:
             recent_student_turns=recent_student_turns,
             private_canonical=(verdict.private_canonical if verdict else ""),
             context=context,
+            posed_via_tool=(first_resp.pending_pose is not None),
         )
 
         fallback_used = False
         if not conf_result.passed:
             # One retry on rejection — surface violations to the tutor.
             with emit_span("audit", "tutor.retry") as span:
-                retry_text = self._invoke_tutor_or_fallback(
+                retry_resp = self._invoke_tutor_or_fallback(
                     context=context,
                     verdict=verdict,
                     move=selected_move,
@@ -273,6 +295,7 @@ class TutorEngine:
                 )
                 if span is not None:
                     span["payload"] = {"violations": conf_result.violations[:5]}
+            retry_text = retry_resp.text
 
             retry_conf = self.conformance.run(
                 candidate_response=retry_text,
@@ -291,18 +314,24 @@ class TutorEngine:
                 recent_student_turns=recent_student_turns,
                 private_canonical=(verdict.private_canonical if verdict else ""),
                 context=context,
+                posed_via_tool=(retry_resp.pending_pose is not None),
             )
             retry_conf.retry_used = True
 
             if retry_conf.passed:
                 attempt_text = retry_text
                 conf_result = retry_conf
+                # Retry's PendingPose replaces the first attempt's —
+                # Phase A ran from scratch on retry.
+                committed_pose = retry_resp.pending_pose
             else:
                 # Safe terminal template — never release a free-form
-                # response that failed conformance twice.
+                # response that failed conformance twice. Discard any
+                # pending pose; no Phase B commit happens.
                 fallback_used = True
                 conf_result = retry_conf
                 conf_result.fallback_used = True
+                committed_pose = None
                 next_action = self._render_next_action_for_template(
                     context=context, runtime_state=runtime_state,
                 )
@@ -314,6 +343,21 @@ class TutorEngine:
                         else False
                     ),
                     next_action_text=next_action,
+                )
+
+        # 4b. Phase B commit (Phase 1 §4): only commits if conformance
+        # accepted AND the LLM called the pose_question tool. Updates
+        # ``runtime_state.open_question`` + appends to the ledger so
+        # the next turn's grader has something to grade against.
+        if committed_pose is not None:
+            try:
+                runtime_state = self.context_manager.commit_pending_pose(
+                    committed_pose,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[TutorEngine] commit_pending_pose raised %s — pose dropped",
+                    type(exc).__name__,
                 )
 
         # 5. Skill-mastery write hook (dashboard-only, isolated).
@@ -549,8 +593,15 @@ class TutorEngine:
         media_catalog: list[dict],
         student_input: str,
         violation_hints: Optional[list[str]] = None,
-    ) -> str:
-        """Call the StudentTutor; on any raise, surface a safe template."""
+    ):
+        """Call the StudentTutor; on any raise, surface a safe template.
+
+        Returns a ``TutorResponse`` (``text`` + optional
+        ``pending_pose``). The safe-template fallback has no
+        PendingPose attached.
+        """
+        from apps.tutoring.v2.services.student_tutor import TutorResponse
+
         # Violation hints — surfaced as a tail-appended directive to
         # the user prompt so the model can reshape. We do this by
         # patching the student_input parameter — the tutor's user
@@ -578,10 +629,13 @@ class TutorEngine:
             next_action = self._render_next_action_for_template(
                 context=context, runtime_state=context.runtime_state,
             )
-            return render_safe_template(
-                verdict=verdict,
-                student_claim_present=False,
-                next_action_text=next_action,
+            return TutorResponse(
+                text=render_safe_template(
+                    verdict=verdict,
+                    student_claim_present=False,
+                    next_action_text=next_action,
+                ),
+                pending_pose=None,
             )
 
     def _build_media_catalog(self, context: TutoringContext) -> list[dict]:
@@ -667,15 +721,29 @@ class TutorEngine:
         return out
 
     def _bank_stems_for_context(self, context: TutoringContext) -> list[str]:
-        """Fetch bank stems for the lesson — used by rule_check's allowed set."""
+        """Fetch bank stems for the lesson — used by rule_check's allowed set.
+
+        Includes BOTH ``teacher_script`` (narrative/explanation text)
+        AND ``question`` (actual posable bank stems). Earlier versions
+        looked at ``teacher_script`` only, which made rule_check flag
+        every number that appeared in a tool-posed question stem as
+        "authored" — false-positive rejections on the legitimate
+        tool path.
+        """
         try:
             from apps.curriculum.models import LessonStep
-            stems = list(
+            rows = list(
                 LessonStep.objects
                 .filter(lesson_id=context.lesson_id)
-                .values_list("teacher_script", flat=True)[:20]
+                .values_list("teacher_script", "question")[:40]
             )
-            return [s or "" for s in stems]
+            stems: list[str] = []
+            for teacher_script, question in rows:
+                if teacher_script:
+                    stems.append(teacher_script)
+                if question:
+                    stems.append(question)
+            return stems
         except Exception:
             return []
 

@@ -170,15 +170,25 @@ def apply_verdict_matrix(
     *,
     labels: ClassifierLabels,
     verdict: Optional[GradingResult],
+    posed_via_tool: bool = False,
 ) -> List[MatrixViolation]:
     """Run the verdict-keyed rules and return all violations.
 
     Returns an empty list when the candidate satisfies every applicable
     rule. The orchestrator (``check.py``) decides whether any violation
     triggers a retry.
+
+    ``posed_via_tool`` — when True, the candidate response already
+    carries a verified bank stem committed via the pose_question tool
+    (Phase A passed; Phase B will commit on conformance accept). The
+    ``all__no_assessment_in_prose`` rule is skipped in that case
+    because the candidate's question text DID come through the tool;
+    the classifier reads only the visible characters and cannot
+    distinguish a tool-rendered stem from a prose-authored one.
     """
     rules: List[_Rule] = []
-    rules.extend(_ruleset_all_verdicts())
+    if not posed_via_tool:
+        rules.extend(_ruleset_all_verdicts())
 
     if verdict is None:
         # No-verdict turn: only the student-claim path adds rules.

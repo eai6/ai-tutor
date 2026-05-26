@@ -101,6 +101,13 @@ class TutoringContext(BaseModel):
     runtime_state: SessionRuntimeState
     profile_summary: str = ""  # last-persisted snapshot (R2)
     current_objective: str = ""
+    # Lesson-level metadata surfaced into the shared preamble so the
+    # LLM has a concrete subject + title to anchor on, instead of
+    # falling back to a training-data prior ("S3 maths" on a geography
+    # lesson). Default-empty for backwards compatibility with the
+    # Phase 1 placeholder routing tests.
+    lesson_title: str = ""
+    lesson_subject: str = ""
 
 
 class ProfileUpdate(BaseModel):

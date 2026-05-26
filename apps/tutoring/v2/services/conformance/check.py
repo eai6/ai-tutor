@@ -99,6 +99,7 @@ class ConformanceCheck:
         recent_student_turns: Optional[List[str]] = None,
         private_canonical: str = "",
         context=None,  # TutoringContext — for tutor-claim adjudication
+        posed_via_tool: bool = False,
     ) -> ConformanceResult:
         """Run one full conformance pass over the candidate.
 
@@ -175,7 +176,7 @@ class ConformanceCheck:
 
         # 8. Verdict-keyed rule matrix.
         matrix_violations = apply_verdict_matrix(
-            labels=labels, verdict=verdict,
+            labels=labels, verdict=verdict, posed_via_tool=posed_via_tool,
         )
         if matrix_violations:
             for mv in matrix_violations:

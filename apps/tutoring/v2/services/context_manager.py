@@ -154,6 +154,22 @@ class ContextManager:
             getattr(lesson, "course", None), "language", None
         ) or "en"
 
+        # Resolve lesson-level metadata. ``current_objective`` falls
+        # back to ``Lesson.objective`` when the caller didn't pass one
+        # — earlier code paths passed empty string, which produced the
+        # subject-hallucination bug (S3 maths welcome on a geography
+        # lesson). ``lesson_subject`` derives from
+        # ``Course.subject_type`` and is surfaced into the shared
+        # preamble so the LLM stops inventing subjects.
+        lesson_title = (getattr(lesson, "title", "") or "").strip()
+        unit = getattr(lesson, "unit", None)
+        course = getattr(unit, "course", None)
+        lesson_subject = (
+            getattr(course, "subject_type", "") or ""
+        ).strip().lower()
+        if not current_objective:
+            current_objective = (getattr(lesson, "objective", "") or "").strip()
+
         if full_transcript is None:
             full_transcript = self._load_full_transcript()
 
@@ -171,6 +187,8 @@ class ContextManager:
             runtime_state=self.load_runtime_state(),
             profile_summary=profile_summary,
             current_objective=current_objective,
+            lesson_title=lesson_title,
+            lesson_subject=lesson_subject,
         )
 
     def _load_full_transcript(self) -> list[dict]:

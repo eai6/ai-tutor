@@ -156,9 +156,18 @@ def select_move(
         # Three consecutive unverified turns → explain and reset.
         if runtime_state.unverified_run_length >= 3:
             return "explain"
-        # First / second unverified → keep the floor open with the
-        # student via a probe-style pose. (The tutor's unverified
-        # response prompt surfaces uncertainty per §3 / §7 item 1.)
+        # When an open_question is still in flight, scaffold back to
+        # it rather than pose a fresh one — the open Q stays the
+        # focus, and ``scaffold_hint``'s prompt surfaces uncertainty
+        # by design (it cites ``what_right`` / ``what_missing`` from
+        # student_safe_feedback, which the conformance classifier
+        # reads as a hedged stance).
+        if runtime_state.open_question is not None:
+            return "scaffold_hint"
+        # No open question (free-chat / topic-divergence) → probe
+        # via a fresh tool-posed question. The tutor's pose_question
+        # move prompt is verdict-aware and surfaces uncertainty in
+        # the lead_in on unverified turns.
         return "pose_question"
 
     # Defensive default.

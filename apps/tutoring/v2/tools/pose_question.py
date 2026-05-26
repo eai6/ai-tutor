@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
@@ -251,3 +251,130 @@ class PoseInlineQuestionTool:
 
     name = "pose_inline_question"
     args_schema = PoseQuestionToolArgs
+
+
+# ----------------------------------------------------------------------
+# LLM-facing tool builder — slot-based bank surface
+# ----------------------------------------------------------------------
+
+POSE_QUESTION_LLM_TOOL_NAME = "pose_question"
+
+
+def build_anthropic_pose_question_tool(
+    *,
+    lesson_id: int,
+    posed_step_ids: set[int] | None = None,
+    max_stem_chars: int = 160,
+) -> tuple[Optional[dict], dict[int, Any]]:
+    """Build the slot-indexed Anthropic tool dict for the LLM.
+
+    Returns ``(tool_dict, slot_to_step_map)``. ``tool_dict`` is None
+    when the lesson has no posable steps (no step with a populated
+    ``question`` field after filtering out steps already in
+    ``posed_step_ids``); the caller falls back to the plain
+    ``generate()`` text path.
+
+    The LLM only ever sees an integer ``slot`` — the canonical answer
+    stays on the backend. This mirrors the legacy
+    ``ConversationalTutor._build_pose_question_tool`` surface so the
+    Anthropic / Gemini / OpenAI tool-use APIs all behave the same.
+
+    ``posed_step_ids`` is the set of LessonStep ids already in
+    ``runtime_state.posed_question_ledger`` for this session — the
+    builder drops those slots up front so the in-session repeat guard
+    has nothing to reject during Phase A.
+    """
+    from apps.curriculum.models import LessonStep
+
+    posed_step_ids = posed_step_ids or set()
+    steps = (
+        LessonStep.objects
+        .filter(lesson_id=lesson_id)
+        .exclude(id__in=posed_step_ids)
+        .exclude(question__isnull=True)
+        .exclude(question__exact="")
+        .order_by("order_index")
+    )
+
+    slot_map: dict[int, Any] = {}
+    menu_lines: list[str] = []
+    for slot_idx, step in enumerate(steps):
+        stem = (step.question or "").strip()
+        if not stem:
+            continue
+        slot_map[slot_idx] = step
+        menu_lines.append(f"  {slot_idx}: {stem[:max_stem_chars]}")
+
+    if not slot_map:
+        return None, {}
+
+    max_slot = max(slot_map.keys())
+    tool = {
+        "name": POSE_QUESTION_LLM_TOOL_NAME,
+        "description": (
+            "Pose ONE verified question from the lesson bank to the "
+            "student. This is the ONLY legal way to ask a question "
+            "with a checkable answer (numerical, MCQ, fill-in, short "
+            "answer). The slot index maps to a question in the bank — "
+            "the backend renders the canonical stem verbatim. "
+            "Optionally supply a SHORT one-sentence ``lead_in`` "
+            "(≤80 chars, no '?'). NEVER type the question stem in "
+            "your text response — emit a real tool_use block.\n\n"
+            "Available slots:\n" + "\n".join(menu_lines)
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "slot": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": max_slot,
+                    "description": (
+                        f"Bank slot to pose. Must be one of: "
+                        f"{sorted(slot_map.keys())}"
+                    ),
+                },
+                "lead_in": {
+                    "type": "string",
+                    "description": (
+                        "Optional short transition shown before the "
+                        "bank question. At most one sentence, no '?'. "
+                        "Leave empty if the bank stem stands alone."
+                    ),
+                },
+            },
+            "required": ["slot"],
+        },
+    }
+    return tool, slot_map
+
+
+def make_resolve_canonical_for_lesson(slot_map: dict[int, Any]):
+    """Build a ``resolve_canonical`` callback bound to a slot map.
+
+    Used by ``validate_pose`` to resolve a ``QuestionRef`` (always
+    ``LESSON_STEP`` source on this path) to the step's
+    ``expected_answer``. Raises ``LookupError`` when the step id is
+    unknown — ``validate_pose`` converts that to a ``ToolRejection``.
+    """
+    step_by_id = {step.id: step for step in slot_map.values()}
+
+    def _resolve(ref: QuestionRef) -> str:
+        step = step_by_id.get(ref.id)
+        if step is None:
+            raise LookupError(
+                f"lesson step id={ref.id} not in current slot map"
+            )
+        return (step.expected_answer or "").strip()
+
+    return _resolve
+
+
+def _noop_pre_pose_check(**_kwargs) -> None:
+    """Placeholder pre-pose check used when ``BANK_PREPOSE_RECHECK=off``.
+
+    ``validate_pose`` only calls this when the env flag is on; we
+    still supply a callable so the parameter shape stays uniform.
+    Phase 2+ supplies the real grounded-derivability check.
+    """
+    return None

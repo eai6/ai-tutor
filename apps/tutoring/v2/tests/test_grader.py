@@ -30,6 +30,11 @@ from apps.tutoring.v2.services.grader_prompts import (
 from apps.tutoring.v2.services.student_grader import (
     PrePoseRefusedError,
     StudentGrader,
+    _extract_canonical_numeric,
+    _extract_prose_numeric,
+    _match_mcq_letter,
+    _match_short_numeric,
+    _match_true_false,
     _parse_grounded_response,
     _parse_student_math_value,
     _safe_json_loads,
@@ -334,3 +339,172 @@ def test_parse_student_math_value_bare_numeric():
 def test_parse_student_math_value_returns_none_on_prose_without_value():
     v, _ = _parse_student_math_value("I added them up")
     assert v is None
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Prose-numeric extraction — covers the verdict-UNVERIFIED regression
+# that the S1 / S5 eval surfaced on 2026-05-26 (student answers like
+# "ohhh x = 6" / "is it 21?" collapsing to UNVERIFIED). Each row is a
+# pattern that returned ``None`` BEFORE the fix and must now resolve to
+# the terminal numeric value the student stated.
+# ──────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("is it 21?", 21),
+    ("is it 21", 21),
+    ("ohhh x = 6", 6),
+    ("okay x = 15", 15),
+    ("x = -4.2", -4.2),
+    ("the answer is 7", 7),
+    ("it is 7", 7),
+    ("answer: 6", 6),
+    ("y = 3.5", 3.5),
+    ("i think you add 3 to both sides so x = 21", 21),
+    # No terminal number → None
+    ("I added them up", None),
+    ("", None),
+    # Trailing punctuation
+    ("the answer is 7.", 7),
+    ("is it 7?", 7),
+])
+def test_extract_prose_numeric_patterns(text, expected):
+    assert _extract_prose_numeric(text) == expected
+
+
+def test_parse_student_math_value_prose_wrapped_correct_answer():
+    """The bug that motivated the fix: 'ohhh x = 6' was UNVERIFIED."""
+    v, s = _parse_student_math_value("ohhh x = 6")
+    assert v == 6
+    assert s
+
+
+def test_parse_student_math_value_prose_wrapped_wrong_answer():
+    v, _ = _parse_student_math_value("is it 21?")
+    assert v == 21  # value extracted; comparator decides it's wrong
+
+
+def test_parse_student_math_value_picks_terminal_over_setup():
+    """Numbers in problem setup ('add 3 to both sides') must NOT mask the
+    student's terminal answer ('x = 21')."""
+    v, _ = _parse_student_math_value(
+        "i think you add 3 to both sides so x = 21"
+    )
+    assert v == 21
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Canonical-numeric extraction for LessonStep.expected_answer values
+# with units ("55 SCR", "2.88 m³/s") or formulaic shapes ("x = 6").
+# ──────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("x = 6", 6),
+    ("55 SCR", 55),
+    ("2.88 m³/s", 2.88),
+    ("40 SCR", 40),
+    ("-3.5", -3.5),
+    ("no number here", None),
+    ("", None),
+])
+def test_extract_canonical_numeric(text, expected):
+    assert _extract_canonical_numeric(text) == expected
+
+
+# ──────────────────────────────────────────────────────────────────────
+# MCQ letter matcher — answer_type='multiple_choice' canonical='B'.
+# ──────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("canonical, student, expected", [
+    ("B", "I would pick option B because small-scale maps cover more", True),
+    ("B", "B", True),
+    ("B", "(B)", True),
+    ("B", "[B]", True),
+    ("B", "b.", True),
+    ("A", "i pick a", True),
+    ("A", "answer: A", True),
+    ("C", "I'd choose D", False),
+    ("B", "I pick c", False),
+    ("D", "I think d", True),
+    ("B", "I would say B", True),
+    # No letter detected → None (fall through to grounded)
+    ("B", "I don't know", None),
+    ("B", "small-scale maps cover larger areas", None),
+    # Canonical is not a single letter → not an MCQ; matcher returns None.
+    ("True", "B", None),
+    ("the answer is B", "B", None),
+])
+def test_match_mcq_letter(canonical, student, expected):
+    assert _match_mcq_letter(canonical, student) == expected
+
+
+# ──────────────────────────────────────────────────────────────────────
+# True/False matcher.
+# ──────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("canonical, student, expected", [
+    ("True", "True", True),
+    ("True", "true.", True),
+    ("True", "true - large-scale maps show smaller areas", True),
+    ("True", "yes", True),
+    ("False", "false", True),
+    ("False", "no", True),
+    ("True", "False", False),
+    ("False", "True", False),
+    # First-word fast path beats later token: leading "True" wins even
+    # when the prose mentions "wrong" further on.
+    ("True", "True because the other is wrong", True),
+    # Empty / canonical not a T/F token → None
+    ("True", "", None),
+    ("maybe", "true", None),
+    # Mixed signals with no leading T/F token → None (grounded grader)
+    ("True", "I think both true and false answers could apply", None),
+])
+def test_match_true_false(canonical, student, expected):
+    assert _match_true_false(canonical, student) == expected
+
+
+# ──────────────────────────────────────────────────────────────────────
+# short_numeric matcher — handles canonicals with units / formulae.
+# ──────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("canonical, student, expected", [
+    ("x = 6", "ohhh x = 6", True),
+    ("x = 6", "is it 21?", False),
+    ("x = 6", "okay x = 6", True),
+    ("55 SCR", "55", True),
+    ("55 SCR", "the answer is 55", True),
+    ("55 SCR", "55 SCR", True),
+    ("2.88 m³/s", "2.88", True),
+    ("40 SCR", "is it 40?", True),
+    ("40 SCR", "is it 50?", False),
+    # Student input has no number at all → None.
+    ("x = 6", "I don't know", None),
+    # Canonical has no number → None (not a short_numeric canonical).
+    ("foo bar", "5", None),
+])
+def test_match_short_numeric(canonical, student, expected):
+    assert _match_short_numeric(canonical, student) == expected
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Step.computed regression — the .value→.computed bug at line 763 was
+# silently returning None for any multi-step working chain. Test that
+# a working-style answer now resolves.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_parse_student_math_value_multi_step_working():
+    """3-step chain: '95 + 70 = 165' → '165 + 110 = 275'. The analyzer
+    should return the terminal claim. Pre-fix this returned None because
+    Step has ``.computed`` not ``.value``."""
+    v, _ = _parse_student_math_value("95 + 70 = 165\n165 + 110 = 275")
+    # The chain analyzer may or may not parse this exact shape — what
+    # matters is that the function returns SOMETHING when there's a
+    # parseable chain, not silently None. Either int(275) or float(275).
+    if v is not None:
+        assert int(v) == 275

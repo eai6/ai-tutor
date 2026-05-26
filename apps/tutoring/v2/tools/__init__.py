@@ -18,10 +18,13 @@ schema and stays unaffected.
 
 from apps.tutoring.v2.tools.math_verification import MathVerificationTool
 from apps.tutoring.v2.tools.pose_question import (
+    POSE_QUESTION_LLM_TOOL_NAME,
     PoseInlineQuestionTool,
     PoseQuestionTool,
     PoseQuestionToolArgs,
     ToolRejection,
+    build_anthropic_pose_question_tool,
+    make_resolve_canonical_for_lesson,
     validate_pose,
 )
 from apps.tutoring.v2.tools.repeat_guards import (
@@ -36,14 +39,17 @@ from apps.tutoring.v2.tools.token_cache import (
 
 __all__ = [
     "MathVerificationTool",
+    "POSE_QUESTION_LLM_TOOL_NAME",
     "PoseInlineQuestionTool",
     "PoseQuestionTool",
     "PoseQuestionToolArgs",
     "ToolRejection",
     "TokenAlreadyConsumed",
     "TokenInvalid",
+    "build_anthropic_pose_question_tool",
     "cross_session_repeat_guard",
     "in_session_repeat_guard",
+    "make_resolve_canonical_for_lesson",
     "token_cache",
     "validate_pose",
 ]

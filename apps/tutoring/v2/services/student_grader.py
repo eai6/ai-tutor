@@ -306,8 +306,24 @@ class StudentGrader:
         context: TutoringContext,
         request: GradingRequest,
     ) -> GradingResult:
-        """Tier order: deterministic bank → KB-grounded → Google-grounded."""
+        """Tier order: deterministic direct match → bank → KB-grounded."""
         with emit_span("audit", "grader.grounded") as span:
+            # Tier 0 — answer_type-aware direct match (LessonStep only).
+            # ``bank_grader`` assumes ``question_type`` exists and
+            # defaults to ``"mcq"`` when absent; LessonStep rows have
+            # ``answer_type`` instead and the default-to-mcq path
+            # collapses every short-numeric / true-false / free-text
+            # step to UNVERIFIED. This tier catches the common shapes
+            # cheaply before ever touching the LLM.
+            direct = self._try_direct_step_match(request)
+            if direct is not None:
+                if span is not None:
+                    span["payload"] = {
+                        "verdict": direct.verdict.value,
+                        "tier": "direct",
+                    }
+                return direct
+
             # Tier 1 — deterministic bank grader when a canonical exists.
             bank_result = self._try_bank_grading(request)
             if bank_result is not None:
@@ -355,6 +371,75 @@ class StudentGrader:
                 citation=adjudication.citation,
                 bare_answer=False,
             )
+
+    def _try_direct_step_match(
+        self,
+        request: GradingRequest,
+    ) -> Optional[GradingResult]:
+        """Answer-type-aware direct match for ``LESSON_STEP`` open questions.
+
+        Returns:
+          - ``GradingResult`` (``CORRECT`` or ``WRONG``) when the
+            student's input cleanly maps to the canonical via the
+            step's ``answer_type`` shape.
+          - ``None`` when the step is not present, has no canonical,
+            uses ``answer_type='free_text'`` / ``'none'`` (which need
+            grounded judgment), or the matcher couldn't extract a
+            confident answer from the student's input. Falls through
+            to ``_try_bank_grading`` / grounded adjudication.
+
+        Does NOT call any LLM — purely deterministic string / regex
+        work. Avoids the no-KB-grounding UNVERIFIED trap (the dominant
+        verdict regression observed in S1 + S5 evaluation sessions).
+        """
+        open_q = request.open_question
+        if open_q.source != QuestionSource.LESSON_STEP:
+            return None
+        try:
+            from apps.curriculum.models import LessonStep
+            step = LessonStep.objects.filter(pk=open_q.id).first()
+        except Exception:
+            return None
+        if step is None:
+            return None
+        answer_type = (getattr(step, "answer_type", "") or "").strip().lower()
+        canonical = (step.expected_answer or "").strip()
+        if not canonical:
+            return None
+        student_raw = (request.student_input or "").strip()
+        if not student_raw:
+            return None
+
+        matched: Optional[bool] = None
+        if answer_type == "multiple_choice":
+            matched = _match_mcq_letter(canonical, student_raw)
+        elif answer_type == "true_false":
+            matched = _match_true_false(canonical, student_raw)
+        elif answer_type == "short_numeric":
+            matched = _match_short_numeric(canonical, student_raw)
+        # free_text + none + unknown answer_types → return None so
+        # we fall through to grounded adjudication.
+
+        if matched is None:
+            return None
+
+        verdict_kind = Verdict.CORRECT if matched else Verdict.WRONG
+        if verdict_kind == Verdict.CORRECT:
+            safe = StudentSafeFeedback(what_right="you matched the answer")
+        else:
+            safe = StudentSafeFeedback(
+                first_misconception_redacted=(
+                    "that doesn't match the expected answer"
+                ),
+            )
+        return GradingResult(
+            verdict=verdict_kind,
+            private_canonical=canonical,
+            student_safe_feedback=safe,
+            student_value=student_raw,
+            reasoning=f"direct_step_match:{answer_type}",
+            bare_answer=False,
+        )
 
     def _try_bank_grading(
         self,
@@ -728,10 +813,22 @@ def _format_canonical(value: Any) -> str:
 
 
 def _parse_student_math_value(student_input: str) -> tuple[Optional[Any], str]:
-    """Extract a numeric value via the existing ast-based working analyzer (R9).
+    """Extract a numeric value from ``student_input`` for math comparison.
 
     Returns ``(value, rendered_str)``. ``value`` is ``None`` when no
     numeric value can be extracted.
+
+    Pipeline:
+      1. Bare-arithmetic fast path — ``safe_eval_arithmetic`` parses
+         clean numeric strings like ``"25"`` or ``"3 + 4"``.
+      2. Prose-numeric fast path — pulls a number out of common student
+         framings ("is it 21?", "ohhh x = 6", "the answer is 7",
+         "= 6", trailing "… 6"). These are the patterns that show up in
+         real S1–S3 chat transcripts; without this fallback every
+         prose-wrapped answer collapses to UNVERIFIED.
+      3. Multi-step chain fallback — when the student typed actual
+         working (``"3x = 18 → x = 18 ÷ 3 = 6"``), use the working
+         analyzer to walk steps and take the final ``Step.computed``.
     """
     from apps.tutoring.student_working_analyzer import (
         analyze_chain,
@@ -742,11 +839,21 @@ def _parse_student_math_value(student_input: str) -> tuple[Optional[Any], str]:
     text = (student_input or "").strip()
     if not text:
         return None, ""
-    # First try a direct numeric parse — bare-answer fast path.
+
+    # 1. Bare-arithmetic fast path.
     bare = safe_eval_arithmetic(text)
     if bare is not None:
         return bare, str(bare)
-    # Otherwise extract the chain of steps and take the final result.
+
+    # 2. Prose-numeric fast path. Order matters — the most specific
+    # patterns first so "x = 6" doesn't get clobbered by the trailing
+    # "any number" rule that would also match the "3" in "add 3 to
+    # both sides".
+    prose_value = _extract_prose_numeric(text)
+    if prose_value is not None:
+        return prose_value, str(prose_value)
+
+    # 3. Multi-step working chain fallback.
     try:
         steps = extract_steps(text)
     except Exception:
@@ -760,10 +867,198 @@ def _parse_student_math_value(student_input: str) -> tuple[Optional[Any], str]:
     if final_index is None or final_index < 0 or final_index >= len(steps):
         return None, ""
     final_step = steps[final_index]
-    value = getattr(final_step, "value", None)
+    # Step.computed is the analyzer's evaluated result; Step.claim is
+    # the student's stated value. Prefer claim (what they SAID) — that's
+    # what we're grading against. Fall back to computed if claim is
+    # not parseable as a number.
+    claim_str = (getattr(final_step, "claim", "") or "").strip()
+    try:
+        value: Any = float(claim_str)
+        if value.is_integer():
+            value = int(value)
+    except (TypeError, ValueError):
+        value = getattr(final_step, "computed", None)
     if value is None:
         return None, ""
     return value, str(value)
+
+
+# Regex set for prose-numeric extraction. Kept narrow so it doesn't
+# misfire on numbers that are part of the problem setup ("3x = 18" in
+# the student echoing the question) — we anchor on terminal-answer
+# phrasing.
+_PROSE_NUMERIC_PATTERNS = (
+    # "x = 6", "y = -3.5", "answer: 6", "answer is 7"
+    re.compile(
+        r"(?ix)\b(?:x|y|z|n|answer)\s*(?:=|:|is)\s*"
+        r"(-?\d+(?:\.\d+)?)\s*$"
+    ),
+    # "is it 21?", "is the answer 21?"
+    re.compile(
+        r"(?ix)\b(?:is\s+it|is\s+the\s+answer|is\s+that)\s+"
+        r"(-?\d+(?:\.\d+)?)\s*\??\s*$"
+    ),
+    # "the answer is 7", "it is 7", "= 7"
+    re.compile(
+        r"(?ix)(?:the\s+answer\s+is|it\s+is|=)\s+"
+        r"(-?\d+(?:\.\d+)?)\s*\.?\s*$"
+    ),
+    # Trailing bare number: "… so 6" / "ohhh 6" / final "6."
+    re.compile(r"(?:^|[^\w.])(-?\d+(?:\.\d+)?)\s*[.!?]?\s*$"),
+)
+
+
+_MCQ_PROSE_PATTERNS = (
+    # "option B", "answer: B", "choice B", "pick B"
+    re.compile(r"(?i)\b(?:option|answer|choice|pick)\s*[:\-]?\s*([A-Da-d])\b"),
+    # "I pick B", "I choose B", "I'd choose B", "I'll go with B"
+    re.compile(
+        r"(?i)\bi(?:'?ll|'?d|\s+would)?\s+"
+        r"(?:pick|choose|select|go\s+with|say|think)\s+"
+        r"(?:it\s+is\s+|is\s+|the\s+answer\s+is\s+|that\s+)?([A-Da-d])\b"
+    ),
+    # "(B)", "[B]" — bracketed letter
+    re.compile(r"(?i)^\s*[\(\[]([A-Da-d])[\)\]]"),
+    # Bare letter alone or with terminal punctuation: "B", "b.", "B!"
+    re.compile(r"(?i)^\s*([A-Da-d])\s*[\.\!]?\s*$"),
+)
+
+
+def _match_mcq_letter(canonical: str, student_input: str) -> Optional[bool]:
+    """Map ``student_input`` to True/False for an MCQ-letter canonical.
+
+    Accepts the canonical as a single letter (A/B/C/D, case-insensitive).
+    Returns ``None`` when the canonical is not a single letter — that
+    means the lesson author stored full option text, not a letter, and
+    we let the grounded grader decide.
+    """
+    canon = (canonical or "").strip().upper()
+    if len(canon) != 1 or canon not in "ABCD":
+        return None
+    text = (student_input or "").strip()
+    if not text:
+        return None
+    for pat in _MCQ_PROSE_PATTERNS:
+        m = pat.search(text)
+        if m:
+            return m.group(1).upper() == canon
+    return None
+
+
+_TRUE_TOKENS = {"true", "t", "yes", "y", "correct", "right"}
+_FALSE_TOKENS = {"false", "f", "no", "n", "incorrect", "wrong"}
+
+
+def _match_true_false(canonical: str, student_input: str) -> Optional[bool]:
+    """True/False canonical comparator with prose-aware extraction.
+
+    Returns ``None`` when the canonical isn't a recognisable T/F token
+    or the student input contains BOTH a true and a false token (we
+    can't disambiguate "true because false is wrong" cheaply — that's
+    grounded-grader territory).
+    """
+    canon = (canonical or "").strip().lower()
+    if canon in _TRUE_TOKENS:
+        canon_is_true: Optional[bool] = True
+    elif canon in _FALSE_TOKENS:
+        canon_is_true = False
+    else:
+        return None
+
+    text = (student_input or "").strip().lower()
+    if not text:
+        return None
+    # Strip punctuation so "True." / "false?" still match.
+    text_norm = re.sub(r"[^a-z0-9\s]", " ", text)
+    words = set(text_norm.split())
+    has_true = bool(words & _TRUE_TOKENS)
+    has_false = bool(words & _FALSE_TOKENS)
+    # First word fast-path: "True - large-scale maps…" should still
+    # match True even though the rest of the prose mentions "smaller".
+    first_word = (text_norm.split() or [""])[0]
+    if first_word in _TRUE_TOKENS:
+        return canon_is_true is True
+    if first_word in _FALSE_TOKENS:
+        return canon_is_true is False
+    if has_true and not has_false:
+        return canon_is_true is True
+    if has_false and not has_true:
+        return canon_is_true is False
+    return None
+
+
+def _match_short_numeric(canonical: str, student_input: str) -> Optional[bool]:
+    """Compare a short-numeric canonical against student input.
+
+    Uses the prose-numeric extractor on both sides so canonicals
+    like ``"x = 6"`` / ``"55 SCR"`` / ``"2.88 m³/s"`` and student
+    inputs like ``"ohhh x = 6"`` all resolve to a comparable number.
+    Returns ``None`` when either side can't be pinned to a numeric
+    value (grounded grader handles those).
+    """
+    canon_val = _extract_canonical_numeric(canonical)
+    if canon_val is None:
+        return None
+    student_val, _ = _parse_student_math_value(student_input)
+    if student_val is None:
+        # Last-ditch: pull any number out of the student prose.
+        student_val = _extract_canonical_numeric(student_input)
+    if student_val is None:
+        return None
+    try:
+        return abs(float(canon_val) - float(student_val)) < 1e-6
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_canonical_numeric(text: str) -> Optional[Any]:
+    """Pull the dominant numeric value out of a canonical answer string.
+
+    Looser than ``_extract_prose_numeric`` (which is anchored at end of
+    string to avoid stripping numbers out of the problem setup).
+    Canonicals like ``"55 SCR"`` / ``"2.88 m³/s"`` / ``"x = 6"`` all
+    have a single dominant number; this returns it. Returns ``None``
+    only when the string has no numeric token.
+    """
+    if not text:
+        return None
+    # Prefer the same prose patterns first (catches "x = 6").
+    val = _extract_prose_numeric(text)
+    if val is not None:
+        return val
+    # Fall back to first numeric token in the string.
+    m = re.search(r"(-?\d+(?:\.\d+)?)", text)
+    if not m:
+        return None
+    try:
+        f = float(m.group(1))
+        return int(f) if f.is_integer() else f
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_prose_numeric(text: str) -> Optional[Any]:
+    """Pull a terminal numeric answer out of student prose.
+
+    Returns ``int`` for whole numbers, ``float`` for non-integers,
+    ``None`` when no terminal numeric is found. Anchored on the END of
+    the string so we don't capture numbers from the problem setup the
+    student is echoing back.
+    """
+    text = (text or "").strip()
+    if not text:
+        return None
+    for pattern in _PROSE_NUMERIC_PATTERNS:
+        m = pattern.search(text)
+        if not m:
+            continue
+        raw = m.group(1)
+        try:
+            f = float(raw)
+        except (TypeError, ValueError):
+            continue
+        return int(f) if f.is_integer() else f
+    return None
 
 
 def _resolve_bank_question(open_q: OpenQuestion):
