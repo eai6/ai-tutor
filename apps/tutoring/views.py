@@ -740,11 +740,11 @@ def chat_start_session(request, lesson_id):
         from apps.tutoring.v2.routing import (
             ensure_engine_version_set,
             is_v2_session,
-            v2_placeholder_response,
+            v2_resume_dispatch,
         )
         ensure_engine_version_set(session)
         if is_v2_session(session):
-            payload = v2_placeholder_response(session, kind="resume")
+            payload = v2_resume_dispatch(session)
             payload["history"] = _build_session_history(session)
             return JsonResponse(payload)
         history = _build_session_history(session)
@@ -868,11 +868,11 @@ def chat_start_session(request, lesson_id):
         from apps.tutoring.v2.routing import (
             ensure_engine_version_set,
             is_v2_session,
-            v2_placeholder_response,
+            v2_start_dispatch,
         )
         ensure_engine_version_set(session)
         if is_v2_session(session):
-            return JsonResponse(v2_placeholder_response(session, kind="start"))
+            return JsonResponse(v2_start_dispatch(session))
 
         tutor = ConversationalTutor(session)
         response = tutor.start()
@@ -973,14 +973,18 @@ def chat_respond(request, session_id):
         student=request.user,
     )
 
-    # v2 dispatch (sticky-per-session). Phase 1: route v2 sessions
-    # to the placeholder; Phase 2 wires TutorEngine.respond() here.
+    # v2 dispatch (sticky-per-session). Phase 2 wires
+    # TutorEngine.respond() here via v2_respond_dispatch.
+    #
+    # NOTE: the v2 path runs its own conformance.safety + answer-leak
+    # checks on the *tutor* response. We still parse + safety-check
+    # the *student* input below (line 1022+) before routing because
+    # the student-input safety treatment is the same on both engines.
     from apps.tutoring.v2.routing import (
         is_v2_session,
-        v2_placeholder_response,
+        v2_respond_dispatch,
     )
-    if is_v2_session(session):
-        return JsonResponse(v2_placeholder_response(session, kind="respond"))
+    _is_v2 = is_v2_session(session)
 
     # Check if student is suspended
     try:
@@ -1155,6 +1159,12 @@ def chat_respond(request, session_id):
     if _pii_pass.filtered_content and _pii_pass.filtered_content != message:
         message = _pii_pass.filtered_content
 
+    # v2 dispatch — runs the full TutorEngine flow + returns the
+    # legacy-shape JSON envelope. Bypasses the ConversationalTutor
+    # path entirely.
+    if _is_v2:
+        return JsonResponse(v2_respond_dispatch(session, message))
+
     # Generate response (non-streaming for Azure Container Apps compatibility)
     import logging
     import time
@@ -1241,10 +1251,10 @@ def chat_start_review(request, session_id):
     # to the placeholder.
     from apps.tutoring.v2.routing import (
         is_v2_session,
-        v2_placeholder_response,
+        v2_review_dispatch,
     )
     if is_v2_session(session):
-        payload = v2_placeholder_response(session, kind="review")
+        payload = v2_review_dispatch(session)
         payload["artifact_html"] = None
         return JsonResponse(payload)
 

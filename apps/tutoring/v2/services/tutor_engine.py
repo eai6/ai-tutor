@@ -31,13 +31,23 @@ from typing import Any, Optional
 
 from apps.tutoring.tracing import emit_span
 from apps.tutoring.v2.contracts import (
+    GradingRequest,
     GradingResult,
+    ObjectiveProgress,
     SessionRuntimeState,
     TutoringContext,
     Verdict,
 )
+from apps.tutoring.v2.services.conformance import (
+    ConformanceCheck,
+    ConformanceResult,
+)
 from apps.tutoring.v2.services.context_manager import ContextManager
+from apps.tutoring.v2.services.media import MediaService
 from apps.tutoring.v2.services.move_selection import ALLOWED_MOVES, select_move
+from apps.tutoring.v2.services.student_grader import StudentGrader
+from apps.tutoring.v2.services.student_tutor import StudentTutor
+from apps.tutoring.v2.services.templates import render_safe_template
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +74,20 @@ class TutorEngine:
     """Top-level orchestrator. Stateless services; state lives on
     ``ContextManager``."""
 
-    def __init__(self, context_manager: ContextManager) -> None:
+    def __init__(
+        self,
+        context_manager: ContextManager,
+        *,
+        grader: Optional[StudentGrader] = None,
+        tutor: Optional[StudentTutor] = None,
+        conformance: Optional[ConformanceCheck] = None,
+        media_service: Optional[MediaService] = None,
+    ) -> None:
         self.context_manager = context_manager
+        self.grader = grader or StudentGrader()
+        self.tutor = tutor or StudentTutor()
+        self.conformance = conformance or ConformanceCheck(grader=self.grader)
+        self.media_service = media_service or MediaService()
 
     # ------------------------------------------------------------------
     # Turn entrypoints (Phase 2)
@@ -74,13 +96,61 @@ class TutorEngine:
     def start_session(self, context: TutoringContext) -> TurnResult:
         """Produce the opening turn for a new session.
 
-        Phase 2 Task #12 wires this into ``chat_start_session``. Until
-        StudentTutor's per-move prompts land (Task #7) the engine
-        cannot generate the opening body — surfaces NotImplementedError
-        so any wiring oversight fails loudly.
+        No verdict, no student input — the engine selects an opening
+        move (explain or worked_example based on profile) and asks
+        StudentTutor to render it.
         """
-        raise NotImplementedError(
-            "TutorEngine.start_session — wired in Phase 2 Task #12"
+        runtime_state = context.runtime_state
+        media_catalog = self._build_media_catalog(context)
+
+        move = self.pick_move(
+            verdict=None,
+            runtime_state=runtime_state,
+            profile_summary=context.profile_summary,
+            objective_just_opened=True,
+            current_objective=context.current_objective,
+        )
+        v2_trace: dict[str, Any] = {
+            "selected_move": move,
+            "verdict": None,
+            "fallback_used": False,
+            "retry_used": False,
+        }
+        try:
+            response_text = self.tutor.respond(
+                context=context,
+                verdict=None,
+                move=move,
+                media_catalog=media_catalog,
+                student_input="",
+            )
+        except Exception as exc:
+            logger.warning(
+                "[TutorEngine] start_session tutor.respond raised %s",
+                type(exc).__name__,
+            )
+            response_text = render_safe_template(
+                verdict=None,
+                student_claim_present=False,
+                next_action_text="Let's get started together.",
+            )
+            v2_trace["fallback_used"] = True
+
+        # Persist state — opening turn updates counters, no verdict.
+        runtime_state.current_move = move
+        runtime_state.move_history = list(runtime_state.move_history) + [move]
+        runtime_state = self.update_counters_post_turn(
+            runtime_state=runtime_state, verdict=None, objective_changed=True,
+        )
+        self.context_manager.save_runtime_state(runtime_state)
+
+        return TurnResult(
+            response_text=response_text,
+            runtime_state=runtime_state,
+            selected_move=move,
+            verdict=None,
+            fallback_used=v2_trace["fallback_used"],
+            v2_trace=v2_trace,
         )
 
     def respond(
@@ -90,13 +160,194 @@ class TutorEngine:
     ) -> TurnResult:
         """Run one full turn end-to-end.
 
-        Phase 2 Task #12 ties StudentGrader (Task #5/#6), StudentTutor
-        (Task #7), and ConformanceCheck (Task #8) together here. Until
-        those land, callers see ``NotImplementedError`` — this is the
-        single seam the entire conversational engine routes through.
+        Order (per analysis §3 turn-by-turn flow):
+          1. Grade (only when an assessment question is open).
+          2. Select move from inputs (pure function + safety valves).
+          3. Tutor generates one response.
+          4. Conformance check; on reject → ONE retry; on second
+             reject → safe terminal template.
+          5. Record skill practice (correct/wrong only — dashboard).
+          6. Persist runtime state.
+          7. Return ``TurnResult`` with v2_trace rollup.
+
+        The caller (views.py) is responsible for persisting the
+        ``SessionTurn`` row and flushing buffered spans against it.
         """
-        raise NotImplementedError(
-            "TutorEngine.respond — wired in Phase 2 Task #12"
+        runtime_state = context.runtime_state
+        objective_changed = False
+        media_catalog = self._build_media_catalog(context)
+
+        # 1. Grade — only when there's an open question to grade against.
+        verdict: Optional[GradingResult] = None
+        if runtime_state.open_question is not None and student_input.strip():
+            try:
+                verdict = self.grader.grade_student_response(
+                    context,
+                    GradingRequest(
+                        open_question=runtime_state.open_question,
+                        student_input=student_input,
+                        is_math=self._is_math_lesson(context),
+                        kb_chunks=[],  # Phase 3: KB retrieval pass
+                    ),
+                )
+                # Update per-objective progress + attempts counter.
+                self._update_objective_progress(
+                    runtime_state=runtime_state,
+                    verdict=verdict,
+                    current_objective=context.current_objective,
+                )
+                if verdict.verdict == Verdict.CORRECT:
+                    runtime_state.attempts_on_open_question = 0
+                else:
+                    runtime_state.attempts_on_open_question += 1
+            except Exception as exc:
+                logger.warning(
+                    "[TutorEngine] grader raised %s — proceeding as unverified",
+                    type(exc).__name__,
+                )
+                verdict = GradingResult(verdict=Verdict.UNVERIFIED)
+
+        # 2. Select move.
+        selected_move = self.pick_move(
+            verdict=verdict,
+            runtime_state=runtime_state,
+            profile_summary=context.profile_summary,
+            objective_just_opened=False,
+            current_objective=context.current_objective,
+        )
+
+        # 3. Tutor → first attempt.
+        attempt_text = self._invoke_tutor_or_fallback(
+            context=context,
+            verdict=verdict,
+            move=selected_move,
+            media_catalog=media_catalog,
+            student_input=student_input,
+        )
+
+        # 4. Conformance check.
+        prior_student_turn = self._prior_student_turn(context)
+        bank_stems = self._bank_stems_for_context(context)
+        recent_student_turns = self._recent_student_turns(context)
+        attached_media_count, figure_facts = self._media_counts_and_facts(
+            attempt_text=attempt_text, catalog=media_catalog,
+        )
+        conf_result = self.conformance.run(
+            candidate_response=attempt_text,
+            verdict=verdict,
+            runtime_state=runtime_state,
+            selected_move=selected_move,
+            prior_student_turn=prior_student_turn,
+            open_question_stem=(
+                runtime_state.open_question.rendered_stem
+                if runtime_state.open_question
+                else ""
+            ),
+            attached_media_count=attached_media_count,
+            figure_facts=figure_facts,
+            bank_stems=bank_stems,
+            recent_student_turns=recent_student_turns,
+            private_canonical=(verdict.private_canonical if verdict else ""),
+            context=context,
+        )
+
+        fallback_used = False
+        if not conf_result.passed:
+            # One retry on rejection — surface violations to the tutor.
+            with emit_span("audit", "tutor.retry") as span:
+                retry_text = self._invoke_tutor_or_fallback(
+                    context=context,
+                    verdict=verdict,
+                    move=selected_move,
+                    media_catalog=media_catalog,
+                    student_input=student_input,
+                    violation_hints=conf_result.violations,
+                )
+                if span is not None:
+                    span["payload"] = {"violations": conf_result.violations[:5]}
+
+            retry_conf = self.conformance.run(
+                candidate_response=retry_text,
+                verdict=verdict,
+                runtime_state=runtime_state,
+                selected_move=selected_move,
+                prior_student_turn=prior_student_turn,
+                open_question_stem=(
+                    runtime_state.open_question.rendered_stem
+                    if runtime_state.open_question
+                    else ""
+                ),
+                attached_media_count=attached_media_count,
+                figure_facts=figure_facts,
+                bank_stems=bank_stems,
+                recent_student_turns=recent_student_turns,
+                private_canonical=(verdict.private_canonical if verdict else ""),
+                context=context,
+            )
+            retry_conf.retry_used = True
+
+            if retry_conf.passed:
+                attempt_text = retry_text
+                conf_result = retry_conf
+            else:
+                # Safe terminal template — never release a free-form
+                # response that failed conformance twice.
+                fallback_used = True
+                conf_result = retry_conf
+                conf_result.fallback_used = True
+                next_action = self._render_next_action_for_template(
+                    context=context, runtime_state=runtime_state,
+                )
+                attempt_text = render_safe_template(
+                    verdict=verdict,
+                    student_claim_present=(
+                        conf_result.labels.student_claim_present
+                        if conf_result.labels is not None
+                        else False
+                    ),
+                    next_action_text=next_action,
+                )
+
+        # 5. Skill-mastery write hook (dashboard-only, isolated).
+        if verdict is not None:
+            self.record_skill_practice(
+                verdict=verdict,
+                lesson_step=self._current_lesson_step(context),
+                hints_used=0,
+            )
+
+        # 6. Persist state — update move history + counters.
+        runtime_state.current_move = selected_move
+        runtime_state.move_history = list(runtime_state.move_history) + [selected_move]
+        runtime_state = self.update_counters_post_turn(
+            runtime_state=runtime_state,
+            verdict=verdict,
+            objective_changed=objective_changed,
+        )
+        self.context_manager.save_runtime_state(runtime_state)
+
+        # 7. Build v2_trace rollup for SessionTurn.judge_outputs.v2_trace.
+        v2_trace = {
+            "selected_move": selected_move,
+            "verdict": verdict.verdict.value if verdict else None,
+            "verdict_bare_answer": verdict.bare_answer if verdict else False,
+            "conformance_violations": list(conf_result.violations),
+            "conformance_labels": (
+                conf_result.labels.model_dump()
+                if conf_result.labels is not None
+                else None
+            ),
+            "retry_used": conf_result.retry_used,
+            "fallback_used": fallback_used,
+        }
+
+        return TurnResult(
+            response_text=attempt_text,
+            runtime_state=runtime_state,
+            selected_move=selected_move,
+            verdict=verdict,
+            fallback_used=fallback_used,
+            v2_trace=v2_trace,
         )
 
     # ------------------------------------------------------------------
@@ -276,6 +527,195 @@ class TutorEngine:
                 "[TutorEngine] record_practice failed for skill=%s: %s",
                 getattr(skill, "id", None), exc,
             )
+
+    # ------------------------------------------------------------------
+    # Orchestration helpers (Phase 2 §2.3 / §2.7)
+    # ------------------------------------------------------------------
+
+    def _invoke_tutor_or_fallback(
+        self,
+        *,
+        context: TutoringContext,
+        verdict: Optional[GradingResult],
+        move: str,
+        media_catalog: list[dict],
+        student_input: str,
+        violation_hints: Optional[list[str]] = None,
+    ) -> str:
+        """Call the StudentTutor; on any raise, surface a safe template."""
+        # Violation hints — surfaced as a tail-appended directive to
+        # the user prompt so the model can reshape. We do this by
+        # patching the student_input parameter — the tutor's user
+        # prompt incorporates it; cheap + keeps the surface narrow.
+        effective_input = student_input
+        if violation_hints:
+            tail = "\n\n[Conformance retry — your previous response was rejected for: "
+            tail += "; ".join(violation_hints[:5])
+            tail += ". Rewrite per the MOVE directives.]"
+            effective_input = (student_input or "") + tail
+
+        try:
+            return self.tutor.respond(
+                context=context,
+                verdict=verdict,
+                move=move,
+                media_catalog=media_catalog,
+                student_input=effective_input,
+            )
+        except Exception as exc:
+            logger.warning(
+                "[TutorEngine] tutor.respond raised %s — safe template",
+                type(exc).__name__,
+            )
+            next_action = self._render_next_action_for_template(
+                context=context, runtime_state=context.runtime_state,
+            )
+            return render_safe_template(
+                verdict=verdict,
+                student_claim_present=False,
+                next_action_text=next_action,
+            )
+
+    def _build_media_catalog(self, context: TutoringContext) -> list[dict]:
+        """Build the per-turn media catalog via ``MediaService``."""
+        try:
+            return self.media_service.build_catalog(
+                lesson_id=context.lesson_id,
+                institution_id=context.institution_id,
+            )
+        except Exception as exc:
+            logger.warning(
+                "[TutorEngine] media catalog raised %s — empty catalog",
+                type(exc).__name__,
+            )
+            return []
+
+    def _media_counts_and_facts(
+        self, *, attempt_text: str, catalog: list[dict],
+    ) -> tuple[int, list[str]]:
+        """Parse ``|||MEDIA:N|||`` and resolve figure_facts for conformance."""
+        try:
+            _, indices = self.media_service.parse_signal(attempt_text or "")
+        except Exception:
+            indices = []
+        facts: list[str] = []
+        try:
+            facts = self.media_service.figure_facts_for_indices(
+                catalog=catalog, indices=indices,
+            )
+        except Exception:
+            facts = []
+        return len(indices), facts
+
+    def _is_math_lesson(self, context: TutoringContext) -> bool:
+        """Heuristic: lesson's course flagged math. Fail-soft to False."""
+        try:
+            from apps.curriculum.models import Lesson
+            lesson = (
+                Lesson.objects
+                .select_related("unit__course")
+                .filter(pk=context.lesson_id)
+                .first()
+            )
+            if lesson is None:
+                return False
+            course = getattr(lesson.unit, "course", None)
+            return bool(getattr(course, "is_math", False))
+        except Exception:
+            return False
+
+    def _current_lesson_step(self, context: TutoringContext):
+        """Resolve the current LessonStep from the session (or None)."""
+        session = self.context_manager.session
+        idx = getattr(session, "current_step_index", 0) or 0
+        try:
+            lesson = session.lesson
+            return lesson.steps.all()[idx] if hasattr(lesson, "steps") else None
+        except (IndexError, AttributeError, Exception):
+            return None
+
+    def _prior_student_turn(self, context: TutoringContext) -> str:
+        """Last student turn from the transcript (empty when none)."""
+        for turn in reversed(context.full_transcript or []):
+            if turn.get("role") == "student":
+                return turn.get("content") or ""
+        return ""
+
+    def _recent_student_turns(self, context: TutoringContext) -> list[str]:
+        """Last few student turns — used by rule_check's allowed-number set."""
+        out: list[str] = []
+        for turn in reversed(context.full_transcript or []):
+            if turn.get("role") == "student":
+                out.append(turn.get("content") or "")
+                if len(out) >= 5:
+                    break
+        return out
+
+    def _bank_stems_for_context(self, context: TutoringContext) -> list[str]:
+        """Fetch bank stems for the lesson — used by rule_check's allowed set."""
+        try:
+            from apps.curriculum.models import LessonStep
+            stems = list(
+                LessonStep.objects
+                .filter(lesson_id=context.lesson_id)
+                .values_list("teacher_script", flat=True)[:20]
+            )
+            return [s or "" for s in stems]
+        except Exception:
+            return []
+
+    def _render_next_action_for_template(
+        self,
+        *,
+        context: TutoringContext,
+        runtime_state: SessionRuntimeState,
+    ) -> str:
+        """One-line next-action hint for the safe terminal template."""
+        # The next move TutorEngine would have picked — used to fill
+        # the template's "next action" slot per analysis §3.
+        next_move = select_move(
+            verdict=None,
+            runtime_state=runtime_state,
+            profile_summary=context.profile_summary,
+            objective_just_opened=False,
+            current_objective=context.current_objective,
+        )
+        return {
+            "pose_question": "Let's try a question on this together.",
+            "confirm_and_advance": "Let's move on to the next part.",
+            "confirm_and_extend": "Let's push that a little further.",
+            "scaffold_hint": "Let's work the next step together.",
+            "name_misconception": "Let me name what looks like the slip.",
+            "worked_example": "Let me walk through one together first.",
+            "explain": "Let me set up the idea first, then we'll try it.",
+            "pivot": "Let's try a different angle on the same idea.",
+            "close_topic": "We're ready to wrap this objective.",
+        }.get(next_move, "Let's keep going together.")
+
+    def _update_objective_progress(
+        self,
+        *,
+        runtime_state: SessionRuntimeState,
+        verdict: GradingResult,
+        current_objective: str,
+    ) -> None:
+        """Bump the per-objective counters after a graded turn."""
+        key = (current_objective or "_").strip() or "_"
+        progress = runtime_state.objective_progress.get(key)
+        if progress is None:
+            progress = ObjectiveProgress(objective=key)
+        progress.attempts += 1
+        if verdict.verdict == Verdict.CORRECT:
+            progress.correct += 1
+        elif verdict.verdict == Verdict.WRONG:
+            progress.wrong += 1
+        elif verdict.verdict == Verdict.PARTIAL:
+            progress.partial += 1
+        elif verdict.verdict == Verdict.UNVERIFIED:
+            progress.unverified += 1
+        runtime_state.objective_progress[key] = progress
+
+    # ------------------------------------------------------------------
 
     def _resolve_skill_for_step(self, lesson_step: Any):
         """Resolve ``Skill`` row from a ``LessonStep`` via enabling-objective.
