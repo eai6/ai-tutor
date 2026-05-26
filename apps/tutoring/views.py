@@ -1269,6 +1269,26 @@ def chat_start_review(request, session_id):
         student=request.user,
     )
 
+    # Engine dispatch: route review through simple_tutor when enabled.
+    # ``start_for_view`` does the right thing for a completed session
+    # — an ``ExitTicketAttempt`` exists, so the engine enters
+    # REMEDIATION mode and the LLM either re-teaches missed objectives
+    # (failed) or congratulates and advances (passed). Without this
+    # branch the legacy CT.start_review runs even when the rest of the
+    # chat flow is on simple_tutor, breaking the engine contract.
+    from apps.tutoring import simple_tutor
+    if simple_tutor.is_enabled():
+        from apps.tutoring.simple_tutor.engine import start_for_view
+        try:
+            payload = start_for_view(session)
+            payload['session_id'] = session.id
+            return JsonResponse(payload)
+        except Exception as e:
+            logger.error(
+                f"[start_review:simple] failed: {e}", exc_info=True,
+            )
+            # Fall through to legacy review on error.
+
     tutor = ConversationalTutor(session)
     result = tutor.start_review()
 
