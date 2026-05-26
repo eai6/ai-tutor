@@ -565,4 +565,34 @@ Recommend Path A: a 30-minute skeleton run proves the architecture; then scenari
 
 ---
 
+How to run the Evaluation:
+# 1. Extract lesson fixtures from prod_content_dump.sql (only if you
+#    don't have evals/fixtures/lessons.json yet, or the dump changed):
+python evals/fixtures/extract.py
+
+# 2. Load fixtures into the dev DB:
+python manage.py loaddata evals/fixtures/institution.json evals/fixtures/lessons.json
+
+
+# ─── running the eval ──────────────────────────────────────────────
+# Smoke test (plumbing check — single trivial scenario):
+python manage.py run_eval --smoke
+
+# Single scenario by id:
+python manage.py run_eval --scenario math_correct_advance_001
+
+# Full suite (everything under evals/dataset/ except smoke/):
+python manage.py run_eval
+
+
+# ─── reading results ───────────────────────────────────────────────
+# Most recent run summary:
+python -m evals.report
+
+# Diff most recent vs the one before it:
+python -m evals.report --diff
+
+# Explicit two-run diff:
+python -m evals.report evals/runs/<newer>.json --diff evals/runs/<older>.json
+
 Refs: memory/eval_benchmark_v2_simplified.md, memory/llm_student_simulator_plan.md, memory/agentic_platform_architecture_plan.md
