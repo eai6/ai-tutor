@@ -1625,8 +1625,33 @@ def chat_exit_ticket(request, session_id):
         enriched_exit_ticket = dict(response.exit_ticket_data or {})
         enriched_exit_ticket["competency"] = competency
 
+        # Tutor-driven remediation: when the simple-tutor engine is on
+        # AND the student didn't pass AND the session isn't complete,
+        # replace the static "Let's revisit anything you'd like to lock
+        # in" message with an LLM-generated opener that ACKNOWLEDGES
+        # the score and IMMEDIATELY re-teaches the first missed
+        # objective + poses a targeted question. Removes the passive
+        # "want to review?" prompt. See M13 remediation context wiring.
+        message_out = response.content
+        from apps.tutoring import simple_tutor
+        if (
+            simple_tutor.is_enabled()
+            and not response.is_complete
+            and not (response.exit_ticket_data or {}).get('passed', True)
+        ):
+            try:
+                from apps.tutoring.simple_tutor.engine import start_remediation
+                rem = start_remediation(session)
+                if rem and rem.get('content'):
+                    message_out = rem['content']
+            except Exception as e:
+                logger.warning(
+                    f"[simple_tutor] remediation opener failed: {e}",
+                    exc_info=True,
+                )
+
         return JsonResponse({
-            "message": response.content,
+            "message": message_out,
             "phase": response.phase,
             "exit_ticket": enriched_exit_ticket,
             "is_complete": response.is_complete,

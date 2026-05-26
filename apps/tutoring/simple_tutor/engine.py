@@ -63,6 +63,21 @@ _OPENING_INSTRUCTION = (
     "Do not ask for permission to start; just open and pose."
 )
 
+_REMEDIATION_OPENING_INSTRUCTION = (
+    "The student just submitted the exit ticket. The "
+    "<exit_ticket_review> block in your system prompt shows their "
+    "score and which enabling objectives they missed. Open the "
+    "remediation tutor-driven: acknowledge their score in ONE short "
+    "sentence, briefly re-explain the FIRST missed objective in "
+    "1-3 sentences (fresh phrasing, not a re-read), then "
+    "IMMEDIATELY call pose_question with a NEW question targeting "
+    "that same enabling_objective — include the stem and options "
+    "in your visible text reply. Do NOT ask for permission "
+    "(\"would you like to review?\"); just open and pose. If "
+    "<missed_objectives> is empty, briefly congratulate and call "
+    "advance_step."
+)
+
 
 def start(session: 'TutorSession') -> dict[str, Any]:
     """Open a brand-new session via the simple-tutor engine.
@@ -77,6 +92,19 @@ def start(session: 'TutorSession') -> dict[str, Any]:
     can project it uniformly.
     """
     payload = respond(session, _OPENING_INSTRUCTION, _is_opening=True)
+    return payload
+
+
+def start_remediation(session: 'TutorSession') -> dict[str, Any]:
+    """Open the remediation phase tutor-driven, immediately after the
+    student submits the exit ticket. No student turn — the message is
+    a synthetic "begin remediation" instruction. The engine's
+    ``<exit_ticket_review>`` block (built from the latest
+    ExitTicketAttempt) drives the LLM toward acknowledging the score,
+    re-explaining the first missed objective, and posing a targeted
+    question — all without waiting for the student to ask.
+    """
+    payload = respond(session, _REMEDIATION_OPENING_INSTRUCTION, _is_opening=True)
     return payload
 
 
@@ -837,29 +865,45 @@ def respond_for_view(session, user_input: str) -> dict:
     show_exit_ticket = False
     is_complete = False
     if steps_exhausted:
-        posed_this_turn = any(
-            entry.get('tool') == 'pose_question'
-            and (entry.get('result') or {}).get('posed')
-            for entry in (out.get('tool_calls') or [])
-        )
-        if posed_this_turn:
-            from apps.tutoring.models import InFlightQuestion
-            cleared = InFlightQuestion.objects.filter(session=session).delete()
-            logger.info(
-                "[simple_tutor] cleared orphan pose at exit-ticket "
-                "handoff session=%s deleted=%s",
-                session.pk, cleared,
-            )
+        # Only surface the exit-ticket modal on the FIRST transition.
+        # Once the student has submitted (and we have an
+        # ExitTicketAttempt for this session), the engine is in
+        # REMEDIATION mode — re-rendering the modal would confuse the
+        # student and bury the post-submit chat. M12.9 E2E found this:
+        # the modal reopened on every remediation turn.
+        from apps.tutoring.models import ExitTicketAttempt
+        already_submitted = ExitTicketAttempt.objects.filter(
+            session=session, completed_at__isnull=False,
+        ).exists()
 
-        exit_ticket_payload = _build_exit_ticket_payload(session)
-        if exit_ticket_payload is not None:
-            show_exit_ticket = True
-            # is_complete stays False — the student still has to submit
-            # the exit ticket. The chat_complete_session endpoint flips
-            # the session to COMPLETED once the ticket is scored.
+        if already_submitted:
+            # Remediation phase — let the chat continue normally.
+            show_exit_ticket = False
         else:
-            # No exit ticket attached → end the lesson here.
-            is_complete = True
+            posed_this_turn = any(
+                entry.get('tool') == 'pose_question'
+                and (entry.get('result') or {}).get('posed')
+                for entry in (out.get('tool_calls') or [])
+            )
+            if posed_this_turn:
+                from apps.tutoring.models import InFlightQuestion
+                cleared = InFlightQuestion.objects.filter(session=session).delete()
+                logger.info(
+                    "[simple_tutor] cleared orphan pose at exit-ticket "
+                    "handoff session=%s deleted=%s",
+                    session.pk, cleared,
+                )
+
+            exit_ticket_payload = _build_exit_ticket_payload(session)
+            if exit_ticket_payload is not None:
+                show_exit_ticket = True
+                # is_complete stays False — the student still has to
+                # submit the exit ticket. The chat_complete_session
+                # endpoint flips the session to COMPLETED once the
+                # ticket is scored.
+            else:
+                # No exit ticket attached → end the lesson here.
+                is_complete = True
 
     return {
         'message': out.get('content', ''),
