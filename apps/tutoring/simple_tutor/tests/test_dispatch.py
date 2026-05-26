@@ -163,37 +163,53 @@ class RespondForViewTest(DjangoTestCase):
         self.assertEqual(payload['phase'], 'explore')
 
     def test_is_correct_when_record_answer_correct(self, _mock_kb):
+        from apps.tutoring.models import InFlightQuestion
         session = _make_session()
-        with patch(
-            'apps.tutoring.simple_tutor.engine._call_llm',
-            return_value=_llm_response(
+        InFlightQuestion.objects.create(
+            session=session,
+            question_text='Which?',
+            question_type='mcq',
+            options=['a', 'b', 'c', 'd'],
+            reference_answer='B',
+            source='inline_authored',
+        )
+        responses = [
+            _llm_response(
                 text='Great.',
                 tool_uses=[{'name': 'record_answer',
-                            'input': {
-                                'extracted_answer': 'B',
-                                'reference_answer': 'B',
-                                'question_type': 'mcq',
-                                'question_text': 'Which?',
-                            }}],
+                            'input': {'extracted_answer': 'B'}}],
             ),
+            _llm_response(text='Correct.'),
+        ]
+        with patch(
+            'apps.tutoring.simple_tutor.engine._call_llm',
+            side_effect=responses,
         ):
             payload = respond_for_view(session, 'B')
         self.assertTrue(payload['is_correct'])
 
     def test_is_correct_false_when_wrong(self, _mock_kb):
+        from apps.tutoring.models import InFlightQuestion
         session = _make_session()
-        with patch(
-            'apps.tutoring.simple_tutor.engine._call_llm',
-            return_value=_llm_response(
+        InFlightQuestion.objects.create(
+            session=session,
+            question_text='Which?',
+            question_type='mcq',
+            options=['a', 'b', 'c', 'd'],
+            reference_answer='B',
+            source='inline_authored',
+        )
+        responses = [
+            _llm_response(
                 text='Try again.',
                 tool_uses=[{'name': 'record_answer',
-                            'input': {
-                                'extracted_answer': 'A',
-                                'reference_answer': 'B',
-                                'question_type': 'mcq',
-                                'question_text': 'Which?',
-                            }}],
+                            'input': {'extracted_answer': 'A'}}],
             ),
+            _llm_response(text='Not quite.'),
+        ]
+        with patch(
+            'apps.tutoring.simple_tutor.engine._call_llm',
+            side_effect=responses,
         ):
             payload = respond_for_view(session, 'A')
         self.assertIs(payload['is_correct'], False)
@@ -208,6 +224,9 @@ class RespondForViewTest(DjangoTestCase):
         self.assertIsNone(payload['is_correct'])
 
     def test_complete_after_advancing_past_last_step(self, _mock_kb):
+        """When all lesson steps are done, the engine transitions to the
+        exit ticket instead of completing immediately (M12.8 wiring).
+        """
         session = _make_session(n_questions=1)
         # Force-advance past last step
         session.current_step_index = 99
@@ -217,4 +236,12 @@ class RespondForViewTest(DjangoTestCase):
             return_value=_llm_response(text='done'),
         ):
             payload = respond_for_view(session, 'what is an angle?')
-        self.assertTrue(payload['is_complete'])
+        # The fixture session has an attached ExitTicket → bridge to it.
+        self.assertTrue(payload['show_exit_ticket'])
+        self.assertIsNotNone(payload['exit_ticket'])
+        # is_complete stays False until the exit ticket is scored.
+        self.assertFalse(payload['is_complete'])
+        # Payload shape matches the legacy engine's contract.
+        self.assertIn('questions', payload['exit_ticket'])
+        self.assertIn('total', payload['exit_ticket'])
+        self.assertIn('passing_score', payload['exit_ticket'])

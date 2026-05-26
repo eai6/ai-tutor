@@ -1,10 +1,9 @@
-"""M8 acceptance tests — server-side tool handlers + flow primitives.
+"""M8 + M12 acceptance tests — server-side tool handlers + flow primitives.
 
-Per the simplified server-owned-state design
-(auto-memory/feedback_server_owns_question_state.md):
-
-  - record_answer does NOT take a question_id (server owns it)
-  - pose_question and advance_step are dropped (server-driven)
+M12 pose_question architecture (2026-05-26):
+  - record_answer takes only ``extracted_answer`` — the slot owns
+    reference_answer / question_type / options
+  - pose_question persists a single in-flight slot per session
   - All handlers return dicts (never raise) — conversation must flow
   - Auto-fallback grading + auto-step-advance are server-driven
 """
@@ -17,7 +16,8 @@ from django.test import TestCase as DjangoTestCase
 from apps.accounts.models import Institution
 from apps.curriculum.models import Course, Lesson, LessonStep, Unit
 from apps.tutoring.models import (
-    ExitTicket, ExitTicketQuestion, SessionTurn, TutorSession,
+    ExitTicket, ExitTicketQuestion, InFlightQuestion,
+    SessionTurn, TutorSession,
 )
 from apps.tutoring.simple_tutor.tools import (
     DEFAULT_COMPETENCE_THRESHOLD,
@@ -26,6 +26,7 @@ from apps.tutoring.simple_tutor.tools import (
     EXCLUDED_QUESTION_TYPES,
     build_question_pool,
     handle_advance_step,
+    handle_pose_question,
     handle_record_answer,
     handle_request_figure,
     handle_redirect_off_topic,
@@ -214,16 +215,30 @@ class BuildQuestionPoolTest(DjangoTestCase):
         pool = build_question_pool(session)
         self.assertLessEqual(len(pool), DEFAULT_POOL_SIZE)
 
-    def test_does_not_skip_already_graded(self):
-        """The pool is CONTEXT, not a worklist. Prior verdicts on a
-        question don't remove it from the pool (the LLM may still
-        reference it).
+    def test_skips_already_graded_by_question_text(self):
+        """Questions whose question_text has already been graded in
+        the session are dropped from the pool — keeping them around
+        causes the LLM to reference settled questions in hints for
+        new questions (caught 2026-05-26 in M11.3 E2E).
+
+        The match is by lowercased question_text (the LLM-provided
+        field on grader judge_outputs), not by pk, because the post-
+        tear-down engine no longer stores question ids.
         """
+        from apps.tutoring.models import SessionTurn
         session, etqs = _make_session(n_questions=2)
-        _add_graded_turn(session, etqs[0])
+        # Simulate a prior graded turn referencing etqs[0]'s text.
+        SessionTurn.objects.create(
+            session=session, role='tutor', content='ack',
+            judge_outputs={'grader': {
+                'verdict': 'correct',
+                'question_text': etqs[0].question_text,
+            }},
+        )
         pool = build_question_pool(session)
         pks = {getattr(q, 'pk', None) for q in pool}
-        self.assertIn(etqs[0].pk, pks)
+        self.assertNotIn(etqs[0].pk, pks)
+        self.assertIn(etqs[1].pk, pks)
 
 
 # ============================================================================
@@ -231,49 +246,75 @@ class BuildQuestionPoolTest(DjangoTestCase):
 # ============================================================================
 
 
+def _seed_in_flight(
+    session,
+    *,
+    question_text='Which is greatest?',
+    question_type='mcq',
+    reference_answer='B',
+    options=None,
+    source='inline_authored',
+    catalog_question_id=None,
+    attempt_count=0,
+):
+    """Helper: write an in-flight slot for the session, mirroring what
+    handle_pose_question would have created.
+    """
+    return InFlightQuestion.objects.create(
+        session=session,
+        question_text=question_text,
+        question_type=question_type,
+        options=options or [],
+        reference_answer=reference_answer,
+        source=source,
+        catalog_question_id=catalog_question_id,
+        attempt_count=attempt_count,
+    )
+
+
 class HandleRecordAnswerTest(DjangoTestCase):
-    """Post-tear-down (M11.3): record_answer takes BOTH the student's
-    extracted answer AND the LLM-provided reference answer + type +
-    question text. No server-side question anchor; the grader operates
-    on the LLM's context.
+    """M12: record_answer reads question / reference / type from the
+    InFlightQuestion slot. The LLM only passes ``extracted_answer``.
     """
 
     def test_mcq_correct(self):
         session, _ = _make_session()
-        r = handle_record_answer(
-            session,
-            extracted_answer='B',
-            reference_answer='B',
-            question_type='mcq',
+        _seed_in_flight(
+            session, question_type='mcq', reference_answer='B',
             question_text='Which is greatest?',
+            options=['10', '100', '1000', '0.1'],
         )
+        r = handle_record_answer(session, extracted_answer='B')
         self.assertTrue(r['recorded'])
         self.assertEqual(r['verdict'], 'correct')
         self.assertEqual(r['tier'], 'mcq')
         self.assertEqual(r['question_type'], 'mcq')
         self.assertEqual(r['reference_answer'], 'B')
+        # Slot cleared on correct verdict.
+        self.assertFalse(InFlightQuestion.objects.filter(session=session).exists())
 
-    def test_mcq_incorrect(self):
+    def test_mcq_incorrect_increments_attempt_count(self):
         session, _ = _make_session()
-        r = handle_record_answer(
-            session,
-            extracted_answer='A',
-            reference_answer='B',
-            question_type='mcq',
-            question_text='Which?',
+        _seed_in_flight(
+            session, question_type='mcq', reference_answer='B',
+            options=['x', 'y', 'z', 'w'],
         )
+        r = handle_record_answer(session, extracted_answer='A')
         self.assertTrue(r['recorded'])
         self.assertEqual(r['verdict'], 'incorrect')
+        # Slot persists; attempt_count incremented.
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.attempt_count, 1)
+        # Snapshot field on the result for the LLM's hint-ladder logic.
+        self.assertEqual(r['attempt_count_before'], 0)
 
     def test_short_numeric_correct(self):
         session, _ = _make_session()
-        r = handle_record_answer(
-            session,
-            extracted_answer='42',
-            reference_answer='42',
-            question_type='short_numeric',
+        _seed_in_flight(
+            session, question_type='short_numeric', reference_answer='42',
             question_text='6 × 7 = ?',
         )
+        r = handle_record_answer(session, extracted_answer='42')
         self.assertTrue(r['recorded'])
         self.assertEqual(r['verdict'], 'correct')
 
@@ -282,50 +323,211 @@ class HandleRecordAnswerTest(DjangoTestCase):
         grader's unit-strip + tolerance.
         """
         session, _ = _make_session()
-        r = handle_record_answer(
-            session,
-            extracted_answer='150',
-            reference_answer='150°',
-            question_type='short_numeric',
+        _seed_in_flight(
+            session, question_type='short_numeric', reference_answer='150°',
             question_text='What angle remains?',
         )
+        r = handle_record_answer(session, extracted_answer='150')
         self.assertTrue(r['recorded'])
         self.assertEqual(r['verdict'], 'correct')
 
     def test_empty_extracted_returns_error(self):
         session, _ = _make_session()
-        r = handle_record_answer(
-            session,
-            extracted_answer='   ',
-            reference_answer='B',
-            question_type='mcq',
-            question_text='Which?',
-        )
+        _seed_in_flight(session)
+        r = handle_record_answer(session, extracted_answer='   ')
         self.assertFalse(r['recorded'])
         self.assertIn('empty', r['error'])
 
-    def test_unknown_question_type_falls_back_to_short_answer(self):
-        """Unsupported types route to short_answer (verifier LLM)
-        instead of crashing. The fallback is recorded in question_type.
+    def test_no_in_flight_returns_error(self):
+        """When no slot exists, record_answer refuses — the LLM is
+        meant to call pose_question first, or treat the student's
+        message as conversation.
         """
-        from unittest.mock import patch
         session, _ = _make_session()
-        # Patch the verifier LLM to a deterministic correct verdict so
-        # this test doesn't depend on the network.
-        from apps.tutoring.simple_tutor import grader as _g
-        with patch.object(_g, '_grade_verifier_llm', return_value=_g.GradeResult(
-            verdict=_g.Verdict.CORRECT, confidence=1.0,
-            tier='verifier_llm', justification='mocked',
-        )):
-            r = handle_record_answer(
-                session,
-                extracted_answer='because tropical climates',
-                reference_answer='because of tropical climate',
-                question_type='unknown_type',
-                question_text='Why?',
-            )
-        self.assertTrue(r['recorded'])
-        self.assertEqual(r['question_type'], 'short_answer')
+        # No slot.
+        r = handle_record_answer(session, extracted_answer='B')
+        self.assertFalse(r['recorded'])
+        self.assertIn('no in-flight', r['error'])
+
+
+# ============================================================================
+# handle_pose_question (M12)
+# ============================================================================
+
+
+class HandlePoseQuestionTest(DjangoTestCase):
+
+    def test_creates_in_flight_slot(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session,
+            question_text='What is 5 + 3?',
+            question_type='short_numeric',
+            reference_answer='8',
+            source='inline_authored',
+        )
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.question_text, 'What is 5 + 3?')
+        self.assertEqual(slot.question_type, 'short_numeric')
+        self.assertEqual(slot.reference_answer, '8')
+        self.assertEqual(slot.attempt_count, 0)
+        self.assertEqual(slot.source, 'inline_authored')
+
+    def test_pose_mcq_persists_options(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session,
+            question_text='Which is largest?',
+            question_type='mcq',
+            options=['10', '100', '1000', '0.1'],
+            reference_answer='C',
+            source='inline_authored',
+        )
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.options, ['10', '100', '1000', '0.1'])
+        self.assertEqual(slot.reference_answer, 'C')
+
+    def test_pose_replaces_prior_slot_and_logs_orphan(self):
+        """If a slot already exists when pose_question fires, it's
+        replaced — and the orphaned prior question is logged for audit
+        (the student answered nothing on it).
+        """
+        session, _ = _make_session()
+        _seed_in_flight(
+            session, question_text='OLD Q', reference_answer='A',
+            attempt_count=2,
+        )
+
+        r = handle_pose_question(
+            session,
+            question_text='NEW Q',
+            question_type='short_answer',
+            reference_answer='photosynthesis',
+            source='inline_authored',
+        )
+        self.assertTrue(r['posed'])
+        # Only one slot per session (OneToOne).
+        slots = InFlightQuestion.objects.filter(session=session)
+        self.assertEqual(slots.count(), 1)
+        self.assertEqual(slots.first().question_text, 'NEW Q')
+        # Orphan logged into engine_state for audit.
+        session.refresh_from_db()
+        orphans = (session.engine_state or {}).get('orphan_questions') or []
+        self.assertGreaterEqual(len(orphans), 1)
+        last = orphans[-1]
+        self.assertEqual(last['question_text'], 'OLD Q')
+        self.assertEqual(last['attempt_count'], 2)
+
+    def test_pose_falls_back_to_short_answer_on_bad_type(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session,
+            question_text='Q',
+            question_type='fill_in_blank',  # disallowed
+            reference_answer='x',
+            source='inline_authored',
+        )
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        # Falls back to short_answer rather than crashing.
+        self.assertEqual(slot.question_type, 'short_answer')
+
+    def test_pose_falls_back_to_inline_authored_on_bad_source(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session,
+            question_text='Q',
+            question_type='short_answer',
+            reference_answer='x',
+            source='made_up_source',
+        )
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.source, 'inline_authored')
+
+    def test_pose_empty_question_text_refuses(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session,
+            question_text='   ',
+            question_type='mcq',
+            reference_answer='B',
+            source='inline_authored',
+        )
+        self.assertFalse(r['posed'])
+        self.assertIn('error', r)
+        self.assertFalse(InFlightQuestion.objects.filter(session=session).exists())
+
+    def test_pose_empty_reference_refuses(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session,
+            question_text='Q',
+            question_type='mcq',
+            reference_answer='',
+            source='inline_authored',
+        )
+        self.assertFalse(r['posed'])
+        self.assertFalse(InFlightQuestion.objects.filter(session=session).exists())
+
+
+# ============================================================================
+# pose → record cycle (M12 integration)
+# ============================================================================
+
+
+class PoseThenRecordCycleTest(DjangoTestCase):
+
+    def test_full_cycle_correct(self):
+        session, _ = _make_session()
+
+        # Cycle 1: tutor poses a question.
+        p = handle_pose_question(
+            session,
+            question_text='What is 7 × 6?',
+            question_type='short_numeric',
+            reference_answer='42',
+            source='inline_authored',
+        )
+        self.assertTrue(p['posed'])
+
+        # Cycle 2: student answers correctly. Slot clears.
+        g = handle_record_answer(session, extracted_answer='42')
+        self.assertTrue(g['recorded'])
+        self.assertEqual(g['verdict'], 'correct')
+        self.assertFalse(InFlightQuestion.objects.filter(session=session).exists())
+
+    def test_full_cycle_wrong_then_correct(self):
+        session, _ = _make_session()
+
+        handle_pose_question(
+            session,
+            question_text='What is 7 × 6?',
+            question_type='short_numeric',
+            reference_answer='42',
+            source='inline_authored',
+        )
+
+        # First attempt — wrong.
+        g1 = handle_record_answer(session, extracted_answer='40')
+        self.assertEqual(g1['verdict'], 'incorrect')
+        self.assertEqual(g1['attempt_count_before'], 0)
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.attempt_count, 1)
+
+        # Second attempt — wrong again, attempt_count climbs.
+        g2 = handle_record_answer(session, extracted_answer='41')
+        self.assertEqual(g2['verdict'], 'incorrect')
+        self.assertEqual(g2['attempt_count_before'], 1)
+        slot.refresh_from_db()
+        self.assertEqual(slot.attempt_count, 2)
+
+        # Third attempt — correct. Slot clears.
+        g3 = handle_record_answer(session, extracted_answer='42')
+        self.assertEqual(g3['verdict'], 'correct')
+        self.assertFalse(InFlightQuestion.objects.filter(session=session).exists())
 
 
 # ============================================================================

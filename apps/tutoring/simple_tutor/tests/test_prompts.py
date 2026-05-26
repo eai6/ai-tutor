@@ -30,6 +30,7 @@ from apps.tutoring.simple_tutor.prompts import (
     _render_current_step_block,
     _render_question_pool,
     _render_figure_catalog,
+    _render_in_flight_block,
     _render_kb_block,
     _render_recent_turns_block,
 )
@@ -99,35 +100,50 @@ def _turn(role, content):
     return SimpleNamespace(role=role, content=content)
 
 
+def _in_flight(
+    question_text='What is 5 + 3?',
+    question_type='short_numeric',
+    options=None,
+    reference_answer='8',
+    source='inline_authored',
+    catalog_question_id=None,
+    attempt_count=0,
+):
+    """Stand-in for an InFlightQuestion row — same attribute surface as
+    the model, no DB needed.
+    """
+    return SimpleNamespace(
+        question_text=question_text,
+        question_type=question_type,
+        options=options or [],
+        reference_answer=reference_answer,
+        source=source,
+        catalog_question_id=catalog_question_id,
+        attempt_count=attempt_count,
+    )
+
+
 # ============================================================================
 # Tool schemas — structural
 # ============================================================================
 
 
 class ToolSchemasTest(TestCase):
-    """4-tool design (revised 2026-05-26).
-    pose_question stays dropped (server picks the current question).
-    advance_step is back as a SOFT HINT (server has auto-advance + turn
-    cap as the safety net).
-    See auto-memory/feedback_server_owns_question_state.md.
+    """5-tool design (M12 — pose_question architecture, 2026-05-26 eve).
+    pose_question writes the in-flight question to a server-persisted
+    slot at the moment of posing. record_answer reads from that slot.
+    See memory/simple_tutor_m12_pose_question_milestones.md.
     """
 
-    def test_four_tools_present(self):
+    def test_five_tools_present(self):
         names = {t['name'] for t in TOOL_SCHEMAS}
         self.assertEqual(
             names,
-            {'record_answer', 'request_figure', 'redirect_off_topic',
-             'advance_step'},
+            {'pose_question', 'record_answer', 'request_figure',
+             'redirect_off_topic', 'advance_step'},
         )
 
-    def test_pose_question_still_absent(self):
-        # Defensive: pose_question stays out — server picks the question.
-        names = {t['name'] for t in TOOL_SCHEMAS}
-        self.assertNotIn('pose_question', names)
-
     def test_advance_step_description_marks_it_soft(self):
-        # The description must communicate that the platform also
-        # auto-advances — so LLM forgetting this tool isn't fatal.
         t = next(t for t in TOOL_SCHEMAS if t['name'] == 'advance_step')
         self.assertIn('soft hint', t['description'].lower())
         self.assertIn('auto-advance', t['description'].lower())
@@ -139,26 +155,51 @@ class ToolSchemasTest(TestCase):
             self.assertGreater(len(t['description']), 50,
                                f'{t["name"]} description is too thin')
 
-    def test_record_answer_requires_four_fields(self):
-        # Post-tear-down (M11.3): record_answer takes extracted_answer,
-        # reference_answer, question_type, question_text. No server
-        # anchor — the LLM provides all four.
-        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'record_answer')
+    def test_pose_question_required_fields(self):
+        """M12: pose_question takes question_text, question_type,
+        reference_answer, source. options + catalog_question_id are
+        optional but well-typed.
+        """
+        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'pose_question')
         required = t['input_schema']['required']
         for field in (
-            'extracted_answer', 'reference_answer',
-            'question_type', 'question_text',
+            'question_text', 'question_type',
+            'reference_answer', 'source',
         ):
             self.assertIn(field, required)
-        self.assertNotIn(
-            'question_id', t['input_schema']['properties'],
-            'record_answer must NOT take question_id — anchor was retired',
+        props = t['input_schema']['properties']
+        # source must enum to catalog | inline_authored
+        self.assertEqual(
+            set(props['source']['enum']),
+            {'catalog', 'inline_authored'},
+        )
+        # question_type enum stays MCQ/short_numeric/short_answer
+        self.assertEqual(
+            set(props['question_type']['enum']),
+            {'mcq', 'short_numeric', 'short_answer'},
         )
 
-    def test_record_answer_description_forbids_grading(self):
+    def test_record_answer_only_takes_extracted_answer(self):
+        """M12: record_answer is simplified to a single arg. The
+        reference_answer + question_type + question_text args from
+        M11.3 are gone — the server reads them from the persisted
+        in-flight slot.
+        """
         t = next(t for t in TOOL_SCHEMAS if t['name'] == 'record_answer')
-        # Must explicitly tell the LLM it does NOT decide correctness
-        self.assertIn('do NOT decide correctness', t['description'])
+        self.assertEqual(t['input_schema']['required'], ['extracted_answer'])
+        props = t['input_schema']['properties']
+        for old_field in (
+            'reference_answer', 'question_type', 'question_text', 'question_id',
+        ):
+            self.assertNotIn(
+                old_field, props,
+                f'record_answer must NOT take {old_field} under M12',
+            )
+
+    def test_record_answer_description_emphasises_in_flight(self):
+        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'record_answer')
+        # Description should reference the in-flight question
+        self.assertIn('in-flight', t['description'].lower())
 
     def test_request_figure_description_rejects_invented_ids(self):
         t = next(t for t in TOOL_SCHEMAS if t['name'] == 'request_figure')
@@ -386,17 +427,18 @@ class RecentTurnsTest(TestCase):
                  _turn('student', 'Because tropical countries get rain')]
         s = _render_recent_turns_block(turns)
         self.assertIn('<turn role="student">I think it is B</turn>', s)
-        # The last tutor turn is marked in_flight so the LLM knows which
-        # turn to grade against.
+        # Tutor turns carry only role + (optional) graded — the M12
+        # pose_question architecture moved the in-flight anchor to the
+        # dedicated <in_flight_question> block.
         self.assertIn(
-            '<turn role="tutor" in_flight="true">Why do you think that?</turn>',
+            '<turn role="tutor">Why do you think that?</turn>',
             s,
         )
 
-    def test_last_tutor_turn_marked_in_flight(self):
-        """The most recent tutor turn carries in_flight="true" so the
-        LLM anchors its grading to it (per 2026-05-26 user direction).
-        Older tutor turns do not get the marker.
+    def test_recent_turns_does_not_mark_in_flight(self):
+        """M12: the in_flight pointer lives in the <in_flight_question>
+        block, NOT as an attribute on recent_turns. Older builds put
+        in_flight="true" on the last tutor turn — that's been removed.
         """
         turns = [
             _turn('tutor', 'Q1?'),
@@ -406,16 +448,116 @@ class RecentTurnsTest(TestCase):
             _turn('tutor', 'Q3?'),
         ]
         s = _render_recent_turns_block(turns)
-        self.assertIn('<turn role="tutor" in_flight="true">Q3?</turn>', s)
-        # Earlier tutor turns do NOT carry in_flight
+        self.assertNotIn('in_flight="true"', s)
+        # All tutor turns render with the plain role attribute.
         self.assertIn('<turn role="tutor">Q1?</turn>', s)
         self.assertIn('<turn role="tutor">Q2?</turn>', s)
+        self.assertIn('<turn role="tutor">Q3?</turn>', s)
 
     def test_empty_returns_empty_string(self):
         # Empty turns → omit the block entirely (consistent with
         # _render_kb_block and _render_history_summary_block).
         self.assertEqual(_render_recent_turns_block(None), '')
         self.assertEqual(_render_recent_turns_block([]), '')
+
+
+# ============================================================================
+# In-flight question block (M12)
+# ============================================================================
+
+
+class InFlightQuestionBlockTest(TestCase):
+
+    def test_none_returns_empty(self):
+        self.assertEqual(_render_in_flight_block(None), '')
+
+    def test_short_numeric_basic_render(self):
+        slot = _in_flight(
+            question_text='What is 7 × 6?',
+            question_type='short_numeric',
+            reference_answer='42',
+        )
+        s = _render_in_flight_block(slot)
+        self.assertIn('<in_flight_question>', s)
+        self.assertIn('<question_type>short_numeric</question_type>', s)
+        self.assertIn('<stem>What is 7 × 6?</stem>', s)
+        self.assertIn('<reference_answer>42</reference_answer>', s)
+        self.assertIn('<attempt_count>0</attempt_count>', s)
+
+    def test_mcq_renders_options(self):
+        slot = _in_flight(
+            question_text='Which is largest?',
+            question_type='mcq',
+            options=['10', '100', '1000', '0.1'],
+            reference_answer='C',
+        )
+        s = _render_in_flight_block(slot)
+        self.assertIn('<options>', s)
+        self.assertIn('<option key="A">10</option>', s)
+        self.assertIn('<option key="B">100</option>', s)
+        self.assertIn('<option key="C">1000</option>', s)
+        self.assertIn('<option key="D">0.1</option>', s)
+        self.assertIn('<reference_answer>C</reference_answer>', s)
+
+    def test_attempt_count_passthrough(self):
+        slot = _in_flight(attempt_count=2)
+        s = _render_in_flight_block(slot)
+        self.assertIn('<attempt_count>2</attempt_count>', s)
+
+    def test_catalog_source_passes_through_id(self):
+        slot = _in_flight(
+            source='catalog', catalog_question_id=17,
+        )
+        s = _render_in_flight_block(slot)
+        self.assertIn('<source>catalog</source>', s)
+        self.assertIn('<catalog_question_id>17</catalog_question_id>', s)
+
+    def test_xml_escapes_unsafe_input(self):
+        slot = _in_flight(question_text='What is <X> & </Y>?')
+        s = _render_in_flight_block(slot)
+        # Stem characters escaped — no raw '<X>' that could close a tag.
+        self.assertIn('&lt;X&gt;', s)
+        self.assertIn('&amp;', s)
+
+    def test_full_render_includes_slot_when_passed(self):
+        """Smoke test: build_system_prompt with an in_flight_question
+        emits the slot block as the LAST dynamic part (closest to user
+        message — recency win).
+        """
+        slot = _in_flight(
+            question_text='Q?', question_type='mcq',
+            options=['a', 'b', 'c', 'd'], reference_answer='C',
+            attempt_count=1,
+        )
+        blocks, _ = build_system_prompt(
+            session=_session(),
+            step=_step(),
+            in_flight_question=slot,
+            recent_window=[_turn('student', 'I think A')],
+        )
+        # Block 2 is the dynamic per-turn block. It should contain both
+        # recent_turns AND in_flight_question, with in_flight LAST.
+        dyn = blocks[2]['text']
+        self.assertIn('<recent_turns>', dyn)
+        self.assertIn('<in_flight_question>', dyn)
+        self.assertLess(dyn.index('<recent_turns>'), dyn.index('<in_flight_question>'))
+        self.assertIn('<attempt_count>1</attempt_count>', dyn)
+
+    def test_slot_omitted_when_none(self):
+        """When no in-flight slot, the dynamic block has no
+        <in_flight_question> tag (the prose rules still mention the
+        block name — that's expected).
+        """
+        blocks, _ = build_system_prompt(
+            session=_session(),
+            step=_step(),
+            in_flight_question=None,
+            recent_window=[_turn('student', 'hi')],
+        )
+        # Block 2 is the per-turn dynamic block. The slot tag should
+        # not appear there. (Block 0 mentions the tag in prose rules.)
+        dyn = blocks[2]['text']
+        self.assertNotIn('<in_flight_question>\n', dyn)
 
 
 # ============================================================================
@@ -515,19 +657,27 @@ class RulesContentTest(TestCase):
         self.assertIn('Tutor-driven', block0)
         self.assertIn('concrete next action', block0)
         # Explicit instruction NOT to wait for student to ask what's next
-        self.assertIn("immediately pose the next question", block0)
+        self.assertIn("immediately call pose_question", block0)
+        # Banned-phrasing list catches the 2026-05-26 "Ready for the
+        # next one?" regression caught in M12.8 local E2E.
+        self.assertIn("Ready for the next one?", block0)
+        self.assertIn("Banned turn", block0)
 
     def test_rules_forbid_self_grading(self):
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
         )
         block0 = blocks[0]['text']
-        self.assertIn("deterministic grader", block0)
-        self.assertIn("returns the verdict", block0)
+        # M12: the platform persists the reference and grades against
+        # it; the LLM never decides correctness itself. Phrasing changed
+        # from "deterministic grader" to platform-grading language.
+        self.assertIn("platform", block0)
+        self.assertIn("grades", block0)
+        self.assertIn("reference you provided", block0)
 
     def test_rules_hint_ladder(self):
-        """Wrong-answer behaviour is a 3-step hint ladder, then explain
-        + re-pose. Tutor must not reveal the answer.
+        """Wrong-answer behaviour scales with attempt_count from the
+        in-flight slot. Tutor must not reveal the answer.
         """
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
@@ -536,15 +686,15 @@ class RulesContentTest(TestCase):
         # Hint ladder language
         self.assertIn("hint ladder", block0)
         self.assertIn("Do not reveal reference answers", block0)
-        # First two attempt levels named explicitly
-        self.assertIn("1st wrong attempt", block0)
-        self.assertIn("2nd wrong attempt", block0)
-        # 3rd+ attempts: continued hinting preferred, pivot is optional
-        self.assertIn("3rd+ wrong attempts", block0)
+        # M12: attempt-count levels (rather than the old "1st/2nd/3rd
+        # wrong attempt" wording).
+        self.assertIn("attempt_count = 0", block0)
+        self.assertIn("attempt_count = 1", block0)
+        self.assertIn("attempt_count >= 2", block0)
         self.assertIn("Continued hinting is always preferred", block0)
         # Pivot is permitted, not mandated
         self.assertIn("Only pivot", block0)
-        self.assertIn("different, easier question", block0)
+        self.assertIn("easier question", block0)
 
     def test_rules_no_caps_shouting(self):
         # Claude 4.5+ overtriggers on CRITICAL/MUST caps. Allow specific
@@ -588,7 +738,9 @@ class EndToEndShapeTest(TestCase):
             step_summaries=['Step 1 (Engage) — mastered after 1 attempt'],
         )
         self.assertEqual(len(blocks), 3)
-        self.assertEqual(len(tools), 4)   # 4-tool design (advance_step soft hint added back)
+        # M12: 5 tools — pose_question, record_answer, request_figure,
+        # redirect_off_topic, advance_step.
+        self.assertEqual(len(tools), 5)
 
         # Block 0 — static
         b0 = blocks[0]['text']

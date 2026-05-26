@@ -849,6 +849,26 @@ def chat_start_session(request, lesson_id):
             },
         )
 
+        # Engine dispatch: when the simple-tutor engine is enabled,
+        # route the warm-up through it too (otherwise the legacy v1
+        # engine seeds the first turn and the M12 ``InFlightQuestion``
+        # slot never gets written for the warm-up question — the
+        # follow-up /respond/ turn then sees a mismatch between
+        # <recent_turns> and an empty slot).
+        from apps.tutoring import simple_tutor
+        if simple_tutor.is_enabled():
+            from apps.tutoring.simple_tutor.engine import start_for_view
+            try:
+                payload = start_for_view(session)
+                payload['session_id'] = session.id
+                return JsonResponse(payload)
+            except Exception as e:
+                logger.error(f"[start:simple] Failed: {e}", exc_info=True)
+                return JsonResponse(
+                    {"error": "Something went wrong starting the session."},
+                    status=500,
+                )
+
         tutor = ConversationalTutor(session)
         response = tutor.start()
 

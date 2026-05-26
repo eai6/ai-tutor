@@ -107,11 +107,23 @@ def build_question_pool(
     if step is None:
         return []
 
+    # Drop questions whose text has already been graded in this session.
+    # Without this, the LLM keeps seeing the just-answered question in
+    # the pool and references it when hinting on a NEW question. Caught
+    # 2026-05-26 in M11.3 E2E.
+    graded_texts = _previously_graded_question_texts(session)
+
+    def _is_already_graded(q) -> bool:
+        qtext = (getattr(q, 'question_text', '') or '').strip().lower()
+        return bool(qtext) and qtext in graded_texts
+
     pool: list = []
 
     # Source 1 — LessonStep.question (one entry max).
     if step_has_question(step):
-        pool.append(StepQuestion.from_step(step))
+        sq = StepQuestion.from_step(step)
+        if not _is_already_graded(sq):
+            pool.append(sq)
 
     # Source 2 — ETQs matching this step's enabling_objective.
     objective = (getattr(step, 'enabling_objective', '') or '').strip()
@@ -123,9 +135,13 @@ def build_question_pool(
                 enabling_objective=objective,
             )
             .exclude(question_type__in=EXCLUDED_QUESTION_TYPES)
-            .order_by('order_index', 'id')[: max_questions - len(pool)]
+            .order_by('order_index', 'id')
         ):
+            if _is_already_graded(q):
+                continue
             pool.append(q)
+            if len(pool) >= max_questions:
+                break
 
     # Source 3 — ANY un-excluded ETQ on the lesson (fills the rest).
     if len(pool) < max_questions:
@@ -137,11 +153,37 @@ def build_question_pool(
                 getattr(p, 'pk', None) for p in pool
                 if getattr(p, 'source', '') != 'lesson_step'
             ])
-            .order_by('order_index', 'id')[: max_questions - len(pool)]
+            .order_by('order_index', 'id')
         ):
+            if _is_already_graded(q):
+                continue
             pool.append(q)
+            if len(pool) >= max_questions:
+                break
 
     return pool
+
+
+def _previously_graded_question_texts(session: 'TutorSession') -> set[str]:
+    """Set of normalised question_text values that already have a
+    recorded grader verdict on this session. Used by build_question_pool
+    to drop questions the student has already worked through.
+    """
+    texts: set[str] = set()
+    for jo in (
+        session.turns
+        .exclude(judge_outputs={})
+        .values_list('judge_outputs', flat=True)
+    ):
+        if not isinstance(jo, dict):
+            continue
+        grader = jo.get('grader')
+        if not isinstance(grader, dict):
+            continue
+        q = (grader.get('question_text') or '').strip().lower()
+        if q:
+            texts.add(q)
+    return texts
 
 
 # Backwards-compat shim: callers that still import pick_current_question
@@ -198,7 +240,153 @@ def _current_step_correct_verdict_count(session: 'TutorSession') -> int:
         if isinstance(grader, dict) and grader.get('verdict') == 'correct':
             count += 1
     return count
-    return graded
+
+
+# ============================================================================
+# handle_pose_question — LLM-called: "I want to ask this question next"
+# ============================================================================
+
+
+def handle_pose_question(
+    session: 'TutorSession',
+    *,
+    question_text: str,
+    question_type: str,
+    reference_answer: str,
+    source: str,
+    options: list | None = None,
+    catalog_question_id: int | None = None,
+) -> dict[str, Any]:
+    """Persist the LLM's question as the session's in-flight question.
+
+    Writes (or replaces) the InFlightQuestion row. When source=catalog
+    and catalog_question_id is provided, cross-checks the LLM's
+    reference_answer against the catalog's correct_answer and logs a
+    warning on mismatch (but still uses the LLM's reference — catalog
+    content has had errors in pilot data).
+
+    Returns a dict the engine passes back as the tool_result:
+        {
+            'posed': True,
+            'question_type': str,
+            'catalog_mismatch': bool,   # only when source=catalog
+        }
+
+    Never raises — bad input returns a posed=False error dict so the
+    conversation flow doesn't break.
+    """
+    from apps.tutoring.models import InFlightQuestion, ExitTicketQuestion
+
+    qtext = (question_text or '').strip()
+    ref = (reference_answer or '').strip()
+    qtype = (question_type or '').strip().lower()
+    src = (source or '').strip().lower()
+
+    if not qtext or not ref:
+        return {
+            'posed': False,
+            'error': 'question_text and reference_answer are required',
+        }
+    if qtype not in ('mcq', 'short_numeric', 'short_answer'):
+        logger.warning(
+            "handle_pose_question: unsupported question_type=%r — "
+            "falling back to short_answer",
+            qtype,
+        )
+        qtype = 'short_answer'
+    if src not in ('catalog', 'inline_authored'):
+        logger.warning(
+            "handle_pose_question: unsupported source=%r — "
+            "falling back to inline_authored",
+            src,
+        )
+        src = 'inline_authored'
+
+    # Normalise options — must be a list of strings.
+    opts = options or []
+    if not isinstance(opts, list):
+        opts = []
+    opts = [str(o)[:300] for o in opts]
+
+    # Replace any prior in-flight question (analytics-log the orphan).
+    prior = InFlightQuestion.objects.filter(session=session).first()
+    if prior is not None:
+        logger.info(
+            "[simple_tutor] orphan_in_flight session=%s prior_type=%s "
+            "attempts=%s — replaced before grading",
+            session.pk, prior.question_type, prior.attempt_count,
+        )
+        # Mark on engine_state for downstream analytics.
+        es = getattr(session, 'engine_state', None) or {}
+        if isinstance(es, dict):
+            orphans = es.get('orphan_questions') or []
+            orphans.append({
+                'question_text': prior.question_text[:200],
+                'question_type': prior.question_type,
+                'attempt_count': prior.attempt_count,
+            })
+            es['orphan_questions'] = orphans[-20:]   # keep last 20
+            session.engine_state = es
+            session.save(update_fields=['engine_state'])
+        prior.delete()
+
+    # Catalog cross-check (advisory — does NOT override LLM's reference).
+    catalog_mismatch = False
+    if src == 'catalog' and isinstance(catalog_question_id, int):
+        try:
+            cat_q = ExitTicketQuestion.objects.filter(
+                pk=catalog_question_id,
+            ).first()
+            if cat_q is not None:
+                cat_correct = (cat_q.correct_answer or '').strip()
+                if cat_correct and cat_correct.lower() != ref.lower():
+                    catalog_mismatch = True
+                    logger.warning(
+                        "[simple_tutor] catalog_mismatch session=%s "
+                        "catalog_q=%s catalog_correct=%r llm_ref=%r "
+                        "— using LLM ref; flag for content review",
+                        session.pk, catalog_question_id,
+                        cat_correct, ref,
+                    )
+        except Exception as exc:
+            logger.warning(
+                "handle_pose_question: catalog lookup failed for "
+                "id=%s: %s",
+                catalog_question_id, exc,
+            )
+
+    # Resolve the tutor turn the pose was made on — engine sets this
+    # via session.engine_state['_pose_turn_id'] if it knows the turn,
+    # but we tolerate the slot being null on first-write.
+    es = getattr(session, 'engine_state', None) or {}
+    posed_at_turn_id = (
+        es.get('_current_turn_id') if isinstance(es, dict) else None
+    )
+
+    new = InFlightQuestion.objects.create(
+        session=session,
+        question_text=qtext,
+        question_type=qtype,
+        options=opts,
+        reference_answer=ref,
+        source=src,
+        catalog_question_id=catalog_question_id if isinstance(catalog_question_id, int) else None,
+        posed_at_turn_id=posed_at_turn_id,
+    )
+
+    logger.info(
+        "[simple_tutor] posed session=%s type=%s source=%s "
+        "catalog_id=%s mismatch=%s",
+        session.pk, qtype, src,
+        catalog_question_id, catalog_mismatch,
+    )
+
+    return {
+        'posed': True,
+        'question_type': qtype,
+        'source': src,
+        'catalog_mismatch': catalog_mismatch,
+    }
 
 
 # ============================================================================
@@ -210,68 +398,64 @@ def handle_record_answer(
     session: 'TutorSession',
     *,
     extracted_answer: str,
-    reference_answer: str = '',
-    question_type: str = 'short_answer',
-    question_text: str = '',
 ) -> dict[str, Any]:
-    """Grade the student's extracted answer against the LLM-provided
-    reference. No server-side question anchor — the LLM is the source
-    of truth for what was posed (text + correct answer + type).
+    """Grade the student's extracted answer against the persisted
+    in-flight question.
 
-    Tear-down 2026-05-26 (M11.3 of memory/simple_tutor_engine_milestones.md):
-    the deterministic ``current_question_id`` was retired because the
-    LLM frequently authored its own questions outside the catalog,
-    leaving the server-side anchor out of sync. The grader now operates
-    on a transient ``_TransientQuestion`` built from the LLM's tool
-    args.
+    M12 architecture: the tutor LLM no longer supplies the reference
+    on every grade call. The reference + question_type + question_text
+    were written to ``InFlightQuestion`` at the moment of posing (via
+    ``handle_pose_question``). The grader reads from that slot.
+
+    This eliminates the M11.3 failure mode where the LLM mis-identified
+    which question was in flight when one turn mixed praise + new
+    question, causing it to pass the wrong reference.
 
     Args:
-        session: TutorSession (used only for audit logging).
-        extracted_answer: the student's answer in canonical form
-            (LLM-extracted).
-        reference_answer: the correct answer the LLM was checking
-            against. For MCQ: 'A'/'B'/'C'/'D'. For short_numeric: the
-            numeric value (e.g. '150'). For short_answer: one canonical
-            phrasing.
-        question_type: 'mcq', 'short_numeric', or 'short_answer'.
-            Selects the grader tier.
-        question_text: the question stem the LLM posed (verbatim) —
-            audit-only; the verifier LLM (short_answer Tier 2) reads it
-            for context.
+        session: TutorSession.
+        extracted_answer: the student's literal answer text
+            (LLM-extracted from the conversation).
 
     Returns:
         ``{'recorded': bool, 'verdict': ..., 'confidence': ..., 'tier': ...,
-           'justification': ..., 'reference_answer': ..., 'question_type': ...}``
+           'justification': ..., 'question_type': ..., 'reference_answer': ...,
+           'question_text': ...}``
+
+        When no in-flight question exists, ``recorded=False`` and the
+        caller should treat the student's message as a clarification
+        rather than an answer.
     """
+    from apps.tutoring.models import InFlightQuestion
     from apps.tutoring.simple_tutor.grader import grade_answer
 
     extracted = (extracted_answer or '').strip()
-    reference = (reference_answer or '').strip()
-    qtype = (question_type or '').strip().lower() or 'short_answer'
-
-    if qtype not in ('mcq', 'short_numeric', 'short_answer'):
-        # Unknown type — fall back to short_answer (the verifier LLM
-        # handles arbitrary text). Logged for analytics.
-        logger.warning(
-            "handle_record_answer: unsupported question_type=%r — "
-            "falling back to short_answer",
-            qtype,
-        )
-        qtype = 'short_answer'
-
     if not extracted:
         return {
             'recorded': False,
             'error': 'extracted_answer is empty',
         }
 
-    # The grader expects an ExitTicketQuestion-shaped object. Build a
-    # transient namespace carrying the LLM-provided fields in the same
-    # surface the grader reads.
+    in_flight = InFlightQuestion.objects.filter(session=session).first()
+    if in_flight is None:
+        # No question in flight — LLM called record_answer in the
+        # wrong context. Return a soft error so the conversation
+        # continues; the LLM can react in Call 2.
+        logger.warning(
+            "[simple_tutor] record_answer without in-flight question "
+            "session=%s extracted=%r",
+            session.pk, extracted[:60],
+        )
+        return {
+            'recorded': False,
+            'error': 'no in-flight question — student input was not an answer',
+        }
+
+    # Build the transient question surface the grader expects.
     question = _TransientQuestion(
-        question_text=(question_text or '').strip(),
-        question_type=qtype,
-        reference_answer=reference,
+        question_text=in_flight.question_text,
+        question_type=in_flight.question_type,
+        reference_answer=in_flight.reference_answer,
+        options=in_flight.options or [],
     )
 
     try:
@@ -281,25 +465,44 @@ def handle_record_answer(
         logger.warning(
             "handle_record_answer: grader raised %s: %s "
             "(qtype=%s, session=%s)",
-            type(exc).__name__, msg, qtype, session.pk,
+            type(exc).__name__, msg, in_flight.question_type, session.pk,
         )
         return {
             'recorded': False,
             'error': f'grader exception {type(exc).__name__}: {msg}',
         }
 
+    verdict = result.verdict.value
+
+    # Snapshot the in-flight question state BEFORE we mutate it; the
+    # result payload echoes question_text + reference for audit.
+    snapshot = {
+        'question_text': in_flight.question_text[:300],
+        'reference_answer': in_flight.reference_answer,
+        'question_type': in_flight.question_type,
+        'attempt_count_before': in_flight.attempt_count,
+    }
+
+    if verdict == 'correct':
+        # Slot is resolved — clear it. The hint ladder + analytics
+        # state is preserved in the grader result + session turns.
+        in_flight.delete()
+    else:
+        # Increment attempt counter for the hint ladder.
+        in_flight.attempt_count = (in_flight.attempt_count or 0) + 1
+        in_flight.save(update_fields=['attempt_count'])
+
     logger.info(
         "[simple_tutor] graded session=%s qtype=%s verdict=%s "
-        "ref=%r ext=%r",
-        session.pk, qtype, result.verdict.value,
-        reference[:40], extracted[:40],
+        "ref=%r ext=%r attempts=%s",
+        session.pk, snapshot['question_type'], verdict,
+        snapshot['reference_answer'][:40], extracted[:40],
+        snapshot['attempt_count_before'] + (0 if verdict == 'correct' else 1),
     )
 
     return {
         'recorded': True,
-        'question_type': qtype,
-        'reference_answer': reference,
-        'question_text': (question_text or '').strip()[:300],
+        **snapshot,
         **result.to_dict(),
     }
 
@@ -324,6 +527,7 @@ class _TransientQuestion:
         question_text: str,
         question_type: str,
         reference_answer: str,
+        options: list | None = None,
     ):
         self.pk = None
         self.question_text = question_text
@@ -342,10 +546,15 @@ class _TransientQuestion:
             except (ValueError, TypeError):
                 pass
         self.answer_data = ad
-        # MCQ options aren't passed via the tool args — the grader's
-        # _grade_mcq only reads correct_answer (a letter), so empty
-        # options are fine.
-        self.option_a = self.option_b = self.option_c = self.option_d = ''
+        # MCQ options: passed in by pose_question (M12). The grader's
+        # _grade_mcq does letter match against correct_answer; the
+        # option text is useful when full-option-text matching is
+        # needed (e.g. student typed "alpha" instead of "A").
+        opts = options or []
+        self.option_a = opts[0] if len(opts) > 0 else ''
+        self.option_b = opts[1] if len(opts) > 1 else ''
+        self.option_c = opts[2] if len(opts) > 2 else ''
+        self.option_d = opts[3] if len(opts) > 3 else ''
 
 
 # ============================================================================

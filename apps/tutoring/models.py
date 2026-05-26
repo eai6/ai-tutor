@@ -321,6 +321,89 @@ class SessionTurn(models.Model):
         return f"[{self.role}] {preview}"
 
 
+class InFlightQuestion(models.Model):
+    """The simple-tutor's currently-posed question, persisted per
+    session at the moment the tutor LLM calls ``pose_question``.
+
+    Replaces the M11.3 design where the tutor passed reference_answer
+    on every ``record_answer`` call. M11.3 hit a structural failure:
+    when one tutor turn mixed praise of a prior answer + a new
+    question, the LLM consistently mis-identified the in-flight
+    question and graded against the wrong reference.
+
+    The pose_question architecture (M12) writes a server-side slot
+    when the tutor poses; ``record_answer`` reads from that slot. The
+    LLM is never asked to re-identify what's in flight.
+
+    OneToOne with TutorSession — there is at most one in-flight
+    question per session at a time. Cleared on grade, replaced on
+    pose (with an analytics warning for ``posed_without_grading``).
+
+    See memory/simple_tutor_m12_pose_question_milestones.md.
+    """
+
+    class QuestionType(models.TextChoices):
+        MCQ = 'mcq', 'mcq'
+        SHORT_NUMERIC = 'short_numeric', 'short_numeric'
+        SHORT_ANSWER = 'short_answer', 'short_answer'
+
+    class Source(models.TextChoices):
+        CATALOG = 'catalog', 'from <question_pool>'
+        INLINE_AUTHORED = 'inline_authored', 'authored by LLM in-line'
+
+    session = models.OneToOneField(
+        TutorSession,
+        on_delete=models.CASCADE,
+        related_name='in_flight_question',
+    )
+    question_text = models.TextField(
+        help_text="The question stem the tutor posed (verbatim).",
+    )
+    question_type = models.CharField(
+        max_length=20,
+        choices=QuestionType.choices,
+        help_text="Selects the grading tier in apps.tutoring.simple_tutor.grader.",
+    )
+    # MCQ options as a list of strings: ['option A text', 'option B text', ...].
+    # Empty list for short_numeric / short_answer.
+    options = models.JSONField(default=list, blank=True)
+    reference_answer = models.TextField(
+        help_text="What the tutor would mark correct. For MCQ: the "
+                  "letter (A/B/C/D). For short_numeric: the numeric "
+                  "value. For short_answer: one canonical phrasing.",
+    )
+    source = models.CharField(
+        max_length=20,
+        choices=Source.choices,
+        help_text="Whether the tutor used a question from <question_pool> "
+                  "or authored its own.",
+    )
+    catalog_question_id = models.IntegerField(
+        null=True, blank=True,
+        help_text="ExitTicketQuestion / LessonStep pk when source=catalog. "
+                  "Used for catalog cross-checks + analytics.",
+    )
+    # Number of incorrect verdicts recorded against this in-flight
+    # question (cleared with the slot). Drives the hint ladder rule
+    # without forcing the LLM to re-count from <recent_turns>.
+    attempt_count = models.PositiveIntegerField(default=0)
+    posed_at_turn = models.ForeignKey(
+        'SessionTurn',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        help_text="The tutor SessionTurn whose pose_question call "
+                  "created this row. Audit trail.",
+    )
+    posed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tutoring_inflightquestion'
+
+    def __str__(self):
+        return f"InFlightQ(session={self.session_id} type={self.question_type})"
+
+
 class TurnSpan(models.Model):
     """One span per LLM call / tool call / judge fire / regen pass that
     contributed to producing a tutor turn.

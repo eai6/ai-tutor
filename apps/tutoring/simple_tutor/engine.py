@@ -54,7 +54,32 @@ _FALLBACK_REPLY = (
 # ============================================================================
 
 
-def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
+_OPENING_INSTRUCTION = (
+    "Begin the lesson. Greet the student briefly, name what they'll "
+    "learn in one short sentence, then immediately pose the first "
+    "warm-up question via pose_question — include the full question "
+    "stem (and A/B/C/D options for MCQ) in your visible text reply. "
+    "Do not ask for permission to start; just open and pose."
+)
+
+
+def start(session: 'TutorSession') -> dict[str, Any]:
+    """Open a brand-new session via the simple-tutor engine.
+
+    Behaves like ``respond()`` but with no student turn — the message
+    is a synthetic "begin the lesson" instruction the LLM sees as the
+    opening user turn. The platform persists only the resulting tutor
+    turn (warm-up + optional pose_question), so the chat thread starts
+    with the tutor greeting + the first question.
+
+    Returns the same dict shape as ``respond()`` so the view adapter
+    can project it uniformly.
+    """
+    payload = respond(session, _OPENING_INSTRUCTION, _is_opening=True)
+    return payload
+
+
+def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = False) -> dict[str, Any]:
     """Process one student turn and return the tutor's response.
 
     Args:
@@ -79,11 +104,13 @@ def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
         session.engine = _TS.Engine.SIMPLE
         session.save(update_fields=['engine'])
 
-    # ─── 1. Gather context (NO server-side anchor) ────────────────
-    # The tutor LLM sees a pool of candidate questions and reference
-    # answers as CONTEXT. It may pose any of them verbatim, adapt one,
-    # or author its own. Grading happens via record_answer which
-    # carries the LLM's chosen reference. See M11.3 in the milestones.
+    # ─── 1. Gather context + check for an in-flight question ─────
+    # M12 pose_question architecture: when an InFlightQuestion row
+    # exists for the session, the LLM is in GRADE mode (its job is
+    # to interpret the student's input against the persisted slot).
+    # When no slot exists, the LLM is in TEACH/POSE mode.
+    from apps.tutoring.models import InFlightQuestion
+    in_flight = InFlightQuestion.objects.filter(session=session).first()
     step = _load_current_step(session)
     question_pool = build_question_pool(session)
     kb_chunks = _retrieve_kb(session, user_input)
@@ -93,7 +120,8 @@ def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
     step_summaries = step_summary_log(session)
 
     logger.info(
-        "[simple_tutor] pool session=%s step=%s pool_size=%s",
+        "[simple_tutor] mode=%s session=%s step=%s pool_size=%s",
+        'GRADE' if in_flight else 'POSE',
         session.pk, session.current_step_index, len(question_pool),
     )
 
@@ -103,6 +131,7 @@ def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
         session=session,
         step=step,
         question_pool=question_pool,
+        in_flight_question=in_flight,
         kb_chunks=kb_chunks,
         figure_catalog=figure_catalog,
         figures_enabled=figures_enabled,
@@ -178,6 +207,17 @@ def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
         # placeholder so the bubble isn't blank.
         text_reply = _empty_reply_placeholder(tool_results)
 
+    # Defensive enforcement of the "include question stem in visible
+    # text" contract. The prompt asks the LLM to render the stem +
+    # options in its text reply when pose_question fires (since the
+    # frontend renders the chat thread, not the InFlightQuestion
+    # slot), but the LLM sometimes forgets — leaving the student
+    # with a passive "Try this:" with no question visible. Detect
+    # the miss and append from the slot. Caught in M12.8 E2E.
+    text_reply = _ensure_posed_question_in_text(
+        text_reply, tool_results, session,
+    )
+
     logger.info(
         "[simple_tutor] two_call=%s text_chars=%s tools=%s",
         used_two_call, len(text_reply or ''),
@@ -185,7 +225,11 @@ def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
     )
 
     # ─── 8. Persist turns + verdicts ──────────────────────────────
-    _persist_student_turn(session, user_input, step)
+    # On the opening (warm-up) call, ``user_input`` is the synthetic
+    # "begin the lesson" instruction — do NOT persist it as a student
+    # turn so the chat thread starts with the tutor's greeting.
+    if not _is_opening:
+        _persist_student_turn(session, user_input, step)
     _persist_tutor_turn(session, text_reply, step, tool_results)
 
     # ─── 9. Server auto-advance (safety net) ──────────────────────
@@ -221,24 +265,21 @@ def _build_tool_result_content(tool_use_blocks: list, tool_results: list) -> lis
     Auto-fallback grading results are NOT included — they didn't come
     from an LLM tool_use block.
     """
-    import json
     out = []
-    # Filter tool_results to those that came from an LLM tool_use block
-    # (i.e. names the LLM actually called this turn).
-    llm_tool_names = {getattr(b, 'name', None) for b in tool_use_blocks}
-    matched_results = [
-        tr for tr in tool_results if tr.get('tool') in llm_tool_names
-    ]
-    if len(matched_results) != len(tool_use_blocks):
-        # Defensive: pairing-by-order requires equal counts. If they
-        # don't match (rare), skip the loop and let the single-call
-        # text stand. Logged so we can diagnose.
-        logger.warning(
-            "tool_use_blocks=%s but matched_results=%s — skipping call 2",
-            len(tool_use_blocks), len(matched_results),
-        )
-        return []
-    for block, tr in zip(tool_use_blocks, matched_results):
+    # Pair tool_results to tool_use blocks by block identity (the
+    # dispatch loop stores the source block on each result under
+    # '_block'). This is robust to dispatch re-ordering (pose_question
+    # is sorted first in M12).
+    by_block_id = {}
+    for tr in tool_results:
+        blk = tr.get('_block')
+        if blk is not None:
+            by_block_id[id(blk)] = tr
+
+    for block in tool_use_blocks:
+        tr = by_block_id.get(id(block))
+        if tr is None:
+            continue
         result_obj = tr.get('result') or {}
         tool_name = tr.get('tool') or ''
         # Render the tool result as a human-readable summary instead of
@@ -263,30 +304,74 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
     its next reply must be ABOUT THIS QUESTION (not an older one in
     recent_turns).
     """
+    if tool_name == 'pose_question' and result.get('posed'):
+        # The platform has persisted the question to the slot. The
+        # text reply must also CONTAIN the question stem (and A/B/C/D
+        # options for MCQ) so the student sees it in the chat — the
+        # slot is the grading anchor, not the student-visible surface.
+        qtype = result.get('question_type', '?')
+        src = result.get('source', '?')
+        mismatch = result.get('catalog_mismatch')
+        parts = [
+            f"QUESTION POSED (type={qtype}, source={src}).",
+            "Your text reply on this turn MUST include the question "
+            "stem verbatim (and the four labelled options A/B/C/D if "
+            "MCQ) so the student can read the question in the chat. "
+            "A brief lead-in is fine (e.g. 'Try this:'), but the "
+            "stem itself must appear in the visible text.",
+        ]
+        if mismatch:
+            parts.append(
+                "[advisory] Your reference_answer differs from the "
+                "catalog's correct_answer for this catalog_question_id. "
+                "The platform is using YOUR reference; double-check "
+                "you picked the right option."
+            )
+        return "\n".join(parts)
+
     if tool_name == 'record_answer' and result.get('recorded'):
         verdict = (result.get('verdict') or '?').upper()
         ref = (result.get('reference_answer') or '').strip()
-        ext = (result.get('justification') or '').strip()
-        # The student's extracted answer isn't in the result dict (it
-        # was an input). Fall back to a generic phrasing.
+        just = (result.get('justification') or '').strip()
         qtext = (result.get('question_text') or '').strip()
         qtype = result.get('question_type') or 'short_answer'
+        attempts_before = result.get('attempt_count_before', 0)
+        # attempt_count for the hint ladder: when verdict=correct the
+        # slot was cleared; otherwise attempts is attempts_before + 1.
+        attempts_so_far = attempts_before if verdict == 'CORRECT' else attempts_before + 1
         parts = [
             f"VERDICT: {verdict}",
-            f"This was the question I just graded (question_type={qtype}):",
+            f"Question I just graded (type={qtype}):",
             f'  "{qtext}"' if qtext else '  (no question_text recorded)',
-            f"Correct answer (reference): {ref}" if ref else "",
+            f"Reference (correct answer): {ref}" if ref else "",
+            f"Wrong-attempt count on this question so far: {attempts_so_far}",
             "",
-            "Compose your next reply ABOUT THIS QUESTION ONLY. Do NOT "
-            "reference older questions from <recent_turns> in your hint "
-            "or feedback. If incorrect, give a hint about THIS question "
-            "and re-pose it. If correct, briefly acknowledge and move "
-            "to the next teaching beat or new question.",
+            (
+                "Compose your next reply ABOUT THIS EXACT QUESTION. "
+                "If incorrect, give a hint per the wrong-answer "
+                "ladder (1st/2nd/3rd+ attempts → progressively deeper "
+                "scaffolding, never reveal the reference). If correct, "
+                "briefly acknowledge and either continue teaching or "
+                "call pose_question with the next question. Do NOT "
+                "reference older questions from <recent_turns>."
+            ),
         ]
-        if ext:
-            parts.insert(3, f"Grader justification: {ext}")
+        if just:
+            parts.insert(4, f"Grader justification: {just}")
         return "\n".join(p for p in parts if p)
-    # Non-record_answer tools: keep JSON (cheaper context).
+
+    if (tool_name == 'record_answer'
+            and not result.get('recorded')
+            and result.get('error', '').startswith('no in-flight')):
+        return (
+            "NO IN-FLIGHT QUESTION. The student's message was not "
+            "interpreted as an answer because there's no question "
+            "currently posed. Treat their message as a clarification "
+            "or off-topic input, and respond conversationally. If you "
+            "want them to answer something, call pose_question first."
+        )
+
+    # Other tools / non-success results — JSON is fine.
     import json
     return json.dumps(result, default=str)
 
@@ -305,10 +390,88 @@ def _empty_reply_placeholder(tool_results: list) -> str:
                 verdict = r.get('verdict')
                 break
     if verdict == 'correct':
-        return "Got it — that's right. Ready for the next one?"
+        return "Got it — that's right. Here's the next one:"
     if verdict == 'incorrect':
-        return "Not quite — want to walk through it together?"
-    return "Let's keep going. What are you thinking?"
+        return "Not quite — let's walk through it together."
+    return "Let's keep going."
+
+
+def _ensure_posed_question_in_text(
+    text_reply: str, tool_results: list, session,
+) -> str:
+    """Defensive: when pose_question fired this turn but the LLM's
+    text reply doesn't actually contain the question stem, append the
+    stem (and options for MCQ) from the persisted InFlightQuestion
+    slot. The chat UI renders only the chat thread (not the slot), so
+    a missed stem leaves the student with nothing to answer.
+
+    Matching is loose — if the first 30 chars of the stem appear in
+    the text reply (case-insensitive, whitespace-collapsed), assume
+    the LLM included it.
+    """
+    posed = any(
+        tr.get('tool') == 'pose_question'
+        and (tr.get('result') or {}).get('posed')
+        for tr in tool_results
+    )
+    if not posed:
+        return text_reply
+
+    from apps.tutoring.models import InFlightQuestion
+    slot = InFlightQuestion.objects.filter(session=session).first()
+    if slot is None:
+        # Slot was posed and then immediately graded clean this turn.
+        # Nothing left to render.
+        return text_reply
+
+    stem = (slot.question_text or '').strip()
+    if not stem:
+        return text_reply
+
+    def _norm(s: str) -> str:
+        # Lowercase + collapse whitespace + strip common markdown
+        # emphasis characters so "**1:25,000**" matches "1:25,000".
+        s = (s or '').lower()
+        for ch in ('*', '_', '`'):
+            s = s.replace(ch, '')
+        return ' '.join(s.split())
+
+    needle = _norm(stem)[:30]
+    if needle and needle in _norm(text_reply):
+        return text_reply  # LLM included the stem — nothing to do.
+
+    logger.info(
+        "[simple_tutor] appending missing stem session=%s slot_id=%s",
+        session.pk, slot.pk,
+    )
+
+    parts = [text_reply.rstrip(), '', stem]
+    # Only append the options block when the stem doesn't already
+    # have lettered options baked in AND the LLM's text reply doesn't
+    # already list them (some LLMs render options without the stem,
+    # which would cause double-render if we naively append).
+    needs_options = (
+        slot.question_type == InFlightQuestion.QuestionType.MCQ
+        and slot.options
+        and not _contains_lettered_options(stem)
+        and not _contains_lettered_options(text_reply)
+    )
+    if needs_options:
+        for letter, opt in zip(('A', 'B', 'C', 'D'), slot.options):
+            parts.append(f"{letter}) {opt}")
+    return "\n".join(parts).strip()
+
+
+def _contains_lettered_options(text: str) -> bool:
+    """True when ``text`` contains MCQ-style option lines (at least
+    A and B with either ``)`` or ``.`` after the letter).
+    """
+    if not text:
+        return False
+    import re
+    has_a = bool(re.search(r'(?mi)^\s*A[\)\.]', text))
+    has_b = bool(re.search(r'(?mi)^\s*B[\)\.]', text))
+    return has_a and has_b
 
 
 # ============================================================================
@@ -483,40 +646,73 @@ def _dispatch_tools(*, session, response, figure_catalog):
     """Walk Anthropic response content. For each text block, accumulate
     the reply. For each tool_use block, dispatch to the right handler.
 
+    M12 dispatch order: pose_question runs FIRST (it writes the
+    in-flight slot), so a same-turn record_answer can read the freshly
+    posed question. Anthropic returns content blocks in the order the
+    model produced them, but the model can interleave — we re-order
+    pose_question → record_answer → other to make the semantics
+    deterministic.
+
     Returns:
         (text_reply, tool_results, llm_called_record_answer)
     """
     from apps.tutoring.simple_tutor.tools import (
-        handle_record_answer, handle_request_figure,
+        handle_pose_question, handle_record_answer, handle_request_figure,
         handle_redirect_off_topic, handle_advance_step,
     )
 
     text_reply = ''
-    tool_results: list[dict] = []
+    tool_use_blocks: list = []
     llm_called_record_answer = False
 
-    # Anthropic SDK returns response.content as a list of typed blocks
+    # First pass — accumulate text + collect tool_use blocks separately.
     for block in getattr(response, 'content', None) or []:
         btype = getattr(block, 'type', None)
         if btype == 'text':
             text_reply += getattr(block, 'text', '')
-            continue
-        if btype != 'tool_use':
-            continue
+        elif btype == 'tool_use':
+            tool_use_blocks.append(block)
 
+    # Sort: pose_question first, then record_answer, then everything
+    # else preserving original order. This way handle_record_answer
+    # always sees the slot the LLM just wrote in the same turn.
+    def _priority(blk) -> int:
+        n = getattr(blk, 'name', '')
+        if n == 'pose_question':
+            return 0
+        if n == 'record_answer':
+            return 1
+        return 2
+    sorted_blocks = sorted(
+        enumerate(tool_use_blocks), key=lambda iblk: (_priority(iblk[1]), iblk[0]),
+    )
+
+    tool_results: list[dict] = []
+    for _idx, block in sorted_blocks:
         name = getattr(block, 'name', '')
         params = getattr(block, 'input', None) or {}
         if not isinstance(params, dict):
             params = {}
 
         try:
-            if name == 'record_answer':
+            if name == 'pose_question':
+                result = handle_pose_question(
+                    session,
+                    question_text=str(params.get('question_text', '')),
+                    question_type=str(params.get('question_type', '')),
+                    reference_answer=str(params.get('reference_answer', '')),
+                    source=str(params.get('source', '')),
+                    options=params.get('options') or [],
+                    catalog_question_id=(
+                        params.get('catalog_question_id')
+                        if isinstance(params.get('catalog_question_id'), int)
+                        else None
+                    ),
+                )
+            elif name == 'record_answer':
                 result = handle_record_answer(
                     session,
                     extracted_answer=str(params.get('extracted_answer', '')),
-                    reference_answer=str(params.get('reference_answer', '')),
-                    question_type=str(params.get('question_type', '')),
-                    question_text=str(params.get('question_text', '')),
                 )
                 llm_called_record_answer = True
             elif name == 'request_figure':
@@ -552,7 +748,7 @@ def _dispatch_tools(*, session, response, figure_catalog):
             )
             result = {'error': f'handler exception {type(exc).__name__}'}
 
-        tool_results.append({'tool': name, 'result': result})
+        tool_results.append({'tool': name, 'result': result, '_block': block})
 
     return text_reply, tool_results, llm_called_record_answer
 
@@ -616,19 +812,151 @@ def respond_for_view(session, user_input: str) -> dict:
         elif tool == 'request_figure' and result.get('displayed'):
             media_url = result.get('url')
 
-    is_complete = step is None or current_idx >= total_steps
+    # Exit ticket transition: when all lesson steps are done, hand the
+    # student off to the exit ticket instead of marking is_complete.
+    # The session is only TRULY complete once the exit ticket itself
+    # is scored (the legacy chat_complete_session endpoint handles that).
+    #
+    # Guard against the pose-and-complete race: if pose_question fired
+    # this turn, the LLM has a fresh question in the slot the student
+    # hasn't seen yet. Clear that slot before transitioning to the
+    # exit ticket so the unanswered pose doesn't dangle as orphan state.
+    steps_exhausted = step is None or current_idx >= total_steps
+    exit_ticket_payload = None
+    show_exit_ticket = False
+    is_complete = False
+    if steps_exhausted:
+        posed_this_turn = any(
+            entry.get('tool') == 'pose_question'
+            and (entry.get('result') or {}).get('posed')
+            for entry in (out.get('tool_calls') or [])
+        )
+        if posed_this_turn:
+            from apps.tutoring.models import InFlightQuestion
+            cleared = InFlightQuestion.objects.filter(session=session).delete()
+            logger.info(
+                "[simple_tutor] cleared orphan pose at exit-ticket "
+                "handoff session=%s deleted=%s",
+                session.pk, cleared,
+            )
+
+        exit_ticket_payload = _build_exit_ticket_payload(session)
+        if exit_ticket_payload is not None:
+            show_exit_ticket = True
+            # is_complete stays False — the student still has to submit
+            # the exit ticket. The chat_complete_session endpoint flips
+            # the session to COMPLETED once the ticket is scored.
+        else:
+            # No exit ticket attached → end the lesson here.
+            is_complete = True
 
     return {
         'message': out.get('content', ''),
         'phase': phase,
         'media': [{'url': media_url}] if media_url else [],
-        'show_exit_ticket': False,           # v2 hasn't wired exit ticket yet
-        'exit_ticket': None,
+        'show_exit_ticket': show_exit_ticket,
+        'exit_ticket': exit_ticket_payload,
         'is_complete': is_complete,
         'step_number': current_idx + 1,
         'total_steps': total_steps,
         'is_correct': is_correct,
         'streak_count': None,                 # gamification not in v2 scope
+        'practice_score': None,
+        'milestone': None,
+        'artifact_html': None,
+        'probe': None,
+        'pending_question': None,
+        'follow_up_message': None,
+    }
+
+
+def _build_exit_ticket_payload(session) -> dict | None:
+    """Build the same exit-ticket payload the legacy engine emits, so
+    the existing chat UI can render the ticket without changes.
+
+    Returns the dict shape ``{'questions': [...], 'total': N,
+    'passing_score': N}``, or ``None`` when no exit ticket is attached
+    to this lesson.
+    """
+    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+
+    et = ExitTicket.objects.filter(lesson=session.lesson).first()
+    if et is None:
+        return None
+
+    questions = ExitTicketQuestion.objects.filter(exit_ticket=et)
+    if not questions.exists():
+        return None
+
+    # Use all questions in canonical order. Randomized sub-sampling is
+    # a v1-engine detail (``self.exit_ticket_concepts``) we can mirror
+    # later if pilot data shows long tickets hurt completion rates.
+    exit_questions = []
+    for i, q in enumerate(questions):
+        q_type = (q.question_type or 'mcq') or 'mcq'
+        q_data = {
+            'index': i,
+            'question_type': q_type,
+            'question': q.question_text,
+        }
+        if q_type == 'mcq':
+            q_data['options'] = [
+                {'letter': 'A', 'text': q.option_a or ''},
+                {'letter': 'B', 'text': q.option_b or ''},
+                {'letter': 'C', 'text': q.option_c or ''},
+                {'letter': 'D', 'text': q.option_d or ''},
+            ]
+            q_data['correct'] = q.correct_answer or ''
+            if q.answer_data and isinstance(q.answer_data, dict) and q.answer_data.get('source'):
+                q_data['source'] = q.answer_data['source']
+        else:
+            q_data['answer_data'] = q.answer_data or {}
+        exit_questions.append(q_data)
+
+    return {
+        'questions': exit_questions,
+        'total': len(exit_questions),
+        'passing_score': et.passing_score or 8,
+    }
+
+
+def start_for_view(session) -> dict:
+    """Adapter for ``apps.tutoring.views.chat_start_session`` when the
+    simple-tutor engine handles the warmup.
+
+    Opens the session via ``start()`` and projects the result into the
+    same JSON shape ``respond_for_view`` returns.
+    """
+    from apps.curriculum.models import LessonStep
+
+    out = start(session)
+
+    session.refresh_from_db()
+    current_idx = session.current_step_index or 0
+    step = (
+        LessonStep.objects
+        .filter(lesson=session.lesson, order_index=current_idx)
+        .first()
+    )
+    total_steps = LessonStep.objects.filter(lesson=session.lesson).count()
+    phase = (
+        (getattr(step, 'phase', '') or '').lower()
+        if step else 'evaluate'
+    )
+
+    is_complete = step is None or current_idx >= total_steps
+
+    return {
+        'message': out.get('content', ''),
+        'phase': phase,
+        'media': [],
+        'show_exit_ticket': False,
+        'exit_ticket': None,
+        'is_complete': is_complete,
+        'step_number': current_idx + 1,
+        'total_steps': total_steps,
+        'is_correct': None,
+        'streak_count': None,
         'practice_score': None,
         'milestone': None,
         'artifact_html': None,
@@ -647,7 +975,14 @@ def _persist_tutor_turn(session, text_reply: str, step, tool_results: list):
     from apps.tutoring.models import SessionTurn
 
     judge_outputs: dict = {}
-    metadata: dict = {'tool_calls': tool_results}
+    # Strip non-serialisable fields before persisting. ``_block`` carries
+    # the Anthropic ContentBlock object so Call 2 can pair tool_result
+    # to tool_use by identity — it must not land in the DB JSON.
+    persistable = [
+        {k: v for k, v in entry.items() if k != '_block'}
+        for entry in tool_results
+    ]
+    metadata: dict = {'tool_calls': persistable}
 
     # Surface the most recent grader verdict on the tutor turn's
     # judge_outputs['grader']. With the M11.3 tear-down the LLM provides

@@ -124,23 +124,34 @@ class HappyPathTest(DjangoTestCase):
         self.assertEqual(session.turns.count(), 2)
 
     def test_record_answer_grades_correctly(self, _mock_kb):
-        """Post-tear-down (M11.3): the LLM passes BOTH the student's
-        extracted answer AND the reference answer + question_type +
-        question_text. Grader compares them, returns the verdict.
+        """M12: the slot owns reference / question_type / text. The LLM
+        only passes extracted_answer; the platform looks the rest up
+        from InFlightQuestion.
         """
+        from apps.tutoring.models import InFlightQuestion
         session, _qs = _make_session()
-        with patch(
-            'apps.tutoring.simple_tutor.engine._call_llm',
-            return_value=_llm_response(
+        # Pre-create the in-flight slot (as if pose_question fired on
+        # an earlier turn).
+        InFlightQuestion.objects.create(
+            session=session,
+            question_text='Which is greatest?',
+            question_type='mcq',
+            options=['a', 'b', 'c', 'd'],
+            reference_answer='B',
+            source='inline_authored',
+        )
+        # Mock both Call 1 (tool_use) and Call 2 (text reply).
+        responses = [
+            _llm_response(
                 text="Let's see how you did.",
                 tool_uses=[{'name': 'record_answer',
-                            'input': {
-                                'extracted_answer': 'B',
-                                'reference_answer': 'B',
-                                'question_type': 'mcq',
-                                'question_text': 'Which is greatest?',
-                            }}],
+                            'input': {'extracted_answer': 'B'}}],
             ),
+            _llm_response(text='Nice — correct.'),
+        ]
+        with patch(
+            'apps.tutoring.simple_tutor.engine._call_llm',
+            side_effect=responses,
         ):
             result = respond(session, 'I think the answer is B')
         ranswer = next(
@@ -153,31 +164,40 @@ class HappyPathTest(DjangoTestCase):
         self.assertEqual(
             tutor_turn.judge_outputs['grader']['verdict'], 'correct',
         )
-        # Reference + question_type preserved on the verdict for audit
         self.assertEqual(
             tutor_turn.judge_outputs['grader']['reference_answer'], 'B',
         )
         self.assertEqual(
             tutor_turn.judge_outputs['grader']['question_type'], 'mcq',
         )
+        # Correct verdict clears the slot.
+        self.assertFalse(InFlightQuestion.objects.filter(session=session).exists())
 
     def test_step_advances_after_correct_verdict(self, _mock_kb):
         """End-to-end: correct verdict → maybe_advance_step bumps step
         (competence threshold = 1).
         """
+        from apps.tutoring.models import InFlightQuestion
         session, _qs = _make_session()
-        with patch(
-            'apps.tutoring.simple_tutor.engine._call_llm',
-            return_value=_llm_response(
+        InFlightQuestion.objects.create(
+            session=session,
+            question_text='Q?',
+            question_type='mcq',
+            options=['a', 'b', 'c', 'd'],
+            reference_answer='B',
+            source='inline_authored',
+        )
+        responses = [
+            _llm_response(
                 text='Great.',
                 tool_uses=[{'name': 'record_answer',
-                            'input': {
-                                'extracted_answer': 'B',
-                                'reference_answer': 'B',
-                                'question_type': 'mcq',
-                                'question_text': 'Q?',
-                            }}],
+                            'input': {'extracted_answer': 'B'}}],
             ),
+            _llm_response(text='Moving on.'),
+        ]
+        with patch(
+            'apps.tutoring.simple_tutor.engine._call_llm',
+            side_effect=responses,
         ):
             result = respond(session, 'B')
         session.refresh_from_db()
