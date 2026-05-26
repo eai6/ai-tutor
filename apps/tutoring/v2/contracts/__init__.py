@@ -23,6 +23,7 @@ from apps.tutoring.v2.contracts.tutoring import (
     GradingRequest,
     GradingResult,
     ProfileUpdate,
+    StudentSafeFeedback,
     TutoringContext,
     Verdict,
 )
@@ -42,6 +43,7 @@ __all__ = [
     "ResumeMarker",
     "SafetyValveCounters",
     "SessionRuntimeState",
+    "StudentSafeFeedback",
     "TutoringContext",
     "Verdict",
     "VisibleContextSnapshot",

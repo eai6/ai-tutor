@@ -9,8 +9,9 @@ Per Phase 2 §2.7, the ContextManager:
     code path that mutates the posed-question ledger or writes
     ``open_question``.
 
-Phase 1 ships the load/save boundary + the commit_pending_pose hook.
-Phase 2 wires it into the service-call assembly path.
+Service calls receive **frozen snapshots**, not live state — this is
+what the "stateless services" claim means in practice. Mutation
+happens through this manager's save / commit methods only.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from apps.tutoring.v2.contracts import (
     PendingPose,
     PosedQuestionLedgerEntry,
     SessionRuntimeState,
+    TutoringContext,
 )
 
 
@@ -103,3 +105,86 @@ class ContextManager:
         state.attempts_on_open_question = 0
         self.save_runtime_state(state)
         return state
+
+    # ------------------------------------------------------------------
+    # TutoringContext assembly (Phase 2 §2.7)
+    # ------------------------------------------------------------------
+
+    def assemble_context(
+        self,
+        *,
+        client_kind: str = "web",
+        current_objective: str = "",
+        full_transcript: Optional[list[dict]] = None,
+    ) -> TutoringContext:
+        """Build a frozen TutoringContext snapshot for a service call.
+
+        Pulls per-session inputs (student, lesson, institution, persona,
+        locale, profile_summary) and combines them with the loaded
+        runtime state. ``full_transcript`` defaults to the session's
+        complete turn history — no windowing per §7 item 10.
+        """
+        session = self.session
+        student = session.student
+        lesson = session.lesson
+        institution = session.institution
+
+        profile = getattr(student, "student_profile", None)
+        profile_summary = ""
+        grade_level = ""
+        tutor_persona = ""
+        if profile is not None:
+            profile_summary = profile.profile_summary or ""
+            grade_level = profile.grade_level or ""
+            personality = profile.tutor_personality
+            if personality is not None:
+                tutor_persona = getattr(personality, "name", "") or ""
+
+        institution_name = getattr(institution, "name", "") or ""
+        locale = getattr(lesson, "language", None) or getattr(
+            getattr(lesson, "course", None), "language", None
+        ) or "en"
+
+        if full_transcript is None:
+            full_transcript = self._load_full_transcript()
+
+        return TutoringContext(
+            session_id=session.id,
+            student_id=student.id,
+            institution_id=institution.id if institution else 0,
+            lesson_id=lesson.id if lesson else 0,
+            locale=locale,
+            grade_level=grade_level,
+            institution_name=institution_name,
+            tutor_persona=tutor_persona,
+            client_kind=client_kind if client_kind in ("web", "mobile") else "web",
+            full_transcript=full_transcript,
+            runtime_state=self.load_runtime_state(),
+            profile_summary=profile_summary,
+            current_objective=current_objective,
+        )
+
+    def _load_full_transcript(self) -> list[dict]:
+        """Load every prior turn for this session ordered oldest-first.
+
+        Returns a list of ``{role, content, created_at}`` dicts.
+        Includes student + tutor turns; excludes the system roles
+        (legacy engine occasionally writes those — v2 does not).
+        """
+        from apps.tutoring.models import SessionTurn
+
+        rows = (
+            SessionTurn.objects
+            .filter(session=self.session)
+            .exclude(role=SessionTurn.Role.SYSTEM)
+            .order_by("created_at")
+            .values("role", "content", "created_at")
+        )
+        return [
+            {
+                "role": r["role"],
+                "content": r["content"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else "",
+            }
+            for r in rows
+        ]
