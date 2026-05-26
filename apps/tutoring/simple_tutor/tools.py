@@ -282,20 +282,22 @@ def handle_request_figure(
     session: 'TutorSession',
     *,
     figure_id: int,
+    figure_catalog: list[dict] | None = None,
 ) -> dict[str, Any]:
-    """Look up a pre-generated figure by id, validate it belongs to the
-    current step, and return the URL + alt text for inline rendering.
+    """Validate a figure id against the catalog the engine built for
+    this turn and return the URL + alt text for inline rendering.
 
-    Invalid id (not in the step's StepMedia catalog) returns an error
-    dict — never raises. The engine still renders the LLM's text
-    response, just without the figure.
+    The figure_catalog is the same list the engine passes to
+    ``build_system_prompt`` — entries shaped as
+    ``{'id': int, 'description': str, 'url': str, 'alt_text': str, 'caption': str}``.
+    IDs are synthesised by the engine from the index of each image in
+    ``LessonStep.media['images']`` (1-based; stable within a step).
 
-    When figures are disabled on the course (course.tutoring_images_enabled
-    is False), returns an error dict even if the LLM somehow has the
-    tool available (e.g., from cached prompt before the flag flipped).
+    Invalid id (not in the catalog) returns an error dict — never raises.
+    When figures are disabled on the course
+    (``course.tutoring_images_enabled=False``), returns an error dict
+    even if the LLM somehow has the tool available (cached prompt race).
     """
-    from apps.curriculum.models import LessonStep
-
     # First defense: figures disabled on the course
     lesson = getattr(session, 'lesson', None)
     course = (
@@ -314,61 +316,31 @@ def handle_request_figure(
             'error': 'figures are disabled for this lesson',
         }
 
-    try:
-        from apps.media_library.models import StepMedia
-    except ImportError:
-        # Some test envs may not have media_library — return a
-        # placeholder error rather than crashing.
+    if not figure_catalog:
         return {
             'displayed': False,
-            'error': 'StepMedia model unavailable',
+            'error': f'figure_id {figure_id} not in catalog '
+                     f'(no figures available on this step)',
         }
 
-    # Validate id is in the CURRENT step's media catalog
-    current_step_index = getattr(session, 'current_step_index', 0) or 0
-    lesson = getattr(session, 'lesson', None)
-    step = None
-    if lesson is not None:
-        step = (
-            LessonStep.objects
-            .filter(lesson=lesson, order_index=current_step_index)
-            .first()
-        )
+    for fig in figure_catalog:
+        if fig.get('id') == figure_id:
+            return {
+                'displayed': True,
+                'figure_id': figure_id,
+                'url': fig.get('url') or '',
+                'alt_text': fig.get('alt_text') or fig.get('alt') or '',
+                'caption': fig.get('caption') or '',
+            }
 
-    try:
-        media = StepMedia.objects.get(pk=figure_id)
-    except (StepMedia.DoesNotExist, ValueError):
-        logger.warning(
-            "handle_request_figure: figure_id=%s not found (session=%s)",
-            figure_id, session.pk,
-        )
-        return {
-            'displayed': False,
-            'error': f'figure_id {figure_id} not in catalog',
-        }
-
-    if step is not None and getattr(media, 'lesson_step_id', None) != step.pk:
-        # LLM picked a figure from a different step
-        logger.warning(
-            "handle_request_figure: figure_id=%s belongs to step %s "
-            "but current step is %s (session=%s)",
-            figure_id, getattr(media, 'lesson_step_id', None),
-            step.pk, session.pk,
-        )
-        return {
-            'displayed': False,
-            'error': (
-                f'figure_id {figure_id} not on current step '
-                f'(belongs to step {getattr(media, "lesson_step_id", None)})'
-            ),
-        }
-
+    logger.warning(
+        "handle_request_figure: figure_id=%s not in catalog "
+        "(session=%s, catalog_size=%s)",
+        figure_id, session.pk, len(figure_catalog),
+    )
     return {
-        'displayed': True,
-        'figure_id': figure_id,
-        'url': getattr(media, 'url', '') or '',
-        'alt_text': getattr(media, 'alt_text', '') or '',
-        'caption': getattr(media, 'caption', '') or '',
+        'displayed': False,
+        'error': f'figure_id {figure_id} not in catalog',
     }
 
 

@@ -197,27 +197,53 @@ class HandleRecordAnswerTest(DjangoTestCase):
 
 class HandleRequestFigureTest(DjangoTestCase):
 
+    CATALOG = [
+        {'id': 1, 'description': 'Map of Seychelles',
+         'url': '/media/maps/seychelles.png', 'alt_text': 'map'},
+        {'id': 2, 'description': 'Hydrological cycle',
+         'url': '/media/diagrams/hydro.png', 'alt_text': 'cycle'},
+    ]
+
+    def test_valid_id_returns_url(self):
+        session, _ = _make_session()
+        r = handle_request_figure(
+            session, figure_id=1, figure_catalog=self.CATALOG,
+        )
+        self.assertTrue(r['displayed'])
+        self.assertEqual(r['url'], '/media/maps/seychelles.png')
+        self.assertEqual(r['alt_text'], 'map')
+
     def test_invalid_id_returns_error_dict(self):
         session, _ = _make_session()
-        # Pass a clearly-invalid id; handler must return error, NOT raise
-        r = handle_request_figure(session, figure_id=999_999)
-        self.assertFalse(r['displayed'])
-        self.assertIn('error', r)
-        # The error message should mention either "not in catalog" or
-        # the absence of the StepMedia model (some test envs).
-        err_lower = str(r['error']).lower()
-        self.assertTrue(
-            'not in catalog' in err_lower or 'unavailable' in err_lower,
-            f"unexpected error message: {r['error']!r}",
+        r = handle_request_figure(
+            session, figure_id=999, figure_catalog=self.CATALOG,
         )
+        self.assertFalse(r['displayed'])
+        self.assertIn('not in catalog', r['error'])
 
     def test_invalid_id_does_not_raise(self):
         # The whole point — handler must NEVER raise on bad input
         session, _ = _make_session()
         try:
-            handle_request_figure(session, figure_id=-1)
+            handle_request_figure(
+                session, figure_id=-1, figure_catalog=self.CATALOG,
+            )
         except Exception as exc:
             self.fail(f"handle_request_figure raised: {exc!r}")
+
+    def test_empty_catalog_returns_error(self):
+        session, _ = _make_session()
+        r = handle_request_figure(
+            session, figure_id=1, figure_catalog=[],
+        )
+        self.assertFalse(r['displayed'])
+
+    def test_no_catalog_passed_returns_error(self):
+        # Defensive — engine should always pass a catalog, but if it
+        # doesn't, handler returns a graceful error rather than crashing
+        session, _ = _make_session()
+        r = handle_request_figure(session, figure_id=1)
+        self.assertFalse(r['displayed'])
 
     def test_figures_disabled_on_course_refuses(self):
         """When Course.tutoring_images_enabled=False, handler returns
@@ -228,7 +254,9 @@ class HandleRequestFigureTest(DjangoTestCase):
         course = session.lesson.unit.course
         course.tutoring_images_enabled = False
         course.save(update_fields=['tutoring_images_enabled'])
-        r = handle_request_figure(session, figure_id=42)
+        r = handle_request_figure(
+            session, figure_id=1, figure_catalog=self.CATALOG,
+        )
         self.assertFalse(r['displayed'])
         self.assertIn('disabled', r['error'].lower())
 
