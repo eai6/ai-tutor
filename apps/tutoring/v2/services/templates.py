@@ -78,6 +78,33 @@ _PARTIAL_TEMPLATE = (
 )
 
 
+# Rotation pool for the open-question action floor. Three subject-
+# agnostic phrasings so consecutive fallbacks don't read as identical
+# scripted lines (run-4 MATHS-S1 §4 noted T8/T9/T10 all emitting the
+# same wording). Each line ends in a request to attempt one specific
+# part of the open question.
+_OPEN_Q_ACTION_FLOORS = (
+    "Looking at the question one more time: {oq} Try just one step of it "
+    "and I'll guide you from there.",
+    "Here's the question again, in plain words: {oq} Pick one piece of "
+    "it that feels closest to something you can answer, and try just "
+    "that part.",
+    "Let's slow down on the same question: {oq} Tell me what you'd do "
+    "first, even if you're not sure about the rest.",
+)
+
+# Same shape, used when there's no open question but an objective is
+# available — keeps the student moving without inventing a problem.
+_OBJECTIVE_ACTION_FLOORS = (
+    "Let's stay with the idea — {obj} — and try one small piece of it "
+    "together. Tell me where you'd start.",
+    "Same idea — {obj} — narrowed down: what's one thing you remember "
+    "about it that you can put into words?",
+    "Holding on the same idea: {obj}. Pick the part you feel most "
+    "confident about and start there.",
+)
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Move-aware safety-floor anchor
 # ──────────────────────────────────────────────────────────────────────
@@ -230,10 +257,19 @@ def render_safe_template(
 def _render_worked_example_terminal(anchor: MoveAnchor) -> str:
     """Worked-example move floor.
 
-    Uses ``LessonStep.educational_content.worked_example`` when the
-    lesson authored one. Otherwise restates the open question (or
-    objective) and asks the student to attempt ONE first step — never
-    silently drops the worked-example obligation.
+    Lookup order (subject-agnostic):
+      1. ``LessonStep.educational_content.worked_example`` (the
+         lesson-authored anchor) — used verbatim with a subgoal
+         wrapper.
+      2. ``LessonStep.teacher_script`` (the lesson-authored direct-
+         instruction text) — used as the body when no worked-example
+         JSON exists. Better than dropping the worked-example
+         obligation when authored content is partially missing.
+      3. Restate the open question (or objective) and ask the student
+         to attempt the very first step — models the *method shape*
+         (one step at a time) when no authored content is available.
+
+    Never silently drops the worked-example obligation.
     """
     we = (anchor.worked_example or "").strip()
     if we:
@@ -243,8 +279,6 @@ def _render_worked_example_terminal(anchor: MoveAnchor) -> str:
             f"{we}\n\n"
             "Now you try it"
         )
-        # If there's an open question, point the student back at it
-        # for the practice prompt. Otherwise close with a generic ask.
         oq = (anchor.open_question_stem or "").strip()
         if oq:
             body += f" — apply the same steps to: {oq}"
@@ -252,10 +286,26 @@ def _render_worked_example_terminal(anchor: MoveAnchor) -> str:
             body += " — what's the first step you'd take?"
         return body
 
-    # No authored worked example. Decompose the open question (or
-    # fall back to the objective) into a "try just the first step"
-    # ask — this still meets the worked-example obligation's spirit:
-    # model the *method shape* (one step at a time).
+    # No authored worked-example JSON, but the lesson's teacher_script
+    # may carry the same content in narrative form. Use it as the
+    # worked-example body. This is generic across subjects — every
+    # ``LessonStep`` has the field; the LLM uses whatever's there.
+    ts = (anchor.teacher_script or "").strip()
+    if ts:
+        body = (
+            "Let me walk you through the idea one step at a time:\n\n"
+            f"{ts}\n\nNow you try it"
+        )
+        oq = (anchor.open_question_stem or "").strip()
+        if oq:
+            body += f" — apply the same thinking to: {oq}"
+        else:
+            body += " — what's the first thing you'd do?"
+        return body
+
+    # Final degradation: decompose the open question (or objective)
+    # into a "try just the first step" ask. Still meets the worked-
+    # example obligation's spirit: model the *method shape*.
     target = _question_or_objective(anchor)
     if target:
         return (
@@ -349,16 +399,10 @@ def _action_floor_for_move(
 
     oq = (anchor.open_question_stem or "").strip()
     if oq:
-        return (
-            f"Looking at the question one more time: {oq} "
-            "Try just one step of it and I'll guide you from there."
-        )
+        return _pick(_OPEN_Q_ACTION_FLOORS).format(oq=oq)
     obj = (anchor.objective or "").strip()
     if obj:
-        return (
-            f"Let's stay with the idea — {obj} — and try one small piece "
-            "of it together. Tell me where you'd start."
-        )
+        return _pick(_OBJECTIVE_ACTION_FLOORS).format(obj=obj)
     return next_action_hint
 
 

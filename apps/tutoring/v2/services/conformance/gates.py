@@ -455,6 +455,105 @@ def run_praise_filter(
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Open-question stickiness — safety floor for the scaffold/probe moves
+# ──────────────────────────────────────────────────────────────────────
+
+
+def run_open_question_stickiness_check(
+    *,
+    selected_move: str,
+    runtime_state: SessionRuntimeState,
+    pending_pose,  # PendingPose | None — imported lazily to avoid cycles
+) -> GateResult:
+    """Safety floor: a probe-shaped move must stay on the open question.
+
+    Background. Across both MATHS-S1 and GEO-S5 evaluations, the
+    dominant remaining drift after the run-3 prompt tightening was:
+    the LLM commits a NEW pose (different ``bank_id``) while the
+    student's open question is still live and below the ``pivot``
+    attempt threshold. The strengthened SCAFFOLD_HINT prompt reduced
+    but did not eliminate this.
+
+    This gate is the safety floor that catches the drift after the
+    fact. It does not change move selection (the engine still picked
+    ``scaffold_hint`` / ``confirm_and_extend`` / etc.) and it does not
+    pre-route. On rejection, the existing retry / safe-terminal path
+    handles the response — the per-move terminal restates the open
+    question, which is exactly the recovery the principle asks for
+    (Science of learning principle: Targeted Remediation — stay on
+    the same item, scaffold the path, do not change the question).
+
+    Scope (when the gate is active):
+      * selected_move is one of the probe-shaped moves where the
+        contract is "stay on the open question": ``scaffold_hint``,
+        ``name_misconception``, ``confirm_and_extend``,
+        ``pose_question``.
+      * runtime_state.open_question is set.
+      * pending_pose is set (the LLM used the tool channel this turn).
+
+    When all three hold AND the pending_pose's ``(source, id)`` differs
+    from the open question's ``(source, id)``, the gate fails. Other
+    cases are skipped: a ``pivot`` move is *meant* to introduce a new
+    item; a ``close_topic`` / ``worked_example`` / ``explain`` is
+    out-of-scope; a turn with no tool call has nothing to check; the
+    opening turn of a session has no open question.
+    """
+    with emit_span("audit", "conformance.open_question_stickiness") as span:
+        probe_moves = (
+            "scaffold_hint",
+            "name_misconception",
+            "confirm_and_extend",
+            "pose_question",
+        )
+        if selected_move not in probe_moves:
+            return GateResult(
+                passed=True,
+                name="open_question_stickiness",
+                skipped=True,
+                reason=f"move={selected_move} out of scope",
+            )
+        open_q = runtime_state.open_question
+        if open_q is None:
+            return GateResult(
+                passed=True,
+                name="open_question_stickiness",
+                skipped=True,
+                reason="no open question",
+            )
+        if pending_pose is None:
+            return GateResult(
+                passed=True,
+                name="open_question_stickiness",
+                skipped=True,
+                reason="no tool-call pose this turn",
+            )
+        pose_ref = pending_pose.question_ref
+        if pose_ref.source == open_q.source and pose_ref.id == open_q.id:
+            return GateResult(
+                passed=True,
+                name="open_question_stickiness",
+            )
+        # Drift detected. Reject so the retry / terminal path can run.
+        return _fail(
+            "open_question_stickiness",
+            (
+                f"{selected_move} posed a new item "
+                f"({pose_ref.source}:{pose_ref.id}) while the open "
+                f"question ({open_q.source}:{open_q.id}) is still live; "
+                "stay on the same item or use the pivot move"
+            ),
+            span,
+            payload={
+                "selected_move": selected_move,
+                "open_source": open_q.source,
+                "open_id": open_q.id,
+                "posed_source": pose_ref.source,
+                "posed_id": pose_ref.id,
+            },
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Internal helper
 # ──────────────────────────────────────────────────────────────────────
 

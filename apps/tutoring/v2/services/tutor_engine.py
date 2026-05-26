@@ -305,6 +305,7 @@ class TutorEngine:
             context=context,
             posed_via_tool=(first_resp.pending_pose is not None),
             lesson_has_media=lesson_has_media,
+            pending_pose=first_resp.pending_pose,
         )
 
         fallback_used = False
@@ -342,6 +343,7 @@ class TutorEngine:
                 context=context,
                 posed_via_tool=(retry_resp.pending_pose is not None),
                 lesson_has_media=lesson_has_media,
+                pending_pose=retry_resp.pending_pose,
             )
             retry_conf.retry_used = True
 

@@ -34,18 +34,33 @@ MATH_DSL_SYSTEM = """\
 You decompose a math problem into a constrained JSON DSL that a
 Python interpreter executes.
 
-Output a JSON object with exactly two top-level keys:
+Output a JSON object with these top-level keys:
 
   variables  — a mapping of variable names to numeric values that
                appear in the visible problem text. Every value must
                be derivable from the problem statement; do not invent
                numbers that are not named or implied by the problem.
 
-  expression — a tree of operations. Each node is ONE of:
-               * a bare number (e.g. 42, 3.14)
-               * a variable reference: {"var": "name"}
-               * an operation: {"op": "<opcode>", "args": [<node>, ...]}
-               * a solve: {"op": "solve", "equation": "<eq>", "var": "<name>"}
+  expression — (single-answer problems) a tree of operations.
+  expressions — (multi-answer problems) an array of named expression
+                trees, one per required answer slot. Use this form
+                when the problem asks for more than one numeric value
+                (e.g. "Calculate the loss amount AND the loss
+                percentage", "Find the area AND the perimeter"). Each
+                entry is an object: {"name": "<short slot name>",
+                "expression": <node>}. Slot names should be plain
+                words a student would use: "loss_amount",
+                "loss_percentage", "area", "perimeter", etc.
+
+  Provide EITHER ``expression`` OR ``expressions`` — not both. Use
+  ``expressions`` whenever the problem text names two or more
+  distinct quantities the student must produce.
+
+Each expression node is ONE of:
+  * a bare number (e.g. 42, 3.14)
+  * a variable reference: {"var": "name"}
+  * an operation: {"op": "<opcode>", "args": [<node>, ...]}
+  * a solve: {"op": "solve", "equation": "<eq>", "var": "<name>"}
 
 Whitelisted opcodes: add, sub, mul, div, neg, abs, pow, sqrt, log,
 exp, sin, cos, tan, min, max, round, eq, lt, lte, gt, gte, solve.
@@ -73,6 +88,10 @@ Output: {"variables": {"total": 180, "a": 40, "b": 75}, "expression": {"op": "su
 Example 3
 Problem: Solve for x:  2x + 3 = 11.
 Output: {"variables": {}, "expression": {"op": "solve", "equation": "2*x + 3 = 11", "var": "x"}}
+
+Example 4
+Problem: A trader buys spices for 120 SCR per package and sells them for 90 SCR per package. Calculate the loss amount and the loss percentage.
+Output: {"variables": {"cp": 120, "sp": 90}, "expressions": [{"name": "loss_amount", "expression": {"op": "sub", "args": [{"var": "cp"}, {"var": "sp"}]}}, {"name": "loss_percentage", "expression": {"op": "mul", "args": [{"op": "div", "args": [{"op": "sub", "args": [{"var": "cp"}, {"var": "sp"}]}, {"var": "cp"}]}, 100]}}]}
 """
 
 

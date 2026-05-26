@@ -207,6 +207,49 @@ class StudentGrader:
                     bare_answer=bare,
                 )
 
+            # 4. Comparator. Multi-slot questions: when the canonical is
+            # a list of {name, value} entries, accept the student's
+            # single value if it matches ANY slot (verdict=PARTIAL,
+            # what_right names the slot). All slots matched →
+            # verdict=CORRECT. No slot matched → verdict=WRONG.
+            is_multi = isinstance(canonical_value, list) and canonical_value and \
+                       all(isinstance(e, dict) and "value" in e for e in canonical_value)
+            if is_multi:
+                matched_slots = [
+                    e for e in canonical_value
+                    if values_equivalent(e.get("value"), student_value)
+                ]
+                if len(matched_slots) == len(canonical_value):
+                    verdict_kind = Verdict.CORRECT
+                elif matched_slots:
+                    verdict_kind = Verdict.PARTIAL
+                else:
+                    verdict_kind = Verdict.WRONG
+                safe = self._build_math_safe_feedback_multi(
+                    verdict_kind=verdict_kind,
+                    canonical_slots=canonical_value,
+                    matched_slots=matched_slots,
+                    student_value=student_value,
+                    bare_answer=bare,
+                )
+                if span is not None:
+                    span["payload"] = {
+                        "verdict": verdict_kind.value,
+                        "bare_answer": bare,
+                        "multi_slot": True,
+                        "matched_slot_count": len(matched_slots),
+                        "total_slot_count": len(canonical_value),
+                    }
+                return GradingResult(
+                    verdict=verdict_kind,
+                    private_canonical=canonical_str,
+                    student_safe_feedback=safe,
+                    student_value=student_value_str,
+                    reasoning="math: executed multi-slot DSL + comparator",
+                    bare_answer=bare,
+                )
+
+            # Single-slot path (original behaviour).
             equivalent = values_equivalent(canonical_value, student_value)
             verdict_kind = Verdict.CORRECT if equivalent else Verdict.WRONG
 
@@ -298,6 +341,57 @@ class StudentGrader:
             first_misconception_redacted=(
                 "the working ends at the wrong value — re-check the operation "
                 "you applied"
+            ),
+        )
+
+    def _build_math_safe_feedback_multi(
+        self,
+        *,
+        verdict_kind: Verdict,
+        canonical_slots: list[dict[str, Any]],
+        matched_slots: list[dict[str, Any]],
+        student_value: Any,
+        bare_answer: bool,
+    ) -> StudentSafeFeedback:
+        """Redacted feedback for multi-slot question grading.
+
+        CORRECT: student supplied all slot values.
+        PARTIAL: matched some slots — name them, prompt for the rest.
+        WRONG:   no slot matched — generic operation-check hint.
+
+        Slot names come from the DSL (loss_amount, loss_percentage,
+        area, perimeter, …). Phrased generically — no leak of the
+        underlying canonicals.
+        """
+        if verdict_kind == Verdict.CORRECT:
+            return StudentSafeFeedback(
+                what_right="you have all the values asked for",
+            )
+        if verdict_kind == Verdict.PARTIAL:
+            matched_names = [_humanise_slot(s.get("name", "")) for s in matched_slots]
+            remaining = [
+                _humanise_slot(s.get("name", ""))
+                for s in canonical_slots
+                if s not in matched_slots
+            ]
+            what_right = (
+                f"you have {_join_names(matched_names)} right"
+                if matched_names else "you've made a start"
+            )
+            what_missing = (
+                f"still need {_join_names(remaining)}"
+                if remaining else "still one piece to add"
+            )
+            return StudentSafeFeedback(
+                what_right=what_right,
+                what_missing=what_missing,
+            )
+        # WRONG — no slot matched.
+        return StudentSafeFeedback(
+            first_misconception_redacted=(
+                "the value doesn't line up with any of the quantities asked "
+                "for — check which operation you applied and which slot "
+                "you're answering"
             ),
         )
 
@@ -823,14 +917,59 @@ def _safe_json_loads(text: str) -> Optional[Any]:
 
 
 def _format_canonical(value: Any) -> str:
-    """Render the canonical value for ``private_canonical``."""
+    """Render the canonical value for ``private_canonical``.
+
+    Single-slot: returns the numeric value as a string. Multi-slot:
+    returns ``"loss_amount=30; loss_percentage=25"`` style — joined
+    on ``"; "``, slot names humanised, numbers rendered like the
+    single-slot path.
+    """
     if value is None:
         return ""
+    if isinstance(value, list):
+        parts: list[str] = []
+        for entry in value:
+            if not isinstance(entry, dict):
+                continue
+            name = _humanise_slot(entry.get("name", ""))
+            slot_val = entry.get("value")
+            if isinstance(slot_val, float):
+                if slot_val.is_integer():
+                    slot_val = int(slot_val)
+                else:
+                    slot_val = f"{slot_val:g}"
+            parts.append(f"{name}={slot_val}")
+        return "; ".join(parts)
     if isinstance(value, float):
         if value.is_integer():
             return str(int(value))
         return f"{value:g}"
     return str(value)
+
+
+def _humanise_slot(name: str) -> str:
+    """Render a DSL slot name in student-facing prose.
+
+    "loss_amount" -> "loss amount"; "profit_pct" -> "profit pct".
+    Subject-agnostic; just turns underscores / camelCase into spaces.
+    """
+    s = (name or "").strip()
+    if not s:
+        return "this value"
+    s = s.replace("_", " ").replace("-", " ")
+    return " ".join(p for p in s.split() if p)
+
+
+def _join_names(names: list[str]) -> str:
+    """Oxford-style join for a short list of slot names."""
+    cleaned = [n for n in names if n]
+    if not cleaned:
+        return ""
+    if len(cleaned) == 1:
+        return cleaned[0]
+    if len(cleaned) == 2:
+        return f"{cleaned[0]} and {cleaned[1]}"
+    return ", ".join(cleaned[:-1]) + f", and {cleaned[-1]}"
 
 
 def _parse_student_math_value(student_input: str) -> tuple[Optional[Any], str]:

@@ -32,6 +32,7 @@ from apps.tutoring.v2.services.conformance.gates import (
     GateResult,
     run_answer_leak_check,
     run_figure_ref_check,
+    run_open_question_stickiness_check,
     run_praise_filter,
     run_rule_check,
     run_safety_check,
@@ -101,6 +102,7 @@ class ConformanceCheck:
         context=None,  # TutoringContext — for tutor-claim adjudication
         posed_via_tool: bool = False,
         lesson_has_media: bool = True,
+        pending_pose=None,  # PendingPose | None — for open-question stickiness
     ) -> ConformanceResult:
         """Run one full conformance pass over the candidate.
 
@@ -161,6 +163,20 @@ class ConformanceCheck:
             open_question_stem=open_question_stem,
             bank_stems=bank_stems,
             recent_student_turns=recent_student_turns,
+        )
+        if not self._record(gr, result):
+            return result
+
+        # 4b. Open-question stickiness — safety floor that catches
+        # scaffold/probe moves drifting onto a new bank item while
+        # the original open question is still live. Cheap; only
+        # active for the probe-shaped moves. Rejection routes through
+        # the standard retry path; on second failure the per-move
+        # terminal restates the open question (the intended recovery).
+        gr = run_open_question_stickiness_check(
+            selected_move=selected_move,
+            runtime_state=runtime_state,
+            pending_pose=pending_pose,
         )
         if not self._record(gr, result):
             return result

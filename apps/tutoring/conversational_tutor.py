@@ -464,6 +464,28 @@ def _normalize_for_overlap(s: str) -> str:
     return s
 
 
+_MATCH_LEADING_ARTICLE = re.compile(r"^(the |a |an )")
+
+
+def _norm_match_token(text: str) -> str:
+    """Normalise a matching-question side for tolerant comparison.
+
+    Lowercase, collapse whitespace, strip punctuation, drop a leading
+    article. Used by the exit-ticket matching grader so the deterministic
+    path doesn't reject paraphrased dropdown selections (e.g. "Higher
+    porosity" vs "Higher porosity allows more water to enter the rock").
+    Subject-agnostic — operates on raw strings only.
+    """
+    if not text:
+        return ''
+    s = str(text).strip().lower()
+    s = re.sub(r"[–—‘’“”]", " ", s)
+    s = re.sub(r"[^\w\s%/\.\-]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    s = _MATCH_LEADING_ARTICLE.sub("", s)
+    return s.strip()
+
+
 def _strip_bank_overlap_sentences(
     text: str,
     bank_rendered_text: str,
@@ -11233,6 +11255,202 @@ Which concept numbers were meaningfully covered?"""
             is_math=is_math,
         )
 
+    def _llm_grade_with_instructor(
+        self,
+        *,
+        question,
+        q_type: str,
+        data: dict,
+        student_answer,
+        is_math: bool,
+    ):
+        """Structured LLM grading via the instructor client.
+
+        Returns a small Pydantic object with ``is_correct: bool`` and
+        ``reasoning: str``. The structured-output path eliminates two
+        pre-existing bugs in the prior plain-text grader:
+
+          1. Naive substring parsing — ``'correct' in 'incorrect'`` is
+             True, so the old code passed every well-formed response
+             regardless of verdict.
+          2. Forced binary with no reasoning step — modern LLMs grade
+             far better with a one-line justification before the
+             verdict. Pydantic forces both fields to be produced.
+
+        The prompt itself is constructed per question type so the LLM
+        gets ONE rubric, not three crammed into a paragraph. Each
+        rubric is concrete about the bar (e.g. "majority of pairs",
+        "at least ``min_keywords`` of the listed key concepts") so the
+        LLM doesn't have to guess what "demonstrate understanding"
+        means.
+        """
+        from pydantic import BaseModel, Field
+
+        class _ExitTicketVerdict(BaseModel):
+            reasoning: str = Field(
+                ...,
+                description="One-sentence justification BEFORE the verdict.",
+            )
+            is_correct: bool = Field(
+                ...,
+                description=(
+                    "True if the student answer meets the rubric for this "
+                    "question type, false otherwise."
+                ),
+            )
+
+        system_prompt, user_prompt = self._build_exit_grader_prompts(
+            question=question,
+            q_type=q_type,
+            data=data,
+            student_answer=student_answer,
+            is_math=is_math,
+        )
+
+        # Single-shot focused call — NOT through ``_generate_response``
+        # (which would pull in the live tutoring conversation history
+        # and contaminate the grader). The instructor client wraps the
+        # configured tutoring ModelConfig; max_tokens kept tight because
+        # the JSON envelope is tiny.
+        provider = self._instructor_provider or ""
+        create_kwargs = {
+            "model": None,  # instructor reads from the provider URL
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "response_model": _ExitTicketVerdict,
+            "max_tokens": 250,
+        }
+        # Anthropic / Google providers expose `max_tokens` differently
+        # under the instructor wrapper — drop the key when the provider
+        # rejects it and let the library fall back to its own default.
+        try:
+            return self.instructor_client.chat.completions.create(**create_kwargs)
+        except TypeError:
+            create_kwargs.pop("max_tokens", None)
+            return self.instructor_client.chat.completions.create(**create_kwargs)
+
+    def _build_exit_grader_prompts(
+        self,
+        *,
+        question,
+        q_type: str,
+        data: dict,
+        student_answer,
+        is_math: bool,
+    ) -> Tuple[str, str]:
+        """Construct (system_prompt, user_prompt) for the exit-ticket grader.
+
+        Per question type:
+          * fill_in_blank — accept the student's blanks if the meaning
+            matches each expected blank (or one of its
+            ``accept_alternatives``).
+          * matching — accept when the MAJORITY of pairs match the
+            canonical (paraphrasing / substring tolerated).
+          * short_answer / data_interpretation — accept when the
+            answer covers at least ``min_keywords`` of the listed key
+            concepts, even when phrased with synonyms; extra correct
+            content beyond the keyword list does NOT penalize.
+
+        Each prompt is subject-agnostic. The math note is appended only
+        when the lesson is flagged as math.
+        """
+        # System prompt — terse, positive directives only.
+        sys_lines = [
+            "You grade a single student answer on a short exit-ticket "
+            "question. Return JSON with two fields: ``reasoning`` (one "
+            "short sentence) and ``is_correct`` (true / false).",
+            "",
+            "Grade against the rubric for this question type. Be lenient "
+            "on phrasing — accept synonyms, paraphrasing, and equivalent "
+            "meaning. Extra correct content beyond what the rubric asks "
+            "for does not lower the verdict.",
+        ]
+        if is_math:
+            sys_lines.append(
+                "Math answers: the numerical result is what matters. "
+                "Working / units / phrasing differences are not the bar."
+            )
+        system_prompt = "\n".join(sys_lines)
+
+        # User prompt — per-type rubric.
+        if q_type == "fill_in_blank":
+            blanks = data.get("blanks", []) or []
+            alternatives = data.get("accept_alternatives", []) or []
+            student_blanks = (
+                student_answer if isinstance(student_answer, list) else [student_answer]
+            )
+            alt_lines = []
+            for i, expected in enumerate(blanks):
+                accepted = [expected]
+                if i < len(alternatives):
+                    accepted.extend(alternatives[i] if isinstance(alternatives[i], list) else [alternatives[i]])
+                alt_lines.append(f"  Blank {i+1}: {expected!r}  (alternates: {accepted!r})")
+            rubric = (
+                "Rubric (fill_in_blank): is_correct = TRUE when each "
+                "student blank matches the expected blank OR one of its "
+                "alternates, allowing for minor spelling / phrasing "
+                "differences. The MAJORITY of blanks correct is the floor "
+                f"(i.e. at least {max(1, len(blanks) // 2 + 1)} of "
+                f"{len(blanks)} blanks)."
+            )
+            user_prompt = (
+                f"Question: {question.question_text}\n\n"
+                f"Expected blanks:\n" + "\n".join(alt_lines) + "\n\n"
+                f"Student blanks: {student_blanks!r}\n\n"
+                f"{rubric}\n\nGrade."
+            )
+            return system_prompt, user_prompt
+
+        if q_type == "matching":
+            pairs = data.get("pairs", []) or []
+            student_map = student_answer if isinstance(student_answer, dict) else {}
+            pair_lines = [
+                f"  {p.get('left', '')!r} → {p.get('right', '')!r}" for p in pairs
+            ]
+            student_lines = [
+                f"  {k!r} → {v!r}" for k, v in student_map.items()
+            ]
+            rubric = (
+                "Rubric (matching): is_correct = TRUE when the MAJORITY "
+                f"of pairs are correctly matched (at least "
+                f"{max(1, len(pairs) // 2 + 1)} of {len(pairs)}). Accept "
+                "paraphrased right-side selections that capture the same "
+                "idea as the canonical right (e.g. 'Higher porosity' "
+                "stands in for 'Higher porosity allows more water in')."
+            )
+            user_prompt = (
+                f"Question: {question.question_text}\n\n"
+                f"Canonical pairs:\n" + "\n".join(pair_lines) + "\n\n"
+                f"Student matched:\n" + "\n".join(student_lines) + "\n\n"
+                f"{rubric}\n\nGrade."
+            )
+            return system_prompt, user_prompt
+
+        # short_answer / data_interpretation
+        model_answer = (data.get("model_answer") or "").strip()
+        keywords = data.get("keywords", []) or []
+        min_kw = data.get("min_keywords", max(1, len(keywords) // 2 + 1))
+        rubric = (
+            f"Rubric (short_answer): is_correct = TRUE when the student "
+            f"answer covers at least {min_kw} of the {len(keywords)} key "
+            f"concepts listed below, even when phrased as synonyms, "
+            f"different word order, or in a longer explanation. The "
+            f"model answer is REFERENCE only — the student's wording is "
+            f"not required to match it. Extra correct content beyond "
+            f"the listed key concepts does NOT penalize."
+        )
+        user_prompt = (
+            f"Question: {question.question_text}\n\n"
+            f"Model answer (reference): {model_answer}\n"
+            f"Key concepts: {keywords}\n"
+            f"Minimum concepts required: {min_kw}\n\n"
+            f"Student answer: {str(student_answer)}\n\n"
+            f"{rubric}\n\nGrade."
+        )
+        return system_prompt, user_prompt
+
     def _grade_exit_question(self, question, student_answer) -> bool:
         """Per-question grader entry point.
 
@@ -11321,48 +11539,23 @@ Which concept numbers were meaningfully covered?"""
                 if matched >= min_kw:
                     return True
 
-        # Build context based on question type
-        if q_type == 'fill_in_blank':
-            blanks = data.get('blanks', [])
-            student_blanks = student_answer if isinstance(student_answer, list) else [student_answer]
-            correct_info = f"Expected answers: {', '.join(blanks)}"
-            student_info = f"Student filled in: {', '.join(str(b) for b in student_blanks)}"
-        elif q_type == 'matching':
-            pairs = data.get('pairs', [])
-            correct_info = "Correct pairs: " + "; ".join(f"{p['left']} → {p['right']}" for p in pairs)
-            student_map = student_answer if isinstance(student_answer, dict) else {}
-            student_info = "Student matched: " + "; ".join(f"{k} → {v}" for k, v in student_map.items())
-        else:  # short_answer, data_interpretation
-            model_answer = data.get('model_answer', '')
-            keywords = data.get('keywords', [])
-            correct_info = f"Model answer: {model_answer}"
-            if keywords:
-                correct_info += f"\nKey concepts: {', '.join(keywords)}"
-            student_info = f"Student answer: {student_answer}"
-
-        # Try LLM evaluation
+        # LLM grading (the primary path for non-MCQ exit-ticket
+        # questions). The prompt is structured PER question type so the
+        # LLM gets one rubric, not three; the verdict is captured via a
+        # Pydantic model so the parser cannot conflate "incorrect" with
+        # "correct" via naive substring containment (a pre-existing
+        # bug: ``'correct' in 'incorrect'`` is True, so the old code
+        # silently passed every well-formed response).
         if self.instructor_client:
             try:
-                math_note = (
-                    "For MATH answers: check the NUMERICAL RESULT is correct. "
-                    "The working/method matters less than getting the right number. "
-                    "Use Python to verify: eval the expression if needed. "
-                ) if is_math else ""
-                eval_prompt = (
-                    f"QUESTION: {question.question_text}\n"
-                    f"TYPE: {q_type}\n"
-                    f"{correct_info}\n"
-                    f"{student_info}\n\n"
-                    f"Grade this answer. {math_note}"
-                    f"The student does NOT need exact wording — "
-                    f"accept synonyms, paraphrasing, and equivalent meaning. "
-                    f"For fill-in-blank: accept if the meaning is right even if spelling differs slightly. "
-                    f"For matching: accept if the majority of pairs are correctly matched. "
-                    f"For written answers: accept if they demonstrate understanding of the key concepts.\n\n"
-                    f"Reply ONLY with the single word 'correct' or 'incorrect'."
+                verdict_obj = self._llm_grade_with_instructor(
+                    question=question,
+                    q_type=q_type,
+                    data=data,
+                    student_answer=student_answer,
+                    is_math=is_math,
                 )
-                eval_response = self._generate_response(eval_prompt, max_tokens=10)
-                return 'correct' in eval_response.lower()
+                return bool(verdict_obj.is_correct)
             except Exception as e:
                 logger.warning(f"LLM grading failed, falling back to deterministic: {e}")
 
@@ -11383,12 +11576,31 @@ Which concept numbers were meaningfully covered?"""
 
         if q_type == 'matching':
             pairs = data.get('pairs', [])
-            correct_map = {p['left'].lower(): p['right'].lower() for p in pairs}
+            correct_map = {
+                _norm_match_token(p.get('left', '')): _norm_match_token(p.get('right', ''))
+                for p in pairs
+            }
             student_map = student_answer if isinstance(student_answer, dict) else {}
-            correct_count = sum(
-                1 for left, right in student_map.items()
-                if correct_map.get(left.lower(), '') == right.lower()
-            )
+            # Tolerant comparison: tokens normalised (lowercase, strip
+            # punctuation and leading articles); exact-match first,
+            # then accept substring-match either direction. The latter
+            # catches the common case where the modal's dropdown text
+            # is a paraphrased fragment of the canonical right ("Higher
+            # porosity" vs "Higher porosity allows more water to enter
+            # the rock") — strict equality rejected this in the GEO-S5
+            # run-4 evaluation; substring relaxation fixes the family.
+            correct_count = 0
+            for left, right in student_map.items():
+                expected = correct_map.get(_norm_match_token(left), '')
+                if not expected:
+                    continue
+                given = _norm_match_token(right)
+                if not given:
+                    continue
+                if given == expected:
+                    correct_count += 1
+                elif given in expected or expected in given:
+                    correct_count += 1
             return correct_count >= max(1, len(correct_map) // 2 + 1) if correct_map else False
 
         # short_answer / data_interpretation fallback. Math-symbol
@@ -11402,9 +11614,14 @@ Which concept numbers were meaningfully covered?"""
         text = _math_norm(student_answer if isinstance(student_answer, str) else '')
         # Numeric-aware match: pure numbers extracted from the student
         # answer are compared with tolerance against numeric keywords;
-        # text keywords use substring match.
+        # text keywords use substring match. For text keywords we ALSO
+        # try a token-overlap match: a multi-word keyword counts if
+        # all its non-trivial tokens appear in the student text — this
+        # accepts paraphrases like "porosity allows water in" vs the
+        # canonical "porosity admits water" without inventing synonyms.
         import re as _re
         student_numbers = _re.findall(r'-?\d+(?:\.\d+)?', text)
+        _STOP = {"the", "a", "an", "of", "to", "and", "or", "is", "are", "in", "on"}
         matched = 0
         for kw in keywords:
             if not kw:
@@ -11413,7 +11630,16 @@ Which concept numbers were meaningfully covered?"""
                 target = float(kw)
                 if any(abs(float(sn) - target) < 0.01 for sn in student_numbers):
                     matched += 1
-            elif kw in text:
+                continue
+            if kw in text:
+                matched += 1
+                continue
+            # Token-overlap fallback. Counts when every non-stopword
+            # token of the keyword appears in the student text. Keeps
+            # the bar honest (every token must be present) while
+            # surviving word-order and minor wording differences.
+            kw_tokens = [t for t in _re.split(r"\W+", kw) if t and t not in _STOP]
+            if kw_tokens and all(t in text for t in kw_tokens):
                 matched += 1
         return matched >= min_kw
 

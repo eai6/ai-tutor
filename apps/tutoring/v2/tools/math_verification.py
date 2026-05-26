@@ -328,24 +328,41 @@ class MathVerificationTool:
         problem_text: str,
         program: dict[str, Any],
     ) -> MathVerificationResult:
+        """Evaluate a DSL program. Supports single- and multi-slot.
+
+        Single-slot: ``program['expression']`` -> canonical_value is a
+        scalar.
+
+        Multi-slot: ``program['expressions']`` is a list of
+        ``{"name": str, "expression": <node>}`` entries -> canonical_value
+        is a list of ``{"name": str, "value": scalar}`` dicts in the
+        original order. The grader treats a student's single-value
+        answer as PARTIAL when it matches any one slot, CORRECT when
+        the student supplies all slot values.
+        """
         trace = MathTrace()
         try:
             variables = program.get("variables", {})
             expression = program.get("expression")
-            if expression is None:
+            expressions = program.get("expressions")
+
+            if expression is None and expressions is None:
                 return MathVerificationResult(
                     canonical_value=None,
                     trace=trace,
-                    error="program missing 'expression'",
+                    error="program missing 'expression' or 'expressions'",
+                )
+            if expression is not None and expressions is not None:
+                return MathVerificationResult(
+                    canonical_value=None,
+                    trace=trace,
+                    error="program has BOTH 'expression' and 'expressions'; pick one",
                 )
 
-            # DSL validation pass.
-            _validate_node(expression)
-
-            # Variable-binding check — structured first.
+            # Variable-binding check — structured first. Identical for
+            # single- and multi-slot programs.
             binding_error = _validate_variable_bindings(variables, problem_text)
             if binding_error is not None:
-                # Optional LLM-mediated branch (Phase 1 §5).
                 if self._llm_validator is not None:
                     llm_verdict = self._llm_validator(problem_text, variables)
                     if llm_verdict is not None:
@@ -361,8 +378,40 @@ class MathVerificationTool:
                         error=f"variable_bindings_invalid:{binding_error}",
                     )
 
-            value = _evaluate(expression, variables, trace)
-            return MathVerificationResult(canonical_value=value, trace=trace)
+            # Single-slot path.
+            if expression is not None:
+                _validate_node(expression)
+                value = _evaluate(expression, variables, trace)
+                return MathVerificationResult(canonical_value=value, trace=trace)
+
+            # Multi-slot path.
+            if not isinstance(expressions, list) or not expressions:
+                return MathVerificationResult(
+                    canonical_value=None,
+                    trace=trace,
+                    error="'expressions' must be a non-empty list",
+                )
+            slot_values: list[dict[str, Any]] = []
+            for idx, entry in enumerate(expressions):
+                if not isinstance(entry, dict):
+                    return MathVerificationResult(
+                        canonical_value=None,
+                        trace=trace,
+                        error=f"expressions[{idx}] must be an object",
+                    )
+                node = entry.get("expression")
+                name = str(entry.get("name") or f"slot_{idx}").strip() or f"slot_{idx}"
+                if node is None:
+                    return MathVerificationResult(
+                        canonical_value=None,
+                        trace=trace,
+                        error=f"expressions[{idx}] missing 'expression'",
+                    )
+                _validate_node(node)
+                val = _evaluate(node, variables, trace)
+                slot_values.append({"name": name, "value": val})
+            return MathVerificationResult(canonical_value=slot_values, trace=trace)
+
         except DSLValidationError as exc:
             return MathVerificationResult(
                 canonical_value=None,
