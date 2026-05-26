@@ -735,6 +735,27 @@ def chat_start_session(request, lesson_id):
         # Resume active session — include conversation history
         session = existing
         history = _build_session_history(session)
+
+        # Engine dispatch: when the simple-tutor engine is on, route
+        # the resume through ``start_for_view`` so the M13 in-flight
+        # re-anchor branch can fire (deterministic "Welcome back" +
+        # re-display of the slot, no LLM call). Without this branch
+        # the legacy ConversationalTutor.resume() always runs and
+        # the M13 fix has no effect on resume.
+        from apps.tutoring import simple_tutor
+        if simple_tutor.is_enabled():
+            from apps.tutoring.simple_tutor.engine import start_for_view
+            try:
+                payload = start_for_view(session)
+                payload['session_id'] = session.id
+                payload['history'] = history
+                return JsonResponse(payload)
+            except Exception as e:
+                logger.error(
+                    f"[start:simple] resume failed: {e}", exc_info=True,
+                )
+                # Fall through to legacy resume on error.
+
         tutor = ConversationalTutor(session)
         response = tutor.resume()
 

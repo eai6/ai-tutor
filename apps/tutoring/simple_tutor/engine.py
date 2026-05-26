@@ -1211,8 +1211,19 @@ def _project_start_payload(session, message: str) -> dict:
     """Shared payload-shaping for ``start_for_view`` — keeps both the
     resume and fresh-start branches returning the exact same JSON
     shape ``chat_start_session`` expects.
+
+    ``is_complete`` defaults to ``False`` whenever the chat is still
+    interactive (in-flight question, exit ticket pending, OR
+    remediation in progress). It's only True when the session is
+    truly past everything (no lesson steps left AND no exit ticket
+    attached OR the student already passed). Without this guard, the
+    frontend showed the "Lesson Complete!" modal on every resume
+    after a failed exit ticket — burying the remediation chat.
     """
     from apps.curriculum.models import LessonStep
+    from apps.tutoring.models import (
+        ExitTicket, ExitTicketAttempt, InFlightQuestion,
+    )
 
     session.refresh_from_db()
     current_idx = session.current_step_index or 0
@@ -1227,7 +1238,38 @@ def _project_start_payload(session, message: str) -> dict:
         if step else 'evaluate'
     )
 
-    is_complete = step is None or current_idx >= total_steps
+    steps_exhausted = step is None or current_idx >= total_steps
+    has_in_flight = InFlightQuestion.objects.filter(session=session).exists()
+    last_attempt = (
+        ExitTicketAttempt.objects
+        .filter(session=session, completed_at__isnull=False)
+        .order_by('-completed_at')
+        .first()
+    )
+    has_passed_attempt = bool(last_attempt and last_attempt.passed)
+    has_failed_attempt = bool(last_attempt and not last_attempt.passed)
+    et_attached = ExitTicket.objects.filter(lesson=session.lesson).exists()
+
+    if not steps_exhausted:
+        # Still in lesson steps — definitely not complete.
+        is_complete = False
+    elif has_in_flight:
+        # An in-flight slot means there's an unanswered question — the
+        # student should answer it before anything else. Not complete.
+        is_complete = False
+    elif has_failed_attempt:
+        # Failed exit ticket → remediation chat is active. Not complete.
+        is_complete = False
+    elif has_passed_attempt:
+        # Passed exit ticket — frontend showCompletion is fine.
+        is_complete = True
+    elif et_attached:
+        # No attempt yet but an exit ticket is attached — student
+        # still has to take the ticket.
+        is_complete = False
+    else:
+        # Steps done, no exit ticket attached, no attempt → end here.
+        is_complete = True
 
     return {
         'message': message,
