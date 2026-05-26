@@ -1,0 +1,19 @@
+id: smoke_001
+description: >
+  Bare-minimum smoke. The tutor receives one student message on a fresh
+  session and must produce a non-empty response. No pedagogical claims —
+  this scenario only proves the harness can drive respond() end-to-end.
+persona: struggler
+subject: geography
+lesson_id: 1463
+tags: [smoke, plumbing]
+
+mode: single_turn
+
+seed_history: []
+student_turn: "Hi, I'm ready to start the lesson."
+
+# Phase 1 ships with only the response_nonempty assertion. Layers 2+3
+# (judges + LLM rubric) come online in Phases 2-3 of the harness plan.
+assertions:
+  response_nonempty: true

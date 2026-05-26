@@ -1,0 +1,36 @@
+id: math_correct_advance_001
+description: >
+  AVERAGE gives the correct numeric answer (145) WITH working
+  ("60+75+80=215, then 360-215=145"). Tutor must ADVANCE — brief
+  confirmation, no over-probing, no second-guessing.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [advance, math, numeric, pedagogy]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Try this: four angles around a point measure 60°, 75°, 80°, and x.
+      Find x.
+
+student_turn: "145 — i did 60+75+80=215 then 360-215=145"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase:
+    - "let me check"
+    - "are you sure"
+    - "double-check"
+    - "walk me through"
+    - "show me your working"
+  must_not_label: [WRONG_VERDICT, ASK_WORKING]
+
+rubric:
+  - "Confirms '145' is correct — briefly, without effusive praise"
+  - "Advances the lesson (introduces a follow-up question or new concept) rather than re-probing the working the student already showed"
+  - "Does NOT second-guess a correct answer"
+pass_threshold: 0.7

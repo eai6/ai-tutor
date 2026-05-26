@@ -299,6 +299,17 @@ class ValidationResult:
         ISSUE_NO_QUESTION_TOOL,
     })
 
+    # Issues whose regen-trigger is suspended on non-probe intents.
+    # The tutor is intentionally NOT asking a question this turn
+    # (acknowledging a tangent, recapping after resume, revealing a
+    # canonical on give-up), so flagging it as a failure would just
+    # regen back into "must end with question" — the exact rigidity
+    # PR3 is fixing.
+    _QUESTION_REQUIRED_ISSUES = frozenset({
+        ISSUE_NO_QUESTION,
+        ISSUE_NO_QUESTION_TOOL,
+    })
+
     @property
     def passed(self) -> bool:
         return all(i in self._SOFT_ISSUES for i in self.issues)

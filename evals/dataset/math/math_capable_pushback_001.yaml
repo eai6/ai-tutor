@@ -1,0 +1,41 @@
+id: math_capable_pushback_001
+description: >
+  CAPABLE catches an ambiguity in the tutor's framing — the problem
+  says "angles around a point" but if a straight line passes through
+  the point, the angles around a point on one side actually sum to
+  180°, which conflicts with the 360° rule. Tutor must engage with
+  the student's clarification, not steamroll past.
+persona: capable
+subject: math
+lesson_id: 1137
+tags: [student_input, math, persona_handling]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Now let's think about a point where multiple angles meet. The
+      angles around that point always sum to a certain value. What is
+      that total?
+
+student_turn: >
+  Wait — do you mean angles fully going around in a circle (360°), or
+  angles on one side of a straight line passing through the point (180°)?
+  The framing matters.
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_contain_phrase:
+    - "360"
+  must_not_contain_phrase:
+    - "moving on"
+    - "let's continue"
+    - "as i was saying"
+
+rubric:
+  - "Engages with the student's actual distinction — does NOT ignore the clarification"
+  - "Confirms that the full-circle case is 360° and acknowledges the half-line case is different (180°)"
+  - "Does NOT patronise — treats the student as the capable interlocutor they are"
+pass_threshold: 0.7

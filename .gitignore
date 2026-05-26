@@ -4,6 +4,7 @@ azure
 notes.txt
 azure_app.py
 __Pycache__*
+__pycache__/
 dist
 build
 archives
@@ -13,6 +14,10 @@ media/vectordb/
 openstax_resources */
 media
 design/LOCAL_TESTING_GUIDE.md
+
+
+# Pulumi stack secrets passphrase — never commit
+infra/.pulumi-passphrase
 
 # macOS metadata
 .DS_Store

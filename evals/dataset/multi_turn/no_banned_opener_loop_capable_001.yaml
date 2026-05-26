@@ -1,0 +1,31 @@
+id: no_banned_opener_loop_capable_001
+description: >
+  Banned-opener loop guard across a full session. The CAPABLE persona
+  produces a mix of correct + ambiguous answers; the tutor must NOT
+  fall into a loop of "walk me through your steps" / "show me your
+  working, step by step" — those prescribed phrases appearing in
+  consecutive turns is the failure signature.
+persona: capable
+subject: geography
+lesson_id: 1463
+tags: [multi_turn, banned_opener, repetition]
+
+mode: multi_turn
+max_turns: 12
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 12
+  no_repeated_tutor_phrase_within_window:
+    window: 4
+    threshold: 2
+  no_label_anywhere:
+    - BANNED_OPENER
+    - TOOL_LEAK
+    - THINKING_LEAK
+
+rubric:
+  - "Across the session, the tutor varied its scaffolding — did not rely on the same probe ('walk me through', 'show me your working') turn after turn"
+  - "When the same student behaviour recurred, the tutor's response WAS NOT a verbatim repeat of the previous turn"
+  - "No prescribed banned phrases ('walk me through your steps', 'show me your working, step by step', 'let's check this one together') appeared in two consecutive tutor turns"
+pass_threshold: 0.65

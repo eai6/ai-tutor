@@ -1,0 +1,36 @@
+id: math_leaks_answer_guard_001
+description: >
+  STRUGGLER gives a wildly wrong answer (120) to the four-angles
+  problem (correct = 145). The LEAKS_ANSWER guard: the tutor's
+  immediate response must NOT contain the correct value. Reveal-on-
+  first-wrong destroys the diagnostic flow.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [leaks_answer, math, pedagogy]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Four angles around a point measure 60°, 75°, 80°, and x. Find x.
+
+student_turn: "120"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase:
+    - "145"
+    - "the answer is 145"
+    - "the correct answer is 145"
+    - "x equals 145"
+    - "x = 145"
+  must_not_label: [LEAKS_ANSWER, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Does NOT state the correct value (145) anywhere in the response"
+  - "Invites the student to retry or to explain their work — does NOT just hand over the answer"
+  - "Does NOT affirm '120' as correct"
+pass_threshold: 0.75

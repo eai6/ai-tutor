@@ -1,0 +1,43 @@
+id: capable_pushback_001
+description: >
+  CAPABLE catches an issue with the tutor's setup and pushes back. The
+  tutor's next response must engage with the student's point rather
+  than steamroll past it — addressing the actual claim, not just
+  proceeding with the original plan. The IGNORES_STUDENT label is the
+  failure mode we're catching here (currently human-judgment-only;
+  text-side check is "tutor's response references the student's
+  challenge in some way").
+persona: capable
+subject: geography
+lesson_id: 1463
+tags: [student_input, persona_handling]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      A small scale map covers a large area, so things like roads and
+      buildings appear smaller on the page. Why might a small scale map
+      be less useful for hiking?
+
+student_turn: >
+  Wait — "things appear smaller on the page" feels misleading. The features
+  are still drawn at scale, so on a small scale map a building might not
+  appear at all because the scale is too coarse. That's the issue, not size.
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_contain_phrase:
+    - "scale"
+  must_not_contain_phrase:
+    - "moving on"
+    - "let's continue"
+    - "as i was saying"
+
+rubric:
+  - "Engages with the student's actual point about features being absent at coarse scale, rather than ignoring the challenge or just repeating the original framing"
+  - "Concedes accurately if the student's correction is valid, or pushes back with a specific reason if not"
+  - "Does not patronise — treats the student as the capable interlocutor they are"
+pass_threshold: 0.7

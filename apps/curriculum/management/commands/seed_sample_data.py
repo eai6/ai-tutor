@@ -38,7 +38,7 @@ class Command(BaseCommand):
         Membership.objects.get_or_create(
             user=admin_user,
             institution=institution,
-            defaults={'role': Membership.Role.TEACHER}
+            defaults={'role': Membership.Role.STAFF}
         )
         
         student_user, _ = User.objects.get_or_create(

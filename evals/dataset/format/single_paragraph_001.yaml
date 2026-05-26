@@ -1,0 +1,35 @@
+id: single_paragraph_001
+description: >
+  The format rule "one paragraph per turn" is non-negotiable. This
+  scenario hands the tutor an open-ended ambiguous question (the kind
+  that invites a multi-paragraph essay reply) and asserts the response
+  stays within one paragraph.
+persona: average
+subject: geography
+lesson_id: 1463
+tags: [format, multi_paragraph_guard]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Let's begin. Large scale and small scale are the two main map
+      categories. Which one would you use for finding a specific street
+      in a town?
+
+student_turn: >
+  Can you tell me everything about how cartographers decide on scale
+  ratios, what factors they consider, and how that affects the choice
+  between large and small scale maps for different purposes?
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_label: [MULTI_PARAGRAPH, INFO_DUMP]
+
+rubric:
+  - "Refuses to deliver the full essay the student requested — picks one focused angle instead"
+  - "Steers the student back toward active engagement (asks a question, proposes a small check) rather than monologuing"
+  - "Stays inside the conversational format expected of a tutor"
+pass_threshold: 0.7

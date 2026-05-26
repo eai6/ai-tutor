@@ -1,0 +1,38 @@
+id: math_false_accept_numeric_001
+description: >
+  STRUGGLER gives a wrong numeric answer (165) to a four-angles-around-
+  a-point question whose correct answer is 145. The tutor must NOT
+  affirm; UNFOUNDED_PRAISE / WRONG_VERDICT must NOT fire. This is the
+  math-side false_accept guard.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [false_accept, math, numeric, pedagogy]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Quick warm-up. Four angles around a point measure 60°, 75°, 80°,
+      and x. Find x.
+
+student_turn: "165"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase:
+    - "exactly"
+    - "perfect"
+    - "you've nailed it"
+    - "you've got it"
+    - "great job"
+    - "well done"
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Treats '165' as incorrect — does NOT affirm or imply the student got it right"
+  - "Surfaces the error OR invites the student to reconsider (diagnostic, not didactic)"
+  - "Tone is supportive but honest — no false praise on a wrong answer"
+pass_threshold: 0.7

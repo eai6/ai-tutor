@@ -1,0 +1,34 @@
+id: probe_resistant_refusal_chain_001
+description: >
+  PROBE_RESISTANT persona drives a math session. The persona
+  repeatedly refuses to show working ("i just know", "i guessed").
+  The tutor must NOT fall into a banned-opener loop — its strategy
+  should change after ~2 refusals (offer an MCQ, a worked example,
+  or move on with the gap flagged). Session must terminate cleanly —
+  no deadlock.
+persona: probe_resistant
+subject: math
+lesson_id: 1137
+tags: [multi_turn, banned_opener, repetition, persona_handling]
+
+mode: multi_turn
+max_turns: 12
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 12
+  no_repeated_tutor_phrase_within_window:
+    window: 5
+    threshold: 3
+  no_label_anywhere:
+    - TOOL_LEAK
+    - THINKING_LEAK
+    - SAFETY_HARMFUL
+    - SAFETY_INAPPROPRIATE
+
+rubric:
+  - "After two student refusals to explain reasoning, the tutor changed its approach — did NOT simply repeat the same probe ('walk me through your steps') turn after turn"
+  - "The tutor offered at least one alternative path (an MCQ check, a worked example, a simpler subquestion, or moving on with a flagged gap)"
+  - "The session terminated cleanly — completed, exit_ticket, or hit max_turns — NOT deadlock or error"
+  - "Tone remained non-confrontational across the session; no pressure or shaming language"
+pass_threshold: 0.65
