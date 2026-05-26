@@ -199,12 +199,18 @@ def v2_respond_dispatch(session, message: str) -> dict:
     finally:
         reset_span_buffer(token)
 
-    # 3. Session completion on close_topic — fires StudentProfiler
-    # (Phase 3 §3.1). Fail-soft: completion failures must not block
+    # 3. Lesson completion — fires StudentProfiler (Phase 3 §3.1) and
+    # the exit-ticket modal payload. ONLY fires when ``close_topic``
+    # was the move AND the engine could not advance to a next step
+    # (i.e. the active step was the final one). An intermediate
+    # ``close_topic`` (more steps remain) advances the step but keeps
+    # the session active — the student keeps tutoring on the new step
+    # rather than being shoved to the exit ticket after the first
+    # objective hit. Fail-soft: completion failures must not block
     # the response envelope from reaching the student.
     is_complete = False
     exit_ticket_payload: Optional[dict] = None
-    if result.selected_move == "close_topic":
+    if result.selected_move == "close_topic" and result.is_lesson_complete:
         try:
             engine.complete_session()
             is_complete = True

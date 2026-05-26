@@ -154,21 +154,32 @@ class ContextManager:
             getattr(lesson, "course", None), "language", None
         ) or "en"
 
-        # Resolve lesson-level metadata. ``current_objective`` falls
-        # back to ``Lesson.objective`` when the caller didn't pass one
-        # — earlier code paths passed empty string, which produced the
-        # subject-hallucination bug (S3 maths welcome on a geography
-        # lesson). ``lesson_subject`` derives from
-        # ``Course.subject_type`` and is surfaced into the shared
-        # preamble so the LLM stops inventing subjects.
+        # Resolve lesson-level metadata. ``current_objective`` derives
+        # from the ACTIVE step's ``enabling_objective`` first
+        # (per-step objective progress is what gates close_topic /
+        # advancement — Mastery Learning: gate every step on its
+        # own evidence, not on the lesson-level objective). Falls back
+        # to ``Lesson.objective`` when the step has no
+        # enabling_objective, and to the explicit caller value when
+        # supplied. The previous behaviour (always use Lesson.objective)
+        # caused single-objective tracking across all steps, which fired
+        # close_topic on the first objective hit and shipped the exit
+        # ticket after one practiced step — the GEO-S5 run-5 premature-
+        # close finding.
         lesson_title = (getattr(lesson, "title", "") or "").strip()
         unit = getattr(lesson, "unit", None)
         course = getattr(unit, "course", None)
         lesson_subject = (
             getattr(course, "subject_type", "") or ""
         ).strip().lower()
+
+        step_objective, is_final_step = self._current_step_objective_and_position(
+            session,
+        )
         if not current_objective:
-            current_objective = (getattr(lesson, "objective", "") or "").strip()
+            current_objective = step_objective or (
+                getattr(lesson, "objective", "") or ""
+            ).strip()
 
         if full_transcript is None:
             full_transcript = self._load_full_transcript()
@@ -193,7 +204,36 @@ class ContextManager:
             lesson_subject=lesson_subject,
             current_step_teacher_script=teacher_script,
             current_step_worked_example=worked_example,
+            is_final_step=is_final_step,
         )
+
+    def _current_step_objective_and_position(
+        self, session,
+    ) -> tuple[str, bool]:
+        """Return ``(enabling_objective, is_final_step)`` for the active step.
+
+        ``is_final_step`` lets close_topic phrase its transition
+        correctly: "let's move on" while more steps remain, "exit
+        ticket" on the last step. Both default to safe values on any
+        miss (empty objective, treat as final to avoid orphan-progress
+        sessions stuck mid-lesson).
+        """
+        lesson = getattr(session, "lesson", None)
+        if lesson is None or not hasattr(lesson, "steps"):
+            return "", True
+        try:
+            steps = list(lesson.steps.all())
+        except Exception:
+            return "", True
+        if not steps:
+            return "", True
+        idx = getattr(session, "current_step_index", 0) or 0
+        if idx < 0 or idx >= len(steps):
+            return "", True
+        step = steps[idx]
+        objective = (getattr(step, "enabling_objective", "") or "").strip()
+        is_final = (idx == len(steps) - 1)
+        return objective, is_final
 
     def _current_step_pedagogy(self, session) -> tuple[str, str]:
         """Resolve teacher_script + worked-example text for the active step.

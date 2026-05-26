@@ -60,7 +60,18 @@ MAX_VERDICTLESS_RUN = 6
 
 @dataclass
 class TurnResult:
-    """Bundle returned from TutorEngine.respond() / start_session()."""
+    """Bundle returned from TutorEngine.respond() / start_session().
+
+    ``is_lesson_complete`` is True only when ``close_topic`` fired on
+    the FINAL lesson step. Intermediate ``close_topic`` turns (still
+    more steps to teach) leave this False so the router keeps the
+    session active and re-opens the next step's tutoring. This is the
+    contract that lets one ``close_topic`` move advance per-step
+    rather than ending the whole lesson on the first objective hit
+    (Science of learning principle: Mastery Learning — gate
+    every step on its own evidence; Active Learning — practice
+    counts must accumulate per session, not collapse to one).
+    """
 
     response_text: str
     runtime_state: SessionRuntimeState
@@ -68,6 +79,8 @@ class TurnResult:
     verdict: Optional[GradingResult] = None
     fallback_used: bool = False
     v2_trace: dict = field(default_factory=dict)
+    is_lesson_complete: bool = False
+    advanced_to_step_index: Optional[int] = None
 
 
 class TutorEngine:
@@ -214,7 +227,18 @@ class TutorEngine:
         # move selection below (see move_selection.detect_help_request).
         from apps.tutoring.v2.services.move_selection import detect_help_request
 
-        is_help_request = detect_help_request(student_input) is not None
+        open_q_stem = (
+            runtime_state.open_question.rendered_stem
+            if runtime_state.open_question is not None
+            else ""
+        )
+        # One LLM call (Haiku-backed intent classifier) per turn.
+        # The result is reused downstream by ``pick_move`` so the
+        # classifier never runs twice.
+        help_request_move = detect_help_request(
+            student_input, open_question_stem=open_q_stem,
+        )
+        is_help_request = help_request_move is not None
 
         verdict: Optional[GradingResult] = None
         if (
@@ -265,6 +289,7 @@ class TutorEngine:
             objective_just_opened=False,
             current_objective=context.current_objective,
             student_input=student_input,
+            help_request_move=help_request_move,
         )
 
         # 3. Tutor → first attempt.
@@ -412,6 +437,21 @@ class TutorEngine:
         )
         self.context_manager.save_runtime_state(runtime_state)
 
+        # 6b. Step advancement on close_topic — when more steps remain
+        # in the lesson, advance to the next step rather than ending
+        # the lesson. Only the FINAL step's close_topic marks the
+        # session lesson-complete. (Mastery Learning — every
+        # step gets its own evidence bar; Active Learning —
+        # multi-step lessons must accumulate practice across steps,
+        # not collapse to the first objective hit.)
+        is_lesson_complete = False
+        advanced_to_step_index: Optional[int] = None
+        if selected_move == "close_topic":
+            advanced_to_step_index = self._advance_step_if_possible(
+                runtime_state=runtime_state,
+            )
+            is_lesson_complete = advanced_to_step_index is None
+
         # 7. Build v2_trace rollup for SessionTurn.judge_outputs.v2_trace.
         v2_trace = {
             "selected_move": selected_move,
@@ -425,6 +465,8 @@ class TutorEngine:
             ),
             "retry_used": conf_result.retry_used,
             "fallback_used": fallback_used,
+            "is_lesson_complete": is_lesson_complete,
+            "advanced_to_step_index": advanced_to_step_index,
         }
 
         return TurnResult(
@@ -434,6 +476,8 @@ class TutorEngine:
             verdict=verdict,
             fallback_used=fallback_used,
             v2_trace=v2_trace,
+            is_lesson_complete=is_lesson_complete,
+            advanced_to_step_index=advanced_to_step_index,
         )
 
     # ------------------------------------------------------------------
@@ -449,6 +493,7 @@ class TutorEngine:
         objective_just_opened: bool = False,
         current_objective: str = "",
         student_input: str = "",
+        help_request_move: Optional[str] = None,
     ) -> str:
         """Pure-function move pick, then safety-valve override.
 
@@ -456,6 +501,11 @@ class TutorEngine:
         principled move table — a session that has hit the per-objective
         cap or has drifted 6 verdict-less turns *must* close, even when
         the move table would otherwise pick something else.
+
+        ``help_request_move`` is an optional pre-computed intent override
+        (set by ``TutorEngine.respond`` after running the Haiku-backed
+        intent classifier once per turn). When provided, ``select_move``
+        skips its on-demand classifier call.
         """
         with emit_span("audit", "tutor.move_selection") as span:
             valve_override = self._safety_valve_override(
@@ -476,6 +526,7 @@ class TutorEngine:
                 objective_just_opened=objective_just_opened,
                 current_objective=current_objective,
                 student_input=student_input,
+                help_request_move=help_request_move,
             )
             if move not in ALLOWED_MOVES:
                 # Defensive normalization — should never fire because
@@ -743,6 +794,78 @@ class TutorEngine:
             return lesson.steps.all()[idx] if hasattr(lesson, "steps") else None
         except (IndexError, AttributeError, Exception):
             return None
+
+    def _advance_step_if_possible(
+        self,
+        *,
+        runtime_state: SessionRuntimeState,
+    ) -> Optional[int]:
+        """Advance ``session.current_step_index`` to the next step.
+
+        Called when ``close_topic`` fires. Returns the new step index
+        when an advance happened, or ``None`` when the active step was
+        the final step (signalling lesson completion to the caller).
+
+        Side effects when advancing:
+          * Increments ``session.current_step_index`` and persists.
+          * Clears ``runtime_state.open_question`` — the previous
+            step's open question is no longer in play.
+          * Resets ``runtime_state.attempts_on_open_question`` to 0.
+          * Resets ``runtime_state.unverified_run_length`` to 0.
+          * Marks the just-closed objective progress as ``closed=True``
+            so ``_objective_evidence_sufficient`` no longer fires on it.
+          * Resets ``safety_valve_counters.turns_on_current_objective``
+            so the per-objective cap restarts for the new step.
+
+        Subject-agnostic — works the same way for math, geography, or
+        any other lesson type. Fail-soft on any DB error: returns
+        ``None`` (treated as final-step) so a flaky lesson model never
+        blocks lesson completion.
+        """
+        session = self.context_manager.session
+        lesson = getattr(session, "lesson", None)
+        if lesson is None or not hasattr(lesson, "steps"):
+            return None
+        try:
+            total_steps = lesson.steps.count()
+        except Exception:
+            return None
+        current_idx = getattr(session, "current_step_index", 0) or 0
+        next_idx = current_idx + 1
+        if next_idx >= total_steps:
+            return None  # final step — lesson is done
+
+        # Persist the step advance to the session row.
+        try:
+            session.current_step_index = next_idx
+            session.save(update_fields=["current_step_index"])
+        except Exception as exc:
+            logger.warning(
+                "[TutorEngine] failed to persist current_step_index advance: %s",
+                type(exc).__name__,
+            )
+            return None
+
+        # Reset per-step runtime state. The just-closed objective is
+        # marked closed in objective_progress so future move-selection
+        # passes don't keep firing close_topic on it; the new step's
+        # objective starts fresh on the next assemble_context.
+        runtime_state.open_question = None
+        runtime_state.attempts_on_open_question = 0
+        runtime_state.unverified_run_length = 0
+        # Mark the just-closed objective as closed (the
+        # ``_objective_evidence_sufficient`` check skips closed ones).
+        # We don't know the objective key without re-reading the prior
+        # context, so close any progress entry that matched the prior
+        # step's enabling_objective.
+        for key, prog in runtime_state.objective_progress.items():
+            if prog is not None and not prog.closed and prog.correct >= 1:
+                prog.closed = True
+                runtime_state.objective_progress[key] = prog
+        # Reset per-objective turn counter so the new step gets its
+        # own MAX_TURNS_PER_OBJECTIVE budget.
+        runtime_state.safety_valve_counters.turns_on_current_objective = 0
+        return next_idx
 
     def _prior_student_turn(self, context: TutoringContext) -> str:
         """Last student turn from the transcript (empty when none)."""

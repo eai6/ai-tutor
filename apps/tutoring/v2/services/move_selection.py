@@ -26,7 +26,6 @@ first under normal conditions".
 
 from __future__ import annotations
 
-import re
 from typing import Optional
 
 from apps.tutoring.v2.contracts import (
@@ -34,6 +33,10 @@ from apps.tutoring.v2.contracts import (
     ObjectiveProgress,
     SessionRuntimeState,
     Verdict,
+)
+from apps.tutoring.v2.services.intent_classifier import (
+    classify_student_intent,
+    intent_to_move,
 )
 
 
@@ -50,58 +53,41 @@ ALLOWED_MOVES = (
 )
 
 
-# Explicit student help-request patterns. Kept as a *cheap pre-filter*
-# at move-selection time so the engine routes to ``explain`` /
-# ``worked_example`` instead of yet another retrieval scaffold. This is
-# a router heuristic, not a content gate — the move prompts themselves
-# handle the actual response.
-#
-# We match conservatively: a help-request requires intent words AND a
-# question / first-person phrasing. A student saying "I don't know
-# what's next" is NOT a help-request ("don't know" is a verdict signal);
-# a student saying "I don't understand what an inverse is" IS a help-
-# request. The patterns aim for explicit asks, not stumped-silence.
-_WORKED_EXAMPLE_PATTERNS = (
-    r"\bshow me how\b",
-    r"\bcan you show\b",
-    r"\bworked example\b",
-    r"\bwalk me through\b",
-    r"\b(give|show) me an? example\b",
-    r"\bdemonstrate\b",
-)
-
-_EXPLAIN_PATTERNS = (
-    r"\b(can you )?explain\b",
-    r"\bi don'?t (get|understand)\b",
-    r"\bwhat (is|does|do) .{0,40}(mean|stand for)\b",
-    r"\bdefine\b",
-    r"\bwhat'?s an? \w+\??$",
-    r"\bi'?m (totally )?lost\b",
-    r"\bi'?m confused\b",
-    r"\bhelp me understand\b",
-)
+# Help-request detection (Science of Learning — Direct
+# Instruction: when the student signals they don't have the
+# concept yet, teach it explicitly before asking for more
+# retrieval). Implementation lives in ``intent_classifier`` and uses
+# a fast Haiku-backed LLM call rather than regex patterns. The regex
+# version that shipped in Phase 2 missed the dominant help-request
+# phrasings observed in the run-5 MATHS-S1 evaluation ("i dont know
+# how to do percentages", "can you teach me") because they don't
+# match the narrow ``don't get/understand`` / ``show me how``
+# templates the regex enumerates. The LLM classifier generalises
+# across subjects, dialects, and misspellings.
 
 
-def detect_help_request(student_input: str) -> Optional[str]:
+def detect_help_request(
+    student_input: str,
+    *,
+    open_question_stem: str = "",
+) -> Optional[str]:
     """Return ``"worked_example"``, ``"explain"``, or ``None``.
 
-    Tested against the explicit help-request patterns above. The
-    ``worked_example`` patterns take precedence — "show me how to do
-    this" is a worked-example request whether or not it also contains
-    "I don't understand".
+    Delegates to the LLM-based intent classifier. Fail-soft:
+    returns ``None`` on classifier outage so move selection proceeds
+    on the verdict-driven path.
+
+    ``open_question_stem`` is optional context used by the classifier
+    to disambiguate "I don't understand" (the question vs. the
+    concept). Callers that don't have it can omit it.
     """
-    if not student_input:
+    if not student_input or not student_input.strip():
         return None
-    text = student_input.strip().lower()
-    if not text:
-        return None
-    for pat in _WORKED_EXAMPLE_PATTERNS:
-        if re.search(pat, text):
-            return "worked_example"
-    for pat in _EXPLAIN_PATTERNS:
-        if re.search(pat, text):
-            return "explain"
-    return None
+    intent = classify_student_intent(
+        student_input=student_input,
+        open_question_stem=open_question_stem,
+    )
+    return intent_to_move(intent)
 
 
 # Per analysis §4, objective evidence is sufficient when the student
@@ -121,6 +107,7 @@ def select_move(
     objective_just_opened: bool = False,
     current_objective: str = "",
     student_input: str = "",
+    help_request_move: Optional[str] = None,
 ) -> str:
     """Deterministic move pick. Returns one of ``ALLOWED_MOVES``.
 
@@ -136,9 +123,15 @@ def select_move(
       current_objective: enabling-objective slug for ``objective_progress``
         lookup.
       student_input: the student's latest message. Used only to detect
-        explicit help-requests; never matched against curriculum
-        content. Optional so existing callers (template renderer) that
-        don't have it can keep their current behaviour.
+        explicit help-requests (when ``help_request_move`` is not
+        pre-computed); never matched against curriculum content.
+      help_request_move: optional pre-computed help-request override
+        (``"worked_example"`` / ``"explain"`` / ``None``). Callers that
+        already ran the intent classifier upstream — TutorEngine does
+        this once per turn before grading — pass it here to avoid a
+        second LLM call. When ``None`` the function falls through to
+        the verdict-driven path; when explicitly ``""`` / sentinel the
+        on-demand classifier still runs (back-compat for legacy tests).
     """
     attempts = runtime_state.attempts_on_open_question
     counters = runtime_state.safety_valve_counters
@@ -153,13 +146,27 @@ def select_move(
     if _objective_evidence_sufficient(obj_progress):
         return "close_topic"
 
-    # ── Explicit help-request override (Direct Instruction Ch.11 +
-    # Cognitive Load Ch.14). When the student explicitly asks for an
+    # ── Explicit help-request override (Direct Instruction +
+    # Cognitive Load). When the student explicitly asks for an
     # explanation or worked example, that beats every verdict-driven
     # branch below — answering "show me how" with another retrieval
     # scaffold is the wrong move regardless of what the grader said.
-    help_kind = detect_help_request(student_input)
-    if help_kind is not None:
+    #
+    # Prefer the caller-supplied override (TutorEngine pre-classifies
+    # once per turn). When absent, classify on demand for back-compat
+    # with direct callers (tests, template-renderer paths).
+    if help_request_move is not None:
+        help_kind = help_request_move
+    else:
+        open_q_stem = (
+            runtime_state.open_question.rendered_stem
+            if runtime_state.open_question is not None
+            else ""
+        )
+        help_kind = detect_help_request(
+            student_input, open_question_stem=open_q_stem,
+        )
+    if help_kind in ("worked_example", "explain"):
         return help_kind
 
     # ── No verdict this turn (opening / transitional / free-chat) ──

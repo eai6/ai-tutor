@@ -465,7 +465,7 @@ def run_open_question_stickiness_check(
     runtime_state: SessionRuntimeState,
     pending_pose,  # PendingPose | None — imported lazily to avoid cycles
 ) -> GateResult:
-    """Safety floor: a probe-shaped move must stay on the open question.
+    """Safety floor: a *stay-on-item* move must keep the open question live.
 
     Background. Across both MATHS-S1 and GEO-S5 evaluations, the
     dominant remaining drift after the run-3 prompt tightening was:
@@ -476,7 +476,7 @@ def run_open_question_stickiness_check(
 
     This gate is the safety floor that catches the drift after the
     fact. It does not change move selection (the engine still picked
-    ``scaffold_hint`` / ``confirm_and_extend`` / etc.) and it does not
+    ``scaffold_hint`` / ``name_misconception`` / etc.) and it does not
     pre-route. On rejection, the existing retry / safe-terminal path
     handles the response — the per-move terminal restates the open
     question, which is exactly the recovery the principle asks for
@@ -484,25 +484,39 @@ def run_open_question_stickiness_check(
     the same item, scaffold the path, do not change the question).
 
     Scope (when the gate is active):
-      * selected_move is one of the probe-shaped moves where the
-        contract is "stay on the open question": ``scaffold_hint``,
-        ``name_misconception``, ``confirm_and_extend``,
-        ``pose_question``.
+      * selected_move is one of the *stay-on-item* moves whose contract
+        explicitly keeps the open question live: ``scaffold_hint``,
+        ``name_misconception``, ``pose_question`` (when the engine
+        intends to re-pose the same item).
       * runtime_state.open_question is set.
       * pending_pose is set (the LLM used the tool channel this turn).
 
-    When all three hold AND the pending_pose's ``(source, id)`` differs
-    from the open question's ``(source, id)``, the gate fails. Other
-    cases are skipped: a ``pivot`` move is *meant* to introduce a new
-    item; a ``close_topic`` / ``worked_example`` / ``explain`` is
-    out-of-scope; a turn with no tool call has nothing to check; the
-    opening turn of a session has no open question.
+    Out of scope (explicitly NOT a stay-on-item move):
+      * ``confirm_and_extend`` — by contract this move ADVANCES after a
+        correct answer (Deliberate Practice — keep the next
+        problem at the edge of ability, not the middle). The "twist" is
+        a new bank slot on the same concept; treating it as
+        stay-on-item produced the GEO-S5 P1 cascade where every correct
+        rich answer fell back to a "let's slow down" terminal.
+      * ``pivot`` is meant to introduce a new item.
+      * ``close_topic`` / ``worked_example`` / ``explain`` advance or
+        teach; they are not probe-shaped.
+
+    When all three "active scope" conditions hold AND the pending_pose's
+    ``(source, id)`` differs from the open question's ``(source, id)``,
+    the gate fails. Other cases are skipped (turn with no tool call has
+    nothing to check; the opening turn of a session has no open
+    question).
     """
     with emit_span("audit", "conformance.open_question_stickiness") as span:
+        # IMPORTANT: ``confirm_and_extend`` is NOT in this list. Its
+        # contract is to ADVANCE on a correct answer (Deliberate
+        # Practice — keep the next problem at the edge of ability).
+        # Including it forced every correct-rich-answer turn into the
+        # "let's slow down" terminal (run-5 GEO-S5 P1 finding).
         probe_moves = (
             "scaffold_hint",
             "name_misconception",
-            "confirm_and_extend",
             "pose_question",
         )
         if selected_move not in probe_moves:

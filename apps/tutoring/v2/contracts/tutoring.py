@@ -116,6 +116,13 @@ class TutoringContext(BaseModel):
     # agnostic — empty for any step without these fields populated.
     current_step_teacher_script: str = ""
     current_step_worked_example: str = ""
+    # True when the active step is the final step of the lesson.
+    # Used by close_topic to phrase the transition correctly: more
+    # steps remaining → "let's move on to <next>"; final step → "you're
+    # ready for the exit ticket". Default True is the safe fallback for
+    # contexts that don't know (mid-session legacy / mocked tests) —
+    # treating a session as "final" never leaks half-done lessons.
+    is_final_step: bool = True
 
 
 class ProfileUpdate(BaseModel):

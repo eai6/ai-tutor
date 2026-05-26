@@ -359,8 +359,47 @@ class MathVerificationTool:
                     error="program has BOTH 'expression' and 'expressions'; pick one",
                 )
 
-            # Variable-binding check — structured first. Identical for
-            # single- and multi-slot programs.
+            # Structural validation FIRST — opcode whitelist + tree
+            # shape. A malformed program must be rejected on structural
+            # grounds before any contextual variable-binding check;
+            # otherwise a program with a bad opcode that happens to also
+            # have a missing variable binding is reported as a binding
+            # error rather than a whitelist failure, which masks the
+            # real bug and makes the security-relevant whitelist
+            # rejection silently invisible.
+            if expression is not None:
+                _validate_node(expression)
+            else:
+                if not isinstance(expressions, list) or not expressions:
+                    return MathVerificationResult(
+                        canonical_value=None,
+                        trace=trace,
+                        error="'expressions' must be a non-empty list",
+                    )
+                for idx, entry in enumerate(expressions):
+                    if not isinstance(entry, dict):
+                        return MathVerificationResult(
+                            canonical_value=None,
+                            trace=trace,
+                            error=(
+                                f"'expressions[{idx}]' must be an object "
+                                "with name + expression"
+                            ),
+                        )
+                    slot_expr = entry.get("expression")
+                    if slot_expr is None:
+                        return MathVerificationResult(
+                            canonical_value=None,
+                            trace=trace,
+                            error=(
+                                f"'expressions[{idx}]' missing 'expression'"
+                            ),
+                        )
+                    _validate_node(slot_expr)
+
+            # Variable-binding check — contextual, runs after structural
+            # validation has passed. Identical for single- and multi-slot
+            # programs.
             binding_error = _validate_variable_bindings(variables, problem_text)
             if binding_error is not None:
                 if self._llm_validator is not None:
@@ -378,36 +417,19 @@ class MathVerificationTool:
                         error=f"variable_bindings_invalid:{binding_error}",
                     )
 
-            # Single-slot path.
+            # Single-slot path — evaluate.
             if expression is not None:
-                _validate_node(expression)
                 value = _evaluate(expression, variables, trace)
                 return MathVerificationResult(canonical_value=value, trace=trace)
 
-            # Multi-slot path.
-            if not isinstance(expressions, list) or not expressions:
-                return MathVerificationResult(
-                    canonical_value=None,
-                    trace=trace,
-                    error="'expressions' must be a non-empty list",
-                )
+            # Multi-slot path — evaluate each slot. Structural
+            # validation already passed above; ``expressions`` here is
+            # guaranteed to be a non-empty list of dicts each with an
+            # ``expression`` sub-tree.
             slot_values: list[dict[str, Any]] = []
             for idx, entry in enumerate(expressions):
-                if not isinstance(entry, dict):
-                    return MathVerificationResult(
-                        canonical_value=None,
-                        trace=trace,
-                        error=f"expressions[{idx}] must be an object",
-                    )
-                node = entry.get("expression")
+                node = entry["expression"]  # structural pass guarantees presence
                 name = str(entry.get("name") or f"slot_{idx}").strip() or f"slot_{idx}"
-                if node is None:
-                    return MathVerificationResult(
-                        canonical_value=None,
-                        trace=trace,
-                        error=f"expressions[{idx}] missing 'expression'",
-                    )
-                _validate_node(node)
                 val = _evaluate(node, variables, trace)
                 slot_values.append({"name": name, "value": val})
             return MathVerificationResult(canonical_value=slot_values, trace=trace)

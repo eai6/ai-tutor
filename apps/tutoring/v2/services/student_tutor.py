@@ -566,13 +566,25 @@ class StudentTutor:
         """Compact header with the active objective + open question."""
         open_q = context.runtime_state.open_question
         objective = context.current_objective or "(no objective set)"
+        # Lesson position — the close_topic move uses this to phrase
+        # its transition correctly ("move on to next step" vs. "ready
+        # for exit ticket"). When unknown (legacy / test contexts) we
+        # surface the safe default so the tutor still reads as
+        # coherent.
+        position_hint = (
+            "this is the FINAL step of the lesson"
+            if context.is_final_step
+            else "more steps remain in the lesson after this one"
+        )
         if open_q is None:
             return (
                 f"=== Current objective ===\n{objective}\n"
+                f"Lesson position: {position_hint}\n"
                 f"Open question: (none)"
             )
         return (
             f"=== Current objective ===\n{objective}\n"
+            f"Lesson position: {position_hint}\n"
             f"Open question: {open_q.rendered_stem!r} "
             f"(source={open_q.source.value}, id={open_q.id})"
         )
