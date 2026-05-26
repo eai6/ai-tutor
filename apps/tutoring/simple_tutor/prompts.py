@@ -268,6 +268,27 @@ when you posed it.
 </role>
 
 <rules>
+- **REMEDIATION mode** — when an ``<exit_ticket_review>`` block is \
+present, the student has already submitted the exit ticket. Your job \
+shifts from lesson tutoring to TARGETED RE-TEACHING of the failing \
+``<missed_objectives>``. Treat each missed objective as a mini-step:
+    1. Pick one missed objective the student hasn't recovered yet.
+    2. Briefly re-explain the concept (1-3 sentences) using fresh \
+phrasing — do NOT just re-read the previous lesson script.
+    3. Call pose_question with a NEW question targeting that same \
+enabling_objective (you may adapt from <question_pool> or author \
+your own). Surface the stem + options in your text reply per the \
+POSE rules below.
+    4. Grade with record_answer as usual. On correct, move to the \
+next missed objective. On incorrect, hint per the ladder.
+  Skip objectives in ``<mastered_objectives>`` — the student already \
+demonstrated those. When all missed objectives are recovered (or the \
+student says they're done reviewing), call advance_step(reason="all \
+missed objectives recovered") to end the remediation. The \
+``<exit_ticket_review>`` block is the source of truth — do not \
+re-read it back to the student verbatim; use it to GUIDE your \
+re-teaching.
+
 - **Mode-switching via the in-flight slot.** Every turn you are in \
 one of two modes:
     * **GRADE mode** — the system prompt contains an \
@@ -433,6 +454,7 @@ def build_system_prompt(
     figures_enabled: bool = True,
     recent_window: 'list[SessionTurn] | None' = None,
     step_summaries: list[str] | None = None,
+    exit_ticket_review: dict | None = None,
 ) -> tuple[list[dict], list[dict]]:
     """Build the system prompt as cache-marked content blocks + the tool
     schemas.
@@ -521,6 +543,10 @@ def build_system_prompt(
     recent_text = _render_recent_turns_block(recent_window)
     if recent_text:
         dynamic_parts.append(recent_text)
+
+    review_text = _render_exit_ticket_review_block(exit_ticket_review)
+    if review_text:
+        dynamic_parts.append(review_text)
 
     in_flight_text = _render_in_flight_block(in_flight_question)
     if in_flight_text:
@@ -667,6 +693,70 @@ def _render_figure_catalog(figure_catalog: list[dict] | None) -> str:
             f'  <figure id="{fid}">{_escape_xml(desc.strip())}</figure>'
         )
     parts.append("</figure_catalog>")
+    return "\n".join(parts)
+
+
+def _render_exit_ticket_review_block(review: dict | None) -> str:
+    """Render the ``<exit_ticket_review>`` block — present only when
+    the student has submitted the exit ticket for this session.
+
+    Surfaces score, pass/fail, and the failing enabling objectives
+    (with a sample missed question + the student's wrong answer + the
+    reference) so the LLM can target remediation. Mastered objectives
+    are also listed so the LLM doesn't redundantly re-teach what the
+    student already knows.
+
+    When this block is present the LLM is in REMEDIATION mode (see
+    rules) — its job shifts from new-lesson tutoring to targeted
+    re-teaching of the missed sub-skills.
+    """
+    if not review:
+        return ""
+
+    parts = ["<exit_ticket_review>"]
+    score = int(review.get('score') or 0)
+    total = int(review.get('total') or 0)
+    passed = bool(review.get('passed'))
+    parts.append(
+        f'  <score>{score} of {total} '
+        f'({"passed" if passed else "below threshold"})</score>'
+    )
+
+    missed = review.get('missed_objectives') or []
+    if missed:
+        parts.append('  <missed_objectives>')
+        for i, m in enumerate(missed, start=1):
+            eo = _escape_xml((m.get('enabling_objective') or '').strip())
+            asked = int(m.get('asked') or 0)
+            correct = int(m.get('correct') or 0)
+            parts.append(f'    <objective index="{i}" asked="{asked}" correct="{correct}">')
+            parts.append(f'      <name>{eo}</name>')
+            stem = (m.get('sample_question') or '').strip()
+            if stem:
+                parts.append(
+                    f'      <sample_question>{_escape_xml(stem)}</sample_question>'
+                )
+            student = (m.get('student_answer') or '').strip()
+            if student:
+                parts.append(
+                    f'      <student_answer>{_escape_xml(student)}</student_answer>'
+                )
+            ref = (m.get('reference') or '').strip()
+            if ref:
+                parts.append(
+                    f'      <reference_answer>{_escape_xml(ref)}</reference_answer>'
+                )
+            parts.append('    </objective>')
+        parts.append('  </missed_objectives>')
+
+    mastered = review.get('mastered_objectives') or []
+    if mastered:
+        parts.append('  <mastered_objectives>')
+        for eo in mastered:
+            parts.append(f'    <objective>{_escape_xml(str(eo))}</objective>')
+        parts.append('  </mastered_objectives>')
+
+    parts.append("</exit_ticket_review>")
     return "\n".join(parts)
 
 

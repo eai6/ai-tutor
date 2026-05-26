@@ -25,10 +25,6 @@
                 </div>
                 <div class="participants-bar" id="participants-bar" style="display:flex;gap:0.35rem;align-items:center;flex-wrap:wrap;font-size:0.8rem;"></div>
             </div>
-            <div class="header-difficulty" id="header-difficulty">
-                <button class="difficulty-btn too-hard" id="btn-too-hard" onclick="sendDifficultySignal('too_hard')" title="This is too difficult for me">Too hard?</button>
-                <button class="difficulty-btn too-easy" id="btn-too-easy" onclick="sendDifficultySignal('too_easy')" title="This is too easy for me">Too easy?</button>
-            </div>
             <button class="audio-toggle" id="audio-toggle" onclick="toggleAudioMode()" title="Toggle audio mode">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
@@ -55,9 +51,10 @@
                 </svg>
             </button>
 
-            {% comment %}Mobile-only overflow menu — collapses Too hard / Too easy / Audio
-               into a single kebab button on narrow screens. The desktop
-               buttons above are hidden via CSS at <=640px.{% endcomment %}
+            {% comment %}Mobile-only overflow menu — collapses Audio /
+               other controls into a single kebab button on narrow
+               screens. The desktop buttons above are hidden via CSS
+               at <=640px.{% endcomment %}
             <button type="button"
                     class="header-kebab"
                     id="header-kebab"
@@ -72,12 +69,6 @@
                 </svg>
             </button>
             <div class="header-menu" id="header-menu" role="menu" hidden>
-                <button type="button" role="menuitem" onclick="closeHeaderMenu(); sendDifficultySignal('too_hard');">
-                    <span class="hm-emoji" aria-hidden="true">😣</span> Too hard
-                </button>
-                <button type="button" role="menuitem" onclick="closeHeaderMenu(); sendDifficultySignal('too_easy');">
-                    <span class="hm-emoji" aria-hidden="true">😎</span> Too easy
-                </button>
                 <button type="button" role="menuitem" onclick="closeHeaderMenu(); toggleAudioMode();">
                     <span class="hm-emoji" aria-hidden="true">🔊</span> Toggle audio
                 </button>
@@ -2739,8 +2730,12 @@ async function sendDifficultySignal(signal) {
 }
 
 function updateDifficultyButtons() {
-    document.getElementById('btn-too-easy').classList.toggle('active', currentDifficultyLevel > 0);
-    document.getElementById('btn-too-hard').classList.toggle('active', currentDifficultyLevel < 0);
+    // Buttons removed 2026-05-26 — system is dynamic on its own; left
+    // null-safe in case any caller survives.
+    const easy = document.getElementById('btn-too-easy');
+    const hard = document.getElementById('btn-too-hard');
+    if (easy) easy.classList.toggle('active', currentDifficultyLevel > 0);
+    if (hard) hard.classList.toggle('active', currentDifficultyLevel < 0);
 }
 
 function showDifficultyFeedback(label, signal) {

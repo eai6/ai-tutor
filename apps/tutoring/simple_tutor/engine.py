@@ -110,6 +110,11 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     # exists for the session, the LLM is in GRADE mode (its job is
     # to interpret the student's input against the persisted slot).
     # When no slot exists, the LLM is in TEACH/POSE mode.
+    #
+    # M13 remediation: when an ExitTicketAttempt exists for this
+    # session, the lesson is past the assessment and the LLM is in
+    # REMEDIATION mode — its job is to re-teach the failed enabling
+    # objectives surfaced in the attempt's per-question results.
     from apps.tutoring.models import InFlightQuestion
     in_flight = InFlightQuestion.objects.filter(session=session).first()
     step = _load_current_step(session)
@@ -119,11 +124,15 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     figures_enabled = _figures_enabled(session)
     recent_window = build_recent_window(session)
     step_summaries = step_summary_log(session)
+    exit_ticket_review = _build_exit_ticket_review(session)
 
+    if exit_ticket_review is not None:
+        mode = 'REMEDIATION+GRADE' if in_flight else 'REMEDIATION'
+    else:
+        mode = 'GRADE' if in_flight else 'POSE'
     logger.info(
         "[simple_tutor] mode=%s session=%s step=%s pool_size=%s",
-        'GRADE' if in_flight else 'POSE',
-        session.pk, session.current_step_index, len(question_pool),
+        mode, session.pk, session.current_step_index, len(question_pool),
     )
 
     # ─── 2. Build system prompt + tool schemas ────────────────────
@@ -138,6 +147,7 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         figures_enabled=figures_enabled,
         recent_window=recent_window,
         step_summaries=step_summaries,
+        exit_ticket_review=exit_ticket_review,
     )
 
     # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────
@@ -981,6 +991,105 @@ def _build_exit_ticket_payload(session) -> dict | None:
         'questions': exit_questions,
         'total': len(exit_questions),
         'passing_score': min(et.passing_score or 8, len(exit_questions)),
+    }
+
+
+def _build_exit_ticket_review(session) -> dict | None:
+    """Build a remediation-context payload from the most recent
+    ``ExitTicketAttempt`` for this session.
+
+    Returns ``None`` when the student hasn't submitted yet. When an
+    attempt exists, returns the score, pass/fail, and the per-question
+    breakdown grouped by enabling_objective so the system prompt can
+    surface the failing objectives explicitly. M13 remediation.
+
+    Schema (mirrors what the legacy engine persists at
+    ``ExitTicketAttempt.answers``):
+        {
+            'score': int, 'total': int, 'passed': bool,
+            'missed_objectives': [
+                {
+                    'enabling_objective': str,
+                    'asked': int, 'correct': int,
+                    'sample_question': str,        # one missed question stem
+                    'student_answer': str,         # what they typed
+                    'reference': str,              # correct letter/value
+                },
+                ...
+            ],
+            'mastered_objectives': [str, ...],   # EOs got 100% on
+        }
+    """
+    from apps.tutoring.models import ExitTicketAttempt, ExitTicketQuestion
+
+    attempt = (
+        ExitTicketAttempt.objects
+        .filter(session=session, completed_at__isnull=False)
+        .order_by('-completed_at')
+        .first()
+    )
+    if attempt is None:
+        return None
+
+    answers = attempt.answers or {}
+    per_question = answers.get('per_question') or []
+    eo_competency = answers.get('eo_competency') or {}
+
+    # If the persisted shape isn't what we expect (e.g. attempt from
+    # an older engine version), skip remediation context — better to
+    # fall back to plain POSE/TEACH mode than render a broken block.
+    if not per_question:
+        return None
+
+    # Group per_question by EO so we can name them in the prompt and
+    # pull a sample missed question for each one.
+    missed_objectives: list = []
+    mastered_objectives: list = []
+    for eo, bucket in eo_competency.items():
+        if not eo:
+            continue
+        asked = int(bucket.get('asked') or 0)
+        correct = int(bucket.get('correct') or 0)
+        if asked == 0:
+            continue
+        if correct >= asked:
+            mastered_objectives.append(eo)
+            continue
+        # Find a sample missed question for this EO.
+        sample_q = None
+        for entry in per_question:
+            if entry.get('enabling_objective') == eo and not entry.get('correct'):
+                sample_q = entry
+                break
+        sample_stem = ''
+        sample_student = ''
+        sample_ref = ''
+        if sample_q:
+            sample_student = str(sample_q.get('selected') or '')
+            # We need to look up the question text + correct answer
+            # from ExitTicketQuestion. failed_question_ids is in the
+            # bucket; pick the first.
+            failed_ids = bucket.get('failed_question_ids') or []
+            if failed_ids:
+                q = ExitTicketQuestion.objects.filter(pk=failed_ids[0]).first()
+                if q is not None:
+                    sample_stem = (q.question_text or '').strip()
+                    sample_ref = (q.correct_answer or '').strip()
+        missed_objectives.append({
+            'enabling_objective': eo,
+            'asked': asked,
+            'correct': correct,
+            'sample_question': sample_stem,
+            'student_answer': sample_student,
+            'reference': sample_ref,
+        })
+
+    return {
+        'score': int(attempt.score or 0),
+        'total': len(per_question),
+        'passed': bool(attempt.passed),
+        'missed_objectives': missed_objectives,
+        'mastered_objectives': mastered_objectives,
     }
 
 
