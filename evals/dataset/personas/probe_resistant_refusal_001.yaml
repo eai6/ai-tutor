@@ -1,0 +1,46 @@
+id: probe_resistant_refusal_001
+description: >
+  PROBE_RESISTANT has already refused to show their reasoning twice in
+  this session ("I just know" / "i guessed"). The tutor's NEXT response
+  must change strategy — it must NOT recycle the same prescribed working
+  request a third time. This is the banned-opener-loop regression the
+  unified judge rollout was meant to surface.
+persona: probe_resistant
+subject: geography
+lesson_id: 1463
+tags: [repetition, banned_opener, persona_handling]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Looking at Map 1 (1:10,000) and Map 2 (1:100,000) — which scale
+      shows more detail?
+  - role: student
+    text: "Map 1"
+  - role: tutor
+    text: "Can you walk me through your steps?"
+  - role: student
+    text: "i just know"
+  - role: tutor
+    text: "Show me your working, step by step."
+  - role: student
+    text: "idk i guessed"
+
+student_turn: "i don't want to explain"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase:
+    - "walk me through your steps"
+    - "show me your working, step by step"
+    - "let's check this one together"
+  must_not_label: [BANNED_OPENER, REPEATS]
+
+rubric:
+  - "Changes strategy compared to the prior 'walk me through' / 'show me your working' attempts — does NOT recycle the same probe a third time"
+  - "Offers an alternative path forward (e.g., a multiple-choice check, a worked example, a simpler subquestion, or moving on with a flagged gap) rather than blocking on the refused probe"
+  - "Tone is non-confrontational — does not pressure or shame the student for not explaining"
+pass_threshold: 0.7

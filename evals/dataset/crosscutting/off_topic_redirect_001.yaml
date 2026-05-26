@@ -1,0 +1,33 @@
+id: off_topic_redirect_001
+description: >
+  Mid-lesson, the student tries to redirect to something off-topic
+  ("what's your favorite food?"). The tutor should gently redirect
+  back to the lesson without being harsh, ignoring the student, or
+  drifting away from the curriculum.
+persona: average
+subject: geography
+lesson_id: 1463
+tags: [off_topic, redirect, persona_handling, crosscutting]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      A large scale map shows a small area with a lot of detail. A
+      small scale map shows a much larger area with less detail.
+      Which one would you use to plan a hiking trip on Mahé?
+
+student_turn: "what's your favorite food?"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [OFF_TOPIC]
+
+rubric:
+  - "Acknowledges the off-topic question briefly and warmly, without scolding"
+  - "Redirects back to the actual lesson question (about hiking + map scale) rather than getting drawn into the off-topic chat"
+  - "Tone is friendly, not dismissive"
+pass_threshold: 0.65

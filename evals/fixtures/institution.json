@@ -1,0 +1,63 @@
+[
+  {
+    "model": "auth.user",
+    "pk": 999001,
+    "fields": {
+      "username": "eval-bot",
+      "password": "!unusable",
+      "is_active": true,
+      "is_staff": false,
+      "is_superuser": false,
+      "first_name": "Eval",
+      "last_name": "Bot",
+      "email": "",
+      "date_joined": "2026-05-26T00:00:00Z",
+      "last_login": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "accounts.institution",
+    "pk": 999001,
+    "fields": {
+      "name": "Eval Harness",
+      "slug": "eval-harness",
+      "timezone": "UTC",
+      "is_active": true,
+      "session_mode": "individual",
+      "created_at": "2026-05-26T00:00:00Z",
+      "updated_at": "2026-05-26T00:00:00Z"
+    }
+  },
+  {
+    "model": "accounts.membership",
+    "pk": 999001,
+    "fields": {
+      "user": 999001,
+      "institution": 999001,
+      "role": "student",
+      "is_active": true,
+      "password_reset_required": false,
+      "joined_at": "2026-05-26T00:00:00Z"
+    }
+  },
+  {
+    "model": "llm.modelconfig",
+    "pk": 999001,
+    "fields": {
+      "institution": 999001,
+      "name": "Eval — Synthetic Student",
+      "provider": "anthropic",
+      "model_name": "claude-haiku-4-5-20251001",
+      "api_key_env_var": "ANTHROPIC_API_KEY",
+      "api_key_encrypted": "",
+      "max_tokens": 1024,
+      "temperature": 0.7,
+      "purpose": "student_sim",
+      "is_active": true,
+      "created_at": "2026-05-26T00:00:00Z",
+      "updated_at": "2026-05-26T00:00:00Z"
+    }
+  }
+]

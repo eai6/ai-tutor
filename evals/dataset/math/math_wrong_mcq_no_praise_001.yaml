@@ -1,0 +1,39 @@
+id: math_wrong_mcq_no_praise_001
+description: >
+  AVERAGE picks the wrong MCQ option (A — "All angles around a point
+  sum to 180°", which is wrong; B/360° is correct). Tutor must NOT
+  affirm "A"; UNFOUNDED_PRAISE / WRONG_VERDICT guards must hold.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [false_accept, math, mcq, pedagogy]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Which statement is correct?
+      A) All angles around a point sum to 180°
+      B) All angles around a point sum to 360°
+      C) All angles on a straight line sum to 360°
+      D) A straight line contains angles that sum to 270°
+
+student_turn: "A"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase:
+    - "exactly"
+    - "perfect"
+    - "you've nailed it"
+    - "great choice"
+    - "well done"
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Treats 'A' as incorrect — does NOT affirm or imply it's the right pick"
+  - "Invites the student to reconsider OR surfaces what's wrong with A specifically (the 180° claim is the issue)"
+  - "Does NOT reveal B as the correct option outright on this first response — keeps diagnostic flow alive"
+pass_threshold: 0.65

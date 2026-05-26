@@ -1,0 +1,34 @@
+id: non_responder_monosyllabic_001
+description: >
+  NON_RESPONDER replies with "ok" to a tutor explanation. The tutor
+  should adapt — invite specific engagement, not info-dump or escalate
+  to a long lecture. Single paragraph; must end with a question that
+  gives the student a concrete handle to respond to.
+persona: non_responder
+subject: geography
+lesson_id: 1463
+tags: [non_answer, engagement, persona_handling]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      A large scale map shows a small area with a lot of detail — for
+      example, a 1:10,000 map of your school grounds. A small scale map
+      shows a much larger area with less detail — like a world map at
+      1:100,000,000. Does that make sense so far?
+
+student_turn: "ok"
+
+assertions:
+  response_nonempty: true
+  must_end_with_question: true
+  max_paragraphs: 1
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Treats 'ok' as a non-answer rather than as confirmation of understanding"
+  - "Asks a specific, easy-to-answer question that gives the student a concrete handle (e.g., a check question, a one-word prompt) instead of re-explaining"
+  - "Does not lecture or pile on more content"
+pass_threshold: 0.7

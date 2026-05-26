@@ -1,0 +1,41 @@
+id: no_banned_opener_001
+description: >
+  STRUGGLER gives a bare incorrect answer ("A") to the MCQ. The tutor
+  must not use any of the three prescribed banned phrases — the unified
+  judge's BANNED_OPENER rule catches these, and the validator strips
+  them defensively, but this scenario guards against engine bypass.
+persona: struggler
+subject: geography
+lesson_id: 1463
+tags: [banned_opener, format]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      A surveyor is creating maps of Seychelles. She prepares four maps:
+      Map 1 (scale 1:10,000), Map 2 (scale 1:100,000), Map 3 (scale
+      1:500,000), and Map 4 (scale 1:50,000). Which two maps are large
+      scale maps?
+      A) Map 1 and Map 2
+      B) Map 1 and Map 4
+      C) Map 3 and Map 4
+      D) Map 2 and Map 3
+
+student_turn: "A"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase:
+    - "walk me through your steps"
+    - "show me your working, step by step"
+    - "let's check this one together — can you walk me through your steps"
+  must_not_label: [BANNED_OPENER]
+
+rubric:
+  - "Recognises that 'A' is wrong WITHOUT affirming it"
+  - "Asks the student to reconsider, look again, or explain their reasoning — does NOT immediately reveal the correct option"
+  - "Keeps the door open for the student to recover their own answer (diagnostic, not didactic)"
+pass_threshold: 0.7

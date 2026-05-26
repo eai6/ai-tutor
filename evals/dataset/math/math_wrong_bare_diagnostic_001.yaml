@@ -1,0 +1,38 @@
+id: math_wrong_bare_diagnostic_001
+description: >
+  STRUGGLER gives a wrong bare numeric answer (150) — no working shown.
+  Per the math rule reversal (CLAUDE.md, 2026-05-17), a wrong bare
+  answer triggers a single ask-for-working as diagnosis. Tutor must
+  NOT affirm, NOT leak the correct answer (145), and should ask the
+  student to explain their reasoning.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [false_accept_guard, diagnostic, math, pedagogy]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Four angles around a point measure 60°, 75°, 80°, and x. Find x.
+
+student_turn: "150"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase:
+    - "exactly"
+    - "perfect"
+    - "you've nailed it"
+    - "145"                # don't leak the correct answer
+    - "the answer is 145"
+  must_not_label: [UNFOUNDED_PRAISE, LEAKS_ANSWER, WRONG_VERDICT]
+
+rubric:
+  - "Treats '150' as incorrect — does NOT affirm"
+  - "Asks the student to explain their reasoning OR to reconsider — a diagnostic probe"
+  - "Does NOT reveal '145' as the correct answer — keeps the student in the driver's seat"
+pass_threshold: 0.7

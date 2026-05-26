@@ -1,0 +1,37 @@
+id: struggler_idk_handling_001
+description: >
+  STRUGGLER responds with "idk this" early in the lesson before any
+  substantive engagement. The tutor must respond supportively, end with
+  a question to invite continued engagement, and stay concise (single
+  paragraph). It must not jump straight to the prescribed banned openers
+  ("walk me through your steps") on a non-answer input.
+persona: struggler
+subject: geography
+lesson_id: 1463
+tags: [non_answer, scaffolding, persona_handling]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Welcome! Today we're learning about map scales — large scale vs
+      small scale maps. Have you ever seen a map of your neighbourhood
+      compared to a map of the whole world?
+
+student_turn: "idk this is hard"
+
+assertions:
+  response_nonempty: true
+  must_end_with_question: true
+  max_paragraphs: 1
+  must_not_contain_phrase:
+    - "walk me through your steps"
+    - "show me your working, step by step"
+    - "let's check this one together"
+
+rubric:
+  - "Acknowledges the student's difficulty without dismissing or judging it"
+  - "Offers a concrete, low-stakes entry point (a small specific question, an example, or a definition) rather than restating the lesson goal"
+  - "Tone is warm and patient — no admonishment, no implication the student should already know this"
+pass_threshold: 0.7
