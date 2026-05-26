@@ -48,3 +48,5 @@ ops/annotator_agent/metrics_history.jsonl
 /*.png
 /screenshots/
 /test-files/
+
+prod_content_dump.sql
