@@ -555,7 +555,7 @@ class StudentGrader:
             token = token_cache.issue(
                 session_id=context.session_id,
                 canonical=canonical,
-                visible_context=visible_context.model_dump(mode="json"),
+                visible_context_json=visible_context.model_dump_json(),
             )
             return token
 

@@ -41,15 +41,18 @@ Output a JSON object with exactly two top-level keys:
                be derivable from the problem statement; do not invent
                numbers that are not named or implied by the problem.
 
-  expression — a tree of operations. Each node has shape
-               {"op": "<opcode>", "args": [<node | var-name | number>]}.
+  expression — a tree of operations. Each node is ONE of:
+               * a bare number (e.g. 42, 3.14)
+               * a variable reference: {"var": "name"}
+               * an operation: {"op": "<opcode>", "args": [<node>, ...]}
+               * a solve: {"op": "solve", "equation": "<eq>", "var": "<name>"}
 
 Whitelisted opcodes: add, sub, mul, div, neg, abs, pow, sqrt, log,
 exp, sin, cos, tan, min, max, round, eq, lt, lte, gt, gte, solve.
 
-Use ``solve`` for equations: {"op": "solve", "args": ["<equation>", "<var>"]}.
-String args inside ``solve`` use sympy-compatible syntax
-(e.g. "2*x + 3 = 11").
+For ``solve``, use sympy-compatible syntax in ``equation``
+(e.g. "2*x + 3 = 11"). The ``var`` field names the variable to
+solve for.
 
 Return JSON only — no prose, no markdown fences.
 """
@@ -61,15 +64,15 @@ Return JSON only — no prose, no markdown fences.
 MATH_DSL_FEW_SHOT = """\
 Example 1
 Problem: What is 12 + 13?
-Output: {"variables": {"a": 12, "b": 13}, "expression": {"op": "add", "args": ["a", "b"]}}
+Output: {"variables": {"a": 12, "b": 13}, "expression": {"op": "add", "args": [{"var": "a"}, {"var": "b"}]}}
 
 Example 2
 Problem: The angles in a triangle sum to 180°. Two of the angles are 40° and 75°. What is the third angle?
-Output: {"variables": {"total": 180, "a": 40, "b": 75}, "expression": {"op": "sub", "args": ["total", "a", "b"]}}
+Output: {"variables": {"total": 180, "a": 40, "b": 75}, "expression": {"op": "sub", "args": [{"var": "total"}, {"var": "a"}, {"var": "b"}]}}
 
 Example 3
 Problem: Solve for x:  2x + 3 = 11.
-Output: {"variables": {}, "expression": {"op": "solve", "args": ["2*x + 3 = 11", "x"]}}
+Output: {"variables": {}, "expression": {"op": "solve", "equation": "2*x + 3 = 11", "var": "x"}}
 """
 
 
