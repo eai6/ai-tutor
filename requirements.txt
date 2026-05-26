@@ -139,6 +139,10 @@ sympy==1.14.0
 # secondary-school math).
 math-verify>=0.6.0
 latex2sympy2-extended>=1.0.0
+# Spoken-answer normalization for the math grader — students using TTS/STT
+# say "twenty" not "20", "one hundred and fifty degrees" not "150°". Pre-
+# processed before math-verify in apps/tutoring/simple_tutor/grader.py.
+word2number>=1.1
 tenacity==9.1.4
 threadpoolctl==3.6.0
 tokenizers==0.22.2
