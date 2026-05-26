@@ -211,11 +211,12 @@ class GradeAnswerDispatchTest(TestCase):
         self.assertEqual(r.verdict, Verdict.CORRECT)
 
     def test_unsupported_type_raises_not_implemented(self):
-        # 'matching' has no Tier-1 grader and isn't yet routed to the
-        # verifier LLM; should raise NotImplementedError. Update this
-        # test if matching support lands.
-        q = SimpleNamespace(question_type='matching')
-        with self.assertRaisesRegex(NotImplementedError, 'matching'):
+        # Every QuestionType.choices value is now supported by the grader
+        # stack (M2 MCQ, M3 math, M4 fill_in_blank + embed gate, M5
+        # verifier LLM, M5.5 matching). Use a deliberately fake type to
+        # verify the dispatcher's catch-all branch still raises.
+        q = SimpleNamespace(question_type='__not_a_real_type__')
+        with self.assertRaisesRegex(NotImplementedError, '__not_a_real_type__'):
             grade_answer(question=q, student_answer='something')
 
     def test_math_type_routes_to_math_grader(self):

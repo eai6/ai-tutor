@@ -123,7 +123,8 @@ def grade_answer(*, question, student_answer: str) -> GradeResult:
             return gate_result
         # M5 verifier LLM
         return _grade_verifier_llm(question, student_answer)
-    # Other question types (matching) route to verifier LLM directly in M5.
+    if qtype == 'matching':
+        return _grade_matching(question, student_answer)
     raise NotImplementedError(
         f"grade_answer: question_type={qtype!r} not yet supported."
     )
@@ -691,6 +692,180 @@ def _grade_fill_in_blank(question, student_answer) -> GradeResult:
         per_criterion_scores=per_blank,
         justification=f'0/{len(blanks)} blanks matched',
     )
+
+
+# ============================================================================
+# Tier 1 — Matching grader (M5.5)
+# ============================================================================
+#
+# Production shape:
+#   answer_data = {
+#       'pairs': [
+#           {'left': 'Sugarcane farming', 'right': 'Primary'},
+#           {'left': 'Sugar refinery',    'right': 'Secondary'},
+#           {'left': 'Tourism hotel',     'right': 'Tertiary'},
+#       ],
+#       'distractor_rights': ['Road construction', 'Fishing vessel operation'],
+#   }
+#
+# Student input shape (flexible):
+#   - List[str] of right-side values in the SAME ORDER as pairs[i].left
+#       e.g. ['Primary', 'Secondary', 'Tertiary']
+#   - Dict[str, str] left → right map (more robust to LLM extraction
+#       reordering): {'Sugarcane farming': 'Primary', ...}
+#   - JSON-like string of either form
+#
+# Grading:
+#   - All pairs correct → CORRECT
+#   - Some correct → PARTIAL with per-pair scores + needs_followup
+#   - None correct → INCORRECT
+#   - Wrong count → INCORRECT
+
+
+def _grade_matching(question, student_answer) -> GradeResult:
+    """Tier-1 deterministic matching grader.
+
+    Counts how many of the (left, right) pairs the student matched
+    correctly. Case-insensitive comparison on the right-side values.
+    Supports list-form (order matters) and dict-form (order-free)
+    student inputs.
+    """
+    answer_data = getattr(question, 'answer_data', None) or {}
+    if not isinstance(answer_data, dict):
+        answer_data = {}
+
+    pairs = answer_data.get('pairs') or []
+    if not pairs or not isinstance(pairs, list):
+        raise ValueError(
+            f"_grade_matching: question {getattr(question, 'pk', '?')} "
+            f"has no 'pairs' in answer_data."
+        )
+
+    # Parse student input — accept list, dict, or JSON-like string.
+    student_map = _parse_matching_answer(student_answer, pairs)
+    if student_map is None:
+        return GradeResult(
+            verdict=Verdict.INCORRECT,
+            confidence=1.0,
+            tier='matching',
+            justification=f'could not parse student answer: {str(student_answer)[:80]!r}',
+        )
+
+    correct = 0
+    per_pair: dict[str, float] = {}
+    for i, pair in enumerate(pairs):
+        if not isinstance(pair, dict):
+            continue
+        left = str(pair.get('left', '')).strip()
+        expected_right = str(pair.get('right', '')).strip().lower()
+        given_right = (student_map.get(left) or '').strip().lower()
+        ok = bool(expected_right) and given_right == expected_right
+        per_pair[f'pair_{i}_{left[:30]}'] = 1.0 if ok else 0.0
+        if ok:
+            correct += 1
+
+    total = len(pairs)
+    if total == 0:
+        # Defensive — shouldn't get here given the empty-pairs check above
+        return GradeResult(
+            verdict=Verdict.INCORRECT, confidence=1.0, tier='matching',
+            justification='no pairs to grade',
+        )
+
+    ratio = correct / total
+    if ratio == 1.0:
+        return GradeResult(
+            verdict=Verdict.CORRECT,
+            confidence=1.0,
+            tier='matching',
+            per_criterion_scores=per_pair,
+            justification=f'{correct}/{total} pairs correct',
+        )
+    if ratio > 0:
+        return GradeResult(
+            verdict=Verdict.PARTIAL,
+            confidence=0.9,
+            tier='matching',
+            per_criterion_scores=per_pair,
+            justification=f'{correct}/{total} pairs correct',
+            needs_followup=True,
+        )
+    return GradeResult(
+        verdict=Verdict.INCORRECT,
+        confidence=1.0,
+        tier='matching',
+        per_criterion_scores=per_pair,
+        justification=f'0/{total} pairs matched',
+    )
+
+
+def _parse_matching_answer(student_answer, pairs: list) -> dict[str, str] | None:
+    """Parse student answer into a ``{left_text: right_text}`` map.
+
+    Accepted input shapes:
+      - dict[str, str]            — direct map (preferred; LLM-friendly)
+      - list[str]                 — right-side values in pair order
+      - list[dict]                — list of {left, right} pair objects
+      - str (JSON of any above)   — fall back to json.loads
+      - str ("a -> b, c -> d")    — arrow-form
+
+    Returns None if parsing fails.
+    """
+    if student_answer is None:
+        return None
+
+    # Already a dict — use as-is.
+    if isinstance(student_answer, dict):
+        return {str(k): str(v) for k, v in student_answer.items()}
+
+    # List form.
+    if isinstance(student_answer, list):
+        # List of pair-dicts: [{'left': X, 'right': Y}, ...]
+        if all(isinstance(item, dict) for item in student_answer):
+            out = {}
+            for item in student_answer:
+                left = item.get('left')
+                right = item.get('right')
+                if left is not None and right is not None:
+                    out[str(left)] = str(right)
+            return out
+        # List of right-side values in pair order.
+        if len(student_answer) == len(pairs):
+            return {
+                str(pair.get('left', '')): str(student_answer[i])
+                for i, pair in enumerate(pairs)
+            }
+        return None
+
+    # String form.
+    text = str(student_answer).strip()
+    if not text:
+        return None
+
+    # Try JSON
+    if text.startswith(('{', '[')):
+        try:
+            import json
+            parsed = json.loads(text)
+            return _parse_matching_answer(parsed, pairs)
+        except (ValueError, TypeError):
+            pass
+
+    # Arrow form: "Sugarcane farming -> Primary, Sugar refinery -> Secondary"
+    if '->' in text or '→' in text:
+        out = {}
+        # Split on comma or newline
+        for chunk in re.split(r'[,\n]', text):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            # Split on -> or →
+            parts = re.split(r'\s*(?:->|→)\s*', chunk, maxsplit=1)
+            if len(parts) == 2:
+                out[parts[0].strip()] = parts[1].strip()
+        return out if out else None
+
+    return None
 
 
 # ============================================================================
