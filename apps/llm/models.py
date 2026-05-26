@@ -164,6 +164,19 @@ class ModelConfig(models.Model):
         CONTENT_JUDGE_PEDAGOGY_STEP = 'content_judge_pedagogy_step', 'Content Judge — Pedagogical Soundness (Lesson Step)'
         CONTENT_JUDGE_SAFETY_CONTENT = 'content_judge_safety_content', 'Content Judge — Safety + Cultural Fit (Content)'
 
+        # v2 engine purposes (refactor-implementation-plan.md Phase 1
+        # §7). Six new purposes for the grader / tutor / conformance /
+        # profiler decomposition. GRADER_GROUNDED + TUTOR_CLAIM_ADJUDICATOR
+        # MUST be Gemini (Google-grounding is provider-required). The
+        # other four are provider-tuned during Phase 2 against the
+        # benchmark (§7 sub-decision).
+        GRADER_MATH = 'grader_math', 'v2 Grader — Math Path'
+        GRADER_GROUNDED = 'grader_grounded', 'v2 Grader — Grounded (KB + Google) — Gemini-pinned'
+        TUTOR_MOVE = 'tutor_move', 'v2 StudentTutor — Per-Move Response'
+        CONFORMANCE_CLASSIFIER = 'conformance_classifier', 'v2 Conformance Classifier'
+        TUTOR_CLAIM_ADJUDICATOR = 'tutor_claim_adjudicator', 'v2 Tutor-Claim Adjudicator — Gemini-pinned'
+        PROFILER_SUMMARY = 'profiler_summary', 'v2 StudentProfiler — End-of-Session Summary'
+
     institution = models.ForeignKey(
         Institution,
         on_delete=models.CASCADE,
@@ -261,6 +274,21 @@ class ModelConfig(models.Model):
         # future content_judge_* purposes inherit the rule automatically.
         if purpose.startswith('content_judge'):
             return self.JUDGE_TEMP
+        # v2 engine — JUDGE-class verification consistency (Phase 1 §7).
+        # GRADER_MATH / GRADER_GROUNDED / CONFORMANCE_CLASSIFIER /
+        # TUTOR_CLAIM_ADJUDICATOR all want deterministic verdicts.
+        # PROFILER_SUMMARY is also 0 (memory artifact, not creative).
+        if purpose in (
+            self.Purpose.GRADER_MATH.value,
+            self.Purpose.GRADER_GROUNDED.value,
+            self.Purpose.CONFORMANCE_CLASSIFIER.value,
+            self.Purpose.TUTOR_CLAIM_ADJUDICATOR.value,
+            self.Purpose.PROFILER_SUMMARY.value,
+        ):
+            return self.JUDGE_TEMP
+        # v2 TUTOR_MOVE — TUTORING-class clamp [0.1, 0.3].
+        if purpose == self.Purpose.TUTOR_MOVE.value:
+            return max(0.1, min(0.3, temp))
         if purpose == self.Purpose.TUTORING.value:
             return max(self.TUTORING_TEMP_MIN, min(self.TUTORING_TEMP_MAX, temp))
         return temp

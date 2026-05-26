@@ -734,6 +734,19 @@ def chat_start_session(request, lesson_id):
     if existing:
         # Resume active session — include conversation history
         session = existing
+        # v2 dispatch (sticky-per-session). Phase 1 only ensures the
+        # engine_version is read; routing back to legacy is the
+        # default for sessions started before the new engine landed.
+        from apps.tutoring.v2.routing import (
+            ensure_engine_version_set,
+            is_v2_session,
+            v2_placeholder_response,
+        )
+        ensure_engine_version_set(session)
+        if is_v2_session(session):
+            payload = v2_placeholder_response(session, kind="resume")
+            payload["history"] = _build_session_history(session)
+            return JsonResponse(payload)
         history = _build_session_history(session)
         tutor = ConversationalTutor(session)
         response = tutor.resume()
@@ -849,6 +862,18 @@ def chat_start_session(request, lesson_id):
             },
         )
 
+        # v2 dispatch — set the sticky engine_version field for this
+        # brand-new session. NEW_TUTOR=off (default) routes to legacy;
+        # NEW_TUTOR=on routes to v2 and initializes runtime_state.
+        from apps.tutoring.v2.routing import (
+            ensure_engine_version_set,
+            is_v2_session,
+            v2_placeholder_response,
+        )
+        ensure_engine_version_set(session)
+        if is_v2_session(session):
+            return JsonResponse(v2_placeholder_response(session, kind="start"))
+
         tutor = ConversationalTutor(session)
         response = tutor.start()
 
@@ -947,6 +972,15 @@ def chat_respond(request, session_id):
         id=session_id,
         student=request.user,
     )
+
+    # v2 dispatch (sticky-per-session). Phase 1: route v2 sessions
+    # to the placeholder; Phase 2 wires TutorEngine.respond() here.
+    from apps.tutoring.v2.routing import (
+        is_v2_session,
+        v2_placeholder_response,
+    )
+    if is_v2_session(session):
+        return JsonResponse(v2_placeholder_response(session, kind="respond"))
 
     # Check if student is suspended
     try:
@@ -1202,6 +1236,17 @@ def chat_start_review(request, session_id):
         id=session_id,
         student=request.user,
     )
+
+    # v2 dispatch (sticky-per-session). Phase 1: route v2 sessions
+    # to the placeholder.
+    from apps.tutoring.v2.routing import (
+        is_v2_session,
+        v2_placeholder_response,
+    )
+    if is_v2_session(session):
+        payload = v2_placeholder_response(session, kind="review")
+        payload["artifact_html"] = None
+        return JsonResponse(payload)
 
     tutor = ConversationalTutor(session)
     result = tutor.start_review()

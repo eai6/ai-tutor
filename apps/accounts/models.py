@@ -284,6 +284,30 @@ class StudentProfile(models.Model):
     skills_snapshot = models.JSONField(default=dict, blank=True)
     skills_snapshot_updated_at = models.DateTimeField(null=True, blank=True)
 
+    # v2 profiler artifacts (Phase 1 §3 of the refactor implementation
+    # plan). Written end-of-session by StudentProfiler in Phase 3; read
+    # by the tool-boundary cross-session repeat guard in Phase 2.
+    #
+    #   profile_summary: qualitative recall (strengths, struggles,
+    #     misconceptions named, examples shown). Free-text.
+    #   asked_questions: structured map keyed by "{source}:{id}"
+    #     composite per §4.1; values {last_asked_at: iso8601}. Drives
+    #     cross_session_repeat_guard() (apps/tutoring/v2/tools/
+    #     repeat_guards.py). Capped at last 500 entries with LRU
+    #     eviction.
+    profile_summary = models.TextField(
+        default='',
+        blank=True,
+        help_text="Qualitative recall of the student's strengths / struggles / "
+                  "examples shown, written by StudentProfiler at end-of-session.",
+    )
+    asked_questions = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Structured map keyed by "{source}:{id}" (e.g. "exit_ticket_question:7"); '
+                  'values {last_asked_at: iso8601}. Drives cross-session repeat avoidance.',
+    )
+
     # Platform terms acceptance — version of `PlatformTerms` the student
     # most recently accepted. When `PlatformTerms.active().version` is
     # higher than this, the next login routes through `/terms/accept/`.
