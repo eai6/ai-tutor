@@ -33,6 +33,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from apps.tutoring.tracing import emit_span
+
 logger = logging.getLogger(__name__)
 
 
@@ -139,51 +141,69 @@ def run_conformance_classifier(
     shipping unchecked content (we choose to fall back to "the rules
     look unsatisfied" rather than to "all clear").
     """
-    if llm_client is None:
-        from apps.tutoring.v2.services.student_grader import (
-            _build_client_for_purpose,
-        )
-        llm_client = _build_client_for_purpose("conformance_classifier")
-    if llm_client is None:
-        logger.warning(
-            "[ConformanceClassifier] no CONFORMANCE_CLASSIFIER client "
-            "available — returning conservative default labels"
-        )
-        return ClassifierLabels()
+    with emit_span("audit", "conformance.classifier") as span:
+        if llm_client is None:
+            from apps.tutoring.v2.services.student_grader import (
+                _build_client_for_purpose,
+            )
+            llm_client = _build_client_for_purpose("conformance_classifier")
+        if llm_client is None:
+            logger.warning(
+                "[ConformanceClassifier] no CONFORMANCE_CLASSIFIER client "
+                "available — returning conservative default labels"
+            )
+            if span is not None:
+                span["payload"] = {"outcome": "skipped", "reason": "no_client"}
+            return ClassifierLabels()
 
-    try:
-        response = llm_client.generate(
-            messages=[
-                {
-                    "role": "user",
-                    "content": _render_user_prompt(
-                        candidate_response=candidate_response,
-                        prior_student_turn=prior_student_turn,
-                    ),
-                },
-            ],
-            system_prompt=CLASSIFIER_SYSTEM,
-            max_tokens=400,
-        )
-        payload = _safe_json_loads(response.content or "") or {}
-    except Exception as exc:
-        logger.warning(
-            "[ConformanceClassifier] LLM call raised %s — conservative default",
-            type(exc).__name__,
-        )
-        return ClassifierLabels()
+        try:
+            response = llm_client.generate(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": _render_user_prompt(
+                            candidate_response=candidate_response,
+                            prior_student_turn=prior_student_turn,
+                        ),
+                    },
+                ],
+                system_prompt=CLASSIFIER_SYSTEM,
+                max_tokens=400,
+            )
+            payload = _safe_json_loads(response.content or "") or {}
+        except Exception as exc:
+            logger.warning(
+                "[ConformanceClassifier] LLM call raised %s — conservative default",
+                type(exc).__name__,
+            )
+            if span is not None:
+                span["payload"] = {
+                    "outcome": "fail_soft",
+                    "reason": type(exc).__name__,
+                }
+            return ClassifierLabels()
 
-    if not isinstance(payload, dict):
-        return ClassifierLabels()
-    # Coerce missing / non-bool values to False conservatively.
-    fields: dict[str, Any] = {}
-    for key in ClassifierLabels.model_fields:
-        raw = payload.get(key)
-        fields[key] = bool(raw) if raw is not None else False
-    try:
-        return ClassifierLabels(**fields)
-    except Exception:
-        return ClassifierLabels()
+        if not isinstance(payload, dict):
+            if span is not None:
+                span["payload"] = {"outcome": "fail_soft", "reason": "non_dict_payload"}
+            return ClassifierLabels()
+        # Coerce missing / non-bool values to False conservatively.
+        fields: dict[str, Any] = {}
+        for key in ClassifierLabels.model_fields:
+            raw = payload.get(key)
+            fields[key] = bool(raw) if raw is not None else False
+        try:
+            labels = ClassifierLabels(**fields)
+        except Exception:
+            if span is not None:
+                span["payload"] = {"outcome": "fail_soft", "reason": "coerce_failed"}
+            return ClassifierLabels()
+        if span is not None:
+            span["payload"] = {
+                "outcome": "ok",
+                "labels": labels.model_dump(),
+            }
+        return labels
 
 
 def _safe_json_loads(text: str) -> Optional[Any]:

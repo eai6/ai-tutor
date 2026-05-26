@@ -200,6 +200,14 @@ class TutorEngine:
                     runtime_state.attempts_on_open_question = 0
                 else:
                     runtime_state.attempts_on_open_question += 1
+                # Bare-answer signal counter (Phase 2 §2.1.1). Counter
+                # lives on runtime_state for future tuning; not consumed
+                # by move selection or move prompts.
+                if verdict.bare_answer:
+                    key = (context.current_objective or "_").strip() or "_"
+                    runtime_state.bare_answer_counts_by_objective[key] = (
+                        runtime_state.bare_answer_counts_by_objective.get(key, 0) + 1
+                    )
             except Exception as exc:
                 logger.warning(
                     "[TutorEngine] grader raised %s — proceeding as unverified",

@@ -19,6 +19,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
+from apps.tutoring.tracing import emit_span
 from apps.tutoring.v2.contracts import (
     OpenQuestion,
     PendingPose,
@@ -78,33 +79,41 @@ class ContextManager:
         # Local import to avoid circular import at module load.
         from apps.tutoring.v2.tools.token_cache import token_cache
 
-        if pending.token:
-            # Atomic single-use consumption — raises if already
-            # consumed or unknown.
-            token_cache.consume(self.session.id, pending.token)
+        with emit_span("audit", "tool.commit") as span:
+            if pending.token:
+                # Atomic single-use consumption — raises if already
+                # consumed or unknown.
+                token_cache.consume(self.session.id, pending.token)
 
-        state = self.load_runtime_state()
+            state = self.load_runtime_state()
 
-        now = datetime.now(timezone.utc)
-        ledger_entry = PosedQuestionLedgerEntry(
-            source=pending.question_ref.source,
-            id=pending.question_ref.id,
-            jaccard_signature=pending.jaccard_signature,
-            posed_at=now,
-        )
-        state.posed_question_ledger.append(ledger_entry)
-        state.open_question = OpenQuestion(
-            source=pending.question_ref.source,
-            id=pending.question_ref.id,
-            canonical=pending.canonical,
-            rendered_stem=pending.rendered_stem,
-            jaccard_signature=pending.jaccard_signature,
-            visible_context_at_pose=pending.visible_context,
-            posed_at=now,
-        )
-        state.attempts_on_open_question = 0
-        self.save_runtime_state(state)
-        return state
+            now = datetime.now(timezone.utc)
+            ledger_entry = PosedQuestionLedgerEntry(
+                source=pending.question_ref.source,
+                id=pending.question_ref.id,
+                jaccard_signature=pending.jaccard_signature,
+                posed_at=now,
+            )
+            state.posed_question_ledger.append(ledger_entry)
+            state.open_question = OpenQuestion(
+                source=pending.question_ref.source,
+                id=pending.question_ref.id,
+                canonical=pending.canonical,
+                rendered_stem=pending.rendered_stem,
+                jaccard_signature=pending.jaccard_signature,
+                visible_context_at_pose=pending.visible_context,
+                posed_at=now,
+            )
+            state.attempts_on_open_question = 0
+            self.save_runtime_state(state)
+            if span is not None:
+                span["payload"] = {
+                    "source": pending.question_ref.source,
+                    "question_id": pending.question_ref.id,
+                    "token_consumed": bool(pending.token),
+                    "ledger_size": len(state.posed_question_ledger),
+                }
+            return state
 
     # ------------------------------------------------------------------
     # TutoringContext assembly (Phase 2 §2.7)
