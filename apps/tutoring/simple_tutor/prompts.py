@@ -217,9 +217,7 @@ mean?"), respond directly with an explanation. Do NOT call record_answer.
 understanding, call advance_step(reason). This is a soft hint — the \
 platform also auto-advances when warranted.
 
-- Reference pre-generated figures only via request_figure(figure_id) \
-using ids from <figure_catalog>. Do not invent figure ids or describe \
-figures that aren't in the catalog.
+{FIGURE_RULE}
 
 - After two consecutive off-topic turns, call redirect_off_topic.
 
@@ -247,6 +245,7 @@ def build_system_prompt(
     current_question=None,
     kb_chunks: list[dict] | None = None,
     figure_catalog: list[dict] | None = None,
+    figures_enabled: bool = True,
     recent_window: 'list[SessionTurn] | None' = None,
     step_summaries: list[str] | None = None,
 ) -> tuple[list[dict], list[dict]]:
@@ -268,7 +267,12 @@ def build_system_prompt(
         kb_chunks: top-K retrieved KB chunks for this turn (from
             query_with_global_fallback).
         figure_catalog: list of pre-generated figures for the current
-            step ({'id': int, 'description': str}).
+            step ({'id': int, 'description': str}). Ignored when
+            figures_enabled=False.
+        figures_enabled: per-course flag (Course.tutoring_images_enabled).
+            When False: figure_catalog is suppressed, the figure-related
+            rules in <rules> are omitted, AND request_figure is removed
+            from the returned tools list (no affordance for the LLM).
         recent_window: last N SessionTurns of this step, oldest → newest.
         step_summaries: one-line summary per completed step.
 
@@ -290,15 +294,31 @@ def build_system_prompt(
     blocks: list[dict] = []
 
     # ── Block 0 — static per conversation ──────────────────────────
+    # The FIGURE_RULE placeholder switches based on figures_enabled.
+    if figures_enabled:
+        figure_rule = (
+            "- Reference pre-generated figures only via request_figure(figure_id) "
+            "using ids from <figure_catalog>. Do not invent figure ids or describe "
+            "figures that aren't in the catalog."
+        )
+    else:
+        figure_rule = (
+            "- This lesson has IMAGES DISABLED. Do not mention figures, diagrams, "
+            "images, or visuals. Describe concepts in prose. The request_figure "
+            "tool is unavailable on this lesson."
+        )
+    block_0_text = _BLOCK_1_TEMPLATE.replace('{FIGURE_RULE}', figure_rule)
     blocks.append({
         "type": "text",
-        "text": _BLOCK_1_TEMPLATE,
+        "text": block_0_text,
         "cache_control": {"type": "ephemeral"},
     })
 
     # ── Block 1 — static per step (changes only when step advances) ─
+    # Suppress figure_catalog when figures are disabled for this lesson.
+    effective_figure_catalog = figure_catalog if figures_enabled else None
     step_text = _render_current_step_block(
-        step, current_question, figure_catalog,
+        step, current_question, effective_figure_catalog,
     )
     if step_text:
         blocks.append({
@@ -330,7 +350,17 @@ def build_system_prompt(
             # it would just register writes (1.25× cost) for no hits.
         })
 
-    return blocks, TOOL_SCHEMAS
+    # When figures are disabled for this lesson, remove the
+    # request_figure tool from the available set. The LLM doesn't see
+    # the affordance, so it can't call it.
+    if figures_enabled:
+        tools_for_llm = TOOL_SCHEMAS
+    else:
+        tools_for_llm = [
+            t for t in TOOL_SCHEMAS if t['name'] != 'request_figure'
+        ]
+
+    return blocks, tools_for_llm
 
 
 # ============================================================================

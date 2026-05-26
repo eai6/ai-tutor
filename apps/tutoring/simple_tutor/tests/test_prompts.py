@@ -531,3 +531,56 @@ class EndToEndShapeTest(TestCase):
         )
         self.assertGreaterEqual(len(blocks), 2)
         self.assertIn('<current_question status="none"/>', blocks[1]['text'])
+
+
+class FiguresDisabledTest(TestCase):
+    """When Course.tutoring_images_enabled=False, the system prompt must
+    NOT carry figure catalog, the figure rule changes to a no-figures
+    instruction, AND the request_figure tool is dropped from the
+    returned tools list (no affordance).
+    """
+
+    def test_request_figure_tool_omitted_when_disabled(self):
+        _, tools = build_system_prompt(
+            session=_session(), step=_step(),
+            figures_enabled=False,
+        )
+        names = {t['name'] for t in tools}
+        self.assertNotIn('request_figure', names)
+        # Other tools still present
+        self.assertIn('record_answer', names)
+        self.assertIn('advance_step', names)
+        self.assertIn('redirect_off_topic', names)
+
+    def test_request_figure_tool_present_when_enabled(self):
+        _, tools = build_system_prompt(
+            session=_session(), step=_step(),
+            figures_enabled=True,
+        )
+        names = {t['name'] for t in tools}
+        self.assertIn('request_figure', names)
+
+    def test_rule_text_swapped_when_disabled(self):
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(),
+            figures_enabled=False,
+        )
+        block0 = blocks[0]['text']
+        # No "request_figure" mentioned in the rules
+        self.assertNotIn('request_figure(figure_id)', block0)
+        # Instead: IMAGES DISABLED instruction
+        self.assertIn('IMAGES DISABLED', block0)
+
+    def test_figure_catalog_suppressed_when_disabled(self):
+        blocks, tools = build_system_prompt(
+            session=_session(), step=_step(),
+            figure_catalog=[{'id': 5, 'description': 'should not show'}],
+            figures_enabled=False,
+        )
+        # Step block (1) should not include the figure descriptions
+        step_block = blocks[1]['text']
+        self.assertNotIn('should not show', step_block)
+        # The self-closing tag is fine since figure_catalog→None
+        self.assertIn('<figure_catalog/>', step_block)
+        # Double-check request_figure is also dropped from tools
+        self.assertNotIn('request_figure', {t['name'] for t in tools})

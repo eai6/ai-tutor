@@ -109,22 +109,20 @@ def pick_current_question(session: 'TutorSession'):
     )
 
 
-def _current_step_questions_remaining(session: 'TutorSession') -> bool:
-    """STRICT check used by maybe_advance_step: are there any un-graded
-    questions matching the CURRENT step's enabling_objective?
+def _current_step_correct_verdict_count(session: 'TutorSession') -> int:
+    """Count CORRECT grader verdicts on the current step's objective.
 
-    Distinct from ``pick_current_question`` (which falls back to
-    lesson-wide pool). This function returns True ONLY when there's
-    an objective-matching question still un-graded. When the current
-    step's objective is empty / has no questions at all, returns False
-    (treat as "step has no evaluation; ready to advance").
+    Used by maybe_advance_step to decide "is the student demonstrating
+    competence?" Per user direction: competence isn't "answered all
+    questions" — it's "demonstrated enough correct understanding".
+    One or two correct answers on an objective can be sufficient.
     """
-    from apps.tutoring.models import ExitTicketQuestion
     from apps.curriculum.models import LessonStep
+    from apps.tutoring.models import ExitTicketQuestion
 
     lesson = getattr(session, 'lesson', None)
     if lesson is None:
-        return False
+        return 0
 
     current_idx = session.current_step_index or 0
     step = (
@@ -133,23 +131,39 @@ def _current_step_questions_remaining(session: 'TutorSession') -> bool:
         .first()
     )
     if step is None:
-        return False
+        return 0
 
     objective = (getattr(step, 'enabling_objective', '') or '').strip()
     if not objective:
-        # No objective → no questions strictly tied to this step
-        return False
+        return 0
 
-    graded_qids = _graded_question_ids(session)
-    return (
+    # Question ids tied to this step's objective
+    objective_qids = set(
         ExitTicketQuestion.objects
         .filter(
             exit_ticket__lesson=lesson,
             enabling_objective=objective,
         )
-        .exclude(pk__in=graded_qids)
-        .exists()
+        .values_list('pk', flat=True)
     )
+    if not objective_qids:
+        return 0
+
+    # Walk this session's turns; count CORRECT verdicts where the
+    # graded question_id is in this objective's set.
+    count = 0
+    for jo in (
+        session.turns.exclude(judge_outputs={})
+        .values_list('judge_outputs', flat=True)
+    ):
+        if not isinstance(jo, dict):
+            continue
+        grader = jo.get('grader')
+        if not isinstance(grader, dict):
+            continue
+        if grader.get('question_id') in objective_qids and grader.get('verdict') == 'correct':
+            count += 1
+    return count
 
 
 def _graded_question_ids(session: 'TutorSession') -> set:
@@ -275,8 +289,31 @@ def handle_request_figure(
     Invalid id (not in the step's StepMedia catalog) returns an error
     dict — never raises. The engine still renders the LLM's text
     response, just without the figure.
+
+    When figures are disabled on the course (course.tutoring_images_enabled
+    is False), returns an error dict even if the LLM somehow has the
+    tool available (e.g., from cached prompt before the flag flipped).
     """
     from apps.curriculum.models import LessonStep
+
+    # First defense: figures disabled on the course
+    lesson = getattr(session, 'lesson', None)
+    course = (
+        getattr(getattr(lesson, 'unit', None), 'course', None)
+        if lesson is not None else None
+    )
+    images_enabled = getattr(course, 'tutoring_images_enabled', True)
+    if not images_enabled:
+        logger.warning(
+            "handle_request_figure: figures disabled on course "
+            "(session=%s figure_id=%s) — refusing",
+            session.pk, figure_id,
+        )
+        return {
+            'displayed': False,
+            'error': 'figures are disabled for this lesson',
+        }
+
     try:
         from apps.media_library.models import StepMedia
     except ImportError:
@@ -543,27 +580,34 @@ def auto_grade_if_missed(
 # ============================================================================
 
 
+DEFAULT_COMPETENCE_THRESHOLD = 1   # number of CORRECT verdicts to call it
+
+
 def maybe_advance_step(
     session: 'TutorSession',
     *,
     turn_cap: int = DEFAULT_STEP_TURN_CAP,
+    competence_threshold: int = DEFAULT_COMPETENCE_THRESHOLD,
 ) -> bool:
     """Soft, automatic step advancement called after each engine turn.
 
-    Two triggers (in order):
+    The PRIMARY signal is the LLM's ``advance_step(reason)`` tool call
+    (handled by ``handle_advance_step``). This function only fires the
+    SAFETY NETS for when the LLM never calls it:
 
-    1. **Objective complete** — all questions for the current step's
-       ``enabling_objective`` have a recorded verdict. The step's
-       evaluation is done, so move on.
+    1. **Competence demonstrated** — the student has at least
+       ``competence_threshold`` CORRECT verdicts on the current step's
+       objective (default 1). Per user direction: a step doesn't require
+       ALL questions answered — 1-2 correct attempts can be enough.
+       The engine advances regardless.
 
     2. **Soft turn cap** — student has had ``turn_cap`` turns on the
-       same step without the LLM hinting via ``advance_step``. Move on
-       anyway with ``forced=True`` logged. Prevents the tutor from
-       getting stuck on a step forever.
+       current step regardless of verdicts. Force-advance with
+       ``forced=True`` logged. Prevents the tutor from getting stuck on
+       a step forever.
 
-    The LLM's own ``advance_step`` tool call (M8 ``handle_advance_step``)
-    is the FAST path — this function is the SAFETY NET for when the
-    LLM doesn't call it.
+    Both triggers respect idempotency (won't advance past the last
+    step).
 
     Returns True if the session moved.
     """
@@ -585,23 +629,25 @@ def maybe_advance_step(
     if current_step is None:
         return False
 
-    # Trigger 1 — current step's objective-matching questions are
-    # all graded (STRICT check via _current_step_questions_remaining,
-    # which does NOT fall back to lesson-wide pool).
     forced = False
-    if _current_step_questions_remaining(session):
-        # Still have ungraded objective-matching questions — check the
-        # soft turn cap. Count student turns on the CURRENT step using
-        # the SessionTurn.step FK.
+
+    # Trigger 1 — competence demonstrated. Threshold is per-call (LOW
+    # default of 1 correct verdict; engine/caller can raise per-step).
+    correct_count = _current_step_correct_verdict_count(session)
+    if correct_count >= competence_threshold:
+        pass   # advance
+    else:
+        # Trigger 2 — soft turn cap. Count student turns on the CURRENT
+        # step via the SessionTurn.step FK.
         try:
             this_step_turns = session.turns.filter(
                 step=current_step, role='student',
             ).count()
-            if this_step_turns < turn_cap:
-                return False
-            forced = True
         except Exception:
             return False
+        if this_step_turns < turn_cap:
+            return False
+        forced = True
 
     # Compute next step index
     next_idx = current_idx + 1

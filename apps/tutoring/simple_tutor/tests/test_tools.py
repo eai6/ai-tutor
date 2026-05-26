@@ -20,6 +20,7 @@ from apps.tutoring.models import (
     ExitTicket, ExitTicketQuestion, SessionTurn, TutorSession,
 )
 from apps.tutoring.simple_tutor.tools import (
+    DEFAULT_COMPETENCE_THRESHOLD,
     DEFAULT_STEP_TURN_CAP,
     auto_grade_if_missed,
     handle_advance_step,
@@ -28,6 +29,7 @@ from apps.tutoring.simple_tutor.tools import (
     handle_redirect_off_topic,
     maybe_advance_step,
     pick_current_question,
+    _current_step_correct_verdict_count,
     _looks_like_answer_attempt,
 )
 
@@ -217,6 +219,19 @@ class HandleRequestFigureTest(DjangoTestCase):
         except Exception as exc:
             self.fail(f"handle_request_figure raised: {exc!r}")
 
+    def test_figures_disabled_on_course_refuses(self):
+        """When Course.tutoring_images_enabled=False, handler returns
+        error dict regardless of valid figure_id. Prevents the LLM
+        from leaking figure references when the course turned them off.
+        """
+        session, _ = _make_session()
+        course = session.lesson.unit.course
+        course.tutoring_images_enabled = False
+        course.save(update_fields=['tutoring_images_enabled'])
+        r = handle_request_figure(session, figure_id=42)
+        self.assertFalse(r['displayed'])
+        self.assertIn('disabled', r['error'].lower())
+
 
 # ============================================================================
 # handle_redirect_off_topic
@@ -385,36 +400,57 @@ class HandleAdvanceStepTest(DjangoTestCase):
 
 
 class MaybeAdvanceStepTest(DjangoTestCase):
-    """Server-driven auto-advance. Two triggers:
-      1. All questions for CURRENT step's enabling_objective are graded
-      2. Soft turn cap exceeded on the current step
+    """Server-driven auto-advance (safety net). LLM's advance_step is
+    the primary signal; this function only fires when:
+      1. Student has ≥ competence_threshold CORRECT verdicts on step's
+         objective (default 1 — "demonstrated enough").
+      2. Soft turn cap exceeded on the current step.
+    Per user direction: don't require ALL questions answered, just
+    demonstrated competence.
     """
 
-    def test_does_not_advance_when_step_questions_remain(self):
+    def test_does_not_advance_when_no_verdicts(self):
         session, qs = _make_session(n_questions=3, n_steps=2)
-        # No verdicts yet — questions 0, 1, 2 all un-graded
+        # No verdicts yet
         advanced = maybe_advance_step(session)
         self.assertFalse(advanced)
         session.refresh_from_db()
         self.assertEqual(session.current_step_index, 0)
 
-    def test_advances_when_step_questions_all_graded(self):
-        """When all current-step (enabling_objective) questions have
-        verdicts, server advances to next step.
+    def test_advances_after_one_correct_verdict(self):
+        """Per user direction: 1 correct verdict is enough to advance.
+        Doesn't require answering all questions for the objective.
         """
         session, qs = _make_session(n_questions=3, n_steps=2)
-        # Grade ALL three (they share the step's enabling_objective)
-        for q in qs:
-            _add_graded_turn(session, q)
+        _add_graded_turn(session, qs[0], verdict='correct')
+        # qs[1], qs[2] still un-graded
         advanced = maybe_advance_step(session)
         self.assertTrue(advanced)
         session.refresh_from_db()
         self.assertEqual(session.current_step_index, 1)
         self.assertIsNone(session.current_question_id)
 
+    def test_partial_verdict_does_not_count(self):
+        """Only CORRECT verdicts count toward competence."""
+        session, qs = _make_session(n_questions=3, n_steps=2)
+        _add_graded_turn(session, qs[0], verdict='partial')
+        _add_graded_turn(session, qs[1], verdict='incorrect')
+        advanced = maybe_advance_step(session)
+        self.assertFalse(advanced)
+
+    def test_higher_threshold(self):
+        # Caller can demand more correct verdicts per step
+        session, qs = _make_session(n_questions=3, n_steps=2)
+        _add_graded_turn(session, qs[0], verdict='correct')
+        advanced = maybe_advance_step(session, competence_threshold=2)
+        self.assertFalse(advanced)
+        _add_graded_turn(session, qs[1], verdict='correct')
+        advanced = maybe_advance_step(session, competence_threshold=2)
+        self.assertTrue(advanced)
+
     def test_advance_clears_current_question(self):
         session, qs = _make_session(n_questions=1)
-        _add_graded_turn(session, qs[0])
+        _add_graded_turn(session, qs[0], verdict='correct')
         session.current_question_id = 42
         session.save(update_fields=['current_question_id'])
         maybe_advance_step(session)
@@ -424,14 +460,14 @@ class MaybeAdvanceStepTest(DjangoTestCase):
     def test_idempotent_when_no_more_to_advance(self):
         """Past the last step → no change on subsequent calls."""
         session, qs = _make_session(n_questions=1, n_steps=1)
-        _add_graded_turn(session, qs[0])
-        maybe_advance_step(session)   # advances to step 1
+        _add_graded_turn(session, qs[0], verdict='correct')
+        maybe_advance_step(session)   # advances to step_index=1
         advanced_again = maybe_advance_step(session)
         self.assertFalse(advanced_again)
 
-    def test_turn_cap_forces_advance(self):
-        """Even with ungraded questions remaining, server force-advances
-        after the soft turn cap and logs `forced=True` in engine_state.
+    def test_turn_cap_forces_advance_without_competence(self):
+        """Even with no correct verdicts, server force-advances after
+        the soft turn cap. forced=True logged in engine_state.
         """
         session, qs = _make_session(n_questions=3, n_steps=2)
         # No verdicts. Pile up student turns on the current step.
@@ -445,7 +481,6 @@ class MaybeAdvanceStepTest(DjangoTestCase):
         self.assertTrue(advanced)
         session.refresh_from_db()
         self.assertEqual(session.current_step_index, 1)
-        # forced_advances entry logged
         forced = session.engine_state.get('forced_advances', [])
         self.assertEqual(len(forced), 1)
         self.assertEqual(forced[0]['from_step_index'], 0)
@@ -460,6 +495,28 @@ class MaybeAdvanceStepTest(DjangoTestCase):
             )
         advanced = maybe_advance_step(session)
         self.assertFalse(advanced)
+
+
+class CurrentStepCorrectVerdictCountTest(DjangoTestCase):
+    """Helper underlying the competence trigger."""
+
+    def test_counts_only_correct_for_current_objective(self):
+        session, qs = _make_session(n_questions=3, n_steps=2)
+        _add_graded_turn(session, qs[0], verdict='correct')
+        _add_graded_turn(session, qs[1], verdict='partial')
+        _add_graded_turn(session, qs[2], verdict='incorrect')
+        # 1 correct out of 3 graded
+        self.assertEqual(_current_step_correct_verdict_count(session), 1)
+
+    def test_zero_when_no_verdicts(self):
+        session, _ = _make_session()
+        self.assertEqual(_current_step_correct_verdict_count(session), 0)
+
+    def test_zero_when_objective_empty(self):
+        session, qs = _make_session(with_objective=False)
+        _add_graded_turn(session, qs[0], verdict='correct')
+        # No objective on the step → no objective-tied verdicts
+        self.assertEqual(_current_step_correct_verdict_count(session), 0)
 
 
 class PickCurrentQuestionByObjectiveTest(DjangoTestCase):
