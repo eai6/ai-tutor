@@ -1,63 +1,50 @@
 """Help-docs knowledge base.
 
-Single platform-wide ChromaDB collection (`help_docs`) embedded
-with the same local sentence-transformers model the curriculum KB
-uses. Chunks tagged with metadata so we can filter by audience
-('all' / 'staff') at retrieval time.
+pgvector-backed retrieval for the help assistant. Was ChromaDB until
+2026-05-24; migrated alongside the curriculum KB because both shared
+the same ``VECTORDB_ROOT=/tmp/vectordb`` SMB-SQLite workaround → both
+silently lost writes on container restart. See
+``memory/pgvector_migration_plan.md``.
 
-See memory/help_assistant_plan.md for the design.
+Each chunk is one row in ``apps.support.models.SupportChunk`` with a
+384-d ``vector`` column. Chunks carry an audience tag ('all' / 'staff')
+so the help assistant can filter by caller role at retrieval time.
+Embedding model unchanged: sentence-transformers all-MiniLM-L6-v2.
+
+Public API preserved: ``HelpKB.upsert_chunk(...)``, ``HelpKB.query(...)``,
+``HelpKB.count()`` — call sites in services.py / tools.py /
+build_help_index don't change.
 """
 
 import logging
-import os
 import re
-from pathlib import Path
 from typing import Dict, List, Optional
 
-from django.conf import settings
+from django.db import connection, transaction
 
 logger = logging.getLogger(__name__)
 
-# Single collection — help docs are platform-wide, not institution-scoped.
+# Kept for back-compat. Now purely a label — the ORM stores everything
+# in a single ``support_supportchunk`` table; "collection" semantics
+# are encoded by ``source`` + ``audience`` metadata, not by a separate
+# Chroma collection.
 COLLECTION_NAME = "help_docs"
 
 
 class HelpKB:
-    """ChromaDB-backed retrieval for the help assistant."""
+    """pgvector-backed retrieval for the help assistant."""
 
     def __init__(self, persist_directory: Optional[str] = None):
-        # Reuse the curriculum KB's persist root so we share the
-        # cached embedding model. Different collection name keeps
-        # the data isolated.
-        self.persist_directory = persist_directory or os.path.join(
-            getattr(settings, 'VECTORDB_ROOT',
-                    str(Path(settings.BASE_DIR) / 'media' / 'vectordb')),
-            'support',
-        )
-        os.makedirs(self.persist_directory, exist_ok=True)
-        self._init_chromadb()
-
-    def _init_chromadb(self):
-        import chromadb
-        from chromadb.config import Settings as ChromaSettings
-
-        self.client = chromadb.PersistentClient(
-            path=self.persist_directory,
-            settings=ChromaSettings(anonymized_telemetry=False),
-        )
-
-        # Embedding function — same local sentence-transformers
-        # backend used by the curriculum KB. Avoids a second model
-        # download on the container.
-        from chromadb.utils import embedding_functions
-        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name='sentence-transformers/all-MiniLM-L6-v2',
-        )
-        self.collection = self.client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            embedding_function=self.embedding_fn,
-            metadata={'hnsw:space': 'cosine'},
-        )
+        # ``persist_directory`` retained for back-compat with the
+        # 4 call sites that still pass it (tests, build_help_index).
+        # Ignored — storage is in Postgres now.
+        self.persist_directory = persist_directory or '<pgvector:support>'
+        self._storage_available = connection.vendor == 'postgresql'
+        if not self._storage_available:
+            logger.info(
+                "[HelpKB] backend=%s — vector ops are no-ops (SQLite local dev / CI)",
+                connection.vendor,
+            )
 
     def upsert_chunk(self, *, chunk_id: str, text: str,
                      source: str, section_title: str,
@@ -67,24 +54,47 @@ class HelpKB:
 
         audience: 'all' (visible to students + teachers) or 'staff'
         (teachers + super_admins only).
+
+        Idempotent — ``chunk_id`` is the unique key. Re-running the
+        indexer overwrites the row in place.
         """
         if not text or not text.strip():
             return
-        meta = {
-            'source': source,
-            'section_title': section_title[:200],
-            'audience': audience,
-            'anchor': anchor[:200],
-        }
+        if not self._storage_available:
+            return  # SQLite local dev / CI — no-op
+
+        from apps.support.models import SupportChunk
+        from apps.curriculum.kb_storage import embed
+
+        # Compute embedding once (the embed() helper in curriculum's
+        # kb_storage uses the SAME all-MiniLM-L6-v2 model — class-level
+        # cached, no second model load).
+        vec = embed([text])
+        if not vec:
+            return
+        embedding = vec[0]
+
+        # Sanitize the extra dict (only scalars allowed, matching the
+        # prior ChromaDB metadata constraints).
+        clean_extra = {}
         if extra:
             for k, v in extra.items():
                 if isinstance(v, (str, int, float, bool)) and v is not None:
-                    meta[k] = v
+                    clean_extra[k] = v
+
         try:
-            self.collection.upsert(
-                ids=[chunk_id],
-                documents=[text],
-                metadatas=[meta],
+            SupportChunk.objects.update_or_create(
+                chunk_id=chunk_id,
+                defaults=dict(
+                    content=text,
+                    embedding=embedding,
+                    content_hash=SupportChunk.compute_hash(text),
+                    source=source,
+                    section_title=section_title[:200],
+                    audience=audience,
+                    anchor=anchor[:200],
+                    extra=clean_extra,
+                ),
             )
         except Exception as e:
             logger.warning(f"HelpKB upsert failed for {chunk_id}: {e}")
@@ -98,49 +108,61 @@ class HelpKB:
         """
         if not question or not question.strip():
             return []
+        if not self._storage_available:
+            return []
 
-        # ChromaDB metadata filter: 'all' chunks visible to everyone;
-        # 'staff' only visible to staff or super_admin.
+        from apps.support.models import SupportChunk
+        from apps.curriculum.kb_storage import embed
+        from pgvector.django import CosineDistance
+
+        # Embed the query
+        vec = embed([question])
+        if not vec:
+            return []
+        query_vec = vec[0]
+
+        # Audience filter: 'all' chunks visible to everyone; 'staff'
+        # only visible to staff or super_admin.
+        qs = SupportChunk.objects.all()
         if audience in ('staff', 'super_admin', 'teacher'):
-            where = {'audience': {'$in': ['all', 'staff']}}
+            qs = qs.filter(audience__in=['all', 'staff'])
         else:
-            where = {'audience': 'all'}
+            qs = qs.filter(audience='all')
 
         try:
-            res = self.collection.query(
-                query_texts=[question],
-                n_results=n_results,
-                where=where,
+            rows = list(
+                qs.annotate(_distance=CosineDistance('embedding', query_vec))
+                  .order_by('_distance')[:n_results]
+                  .values('chunk_id', 'content', '_distance',
+                          'source', 'section_title', 'audience', 'anchor')
             )
         except Exception as e:
             logger.warning(f"HelpKB query failed: {e}")
             return []
 
         out = []
-        ids = (res.get('ids') or [[]])[0]
-        docs = (res.get('documents') or [[]])[0]
-        metas = (res.get('metadatas') or [[]])[0]
-        dists = (res.get('distances') or [[]])[0]
-        for i, doc in enumerate(docs):
-            distance = dists[i] if i < len(dists) else 1.0
+        for row in rows:
+            distance = float(row['_distance'])
             score = max(0.0, 1.0 - distance)  # cosine: 0 dist = perfect match
             if score < min_score:
                 continue
-            meta = metas[i] if i < len(metas) else {}
             out.append({
-                'id': ids[i] if i < len(ids) else '',
-                'text': doc,
+                'id': row['chunk_id'],
+                'text': row['content'],
                 'score': round(score, 3),
-                'source': meta.get('source', ''),
-                'section_title': meta.get('section_title', ''),
-                'audience': meta.get('audience', 'all'),
-                'anchor': meta.get('anchor', ''),
+                'source': row['source'] or '',
+                'section_title': row['section_title'] or '',
+                'audience': row['audience'] or 'all',
+                'anchor': row['anchor'] or '',
             })
         return out
 
     def count(self) -> int:
+        if not self._storage_available:
+            return 0
         try:
-            return self.collection.count()
+            from apps.support.models import SupportChunk
+            return SupportChunk.objects.count()
         except Exception:
             return 0
 

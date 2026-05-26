@@ -14,8 +14,11 @@ cassidy==0.1.4
 certifi==2026.1.4
 cffi==2.0.0
 charset-normalizer==3.4.4
-chromadb==1.5.0
+# chromadb removed 2026-05-24 — vectors now in Postgres via pgvector.
+# Re-install temporarily if running scripts/port_chromadb_to_pgvector.py:
+#   pip install chromadb==1.5.0
 click==8.3.1
+pgvector==0.4.1
 comm==0.2.3
 cryptography==46.0.5
 debugpy==1.8.20
