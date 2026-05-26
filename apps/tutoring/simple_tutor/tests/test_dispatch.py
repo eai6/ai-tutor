@@ -46,9 +46,11 @@ def _make_session(*, n_questions=1):
         order_index=0, is_published=True,
     )
     for idx in range(2):
+        # Empty step.question/expected_answer routes pick_current_question
+        # to the ExitTicketQuestion fallback that test_dispatch needs.
         LessonStep.objects.create(
             lesson=lesson, teacher_script='t',
-            question='?', expected_answer='42',
+            question='', expected_answer='',
             phase='explore', order_index=idx,
             enabling_objective=f'obj-{i}',
         )
@@ -167,7 +169,12 @@ class RespondForViewTest(DjangoTestCase):
             return_value=_llm_response(
                 text='Great.',
                 tool_uses=[{'name': 'record_answer',
-                            'input': {'extracted_answer': 'B'}}],
+                            'input': {
+                                'extracted_answer': 'B',
+                                'reference_answer': 'B',
+                                'question_type': 'mcq',
+                                'question_text': 'Which?',
+                            }}],
             ),
         ):
             payload = respond_for_view(session, 'B')
@@ -180,7 +187,12 @@ class RespondForViewTest(DjangoTestCase):
             return_value=_llm_response(
                 text='Try again.',
                 tool_uses=[{'name': 'record_answer',
-                            'input': {'extracted_answer': 'A'}}],
+                            'input': {
+                                'extracted_answer': 'A',
+                                'reference_answer': 'B',
+                                'question_type': 'mcq',
+                                'question_text': 'Which?',
+                            }}],
             ),
         ):
             payload = respond_for_view(session, 'A')

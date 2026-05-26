@@ -64,9 +64,13 @@ def _make_session(*, n_questions=2, with_step_media=False, figures_enabled=True)
                     {'url': '/m/b.png', 'alt': 'B figure', 'caption': 'cap B'},
                 ],
             }
+        # Leave step.question + step.expected_answer empty so
+        # pick_current_question falls through to the MCQ
+        # ExitTicketQuestion created below. LessonStep-primary pickup
+        # is exercised separately in test_tools::PickCurrentQuestionLessonStepTest.
         LessonStep.objects.create(
             lesson=lesson, teacher_script='Teach this concept',
-            question='?', expected_answer='42',
+            question='', expected_answer='',
             phase='engage', order_index=idx,
             enabling_objective=objective_text,
             media=step_media,
@@ -120,17 +124,25 @@ class HappyPathTest(DjangoTestCase):
         self.assertEqual(session.turns.count(), 2)
 
     def test_record_answer_grades_correctly(self, _mock_kb):
-        session, qs = _make_session()
+        """Post-tear-down (M11.3): the LLM passes BOTH the student's
+        extracted answer AND the reference answer + question_type +
+        question_text. Grader compares them, returns the verdict.
+        """
+        session, _qs = _make_session()
         with patch(
             'apps.tutoring.simple_tutor.engine._call_llm',
             return_value=_llm_response(
                 text="Let's see how you did.",
                 tool_uses=[{'name': 'record_answer',
-                            'input': {'extracted_answer': 'B'}}],
+                            'input': {
+                                'extracted_answer': 'B',
+                                'reference_answer': 'B',
+                                'question_type': 'mcq',
+                                'question_text': 'Which is greatest?',
+                            }}],
             ),
         ):
             result = respond(session, 'I think the answer is B')
-        # Tool dispatched, grader ran, verdict in result
         ranswer = next(
             t for t in result['tool_calls'] if t['tool'] == 'record_answer'
         )
@@ -141,73 +153,57 @@ class HappyPathTest(DjangoTestCase):
         self.assertEqual(
             tutor_turn.judge_outputs['grader']['verdict'], 'correct',
         )
+        # Reference + question_type preserved on the verdict for audit
         self.assertEqual(
-            tutor_turn.judge_outputs['grader']['question_id'], qs[0].pk,
+            tutor_turn.judge_outputs['grader']['reference_answer'], 'B',
         )
-
-    def test_server_picks_current_question_before_llm(self, _mock_kb):
-        session, qs = _make_session()
-        self.assertIsNone(session.current_question_id)
-        # Use a clarifying-question input so auto-fallback doesn't fire
-        # (which would clear current_question_id after grading).
-        with patch(
-            'apps.tutoring.simple_tutor.engine._call_llm',
-            return_value=_llm_response(text='OK'),
-        ):
-            respond(session, 'what does that mean?')
-        session.refresh_from_db()
-        # First un-graded question got assigned by pick_current_question
-        self.assertEqual(session.current_question_id, qs[0].pk)
+        self.assertEqual(
+            tutor_turn.judge_outputs['grader']['question_type'], 'mcq',
+        )
 
     def test_step_advances_after_correct_verdict(self, _mock_kb):
         """End-to-end: correct verdict → maybe_advance_step bumps step
         (competence threshold = 1).
         """
-        session, qs = _make_session()
+        session, _qs = _make_session()
         with patch(
             'apps.tutoring.simple_tutor.engine._call_llm',
             return_value=_llm_response(
                 text='Great.',
                 tool_uses=[{'name': 'record_answer',
-                            'input': {'extracted_answer': 'B'}}],
+                            'input': {
+                                'extracted_answer': 'B',
+                                'reference_answer': 'B',
+                                'question_type': 'mcq',
+                                'question_text': 'Q?',
+                            }}],
             ),
         ):
             result = respond(session, 'B')
         session.refresh_from_db()
-        # current_step_index moved from 0 → 1
         self.assertEqual(session.current_step_index, 1)
         self.assertTrue(result['step_advanced'])
 
 
 @patch('apps.tutoring.simple_tutor.engine._retrieve_kb', return_value=[])
-class AutoFallbackTest(DjangoTestCase):
+class TrustTheLLMTest(DjangoTestCase):
+    """Regression for the 2026-05-26 auto-fallback removal: if the LLM
+    doesn't call record_answer, the engine MUST NOT auto-grade. Trust
+    the LLM's tool-call decision — no safety-net grading.
+    """
 
-    def test_auto_grades_when_llm_skips_record_answer(self, _mock_kb):
-        session, qs = _make_session()
-        # LLM responds with text only; student input is an answer attempt
+    def test_no_grading_when_llm_skips_record_answer(self, _mock_kb):
+        session, _qs = _make_session()
         with patch(
             'apps.tutoring.simple_tutor.engine._call_llm',
             return_value=_llm_response(text='Interesting answer.'),
         ):
-            result = respond(session, 'B')   # student says 'B', no tool call
-        # Auto-fallback fired
-        auto = next(
-            t for t in result['tool_calls']
-            if t['tool'] == 'auto_grade_fallback'
-        )
-        self.assertTrue(auto['result']['recorded'])
-        self.assertEqual(auto['result']['verdict'], 'correct')
-        self.assertEqual(auto['result']['tier'], 'auto_fallback')
-
-    def test_no_auto_grade_for_clarifying_question(self, _mock_kb):
-        session, qs = _make_session()
-        with patch(
-            'apps.tutoring.simple_tutor.engine._call_llm',
-            return_value=_llm_response(text="Let me explain."),
-        ):
-            result = respond(session, 'what does that mean?')
-        self.assertFalse(
-            any(t['tool'] == 'auto_grade_fallback' for t in result['tool_calls'])
+            result = respond(session, 'B')
+        # No record_answer should appear — the LLM didn't call it,
+        # so no verdict is recorded. Trust the LLM.
+        self.assertEqual(
+            [t for t in result['tool_calls'] if t['tool'] == 'record_answer'],
+            [],
         )
 
 
@@ -313,7 +309,11 @@ class StatelessPromptTest(DjangoTestCase):
             kwargs = call.kwargs
             self.assertIn('system_blocks', kwargs)
             self.assertIn('tools', kwargs)
-            self.assertIn('user_input', kwargs)
+            self.assertIn('messages', kwargs)
+            # First call's first message should be the student's input.
+            msgs = kwargs['messages']
+            self.assertGreaterEqual(len(msgs), 1)
+            self.assertEqual(msgs[0]['role'], 'user')
 
 
 # ============================================================================

@@ -67,31 +67,42 @@ def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
         failure, returns ``_FALLBACK_REPLY`` content.
     """
     from apps.tutoring.simple_tutor.tools import (
-        pick_current_question, auto_grade_if_missed, maybe_advance_step,
+        build_question_pool, maybe_advance_step,
     )
     from apps.tutoring.simple_tutor.state import (
-        build_recent_window, step_summary_log, set_current_question,
+        build_recent_window, step_summary_log,
     )
+    from apps.tutoring.models import TutorSession as _TS
 
-    # ─── 1. Server picks the current question ─────────────────────
-    current_q = pick_current_question(session)
-    if current_q is not None:
-        set_current_question(session, current_q.pk)
+    # ─── 0. Audit trail — mark the session as routed through this engine
+    if session.engine != _TS.Engine.SIMPLE:
+        session.engine = _TS.Engine.SIMPLE
+        session.save(update_fields=['engine'])
 
-    # ─── 2. Gather context ────────────────────────────────────────
+    # ─── 1. Gather context (NO server-side anchor) ────────────────
+    # The tutor LLM sees a pool of candidate questions and reference
+    # answers as CONTEXT. It may pose any of them verbatim, adapt one,
+    # or author its own. Grading happens via record_answer which
+    # carries the LLM's chosen reference. See M11.3 in the milestones.
     step = _load_current_step(session)
+    question_pool = build_question_pool(session)
     kb_chunks = _retrieve_kb(session, user_input)
     figure_catalog = _build_figure_catalog(step)
     figures_enabled = _figures_enabled(session)
     recent_window = build_recent_window(session)
     step_summaries = step_summary_log(session)
 
-    # ─── 3. Build system prompt + tool schemas ────────────────────
+    logger.info(
+        "[simple_tutor] pool session=%s step=%s pool_size=%s",
+        session.pk, session.current_step_index, len(question_pool),
+    )
+
+    # ─── 2. Build system prompt + tool schemas ────────────────────
     from apps.tutoring.simple_tutor.prompts import build_system_prompt
     system_blocks, tools = build_system_prompt(
         session=session,
         step=step,
-        current_question=current_q,
+        question_pool=question_pool,
         kb_chunks=kb_chunks,
         figure_catalog=figure_catalog,
         figures_enabled=figures_enabled,
@@ -99,15 +110,21 @@ def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
         step_summaries=step_summaries,
     )
 
-    # ─── 4. LLM call ──────────────────────────────────────────────
+    # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────
+    # Standard Anthropic agentic pattern (per claude-prompting-expert):
+    # Call 1 — model decides which tool(s) to invoke. Often emits a
+    #          short pre-text + tool_use blocks; sometimes ONLY tool_use.
+    # Dispatch — server runs the grader / figure lookup / etc.
+    # Call 2 — when any tool fired, we append the assistant's tool_use
+    #          response + the tool_results and call again. The model
+    #          now composes the student-facing reply knowing the verdict.
+    #          This eliminates "tool-call-only" empty bubbles and stops
+    #          the model from guess-confirming a verdict before grading.
+    messages: list = [{'role': 'user', 'content': user_input}]
     response = _call_llm(
-        system_blocks=system_blocks,
-        tools=tools,
-        user_input=user_input,
+        system_blocks=system_blocks, tools=tools, messages=messages,
     )
     if response is None:
-        # LLM call failed entirely → return fallback. Still persist
-        # the student turn so the audit log is complete.
         _persist_student_turn(session, user_input, step)
         return {
             'content': _FALLBACK_REPLY,
@@ -115,36 +132,63 @@ def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
             'fallback': True,
         }
 
-    # ─── 5. Dispatch tool calls ───────────────────────────────────
-    text_reply, tool_results, llm_called_record_answer = _dispatch_tools(
+    # ─── 5. Dispatch tools from Call 1 ────────────────────────────
+    # NOTE: llm_called_record_answer is unused now — the auto-fallback
+    # safety net was removed 2026-05-26 because its heuristic over-fired
+    # on conversational continuations. If the LLM doesn't call
+    # record_answer, no grade is recorded for that turn (trust the LLM).
+    text_reply_1, tool_results, _llm_called_record_answer = _dispatch_tools(
         session=session,
         response=response,
         figure_catalog=figure_catalog,
     )
 
-    # ─── 6. Auto-fallback grading ─────────────────────────────────
-    fallback_verdict = auto_grade_if_missed(
-        session, user_input, llm_called_record_answer,
-    )
-    if fallback_verdict is not None:
-        tool_results.append({
-            'tool': 'auto_grade_fallback',
-            'result': {
-                'recorded': True,
-                'question_id': session.current_question_id,
-                **fallback_verdict.to_dict(),
-            },
-        })
-        # Auto-grade fired — clear the current question so next turn picks
-        # a fresh one if appropriate.
-        from apps.tutoring.simple_tutor.state import clear_current_question
-        clear_current_question(session)
+    # ─── 6. Call 2 — feed tool_results back so the model writes
+    #              the student-facing reply WITH the verdict in hand.
+    text_reply = text_reply_1
+    used_two_call = False
+    tool_use_blocks = _extract_tool_use_blocks(response)
+    if tool_use_blocks:
+        tool_result_content = _build_tool_result_content(
+            tool_use_blocks, tool_results,
+        )
+        if tool_result_content:
+            messages.append({'role': 'assistant', 'content': response.content})
+            messages.append({'role': 'user', 'content': tool_result_content})
+            response2 = _call_llm(
+                system_blocks=system_blocks, tools=tools, messages=messages,
+            )
+            if response2 is not None:
+                used_two_call = True
+                text_reply_2, extra_tool_results, _ = _dispatch_tools(
+                    session=session,
+                    response=response2,
+                    figure_catalog=figure_catalog,
+                )
+                # Call 2 is meant to produce text; if it also chose to
+                # call a tool, accept the side effects but use only the
+                # accumulated text. (No third call — keeps latency
+                # bounded; tool calls in call 2 are uncommon.)
+                tool_results.extend(extra_tool_results)
+                if text_reply_2:
+                    text_reply = text_reply_2
 
-    # ─── 7. Persist turns + verdicts ──────────────────────────────
+    if not text_reply:
+        # Last-resort: neither call produced text. Give a neutral
+        # placeholder so the bubble isn't blank.
+        text_reply = _empty_reply_placeholder(tool_results)
+
+    logger.info(
+        "[simple_tutor] two_call=%s text_chars=%s tools=%s",
+        used_two_call, len(text_reply or ''),
+        [tr.get('tool') for tr in tool_results],
+    )
+
+    # ─── 8. Persist turns + verdicts ──────────────────────────────
     _persist_student_turn(session, user_input, step)
     _persist_tutor_turn(session, text_reply, step, tool_results)
 
-    # ─── 8. Server auto-advance (safety net) ──────────────────────
+    # ─── 9. Server auto-advance (safety net) ──────────────────────
     advanced = maybe_advance_step(session)
 
     return {
@@ -153,6 +197,118 @@ def respond(session: 'TutorSession', user_input: str) -> dict[str, Any]:
         'fallback': False,
         'step_advanced': advanced,
     }
+
+
+def _extract_tool_use_blocks(response) -> list:
+    """Return the tool_use blocks from an Anthropic response, in order.
+    Each block exposes ``.id``, ``.name``, ``.input``.
+    """
+    out = []
+    for block in getattr(response, 'content', None) or []:
+        if getattr(block, 'type', None) == 'tool_use':
+            out.append(block)
+    return out
+
+
+def _build_tool_result_content(tool_use_blocks: list, tool_results: list) -> list:
+    """Pair the LLM's tool_use blocks with our dispatched tool_results
+    by ORDER (Anthropic's tool_use_id is the canonical pairing key, but
+    our dispatch loop preserves order, so the i-th tool_result matches
+    the i-th tool_use block).
+
+    Returns the list of {'type': 'tool_result', 'tool_use_id': ..., 'content': ...}
+    blocks ready to send back as a user-role message in the loop.
+    Auto-fallback grading results are NOT included — they didn't come
+    from an LLM tool_use block.
+    """
+    import json
+    out = []
+    # Filter tool_results to those that came from an LLM tool_use block
+    # (i.e. names the LLM actually called this turn).
+    llm_tool_names = {getattr(b, 'name', None) for b in tool_use_blocks}
+    matched_results = [
+        tr for tr in tool_results if tr.get('tool') in llm_tool_names
+    ]
+    if len(matched_results) != len(tool_use_blocks):
+        # Defensive: pairing-by-order requires equal counts. If they
+        # don't match (rare), skip the loop and let the single-call
+        # text stand. Logged so we can diagnose.
+        logger.warning(
+            "tool_use_blocks=%s but matched_results=%s — skipping call 2",
+            len(tool_use_blocks), len(matched_results),
+        )
+        return []
+    for block, tr in zip(tool_use_blocks, matched_results):
+        result_obj = tr.get('result') or {}
+        tool_name = tr.get('tool') or ''
+        # Render the tool result as a human-readable summary instead of
+        # raw JSON. This makes the "what was just graded" context highly
+        # salient when the LLM composes its Call 2 text — otherwise it
+        # tends to draw on older parts of <recent_turns> and reference
+        # the wrong question in hints. Caught 2026-05-26 in M11.3 E2E.
+        content_text = _format_tool_result_for_call2(tool_name, result_obj)
+        out.append({
+            'type': 'tool_result',
+            'tool_use_id': getattr(block, 'id', ''),
+            'content': content_text,
+        })
+    return out
+
+
+def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
+    """Render a tool result as an instruction-laden block for Call 2.
+
+    For record_answer specifically: surface the question_text + verdict
+    + reference + student answer prominently, and remind the LLM that
+    its next reply must be ABOUT THIS QUESTION (not an older one in
+    recent_turns).
+    """
+    if tool_name == 'record_answer' and result.get('recorded'):
+        verdict = (result.get('verdict') or '?').upper()
+        ref = (result.get('reference_answer') or '').strip()
+        ext = (result.get('justification') or '').strip()
+        # The student's extracted answer isn't in the result dict (it
+        # was an input). Fall back to a generic phrasing.
+        qtext = (result.get('question_text') or '').strip()
+        qtype = result.get('question_type') or 'short_answer'
+        parts = [
+            f"VERDICT: {verdict}",
+            f"This was the question I just graded (question_type={qtype}):",
+            f'  "{qtext}"' if qtext else '  (no question_text recorded)',
+            f"Correct answer (reference): {ref}" if ref else "",
+            "",
+            "Compose your next reply ABOUT THIS QUESTION ONLY. Do NOT "
+            "reference older questions from <recent_turns> in your hint "
+            "or feedback. If incorrect, give a hint about THIS question "
+            "and re-pose it. If correct, briefly acknowledge and move "
+            "to the next teaching beat or new question.",
+        ]
+        if ext:
+            parts.insert(3, f"Grader justification: {ext}")
+        return "\n".join(p for p in parts if p)
+    # Non-record_answer tools: keep JSON (cheaper context).
+    import json
+    return json.dumps(result, default=str)
+
+
+def _empty_reply_placeholder(tool_results: list) -> str:
+    """When both LLM calls produce no text (very rare), surface a
+    minimal acknowledgement so the chat bubble isn't blank.
+
+    If we have a grader verdict, briefly reflect it; otherwise stall.
+    """
+    verdict = None
+    for tr in tool_results:
+        if tr.get('tool') in ('record_answer', 'auto_grade_fallback'):
+            r = tr.get('result') or {}
+            if r.get('recorded'):
+                verdict = r.get('verdict')
+                break
+    if verdict == 'correct':
+        return "Got it — that's right. Ready for the next one?"
+    if verdict == 'incorrect':
+        return "Not quite — want to walk through it together?"
+    return "Let's keep going. What are you thinking?"
 
 
 # ============================================================================
@@ -254,14 +410,22 @@ def _build_figure_catalog(step) -> list[dict]:
 # ============================================================================
 
 
-def _call_llm(*, system_blocks: list, tools: list, user_input: str):
-    """Call Anthropic with the simple-tutor prompt + tools. Returns the
-    raw Anthropic response object, or None on any error.
+def _call_llm(
+    *,
+    system_blocks: list,
+    tools: list,
+    messages: list,
+):
+    """Call Anthropic with the simple-tutor prompt + tools + the messages
+    array. Returns the raw Anthropic response, or None on any error.
 
     Uses ``ModelConfig.get_for('tutoring')`` so the model is configurable
     via the dashboard. Defaults to Claude Opus 4.7 per the prod config.
     Never raises — failures log a warning and return None; caller serves
     the fallback reply.
+
+    ``messages`` is the full Anthropic messages list — the caller manages
+    the user/assistant/tool_result alternation for the two-call loop.
     """
     try:
         from apps.llm.models import ModelConfig
@@ -298,7 +462,7 @@ def _call_llm(*, system_blocks: list, tools: list, user_input: str):
             max_tokens=1024,
             system=system_blocks,
             tools=tools,
-            messages=[{'role': 'user', 'content': user_input}],
+            messages=messages,
         )
         return response
     except Exception as exc:
@@ -350,6 +514,9 @@ def _dispatch_tools(*, session, response, figure_catalog):
                 result = handle_record_answer(
                     session,
                     extracted_answer=str(params.get('extracted_answer', '')),
+                    reference_answer=str(params.get('reference_answer', '')),
+                    question_type=str(params.get('question_type', '')),
+                    question_text=str(params.get('question_text', '')),
                 )
                 llm_called_record_answer = True
             elif name == 'request_figure':
@@ -434,13 +601,13 @@ def respond_for_view(session, user_input: str) -> dict:
         if step else 'evaluate'
     )
 
-    # Extract is_correct from any record_answer / auto_grade verdict
+    # Extract is_correct from any record_answer verdict.
     is_correct = None
     media_url = None
     for entry in out.get('tool_calls') or []:
         tool = entry.get('tool')
         result = entry.get('result') or {}
-        if tool in ('record_answer', 'auto_grade_fallback'):
+        if tool == 'record_answer':
             verdict = result.get('verdict')
             if verdict == 'correct':
                 is_correct = True
@@ -482,12 +649,15 @@ def _persist_tutor_turn(session, text_reply: str, step, tool_results: list):
     judge_outputs: dict = {}
     metadata: dict = {'tool_calls': tool_results}
 
-    # Surface the most recent grader verdict (from either record_answer
-    # or auto_grade_fallback) on the tutor turn's judge_outputs['grader'].
+    # Surface the most recent grader verdict on the tutor turn's
+    # judge_outputs['grader']. With the M11.3 tear-down the LLM provides
+    # the reference + question text per tool call — those are preserved
+    # for audit. There's no longer a question_id linking to a catalog
+    # row (the LLM may have authored its own question).
     for entry in tool_results:
         tool = entry.get('tool')
         result = entry.get('result') or {}
-        if tool in ('record_answer', 'auto_grade_fallback') and result.get('recorded'):
+        if tool == 'record_answer' and result.get('recorded'):
             judge_outputs['grader'] = {
                 'verdict': result.get('verdict'),
                 'confidence': result.get('confidence'),
@@ -495,7 +665,9 @@ def _persist_tutor_turn(session, text_reply: str, step, tool_results: list):
                 'per_criterion_scores': result.get('per_criterion_scores') or {},
                 'justification': result.get('justification') or '',
                 'needs_followup': result.get('needs_followup', False),
-                'question_id': result.get('question_id'),
+                'question_type': result.get('question_type'),
+                'reference_answer': result.get('reference_answer'),
+                'question_text': result.get('question_text'),
             }
             break
 

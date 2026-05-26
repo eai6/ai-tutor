@@ -14,11 +14,15 @@ auto-memory/feedback_server_owns_question_state.md):
                                          question for the CURRENT step's
                                          enabling_objective, BEFORE the
                                          LLM call
-    - auto_grade_if_missed(session, user_input, llm_called_record_answer)
-                                        → safety net AFTER the LLM call
     - maybe_advance_step(session)       → soft auto-advance when current
                                          step's questions are all graded,
                                          OR after a soft turn cap
+
+    NOTE: The auto_grade_if_missed safety net was REMOVED 2026-05-26.
+    Its heuristic over-fired on conversational continuations like
+    "yes let's go deeper", polluting the graded set and corrupting the
+    next pick. We now trust the LLM — if it doesn't call record_answer,
+    no grade is recorded for that turn.
 
 Step ↔ question linkage uses ``enabling_objective`` (string field on both
 LessonStep and ExitTicketQuestion) — see
@@ -30,7 +34,6 @@ must always flow — failures get logged + return error dicts, never block.
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
@@ -46,27 +49,54 @@ DEFAULT_STEP_TURN_CAP = 8
 
 
 # ============================================================================
-# pick_current_question — server picks the next un-graded question
+# build_question_pool — gather context questions for the system prompt
 # ============================================================================
 
 
-def pick_current_question(session: 'TutorSession'):
-    """Return the next un-graded ExitTicketQuestion for the CURRENT
-    lesson step's ``enabling_objective``, or None when the current
-    step's questions are all graded (signals "ready to advance step").
+# ExitTicketQuestion types the tutor should NEVER see in the pool. Per
+# user direction (2026-05-26): fill_in_blank and matching are too
+# ambiguous to grade from free-form text answers. The tutor sticks to
+# MCQ + short_answer + short_numeric (exclusion list keeps the filter
+# forward-compatible with new question types).
+EXCLUDED_QUESTION_TYPES = ('fill_in_blank', 'matching')
 
-    See ``auto-memory/feedback_step_question_linkage.md`` — questions
-    are linked to steps via matching ``enabling_objective`` strings.
+# Cap on the number of pool entries surfaced to the LLM each turn.
+# Keeps the prompt focused + cache-friendly.
+DEFAULT_POOL_SIZE = 6
 
-    Selection order: ``order_index`` then ``pk`` ascending — matches how
-    questions are authored within an objective.
+
+def build_question_pool(
+    session: 'TutorSession',
+    *,
+    max_questions: int = DEFAULT_POOL_SIZE,
+) -> list:
+    """Gather a small pool of CONTEXT questions for the current step.
+
+    NO server-side anchor — the returned objects are for the LLM's
+    grounding only. The LLM is free to pose any of them verbatim,
+    adapt one, or write its own question entirely. ``record_answer``
+    carries the reference answer the LLM chose.
+
+    Source order:
+
+      1. LessonStep.question (if non-empty) → StepQuestion adapter
+      2. ExitTicketQuestion rows on the current step's enabling_objective
+      3. ExitTicketQuestion rows from the same lesson (any objective)
+         as additional context if pool is still short
+
+    Returns at most ``max_questions`` entries. Empty list when the step
+    is pure teaching (no questions anywhere — engine still teaches; LLM
+    just doesn't grade this turn).
     """
     from apps.tutoring.models import ExitTicketQuestion
     from apps.curriculum.models import LessonStep
+    from apps.tutoring.simple_tutor.step_question import (
+        StepQuestion, has_question as step_has_question,
+    )
 
     lesson = getattr(session, 'lesson', None)
     if lesson is None:
-        return None
+        return []
 
     current_step_index = getattr(session, 'current_step_index', 0) or 0
     step = (
@@ -75,50 +105,72 @@ def pick_current_question(session: 'TutorSession'):
         .first()
     )
     if step is None:
-        return None
+        return []
 
+    pool: list = []
+
+    # Source 1 — LessonStep.question (one entry max).
+    if step_has_question(step):
+        pool.append(StepQuestion.from_step(step))
+
+    # Source 2 — ETQs matching this step's enabling_objective.
     objective = (getattr(step, 'enabling_objective', '') or '').strip()
-    graded_qids = _graded_question_ids(session)
-
-    # Pass 1 — prefer questions matching the current step's objective.
-    if objective:
-        match = (
+    if objective and len(pool) < max_questions:
+        for q in (
             ExitTicketQuestion.objects
             .filter(
                 exit_ticket__lesson=lesson,
                 enabling_objective=objective,
             )
-            .exclude(pk__in=graded_qids)
-            .order_by('order_index', 'id')
-            .first()
-        )
-        if match is not None:
-            return match
+            .exclude(question_type__in=EXCLUDED_QUESTION_TYPES)
+            .order_by('order_index', 'id')[: max_questions - len(pool)]
+        ):
+            pool.append(q)
 
-    # Pass 2 — fall back to ANY un-graded lesson question. Handles:
-    #  - Step has empty enabling_objective (legacy / sparse data)
-    #  - Step has objective but no questions match (content generator
-    #    didn't author one for it)
-    # Per user direction: better to pick any question than block.
-    return (
-        ExitTicketQuestion.objects
-        .filter(exit_ticket__lesson=lesson)
-        .exclude(pk__in=graded_qids)
-        .order_by('order_index', 'id')
-        .first()
-    )
+    # Source 3 — ANY un-excluded ETQ on the lesson (fills the rest).
+    if len(pool) < max_questions:
+        for q in (
+            ExitTicketQuestion.objects
+            .filter(exit_ticket__lesson=lesson)
+            .exclude(question_type__in=EXCLUDED_QUESTION_TYPES)
+            .exclude(pk__in=[
+                getattr(p, 'pk', None) for p in pool
+                if getattr(p, 'source', '') != 'lesson_step'
+            ])
+            .order_by('order_index', 'id')[: max_questions - len(pool)]
+        ):
+            pool.append(q)
+
+    return pool
+
+
+# Backwards-compat shim: callers that still import pick_current_question
+# get a pool function that returns the first entry, or None. This is a
+# stop-gap so we don't have to update every test file in this PR.
+def pick_current_question(session: 'TutorSession'):
+    """Deprecated 2026-05-26: returns the FIRST entry from
+    ``build_question_pool`` to keep older call sites compiling. Real
+    pickup logic has been replaced by context-only pool gathering.
+    """
+    pool = build_question_pool(session, max_questions=1)
+    return pool[0] if pool else None
 
 
 def _current_step_correct_verdict_count(session: 'TutorSession') -> int:
-    """Count CORRECT grader verdicts on the current step's objective.
+    """Count CORRECT grader verdicts recorded on the CURRENT step.
 
-    Used by maybe_advance_step to decide "is the student demonstrating
-    competence?" Per user direction: competence isn't "answered all
-    questions" — it's "demonstrated enough correct understanding".
-    One or two correct answers on an objective can be sufficient.
+    Uses the ``SessionTurn.step`` FK (set by ``_persist_tutor_turn``)
+    rather than tracking individual question ids — since the LLM is
+    now free to author its own questions outside the catalog, there's
+    no stable question-id mapping. A "correct verdict on this step"
+    just means: some tutor turn on this step had a grader verdict of
+    'correct' in its judge_outputs.
+
+    Used by maybe_advance_step as the competence signal. One correct
+    answer on the step is enough to advance (per user direction:
+    competence isn't "answer everything").
     """
     from apps.curriculum.models import LessonStep
-    from apps.tutoring.models import ExitTicketQuestion
 
     lesson = getattr(session, 'lesson', None)
     if lesson is None:
@@ -133,58 +185,19 @@ def _current_step_correct_verdict_count(session: 'TutorSession') -> int:
     if step is None:
         return 0
 
-    objective = (getattr(step, 'enabling_objective', '') or '').strip()
-    if not objective:
-        return 0
-
-    # Question ids tied to this step's objective
-    objective_qids = set(
-        ExitTicketQuestion.objects
-        .filter(
-            exit_ticket__lesson=lesson,
-            enabling_objective=objective,
-        )
-        .values_list('pk', flat=True)
-    )
-    if not objective_qids:
-        return 0
-
-    # Walk this session's turns; count CORRECT verdicts where the
-    # graded question_id is in this objective's set.
     count = 0
     for jo in (
-        session.turns.exclude(judge_outputs={})
+        session.turns
+        .filter(step=step)
+        .exclude(judge_outputs={})
         .values_list('judge_outputs', flat=True)
     ):
         if not isinstance(jo, dict):
             continue
         grader = jo.get('grader')
-        if not isinstance(grader, dict):
-            continue
-        if grader.get('question_id') in objective_qids and grader.get('verdict') == 'correct':
+        if isinstance(grader, dict) and grader.get('verdict') == 'correct':
             count += 1
     return count
-
-
-def _graded_question_ids(session: 'TutorSession') -> set:
-    """Set of question pks that already have a recorded verdict on
-    this session.
-    """
-    graded: set = set()
-    # iterate only turns with a non-empty judge_outputs JSON
-    turns = (
-        session.turns
-        .exclude(judge_outputs={})
-        .values_list('judge_outputs', flat=True)
-    )
-    for jo in turns:
-        if not isinstance(jo, dict):
-            continue
-        grader = jo.get('grader')
-        if isinstance(grader, dict):
-            qid = grader.get('question_id')
-            if qid:
-                graded.add(qid)
     return graded
 
 
@@ -197,80 +210,142 @@ def handle_record_answer(
     session: 'TutorSession',
     *,
     extracted_answer: str,
+    reference_answer: str = '',
+    question_type: str = 'short_answer',
+    question_text: str = '',
 ) -> dict[str, Any]:
-    """Grade the student's extracted answer against
-    ``session.current_question_id`` and persist the verdict.
+    """Grade the student's extracted answer against the LLM-provided
+    reference. No server-side question anchor — the LLM is the source
+    of truth for what was posed (text + correct answer + type).
 
-    The LLM does NOT pass question_id — the server already knows from
-    current_question_id (set by pick_current_question before the LLM
-    call).
+    Tear-down 2026-05-26 (M11.3 of memory/simple_tutor_engine_milestones.md):
+    the deterministic ``current_question_id`` was retired because the
+    LLM frequently authored its own questions outside the catalog,
+    leaving the server-side anchor out of sync. The grader now operates
+    on a transient ``_TransientQuestion`` built from the LLM's tool
+    args.
 
-    Returns a dict the engine passes back to the LLM as the tool_result:
-        {
-            'verdict': 'correct' | 'partial' | 'incorrect',
-            'confidence': 0.0-1.0,
-            'tier': 'mcq' | 'math' | ...,
-            'justification': '...',
-            'question_id': int | None,
-            'recorded': bool,
-        }
+    Args:
+        session: TutorSession (used only for audit logging).
+        extracted_answer: the student's answer in canonical form
+            (LLM-extracted).
+        reference_answer: the correct answer the LLM was checking
+            against. For MCQ: 'A'/'B'/'C'/'D'. For short_numeric: the
+            numeric value (e.g. '150'). For short_answer: one canonical
+            phrasing.
+        question_type: 'mcq', 'short_numeric', or 'short_answer'.
+            Selects the grader tier.
+        question_text: the question stem the LLM posed (verbatim) —
+            audit-only; the verifier LLM (short_answer Tier 2) reads it
+            for context.
+
+    Returns:
+        ``{'recorded': bool, 'verdict': ..., 'confidence': ..., 'tier': ...,
+           'justification': ..., 'reference_answer': ..., 'question_type': ...}``
     """
-    from apps.tutoring.simple_tutor.grader import grade_answer, Verdict
-    from apps.tutoring.models import ExitTicketQuestion
+    from apps.tutoring.simple_tutor.grader import grade_answer
 
-    qid = getattr(session, 'current_question_id', None)
-    if qid is None:
-        # Server didn't set a current question — LLM is calling
-        # record_answer in the wrong context. Don't crash; return a
-        # benign error result so the LLM can react.
+    extracted = (extracted_answer or '').strip()
+    reference = (reference_answer or '').strip()
+    qtype = (question_type or '').strip().lower() or 'short_answer'
+
+    if qtype not in ('mcq', 'short_numeric', 'short_answer'):
+        # Unknown type — fall back to short_answer (the verifier LLM
+        # handles arbitrary text). Logged for analytics.
         logger.warning(
-            "handle_record_answer called with no current_question_id "
-            "set (session=%s, extracted=%r)",
-            session.pk, str(extracted_answer)[:60],
+            "handle_record_answer: unsupported question_type=%r — "
+            "falling back to short_answer",
+            qtype,
         )
+        qtype = 'short_answer'
+
+    if not extracted:
         return {
             'recorded': False,
-            'error': 'no current question in play; nothing to grade',
+            'error': 'extracted_answer is empty',
         }
 
-    try:
-        question = ExitTicketQuestion.objects.get(pk=qid)
-    except ExitTicketQuestion.DoesNotExist:
-        logger.warning(
-            "handle_record_answer: current_question_id=%s no longer "
-            "exists (session=%s)",
-            qid, session.pk,
-        )
-        # Clear the stale pointer so the next turn doesn't repeat
-        session.current_question_id = None
-        session.save(update_fields=['current_question_id'])
-        return {
-            'recorded': False,
-            'error': f'question_id {qid} not found',
-        }
+    # The grader expects an ExitTicketQuestion-shaped object. Build a
+    # transient namespace carrying the LLM-provided fields in the same
+    # surface the grader reads.
+    question = _TransientQuestion(
+        question_text=(question_text or '').strip(),
+        question_type=qtype,
+        reference_answer=reference,
+    )
 
     try:
-        result = grade_answer(question=question, student_answer=extracted_answer)
+        result = grade_answer(question=question, student_answer=extracted)
     except Exception as exc:
         msg = str(exc).strip().replace('\n', ' ')[:200]
         logger.warning(
-            "handle_record_answer: grader raised %s: %s (qid=%s, session=%s)",
-            type(exc).__name__, msg, qid, session.pk,
+            "handle_record_answer: grader raised %s: %s "
+            "(qtype=%s, session=%s)",
+            type(exc).__name__, msg, qtype, session.pk,
         )
         return {
             'recorded': False,
             'error': f'grader exception {type(exc).__name__}: {msg}',
         }
 
-    # Stamp the verdict + the question_id it applies to. The verdict
-    # gets persisted on the CURRENT tutor turn (the one being built by
-    # the engine main loop). Persistence happens in M9 — here we just
-    # return the data.
+    logger.info(
+        "[simple_tutor] graded session=%s qtype=%s verdict=%s "
+        "ref=%r ext=%r",
+        session.pk, qtype, result.verdict.value,
+        reference[:40], extracted[:40],
+    )
+
     return {
         'recorded': True,
-        'question_id': qid,
+        'question_type': qtype,
+        'reference_answer': reference,
+        'question_text': (question_text or '').strip()[:300],
         **result.to_dict(),
     }
+
+
+class _TransientQuestion:
+    """ExitTicketQuestion-shaped duck for the grader. Built per tool
+    call from the LLM's record_answer args — no DB row, no persistence.
+
+    Exposes the attribute surface the grader functions read:
+    ``question_type``, ``question_text``, ``correct_answer``,
+    ``answer_data``, ``option_a..d``, ``pk``.
+    """
+    __slots__ = (
+        'question_text', 'question_type', 'correct_answer',
+        'answer_data', 'option_a', 'option_b', 'option_c', 'option_d',
+        'pk',
+    )
+
+    def __init__(
+        self,
+        *,
+        question_text: str,
+        question_type: str,
+        reference_answer: str,
+    ):
+        self.pk = None
+        self.question_text = question_text
+        self.question_type = question_type
+        self.correct_answer = reference_answer
+        # answer_data shape mirrors what the math grader expects:
+        # {'model_answer': str, 'computed': float | None}
+        ad: dict[str, Any] = {'model_answer': reference_answer}
+        if question_type == 'short_numeric':
+            try:
+                # Strip optional unit suffix (e.g. "150°", "1000 cm")
+                import re as _re
+                m = _re.match(r'\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)', reference_answer)
+                if m:
+                    ad['computed'] = float(m.group(1))
+            except (ValueError, TypeError):
+                pass
+        self.answer_data = ad
+        # MCQ options aren't passed via the tool args — the grader's
+        # _grade_mcq only reads correct_answer (a letter), so empty
+        # options are fine.
+        self.option_a = self.option_b = self.option_c = self.option_d = ''
 
 
 # ============================================================================
@@ -421,10 +496,9 @@ def handle_advance_step(
     es['advance_step_hints'] = hints[-20:]   # keep last 20
 
     session.current_step_index = next_idx
-    session.current_question_id = None
     session.engine_state = es
     session.save(update_fields=[
-        'current_step_index', 'current_question_id', 'engine_state',
+        'current_step_index', 'engine_state',
     ])
 
     logger.info(
@@ -438,113 +512,6 @@ def handle_advance_step(
         'new_step_index': next_idx,
         'has_next_step': next_step is not None,
     }
-
-
-# ============================================================================
-# auto_grade_if_missed — safety net for LLM that skipped record_answer
-# ============================================================================
-
-
-_LIKELY_QUESTION_PATTERNS = (
-    re.compile(r'^\s*what\b', re.IGNORECASE),
-    re.compile(r'^\s*why\b', re.IGNORECASE),
-    re.compile(r'^\s*how\b', re.IGNORECASE),
-    re.compile(r'^\s*can you\b', re.IGNORECASE),
-    re.compile(r'^\s*explain\b', re.IGNORECASE),
-    re.compile(r'^\s*tell me\b', re.IGNORECASE),
-    re.compile(r'\?\s*$'),
-)
-
-
-def _looks_like_answer_attempt(text: str) -> bool:
-    """Heuristic: is the student's text an attempt at an answer (vs a
-    clarifying question)?
-
-    Conservative — false-positives auto-grade something the student
-    didn't intend as an answer. We err on the side of NOT auto-grading
-    (return False) when uncertain.
-
-    Returns True when:
-      - Text is short (< 200 chars) AND doesn't end in '?'
-      - Text doesn't start with what/why/how/explain/tell-me/can-you
-    Returns False when:
-      - Empty / whitespace-only
-      - Starts with question-word pattern
-      - Ends with '?'
-    """
-    if not text or not text.strip():
-        return False
-    if len(text) > 500:
-        # Long student responses are more likely clarifications or
-        # discussion — defer to LLM judgement (via record_answer).
-        return False
-    for pat in _LIKELY_QUESTION_PATTERNS:
-        if pat.search(text):
-            return False
-    return True
-
-
-def auto_grade_if_missed(
-    session: 'TutorSession',
-    student_input: str,
-    llm_called_record_answer: bool,
-):
-    """Auto-grade the student's input when the LLM skipped
-    ``record_answer`` but there's still a question in play.
-
-    Returns:
-        ``GradeResult`` when auto-grading fired. Caller persists this
-            with ``tier='auto_fallback'`` so analytics can distinguish.
-        ``None`` when no grading was triggered (either the LLM handled
-            it, or the input doesn't look like an answer, or no
-            current question is set).
-    """
-    if llm_called_record_answer:
-        return None
-
-    if session.current_question_id is None:
-        # No question in play — nothing to grade against
-        return None
-
-    if not _looks_like_answer_attempt(student_input):
-        return None
-
-    from apps.tutoring.models import ExitTicketQuestion
-    from apps.tutoring.simple_tutor.grader import grade_answer
-
-    try:
-        question = ExitTicketQuestion.objects.get(pk=session.current_question_id)
-    except ExitTicketQuestion.DoesNotExist:
-        return None
-
-    try:
-        result = grade_answer(question=question, student_answer=student_input)
-    except Exception as exc:
-        logger.warning(
-            "auto_grade_if_missed: grader raised %s: %s",
-            type(exc).__name__, str(exc)[:120],
-        )
-        return None
-
-    # Mark this result as auto-fallback (engine persists; we just
-    # return the result with a tier override in justification).
-    logger.info(
-        "auto_grade_if_missed: graded session=%s qid=%s verdict=%s "
-        "(tier=auto_fallback)",
-        session.pk, session.current_question_id, result.verdict.value,
-    )
-
-    # Return a new GradeResult with tier='auto_fallback' so the engine
-    # persists it correctly. dataclasses are frozen → replace.
-    from dataclasses import replace
-    return replace(
-        result,
-        tier='auto_fallback',
-        justification=(
-            f'[auto-fallback: LLM did not call record_answer] '
-            f'{result.justification}'
-        )[:300],
-    )
 
 
 # ============================================================================
@@ -630,7 +597,6 @@ def maybe_advance_step(
     )
 
     session.current_step_index = next_idx
-    session.current_question_id = None
     if forced:
         # Record on engine_state so analytics can spot stuck steps.
         es = getattr(session, 'engine_state', None) or {}
@@ -643,13 +609,9 @@ def maybe_advance_step(
         })
         es['forced_advances'] = forced_log[-20:]
         session.engine_state = es
-        session.save(update_fields=[
-            'current_step_index', 'current_question_id', 'engine_state',
-        ])
+        session.save(update_fields=['current_step_index', 'engine_state'])
     else:
-        session.save(
-            update_fields=['current_step_index', 'current_question_id'],
-        )
+        session.save(update_fields=['current_step_index'])
 
     logger.info(
         "maybe_advance_step: session=%s advanced to step_index=%s "

@@ -18,8 +18,6 @@ from apps.tutoring.simple_tutor.state import (
     build_recent_window,
     build_step_summary,
     step_summary_log,
-    set_current_question,
-    clear_current_question,
     _current_step,
     _step_label,
 )
@@ -109,11 +107,41 @@ class BuildRecentWindowTest(DjangoTestCase):
         for i in range(12):
             _add_turn(session, 'student' if i % 2 == 0 else 'tutor',
                       f'msg {i}', step=step)
-        window = build_recent_window(session, max_turns=5)
+        # Use a high max_tutor_turns to test the overall cap, not the
+        # tutor-turn cap.
+        window = build_recent_window(session, max_turns=5, max_tutor_turns=10)
         self.assertEqual(len(window), 5)
         # Should be the last 5
         self.assertEqual(window[-1].content, 'msg 11')
         self.assertEqual(window[0].content, 'msg 7')
+
+    def test_tutor_turn_cap_drops_older_questions(self):
+        """max_tutor_turns=2 keeps only the most recent in-flight tutor
+        turn plus at most one prior hint. Older tutor turns (from a
+        different settled question) get dropped to prevent the LLM
+        from referencing the wrong question in hints.
+        Regression for 2026-05-26 staging E2E.
+        """
+        session = _make_session_with_lesson()
+        step = session.lesson.steps.first()
+        # Conversation: tutor(Q1) → student → tutor(Q2-graded+Q3) → student
+        # → tutor(Q4) — alternating. With max_tutor_turns=2, only the
+        # two most recent tutor turns should remain.
+        for i in range(8):
+            role = 'tutor' if i % 2 == 0 else 'student'
+            _add_turn(session, role, f'msg {i}', step=step)
+        # Last turn is i=7 (student). Tutor turns at i = 0, 2, 4, 6.
+        # With cap of 2, we keep tutors at i=6 and i=4, plus the
+        # student turns from i=5..7.
+        window = build_recent_window(
+            session, max_turns=10, max_tutor_turns=2,
+        )
+        tutor_contents = [t.content for t in window if t.role == 'tutor']
+        self.assertEqual(tutor_contents, ['msg 4', 'msg 6'])
+        # Older tutor turns (msg 0, msg 2) are NOT in the window
+        all_contents = [t.content for t in window]
+        self.assertNotIn('msg 0', all_contents)
+        self.assertNotIn('msg 2', all_contents)
 
     def test_respects_step_boundary(self):
         """Turns from prior steps must NOT appear in the window."""
@@ -284,50 +312,11 @@ class StepSummaryLogTest(DjangoTestCase):
         self.assertEqual(len(log), 3)
 
 
-# ============================================================================
-# set_current_question / clear_current_question
-# ============================================================================
-
-
-class CurrentQuestionLifecycleTest(DjangoTestCase):
-
-    def test_set_persists(self):
-        session = _make_session_with_lesson()
-        self.assertIsNone(session.current_question_id)
-        set_current_question(session, 42)
-        session.refresh_from_db()
-        self.assertEqual(session.current_question_id, 42)
-
-    def test_set_idempotent_no_save_on_repeat(self):
-        session = _make_session_with_lesson()
-        set_current_question(session, 42)
-        session.refresh_from_db()
-        first_updated_at = session.started_at
-        # Repeat with same value — should not re-save
-        set_current_question(session, 42)
-        session.refresh_from_db()
-        self.assertEqual(session.current_question_id, 42)
-
-    def test_clear_persists_none(self):
-        session = _make_session_with_lesson()
-        set_current_question(session, 42)
-        clear_current_question(session)
-        session.refresh_from_db()
-        self.assertIsNone(session.current_question_id)
-
-    def test_clear_idempotent(self):
-        session = _make_session_with_lesson()
-        # Already None — clear should be a no-op
-        clear_current_question(session)
-        session.refresh_from_db()
-        self.assertIsNone(session.current_question_id)
-
-    def test_change_question(self):
-        session = _make_session_with_lesson()
-        set_current_question(session, 42)
-        set_current_question(session, 99)
-        session.refresh_from_db()
-        self.assertEqual(session.current_question_id, 99)
+# NOTE: set_current_question / clear_current_question tests were
+# removed 2026-05-26 (M11.3). The deterministic question anchor was
+# retired — see state.py for the rationale. The schema fields remain
+# on TutorSession but the simple-tutor engine no longer reads/writes
+# them.
 
 
 # ============================================================================

@@ -36,6 +36,16 @@ else:
 # Defaults — see auto-memory/feedback_simple_tutor_engine_design.md
 DEFAULT_RECENT_WINDOW_TURNS = 8
 
+# Cap on tutor turns kept in the window. Older tutor turns (from a
+# DIFFERENT question that's already settled) consistently confuse
+# the LLM into hinting about the wrong question even when those turns
+# carry `graded`/`in_flight` markers. Per user direction 2026-05-26:
+# keep ONLY the most recent tutor turn. Trade-off: hint-ladder context
+# (prior hints for the same question) is lost — the LLM re-derives
+# hints from scratch each turn. Acceptable because hint quality
+# stays good and the alternative (wrong-question hints) is worse.
+DEFAULT_MAX_TUTOR_TURNS_IN_WINDOW = 1
+
 
 # ============================================================================
 # Sliding window — last N turns of the CURRENT step
@@ -45,22 +55,31 @@ DEFAULT_RECENT_WINDOW_TURNS = 8
 def build_recent_window(
     session: 'TutorSession',
     max_turns: int = DEFAULT_RECENT_WINDOW_TURNS,
+    max_tutor_turns: int = DEFAULT_MAX_TUTOR_TURNS_IN_WINDOW,
 ) -> 'list[SessionTurn]':
-    """Return the last ``max_turns`` SessionTurns from the session's
-    CURRENT step.
+    """Return the most relevant SessionTurns for the current question
+    thread.
 
-    Scoped to the current step so older steps' turns don't pollute the
-    context. Older steps are represented by step-anchored summaries via
-    :func:`step_summary_log` instead.
+    Two caps:
+      * ``max_turns`` — overall cap on turns returned.
+      * ``max_tutor_turns`` — cap on tutor turns specifically. Older
+        tutor turns (from a different, already-settled question) tend
+        to confuse the LLM into hinting about the wrong question.
+        Default is 2: keep the most recent tutor turn (the in-flight
+        one) and at most one prior hint turn for the same question
+        ladder. Anything older gets dropped.
+
+    Algorithm: walk newest → oldest, include turns until we've kept
+    ``max_tutor_turns`` tutor turns OR hit ``max_turns`` total. Return
+    in chronological order (oldest → newest).
 
     Args:
         session: TutorSession instance.
-        max_turns: Cap on the number of turns returned. Defaults to 8.
+        max_turns: Total turn cap.
+        max_tutor_turns: Tutor-turn cap (older tutor turns dropped).
 
     Returns:
         List of SessionTurn instances, oldest → newest.
-        Empty list if session has no turns yet OR if the current step
-        has no turns yet (e.g., session just advanced).
     """
     if max_turns <= 0:
         return []
@@ -70,14 +89,29 @@ def build_recent_window(
         # No active step (session not started or completed). Window
         # spans the entire session as a last-ditch fallback.
         qs = session.turns.order_by('-created_at')[:max_turns]
-        return list(reversed(list(qs)))
+        candidates = list(qs)
+    else:
+        # Include turns with step=current_step OR step=None. The v1
+        # chat_start endpoint writes its intro tutor turn with
+        # step=None and we need it on turn 1 of the simple-tutor.
+        from django.db.models import Q
+        qs = (
+            session.turns
+            .filter(Q(step=current_step) | Q(step__isnull=True))
+            .order_by('-created_at')[:max_turns]
+        )
+        candidates = list(qs)
 
-    qs = (
-        session.turns
-        .filter(step=current_step)
-        .order_by('-created_at')[:max_turns]
-    )
-    return list(reversed(list(qs)))
+    # Cap by tutor-turn count (walking newest → oldest).
+    result: list = []
+    tutor_count = 0
+    for turn in candidates:   # already newest → oldest
+        if getattr(turn, 'role', '') == 'tutor':
+            if tutor_count >= max_tutor_turns:
+                break
+            tutor_count += 1
+        result.append(turn)
+    return list(reversed(result))
 
 
 # ============================================================================
@@ -170,37 +204,17 @@ def step_summary_log(session: 'TutorSession') -> list[str]:
 # ============================================================================
 
 
-def set_current_question(session: 'TutorSession', question_id: int) -> None:
-    """Mark a question as currently posed by the tutor.
-
-    Mutates and saves ``session.current_question_id``. The next student
-    turn is expected to be an answer attempt against this question.
-
-    Idempotent — calling twice with the same id is a no-op for the
-    persisted state (the timestamp on ``updated_at`` may move).
-
-    Args:
-        session: TutorSession instance.
-        question_id: The ExitTicketQuestion (or step-question) PK the
-            tutor is asking about.
-    """
-    if session.current_question_id == question_id:
-        return
-    session.current_question_id = question_id
-    session.save(update_fields=['current_question_id'])
-
-
-def clear_current_question(session: 'TutorSession') -> None:
-    """Clear the currently-posed-question marker.
-
-    Called by record_answer (after grading) and by advance_step (when
-    moving to the next step). After clearing, the next student turn is
-    treated as a clarification or open response, not an answer attempt.
-    """
-    if session.current_question_id is None:
-        return
-    session.current_question_id = None
-    session.save(update_fields=['current_question_id'])
+# NOTE: set_current_question / clear_current_question were removed
+# 2026-05-26 (M11.3). The deterministic server-side question anchor was
+# retired because the LLM frequently authors its own questions outside
+# the catalog, leaving the anchor stale. The grader now operates on
+# LLM-provided context per record_answer call — see handle_record_answer
+# in tools.py and the M11.3 milestones note.
+#
+# The DB columns ``TutorSession.current_question_id`` and
+# ``TutorSession.current_question_source`` remain on the schema for
+# backwards compatibility with older sessions, but the simple-tutor
+# engine no longer reads or writes them.
 
 
 # ============================================================================

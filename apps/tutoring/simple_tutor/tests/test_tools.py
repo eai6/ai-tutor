@@ -21,16 +21,16 @@ from apps.tutoring.models import (
 )
 from apps.tutoring.simple_tutor.tools import (
     DEFAULT_COMPETENCE_THRESHOLD,
+    DEFAULT_POOL_SIZE,
     DEFAULT_STEP_TURN_CAP,
-    auto_grade_if_missed,
+    EXCLUDED_QUESTION_TYPES,
+    build_question_pool,
     handle_advance_step,
     handle_record_answer,
     handle_request_figure,
     handle_redirect_off_topic,
     maybe_advance_step,
-    pick_current_question,
     _current_step_correct_verdict_count,
-    _looks_like_answer_attempt,
 )
 
 User = get_user_model()
@@ -39,13 +39,26 @@ User = get_user_model()
 _counter = {'n': 0}
 
 
-def _make_session(*, n_questions=3, n_steps=2, with_objective=True):
+def _make_session(
+    *,
+    n_questions=3,
+    n_steps=2,
+    with_objective=True,
+    step_question='',
+    step_expected_answer='',
+):
     """Build a session + lesson + exit ticket with N MCQ questions.
 
     Steps and questions share the same ``enabling_objective`` so the
     enabling_objective-based filter in pick_current_question routes
     them to the current step. Pass ``with_objective=False`` to leave
     fields blank (tests the legacy/sparse-data fallback).
+
+    ``step_question`` + ``step_expected_answer`` are empty by default —
+    the simple tutor's LessonStep-primary pickup is exercised by tests
+    that explicitly set them (see ``PickCurrentQuestionLessonStepTest``).
+    Leaving them blank routes pickup to the ExitTicketQuestion fallback,
+    which is what these legacy tests assert against.
     """
     _counter['n'] += 1
     i = _counter['n']
@@ -66,7 +79,7 @@ def _make_session(*, n_questions=3, n_steps=2, with_objective=True):
     for idx in range(n_steps):
         LessonStep.objects.create(
             lesson=lesson, teacher_script=f's{idx}',
-            question='?', expected_answer='42',
+            question=step_question, expected_answer=step_expected_answer,
             phase='engage', order_index=idx,
             enabling_objective=objective_text,
         )
@@ -91,12 +104,23 @@ def _make_session(*, n_questions=3, n_steps=2, with_objective=True):
     return session, questions
 
 
-def _add_graded_turn(session, question, verdict='correct'):
-    """Helper: add a tutor turn with a recorded grader verdict."""
+def _add_graded_turn(session, question, verdict='correct', source='exit_ticket'):
+    """Helper: add a tutor turn with a recorded grader verdict on the
+    session's CURRENT step (so _current_step_correct_verdict_count
+    counts it). question is kept as the legacy ref but no longer drives
+    pickup — see M11.3.
+    """
+    from apps.curriculum.models import LessonStep
+    step = (
+        LessonStep.objects
+        .filter(lesson=session.lesson, order_index=session.current_step_index or 0)
+        .first()
+    )
     return SessionTurn.objects.create(
         session=session,
         role='tutor',
         content='turn',
+        step=step,
         judge_outputs={
             'grader': {
                 'verdict': verdict,
@@ -105,7 +129,9 @@ def _add_graded_turn(session, question, verdict='correct'):
                 'per_criterion_scores': {},
                 'justification': 'test',
                 'needs_followup': False,
-                'question_id': question.pk,
+                'question_type': 'mcq',
+                'reference_answer': getattr(question, 'correct_answer', ''),
+                'question_text': getattr(question, 'question_text', ''),
             },
         },
     )
@@ -116,29 +142,88 @@ def _add_graded_turn(session, question, verdict='correct'):
 # ============================================================================
 
 
-class PickCurrentQuestionTest(DjangoTestCase):
+class BuildQuestionPoolTest(DjangoTestCase):
+    """The pool is context-only — no anchor, no skip-already-graded.
+    The LLM picks what to pose and what reference answer to grade
+    against, then passes both via record_answer.
+    """
 
-    def test_picks_first_question_when_none_graded(self):
-        session, qs = _make_session(n_questions=3)
-        q = pick_current_question(session)
-        self.assertIsNotNone(q)
-        self.assertEqual(q.pk, qs[0].pk)
+    def test_returns_pool_with_etq_questions(self):
+        session, etqs = _make_session(n_questions=3)
+        pool = build_question_pool(session)
+        # Pool should include the ETQs (no LessonStep.question in this
+        # default fixture).
+        pks = {getattr(q, 'pk', None) for q in pool}
+        for etq in etqs:
+            self.assertIn(etq.pk, pks)
 
-    def test_skips_already_graded(self):
-        session, qs = _make_session(n_questions=3)
-        _add_graded_turn(session, qs[0])
-        q = pick_current_question(session)
-        self.assertEqual(q.pk, qs[1].pk)
+    def test_includes_lesson_step_question_as_first_entry(self):
+        from apps.curriculum.models import LessonStep
+        session, _ = _make_session(
+            n_questions=2,
+            step_question='What is 7 × 8?',
+            step_expected_answer='56',
+        )
+        step = LessonStep.objects.get(lesson=session.lesson, order_index=0)
+        pool = build_question_pool(session)
+        self.assertGreater(len(pool), 0)
+        # First entry: the LessonStep-backed StepQuestion adapter
+        self.assertEqual(getattr(pool[0], 'source', None), 'lesson_step')
+        self.assertEqual(pool[0].pk, step.pk)
+        self.assertEqual(pool[0].question_text, 'What is 7 × 8?')
 
-    def test_returns_none_when_all_graded(self):
-        session, qs = _make_session(n_questions=2)
-        _add_graded_turn(session, qs[0])
-        _add_graded_turn(session, qs[1])
-        self.assertIsNone(pick_current_question(session))
-
-    def test_returns_none_when_lesson_has_no_questions(self):
+    def test_empty_when_lesson_has_no_questions(self):
         session, _ = _make_session(n_questions=0)
-        self.assertIsNone(pick_current_question(session))
+        # No LessonStep.question + no ETQs → empty pool.
+        self.assertEqual(build_question_pool(session), [])
+
+    def test_excludes_fill_in_blank_and_matching(self):
+        from apps.tutoring.models import ExitTicketQuestion, ExitTicket
+        from apps.curriculum.models import LessonStep
+        session, _ = _make_session(n_questions=0)
+        ticket = ExitTicket.objects.get(lesson=session.lesson)
+        eo = LessonStep.objects.filter(lesson=session.lesson, order_index=0).first().enabling_objective
+        fib = ExitTicketQuestion.objects.create(
+            exit_ticket=ticket, question_type='fill_in_blank',
+            question_text='_ is the capital.',
+            option_a='', option_b='', option_c='', option_d='',
+            correct_answer='', answer_data={'blanks': ['Paris']},
+            order_index=0, enabling_objective=eo,
+        )
+        mat = ExitTicketQuestion.objects.create(
+            exit_ticket=ticket, question_type='matching',
+            question_text='Match pairs',
+            option_a='', option_b='', option_c='', option_d='',
+            correct_answer='', order_index=1, enabling_objective=eo,
+        )
+        mcq = ExitTicketQuestion.objects.create(
+            exit_ticket=ticket, question_type='mcq',
+            question_text='Which is correct?',
+            option_a='alpha', option_b='beta',
+            option_c='gamma', option_d='delta',
+            correct_answer='B', order_index=2, enabling_objective=eo,
+        )
+        pool = build_question_pool(session)
+        pks = {getattr(q, 'pk', None) for q in pool}
+        self.assertIn(mcq.pk, pks)
+        self.assertNotIn(fib.pk, pks)
+        self.assertNotIn(mat.pk, pks)
+
+    def test_pool_capped_at_default_size(self):
+        session, _ = _make_session(n_questions=DEFAULT_POOL_SIZE + 5)
+        pool = build_question_pool(session)
+        self.assertLessEqual(len(pool), DEFAULT_POOL_SIZE)
+
+    def test_does_not_skip_already_graded(self):
+        """The pool is CONTEXT, not a worklist. Prior verdicts on a
+        question don't remove it from the pool (the LLM may still
+        reference it).
+        """
+        session, etqs = _make_session(n_questions=2)
+        _add_graded_turn(session, etqs[0])
+        pool = build_question_pool(session)
+        pks = {getattr(q, 'pk', None) for q in pool}
+        self.assertIn(etqs[0].pk, pks)
 
 
 # ============================================================================
@@ -147,47 +232,100 @@ class PickCurrentQuestionTest(DjangoTestCase):
 
 
 class HandleRecordAnswerTest(DjangoTestCase):
+    """Post-tear-down (M11.3): record_answer takes BOTH the student's
+    extracted answer AND the LLM-provided reference answer + type +
+    question text. No server-side question anchor; the grader operates
+    on the LLM's context.
+    """
 
-    def test_grades_against_current_question(self):
-        session, qs = _make_session(n_questions=2)
-        session.current_question_id = qs[0].pk
-        session.save(update_fields=['current_question_id'])
-
-        # Correct MCQ answer
-        r = handle_record_answer(session, extracted_answer='B')
+    def test_mcq_correct(self):
+        session, _ = _make_session()
+        r = handle_record_answer(
+            session,
+            extracted_answer='B',
+            reference_answer='B',
+            question_type='mcq',
+            question_text='Which is greatest?',
+        )
         self.assertTrue(r['recorded'])
-        self.assertEqual(r['question_id'], qs[0].pk)
         self.assertEqual(r['verdict'], 'correct')
         self.assertEqual(r['tier'], 'mcq')
+        self.assertEqual(r['question_type'], 'mcq')
+        self.assertEqual(r['reference_answer'], 'B')
 
-    def test_wrong_mcq(self):
-        session, qs = _make_session(n_questions=2)
-        session.current_question_id = qs[0].pk
-        session.save(update_fields=['current_question_id'])
-        r = handle_record_answer(session, extracted_answer='A')
+    def test_mcq_incorrect(self):
+        session, _ = _make_session()
+        r = handle_record_answer(
+            session,
+            extracted_answer='A',
+            reference_answer='B',
+            question_type='mcq',
+            question_text='Which?',
+        )
         self.assertTrue(r['recorded'])
         self.assertEqual(r['verdict'], 'incorrect')
 
-    def test_no_current_question_returns_error(self):
-        """Handler does NOT raise — returns error dict so engine flow continues."""
+    def test_short_numeric_correct(self):
         session, _ = _make_session()
-        session.current_question_id = None
-        session.save(update_fields=['current_question_id'])
-        r = handle_record_answer(session, extracted_answer='B')
-        self.assertFalse(r['recorded'])
-        self.assertIn('no current question', r['error'])
+        r = handle_record_answer(
+            session,
+            extracted_answer='42',
+            reference_answer='42',
+            question_type='short_numeric',
+            question_text='6 × 7 = ?',
+        )
+        self.assertTrue(r['recorded'])
+        self.assertEqual(r['verdict'], 'correct')
 
-    def test_stale_question_id_clears_pointer(self):
-        """If current_question_id points to a deleted question, handler
-        clears it AND returns an error dict (doesn't crash).
+    def test_short_numeric_with_unit_suffix(self):
+        """Reference '150°' should grade '150' as correct via the math
+        grader's unit-strip + tolerance.
         """
-        session, qs = _make_session()
-        session.current_question_id = 999_999    # bogus
-        session.save(update_fields=['current_question_id'])
-        r = handle_record_answer(session, extracted_answer='B')
+        session, _ = _make_session()
+        r = handle_record_answer(
+            session,
+            extracted_answer='150',
+            reference_answer='150°',
+            question_type='short_numeric',
+            question_text='What angle remains?',
+        )
+        self.assertTrue(r['recorded'])
+        self.assertEqual(r['verdict'], 'correct')
+
+    def test_empty_extracted_returns_error(self):
+        session, _ = _make_session()
+        r = handle_record_answer(
+            session,
+            extracted_answer='   ',
+            reference_answer='B',
+            question_type='mcq',
+            question_text='Which?',
+        )
         self.assertFalse(r['recorded'])
-        session.refresh_from_db()
-        self.assertIsNone(session.current_question_id)
+        self.assertIn('empty', r['error'])
+
+    def test_unknown_question_type_falls_back_to_short_answer(self):
+        """Unsupported types route to short_answer (verifier LLM)
+        instead of crashing. The fallback is recorded in question_type.
+        """
+        from unittest.mock import patch
+        session, _ = _make_session()
+        # Patch the verifier LLM to a deterministic correct verdict so
+        # this test doesn't depend on the network.
+        from apps.tutoring.simple_tutor import grader as _g
+        with patch.object(_g, '_grade_verifier_llm', return_value=_g.GradeResult(
+            verdict=_g.Verdict.CORRECT, confidence=1.0,
+            tier='verifier_llm', justification='mocked',
+        )):
+            r = handle_record_answer(
+                session,
+                extracted_answer='because tropical climates',
+                reference_answer='because of tropical climate',
+                question_type='unknown_type',
+                question_text='Why?',
+            )
+        self.assertTrue(r['recorded'])
+        self.assertEqual(r['question_type'], 'short_answer')
 
 
 # ============================================================================
@@ -295,100 +433,6 @@ class HandleRedirectOffTopicTest(DjangoTestCase):
 
 
 # ============================================================================
-# _looks_like_answer_attempt heuristic
-# ============================================================================
-
-
-class LooksLikeAnswerAttemptTest(DjangoTestCase):
-
-    def test_short_factual_answer(self):
-        self.assertTrue(_looks_like_answer_attempt('B'))
-        self.assertTrue(_looks_like_answer_attempt('150°'))
-        self.assertTrue(_looks_like_answer_attempt('Because tropical climates have heavy rainfall'))
-
-    def test_clarifying_question_rejected(self):
-        self.assertFalse(_looks_like_answer_attempt('What does export mean?'))
-        self.assertFalse(_looks_like_answer_attempt('Why is that?'))
-        self.assertFalse(_looks_like_answer_attempt('How do I solve this?'))
-        self.assertFalse(_looks_like_answer_attempt('Can you explain again?'))
-        self.assertFalse(_looks_like_answer_attempt('Tell me more about angles'))
-        self.assertFalse(_looks_like_answer_attempt('Explain it differently'))
-
-    def test_ends_with_question_mark_rejected(self):
-        self.assertFalse(_looks_like_answer_attempt('Is it B?'))
-
-    def test_empty_rejected(self):
-        self.assertFalse(_looks_like_answer_attempt(''))
-        self.assertFalse(_looks_like_answer_attempt('   '))
-
-    def test_very_long_rejected(self):
-        # >500 chars → likely a discussion not a focused answer
-        self.assertFalse(_looks_like_answer_attempt('answer ' * 100))
-
-
-# ============================================================================
-# auto_grade_if_missed
-# ============================================================================
-
-
-class AutoGradeIfMissedTest(DjangoTestCase):
-
-    def test_llm_called_record_answer_noop(self):
-        session, qs = _make_session()
-        session.current_question_id = qs[0].pk
-        session.save(update_fields=['current_question_id'])
-        result = auto_grade_if_missed(session, 'B', llm_called_record_answer=True)
-        self.assertIsNone(result)
-
-    def test_no_current_question_noop(self):
-        session, _ = _make_session()
-        session.current_question_id = None
-        session.save(update_fields=['current_question_id'])
-        result = auto_grade_if_missed(session, 'B', llm_called_record_answer=False)
-        self.assertIsNone(result)
-
-    def test_clarifying_question_noop(self):
-        session, qs = _make_session()
-        session.current_question_id = qs[0].pk
-        session.save(update_fields=['current_question_id'])
-        result = auto_grade_if_missed(
-            session, 'What is an angle?', llm_called_record_answer=False,
-        )
-        self.assertIsNone(result)
-
-    def test_answer_shaped_input_grades(self):
-        session, qs = _make_session()
-        session.current_question_id = qs[0].pk
-        session.save(update_fields=['current_question_id'])
-        result = auto_grade_if_missed(
-            session, 'B', llm_called_record_answer=False,
-        )
-        self.assertIsNotNone(result)
-        self.assertEqual(result.verdict.value, 'correct')
-        # tier override marks it as auto-fallback so analytics can tell
-        self.assertEqual(result.tier, 'auto_fallback')
-        self.assertIn('auto-fallback', result.justification)
-
-    def test_wrong_answer_via_auto_grade(self):
-        session, qs = _make_session()
-        session.current_question_id = qs[0].pk
-        session.save(update_fields=['current_question_id'])
-        result = auto_grade_if_missed(
-            session, 'A', llm_called_record_answer=False,
-        )
-        self.assertIsNotNone(result)
-        self.assertEqual(result.verdict.value, 'incorrect')
-
-    def test_stale_question_id_no_crash(self):
-        session, _ = _make_session()
-        session.current_question_id = 999_999
-        session.save(update_fields=['current_question_id'])
-        # Must return None rather than crashing on the lookup
-        result = auto_grade_if_missed(session, 'B', llm_called_record_answer=False)
-        self.assertIsNone(result)
-
-
-# ============================================================================
 # maybe_advance_step
 # ============================================================================
 
@@ -456,7 +500,6 @@ class MaybeAdvanceStepTest(DjangoTestCase):
         self.assertTrue(advanced)
         session.refresh_from_db()
         self.assertEqual(session.current_step_index, 1)
-        self.assertIsNone(session.current_question_id)
 
     def test_partial_verdict_does_not_count(self):
         """Only CORRECT verdicts count toward competence."""
@@ -476,14 +519,16 @@ class MaybeAdvanceStepTest(DjangoTestCase):
         advanced = maybe_advance_step(session, competence_threshold=2)
         self.assertTrue(advanced)
 
-    def test_advance_clears_current_question(self):
+    def test_advance_bumps_step_index(self):
+        """After a CORRECT verdict on the current step, the session
+        moves to the next step. Post-tear-down the engine no longer
+        touches current_question_id — that field is unused.
+        """
         session, qs = _make_session(n_questions=1)
         _add_graded_turn(session, qs[0], verdict='correct')
-        session.current_question_id = 42
-        session.save(update_fields=['current_question_id'])
         maybe_advance_step(session)
         session.refresh_from_db()
-        self.assertIsNone(session.current_question_id)
+        self.assertEqual(session.current_step_index, 1)
 
     def test_idempotent_when_no_more_to_advance(self):
         """Past the last step → no change on subsequent calls."""
@@ -526,44 +571,33 @@ class MaybeAdvanceStepTest(DjangoTestCase):
 
 
 class CurrentStepCorrectVerdictCountTest(DjangoTestCase):
-    """Helper underlying the competence trigger."""
+    """Helper underlying the competence trigger. Post-tear-down: uses
+    SessionTurn.step FK + grader.verdict directly, no question_id
+    matching.
+    """
 
-    def test_counts_only_correct_for_current_objective(self):
+    def test_counts_only_correct_verdicts_on_current_step(self):
         session, qs = _make_session(n_questions=3, n_steps=2)
         _add_graded_turn(session, qs[0], verdict='correct')
         _add_graded_turn(session, qs[1], verdict='partial')
         _add_graded_turn(session, qs[2], verdict='incorrect')
-        # 1 correct out of 3 graded
+        # 1 CORRECT verdict on the current step (step_index=0).
         self.assertEqual(_current_step_correct_verdict_count(session), 1)
 
     def test_zero_when_no_verdicts(self):
         session, _ = _make_session()
         self.assertEqual(_current_step_correct_verdict_count(session), 0)
 
-    def test_zero_when_objective_empty(self):
-        session, qs = _make_session(with_objective=False)
-        _add_graded_turn(session, qs[0], verdict='correct')
-        # No objective on the step → no objective-tied verdicts
+    def test_verdicts_on_other_steps_dont_count(self):
+        """Only verdicts on SessionTurn.step == current_step count."""
+        from apps.curriculum.models import LessonStep
+        session, qs = _make_session(n_questions=2, n_steps=2)
+        # Add a correct verdict on step 1 (NOT the current step 0)
+        step1 = LessonStep.objects.get(lesson=session.lesson, order_index=1)
+        SessionTurn.objects.create(
+            session=session, role='tutor', content='turn',
+            step=step1,
+            judge_outputs={'grader': {'verdict': 'correct'}},
+        )
+        # Engine is on step 0 — no correct verdicts on step 0 yet.
         self.assertEqual(_current_step_correct_verdict_count(session), 0)
-
-
-class PickCurrentQuestionByObjectiveTest(DjangoTestCase):
-    """When question + step share enabling_objective, picker filters
-    correctly. When the step's objective is empty (sparse legacy data),
-    picker falls back to lesson-wide pool.
-    """
-
-    def test_legacy_data_no_objective_falls_back_to_lesson_pool(self):
-        session, qs = _make_session(n_questions=2, with_objective=False)
-        # Both step + questions have empty objective — picker falls back
-        # to lesson-wide pool, returns first un-graded question.
-        q = pick_current_question(session)
-        self.assertIsNotNone(q)
-        self.assertEqual(q.pk, qs[0].pk)
-
-    def test_with_objective_filters_correctly(self):
-        # Default with_objective=True: step.enabling_objective matches
-        # questions, so picker filters and returns first.
-        session, qs = _make_session(n_questions=3, with_objective=True)
-        q = pick_current_question(session)
-        self.assertEqual(q.pk, qs[0].pk)

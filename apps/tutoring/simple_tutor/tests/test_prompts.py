@@ -28,7 +28,7 @@ from apps.tutoring.simple_tutor.prompts import (
     build_system_prompt,
     _escape_xml,
     _render_current_step_block,
-    _render_current_question,
+    _render_question_pool,
     _render_figure_catalog,
     _render_kb_block,
     _render_recent_turns_block,
@@ -41,13 +41,15 @@ from apps.tutoring.simple_tutor.prompts import (
 
 
 def _step(order_index=0, phase='engage', question='Step question?',
-          expected='42', teacher_script='Teach about X'):
+          expected='42', teacher_script='Teach about X',
+          enabling_objective='canonical objective'):
     return SimpleNamespace(
         order_index=order_index,
         phase=phase,
         question=question,
         expected_answer=expected,
         teacher_script=teacher_script,
+        enabling_objective=enabling_objective,
     )
 
 
@@ -137,14 +139,20 @@ class ToolSchemasTest(TestCase):
             self.assertGreater(len(t['description']), 50,
                                f'{t["name"]} description is too thin')
 
-    def test_record_answer_requires_only_extracted_answer(self):
-        # Critical: NO question_id parameter. The server already knows
-        # the question. This prevents LLM-attribution confusion.
+    def test_record_answer_requires_four_fields(self):
+        # Post-tear-down (M11.3): record_answer takes extracted_answer,
+        # reference_answer, question_type, question_text. No server
+        # anchor — the LLM provides all four.
         t = next(t for t in TOOL_SCHEMAS if t['name'] == 'record_answer')
-        self.assertEqual(t['input_schema']['required'], ['extracted_answer'])
+        required = t['input_schema']['required']
+        for field in (
+            'extracted_answer', 'reference_answer',
+            'question_type', 'question_text',
+        ):
+            self.assertIn(field, required)
         self.assertNotIn(
             'question_id', t['input_schema']['properties'],
-            'record_answer must NOT take question_id — server owns that',
+            'record_answer must NOT take question_id — anchor was retired',
         )
 
     def test_record_answer_description_forbids_grading(self):
@@ -225,9 +233,31 @@ class StepContentTest(TestCase):
         s = _render_current_step_block(_step(phase='explore'), None, [])
         self.assertIn('<phase>Explore</phase>', s)
 
-    def test_objective_in_step_block(self):
-        s = _render_current_step_block(_step(expected='canonical answer'), None, [])
-        self.assertIn('<objective>canonical answer</objective>', s)
+    def test_enabling_objective_in_step_block(self):
+        """The step's enabling_objective renders inside <enabling_objective>.
+        Regression: this used to render <objective>{expected_answer}</objective>
+        — the wrong field — leaving the LLM with no real objective.
+        """
+        s = _render_current_step_block(
+            _step(enabling_objective='Find missing angle around point'),
+            None, [],
+        )
+        self.assertIn(
+            '<enabling_objective>Find missing angle around point</enabling_objective>',
+            s,
+        )
+
+    def test_step_block_does_not_leak_expected_answer_as_objective(self):
+        """Guard against the prior bug where expected_answer was rendered
+        as <objective>. The LessonStep's expected_answer must stay out of
+        the step block — it belongs in <current_question><reference_answer>.
+        """
+        s = _render_current_step_block(
+            _step(expected='SECRET-EXPECTED-42',
+                  enabling_objective='real objective'),
+            None, [],
+        )
+        self.assertNotIn('SECRET-EXPECTED-42', s)
 
     def test_step_number_in_block(self):
         s = _render_current_step_block(_step(order_index=2), None, [])
@@ -244,27 +274,30 @@ class StepContentTest(TestCase):
         )
         self.assertIn('hydrological cycle', s)
 
-    def test_current_question_rendered_inside_step(self):
+    def test_question_pool_rendered_inside_step(self):
         q = _mcq_question(pk=42, stem='Which?', correct='B')
-        s = _render_current_step_block(_step(), q, [])
-        self.assertIn('<current_question id="42"', s)
+        s = _render_current_step_block(_step(), [q], [])
+        self.assertIn('<question_pool>', s)
         self.assertIn('Which?', s)
+        self.assertIn('type="mcq"', s)
 
 
 # ============================================================================
-# Question catalog
+# Question pool (context-only — LLM grades via record_answer args)
 # ============================================================================
 
 
-class CurrentQuestionTest(TestCase):
-    """Single <current_question> picked by the SERVER. No multi-question
-    catalog — prevents LLM-attribution confusion.
+class QuestionPoolTest(TestCase):
+    """The <question_pool> block shows a small catalog of questions
+    with reference answers as CONTEXT. No anchor — the LLM picks what
+    to pose. The pool is rendered with the same per-type detail the
+    LLM needs to choose a reference_answer for record_answer.
     """
 
     def test_mcq_includes_options_and_correct_letter(self):
         q = _mcq_question(pk=42, stem='Which is greatest?', correct='B')
-        s = _render_current_question(q)
-        self.assertIn('id="42"', s)
+        s = _render_question_pool([q])
+        self.assertIn('<question_pool>', s)
         self.assertIn('type="mcq"', s)
         self.assertIn('Which is greatest?', s)
         self.assertIn('<option key="A">alpha</option>', s)
@@ -274,16 +307,24 @@ class CurrentQuestionTest(TestCase):
     def test_short_answer_includes_model_answer(self):
         q = _short_answer(model_answer='because of evaporation',
                           keywords=['evaporation', 'sun'])
-        s = _render_current_question(q)
+        s = _render_question_pool([q])
         self.assertIn('type="short_answer"', s)
         self.assertIn('<reference_answer>because of evaporation</reference_answer>', s)
         self.assertIn('<key_concepts>evaporation, sun</key_concepts>', s)
 
-    def test_none_renders_status_marker(self):
-        # No question in play → self-closing tag with status="none" so the
-        # LLM knows to stay in conversational/Socratic mode.
-        s = _render_current_question(None)
-        self.assertEqual(s, '<current_question status="none"/>')
+    def test_empty_pool_renders_status_marker(self):
+        # No catalog questions for this step → self-closing tag so the
+        # LLM knows the pool is empty and may author its own question.
+        s = _render_question_pool([])
+        self.assertEqual(s, '<question_pool status="empty"/>')
+
+    def test_multiple_questions_each_indexed(self):
+        s = _render_question_pool([
+            _mcq_question(pk=1, stem='Q1?', correct='A'),
+            _mcq_question(pk=2, stem='Q2?', correct='B'),
+        ])
+        self.assertIn('index="1"', s)
+        self.assertIn('index="2"', s)
 
 
 # ============================================================================
@@ -345,7 +386,30 @@ class RecentTurnsTest(TestCase):
                  _turn('student', 'Because tropical countries get rain')]
         s = _render_recent_turns_block(turns)
         self.assertIn('<turn role="student">I think it is B</turn>', s)
-        self.assertIn('<turn role="tutor">Why do you think that?</turn>', s)
+        # The last tutor turn is marked in_flight so the LLM knows which
+        # turn to grade against.
+        self.assertIn(
+            '<turn role="tutor" in_flight="true">Why do you think that?</turn>',
+            s,
+        )
+
+    def test_last_tutor_turn_marked_in_flight(self):
+        """The most recent tutor turn carries in_flight="true" so the
+        LLM anchors its grading to it (per 2026-05-26 user direction).
+        Older tutor turns do not get the marker.
+        """
+        turns = [
+            _turn('tutor', 'Q1?'),
+            _turn('student', 'A'),
+            _turn('tutor', 'Q2?'),
+            _turn('student', 'B'),
+            _turn('tutor', 'Q3?'),
+        ]
+        s = _render_recent_turns_block(turns)
+        self.assertIn('<turn role="tutor" in_flight="true">Q3?</turn>', s)
+        # Earlier tutor turns do NOT carry in_flight
+        self.assertIn('<turn role="tutor">Q1?</turn>', s)
+        self.assertIn('<turn role="tutor">Q2?</turn>', s)
 
     def test_empty_returns_empty_string(self):
         # Empty turns → omit the block entirely (consistent with
@@ -418,19 +482,19 @@ class RulesContentTest(TestCase):
         # Quantified instead of vague — concrete sentence / word caps
         self.assertIn('2-4 sentences', block0)
         self.assertIn('150 words', block0)
-        # 5E-flexible turn modes (NOT "one question per turn")
-        self.assertIn('ONE FOCUSED TURN', block0)
+        # Tutor must keep each turn focused (not "one question per turn")
+        self.assertIn('Keep each turn focused', block0)
 
     def test_rules_describe_5e_phases(self):
-        # Tutor must be able to EXPLAIN content, not just ask questions
+        # Tutor must be able to explain content, not just ask questions
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
         )
         block0 = blocks[0]['text']
         for phase in ('Engage', 'Explore', 'Explain', 'Elaborate', 'Evaluate'):
             self.assertIn(phase, block0, f'5E phase {phase!r} missing')
-        # Specifically: Explain phase must say "deliver", not just questions
-        self.assertIn('DELIVER', block0)
+        # The Explain phase must instruct delivery, not just questioning
+        self.assertIn('Deliver content', block0)
 
     def test_rules_responsive_pacing(self):
         # Adapt to student cognitive load (struggling vs picking up fast)
@@ -438,14 +502,49 @@ class RulesContentTest(TestCase):
             session=_session(), step=_step(),
         )
         block0 = blocks[0]['text']
-        self.assertIn('RESPONSIVE PACING', block0)
+        self.assertIn('Responsive pacing', block0)
+
+    def test_rules_tutor_driven(self):
+        """Every reply must end with a concrete next action for the
+        student — no passive 'let me know when ready' endings.
+        """
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(),
+        )
+        block0 = blocks[0]['text']
+        self.assertIn('Tutor-driven', block0)
+        self.assertIn('concrete next action', block0)
+        # Explicit instruction NOT to wait for student to ask what's next
+        self.assertIn("immediately pose the next question", block0)
 
     def test_rules_forbid_self_grading(self):
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
         )
         block0 = blocks[0]['text']
-        self.assertIn('You do NOT decide correctness', block0)
+        self.assertIn("deterministic grader", block0)
+        self.assertIn("returns the verdict", block0)
+
+    def test_rules_hint_ladder(self):
+        """Wrong-answer behaviour is a 3-step hint ladder, then explain
+        + re-pose. Tutor must not reveal the answer.
+        """
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(),
+        )
+        block0 = blocks[0]['text']
+        # Hint ladder language
+        self.assertIn("hint ladder", block0)
+        self.assertIn("Do not reveal reference answers", block0)
+        # First two attempt levels named explicitly
+        self.assertIn("1st wrong attempt", block0)
+        self.assertIn("2nd wrong attempt", block0)
+        # 3rd+ attempts: continued hinting preferred, pivot is optional
+        self.assertIn("3rd+ wrong attempts", block0)
+        self.assertIn("Continued hinting is always preferred", block0)
+        # Pivot is permitted, not mandated
+        self.assertIn("Only pivot", block0)
+        self.assertIn("different, easier question", block0)
 
     def test_rules_no_caps_shouting(self):
         # Claude 4.5+ overtriggers on CRITICAL/MUST caps. Allow specific
@@ -477,8 +576,12 @@ class EndToEndShapeTest(TestCase):
     def test_full_render(self):
         blocks, tools = build_system_prompt(
             session=_session(),
-            step=_step(phase='explore', expected='150°', teacher_script='Tell them about angles'),
-            current_question=_mcq_question(pk=7, stem='What do angles around a point sum to?', correct='D'),
+            step=_step(
+                phase='explore', expected='150°',
+                teacher_script='Tell them about angles',
+                enabling_objective='Angles meeting at a point sum to 360°',
+            ),
+            question_pool=[_mcq_question(pk=7, stem='What do angles around a point sum to?', correct='D')],
             kb_chunks=[_kb_chunk('Angles around a point sum to 360°.')],
             figure_catalog=[{'id': 1, 'description': 'Diagram of angles'}],
             recent_window=[_turn('student', 'What is an angle?')],
@@ -497,10 +600,13 @@ class EndToEndShapeTest(TestCase):
         b1 = blocks[1]['text']
         self.assertIn('<current_step>', b1)
         self.assertIn('<phase>Explore</phase>', b1)
-        self.assertIn('150°', b1)
+        self.assertIn('Angles meeting at a point sum to 360°', b1)
         self.assertIn('Diagram of angles', b1)
-        self.assertIn('<current_question', b1)
+        self.assertIn('<question_pool>', b1)
         self.assertIn('What do angles around a point sum to?', b1)
+        # Regression: step.expected_answer must NOT leak into the
+        # step block as a free-floating "objective" or similar.
+        self.assertNotIn('150°', b1)
 
         # Block 2 — dynamic (no cache)
         b2 = blocks[2]['text']
@@ -510,7 +616,7 @@ class EndToEndShapeTest(TestCase):
         self.assertIn('What is an angle?', b2)
 
     def test_minimal_render_no_extras(self):
-        # No KB, no history, no figures, no question — only blocks 0 + 1
+        # No KB, no history, no figures, no pool — only blocks 0 + 1
         blocks, tools = build_system_prompt(
             session=_session(), step=_step(),
         )
@@ -523,14 +629,14 @@ class EndToEndShapeTest(TestCase):
         )
         self.assertEqual(len(blocks), 1)
 
-    def test_no_current_question_renders_status_none(self):
-        # Between questions — block 1 should still render but include
-        # the status="none" marker so the LLM stays in Socratic mode.
+    def test_empty_pool_renders_status_marker(self):
+        # No catalog questions for the step — pool renders status="empty"
+        # so the LLM knows it's free to author its own.
         blocks, _ = build_system_prompt(
-            session=_session(), step=_step(), current_question=None,
+            session=_session(), step=_step(), question_pool=None,
         )
         self.assertGreaterEqual(len(blocks), 2)
-        self.assertIn('<current_question status="none"/>', blocks[1]['text'])
+        self.assertIn('<question_pool status="empty"/>', blocks[1]['text'])
 
 
 class FiguresDisabledTest(TestCase):
