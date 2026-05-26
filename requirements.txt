@@ -130,6 +130,15 @@ soupsieve==2.8.3
 sqlparse==0.5.5
 stack-data==0.6.3
 sympy==1.14.0
+# Math grading cascade for the simple-tutor engine. Math-Verify is the
+# de-facto standard since the 2024 GSM8K/MATH eval cleanup; handles
+# $\frac{1}{2}$ = 0.5 = 50% natively. latex2sympy2-extended is the
+# HuggingFace-maintained LaTeX-to-sympy parser. See
+# memory/grading_system_research.md (WolframAlpha was considered and
+# rejected for v1 — cost+latency don't beat sympy+math-verify on
+# secondary-school math).
+math-verify>=0.6.0
+latex2sympy2-extended>=1.0.0
 tenacity==9.1.4
 threadpoolctl==3.6.0
 tokenizers==0.22.2

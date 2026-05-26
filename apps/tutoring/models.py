@@ -125,6 +125,37 @@ class TutorSession(models.Model):
                   "(e.g. 'struggler'). Empty for real sessions.",
     )
 
+    # Engine selection (M1 of memory/simple_tutor_engine_milestones.md).
+    # 'v1' = the legacy conversational_tutor.py state machine.
+    # 'simple' = apps/tutoring/simple_tutor.py — single-LLM-call engine
+    # with 5 tools (pose_question, record_answer, advance_step,
+    # request_figure, redirect_off_topic) and deterministic grading.
+    # Locked at session creation; do NOT mutate mid-session (would split
+    # state across two engines that don't read each other's tables).
+    class Engine(models.TextChoices):
+        V1 = 'v1', 'conversational_tutor'
+        SIMPLE = 'simple', 'simple_tutor'
+
+    engine = models.CharField(
+        max_length=16,
+        choices=Engine.choices,
+        default=Engine.V1,
+        db_index=True,
+        help_text="Which runtime engine handles this session. Locked at "
+                  "creation; do not change mid-session.",
+    )
+    # The question_id the simple-tutor LLM has currently posed via
+    # pose_question(). Set by tool handler; cleared by record_answer or
+    # advance_step. None means no specific question is currently in play —
+    # student input on the next turn should be treated as a clarification
+    # / open-ended response, not as an answer attempt.
+    # Unused on engine='v1'.
+    current_question_id = models.IntegerField(
+        null=True, blank=True,
+        help_text="ExitTicketQuestion or LessonStep question id the simple "
+                  "tutor has currently posed. None = no active question.",
+    )
+
     @property
     def lesson_duration_minutes(self):
         """Time spent on the lesson in minutes."""
