@@ -1141,12 +1141,78 @@ def start_for_view(session) -> dict:
     """Adapter for ``apps.tutoring.views.chat_start_session`` when the
     simple-tutor engine handles the warmup.
 
-    Opens the session via ``start()`` and projects the result into the
-    same JSON shape ``respond_for_view`` returns.
+    Three branches:
+
+    1. **Resume with in-flight question** — when an ``InFlightQuestion``
+       slot exists AND the session has prior turns, the student is
+       returning mid-question. Skip the LLM entirely and emit a
+       deterministic "Welcome back — here's where we left off"
+       message that re-displays the slot's stem + options. Prevents
+       the LLM from orphaning the in-flight question with a fresh
+       warmup pose. The slot itself is preserved so the next student
+       answer routes through GRADE mode normally.
+
+    2. **Fresh start** — no prior turns. Call ``start()`` which fires
+       the warmup ``_OPENING_INSTRUCTION``.
+
+    3. **Resume without in-flight slot** — there are prior turns but
+       no slot (e.g. the last tutor turn was teaching, not posing, or
+       the student finished and is now in remediation). Fall through
+       to ``start()`` and let the engine decide via mode detection
+       (POSE / TEACH / REMEDIATION).
     """
     from apps.curriculum.models import LessonStep
+    from apps.tutoring.models import InFlightQuestion, SessionTurn
+
+    in_flight = InFlightQuestion.objects.filter(session=session).first()
+    has_prior_turns = SessionTurn.objects.filter(session=session).exists()
+
+    if in_flight is not None and has_prior_turns:
+        message = _build_resume_message(in_flight)
+        step = _load_current_step(session)
+        SessionTurn.objects.create(
+            session=session,
+            role=SessionTurn.Role.TUTOR,
+            content=message,
+            step=step,
+        )
+        logger.info(
+            "[simple_tutor] resumed in-flight session=%s slot_id=%s type=%s",
+            session.pk, in_flight.pk, in_flight.question_type,
+        )
+        return _project_start_payload(session, message)
 
     out = start(session)
+    return _project_start_payload(session, out.get('content', ''))
+
+
+def _build_resume_message(slot) -> str:
+    """Deterministic welcome-back text + re-display of the in-flight
+    slot's question. Used by ``start_for_view`` on resume so we don't
+    burn an LLM call (and risk orphaning the slot) just to render a
+    question we already have.
+    """
+    from apps.tutoring.models import InFlightQuestion
+
+    stem = (slot.question_text or '').strip()
+    parts = [
+        "👋 Welcome back! You were working on this question — let's pick "
+        "up where we left off:",
+        '',
+        stem,
+    ]
+    if slot.question_type == InFlightQuestion.QuestionType.MCQ and slot.options:
+        for letter, opt in zip(('A', 'B', 'C', 'D'), slot.options):
+            parts.append(f"{letter}) {opt}")
+    return "\n".join(p for p in parts if p is not None).strip()
+
+
+def _project_start_payload(session, message: str) -> dict:
+    """Shared payload-shaping for ``start_for_view`` — keeps both the
+    resume and fresh-start branches returning the exact same JSON
+    shape ``chat_start_session`` expects.
+    """
+    from apps.curriculum.models import LessonStep
 
     session.refresh_from_db()
     current_idx = session.current_step_index or 0
@@ -1164,7 +1230,7 @@ def start_for_view(session) -> dict:
     is_complete = step is None or current_idx >= total_steps
 
     return {
-        'message': out.get('content', ''),
+        'message': message,
         'phase': phase,
         'media': [],
         'show_exit_ticket': False,

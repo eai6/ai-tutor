@@ -285,3 +285,90 @@ class ExitTicketEnvVarTest(DjangoTestCase):
         with patch.dict('os.environ', {'EXIT_TICKET_TYPES': '  '}):
             # Empty → default (mcq-only).
             self.assertEqual(_e._exit_ticket_allowed_types(), ('mcq',))
+
+
+class StartForViewResumeTest(DjangoTestCase):
+    """When the student returns to a session with an InFlightQuestion
+    already posed, ``start_for_view`` must re-anchor deterministically
+    (no LLM call, no new pose) so the original question isn't orphaned.
+    """
+
+    def test_resume_with_in_flight_skips_llm(self):
+        from apps.tutoring.models import InFlightQuestion, SessionTurn
+        from apps.tutoring.simple_tutor.engine import start_for_view
+
+        session = _make_session(n_questions=1)
+        # Simulate a prior turn (so this looks like a resume, not a
+        # fresh start) and an in-flight question awaiting an answer.
+        SessionTurn.objects.create(
+            session=session, role=SessionTurn.Role.TUTOR,
+            content='Earlier tutor turn',
+        )
+        InFlightQuestion.objects.create(
+            session=session,
+            question_text='Which is the largest-scale map?',
+            question_type='mcq',
+            options=['1:5,000', '1:50,000', '1:500,000', '1:5,000,000'],
+            reference_answer='A',
+            source='inline_authored',
+        )
+
+        # If the LLM is called, the patch raises — the resume branch
+        # MUST short-circuit before any LLM call.
+        with patch(
+            'apps.tutoring.simple_tutor.engine._call_llm',
+            side_effect=AssertionError('LLM should not be called on resume'),
+        ):
+            payload = start_for_view(session)
+
+        # The message re-displays the stem + lettered options.
+        self.assertIn('Welcome back', payload['message'])
+        self.assertIn('Which is the largest-scale map?', payload['message'])
+        self.assertIn('A) 1:5,000', payload['message'])
+        self.assertIn('D) 1:5,000,000', payload['message'])
+
+        # Slot is preserved so the next student answer routes to GRADE.
+        self.assertTrue(
+            InFlightQuestion.objects.filter(session=session).exists()
+        )
+
+        # A new tutor turn was persisted with the resume message.
+        latest = SessionTurn.objects.filter(
+            session=session, role=SessionTurn.Role.TUTOR,
+        ).latest('created_at')
+        self.assertIn('Welcome back', latest.content)
+
+    def test_resume_without_in_flight_falls_through_to_start(self):
+        """Resume with no in-flight slot just runs the normal start path
+        (the LLM decides whether to teach or pose).
+        """
+        from apps.tutoring.models import SessionTurn
+        from apps.tutoring.simple_tutor.engine import start_for_view
+
+        session = _make_session(n_questions=1)
+        SessionTurn.objects.create(
+            session=session, role=SessionTurn.Role.TUTOR,
+            content='Earlier turn',
+        )
+
+        with patch(
+            'apps.tutoring.simple_tutor.engine._call_llm',
+            return_value=_llm_response(text='resumed via LLM'),
+        ):
+            payload = start_for_view(session)
+
+        self.assertEqual(payload['message'], 'resumed via LLM')
+
+    def test_fresh_start_falls_through_to_start(self):
+        """No prior turns + no slot → normal warmup path."""
+        from apps.tutoring.simple_tutor.engine import start_for_view
+
+        session = _make_session(n_questions=1)
+
+        with patch(
+            'apps.tutoring.simple_tutor.engine._call_llm',
+            return_value=_llm_response(text='fresh start warmup'),
+        ):
+            payload = start_for_view(session)
+
+        self.assertEqual(payload['message'], 'fresh start warmup')
