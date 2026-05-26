@@ -203,6 +203,7 @@ def v2_respond_dispatch(session, message: str) -> dict:
     # (Phase 3 §3.1). Fail-soft: completion failures must not block
     # the response envelope from reaching the student.
     is_complete = False
+    exit_ticket_payload: Optional[dict] = None
     if result.selected_move == "close_topic":
         try:
             engine.complete_session()
@@ -212,18 +213,72 @@ def v2_respond_dispatch(session, message: str) -> dict:
                 "[v2_respond_dispatch] complete_session raised %s",
                 type(exc).__name__,
             )
+        # Surface the exit-ticket payload in the SAME envelope the
+        # frontend reads. The chat modal listens for show_exit_ticket
+        # + exit_ticket on chat_respond replies (see
+        # templates/tutoring/_partials/exit_modal.html); without this
+        # the v2 close_topic transition silently never triggers the
+        # modal end-to-end. Fail-soft: a missing/empty bank or any
+        # exception just leaves the payload null so the student still
+        # sees the close message.
+        try:
+            exit_ticket_payload = _build_exit_ticket_payload(session)
+        except Exception as exc:
+            logger.warning(
+                "[v2_respond_dispatch] exit-ticket payload build raised %s",
+                type(exc).__name__,
+            )
+
+    extra: dict = {
+        "selected_move": result.selected_move,
+        "verdict": (result.verdict.verdict.value if result.verdict else None),
+        "fallback_used": result.fallback_used,
+        "is_complete": is_complete,
+    }
+    if exit_ticket_payload is not None:
+        extra["show_exit_ticket"] = True
+        extra["exit_ticket"] = exit_ticket_payload
 
     return _envelope(
         session=session,
         message=result.response_text,
         phase=("completed" if is_complete else "engage"),
-        extra={
-            "selected_move": result.selected_move,
-            "verdict": (result.verdict.verdict.value if result.verdict else None),
-            "fallback_used": result.fallback_used,
-            "is_complete": is_complete,
-        },
+        extra=extra,
     )
+
+
+def _build_exit_ticket_payload(session) -> Optional[dict]:
+    """Sample + serialize this lesson's exit ticket for the modal.
+
+    Reuses the legacy bank-selection + modal-serializer helpers so the
+    frontend wire format is identical to the pretest / legacy
+    completion path. Returns ``None`` when the lesson has no
+    ExitTicket bank — the frontend then skips the modal and the
+    student sees the close message only.
+    """
+    from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+    from apps.tutoring.views import _serialize_pretest_questions_for_modal
+
+    lesson = session.lesson
+    if lesson is None:
+        return None
+    exit_ticket = ExitTicket.objects.filter(lesson=lesson).first()
+    if exit_ticket is None:
+        return None
+    bank = list(
+        ExitTicketQuestion.objects.filter(exit_ticket=exit_ticket)
+        .exclude(question_type="data_interpretation")
+        .order_by("order_index")
+    )
+    if not bank:
+        return None
+    POST_TEST_SIZE = 10
+    if len(bank) > POST_TEST_SIZE:
+        import random as _random
+        sampled = _random.sample(bank, POST_TEST_SIZE)
+    else:
+        sampled = bank
+    return _serialize_pretest_questions_for_modal(sampled)
 
 
 def v2_resume_dispatch(session) -> dict:

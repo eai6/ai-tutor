@@ -108,6 +108,14 @@ class TutoringContext(BaseModel):
     # Phase 1 placeholder routing tests.
     lesson_title: str = ""
     lesson_subject: str = ""
+    # Per-step pedagogy anchors lifted from the current LessonStep.
+    # Surfaced so (a) the explain / worked_example move prompts can
+    # ground their generation in lesson-authored content and (b) the
+    # safe-terminal templates can deliver each move's pedagogy minimum
+    # when the LLM-authored response fails conformance twice. Subject-
+    # agnostic — empty for any step without these fields populated.
+    current_step_teacher_script: str = ""
+    current_step_worked_example: str = ""
 
 
 class ProfileUpdate(BaseModel):

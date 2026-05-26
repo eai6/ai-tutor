@@ -47,7 +47,7 @@ from apps.tutoring.v2.services.media import MediaService
 from apps.tutoring.v2.services.move_selection import ALLOWED_MOVES, select_move
 from apps.tutoring.v2.services.student_grader import StudentGrader
 from apps.tutoring.v2.services.student_tutor import StudentTutor
-from apps.tutoring.v2.services.templates import render_safe_template
+from apps.tutoring.v2.services.templates import MoveAnchor, render_safe_template
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +136,11 @@ class TutorEngine:
                 verdict=None,
                 student_claim_present=False,
                 next_action_text="Let's get started together.",
+                move_anchor=self._build_move_anchor(
+                    context=context,
+                    selected_move=move,
+                    runtime_state=runtime_state,
+                ),
             )
             v2_trace["fallback_used"] = True
 
@@ -365,6 +370,11 @@ class TutorEngine:
                         else False
                     ),
                     next_action_text=next_action,
+                    move_anchor=self._build_move_anchor(
+                        context=context,
+                        selected_move=selected_move,
+                        runtime_state=runtime_state,
+                    ),
                 )
 
         # 4b. Phase B commit (Phase 1 §4): only commits if conformance
@@ -658,6 +668,11 @@ class TutorEngine:
                     verdict=verdict,
                     student_claim_present=False,
                     next_action_text=next_action,
+                    move_anchor=self._build_move_anchor(
+                        context=context,
+                        selected_move=move,
+                        runtime_state=context.runtime_state,
+                    ),
                 ),
                 pending_pose=None,
             )
@@ -770,6 +785,31 @@ class TutorEngine:
             return stems
         except Exception:
             return []
+
+    def _build_move_anchor(
+        self,
+        *,
+        context: TutoringContext,
+        selected_move: str,
+        runtime_state: SessionRuntimeState,
+    ) -> MoveAnchor:
+        """Build the pedagogy anchor handed to ``render_safe_template``.
+
+        Subject-agnostic: pulls open-question stem from runtime state
+        and step-level content (``teacher_script`` /
+        ``worked_example``) from the pre-resolved TutoringContext
+        fields. The safety floor uses whichever fields are populated;
+        empty fields trigger generic-shape fallbacks within the
+        templates module.
+        """
+        open_q = runtime_state.open_question
+        return MoveAnchor(
+            selected_move=selected_move,
+            open_question_stem=(open_q.rendered_stem if open_q else ""),
+            objective=context.current_objective or "",
+            teacher_script=context.current_step_teacher_script or "",
+            worked_example=context.current_step_worked_example or "",
+        )
 
     def _render_next_action_for_template(
         self,

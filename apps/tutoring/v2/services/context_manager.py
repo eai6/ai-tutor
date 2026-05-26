@@ -173,6 +173,8 @@ class ContextManager:
         if full_transcript is None:
             full_transcript = self._load_full_transcript()
 
+        teacher_script, worked_example = self._current_step_pedagogy(session)
+
         return TutoringContext(
             session_id=session.id,
             student_id=student.id,
@@ -189,7 +191,30 @@ class ContextManager:
             current_objective=current_objective,
             lesson_title=lesson_title,
             lesson_subject=lesson_subject,
+            current_step_teacher_script=teacher_script,
+            current_step_worked_example=worked_example,
         )
+
+    def _current_step_pedagogy(self, session) -> tuple[str, str]:
+        """Resolve teacher_script + worked-example text for the active step.
+
+        Both default to empty strings on any miss (no lesson, no steps,
+        step out of range, model attribute absent). Subject-agnostic:
+        the explain / worked_example move prompts and the safe-terminal
+        templates use whichever is non-empty.
+        """
+        lesson = getattr(session, "lesson", None)
+        if lesson is None or not hasattr(lesson, "steps"):
+            return "", ""
+        idx = getattr(session, "current_step_index", 0) or 0
+        try:
+            step = lesson.steps.all()[idx]
+        except (IndexError, AttributeError, Exception):
+            return "", ""
+        teacher_script = (getattr(step, "teacher_script", "") or "").strip()
+        worked_example = _render_worked_example_text(step)
+        return teacher_script, worked_example
+
 
     def _load_full_transcript(self) -> list[dict]:
         """Load every prior turn for this session ordered oldest-first.
@@ -215,3 +240,46 @@ class ContextManager:
             }
             for r in rows
         ]
+
+
+def _render_worked_example_text(step) -> str:
+    """Flatten ``LessonStep.educational_content.worked_example`` to text.
+
+    Output shape (subject-agnostic):
+        Problem: <problem text>
+        1. <action> — <explanation>
+        2. ...
+        Final answer: <final>
+
+    Returns empty string when the field is absent / malformed. The
+    StudentTutor block + safe-terminal template treat an empty string
+    as "no anchor available" and adapt accordingly.
+    """
+    edu = getattr(step, "educational_content", None) or {}
+    if not isinstance(edu, dict):
+        return ""
+    we = edu.get("worked_example") or {}
+    if not isinstance(we, dict):
+        return ""
+    problem = str(we.get("problem") or "").strip()
+    steps_raw = we.get("steps") or []
+    final = str(we.get("final_answer") or "").strip()
+    if not (problem or steps_raw or final):
+        return ""
+    lines: list[str] = []
+    if problem:
+        lines.append(f"Problem: {problem}")
+    for i, s in enumerate(steps_raw, start=1):
+        if not isinstance(s, dict):
+            continue
+        action = str(s.get("action") or s.get("step") or "").strip()
+        explanation = str(s.get("explanation") or "").strip()
+        if action and explanation:
+            lines.append(f"{i}. {action} — {explanation}")
+        elif action:
+            lines.append(f"{i}. {action}")
+        elif explanation:
+            lines.append(f"{i}. {explanation}")
+    if final:
+        lines.append(f"Final answer: {final}")
+    return "\n".join(lines).strip()

@@ -508,6 +508,7 @@ class StudentTutor:
         """
         objective_block = self._render_objective_block(context)
         media_block = self._render_media_catalog_block(media_catalog)
+        lesson_content_block = self._render_lesson_step_content_block(context)
         transcript_block = self._render_transcript_block(context.full_transcript)
         verdict_block = self._render_verdict_block(
             verdict=verdict, move=move,
@@ -515,6 +516,7 @@ class StudentTutor:
         return (
             f"{objective_block}\n\n"
             f"{media_block}\n\n"
+            f"{lesson_content_block}\n\n"
             f"=== Conversation transcript so far ===\n"
             f"{transcript_block}\n\n"
             f"{verdict_block}\n"
@@ -525,6 +527,36 @@ class StudentTutor:
             f"prompt for this turn. Follow the move's directives "
             f"exactly; do not invent a different move."
         )
+
+    def _render_lesson_step_content_block(self, context: TutoringContext) -> str:
+        """Render lesson-authored direct-instruction + worked-example text.
+
+        These anchors are the authoritative content for this step. The
+        ``explain`` and ``worked_example`` move prompts may lift from
+        them so the tutor's wording stays inside the lesson's framing
+        instead of training-data improvisation. Empty when neither
+        anchor was authored — the prompt then falls back to its own
+        generation, same as before.
+        """
+        ts = (context.current_step_teacher_script or "").strip()
+        we = (context.current_step_worked_example or "").strip()
+        if not ts and not we:
+            return (
+                "=== Lesson step content ===\n"
+                "(no authored direct-instruction or worked-example text "
+                "for the current step — generate the explanation / example "
+                "yourself, anchored to the lesson title and objective above)"
+            )
+        parts = ["=== Lesson step content ==="]
+        if ts:
+            parts.append("Direct-instruction draft (use to anchor `explain`):")
+            parts.append(ts)
+        if we:
+            if ts:
+                parts.append("")
+            parts.append("Worked example (use to anchor `worked_example`):")
+            parts.append(we)
+        return "\n".join(parts)
 
     # ------------------------------------------------------------------
     # Block renderers
