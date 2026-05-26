@@ -1127,6 +1127,31 @@ def chat_respond(request, session_id):
     logger = logging.getLogger('apps')
     logger.info(f"[respond] Starting for session {session_id}, message: {message[:50]}")
 
+    # ── Engine dispatch ──────────────────────────────────────────
+    # The simple-tutor engine (apps/tutoring/simple_tutor/) is selected
+    # via the SIMPLE_TUTOR_ENGINE env var. Default OFF → legacy v1.
+    # The student NEVER picks the engine — it's a deploy-level config
+    # set in the Container App env. See
+    # auto-memory/feedback_server_owns_question_state.md.
+    from apps.tutoring import simple_tutor
+    if simple_tutor.is_enabled():
+        from apps.tutoring.simple_tutor.engine import respond_for_view
+        try:
+            t0 = time.time()
+            payload = respond_for_view(session, message)
+            elapsed = time.time() - t0
+            logger.info(
+                f"[respond:simple] Completed in {elapsed:.1f}s "
+                f"step={payload.get('step_number')}/{payload.get('total_steps')}"
+            )
+            return JsonResponse(payload)
+        except Exception as e:
+            logger.error(f"[respond:simple] Failed: {e}", exc_info=True)
+            return JsonResponse(
+                {"error": "Something went wrong. Please try again."},
+                status=500,
+            )
+
     tutor = ConversationalTutor(session)
 
     try:
