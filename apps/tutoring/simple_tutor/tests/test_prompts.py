@@ -103,24 +103,32 @@ def _turn(role, content):
 
 
 class ToolSchemasTest(TestCase):
-    """3-tool design — pose_question and advance_step were dropped
-    when state ownership moved to the server (see
-    auto-memory/feedback_server_owns_question_state.md).
+    """4-tool design (revised 2026-05-26).
+    pose_question stays dropped (server picks the current question).
+    advance_step is back as a SOFT HINT (server has auto-advance + turn
+    cap as the safety net).
+    See auto-memory/feedback_server_owns_question_state.md.
     """
 
-    def test_three_tools_present(self):
+    def test_four_tools_present(self):
         names = {t['name'] for t in TOOL_SCHEMAS}
         self.assertEqual(
             names,
-            {'record_answer', 'request_figure', 'redirect_off_topic'},
+            {'record_answer', 'request_figure', 'redirect_off_topic',
+             'advance_step'},
         )
 
-    def test_dropped_tools_absent(self):
-        # Defensive: pose_question and advance_step were intentionally
-        # removed. Server owns question selection + step advancement.
+    def test_pose_question_still_absent(self):
+        # Defensive: pose_question stays out — server picks the question.
         names = {t['name'] for t in TOOL_SCHEMAS}
         self.assertNotIn('pose_question', names)
-        self.assertNotIn('advance_step', names)
+
+    def test_advance_step_description_marks_it_soft(self):
+        # The description must communicate that the platform also
+        # auto-advances — so LLM forgetting this tool isn't fatal.
+        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'advance_step')
+        self.assertIn('soft hint', t['description'].lower())
+        self.assertIn('auto-advance', t['description'].lower())
 
     def test_every_tool_has_description_and_input_schema(self):
         for t in TOOL_SCHEMAS:
@@ -407,9 +415,30 @@ class RulesContentTest(TestCase):
             session=_session(), step=_step(),
         )
         block0 = blocks[0]['text']
-        # "2-4 sentences" instead of "be concise"
+        # Quantified instead of vague — concrete sentence / word caps
         self.assertIn('2-4 sentences', block0)
-        self.assertIn('One question per turn', block0)
+        self.assertIn('150 words', block0)
+        # 5E-flexible turn modes (NOT "one question per turn")
+        self.assertIn('ONE FOCUSED TURN', block0)
+
+    def test_rules_describe_5e_phases(self):
+        # Tutor must be able to EXPLAIN content, not just ask questions
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(),
+        )
+        block0 = blocks[0]['text']
+        for phase in ('Engage', 'Explore', 'Explain', 'Elaborate', 'Evaluate'):
+            self.assertIn(phase, block0, f'5E phase {phase!r} missing')
+        # Specifically: Explain phase must say "deliver", not just questions
+        self.assertIn('DELIVER', block0)
+
+    def test_rules_responsive_pacing(self):
+        # Adapt to student cognitive load (struggling vs picking up fast)
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(),
+        )
+        block0 = blocks[0]['text']
+        self.assertIn('RESPONSIVE PACING', block0)
 
     def test_rules_forbid_self_grading(self):
         blocks, _ = build_system_prompt(
@@ -456,7 +485,7 @@ class EndToEndShapeTest(TestCase):
             step_summaries=['Step 1 (Engage) — mastered after 1 attempt'],
         )
         self.assertEqual(len(blocks), 3)
-        self.assertEqual(len(tools), 3)   # 3-tool design now
+        self.assertEqual(len(tools), 4)   # 4-tool design (advance_step soft hint added back)
 
         # Block 0 — static
         b0 = blocks[0]['text']
