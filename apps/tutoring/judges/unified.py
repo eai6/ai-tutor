@@ -1,4 +1,21 @@
-"""Single multi-axis judge — drop-in replacement for run_all_judges.
+"""
+DEPRECATED (Phase 3 §3.5 — refactor implementation plan).
+
+This module is part of the legacy tutoring pipeline. The v2 grader /
+tutor / conformance engine in ``apps.tutoring.v2`` replaces it. Kept
+loaded for resume of in-flight legacy sessions and as the kill-switch
+fallback (``NEW_TUTOR=off``). **Do not add new features here.**
+
+Deletion gate (Phase 3 §3.5):
+  1. v2 has served prod traffic ≥ 4 weeks post-cutover.
+  2. Zero kill-switch flips during that window.
+  3. Three consecutive weekly benchmark runs within ±2 pp of
+     cutover numbers on each P1 category.
+  4. No open P1 incidents tied to the v2 engine.
+
+Original module docstring follows:
+
+Single multi-axis judge — drop-in replacement for run_all_judges.
 
 Returns the SAME CombinedJudgeResult shape so the engine doesn't care
 which orchestrator produced it. Gated behind UNIFIED_JUDGE env var in
@@ -16,7 +33,6 @@ than the 7-specialist ensemble at ~42x lower cost, ~2x lower latency.
 
 Rollout plan: memory/unified_judge_rollout_plan.md.
 """
-
 from __future__ import annotations
 
 import json

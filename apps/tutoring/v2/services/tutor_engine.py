@@ -585,11 +585,18 @@ class TutorEngine:
             )
 
     def _build_media_catalog(self, context: TutoringContext) -> list[dict]:
-        """Build the per-turn media catalog via ``MediaService``."""
+        """Build the per-turn media catalog via ``MediaService``.
+
+        Passes the current objective + last student turn as the
+        ranking signal so KB-similarity selects the most-relevant
+        figures first (Phase 3 §3.2).
+        """
         try:
             return self.media_service.build_catalog(
                 lesson_id=context.lesson_id,
                 institution_id=context.institution_id,
+                topic_hint=context.current_objective or "",
+                recent_text=self._prior_student_turn(context) or "",
             )
         except Exception as exc:
             logger.warning(
@@ -758,3 +765,41 @@ class TutorEngine:
             is_enabling_objective=True,
             course=course,
         ).first()
+
+    # ------------------------------------------------------------------
+    # Session completion (Phase 3 §3.1 — profiler trigger)
+    # ------------------------------------------------------------------
+
+    def complete_session(self) -> None:
+        """Mark the session COMPLETED and run the end-of-session profiler.
+
+        Idempotent — repeat calls are no-ops once status is COMPLETED.
+        Profiler failure must not block completion: ``StudentProfiler``
+        already swallows its own exceptions, but we wrap the call too
+        as a belt-and-braces guard against import / wiring errors.
+        """
+        from django.utils import timezone
+
+        from apps.tutoring.models import TutorSession
+        from apps.tutoring.v2.services.profiler import StudentProfiler
+
+        session = self.context_manager.session
+        if session.status == TutorSession.Status.COMPLETED:
+            return
+
+        session.status = TutorSession.Status.COMPLETED
+        session.ended_at = timezone.now()
+        if not session.completed_lesson_at:
+            session.completed_lesson_at = timezone.now()
+        session.save(
+            update_fields=["status", "ended_at", "completed_lesson_at"],
+        )
+
+        try:
+            StudentProfiler().run_for_session(session)
+        except Exception as exc:
+            logger.warning(
+                "[TutorEngine] profiler.run_for_session raised %s "
+                "for session=%s",
+                type(exc).__name__, getattr(session, "id", None),
+            )

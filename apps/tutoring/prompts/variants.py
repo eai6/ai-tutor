@@ -1,4 +1,21 @@
-"""Production-promotable tutor prompt variants + deploy-time selection.
+"""
+DEPRECATED (Phase 3 §3.5 — refactor implementation plan).
+
+This module is part of the legacy tutoring pipeline. The v2 grader /
+tutor / conformance engine in ``apps.tutoring.v2`` replaces it. Kept
+loaded for resume of in-flight legacy sessions and as the kill-switch
+fallback (``NEW_TUTOR=off``). **Do not add new features here.**
+
+Deletion gate (Phase 3 §3.5):
+  1. v2 has served prod traffic ≥ 4 weeks post-cutover.
+  2. Zero kill-switch flips during that window.
+  3. Three consecutive weekly benchmark runs within ±2 pp of
+     cutover numbers on each P1 category.
+  4. No open P1 incidents tied to the v2 engine.
+
+Original module docstring follows:
+
+Production-promotable tutor prompt variants + deploy-time selection.
 
 The v3 baseline tutor prompts live in `anthropic.py` and `gemini.py`
 (different per provider: XML-tagged ~23k chars for Anthropic vs

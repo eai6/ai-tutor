@@ -199,14 +199,29 @@ def v2_respond_dispatch(session, message: str) -> dict:
     finally:
         reset_span_buffer(token)
 
+    # 3. Session completion on close_topic — fires StudentProfiler
+    # (Phase 3 §3.1). Fail-soft: completion failures must not block
+    # the response envelope from reaching the student.
+    is_complete = False
+    if result.selected_move == "close_topic":
+        try:
+            engine.complete_session()
+            is_complete = True
+        except Exception as exc:
+            logger.warning(
+                "[v2_respond_dispatch] complete_session raised %s",
+                type(exc).__name__,
+            )
+
     return _envelope(
         session=session,
         message=result.response_text,
-        phase="engage",
+        phase=("completed" if is_complete else "engage"),
         extra={
             "selected_move": result.selected_move,
             "verdict": (result.verdict.verdict.value if result.verdict else None),
             "fallback_used": result.fallback_used,
+            "is_complete": is_complete,
         },
     )
 
@@ -215,25 +230,39 @@ def v2_resume_dispatch(session) -> dict:
     """Re-render the last open question (if any) on session resume.
 
     Per the Phase 3 §3.4 resume-artifact-preservation test: when an
-    open question exists, surface it verbatim on resume — no new
-    pre-pose check, no new selection, no canonical leak. When no open
-    question is set, emit a neutral re-entry message.
+    open question exists, surface it verbatim on resume — identical
+    visible text, attached media IDs, and (for MCQ) the same option
+    order. No new pre-pose check, no new question selection, no
+    canonical leak in the resume opener. When no open question is
+    set, emit a neutral re-entry message.
     """
     cm = ContextManager(session)
     state = cm.load_runtime_state()
     open_q = state.open_question
+    extra: dict = {"resume": True}
     if open_q is not None:
+        snapshot = open_q.visible_context_at_pose
         msg = (
             f"Welcome back — let's pick up where we left off. "
             f"The open question: {open_q.rendered_stem}"
         )
+        # MCQ option order is preserved verbatim across resume.
+        if snapshot.mcq_option_order:
+            extra["mcq_options"] = list(snapshot.mcq_option_order)
+        if snapshot.attached_media_ids:
+            extra["attached_media_ids"] = list(snapshot.attached_media_ids)
+        extra["open_question"] = {
+            "source": open_q.source.value,
+            "id": open_q.id,
+            "rendered_stem": open_q.rendered_stem,
+        }
     else:
         msg = "Welcome back — let's keep going from where we paused."
     return _envelope(
         session=session,
         message=msg,
         phase="engage",
-        extra={"resume": True},
+        extra=extra,
     )
 
 

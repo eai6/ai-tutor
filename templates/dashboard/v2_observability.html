@@ -1,0 +1,96 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}v2 Engine Observability{% endblock %}
+{% block page_title %}v2 Engine Observability{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Window</div>
+        <div class="stat-value">{{ window_hours }}h</div>
+        <div class="stat-change">{{ aggregates.total_turns }} tutor turns</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Safe-template trigger rate</div>
+        <div class="stat-value">{{ aggregates.safe_template_rate|floatformat:3 }}</div>
+        <div class="stat-change">{{ aggregates.fallback_count }} fallbacks</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Unverified-verdict rate</div>
+        <div class="stat-value">{{ aggregates.unverified_rate|floatformat:3 }}</div>
+        <div class="stat-change">conformance escapes</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Conformance retry rate</div>
+        <div class="stat-value">{{ aggregates.retry_count }}</div>
+        <div class="stat-change">of {{ aggregates.total_turns }} turns</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">P1 errors caught (correct→wrong)</div>
+        <div class="stat-value">{{ aggregates.p1_correct_to_wrong_caught }}</div>
+        <div class="stat-change">conformance rejections</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">P1 errors caught (wrong→correct)</div>
+        <div class="stat-value">{{ aggregates.p1_wrong_to_correct_caught }}</div>
+        <div class="stat-change">conformance rejections</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Pre-pose refusal rate</div>
+        <div class="stat-value">{{ aggregates.pre_pose_refusal_rate|floatformat:3 }}</div>
+        <div class="stat-change">{{ aggregates.pre_pose_refusals }} of {{ aggregates.pre_pose_attempts }}</div>
+    </div>
+</div>
+
+{% if aggregates.alerts %}
+<section style="margin-top: 24px;">
+    <h2>Active alerts</h2>
+    <ul>
+        {% for alert in aggregates.alerts %}
+            <li><strong>{{ alert }}</strong></li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+<section style="margin-top: 24px;">
+    <h2>Verdict distribution</h2>
+    <table>
+        <thead><tr><th>Verdict</th><th>Count</th></tr></thead>
+        <tbody>
+            {% for verdict, count in aggregates.verdict_distribution.items %}
+            <tr><td>{{ verdict }}</td><td>{{ count }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section style="margin-top: 24px;">
+    <h2>Move-selection distribution</h2>
+    <table>
+        <thead><tr><th>Move</th><th>Count</th></tr></thead>
+        <tbody>
+            {% for move, count in aggregates.move_distribution.items %}
+            <tr><td>{{ move }}</td><td>{{ count }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section style="margin-top: 24px;">
+    <h2>Per-stage latency (ms)</h2>
+    <table>
+        <thead><tr><th>Stage</th><th>Count</th><th>p50</th><th>p95</th></tr></thead>
+        <tbody>
+            {% for stage, stats in aggregates.stage_latency_ms.items %}
+            <tr>
+                <td>{{ stage }}</td>
+                <td>{{ stats.count }}</td>
+                <td>{{ stats.p50_ms }}</td>
+                <td>{{ stats.p95_ms }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

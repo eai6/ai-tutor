@@ -212,9 +212,16 @@ class StudentTutor:
         )
 
     def _render_media_catalog_block(self, catalog: list[dict]) -> str:
-        """Render the lesson-scoped media catalog the tutor can reference."""
+        """Render the lesson-scoped media catalog the tutor can reference.
+
+        When the catalog is non-empty, includes the dual-coding
+        directive from ``MediaService.dual_coding_directive()`` per
+        Phase 3 §3.2 — verbal + visual throughout (Ch. 14).
+        """
         if not catalog:
             return "=== Media catalog ===\n(none available)"
+        from apps.tutoring.v2.services.media import MediaService
+
         lines = ["=== Media catalog ==="]
         for idx, entry in enumerate(catalog, start=1):
             title = (entry.get("title") or "").strip() or "(untitled)"
@@ -224,6 +231,7 @@ class StudentTutor:
             "Append `|||MEDIA:N|||` as the LAST line of your response when "
             "showing a figure (1-based index into the catalog above)."
         )
+        lines.append(MediaService.dual_coding_directive())
         return "\n".join(lines)
 
     def _render_transcript_block(self, transcript: list[dict]) -> str:

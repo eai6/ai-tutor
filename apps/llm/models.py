@@ -321,49 +321,75 @@ class ModelConfig(models.Model):
             return os.getenv(self.api_key_env_var, '')
         return ''
 
-    # Deploy-time tutoring-model override via env var. Mirrors the
-    # UNIFIED_JUDGE kill-switch pattern (apps/tutoring/combined_judge.py
-    # :555). Format: "provider/model_name", e.g.
-    # "anthropic/claude-sonnet-4-6" or "google/gemini-3.1-pro-preview".
-    # Empty / unset = use the DB-active config (current production
-    # behaviour). Scoped to purpose='tutoring' only -- judge / regen /
-    # generation purposes keep their DB-active config so an operator
-    # accidentally setting the env var doesn't quietly retarget every
-    # LLM call in the system.
-    _TUTOR_MODEL_OVERRIDE_ENV = 'TUTOR_MODEL_OVERRIDE'
+    # Deploy-time tutoring-model overrides via env var. Format:
+    # "provider/model_name" (e.g. "anthropic/claude-sonnet-4-6").
+    # Empty / unset = use the DB-active config (mirrors the historical
+    # TUTOR_MODEL_OVERRIDE pattern). Phase 3 §3.6.1 replaces the
+    # single legacy env var with one per v2 ModelConfig.Purpose so
+    # each dispatched call can be retargeted independently.
+    _LEGACY_TUTORING_OVERRIDE_ENV = 'TUTOR_MODEL_OVERRIDE'
+    _PURPOSE_OVERRIDE_ENVS = {
+        'tutoring': _LEGACY_TUTORING_OVERRIDE_ENV,
+        'tutor_move': 'TUTOR_MOVE_MODEL_OVERRIDE',
+        'grader_math': 'GRADER_MATH_MODEL_OVERRIDE',
+        'grader_grounded': 'GRADER_GROUNDED_MODEL_OVERRIDE',
+        'conformance_classifier': 'CONFORMANCE_CLASSIFIER_MODEL_OVERRIDE',
+        'tutor_claim_adjudicator': 'TUTOR_CLAIM_ADJUDICATOR_MODEL_OVERRIDE',
+        'profiler_summary': 'PROFILER_SUMMARY_MODEL_OVERRIDE',
+    }
+    # Purposes where Google-grounding is the required runtime branch.
+    # Non-Gemini overrides are refused at resolve-time (fail-soft to
+    # DB-active) so a deploy typo can't silently disable grounding.
+    _GROUNDING_REQUIRED_PURPOSES = frozenset({
+        'grader_grounded', 'tutor_claim_adjudicator',
+    })
 
     @classmethod
     def get_for(cls, purpose: str):
         """Get active config for a specific purpose, with fallback to any active config.
 
-        For purpose='tutoring', TUTOR_MODEL_OVERRIDE env var takes
-        precedence (format "provider/model_name"). See
-        `_TUTOR_MODEL_OVERRIDE_ENV` docstring above. On unknown
-        provider/model, logs a warning and falls through to the
-        DB-active config -- fail-soft so a typo doesn't break tutoring.
+        Each purpose may be retargeted by its own env var (see
+        ``_PURPOSE_OVERRIDE_ENVS``). On unknown provider/model the
+        runtime logs a warning and falls through to the DB-active
+        config — fail-soft so a typo doesn't break the path. The
+        legacy ``TUTOR_MODEL_OVERRIDE`` env var is still honoured for
+        ``purpose='tutoring'`` so in-flight legacy sessions resume
+        with the same dispatch surface they were running on.
         """
-        if purpose == cls.Purpose.TUTORING.value:
-            raw = (os.getenv(cls._TUTOR_MODEL_OVERRIDE_ENV, '') or '').strip()
+        env_name = cls._PURPOSE_OVERRIDE_ENVS.get(purpose)
+        if env_name:
+            raw = (os.getenv(env_name, '') or '').strip()
             if raw:
+                import logging
+                log = logging.getLogger(__name__)
                 if '/' not in raw:
-                    import logging
-                    logging.getLogger(__name__).warning(
+                    log.warning(
                         "[ModelConfig] %s=%r is malformed (expected "
                         "'provider/model_name'); falling back to DB-active",
-                        cls._TUTOR_MODEL_OVERRIDE_ENV, raw,
+                        env_name, raw,
                     )
                 else:
                     provider, model_name = raw.split('/', 1)
-                    runtime = cls.resolve_runtime(provider, model_name)
-                    if runtime is not None:
-                        return runtime
-                    import logging
-                    logging.getLogger(__name__).warning(
-                        "[ModelConfig] %s=%r did not resolve to a "
-                        "ModelConfig (unknown provider or missing API "
-                        "key env var); falling back to DB-active",
-                        cls._TUTOR_MODEL_OVERRIDE_ENV, raw,
-                    )
+                    if (
+                        purpose in cls._GROUNDING_REQUIRED_PURPOSES
+                        and provider.lower() != 'google'
+                    ):
+                        log.warning(
+                            "[ModelConfig] %s=%r non-Gemini provider on "
+                            "grounding-required purpose; falling back to "
+                            "DB-active to preserve Google-grounding",
+                            env_name, raw,
+                        )
+                    else:
+                        runtime = cls.resolve_runtime(provider, model_name)
+                        if runtime is not None:
+                            return runtime
+                        log.warning(
+                            "[ModelConfig] %s=%r did not resolve to a "
+                            "ModelConfig (unknown provider or missing API "
+                            "key env var); falling back to DB-active",
+                            env_name, raw,
+                        )
 
         config = cls.objects.filter(is_active=True, purpose=purpose).first()
         if not config:

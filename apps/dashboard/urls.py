@@ -4,12 +4,20 @@ Dashboard URL Configuration
 
 from django.urls import include, path
 from . import views
+from . import views_v2_observability
 
 app_name = 'dashboard'
 
 urlpatterns = [
     # Home
     path('', views.dashboard_home, name='home'),
+
+    # v2 engine observability (Phase 3 §3.3) — staff-only.
+    path(
+        'v2-observability/',
+        views_v2_observability.v2_observability_dashboard,
+        name='v2_observability',
+    ),
     
     # Students
     path('students/', views.student_list, name='student_list'),

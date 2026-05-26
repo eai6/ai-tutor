@@ -1,4 +1,21 @@
-"""Figure-vision judge — verifies that an attached figure actually
+"""
+DEPRECATED (Phase 3 §3.5 — refactor implementation plan).
+
+This module is part of the legacy tutoring pipeline. The v2 grader /
+tutor / conformance engine in ``apps.tutoring.v2`` replaces it. Kept
+loaded for resume of in-flight legacy sessions and as the kill-switch
+fallback (``NEW_TUTOR=off``). **Do not add new features here.**
+
+Deletion gate (Phase 3 §3.5):
+  1. v2 has served prod traffic ≥ 4 weeks post-cutover.
+  2. Zero kill-switch flips during that window.
+  3. Three consecutive weekly benchmark runs within ±2 pp of
+     cutover numbers on each P1 category.
+  4. No open P1 incidents tied to the v2 engine.
+
+Original module docstring follows:
+
+Figure-vision judge — verifies that an attached figure actually
 matches the question being posed about it.
 
 Uses an LLM with vision capability (Claude vision / GPT-4o vision /
@@ -15,7 +32,6 @@ gate this judge so it only runs when:
 
 When neither precondition is true we skip — no LLM call.
 """
-
 from __future__ import annotations
 
 import logging

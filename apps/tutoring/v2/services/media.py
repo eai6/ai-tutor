@@ -1,7 +1,9 @@
 """MediaService — lesson-scoped media catalog injection.
 
-Phase 2 §2.2 / §3.2 inlined thin selector. Phase 3 extracts a richer
-version (KB-similarity ranking, dual-coding directives).
+Phase 3 §3.2 — extracted form (KB-similarity ranking + dual-coding
+directives). Lifts the figure_facts block injection here too; the
+extended figure_ref conformance check reads from
+``MediaAsset.figure_facts`` populated at authoring time.
 
 Per R8 + the preserved-runtime-surfaces section of the plan:
   - Catalog is scoped at the Lesson level, NOT per step.
@@ -10,6 +12,12 @@ Per R8 + the preserved-runtime-surfaces section of the plan:
   - The ``|||MEDIA:N|||`` signal parser is lifted forward unchanged.
   - Multi-tenancy: ``Q(institution=inst) | Q(institution__isnull=True)``
     pattern when querying ``MediaAsset``.
+
+KB-similarity ranking uses cheap lexical-overlap scoring against the
+(objective + recent_text) signal. This stays inside the request path
+budget — no embedding query per turn. The full ChromaDB embedding
+path remains reserved for the authoring-time figure-description
+pipeline (``CurriculumKnowledgeBase.query_for_figure_descriptions``).
 """
 
 from __future__ import annotations
@@ -25,9 +33,33 @@ logger = logging.getLogger(__name__)
 # ``[SHOW_MEDIA:title]`` fuzzy form (deleted from the legacy engine).
 _MEDIA_SIGNAL_RE = re.compile(r"\|\|\|MEDIA:(\d+)\|\|\|", re.IGNORECASE)
 
+# Dual-coding directive language — Ch. 14 of science-principles.md
+# ("verbal + visual throughout"). Surfaced into per-move prompts via
+# ``dual_coding_directive()`` so the tutor knows *when* and *how* to
+# reach for the MEDIA signal.
+_DUAL_CODING_DIRECTIVE = (
+    "When a figure in the catalog clarifies a concrete step, attach it "
+    "with `|||MEDIA:N|||` and pair it with one sentence of verbal "
+    "explanation — not a replacement for words. Skip the figure when "
+    "the verbal explanation alone is sufficient; do NOT attach a "
+    "figure just because one exists."
+)
+
+
+# Tokens shorter than this are dropped before scoring. Keeps the
+# overlap-Jaccard from matching on stopwords / one-letter variables.
+_MIN_TOKEN_LEN = 2
+
+_STOPWORDS = {
+    "the", "a", "an", "of", "to", "in", "for", "on", "and", "or",
+    "is", "are", "was", "were", "be", "been", "being", "this", "that",
+    "these", "those", "with", "as", "at", "by", "it", "its", "from",
+    "we", "you", "i", "he", "she", "they", "them", "his", "her",
+}
+
 
 class MediaService:
-    """Thin per-lesson catalog selector + media-signal parser."""
+    """Lesson-scoped catalog selector + signal parser + dual-coding hook."""
 
     def build_catalog(
         self,
@@ -35,13 +67,19 @@ class MediaService:
         lesson_id: int,
         institution_id: int,
         max_entries: int = 6,
+        topic_hint: str = "",
+        recent_text: str = "",
     ) -> list[dict]:
         """Return up to ``max_entries`` lesson-scoped catalog entries.
 
         Each entry: ``{"id": int, "title": str, "description": str,
-        "figure_facts": list[str]}``. The tutor's per-move prompts
-        receive this list; the LLM may emit ``|||MEDIA:N|||`` to
-        attach the N-th entry (1-based).
+        "figure_facts": list[str], "score": float}``. When
+        ``topic_hint`` or ``recent_text`` is non-empty, entries are
+        ranked by lexical overlap against that signal — most-relevant
+        first. With no signal, ordering falls back to the lesson's
+        natural step order. The tutor's per-move prompts receive this
+        list; the LLM may emit ``|||MEDIA:N|||`` to attach the N-th
+        entry (1-based).
 
         Returns ``[]`` when the course has
         ``tutoring_images_enabled=False`` — the entire MEDIA block is
@@ -96,7 +134,7 @@ class MediaService:
                 .filter(
                     Q(institution_id=institution_id)
                     | Q(institution__isnull=True)
-                )[: max_entries]
+                )
             )
         except Exception as exc:
             logger.warning(
@@ -105,17 +143,33 @@ class MediaService:
             )
             return []
 
+        signal_tokens = _tokenize(f"{topic_hint} {recent_text}")
         entries: list[dict] = []
         for asset in qs:
+            title = getattr(asset, "title", "") or ""
+            desc = getattr(asset, "scene_description", "") or ""
+            facts = _coerce_figure_facts(getattr(asset, "figure_facts", None))
+            score = (
+                _relevance_score(
+                    signal_tokens,
+                    _tokenize(" ".join([title, desc, *facts])),
+                )
+                if signal_tokens
+                else 0.0
+            )
             entries.append({
                 "id": asset.pk,
-                "title": getattr(asset, "title", "") or "",
-                "description": getattr(asset, "scene_description", "") or "",
-                "figure_facts": _coerce_figure_facts(
-                    getattr(asset, "figure_facts", None),
-                ),
+                "title": title,
+                "description": desc,
+                "figure_facts": facts,
+                "score": score,
             })
-        return entries
+
+        # Rank by overlap when we had a signal; otherwise preserve
+        # the lesson's authoring order (stable for unscored entries).
+        if signal_tokens:
+            entries.sort(key=lambda e: e.get("score", 0.0), reverse=True)
+        return entries[:max_entries]
 
     def parse_signal(self, text: str) -> tuple[str, list[int]]:
         """Parse and strip the trailing ``|||MEDIA:N|||`` signal.
@@ -155,6 +209,25 @@ class MediaService:
                         facts.append(str(fact))
         return facts
 
+    # ------------------------------------------------------------------
+    # Dual-coding directive (Ch. 14 — verbal + visual throughout)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def dual_coding_directive() -> str:
+        """Return the dual-coding directive sentence for move prompts.
+
+        Surfaced inside the media catalog block whenever the catalog
+        is non-empty — guides the model on *when* to attach a figure
+        vs. when verbal explanation alone is sufficient.
+        """
+        return _DUAL_CODING_DIRECTIVE
+
+
+# ----------------------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------------------
+
 
 def _coerce_figure_facts(raw) -> list[str]:
     """Normalise figure_facts into a flat ``list[str]``."""
@@ -175,3 +248,30 @@ def _coerce_figure_facts(raw) -> list[str]:
                 out.append(str(v))
         return out
     return []
+
+
+def _tokenize(text: str) -> set[str]:
+    """Lower-case word tokens, dropping stopwords and tiny tokens."""
+    if not text:
+        return set()
+    raw = re.findall(r"[A-Za-z][A-Za-z0-9_]*", text.lower())
+    return {
+        t for t in raw
+        if len(t) >= _MIN_TOKEN_LEN and t not in _STOPWORDS
+    }
+
+
+def _relevance_score(signal: set[str], candidate: set[str]) -> float:
+    """Jaccard-style overlap, bias toward signal coverage.
+
+    Returns 0.0 when either side is empty. Symmetric Jaccard would
+    underweight short titles; we use ``|A ∩ B| / max(1, |A|)`` so a
+    figure whose tokens fully cover the topic ranks above one with
+    incidental overlap.
+    """
+    if not signal or not candidate:
+        return 0.0
+    inter = len(signal & candidate)
+    if inter == 0:
+        return 0.0
+    return inter / max(1, len(signal))

@@ -1,5 +1,32 @@
 """
-Conversational Tutor Engine
+DEPRECATED (Phase 3 §3.5 — refactor implementation plan).
+
+Conversational Tutor Engine — legacy single-prompt orchestrator.
+
+Replaced by the v2 grader / tutor / conformance pipeline under
+``apps.tutoring.v2``. ``NEW_TUTOR`` defaults to ``on`` as of Phase 3
+cutover (see ``apps/tutoring/v2/config/flags.py``); only the kill
+switch (``NEW_TUTOR=off``) routes *new* sessions back here. In-flight
+legacy sessions continue on this engine until they complete
+(sticky-per-session via ``TutorSession.engine_version``).
+
+Kept loaded for:
+  - Resume of in-flight legacy sessions.
+  - Kill-switch fallback for student-facing safety incidents.
+
+**Do not add new features here.** New code lands in
+``apps.tutoring.v2``. Deletion gate (Phase 3 §3.5):
+  1. v2 engine has served production traffic for ≥ 4 weeks
+     post-cutover.
+  2. Zero kill-switch flips during that window.
+  3. Three consecutive weekly benchmark runs stay within ±2 pp of
+     cutover numbers on each of the three P1 categories.
+  4. No open P1 incidents tied to the v2 engine.
+
+When all four hold, this module is deleted in a single commit.
+
+------------------------------------------------------------------
+Original docstring preserved below for historical reference:
 
 An LLM-driven tutoring system that actively leads learning conversations.
 The tutor dynamically generates responses based on:

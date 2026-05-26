@@ -15,27 +15,50 @@ on:
   # "Run workflow".
   workflow_dispatch:
     inputs:
-      tutor_prompt_variant:
-        description: 'Tutor prompt variant'
+      # Per-purpose model overrides for the v2 engine (Phase 3 §3.6.1).
+      # Each overrides the DB-active ModelConfig row for that purpose.
+      # Format: 'provider/model_name'. Empty = use DB-active.
+      # GRADER_GROUNDED + TUTOR_CLAIM_ADJUDICATOR are Gemini-only
+      # (Google-grounding is provider-required) — the workflow logs a
+      # warning if a non-Gemini value is supplied.
+      tutor_move_model_override:
+        description: 'TUTOR_MOVE override (provider/model_name); blank = DB-active'
         required: false
-        type: choice
-        default: 'baseline'
-        options:
-          - baseline      # current production per-provider template
-          - v6            # highest measured composite quality score
-          - v7            # branch-template restructure (smaller, cleaner)
-      tutor_model_override:
-        description: 'Tutor model override (provider/model_name); leave blank to use DB-active'
-        required: false
-        type: choice
+        type: string
         default: ''
+      grader_math_model_override:
+        description: 'GRADER_MATH override (provider/model_name); blank = DB-active'
+        required: false
+        type: string
+        default: ''
+      grader_grounded_model_override:
+        description: 'GRADER_GROUNDED override — Gemini-only; blank = DB-active'
+        required: false
+        type: string
+        default: ''
+      conformance_classifier_model_override:
+        description: 'CONFORMANCE_CLASSIFIER override (provider/model_name); blank = DB-active'
+        required: false
+        type: string
+        default: ''
+      tutor_claim_adjudicator_model_override:
+        description: 'TUTOR_CLAIM_ADJUDICATOR override — Gemini-only; blank = DB-active'
+        required: false
+        type: string
+        default: ''
+      profiler_summary_model_override:
+        description: 'PROFILER_SUMMARY override (provider/model_name); blank = DB-active'
+        required: false
+        type: string
+        default: ''
+      new_tutor:
+        description: 'NEW_TUTOR routing (default on; off = kill switch for safety incidents only)'
+        required: false
+        type: choice
+        default: 'on'
         options:
-          - ''                                            # use DB-active config
-          - 'anthropic/claude-sonnet-4-20250514'          # Sonnet 4 (standard)
-          - 'anthropic/claude-sonnet-4-6'                 # Sonnet 4.6 (standard, newer)
-          - 'anthropic/claude-opus-4-7'                   # Opus 4.7 (premium)
-          - 'google/gemini-3-flash-preview'               # Flash (cheapest)
-          - 'google/gemini-3.1-pro-preview'               # Pro (premium)
+          - 'on'
+          - 'off'
       skip_eval:
         description: 'Skip the post-deploy tutor evaluation (saves ~$5 and ~15 min)'
         required: false
@@ -94,40 +117,70 @@ jobs:
             --resource-group $RG \
             --mode single
 
-      # Resolve the prompt-variant + model-override values from
-      # (1) workflow_dispatch inputs if present, else
-      # (2) repo variables (`vars.TUTOR_PROMPT_VARIANT`,
-      #     `vars.TUTOR_MODEL_OVERRIDE`), else
-      # (3) defaults that preserve current production behaviour
-      #     (baseline prompt, no model override).
-      # Empty strings on either knob mean "use whatever's in the DB /
-      # built-in" — set explicitly so `az containerapp update` does
-      # not leave a stale value on the previous revision.
+      # Resolve the v2 per-purpose model overrides + NEW_TUTOR kill
+      # switch from (1) workflow_dispatch inputs, else (2) repo
+      # variables, else (3) defaults. Empty strings mean "use the
+      # DB-active config for that purpose" — set explicitly so
+      # `az containerapp update` does not inherit a stale value.
+      # Phase 3 §3.6.1 replaces the single TUTOR_MODEL_OVERRIDE with
+      # six per-purpose overrides (one per v2 ModelConfig.Purpose).
       - name: Resolve deploy-time config
         id: cfg
         run: |
-          PROMPT_VARIANT="${{ github.event.inputs.tutor_prompt_variant || vars.TUTOR_PROMPT_VARIANT || 'baseline' }}"
-          MODEL_OVERRIDE="${{ github.event.inputs.tutor_model_override || vars.TUTOR_MODEL_OVERRIDE || '' }}"
-          echo "prompt_variant=$PROMPT_VARIANT" >> $GITHUB_OUTPUT
-          echo "model_override=$MODEL_OVERRIDE" >> $GITHUB_OUTPUT
-          echo "::notice title=Deploy config::TUTOR_PROMPT_VARIANT=$PROMPT_VARIANT  TUTOR_MODEL_OVERRIDE=$MODEL_OVERRIDE"
+          TUTOR_MOVE="${{ github.event.inputs.tutor_move_model_override || vars.TUTOR_MOVE_MODEL_OVERRIDE || '' }}"
+          GRADER_MATH="${{ github.event.inputs.grader_math_model_override || vars.GRADER_MATH_MODEL_OVERRIDE || '' }}"
+          GRADER_GROUNDED="${{ github.event.inputs.grader_grounded_model_override || vars.GRADER_GROUNDED_MODEL_OVERRIDE || '' }}"
+          CONFORMANCE="${{ github.event.inputs.conformance_classifier_model_override || vars.CONFORMANCE_CLASSIFIER_MODEL_OVERRIDE || '' }}"
+          TUTOR_CLAIM="${{ github.event.inputs.tutor_claim_adjudicator_model_override || vars.TUTOR_CLAIM_ADJUDICATOR_MODEL_OVERRIDE || '' }}"
+          PROFILER="${{ github.event.inputs.profiler_summary_model_override || vars.PROFILER_SUMMARY_MODEL_OVERRIDE || '' }}"
+          NEW_TUTOR="${{ github.event.inputs.new_tutor || vars.NEW_TUTOR || 'on' }}"
+
+          # Gemini-only guard for the grounded purposes (warn but do
+          # not block — the runtime ModelConfig.get_for fail-soft will
+          # fall through to DB-active if the override is invalid).
+          for v in "$GRADER_GROUNDED" "$TUTOR_CLAIM"; do
+            if [[ -n "$v" && ! "$v" =~ ^google/ ]]; then
+              echo "::warning title=Non-Gemini override on grounded purpose::$v — Google-grounding requires a Gemini provider; runtime will fall through to DB-active."
+            fi
+          done
+
+          {
+            echo "tutor_move=$TUTOR_MOVE"
+            echo "grader_math=$GRADER_MATH"
+            echo "grader_grounded=$GRADER_GROUNDED"
+            echo "conformance=$CONFORMANCE"
+            echo "tutor_claim=$TUTOR_CLAIM"
+            echo "profiler=$PROFILER"
+            echo "new_tutor=$NEW_TUTOR"
+          } >> $GITHUB_OUTPUT
+
+          echo "::notice title=Deploy config::NEW_TUTOR=$NEW_TUTOR  TUTOR_MOVE=$TUTOR_MOVE  GRADER_MATH=$GRADER_MATH  GRADER_GROUNDED=$GRADER_GROUNDED  CONFORMANCE_CLASSIFIER=$CONFORMANCE  TUTOR_CLAIM_ADJUDICATOR=$TUTOR_CLAIM  PROFILER_SUMMARY=$PROFILER"
 
       - name: Deploy to Container App
         run: |
           # --set-env-vars writes the env vars onto the new revision.
-          # Both knobs are always written (even when empty) so the new
+          # All knobs are always written (even when empty) so the new
           # revision does not inherit a stale value from a prior one.
           # Reading order in the app:
-          #   * apps/tutoring/prompts/variants.py reads TUTOR_PROMPT_VARIANT
-          #   * apps/llm/models.py::ModelConfig.get_for reads
-          #     TUTOR_MODEL_OVERRIDE (purpose=tutoring only)
+          #   * apps/tutoring/v2/config/flags.py reads NEW_TUTOR
+          #   * apps/llm/models.py::ModelConfig.get_for reads each
+          #     per-purpose override
           az containerapp update \
             --name $APP \
             --resource-group $RG \
             --image $ACR/aitutor:${{ github.sha }} \
             --set-env-vars \
-              "TUTOR_PROMPT_VARIANT=${{ steps.cfg.outputs.prompt_variant }}" \
-              "TUTOR_MODEL_OVERRIDE=${{ steps.cfg.outputs.model_override }}"
+              "NEW_TUTOR=${{ steps.cfg.outputs.new_tutor }}" \
+              "TUTOR_MOVE_MODEL_OVERRIDE=${{ steps.cfg.outputs.tutor_move }}" \
+              "GRADER_MATH_MODEL_OVERRIDE=${{ steps.cfg.outputs.grader_math }}" \
+              "GRADER_GROUNDED_MODEL_OVERRIDE=${{ steps.cfg.outputs.grader_grounded }}" \
+              "CONFORMANCE_CLASSIFIER_MODEL_OVERRIDE=${{ steps.cfg.outputs.conformance }}" \
+              "TUTOR_CLAIM_ADJUDICATOR_MODEL_OVERRIDE=${{ steps.cfg.outputs.tutor_claim }}" \
+              "PROFILER_SUMMARY_MODEL_OVERRIDE=${{ steps.cfg.outputs.profiler }}"
+
+      - name: Log resolved per-purpose models at boot
+        run: |
+          echo "::notice title=Per-purpose dispatch::Resolved at app boot via ModelConfig.get_for(purpose); see logs for runtime values."
 
   # ─────────────────────────────────────────────────────────────────
   # Post-deploy tutor evaluation
