@@ -26,6 +26,7 @@ first under normal conditions".
 
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from apps.tutoring.v2.contracts import (
@@ -49,6 +50,60 @@ ALLOWED_MOVES = (
 )
 
 
+# Explicit student help-request patterns. Kept as a *cheap pre-filter*
+# at move-selection time so the engine routes to ``explain`` /
+# ``worked_example`` instead of yet another retrieval scaffold. This is
+# a router heuristic, not a content gate — the move prompts themselves
+# handle the actual response.
+#
+# We match conservatively: a help-request requires intent words AND a
+# question / first-person phrasing. A student saying "I don't know
+# what's next" is NOT a help-request ("don't know" is a verdict signal);
+# a student saying "I don't understand what an inverse is" IS a help-
+# request. The patterns aim for explicit asks, not stumped-silence.
+_WORKED_EXAMPLE_PATTERNS = (
+    r"\bshow me how\b",
+    r"\bcan you show\b",
+    r"\bworked example\b",
+    r"\bwalk me through\b",
+    r"\b(give|show) me an? example\b",
+    r"\bdemonstrate\b",
+)
+
+_EXPLAIN_PATTERNS = (
+    r"\b(can you )?explain\b",
+    r"\bi don'?t (get|understand)\b",
+    r"\bwhat (is|does|do) .{0,40}(mean|stand for)\b",
+    r"\bdefine\b",
+    r"\bwhat'?s an? \w+\??$",
+    r"\bi'?m (totally )?lost\b",
+    r"\bi'?m confused\b",
+    r"\bhelp me understand\b",
+)
+
+
+def detect_help_request(student_input: str) -> Optional[str]:
+    """Return ``"worked_example"``, ``"explain"``, or ``None``.
+
+    Tested against the explicit help-request patterns above. The
+    ``worked_example`` patterns take precedence — "show me how to do
+    this" is a worked-example request whether or not it also contains
+    "I don't understand".
+    """
+    if not student_input:
+        return None
+    text = student_input.strip().lower()
+    if not text:
+        return None
+    for pat in _WORKED_EXAMPLE_PATTERNS:
+        if re.search(pat, text):
+            return "worked_example"
+    for pat in _EXPLAIN_PATTERNS:
+        if re.search(pat, text):
+            return "explain"
+    return None
+
+
 # Per analysis §4, objective evidence is sufficient when the student
 # has demonstrated mastery on this objective. Conservative default:
 #   - ≥ 2 correct verdicts on this objective AND
@@ -65,6 +120,7 @@ def select_move(
     profile_summary: str = "",
     objective_just_opened: bool = False,
     current_objective: str = "",
+    student_input: str = "",
 ) -> str:
     """Deterministic move pick. Returns one of ``ALLOWED_MOVES``.
 
@@ -79,6 +135,10 @@ def select_move(
         objective (TutorEngine bookkeeping).
       current_objective: enabling-objective slug for ``objective_progress``
         lookup.
+      student_input: the student's latest message. Used only to detect
+        explicit help-requests; never matched against curriculum
+        content. Optional so existing callers (template renderer) that
+        don't have it can keep their current behaviour.
     """
     attempts = runtime_state.attempts_on_open_question
     counters = runtime_state.safety_valve_counters
@@ -92,6 +152,15 @@ def select_move(
     obj_progress = runtime_state.objective_progress.get(current_objective)
     if _objective_evidence_sufficient(obj_progress):
         return "close_topic"
+
+    # ── Explicit help-request override (Direct Instruction Ch.11 +
+    # Cognitive Load Ch.14). When the student explicitly asks for an
+    # explanation or worked example, that beats every verdict-driven
+    # branch below — answering "show me how" with another retrieval
+    # scaffold is the wrong move regardless of what the grader said.
+    help_kind = detect_help_request(student_input)
+    if help_kind is not None:
+        return help_kind
 
     # ── No verdict this turn (opening / transitional / free-chat) ──
     if verdict is None:

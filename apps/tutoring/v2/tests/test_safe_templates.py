@@ -82,7 +82,12 @@ def test_no_verdict_with_student_claim_template():
         student_claim_present=True,
         next_action_text="Probe what you mean.",
     )
-    assert "check that together" in text.lower() or "rather than guess" in text.lower()
+    # Pulled from the rotating no_verdict_student_claim opener pool —
+    # the templates module no longer pins one verbatim string. Any
+    # opener that asks to check / confirm before moving on satisfies
+    # the intent.
+    lower = text.lower()
+    assert any(tok in lower for tok in ("check", "confirm", "make sure"))
     assert "Probe what you mean" in text
 
 
@@ -92,7 +97,8 @@ def test_no_verdict_no_claim_neutral_template():
         student_claim_present=False,
         next_action_text="Let's pick a question.",
     )
-    assert "pick this back up" in text.lower() or "Let's pick a question" in text
+    # Neutral hand-the-floor-back openers; pool varies turn-to-turn.
+    assert "Let's pick a question" in text
 
 
 # ──────────────────────────────────────────────────────────────────────

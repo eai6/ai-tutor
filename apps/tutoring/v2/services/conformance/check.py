@@ -194,7 +194,10 @@ class ConformanceCheck:
 
         # 8. Verdict-keyed rule matrix.
         matrix_violations = apply_verdict_matrix(
-            labels=labels, verdict=verdict, posed_via_tool=posed_via_tool,
+            labels=labels,
+            verdict=verdict,
+            posed_via_tool=posed_via_tool,
+            selected_move=selected_move,
         )
         if matrix_violations:
             for mv in matrix_violations:
@@ -207,6 +210,26 @@ class ConformanceCheck:
         #    through the grader's grounded adjudicator. A
         #    ``contradicted`` or persistent ``unverified`` rejects the
         #    candidate.
+        #
+        # Scope: the adjudicator is designed to catch *stray* factual
+        # claims in moves where prose teaching is incidental (a hint, a
+        # pose, a confirmation). It is NOT designed to block teaching
+        # moves whose entire purpose is to make factual claims:
+        # ``explain`` and ``worked_example`` are explicitly invited to
+        # define terms, state rules, walk arithmetic steps. Running
+        # the adjudicator on every claim they make would reject every
+        # legitimate explanation when KB coverage is sparse — exactly
+        # the failure mode the MATHS-S1 / GEO-S5 evals surfaced. The
+        # safety floor for these moves stays: the answer-leak gate,
+        # the figure-ref gate, and the rule_check (numeric mutation)
+        # still run. The adjudicator-bypass narrows from "every
+        # factual-claim response" to "factual-claim responses outside
+        # the teaching moves" — still a safety net, but matched to
+        # where stray claims actually live.
+        _teaching_moves = {"explain", "worked_example"}
+        if selected_move in _teaching_moves:
+            return result
+
         if (labels.contains_factual_claim or labels.contains_arithmetic_claim) \
                 and self.grader is not None and context is not None:
             try:

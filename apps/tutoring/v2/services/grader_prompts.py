@@ -95,11 +95,24 @@ def render_math_dsl_user_prompt(problem_text: str) -> str:
 
 NON_MATH_GROUNDED_SYSTEM = """\
 You judge whether a student's free-text answer is correct, given the
-question and a set of grounding sources.
+question and (optionally) a set of grounding sources.
 
-Use ONLY the supplied grounding sources. If the sources do not
-establish the correctness of the student's answer with confidence,
-return verdict = "unverified".
+Source preference order:
+  1. Prefer the supplied grounding sources when they cover the
+     question — cite them in the ``citation`` field as [KB-N].
+  2. When the supplied sources do not cover the question (this is
+     common for general curriculum topics where a KB chunk wasn't
+     authored), use your own well-established knowledge of the
+     subject to judge correctness. Set the citation field empty in
+     that case and use the ``confidence`` field to reflect that the
+     judgement is from general knowledge rather than a source.
+  3. When neither path yields a confident judgement, return
+     verdict = "unverified".
+
+The student's answer should be judged on the substance of what they
+said about the question, not on whether their wording matches a
+specific phrasing. A correct mechanism explanation expressed in the
+student's own words is still correct.
 
 Output a JSON object with these keys:
 
@@ -116,11 +129,16 @@ Output a JSON object with these keys:
   citation            — verbatim quote (≤30 words) from one of the
                          sources that supports your judgement, with the
                          source label in brackets (e.g. "[KB-3]"). Empty
-                         when verdict is "unverified" and no source applies.
-  confidence          — a number between 0 and 1 reflecting how strongly
-                         the sources support the verdict. Use ≤0.6 to
-                         indicate "I am not sure" — the tutoring runtime
-                         maps that to "unverified".
+                         when no source applies (general-knowledge route
+                         or genuine "unverified").
+  confidence          — a number between 0 and 1.
+                         ≥0.8 = strong direct support (sources or
+                                unambiguous general knowledge).
+                         0.5–0.79 = supported but with some hedging
+                                (general knowledge with minor wording
+                                ambiguity, or partial source coverage).
+                         <0.5 = genuinely unsure — the runtime maps
+                                this band to "unverified".
 
 Return JSON only — no prose, no markdown fences.
 """
@@ -213,16 +231,28 @@ TUTOR_CLAIM_SYSTEM = """\
 You adjudicate a factual or arithmetic claim made by a tutor in its
 own explanation.
 
-Use ONLY the supplied grounding sources. If the sources do not
-establish the claim as true or false with confidence, return
-status = "unverified".
+Source preference order:
+  1. Prefer the supplied grounding sources when they cover the
+     claim — cite them in the ``citation`` field as [KB-N].
+  2. When the supplied sources do not cover the claim, judge using
+     your own well-established knowledge of the subject. This is
+     standard for explanations of basic curriculum content
+     (arithmetic facts, scientific processes, textbook
+     definitions) where a KB chunk may not have been authored but
+     the claim is uncontroversial. Leave the citation field empty
+     in that case.
+  3. Return ``status = "unverified"`` only when neither the
+     sources nor well-established knowledge let you adjudicate
+     confidently — i.e. the claim is genuinely contested,
+     speculative, or outside settled subject knowledge.
 
 Return a JSON object:
 
   status    — one of: "supported", "contradicted", "unverified".
   citation  — verbatim quote (≤30 words) from one of the grounding
               sources that supports your judgement, with the source
-              label in brackets. Empty when status="unverified".
+              label in brackets. Empty when no source applies
+              (general-knowledge route or genuine "unverified").
 """
 
 

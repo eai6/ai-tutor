@@ -196,9 +196,27 @@ class TutorEngine:
         objective_changed = False
         media_catalog = self._build_media_catalog(context)
 
-        # 1. Grade — only when there's an open question to grade against.
+        # 1. Grade — only when there's an open question AND the student
+        # input is plausibly an attempt at it. Explicit help-requests
+        # ("can you explain", "show me how", "I don't understand") are
+        # not answer attempts and must not be graded: grading them
+        # produces a meaningless ``unverified`` verdict that then
+        # forces the unverified verdict-matrix rules onto the
+        # downstream explain / worked_example response, which can't
+        # comply (a worked example by construction makes factual
+        # claims and does not "surface uncertainty"). Skip the grader
+        # entirely on help-requests; the help-request also overrides
+        # move selection below (see move_selection.detect_help_request).
+        from apps.tutoring.v2.services.move_selection import detect_help_request
+
+        is_help_request = detect_help_request(student_input) is not None
+
         verdict: Optional[GradingResult] = None
-        if runtime_state.open_question is not None and student_input.strip():
+        if (
+            runtime_state.open_question is not None
+            and student_input.strip()
+            and not is_help_request
+        ):
             try:
                 verdict = self.grader.grade_student_response(
                     context,
@@ -241,6 +259,7 @@ class TutorEngine:
             profile_summary=context.profile_summary,
             objective_just_opened=False,
             current_objective=context.current_objective,
+            student_input=student_input,
         )
 
         # 3. Tutor → first attempt.
@@ -417,6 +436,7 @@ class TutorEngine:
         profile_summary: str = "",
         objective_just_opened: bool = False,
         current_objective: str = "",
+        student_input: str = "",
     ) -> str:
         """Pure-function move pick, then safety-valve override.
 
@@ -443,6 +463,7 @@ class TutorEngine:
                 profile_summary=profile_summary,
                 objective_just_opened=objective_just_opened,
                 current_objective=current_objective,
+                student_input=student_input,
             )
             if move not in ALLOWED_MOVES:
                 # Defensive normalization — should never fire because
@@ -766,17 +787,19 @@ class TutorEngine:
             objective_just_opened=False,
             current_objective=context.current_objective,
         )
+        # Student-facing — no system vocabulary, varied by move. Picked
+        # to read naturally when concatenated after a verdict opener.
         return {
-            "pose_question": "Let's try a question on this together.",
-            "confirm_and_advance": "Let's move on to the next part.",
-            "confirm_and_extend": "Let's push that a little further.",
-            "scaffold_hint": "Let's work the next step together.",
-            "name_misconception": "Let me name what looks like the slip.",
-            "worked_example": "Let me walk through one together first.",
-            "explain": "Let me set up the idea first, then we'll try it.",
+            "pose_question": "Here's one for you to try.",
+            "confirm_and_advance": "Let's move on.",
+            "confirm_and_extend": "Let's push that a bit further.",
+            "scaffold_hint": "Let's work the next step.",
+            "name_misconception": "Let me show you the slip I'm seeing.",
+            "worked_example": "Let me walk one through first.",
+            "explain": "Let me set the idea up first.",
             "pivot": "Let's try a different angle on the same idea.",
             "close_topic": "We're ready to wrap this objective.",
-        }.get(next_move, "Let's keep going together.")
+        }.get(next_move, "Let's keep going.")
 
     def _update_objective_progress(
         self,

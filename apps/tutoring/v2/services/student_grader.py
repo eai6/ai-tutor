@@ -74,9 +74,13 @@ logger = logging.getLogger(__name__)
 
 
 # Below this confidence the grounded path escalates to ``unverified``.
-# Conservative starting point per §7 item 1; sub-decision tunes from
-# pilot data.
-_GROUNDED_CONFIDENCE_THRESHOLD = 0.6
+# Lowered from 0.6 → 0.5 after the MATHS-S1 / GEO-S5 evaluations showed
+# rich free-text correct answers (mechanism-level science definitions,
+# transfer-form math reasoning) systematically routed to ``unverified``
+# despite the grounded model returning the right verdict. The 0.5 cut
+# still rejects coin-flip outputs; the model's own ``unverified``
+# branch is the conservative escape valve for genuine non-coverage.
+_GROUNDED_CONFIDENCE_THRESHOLD = 0.5
 
 
 @dataclass
@@ -526,7 +530,15 @@ class StudentGrader:
                     },
                 ],
                 system_prompt=NON_MATH_GROUNDED_SYSTEM,
-                max_tokens=400,
+                # 2048 tokens. Bumped from 400 — the grounded response
+                # has seven JSON fields plus the new confidence-band
+                # explanation; Gemini's emitted JSON was being
+                # truncated mid-``private_canonical`` on rich free-text
+                # answers, which the parser then dropped to
+                # ``unverified``. 2048 leaves headroom for any
+                # extended reasoning Gemini emits before the JSON;
+                # cheap on Gemini 3 Flash.
+                max_tokens=2048,
             )
             return _parse_grounded_response(response.content or "")
         except Exception as exc:
@@ -604,7 +616,11 @@ class StudentGrader:
                         },
                     ],
                     system_prompt=PRE_POSE_SYSTEM,
-                    max_tokens=200,
+                    # Bumped from 200 → 2048 alongside the grader and
+                    # tutor-claim adjudicator; the pre-pose response is
+                    # short but the bigger budget eliminates the
+                    # truncation-mid-JSON failure mode.
+                    max_tokens=2048,
                 )
                 payload = _safe_json_loads(response.content or "") or {}
             except Exception as exc:
@@ -700,7 +716,12 @@ class StudentGrader:
                         },
                     ],
                     system_prompt=TUTOR_CLAIM_SYSTEM,
-                    max_tokens=200,
+                    # 2048 tokens — bumped from 200 to accommodate the
+                    # updated source-preference instructions and longer
+                    # citation strings. Truncation at 200 was forcing
+                    # the parser to fall through to ``unverified`` even
+                    # on supported claims.
+                    max_tokens=2048,
                 )
                 payload = _safe_json_loads(response.content or "") or {}
             except Exception as exc:

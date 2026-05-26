@@ -171,6 +171,7 @@ def apply_verdict_matrix(
     labels: ClassifierLabels,
     verdict: Optional[GradingResult],
     posed_via_tool: bool = False,
+    selected_move: str = "",
 ) -> List[MatrixViolation]:
     """Run the verdict-keyed rules and return all violations.
 
@@ -185,9 +186,20 @@ def apply_verdict_matrix(
     because the candidate's question text DID come through the tool;
     the classifier reads only the visible characters and cannot
     distinguish a tool-rendered stem from a prose-authored one.
+
+    ``selected_move`` — when this is a teaching move (``explain`` or
+    ``worked_example``), the ``all__no_assessment_in_prose`` rule is
+    also skipped. Those moves end with a practice prompt by design
+    (Direct Instruction → practice cycle); if no eligible bank slot
+    exists for the current subskill the LLM cannot author a tool
+    call, and rejecting a prose practice question on a teaching
+    response means the student gets a verdict-keyed safe template
+    with no teaching content instead. The other safety floors —
+    answer-leak, figure-ref, rule_check, praise filter — still run.
     """
+    teaching_moves = {"explain", "worked_example"}
     rules: List[_Rule] = []
-    if not posed_via_tool:
+    if not posed_via_tool and selected_move not in teaching_moves:
         rules.extend(_ruleset_all_verdicts())
 
     if verdict is None:
