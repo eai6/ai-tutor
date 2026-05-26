@@ -353,104 +353,170 @@ def build_system_prompt(
 
 ---
 
-## M8 — Tool definitions + server-side handlers
+## M8 — Tool handlers + server-driven question state (REVISED 2026-05-26)
 
-**Goal:** server-side dispatch for each of the 5 tools. Pure DB mutations.
+**Simplified architecture per `auto-memory/feedback_server_owns_question_state.md`:**
+
+The server owns question + step state. Tool calls are optional structured
+hints, not load-bearing for flow. The system never blocks the
+conversation because the LLM ignored a tool.
+
+**Tool set shrunk from 5 to 3:**
+  - DROPPED: `pose_question` (server picks the current question)
+  - DROPPED: `advance_step` (server auto-advances when current question is graded)
+  - KEPT: `record_answer(extracted_answer)` — NO question_id (server knows)
+  - KEPT: `request_figure(figure_id)` — needed for catalog-based inline images
+  - KEPT: `redirect_off_topic(reason)` — soft moderation flag
 
 **Files:**
-- `apps/tutoring/simple_tutor_tools.py` (NEW)
-- `apps/tutoring/tests/test_simple_tutor_tools.py` (NEW)
+- `apps/tutoring/simple_tutor/tools.py` (NEW)
+- `apps/tutoring/simple_tutor/tests/test_tools.py` (NEW)
 
 **Public API:**
 ```python
-def handle_pose_question(session, *, question_id: int) -> dict: ...
-def handle_record_answer(session, *, question_id: int, extracted_answer: str) -> dict: ...
-def handle_advance_step(session, *, reason: str) -> dict: ...
+def handle_record_answer(session, *, extracted_answer: str) -> dict: ...
 def handle_request_figure(session, *, figure_id: int) -> dict: ...
 def handle_redirect_off_topic(session, *, reason: str) -> dict: ...
+
+# Server-driven question picker (called by M9 engine BEFORE each LLM call):
+def pick_current_question(session) -> ExitTicketQuestion | None: ...
+
+# Server-driven step advance (called by M9 engine AFTER a verdict lands):
+def maybe_advance_step(session) -> bool: ...   # True if advanced
+
+# Auto-fallback grading (called by M9 engine AFTER LLM response if
+# record_answer was not called):
+def auto_grade_if_missed(session, student_input: str, llm_called_record_answer: bool) -> GradeResult | None: ...
 ```
 
-Each returns a `tool_result` dict (verdict, figure URL, step name, etc.) that
-the engine feeds back into the LLM for the next turn.
+Each handler returns a `tool_result` dict that the engine feeds back to
+the LLM. The handlers NEVER raise on bad LLM input — they return error
+dicts so the engine can continue.
 
-**Tests (each handler):**
-- [ ] `pose_question`: sets `session.current_question_id` correctly
-- [ ] `pose_question` with invalid question_id (not in step's catalog) → returns error result, does NOT mutate session
-- [ ] `record_answer`: calls `grader.grade_answer` with correct args, writes to `SessionTurn.judge_outputs`, clears `session.current_question_id`
-- [ ] `record_answer` for question not in current step: logs warning, still grades (sometimes student answers earlier question)
-- [ ] `advance_step`: increments `current_step_index`, triggers step summary write, clears `current_question_id`
-- [ ] `advance_step` past last step: transitions to EXIT_TICKET state
-- [ ] `request_figure`: looks up `StepMedia` by figure_id, returns URL
-- [ ] `request_figure` with invalid id: returns error result, no DB write
-- [ ] `redirect_off_topic`: increments off-topic counter on session metadata; logged
+**Tests:**
+- [ ] `handle_record_answer`: looks up `session.current_question_id`, calls grader, writes verdict to `SessionTurn.judge_outputs['grader']`, clears `current_question_id`
+- [ ] `handle_record_answer` with no `current_question_id` set: still grades against the most recent un-graded question on the step, OR returns a warning result (no exception)
+- [ ] `handle_request_figure` with valid id from catalog: returns figure URL + alt text
+- [ ] `handle_request_figure` with invalid id (not in step catalog): returns `{'error': 'unknown figure_id'}` — does NOT raise
+- [ ] `handle_redirect_off_topic`: writes counter to `session.engine_state['off_topic_count']`; returns success
+- [ ] `pick_current_question`: returns next un-graded catalog question for current step in `order` priority
+- [ ] `pick_current_question` when all questions on step are graded: returns None (signals "ready to advance")
+- [ ] `maybe_advance_step`: when current step has no remaining ungraded questions, increments `current_step_index`, clears `current_question_id`, writes step summary
+- [ ] `maybe_advance_step` past last step: transitions session into exit-ticket mode (status field or engine_state flag)
+- [ ] `auto_grade_if_missed`: when `llm_called_record_answer=False` and student input looks like an answer attempt and `current_question_id` is set → runs grader, persists with `tier='auto_fallback'`
+- [ ] `auto_grade_if_missed`: when LLM DID call record_answer → no-op (returns None)
+- [ ] `auto_grade_if_missed`: when student input is clearly a clarification ("what does X mean?") → no-op
+- [ ] Handlers never raise on malformed input; always return a dict the engine can pass back to the LLM
+
+**Hard rules — these things MUST NOT happen:**
+- ❌ Handler raises an unhandled exception that crashes the engine turn
+- ❌ Handler refuses to advance the conversation because the LLM skipped a tool
+- ❌ `handle_record_answer` requires a `question_id` parameter (it doesn't — server knows)
+- ❌ `maybe_advance_step` blocks advancement when no verdicts exist (it advances anyway with `forced_advance=True` metadata after the soft turn cap)
+
+**Soft safety valves (logged, not blocking):**
+- After 10 turns on the same question without a verdict: server force-grades the latest student input + advances. Logged for tuning.
+- Off-topic count > 4: log warning to analytics; do not block.
 
 **Acceptance:**
 - [ ] All M8 tests pass
-- [ ] No I/O in tool handlers other than DB mutations + grader call
-- [ ] Idempotency: calling `pose_question` twice with the same id is safe
+- [ ] All handlers return dicts (never raise) for any LLM-supplied input
+- [ ] No I/O beyond DB mutations + grader call + figure URL lookup
 
-**Estimated size:** 2.5 hours.
+**Estimated size:** 3 hours.
 
 ---
 
-## M9 — Engine main loop
+## M9 — Engine main loop (REVISED 2026-05-26)
 
-**Goal:** `simple_tutor.respond(session, user_input) -> dict` — single LLM
-call + tool dispatch + persist.
+**Goal:** `simple_tutor.respond(session, user_input) -> dict` — server-
+driven question picking + single LLM call + tool dispatch + auto-grading
+fallback + server-driven step advancement.
 
 **Files:**
-- `apps/tutoring/simple_tutor.py` (NEW)
-- `apps/tutoring/tests/test_simple_tutor.py` (NEW)
+- `apps/tutoring/simple_tutor/engine.py` (NEW)
+- `apps/tutoring/simple_tutor/tests/test_engine.py` (NEW)
 
-**Flow (per turn):**
+**Flow (per turn) — server owns flow, LLM is the narrator:**
 ```python
 def respond(session, user_input):
+    # 1. SERVER picks the current question for this turn
+    current_q = pick_current_question(session)
+    if current_q is not None:
+        session.current_question_id = current_q.pk
+        session.save(update_fields=['current_question_id'])
+
+    # 2. Build context for the system prompt
     step = _load_current_step(session)
     kb_chunks = _retrieve_kb(session, user_input)
     figures = _load_figure_catalog(step)
     recent = build_recent_window(session)
     summaries = step_summary_log(session)
 
-    system_text, tools = build_system_prompt(
-        session=session, step=step, kb_chunks=kb_chunks,
-        figure_catalog=figures, recent_window=recent,
-        step_summaries=summaries,
+    # 3. System prompt shows ONE current question, not the whole catalog
+    system_blocks, tools = build_system_prompt(
+        session=session, step=step,
+        current_question=current_q,    # ← single focused question
+        kb_chunks=kb_chunks, figure_catalog=figures,
+        recent_window=recent, step_summaries=summaries,
     )
 
+    # 4. Call LLM
     response = anthropic_client.messages.create(
-        model='claude-opus-4-7', system=system_text, tools=tools,
-        messages=_format_messages(recent, user_input), max_tokens=1024,
+        model='claude-opus-4-7', system=system_blocks, tools=tools,
+        messages=[{'role': 'user', 'content': user_input}],
+        max_tokens=1024,
     )
 
+    # 5. Dispatch tool calls
     tool_results = []
     text_reply = ''
+    llm_called_record_answer = False
     for block in response.content:
         if block.type == 'text':
             text_reply += block.text
         elif block.type == 'tool_use':
-            tool_results.append(_dispatch_tool(session, block))
+            result = _dispatch_tool(session, block)
+            tool_results.append(result)
+            if block.name == 'record_answer':
+                llm_called_record_answer = True
 
+    # 6. AUTO-FALLBACK: grade if LLM didn't but student looked answer-y
+    auto_grade = auto_grade_if_missed(
+        session, user_input, llm_called_record_answer,
+    )
+    if auto_grade is not None:
+        tool_results.append({'tool': 'auto_grade', 'result': auto_grade.to_dict()})
+
+    # 7. Persist turn
     _persist_turn(session, user_input, text_reply, tool_results)
+
+    # 8. SERVER auto-advances step when current question has a verdict
+    maybe_advance_step(session)
+
     return {'content': text_reply, 'tool_calls': tool_results}
 ```
 
 **Tests (mock the Anthropic client):**
-- [ ] Happy path: mock LLM returns text + record_answer call. `grade_answer` runs, verdict in result, `SessionTurn` persisted.
-- [ ] Multiple tool calls in one response (pose_question + text)
-- [ ] No tool calls (just text reply) — clarification mode
-- [ ] LLM call args include `tools=` and `system=` matching M7 output
-- [ ] Persisted `SessionTurn.metadata['tool_calls']` contains the dispatch records
-- [ ] LLM exception → returns sane fallback response, logs error, does NOT crash session
-- [ ] `advance_step` tool call → next turn's prompt reflects the new step
-- [ ] Hard cap: 10 turns on same step → engine auto-calls `advance_step` (safety valve)
-- [ ] `redirect_off_topic` counter increments correctly
+- [ ] Happy path: mock LLM returns text + record_answer call → grader runs, verdict in `judge_outputs`, turn persisted
+- [ ] LLM returns text only (no tool call) → engine still responds with the text; no error
+- [ ] LLM returns text only AND student input looks like an answer + `current_question_id` is set → auto-fallback grades; verdict has `tier='auto_fallback'`
+- [ ] LLM returns text only AND student input is a clarifying question → no auto-grade; no verdict written
+- [ ] After a turn's verdict lands on the LAST question of the step, server auto-advances `current_step_index`; next turn's prompt shows the new step
+- [ ] After a turn's verdict lands but step has more questions → `current_question_id` updates to the next question; same step
+- [ ] LLM exception → engine returns a sane fallback reply ("Sorry, I had trouble — let's try again"); session unchanged; logged
+- [ ] LLM calls `request_figure` with invalid id → handler returns error result; no crash; figure not displayed
+- [ ] System prompt re-stated EVERY turn (stateless template assertion)
+- [ ] Hard turn cap: 10 turns on same question → server force-grades + advances; logged
+- [ ] `redirect_off_topic` counter increments in `session.engine_state`
 
 **Acceptance:**
 - [ ] All M9 tests pass
 - [ ] No regressions in M2-M8 tests
-- [ ] Engine module line count ≤ 800 (target)
+- [ ] Engine module line count ≤ 600 (simpler than original 800 target)
+- [ ] Every test verifies the engine RETURNS a response (never crashes/raises)
 
-**Estimated size:** 3 hours.
+**Estimated size:** 2.5 hours (simpler than originally estimated due to dropped LLM-driven flow logic).
 
 ---
 

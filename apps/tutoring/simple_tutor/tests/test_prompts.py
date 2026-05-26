@@ -28,9 +28,9 @@ from apps.tutoring.simple_tutor.prompts import (
     build_system_prompt,
     _escape_xml,
     _render_current_step_block,
+    _render_current_question,
     _render_figure_catalog,
     _render_kb_block,
-    _render_question_catalog,
     _render_recent_turns_block,
 )
 
@@ -103,14 +103,24 @@ def _turn(role, content):
 
 
 class ToolSchemasTest(TestCase):
+    """3-tool design — pose_question and advance_step were dropped
+    when state ownership moved to the server (see
+    auto-memory/feedback_server_owns_question_state.md).
+    """
 
-    def test_five_tools_present(self):
+    def test_three_tools_present(self):
         names = {t['name'] for t in TOOL_SCHEMAS}
         self.assertEqual(
             names,
-            {'pose_question', 'record_answer', 'advance_step',
-             'request_figure', 'redirect_off_topic'},
+            {'record_answer', 'request_figure', 'redirect_off_topic'},
         )
+
+    def test_dropped_tools_absent(self):
+        # Defensive: pose_question and advance_step were intentionally
+        # removed. Server owns question selection + step advancement.
+        names = {t['name'] for t in TOOL_SCHEMAS}
+        self.assertNotIn('pose_question', names)
+        self.assertNotIn('advance_step', names)
 
     def test_every_tool_has_description_and_input_schema(self):
         for t in TOOL_SCHEMAS:
@@ -119,19 +129,14 @@ class ToolSchemasTest(TestCase):
             self.assertGreater(len(t['description']), 50,
                                f'{t["name"]} description is too thin')
 
-    def test_pose_question_requires_question_id(self):
-        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'pose_question')
-        self.assertEqual(t['input_schema']['required'], ['question_id'])
-        self.assertEqual(
-            t['input_schema']['properties']['question_id']['type'],
-            'integer',
-        )
-
-    def test_record_answer_requires_both_fields(self):
+    def test_record_answer_requires_only_extracted_answer(self):
+        # Critical: NO question_id parameter. The server already knows
+        # the question. This prevents LLM-attribution confusion.
         t = next(t for t in TOOL_SCHEMAS if t['name'] == 'record_answer')
-        self.assertEqual(
-            set(t['input_schema']['required']),
-            {'question_id', 'extracted_answer'},
+        self.assertEqual(t['input_schema']['required'], ['extracted_answer'])
+        self.assertNotIn(
+            'question_id', t['input_schema']['properties'],
+            'record_answer must NOT take question_id — server owns that',
         )
 
     def test_record_answer_description_forbids_grading(self):
@@ -143,8 +148,8 @@ class ToolSchemasTest(TestCase):
         t = next(t for t in TOOL_SCHEMAS if t['name'] == 'request_figure')
         self.assertIn('invented', t['description'].lower())
 
-    def test_advance_step_requires_reason(self):
-        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'advance_step')
+    def test_redirect_off_topic_takes_reason(self):
+        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'redirect_off_topic')
         self.assertEqual(t['input_schema']['required'], ['reason'])
 
 
@@ -158,8 +163,6 @@ class CacheLayoutTest(TestCase):
     def test_block_0_is_static_with_cache_control(self):
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
-            kb_chunks=[], figure_catalog=[], questions=[],
-            recent_window=[], step_summaries=[],
         )
         self.assertGreaterEqual(len(blocks), 1)
         self.assertEqual(blocks[0]['type'], 'text')
@@ -169,8 +172,6 @@ class CacheLayoutTest(TestCase):
     def test_block_0_contains_role_rules_safety(self):
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
-            kb_chunks=[], figure_catalog=[], questions=[],
-            recent_window=[], step_summaries=[],
         )
         block0 = blocks[0]['text']
         self.assertIn('<role>', block0)
@@ -180,8 +181,6 @@ class CacheLayoutTest(TestCase):
     def test_block_1_is_step_content_cached(self):
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
-            kb_chunks=[], figure_catalog=[], questions=[],
-            recent_window=[], step_summaries=[],
         )
         # Block 1 should exist when step is present
         self.assertGreaterEqual(len(blocks), 2)
@@ -195,7 +194,6 @@ class CacheLayoutTest(TestCase):
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
             kb_chunks=[_kb_chunk('some text')],
-            figure_catalog=[], questions=[],
             recent_window=[_turn('student', 'hi')],
             step_summaries=['Step 1 (Engage) — mastered'],
         )
@@ -216,27 +214,33 @@ class CacheLayoutTest(TestCase):
 class StepContentTest(TestCase):
 
     def test_phase_in_step_block(self):
-        s = _render_current_step_block(_step(phase='explore'), [], [])
+        s = _render_current_step_block(_step(phase='explore'), None, [])
         self.assertIn('<phase>Explore</phase>', s)
 
     def test_objective_in_step_block(self):
-        s = _render_current_step_block(_step(expected='canonical answer'), [], [])
+        s = _render_current_step_block(_step(expected='canonical answer'), None, [])
         self.assertIn('<objective>canonical answer</objective>', s)
 
     def test_step_number_in_block(self):
-        s = _render_current_step_block(_step(order_index=2), [], [])
+        s = _render_current_step_block(_step(order_index=2), None, [])
         self.assertIn('<step_number>3</step_number>', s)
 
     def test_step_none_returns_empty(self):
-        s = _render_current_step_block(None, [], [])
+        s = _render_current_step_block(None, None, [])
         self.assertEqual(s, "")
 
     def test_teaching_notes_included(self):
         s = _render_current_step_block(
             _step(teacher_script='Tell them about hydrological cycle'),
-            [], [],
+            None, [],
         )
         self.assertIn('hydrological cycle', s)
+
+    def test_current_question_rendered_inside_step(self):
+        q = _mcq_question(pk=42, stem='Which?', correct='B')
+        s = _render_current_step_block(_step(), q, [])
+        self.assertIn('<current_question id="42"', s)
+        self.assertIn('Which?', s)
 
 
 # ============================================================================
@@ -244,11 +248,14 @@ class StepContentTest(TestCase):
 # ============================================================================
 
 
-class QuestionCatalogTest(TestCase):
+class CurrentQuestionTest(TestCase):
+    """Single <current_question> picked by the SERVER. No multi-question
+    catalog — prevents LLM-attribution confusion.
+    """
 
     def test_mcq_includes_options_and_correct_letter(self):
         q = _mcq_question(pk=42, stem='Which is greatest?', correct='B')
-        s = _render_question_catalog([q])
+        s = _render_current_question(q)
         self.assertIn('id="42"', s)
         self.assertIn('type="mcq"', s)
         self.assertIn('Which is greatest?', s)
@@ -259,14 +266,16 @@ class QuestionCatalogTest(TestCase):
     def test_short_answer_includes_model_answer(self):
         q = _short_answer(model_answer='because of evaporation',
                           keywords=['evaporation', 'sun'])
-        s = _render_question_catalog([q])
+        s = _render_current_question(q)
         self.assertIn('type="short_answer"', s)
         self.assertIn('<reference_answer>because of evaporation</reference_answer>', s)
         self.assertIn('<key_concepts>evaporation, sun</key_concepts>', s)
 
-    def test_no_questions_renders_self_closing(self):
-        s = _render_question_catalog([])
-        self.assertEqual(s, '<question_catalog/>')
+    def test_none_renders_status_marker(self):
+        # No question in play → self-closing tag with status="none" so the
+        # LLM knows to stay in conversational/Socratic mode.
+        s = _render_current_question(None)
+        self.assertEqual(s, '<current_question status="none"/>')
 
 
 # ============================================================================
@@ -440,14 +449,14 @@ class EndToEndShapeTest(TestCase):
         blocks, tools = build_system_prompt(
             session=_session(),
             step=_step(phase='explore', expected='150°', teacher_script='Tell them about angles'),
+            current_question=_mcq_question(pk=7, stem='What do angles around a point sum to?', correct='D'),
             kb_chunks=[_kb_chunk('Angles around a point sum to 360°.')],
             figure_catalog=[{'id': 1, 'description': 'Diagram of angles'}],
-            questions=[_mcq_question(pk=7, stem='What do angles around a point sum to?', correct='D')],
             recent_window=[_turn('student', 'What is an angle?')],
             step_summaries=['Step 1 (Engage) — mastered after 1 attempt'],
         )
         self.assertEqual(len(blocks), 3)
-        self.assertEqual(len(tools), 5)
+        self.assertEqual(len(tools), 3)   # 3-tool design now
 
         # Block 0 — static
         b0 = blocks[0]['text']
@@ -461,6 +470,7 @@ class EndToEndShapeTest(TestCase):
         self.assertIn('<phase>Explore</phase>', b1)
         self.assertIn('150°', b1)
         self.assertIn('Diagram of angles', b1)
+        self.assertIn('<current_question', b1)
         self.assertIn('What do angles around a point sum to?', b1)
 
         # Block 2 — dynamic (no cache)
@@ -471,7 +481,7 @@ class EndToEndShapeTest(TestCase):
         self.assertIn('What is an angle?', b2)
 
     def test_minimal_render_no_extras(self):
-        # No KB, no history, no figures — only blocks 0 + 1
+        # No KB, no history, no figures, no question — only blocks 0 + 1
         blocks, tools = build_system_prompt(
             session=_session(), step=_step(),
         )
@@ -483,3 +493,12 @@ class EndToEndShapeTest(TestCase):
             session=_session(), step=None,
         )
         self.assertEqual(len(blocks), 1)
+
+    def test_no_current_question_renders_status_none(self):
+        # Between questions — block 1 should still render but include
+        # the status="none" marker so the LLM stays in Socratic mode.
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(), current_question=None,
+        )
+        self.assertGreaterEqual(len(blocks), 2)
+        self.assertIn('<current_question status="none"/>', blocks[1]['text'])
