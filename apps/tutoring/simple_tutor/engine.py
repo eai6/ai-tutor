@@ -406,6 +406,71 @@ def _persist_student_turn(session, user_input: str, step):
     )
 
 
+def respond_for_view(session, user_input: str) -> dict:
+    """Adapter for ``apps.tutoring.views.chat_respond``.
+
+    Calls ``respond(...)`` (which returns the engine's internal dict),
+    then projects the result into the same JSON shape the legacy
+    v1 view returns — so the existing chat UI works without changes.
+
+    Fields not produced by v1 of the simple engine (gamification,
+    artifact_html, follow_up, etc.) default to safe values.
+    """
+    from apps.curriculum.models import LessonStep
+
+    out = respond(session, user_input)
+
+    # Derive step display fields from session state (set by maybe_advance_step)
+    session.refresh_from_db()
+    current_idx = session.current_step_index or 0
+    step = (
+        LessonStep.objects
+        .filter(lesson=session.lesson, order_index=current_idx)
+        .first()
+    )
+    total_steps = LessonStep.objects.filter(lesson=session.lesson).count()
+    phase = (
+        (getattr(step, 'phase', '') or '').lower()
+        if step else 'evaluate'
+    )
+
+    # Extract is_correct from any record_answer / auto_grade verdict
+    is_correct = None
+    media_url = None
+    for entry in out.get('tool_calls') or []:
+        tool = entry.get('tool')
+        result = entry.get('result') or {}
+        if tool in ('record_answer', 'auto_grade_fallback'):
+            verdict = result.get('verdict')
+            if verdict == 'correct':
+                is_correct = True
+            elif verdict == 'incorrect':
+                is_correct = False
+        elif tool == 'request_figure' and result.get('displayed'):
+            media_url = result.get('url')
+
+    is_complete = step is None or current_idx >= total_steps
+
+    return {
+        'message': out.get('content', ''),
+        'phase': phase,
+        'media': [{'url': media_url}] if media_url else [],
+        'show_exit_ticket': False,           # v2 hasn't wired exit ticket yet
+        'exit_ticket': None,
+        'is_complete': is_complete,
+        'step_number': current_idx + 1,
+        'total_steps': total_steps,
+        'is_correct': is_correct,
+        'streak_count': None,                 # gamification not in v2 scope
+        'practice_score': None,
+        'milestone': None,
+        'artifact_html': None,
+        'probe': None,
+        'pending_question': None,
+        'follow_up_message': None,
+    }
+
+
 def _persist_tutor_turn(session, text_reply: str, step, tool_results: list):
     """Create the tutor's SessionTurn row. If any tool call recorded
     a grader verdict (record_answer or auto_grade_fallback), embed it
