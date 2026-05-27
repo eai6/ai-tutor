@@ -56,8 +56,24 @@ def _ends_with_question(text: str) -> bool:
 _META_REASONING_PATTERNS = [
     # "The student has only…" / "The student hasn't…"
     re.compile(r'(?im)^\s*the student\s+(has|hasn\'t|is|isn\'t|wrote|said|answered|gave|seems|appears)\b'),
-    # "I'll grade…" / "Let me prompt…" / "I'm going to…" / "I shouldn't record…"
-    re.compile(r"(?im)^\s*(i'll|i am going to|i'm going to|let me prompt|i shouldn't|i should not|now i need|i need to (call|prompt|record))\b"),
+    # First-person process narration at the start of a sentence:
+    # "I'll grade…" / "I am going to…" / "I'm going to…" / "Let me prompt…" /
+    # "I shouldn't…" / "Now I need…" / "I need to (call|prompt|record|
+    # pose|ask|grade|evaluate|check|verify)…"
+    re.compile(
+        r"(?im)^\s*("
+        r"i'll|i am going to|i'm going to|"
+        r"let me (prompt|grade|evaluate|check|record)|"
+        r"i shouldn't|i should not|"
+        r"now i need|"
+        r"i need to (call|prompt|record|pose|ask|grade|evaluate|check|verify)"
+        r")\b"
+    ),
+    # "to grade it (properly|correctly)" / "to evaluate it" / "to check the
+    # answer" — narration of the tool-call intent in prose.
+    re.compile(
+        r"(?i)\bto\s+(grade|evaluate|score|verify)\s+(it|the\s+(answer|response))\b"
+    ),
     # "This is a partial answer — I shouldn't record"
     re.compile(r"(?i)\bi (shouldn'?t|should not|must not|won'?t) (record|grade|mark|accept)\b"),
 ]

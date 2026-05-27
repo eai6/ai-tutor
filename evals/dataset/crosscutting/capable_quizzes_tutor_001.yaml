@@ -14,6 +14,17 @@ seed_history:
     text: "Right — for 4 equal angles around a point, each is 90°. Try this: 6 equal angles?"
 student_turn: "60. but what if all six are equal AND one of them turns out to be reflex?"
 
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading. Inferred by scripts/migrate_seed_inflight_question.py;
+# review the reference_answer for accuracy.
+seed_inflight_question:
+  question_text: "Right \u2014 for 4 equal angles around a point, each is 90\xB0. Try this: 6 equal angles?"
+  question_type: short_answer
+  reference_answer: "60"
+  source: inline_authored
+
 assertions:
   response_nonempty: true
 

@@ -288,39 +288,61 @@ def insert_block(text: str, block: str) -> str:
 # ----------------------------------------------------------------------
 
 
-# Tutor "last-turn" phrasings that indicate NO new question was posed
-# — pure acknowledgement, transition, or a rhetorical "ready?". In
-# production these turns DELETED the in-flight slot (correct verdict
-# cleared it), so the student's next message lands in POSE mode and
-# we should NOT seed an in-flight question.
-_NO_REAL_QUESTION = re.compile(
+# Rhetorical "next-step" prompts that look like questions but aren't
+# graded — production state was: slot cleared on the correct verdict,
+# tutor is just transitioning. Match against the trailing portion of
+# the tutor turn (last ~60 chars).
+_RHETORICAL_ENDING = re.compile(
     r"(?i)("
-    r"^(right|correct|exactly|nice|that'?s right|got it|excellent)[!.\s]"
-    r"|ready for the next"
-    r"|let'?s move on"
-    r"|shall we (continue|move on)"
+    r"ready for the next( one)?\??\s*$"
+    r"|shall we (continue|move on|go on)\??\s*$"
+    r"|want to (try another|continue|keep going)\??\s*$"
+    r"|let'?s move on\.?\s*$"
     r")"
+)
+
+# Pure-acknowledgement openings used WITHOUT a follow-up question.
+# Combined with "doesn't end with ?" → skip the migration.
+_ACK_OPENING = re.compile(
+    r"(?i)^"
+    r"(right|correct|exactly|nice|that'?s right|got it|excellent|great)"
+    r"[!.\s]"
 )
 
 
 def _seed_has_real_question(seed_history: list[dict]) -> bool:
     """True iff the last tutor turn actually poses a gradable question.
 
-    A bare acknowledgement ("Right! 145 is correct. Ready for the next
-    one?") is NOT a posed question — the slot was cleared on the
-    correct grade. The student's next message lands the engine in POSE
-    mode legitimately.
+    Decision tree:
+      1. Rhetorical ending ("Ready for the next one?", "Shall we
+         continue?", "Want to try another?") → NO real question.
+         In production the slot was already cleared on the correct
+         verdict; the student's next message is conversational, not
+         an answer attempt.
+      2. Ends with "?" but not a rhetorical phrase → REAL question.
+         This catches "Right — Try this: 6 equal angles?" where the
+         affirmation-at-the-start fooled the prior version of this
+         heuristic into skipping the migration.
+      3. Pure-acknowledgement opener with no "?" → NO real question
+         ("Right! 145 is correct.").
+      4. Anything else (statement-style question, command) → REAL.
     """
     if not seed_history or seed_history[-1].get('role') != 'tutor':
         return False
     last = str(seed_history[-1].get('text', '')).strip()
     if not last:
         return False
-    # Pure acknowledgement at the head of the turn = no real question.
-    if _NO_REAL_QUESTION.search(last[:80]):
+    # 1. Rhetorical "ready for the next?" patterns — skip.
+    if _RHETORICAL_ENDING.search(last[-80:]):
         return False
-    # Otherwise treat any tutor turn as posing something. Even short
-    # "What is X?" qualifies.
+    # 2. Ends with "?" but isn't rhetorical → real question.
+    if last.rstrip().endswith('?'):
+        return True
+    # 3. Pure ack at the head + doesn't end with "?" → skip.
+    if _ACK_OPENING.search(last[:80]):
+        return False
+    # 4. Default: treat as a posed question. Even short statement-style
+    # prompts ("Find x.", "Compute 8 × 50,000.") qualify.
     return True
 
 
