@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -386,7 +387,7 @@ class StudentTutor:
             )
             return None, ""
 
-        rendered_stem = (step.question or "").strip()
+        rendered_stem = _render_bank_stem_with_options(step)
         lead_in = (tool_input.get("lead_in") or "").strip()
 
         question_ref = QuestionRef(
@@ -394,6 +395,13 @@ class StudentTutor:
             id=step.id,
         )
         resolve_canonical = make_resolve_canonical_for_lesson(slot_map)
+
+        # MCQ option order — populated for choice-style answer types so
+        # the visible-context snapshot captures what the student saw.
+        # Phase 4 Fix 4a: an MCQ stem with no options is unanswerable;
+        # the renderer now concatenates choices into the visible stem
+        # and we record them here for the snapshot.
+        mcq_option_order = _extract_mcq_letters(step)
 
         # Phase A validation. The visible_prompt the LLM is committing
         # to is the BANK stem (not the LLM's lead_in) — that's what
@@ -409,7 +417,7 @@ class StudentTutor:
                     (t.get("content") or "")[:240]
                     for t in (context.full_transcript or [])[-6:]
                 ],
-                "mcq_option_order": [],
+                "mcq_option_order": mcq_option_order,
             },
             runtime_state=context.runtime_state,
             asked_questions=self._asked_questions_for_student(context),
@@ -477,6 +485,9 @@ class StudentTutor:
             lesson_title=context.lesson_title,
             lesson_subject=context.lesson_subject,
             current_objective=context.current_objective,
+            doing_rate_window=list(
+                context.runtime_state.student_doing_rate_window or []
+            ),
         )
         move_prompt = get_move_prompt(move)
         return (
@@ -694,3 +705,72 @@ class StudentTutor:
             _build_client_for_purpose,
         )
         return _build_client_for_purpose("tutor_move")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Bank-stem rendering helpers (Phase 4 Fix 4a)
+# ──────────────────────────────────────────────────────────────────────
+
+
+_MCQ_LETTER_RE = re.compile(r"^\s*([A-Da-d])\s*[).:\-]")
+
+
+def _render_bank_stem_with_options(step) -> str:
+    """Render a LessonStep's question with MCQ choices appended.
+
+    Subject-agnostic. For ``answer_type=multiple_choice`` (or any step
+    whose ``choices`` JSON field is populated), the rendered stem
+    becomes ``"<question>\\n\\n<choice 1>\\n<choice 2>\\n..."``. For
+    non-MCQ steps, returns the bare question text.
+
+    Resolves the run-6 GEO P1 where T16/T18/T20 posed an MCQ stem with
+    "which of the following best describes..." but no rendered choices,
+    making the question unanswerable. The data was always in
+    ``LessonStep.choices``; the v2 renderer just dropped it.
+
+    Returns the empty string when the step has no question text.
+    """
+    stem = (getattr(step, "question", "") or "").strip()
+    if not stem:
+        return ""
+    answer_type = (getattr(step, "answer_type", "") or "").strip().lower()
+    choices = getattr(step, "choices", None) or []
+    if answer_type != "multiple_choice":
+        # Some authored steps store choices on non-MCQ types
+        # accidentally; only render when answer_type explicitly says
+        # multiple_choice. The Phase A safety floor catches the
+        # converse case (an MCQ-shaped stem with no choices).
+        return stem
+    if not isinstance(choices, list) or not choices:
+        return stem
+    rendered_choices = []
+    for choice in choices:
+        if isinstance(choice, str) and choice.strip():
+            rendered_choices.append(choice.strip())
+    if not rendered_choices:
+        return stem
+    return f"{stem}\n\n" + "\n".join(rendered_choices)
+
+
+def _extract_mcq_letters(step) -> list[str]:
+    """Return the ordered list of MCQ letters from a step's choices.
+
+    Used to populate ``visible_context.mcq_option_order`` for the
+    conformance + repeat-guard surfaces. Returns empty list for
+    non-MCQ steps.
+    """
+    answer_type = (getattr(step, "answer_type", "") or "").strip().lower()
+    if answer_type != "multiple_choice":
+        return []
+    choices = getattr(step, "choices", None) or []
+    if not isinstance(choices, list):
+        return []
+    letters: list[str] = []
+    for choice in choices:
+        if not isinstance(choice, str):
+            continue
+        m = _MCQ_LETTER_RE.match(choice)
+        if m:
+            letters.append(m.group(1).upper())
+    return letters
+

@@ -193,6 +193,91 @@ def render_non_math_grounded_user_prompt(
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Answer-consistency verifier (Phase 4)
+#
+# Fires AFTER the grounded adjudicator when its verdict is correct or
+# partial but its confidence is below the threshold. The old behaviour
+# was to blanket-downgrade those verdicts to ``unverified``, which
+# created the unverified-trap loop on rich natural-language proofs
+# (memory/v2_unverified_trap_redesign.md §Cluster A).
+#
+# This prompt does one thing only: decide whether the student's response,
+# interpreted charitably, asserts the same answer or conclusion the
+# canonical asserts. It does NOT judge wording quality, working shown,
+# or pedagogical completeness — those concerns live in the move-prompt
+# layer, not the grader.
+#
+# Subject-agnostic: works for math proofs, geography reasoning,
+# definitions, language. The verifier is a yes/no/cant-tell adjudicator,
+# not a re-grader.
+# ──────────────────────────────────────────────────────────────────────
+
+ANSWER_CONSISTENCY_VERIFIER_SYSTEM = """\
+You decide one narrow question: does the student's response, read
+charitably, assert the SAME final answer or conclusion as the
+canonical? Nothing else matters here — not wording, not whether
+they showed working, not pedagogical completeness.
+
+Charitable reading rules:
+  - Treat paraphrases, restatements, and natural-language proofs as
+    equivalent when they reach the same conclusion.
+  - Ignore filler ("I think", "is it", "maybe").
+  - Treat numeric equivalences as equal across forms (0.5 ≡ 1/2 ≡
+    50%; "169" ≡ "13 squared"; "yes, it's right-angled" ≡ "right
+    angle confirmed").
+  - For MCQ stems: a single letter, a single option restatement, or
+    the option text all count as the same answer.
+  - For a multi-claim canonical, require ALL claims to be asserted
+    for "yes"; if only some are, return "partial".
+
+Return a JSON object with these keys:
+
+  confirmed — one of:
+    "yes"        — the student's response asserts the same final answer
+                   or conclusion as the canonical.
+    "partial"    — the student covers part of a multi-claim canonical
+                   (e.g. one slot of a multi-slot question).
+    "no"         — the student asserts a different answer / conclusion.
+    "cant_tell"  — the response is too vague, off-topic, or
+                   meta ("idk", "can you give me a hint") to decide
+                   answer-consistency. Use this sparingly; if a
+                   reasonable teacher would call the answer right or
+                   wrong, do not return cant_tell.
+
+  why       — one short phrase (≤15 words) naming the basis for the
+              decision. Examples: "states 784 457, same six-figure
+              ref as canonical"; "concludes right-angled with correct
+              5/12/13 working"; "asserts profit, canonical says loss".
+
+Return JSON only — no prose, no markdown fences.
+"""
+
+
+def render_answer_consistency_user_prompt(
+    *,
+    question_stem: str,
+    canonical: str,
+    student_input: str,
+    tentative_verdict: str,
+) -> str:
+    """Render the user-turn prompt for the answer-consistency verifier.
+
+    Question + canonical + student response placed FIRST as context;
+    decision instruction LAST. Tentative verdict from grounded
+    adjudicator is included so the verifier can confirm or override.
+    """
+    return (
+        f"Question: {question_stem.strip()}\n\n"
+        f"Canonical answer (private — system-side ground truth):\n"
+        f"{canonical.strip()}\n\n"
+        f"Student response:\n{student_input.strip()}\n\n"
+        f"Tentative grounded verdict: {tentative_verdict.strip() or '(none)'}\n\n"
+        f"---\n"
+        f"Decide answer-consistency only. Emit the JSON object specified."
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Pre-pose derivability check
 # ──────────────────────────────────────────────────────────────────────
 
@@ -239,6 +324,88 @@ def render_pre_pose_user_prompt(
         f"Canonical answer the system intends to grade against: {canonical.strip()}\n\n"
         f"Based ONLY on the visible context above, is this canonical "
         f"derivable? Emit the JSON object specified."
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Post-render question extractor (Phase 4 — Fix 2c)
+#
+# Runs AFTER the StudentTutor produces a turn and BEFORE the conformance
+# classifier. Identifies every distinct action prompt in the rendered
+# tutor text — a "question, instruction, or pose-the-tool-stem the
+# student is expected to act on this turn".
+#
+# Enforces:
+#   - One action prompt per turn (Principle #5 Minimising Cognitive Load
+#     Ch.14 — one idea per turn).
+#   - The active-end rule (Principle #1 Active Learning Ch.10 — every
+#     tutor turn ends with an action the student takes).
+#
+# Subject-agnostic: works for math, geography, language, any subject.
+# Replaces a regex-based stacked-question detector with a Haiku call so
+# the rule generalises across phrasings ("which of the following…",
+# "try …", "now you do it", "fill in the blank", "say it back to me").
+# ──────────────────────────────────────────────────────────────────────
+
+QUESTION_EXTRACTOR_SYSTEM = """\
+You read a tutor's reply to a student and list every distinct action
+prompt — a question, fill-in, choice, instruction, or "now you try"
+ask that the student is expected to act on this turn.
+
+What COUNTS as an action prompt:
+  - A direct question ("What is the easting?")
+  - A multiple-choice ask with options ("Which is bigger: A or B?")
+  - A fill-in-blank ask ("The ___ comes first in a six-figure ref.")
+  - A "now you try" / "your turn" / "show your working" ask
+  - A retrieval ask ("Say back the rule in your own words.")
+  - A choose-and-explain ("Pick one and tell me why.")
+
+What does NOT count as an action prompt:
+  - A rhetorical question used for emphasis ("Make sense?")
+  - A check-in tag ("Right?", "OK?") with no answer requirement
+  - A statement framed as a question for tone ("Ready to try one?")
+    when the answer is not used by the tutor
+  - Listing options as part of an explanation without asking the
+    student to pick
+
+Return a JSON object:
+
+  action_count       — the number of distinct action prompts (0, 1,
+                       2, 3, …).
+  primary_action     — the SINGLE action prompt the student should
+                       respond to this turn, in 1 short sentence
+                       quoting (or closely paraphrasing) the tutor.
+                       Empty string when action_count == 0.
+  has_active_end     — true if the last sentence of the tutor turn is
+                       an action prompt; false if the turn ends on a
+                       statement, explanation, or trailing colon.
+  stacked_examples   — when action_count > 1, list each action prompt
+                       in order as a short string (each ≤25 words).
+                       Empty list otherwise.
+
+Return JSON only — no prose, no markdown fences.
+"""
+
+
+def render_question_extractor_user_prompt(
+    *,
+    tutor_text: str,
+    selected_move: str,
+) -> str:
+    """Render the user-turn prompt for the question extractor.
+
+    The tutor text is placed FIRST as the long content; the decision
+    instruction LAST. The selected move is included so the extractor
+    can weight ambiguous cases (e.g., ``explain``'s closing prompt is
+    still expected to be an action; ``close_topic`` may legitimately
+    end without a new ask).
+    """
+    return (
+        f"Selected move: {selected_move.strip() or 'unknown'}\n\n"
+        f"Tutor turn:\n{tutor_text.strip()}\n\n"
+        f"---\n"
+        f"List the action prompts in this turn and emit the JSON "
+        f"object specified."
     )
 
 

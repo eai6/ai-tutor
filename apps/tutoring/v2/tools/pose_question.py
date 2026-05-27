@@ -18,6 +18,7 @@ routing happens, not the outcome.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -143,6 +144,26 @@ def validate_pose(
         args = PoseQuestionToolArgs(**raw_args)
     except ValidationError as exc:
         return ToolRejection(reason="schema_invalid", detail=str(exc))
+
+    # 1b. Phase 4 Fix 4b — deterministic safety floor. An MCQ-shaped
+    # stem ("which of the following…", "the following options…",
+    # "select one of…") with no rendered options is an unanswerable
+    # question and must not reach the student. The renderer for bank
+    # MCQ slots is supposed to populate ``mcq_option_order`` AND
+    # include the choices in ``rendered_stem`` (see
+    # ``_render_bank_stem_with_options`` in student_tutor.py). When
+    # both are missing, refuse here so the engine can pick a different
+    # slot. The Haiku question-extractor (Fix 2c) is the higher-level
+    # catch; this is the belt-and-braces.
+    if _looks_like_mcq_stem_without_options(args.rendered_stem) and not args.mcq_option_order:
+        return ToolRejection(
+            reason="mcq_options_missing",
+            detail=(
+                "rendered stem references multiple options (e.g. "
+                "'which of the following…') but mcq_option_order is "
+                "empty; pick a different slot or fix the bank row"
+            ),
+        )
 
     visible_context = VisibleContextSnapshot(
         visible_prompt=args.rendered_stem,
@@ -303,7 +324,17 @@ def build_anthropic_pose_question_tool(
         if not stem:
             continue
         slot_map[slot_idx] = step
-        menu_lines.append(f"  {slot_idx}: {stem[:max_stem_chars]}")
+        # Phase 4 Fix 4a — surface the answer_type hint in the menu so
+        # the LLM can pick an MCQ slot with eyes-open (e.g. when
+        # building a confirmation question, an MCQ may be easier for
+        # the student to answer than a free-text recall).
+        answer_type = (
+            getattr(step, "answer_type", "") or ""
+        ).strip().lower()
+        type_tag = f" [{answer_type}]" if answer_type else ""
+        menu_lines.append(
+            f"  {slot_idx}{type_tag}: {stem[:max_stem_chars]}"
+        )
 
     if not slot_map:
         return None, {}
@@ -378,3 +409,41 @@ def _noop_pre_pose_check(**_kwargs) -> None:
     Phase 2+ supplies the real grounded-derivability check.
     """
     return None
+
+
+# ----------------------------------------------------------------------
+# Phase 4 Fix 4b — MCQ-without-options safety floor
+# ----------------------------------------------------------------------
+
+# Subject-agnostic phrases that imply "an option list follows".
+# Matched on the rendered stem to refuse a pose where the bank row
+# stores the stem in choice-list shape but the renderer dropped the
+# choices. (GEO run-6 T16/T18/T20 P1.) Case-insensitive whole-phrase
+# match; very tight so a non-MCQ stem mentioning "the following" in
+# passing doesn't get refused.
+_MCQ_STEM_REQUIRES_OPTIONS_RE = re.compile(
+    r"\b("
+    r"which (?:of |one of )?the following"
+    r"|the following options"
+    r"|select one of the following"
+    r"|choose one of the following"
+    r"|pick one of the following"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_mcq_stem_without_options(rendered_stem: str) -> bool:
+    """True when the rendered stem reads like an MCQ but options are
+    not part of the visible text either."""
+    text = (rendered_stem or "").strip()
+    if not text:
+        return False
+    if not _MCQ_STEM_REQUIRES_OPTIONS_RE.search(text):
+        return False
+    # If the renderer has already inlined A)/B)/C)/D) into the visible
+    # stem, the student CAN answer — don't refuse.
+    inlined_options = re.search(
+        r"(?m)^\s*[A-Da-d]\s*[).:\-]\s+\S", text,
+    )
+    return inlined_options is None

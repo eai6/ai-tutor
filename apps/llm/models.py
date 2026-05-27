@@ -176,6 +176,20 @@ class ModelConfig(models.Model):
         CONFORMANCE_CLASSIFIER = 'conformance_classifier', 'v2 Conformance Classifier'
         TUTOR_CLAIM_ADJUDICATOR = 'tutor_claim_adjudicator', 'v2 Tutor-Claim Adjudicator — Gemini-pinned'
         PROFILER_SUMMARY = 'profiler_summary', 'v2 StudentProfiler — End-of-Session Summary'
+        # Phase 4 — unverified-trap + open-question-pivot redesign
+        # (memory/v2_unverified_trap_redesign.md).
+        # GRADER_VERIFIER:    Haiku-backed "did the student claim the
+        #                     same answer as the canonical?" check that
+        #                     fires AFTER the grounded adjudicator when
+        #                     confidence is low. Replaces the blanket
+        #                     confidence-threshold downgrade.
+        # QUESTION_EXTRACTOR: Haiku-backed post-render extractor that
+        #                     counts action-prompts in a tutor turn so
+        #                     conformance can reject stacked questions
+        #                     and bind open_question to the actual
+        #                     rendered question.
+        GRADER_VERIFIER = 'grader_verifier', 'v2 Grader — Answer-Consistency Verifier'
+        QUESTION_EXTRACTOR = 'question_extractor', 'v2 Post-render Question Extractor'
 
     institution = models.ForeignKey(
         Institution,
@@ -284,6 +298,11 @@ class ModelConfig(models.Model):
             self.Purpose.CONFORMANCE_CLASSIFIER.value,
             self.Purpose.TUTOR_CLAIM_ADJUDICATOR.value,
             self.Purpose.PROFILER_SUMMARY.value,
+            # Phase 4 — both new verifier/extractor steps are
+            # adjudicator-class: structured-JSON output, determinism
+            # required for replay + observability.
+            self.Purpose.GRADER_VERIFIER.value,
+            self.Purpose.QUESTION_EXTRACTOR.value,
         ):
             return self.JUDGE_TEMP
         # v2 TUTOR_MOVE — TUTORING-class clamp [0.1, 0.3].
@@ -336,6 +355,8 @@ class ModelConfig(models.Model):
         'conformance_classifier': 'CONFORMANCE_CLASSIFIER_MODEL_OVERRIDE',
         'tutor_claim_adjudicator': 'TUTOR_CLAIM_ADJUDICATOR_MODEL_OVERRIDE',
         'profiler_summary': 'PROFILER_SUMMARY_MODEL_OVERRIDE',
+        'grader_verifier': 'GRADER_VERIFIER_MODEL_OVERRIDE',
+        'question_extractor': 'QUESTION_EXTRACTOR_MODEL_OVERRIDE',
     }
     # Purposes where Google-grounding is the required runtime branch.
     # Non-Gemini overrides are refused at resolve-time (fail-soft to

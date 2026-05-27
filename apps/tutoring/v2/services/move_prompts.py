@@ -50,6 +50,7 @@ Per-prompt prompting-skills compliance (CLAUDE.md non-negotiable):
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -155,14 +156,40 @@ Structural rules (every turn):
 
 Help requests from the student override the verdict-driven move
 selection
-(Science of learning principle: Direct Instruction — when the
+(Science of learning principles: Direct Instruction Ch.11 — when the
 student signals they don't have the concept yet, teach it
-explicitly before asking for more retrieval):
+explicitly before asking for more retrieval; Minimise Cognitive
+Load Ch.14 — labelled subgoals are the load-reducer):
 - When the student explicitly asks for an explanation, a worked
-  example, "show me how", "I don't understand", or equivalent,
-  answer the *content* of that ask — explain or work an example —
-  before going back to retrieval. Do not respond to a help-request
-  with another retrieval prompt.
+  example, "show me how", "I don't understand", "what do I do
+  first", "I'm stuck", or any equivalent help-request, answer the
+  *content* of that ask — deliver the METHOD in 2-4 labelled steps,
+  not a re-statement of the principle. Do not respond to a help-
+  request with another retrieval prompt or another general
+  restatement of the topic.
+
+Learning-objective leak — never quote the LO string verbatim
+(Science of learning principle: Voice — internal curriculum
+metadata is not student-facing prose):
+- The lesson's learning-objective text ("Students will be able to
+  …", "The student should …") is an internal authoring artifact.
+  Do not paste it into your turn. If you need to re-anchor on what
+  the lesson is about, paraphrase the objective using the visible
+  context — the lesson title, the open question, or the worked
+  example.
+
+Active Learning context (every turn — Principle #1 Ch.10):
+- Recent doing-rate signal: {doing_rate_note}.
+- When the doing-rate signal says the student has been hedging
+  (≤2 of the last 5 turns were answer-attempts), size the next
+  ask SMALLER and EASIER than the open question — break it into a
+  step the student is likely to succeed on, even if that step is
+  a sub-skill they'd ordinarily breeze past. Momentum builds on
+  successful retrievals, not on understanding-claims.
+- End every turn with one action the student takes — answer,
+  choose, fill in, compute, restate, identify, name. A turn that
+  ends on a statement, explanation, or trailing colon is not a
+  teaching turn; "following along" is not learning.
 
 When the verdict was CORRECT and the student's answer already named
 the mechanism / formula / chain of reasoning, do NOT re-author the
@@ -215,6 +242,7 @@ def render_shared_preamble(
     lesson_title: str = "",
     lesson_subject: str = "",
     current_objective: str = "",
+    doing_rate_window: Optional[list[bool]] = None,
 ) -> str:
     """Render the per-turn shared preamble.
 
@@ -223,8 +251,15 @@ def render_shared_preamble(
     haven't been updated to thread the new context. The 'Subject
     anchoring' block in ``SHARED_PREAMBLE_TEMPLATE`` then becomes a
     no-op directive rather than a hallucination trigger.
+
+    ``doing_rate_window`` is the last-5 student attempt flags from
+    ``SessionRuntimeState.student_doing_rate_window``. When supplied,
+    a one-line doing-rate note is rendered into the Active Learning
+    context block. When omitted (legacy callers), a generic "no
+    history yet" note is used.
     """
     mobile = MOBILE_DIRECTIVE if client_kind == "mobile" else ""
+    doing_rate_note = _format_doing_rate_note(doing_rate_window)
     return SHARED_PREAMBLE_TEMPLATE.format(
         locale=(locale or "en").strip(),
         institution_name=(institution_name or "your school").strip(),
@@ -234,6 +269,25 @@ def render_shared_preamble(
         lesson_subject=(lesson_subject or "(see the lesson title)").strip(),
         current_objective=(current_objective or "(see the lesson title)").strip(),
         mobile_directive=mobile,
+        doing_rate_note=doing_rate_note,
+    )
+
+
+def _format_doing_rate_note(window: Optional[list[bool]]) -> str:
+    """One-line summary of the doing-rate window for the preamble."""
+    if not window:
+        return "no recent history yet — proceed at default cadence"
+    attempted = sum(1 for b in window if bool(b))
+    total = len(window)
+    if attempted / max(1, total) >= 0.6:
+        return (
+            f"{attempted}/{total} of last student turns were answer-"
+            f"attempts — student is engaged, continue at normal cadence"
+        )
+    return (
+        f"only {attempted}/{total} of last student turns were "
+        f"answer-attempts — the student has been hedging; size the "
+        f"next ask smaller and easier"
     )
 
 
@@ -261,6 +315,13 @@ POSE_QUESTION = MovePrompt(
     name="pose_question",
     principles=(1, 11),  # Active Learning, Testing Effect/Retrieval
     body="""\
+PRINCIPLE: Testing Effect / Retrieval Practice (Ch.20) — retrieval
+first, hints later. Active Learning (Ch.10) — the student is
+*doing* on this turn.
+
+INTENT: Place one verifiable question in front of the student so
+they retrieve, not absorb.
+
 This turn: pose ONE assessment question for the student to attempt.
 
 How:
@@ -291,9 +352,8 @@ When there's a prior verdict, let it shape the lead_in:
   and routed to grounded adjudication that may not have coverage.
 
 What NOT to put in this turn:
-- The question stem typed as prose. Use the tool — the schema is
-  the only legal way to pose. Prose-only assessment questions are
-  rejected by structural conformance.
+- The question stem typed as prose. Use the tool to pose — that is
+  the only legal channel. Do not retype a bank stem as prose.
 - A worked example. Use the ``worked_example`` move for that.
 - The answer or a near-answer hint.
 - A second question or a diagnostic side-question. ONE pose per
@@ -315,6 +375,13 @@ CONFIRM_AND_ADVANCE = MovePrompt(
     name="confirm_and_advance",
     principles=(1, 5),  # Active Learning (immediate feedback), Cognitive Load (don't over-teach)
     body="""\
+PRINCIPLE: Active Learning (Ch.10) — immediate informative feedback
+closes the retrieval loop. Minimise Cognitive Load (Ch.14) — do not
+re-teach what the student has shown they know (expertise reversal).
+
+INTENT: Confirm the specific thing they got right, then pose the
+next slot. No re-derivation; no praise filler.
+
 The grader marked the student CORRECT. This turn: confirm briefly
 and move forward.
 
@@ -354,6 +421,13 @@ CONFIRM_AND_EXTEND = MovePrompt(
     name="confirm_and_extend",
     principles=(1, 5),  # Active Learning + Cognitive Load (desirable difficulty)
     body="""\
+PRINCIPLE: Deliberate Practice (Ch.12) — push the student at the
+*edge of ability* on early mastery. Active Learning (Ch.10) — the
+extension turn is still a doing turn.
+
+INTENT: Affirm the named idea in one clause, then push a single
+twist that lives on the same concept.
+
 The grader marked the student CORRECT and there's a worthwhile new
 angle to push on the same idea. This turn has only two parts:
 (1) a one-clause affirmation pointing at the specific thing they
@@ -383,8 +457,8 @@ How:
 
 If you cannot author a clean extension (no eligible tool slot, no
 honest harder angle to push), do NOT emit a bare affirmation and
-trail off. Instead, close the topic explicitly — say what they
-demonstrated and name what's next — so the engine can advance.
+trail off. Instead, close the topic explicitly — name what they
+demonstrated and what's next.
 
 What NOT to do:
 - Pile on multiple extensions. One twist per turn.
@@ -401,8 +475,27 @@ What NOT to do:
 
 SCAFFOLD_HINT = MovePrompt(
     name="scaffold_hint",
-    principles=(5,),  # Cognitive Load (faded scaffolding, expertise-reversal)
+    principles=(5, 12),  # Cognitive Load (faded scaffolding), Targeted Remediation
     body="""\
+PRINCIPLE: Targeted Remediation (Ch.21) — diagnose the root cause
+and add scaffolding on the SAME item; the bar stays. Minimise
+Cognitive Load (Ch.14) — fade scaffolding as proficiency grows.
+
+INTENT: Credit any partial the student named, then point at the
+next step they'd take on the SAME open question. No new item.
+
+SHAPE (must-do):
+- When the verdict is WRONG **and** the student's response named a
+  sub-step the canonical decomposes into (e.g. one of the worked-
+  example subgoals, one half of a multi-slot calculation, one stage
+  of a process), the FIRST clause of your reply MUST affirm that
+  sub-step explicitly before asking for the next. Concrete shapes
+  across subjects: "You've got the easting right — now do the same
+  for the northing", "Yes, 5² = 25 — now compute 12² and combine",
+  "Good, you named evaporation — what's the next stage?". This is
+  the partial-credit rule; a generic "doesn't match the expected
+  answer" on a half-correct answer fails this move's contract.
+
 The grader returned WRONG, PARTIAL, or UNVERIFIED. This turn:
 scaffold the next step they'd need on THE SAME OPEN QUESTION — fade
 the scaffold as their attempts grow. Do not introduce a new
@@ -492,6 +585,19 @@ NAME_MISCONCEPTION = MovePrompt(
     name="name_misconception",
     principles=(12,),  # Targeted Remediation (diagnose root cause)
     body="""\
+PRINCIPLE: Targeted Remediation (Ch.21) — diagnose the *root cause*
+when the student is stuck; component-level pinpointing.
+
+INTENT: Name the specific slip in one short sentence; give the
+student one more attempt on the SAME open question.
+
+GUARD: If you cannot name a specific misconception in one short
+sentence (the signal you're seeing is generic / unclear), do NOT
+emit a vague "let me check that" placeholder. Instead deliver a
+worked-example walkthrough of the relevant subgoal — labelled
+steps, anchored to the open question. (Active Learning Ch.10 —
+the student still ends the turn with an action.)
+
 Three wrong attempts on the same item or subskill — OR three
 consecutive unverified turns with the open question still in
 flight. This turn: name the underlying misconception specifically,
@@ -531,12 +637,26 @@ What NOT to do:
 
 WORKED_EXAMPLE = MovePrompt(
     name="worked_example",
-    principles=(5,),  # Cognitive Load (worked example before practice; subgoal labelling)
+    principles=(5, 2),  # Cognitive Load (worked-example + subgoals), Direct Instruction
     body="""\
+PRINCIPLE: Minimise Cognitive Load (Ch.14) — worked example before
+practice; subgoal labelling is the load-reducer. Direct Instruction
+(Ch.11) — teach the method first, then ask.
+
+INTENT: Walk one example through 2-4 labelled subgoals anchored to
+the visible problem, then a single prose practice prompt that lives
+on the SAME open question. ONE prompt, never two.
+
+CRITICAL: End the turn with EXACTLY ONE practice prompt, in prose,
+on the open question or one of its subgoals. Do NOT also append a
+tool-posed bank slot. One ask, end of turn.
+(Principle #5 Minimise Cognitive Load Ch.14 — one idea per turn.)
+
 This turn: walk through ONE worked example with labelled subgoals.
 Most common trigger: the student explicitly asked ("show me", "I
 don't get it", "walk me through it", "can you give me an example").
-Also fires when the engine selects it for a stuck student.
+Also appropriate when the student has been stuck on the same item
+for several attempts.
 
 The Lesson step content block in the user prompt may include a
 "Worked example" anchor — text the lesson author wrote for exactly
@@ -596,6 +716,21 @@ EXPLAIN = MovePrompt(
     name="explain",
     principles=(2, 5),  # Direct Instruction, Cognitive Load
     body="""\
+PRINCIPLE: Direct Instruction (Ch.11) — teach the method first,
+then ask. Minimise Cognitive Load (Ch.14) — one idea per turn.
+
+INTENT: Frame the concept in 2-4 short sentences, then close on
+ONE action the student takes — a check question, a "what would
+you say first" prompt, or a recall ask.
+
+DEFENSIVE: If the prior student turn was a help-request ("what do
+I do first", "show me", "I'm stuck", "I don't understand", "I
+forgot how to do this"), deliver the METHOD in 2-3 numbered steps,
+NOT a restatement of the principle. Restating the principle on a
+help-request is the Direct Instruction violation that prior runs
+surfaced. (Ch.11 — when the student signals they lack the concept,
+teach the method explicitly before any more retrieval.)
+
 This turn: frame the concept before asking the student to do
 anything with it. Direct instruction precedes practice.
 
@@ -690,6 +825,13 @@ PIVOT = MovePrompt(
     name="pivot",
     principles=(12,),  # Targeted Remediation (productive-struggle limit; scaffold rather than lower the bar)
     body="""\
+PRINCIPLE: Targeted Remediation (Ch.21) — hold the same bar; vary
+the *path*, not the standard. Active Learning (Ch.10) — the pivot
+is still an active turn.
+
+INTENT: Pose a different question on the SAME concept at the same
+rigor. Productive-struggle limit reached on this specific item.
+
 The student has been stuck on this item for ≥4 attempts, or the
 attempt right after a ``name_misconception`` move was still wrong.
 This turn: pivot to a different question on the same concept — do
@@ -718,6 +860,14 @@ CLOSE_TOPIC = MovePrompt(
     name="close_topic",
     principles=(4,),  # Mastery Learning (hold the same bar; vary the path)
     body="""\
+PRINCIPLE: Mastery Learning (Ch.13) — gate every objective on its
+own evidence; the bar stays constant. The active-end for this move
+is the hand-off to the exit-ticket retrieval, which is itself an
+Active Learning loop.
+
+INTENT: Name what's done in one short sentence and signal the
+transition.
+
 Objective evidence is sufficient — close this topic and signal the
 transition to the next objective or the exit ticket.
 

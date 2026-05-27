@@ -99,6 +99,60 @@ _OBJECTIVE_MIN_CORRECT = 2
 _OBJECTIVE_MIN_RATIO = 0.5
 
 
+# ──────────────────────────────────────────────────────────────────────
+# Active Learning — doing-rate window (Phase 4)
+# ──────────────────────────────────────────────────────────────────────
+#
+# Principle #1 *Active Learning* (Ch.10): "Student is *doing* on ≥60%
+# of turns". When the doing-rate over the last 5 student turns drops
+# below 60% (i.e. 3 or fewer attempts out of 5), the next move is
+# biased toward LIGHTER cognitive lift — a smaller, easier ask the
+# student can succeed on, restoring momentum on successful retrievals
+# rather than piling on more listening.
+#
+# This is a soft bias, not a hard override: the wrong-branch
+# escalation (scaffold_hint → name_misconception → pivot) stays intact
+# (those moves react to correctness, not effort). The bias only
+# changes:
+#   - PARTIAL + attempts≥3: worked_example  → scaffold_hint
+#   - CORRECT + attempts≤1: confirm_and_extend → confirm_and_advance
+
+_DOING_RATE_WINDOW = 5
+_DOING_RATE_FLOOR = 0.6  # 60% — Ch.10's testable imperative
+
+
+def _compute_doing_rate(window: list[bool]) -> float:
+    """Fraction of recent student turns where they actually attempted.
+
+    Empty window returns 1.0 (no signal yet → no bias).
+    """
+    if not window:
+        return 1.0
+    truthy = sum(1 for b in window if bool(b))
+    return truthy / max(1, len(window))
+
+
+def update_doing_rate_window(
+    runtime_state: SessionRuntimeState,
+    *,
+    attempting: bool,
+) -> None:
+    """Append the current turn's attempting/hedging flag to the window.
+
+    Caller passes ``True`` when the intent classifier returned
+    ``attempting``, ``False`` when it returned a help-request / meta
+    intent. The window holds the last ``_DOING_RATE_WINDOW`` flags;
+    older entries drop off.
+
+    Mutates runtime_state in place.
+    """
+    window = list(runtime_state.student_doing_rate_window or [])
+    window.append(bool(attempting))
+    if len(window) > _DOING_RATE_WINDOW:
+        window = window[-_DOING_RATE_WINDOW:]
+    runtime_state.student_doing_rate_window = window
+
+
 def select_move(
     *,
     verdict: Optional[GradingResult],
@@ -187,6 +241,17 @@ def select_move(
 
     kind = verdict.verdict
 
+    # Phase 4 — Active Learning doing-rate bias. Computed once per
+    # call and used by the verdict-branch picks below to favour
+    # lighter cognitive lift when the student has been hedging /
+    # asking for help. Principle #1 Active Learning Ch.10 — momentum
+    # builds on successful retrievals; a struggling student needs a
+    # smaller ask they can succeed on, not a heavier worked example.
+    doing_rate_low = (
+        _compute_doing_rate(runtime_state.student_doing_rate_window)
+        < _DOING_RATE_FLOOR
+    )
+
     # ── verdict=correct branch ──
     if kind == Verdict.CORRECT:
         # If this correct closes out the objective, the
@@ -196,6 +261,11 @@ def select_move(
         # confirm_and_extend on early mastery (first correct after
         # zero/one attempt — student likely had the idea already).
         if attempts <= 1 and obj_progress and obj_progress.correct >= 1:
+            # When the student has been hedging, keep the celebration
+            # but DON'T extend into harder territory — a fresh easy
+            # ask via confirm_and_advance is the right next step.
+            if doing_rate_low:
+                return "confirm_and_advance"
             return "confirm_and_extend"
         return "confirm_and_advance"
 
@@ -223,7 +293,10 @@ def select_move(
     if kind == Verdict.PARTIAL:
         # Scaffold the missing piece; if the student has been stuck a
         # while on this item, escalate to worked_example.
-        if attempts >= 3:
+        # Active Learning bias: when doing-rate is low, prefer
+        # scaffold_hint even at attempts≥3 — a worked example here
+        # piles on listening when the student needs a small win.
+        if attempts >= 3 and not doing_rate_low:
             return "worked_example"
         return "scaffold_hint"
 

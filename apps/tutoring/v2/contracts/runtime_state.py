@@ -224,6 +224,29 @@ class SessionRuntimeState(BaseModel):
     # Additive — bare-answer signal counters (Phase 1 §2 / §2.1.1).
     bare_answer_counts_by_objective: dict[str, int] = Field(default_factory=dict)
 
+    # Phase 4 — difficulty rung (-2..+2) under the redesign
+    # (memory/v2_unverified_trap_redesign.md Fix 2b). Mutated by the
+    # difficulty-signal endpoint via the v2 single-writer path; consumed
+    # by move-selection / pose tooling to pick the rung-appropriate
+    # bank slot. Default 0 (default rung). Legacy ``engine_state.
+    # difficulty_level`` stays untouched for in-flight legacy sessions.
+    difficulty_level: int = 0
+
+    # Phase 4 — last out-of-band system event handled by the engine
+    # (e.g. ``"difficulty_change:too_easy"``). Set by the entry-point
+    # adapter (the difficulty-signal endpoint, future system actors) so
+    # the trace / observability dashboard records WHY a turn fired
+    # without a real student utterance. Empty for normal student turns.
+    last_system_event: str = ""
+
+    # Phase 4 — Active Learning invariant. Rolling 5-turn window of
+    # whether the student attempted an answer (True) vs hedged / asked
+    # for help / sent meta input (False). Populated from intent
+    # classifier output. Consumed by move-selection to bias toward
+    # lighter cognitive lift when doing-rate drops below 60%.
+    # Principle #1 *Active Learning* (Ch.10).
+    student_doing_rate_window: list[bool] = Field(default_factory=list)
+
     # Schema version for forward-compat. Bump when adding additive
     # fields; ContextManager loaders tolerate older versions.
     schema_version: int = 1

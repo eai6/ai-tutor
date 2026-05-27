@@ -383,6 +383,15 @@ def _action_floor_for_move(
     the open question and asks for a small specific step. For moves
     without an open-question dependency, falls back to the engine's
     ``next_action_hint`` connective (the original behaviour).
+
+    Phase 4 (memory/v2_unverified_trap_redesign.md Fix 3): the raw
+    learning-objective string is NEVER substituted into student-facing
+    prose. The objective is internal curriculum metadata; verbatim
+    substitution leaked system vocabulary ("Students will be able to
+    …") into the GEO run-6 T4 fallback. When no open_question is
+    available, the action floor uses a generic decompose-the-idea
+    phrasing that the active move's prompt is responsible for
+    paraphrasing the objective into.
     """
     open_q_moves = (
         "pose_question",
@@ -400,18 +409,23 @@ def _action_floor_for_move(
     oq = (anchor.open_question_stem or "").strip()
     if oq:
         return _pick(_OPEN_Q_ACTION_FLOORS).format(oq=oq)
-    obj = (anchor.objective or "").strip()
-    if obj:
-        return _pick(_OBJECTIVE_ACTION_FLOORS).format(obj=obj)
-    return next_action_hint
+    # No open question — DO NOT substitute the raw objective. Hand
+    # back a subject-agnostic decompose prompt instead.
+    return (
+        "Let's take one small step on what we're working on. Tell me "
+        "the first thing that comes to mind, and we'll build from there."
+    )
 
 
 def _question_or_objective(anchor: MoveAnchor) -> str:
-    """Pick the best available "thing to point the student at"."""
-    oq = (anchor.open_question_stem or "").strip()
-    if oq:
-        return oq
-    return (anchor.objective or "").strip()
+    """Pick the best available "thing to point the student at".
+
+    Phase 4: returns the open-question stem only. The raw objective is
+    deliberately NOT used as a fallback — see ``_action_floor_for_move``
+    for the rationale (the GEO run-6 T4 LO leak). Callers handle an
+    empty return with a generic decompose prompt.
+    """
+    return (anchor.open_question_stem or "").strip()
 
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")

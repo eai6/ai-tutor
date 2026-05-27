@@ -55,10 +55,12 @@ from apps.tutoring.v2.contracts import (
 )
 from apps.tutoring.v2.services.bare_answer import is_bare_answer
 from apps.tutoring.v2.services.grader_prompts import (
+    ANSWER_CONSISTENCY_VERIFIER_SYSTEM,
     MATH_DSL_SYSTEM,
     NON_MATH_GROUNDED_SYSTEM,
     PRE_POSE_SYSTEM,
     TUTOR_CLAIM_SYSTEM,
+    render_answer_consistency_user_prompt,
     render_math_dsl_user_prompt,
     render_non_math_grounded_user_prompt,
     render_pre_pose_user_prompt,
@@ -73,13 +75,14 @@ from apps.tutoring.v2.tools.token_cache import token_cache
 logger = logging.getLogger(__name__)
 
 
-# Below this confidence the grounded path escalates to ``unverified``.
-# Lowered from 0.6 → 0.5 after the MATHS-S1 / GEO-S5 evaluations showed
-# rich free-text correct answers (mechanism-level science definitions,
-# transfer-form math reasoning) systematically routed to ``unverified``
-# despite the grounded model returning the right verdict. The 0.5 cut
-# still rejects coin-flip outputs; the model's own ``unverified``
-# branch is the conservative escape valve for genuine non-coverage.
+# Below this confidence the grounded path consults the answer-consistency
+# verifier (Phase 4) instead of unconditionally downgrading to UNVERIFIED.
+# The verifier is a Haiku-backed yes/no/cant-tell adjudicator that asks
+# only "does the student's response assert the same answer as the
+# canonical?". It generalises across subjects (math proof, geography
+# reasoning, definition) and breaks the unverified-trap loop that prior
+# runs surfaced on rich natural-language proofs.
+# See memory/v2_unverified_trap_redesign.md §Fix 1.
 _GROUNDED_CONFIDENCE_THRESHOLD = 0.5
 
 
@@ -102,6 +105,19 @@ class _GroundedAdjudication:
     reasoning: str = ""
 
 
+@dataclass
+class _ConsistencyResult:
+    """Output of the Phase 4 answer-consistency verifier.
+
+    ``confirmed`` is one of "yes" | "partial" | "no" | "cant_tell".
+    The grader maps these to final Verdict values when the grounded
+    adjudicator's confidence is below the threshold.
+    """
+    confirmed: str  # "yes" | "partial" | "no" | "cant_tell"
+    why: str
+    available: bool  # False when the verifier client could not be reached
+
+
 class StudentGrader:
     """Stateless central grader. Constructed per-turn."""
 
@@ -111,6 +127,7 @@ class StudentGrader:
         math_client_factory=None,
         grounded_client_factory=None,
         claim_client_factory=None,
+        verifier_client_factory=None,
         math_verification_tool: Optional[MathVerificationTool] = None,
     ) -> None:
         """Optional injection seams for tests.
@@ -122,6 +139,7 @@ class StudentGrader:
         self._math_client_factory = math_client_factory
         self._grounded_client_factory = grounded_client_factory
         self._claim_client_factory = claim_client_factory
+        self._verifier_client_factory = verifier_client_factory
         self._math_verification_tool = math_verification_tool or MathVerificationTool()
 
     # ==================================================================
@@ -155,34 +173,37 @@ class StudentGrader:
             # 1. Extract the DSL from the LLM.
             extraction = self._extract_math_dsl(problem_text)
             if extraction.program is None:
+                # Phase 4 — math DSL extraction failed (often because
+                # the problem is a prose proof, definition, or
+                # explain-and-justify question rather than a compute-
+                # this-value problem). Fall through to the grounded /
+                # verifier path so a correct natural-language proof
+                # can be confirmed. Subject-agnostic.
                 if span is not None:
                     span["payload"] = {
-                        "verdict": Verdict.UNVERIFIED.value,
+                        "verdict": "deferred",
                         "stage": "dsl_extraction",
+                        "fallthrough": "grounded",
                         "error": extraction.error or "",
                     }
-                return GradingResult(
-                    verdict=Verdict.UNVERIFIED,
-                    reasoning=f"math DSL extraction failed: {extraction.error or ''}",
-                    bare_answer=bare,
-                )
+                return self._grade_non_math(context, request)
 
             # 2. Validate + execute the DSL.
             result = self._math_verification_tool.evaluate(
                 problem_text, extraction.program,
             )
             if not result.ok:
+                # Same fallthrough rationale as above — DSL extracted
+                # but failed to validate / execute (e.g. references a
+                # variable the problem text doesn't name).
                 if span is not None:
                     span["payload"] = {
-                        "verdict": Verdict.UNVERIFIED.value,
+                        "verdict": "deferred",
                         "stage": "dsl_validation",
+                        "fallthrough": "grounded",
                         "error": result.error or "",
                     }
-                return GradingResult(
-                    verdict=Verdict.UNVERIFIED,
-                    reasoning=f"math DSL validation failed: {result.error or ''}",
-                    bare_answer=bare,
-                )
+                return self._grade_non_math(context, request)
 
             canonical_value = result.canonical_value
             canonical_str = _format_canonical(canonical_value)
@@ -195,17 +216,19 @@ class StudentGrader:
 
             # 4. Comparator.
             if student_value is None:
+                # The math DSL produced a canonical value but we could
+                # not extract a numeric from the student's prose. Fall
+                # through to the grounded / verifier path so a correct
+                # answer expressed in words ("the triangle is right-
+                # angled because 169 = 169") can be confirmed against
+                # the canonical's substance.
                 if span is not None:
                     span["payload"] = {
-                        "verdict": Verdict.UNVERIFIED.value,
+                        "verdict": "deferred",
                         "stage": "student_value_parse",
+                        "fallthrough": "grounded",
                     }
-                return GradingResult(
-                    verdict=Verdict.UNVERIFIED,
-                    private_canonical=canonical_str,
-                    reasoning="could not parse a numeric value from student input",
-                    bare_answer=bare,
-                )
+                return self._grade_non_math(context, request)
 
             # 4. Comparator. Multi-slot questions: when the canonical is
             # a list of {name, value} entries, accept the student's
@@ -443,9 +466,22 @@ class StudentGrader:
                 student_input=request.student_input,
                 sources=list(request.kb_chunks or []),
             )
+
+            # Phase 4 — when grounded confidence is low AND the
+            # tentative verdict is correct / partial / wrong, consult
+            # the answer-consistency verifier instead of blanket-
+            # downgrading to UNVERIFIED. The verifier is a Haiku-backed
+            # yes/no/cant-tell adjudicator that asks only whether the
+            # student's response asserts the same answer as the
+            # canonical. It is subject-agnostic.
+            verifier_outcome: Optional[_ConsistencyResult] = None
             verdict_kind = adjudication.verdict
-            if adjudication.confidence < _GROUNDED_CONFIDENCE_THRESHOLD:
-                verdict_kind = Verdict.UNVERIFIED
+            verdict_kind, verifier_outcome = self._maybe_consult_verifier(
+                adjudication=adjudication,
+                question_stem=request.open_question.rendered_stem or "",
+                canonical=adjudication.private_canonical,
+                student_input=request.student_input,
+            )
 
             safe = StudentSafeFeedback(
                 what_right=adjudication.what_right,
@@ -454,18 +490,32 @@ class StudentGrader:
             )
 
             if span is not None:
-                span["payload"] = {
+                payload = {
                     "verdict": verdict_kind.value,
                     "tier": "grounded",
                     "confidence": adjudication.confidence,
                 }
+                if verifier_outcome is not None:
+                    payload["verifier"] = {
+                        "confirmed": verifier_outcome.confirmed,
+                        "why": verifier_outcome.why[:120],
+                        "available": verifier_outcome.available,
+                    }
+                span["payload"] = payload
+
+            reasoning = adjudication.reasoning or "non-math grounded adjudication"
+            if verifier_outcome is not None:
+                reasoning = (
+                    f"{reasoning}; verifier={verifier_outcome.confirmed}"
+                    f" ({verifier_outcome.why})"
+                )
 
             return GradingResult(
                 verdict=verdict_kind,
                 private_canonical=adjudication.private_canonical,
                 student_safe_feedback=safe,
                 student_value=request.student_input,
-                reasoning=adjudication.reasoning or "non-math grounded adjudication",
+                reasoning=reasoning,
                 citation=adjudication.citation,
                 bare_answer=False,
             )
@@ -590,6 +640,135 @@ class StudentGrader:
             reasoning="bank_grader deterministic match",
             bare_answer=False,
         )
+
+    # ------------------------------------------------------------------
+    # Phase 4 — Answer-consistency verifier
+    # ------------------------------------------------------------------
+
+    def _maybe_consult_verifier(
+        self,
+        *,
+        adjudication: "_GroundedAdjudication",
+        question_stem: str,
+        canonical: str,
+        student_input: str,
+    ) -> tuple[Verdict, Optional["_ConsistencyResult"]]:
+        """Run the answer-consistency verifier when grounded was unsure.
+
+        Mapping rule:
+          - If grounded.confidence >= threshold → keep grounded verdict
+            as-is, no verifier call.
+          - If grounded.verdict == UNVERIFIED *and* the student input
+            looks meta/empty (no answer attempted) → keep UNVERIFIED.
+            (The verifier can't decide nothing.)
+          - Otherwise consult the verifier:
+              confirmed=yes      → CORRECT  (verifier overrides up)
+              confirmed=partial  → PARTIAL  (verifier overrides up)
+              confirmed=no       → WRONG    (verifier overrides down)
+              confirmed=cant_tell → UNVERIFIED (genuine terminal)
+              verifier unavailable → fall back to the old behaviour
+                                       (downgrade to UNVERIFIED).
+
+        Returns ``(final_verdict, verifier_result_or_None)``. The
+        verifier_result is None when no verifier call was made.
+        """
+        if adjudication.confidence >= _GROUNDED_CONFIDENCE_THRESHOLD:
+            return adjudication.verdict, None
+        if not (student_input or "").strip():
+            return Verdict.UNVERIFIED, None
+        outcome = self._call_consistency_verifier(
+            question_stem=question_stem,
+            canonical=canonical,
+            student_input=student_input,
+            tentative_verdict=adjudication.verdict.value,
+        )
+        if not outcome.available:
+            # Fail-soft: preserve prior behaviour when the verifier
+            # cannot be reached (no GRADER_VERIFIER ModelConfig, model
+            # outage). The grounded verdict still downgrades to
+            # UNVERIFIED, exactly as before Phase 4.
+            return Verdict.UNVERIFIED, outcome
+        mapping = {
+            "yes": Verdict.CORRECT,
+            "partial": Verdict.PARTIAL,
+            "no": Verdict.WRONG,
+            "cant_tell": Verdict.UNVERIFIED,
+        }
+        return mapping.get(outcome.confirmed, Verdict.UNVERIFIED), outcome
+
+    def _call_consistency_verifier(
+        self,
+        *,
+        question_stem: str,
+        canonical: str,
+        student_input: str,
+        tentative_verdict: str,
+    ) -> "_ConsistencyResult":
+        """Haiku-backed verifier — JUDGE-class temperature (0.0).
+
+        Subject-agnostic. Asks only whether the student's response
+        asserts the same final answer as the canonical, ignoring
+        wording quality and working-shown.
+        """
+        with emit_span("audit", "grader.answer_consistency_verifier") as span:
+            client = self._resolve_verifier_client()
+            if client is None:
+                if span is not None:
+                    span["payload"] = {
+                        "confirmed": "unavailable",
+                        "reason": "no GRADER_VERIFIER client",
+                    }
+                return _ConsistencyResult(
+                    confirmed="cant_tell",
+                    why="verifier client unavailable",
+                    available=False,
+                )
+            try:
+                response = client.generate(
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": render_answer_consistency_user_prompt(
+                                question_stem=question_stem,
+                                canonical=canonical,
+                                student_input=student_input,
+                                tentative_verdict=tentative_verdict,
+                            ),
+                        },
+                    ],
+                    system_prompt=ANSWER_CONSISTENCY_VERIFIER_SYSTEM,
+                    max_tokens=400,
+                )
+                payload = _safe_json_loads(response.content or "") or {}
+            except Exception as exc:
+                logger.warning(
+                    "[StudentGrader] answer-consistency verifier raised %s",
+                    type(exc).__name__,
+                )
+                if span is not None:
+                    span["payload"] = {
+                        "confirmed": "unavailable",
+                        "reason": f"raise: {type(exc).__name__}",
+                    }
+                return _ConsistencyResult(
+                    confirmed="cant_tell",
+                    why=f"verifier raise: {type(exc).__name__}",
+                    available=False,
+                )
+            confirmed = str(payload.get("confirmed", "cant_tell")).strip().lower()
+            if confirmed not in ("yes", "partial", "no", "cant_tell"):
+                confirmed = "cant_tell"
+            why = str(payload.get("why", "")).strip()
+            if span is not None:
+                span["payload"] = {
+                    "confirmed": confirmed,
+                    "why": why[:120],
+                }
+            return _ConsistencyResult(
+                confirmed=confirmed,
+                why=why,
+                available=True,
+            )
 
     def _call_grounded_adjudicator(
         self,
@@ -856,6 +1035,11 @@ class StudentGrader:
         if self._claim_client_factory is not None:
             return self._claim_client_factory()
         return _build_client_for_purpose("tutor_claim_adjudicator")
+
+    def _resolve_verifier_client(self):
+        if self._verifier_client_factory is not None:
+            return self._verifier_client_factory()
+        return _build_client_for_purpose("grader_verifier")
 
 
 # ──────────────────────────────────────────────────────────────────────

@@ -44,7 +44,15 @@ from apps.tutoring.v2.services.conformance import (
 )
 from apps.tutoring.v2.services.context_manager import ContextManager
 from apps.tutoring.v2.services.media import MediaService
+from apps.tutoring.v2.services.move_escalation import (
+    escalation_target,
+    is_terminal as is_terminal_move,
+)
 from apps.tutoring.v2.services.move_selection import ALLOWED_MOVES, select_move
+from apps.tutoring.v2.services.question_extractor import (
+    ExtractionResult,
+    QuestionExtractor,
+)
 from apps.tutoring.v2.services.student_grader import StudentGrader
 from apps.tutoring.v2.services.student_tutor import StudentTutor
 from apps.tutoring.v2.services.templates import MoveAnchor, render_safe_template
@@ -56,6 +64,17 @@ logger = logging.getLogger(__name__)
 MAX_TURNS_PER_SESSION = 40
 MAX_TURNS_PER_OBJECTIVE = 12
 MAX_VERDICTLESS_RUN = 6
+
+
+def _doing_rate_observability(window: list) -> dict:
+    """Compact doing-rate summary for ``v2_trace`` (Phase 4)."""
+    truthy = sum(1 for b in window if bool(b))
+    total = len(window)
+    return {
+        "attempted": truthy,
+        "total": total,
+        "rate": (truthy / total) if total else None,
+    }
 
 
 @dataclass
@@ -95,12 +114,14 @@ class TutorEngine:
         tutor: Optional[StudentTutor] = None,
         conformance: Optional[ConformanceCheck] = None,
         media_service: Optional[MediaService] = None,
+        question_extractor: Optional[QuestionExtractor] = None,
     ) -> None:
         self.context_manager = context_manager
         self.grader = grader or StudentGrader()
         self.tutor = tutor or StudentTutor()
         self.conformance = conformance or ConformanceCheck(grader=self.grader)
         self.media_service = media_service or MediaService()
+        self.question_extractor = question_extractor or QuestionExtractor()
 
     # ------------------------------------------------------------------
     # Turn entrypoints (Phase 2)
@@ -225,7 +246,14 @@ class TutorEngine:
         # claims and does not "surface uncertainty"). Skip the grader
         # entirely on help-requests; the help-request also overrides
         # move selection below (see move_selection.detect_help_request).
-        from apps.tutoring.v2.services.move_selection import detect_help_request
+        from apps.tutoring.v2.services.intent_classifier import (
+            INTENT_ATTEMPTING,
+            classify_student_intent,
+            intent_to_move,
+        )
+        from apps.tutoring.v2.services.move_selection import (
+            update_doing_rate_window,
+        )
 
         open_q_stem = (
             runtime_state.open_question.rendered_stem
@@ -233,12 +261,24 @@ class TutorEngine:
             else ""
         )
         # One LLM call (Haiku-backed intent classifier) per turn.
-        # The result is reused downstream by ``pick_move`` so the
-        # classifier never runs twice.
-        help_request_move = detect_help_request(
-            student_input, open_question_stem=open_q_stem,
+        # The intent result drives BOTH the help-request override AND
+        # the Active-Learning doing-rate window (Phase 4 — Principle
+        # #1 Active Learning Ch.10).
+        student_intent = classify_student_intent(
+            student_input=student_input,
+            open_question_stem=open_q_stem,
         )
+        help_request_move = intent_to_move(student_intent)
         is_help_request = help_request_move is not None
+
+        # Update the doing-rate window: True when the student attempted
+        # an answer, False when they hedged / asked for help / sent
+        # meta input. Empty / whitespace input counts as False.
+        attempting = (
+            bool((student_input or "").strip())
+            and student_intent == INTENT_ATTEMPTING
+        )
+        update_doing_rate_window(runtime_state, attempting=attempting)
 
         verdict: Optional[GradingResult] = None
         if (
@@ -264,6 +304,17 @@ class TutorEngine:
                 )
                 if verdict.verdict == Verdict.CORRECT:
                     runtime_state.attempts_on_open_question = 0
+                    # Phase 4 Fix 2a (moved upstream) — clear the
+                    # open_question NOW, before move selection picks
+                    # confirm_and_advance / confirm_and_extend.
+                    # Otherwise the in-turn new pose trips the
+                    # stickiness gate against the stale open
+                    # question. Principle #4 Mastery Learning Ch.13:
+                    # a satisfied question is no longer the
+                    # knowledge frontier and must not anchor the next
+                    # tutor turn's posing.
+                    if runtime_state.open_question is not None:
+                        runtime_state.open_question = None
                 else:
                     runtime_state.attempts_on_open_question += 1
                 # Bare-answer signal counter (Phase 2 §2.1.1). Counter
@@ -303,6 +354,30 @@ class TutorEngine:
         attempt_text = first_resp.text
         committed_pose = first_resp.pending_pose
 
+        # 3b. Post-render question extraction (Phase 4, Fix 2c).
+        # Subject-agnostic Haiku call counts the distinct action prompts
+        # in the rendered turn. Two invariants enforced here, BEFORE
+        # the deterministic conformance gates:
+        #   - One action prompt per turn
+        #     (Principle #5 Minimising Cognitive Load Ch.14 —
+        #     one idea per turn).
+        #   - Active end on every turn
+        #     (Principle #1 Active Learning Ch.10 — student must be
+        #     *doing* on ≥60% of turns).
+        # The extractor outcome is surfaced to conformance as violation
+        # hints; the existing retry → escalation path handles it. The
+        # extractor is FAIL-SOFT: on outage it reports a single action
+        # prompt so conformance behaviour is unchanged. This preserves
+        # the design principle of deterministic gates as safety floors,
+        # not flow controllers.
+        first_extraction = self.question_extractor.extract(
+            tutor_text=attempt_text, selected_move=selected_move,
+        )
+        extractor_violations = self._extractor_violations(
+            extraction=first_extraction, selected_move=selected_move,
+        )
+        retry_extraction: Optional[ExtractionResult] = None
+
         # 4. Conformance check.
         prior_student_turn = self._prior_student_turn(context)
         bank_stems = self._bank_stems_for_context(context)
@@ -332,6 +407,14 @@ class TutorEngine:
             lesson_has_media=lesson_has_media,
             pending_pose=first_resp.pending_pose,
         )
+        # Phase 4 Fix 2c — fold extractor violations into the
+        # conformance result so the existing retry path handles them
+        # identically to deterministic-gate violations.
+        if extractor_violations:
+            conf_result.violations = list(conf_result.violations) + list(
+                extractor_violations
+            )
+            conf_result.passed = False
 
         fallback_used = False
         if not conf_result.passed:
@@ -348,6 +431,13 @@ class TutorEngine:
                 if span is not None:
                     span["payload"] = {"violations": conf_result.violations[:5]}
             retry_text = retry_resp.text
+
+            retry_extraction = self.question_extractor.extract(
+                tutor_text=retry_text, selected_move=selected_move,
+            )
+            retry_extractor_violations = self._extractor_violations(
+                extraction=retry_extraction, selected_move=selected_move,
+            )
 
             retry_conf = self.conformance.run(
                 candidate_response=retry_text,
@@ -371,6 +461,11 @@ class TutorEngine:
                 pending_pose=retry_resp.pending_pose,
             )
             retry_conf.retry_used = True
+            if retry_extractor_violations:
+                retry_conf.violations = list(retry_conf.violations) + list(
+                    retry_extractor_violations
+                )
+                retry_conf.passed = False
 
             if retry_conf.passed:
                 attempt_text = retry_text
@@ -379,30 +474,98 @@ class TutorEngine:
                 # Phase A ran from scratch on retry.
                 committed_pose = retry_resp.pending_pose
             else:
-                # Safe terminal template — never release a free-form
-                # response that failed conformance twice. Discard any
-                # pending pose; no Phase B commit happens.
-                fallback_used = True
-                conf_result = retry_conf
-                conf_result.fallback_used = True
-                committed_pose = None
-                next_action = self._render_next_action_for_template(
-                    context=context, runtime_state=runtime_state,
-                )
-                attempt_text = render_safe_template(
-                    verdict=verdict,
-                    student_claim_present=(
-                        conf_result.labels.student_claim_present
-                        if conf_result.labels is not None
-                        else False
-                    ),
-                    next_action_text=next_action,
-                    move_anchor=self._build_move_anchor(
-                        context=context,
-                        selected_move=selected_move,
-                        runtime_state=runtime_state,
-                    ),
-                )
+                # Phase 4 Fix 3 — move ESCALATION rather than a
+                # verdict-keyed prose blob. The move-escalation ladder
+                # picks the principled neighbour move (test → teach
+                # the method → re-frame → hand off) and runs ONE more
+                # tutor + conformance attempt. The escalated move's
+                # safe-terminal template is the floor if THAT also
+                # fails — so the student still gets the escalated
+                # move's pedagogy, not a generic apology.
+                #
+                # Active Learning preserved: every move in the ladder
+                # ends with an action the student takes
+                # (Principle #1 Active Learning Ch.10).
+                escalated_move = escalation_target(selected_move)
+                if (
+                    escalated_move
+                    and escalated_move != selected_move
+                    and escalated_move in ALLOWED_MOVES
+                ):
+                    esc_text, esc_pose, esc_conf, esc_extraction = (
+                        self._run_escalation_attempt(
+                            context=context,
+                            verdict=verdict,
+                            escalated_move=escalated_move,
+                            media_catalog=media_catalog,
+                            student_input=student_input,
+                            prior_student_turn=prior_student_turn,
+                            bank_stems=bank_stems,
+                            recent_student_turns=recent_student_turns,
+                            attached_media_count=attached_media_count,
+                            figure_facts=figure_facts,
+                            lesson_has_media=lesson_has_media,
+                            runtime_state=runtime_state,
+                        )
+                    )
+                    if esc_conf.passed:
+                        attempt_text = esc_text
+                        conf_result = esc_conf
+                        conf_result.retry_used = True
+                        # Record the escalation in the trace via the
+                        # selected_move surface so observability shows
+                        # WHICH move was emitted.
+                        selected_move = escalated_move
+                        committed_pose = esc_pose
+                        retry_extraction = esc_extraction
+                    else:
+                        # Escalation also failed — fall through to the
+                        # safe terminal template, but keyed to the
+                        # ESCALATED move so the floor delivers that
+                        # move's pedagogy minimum (worked example body
+                        # / explain framing / etc.).
+                        fallback_used = True
+                        conf_result = esc_conf
+                        conf_result.fallback_used = True
+                        committed_pose = None
+                        retry_extraction = esc_extraction
+                        selected_move = escalated_move
+                        attempt_text = render_safe_template(
+                            verdict=verdict,
+                            student_claim_present=(
+                                conf_result.labels.student_claim_present
+                                if conf_result.labels is not None
+                                else False
+                            ),
+                            next_action_text="",
+                            move_anchor=self._build_move_anchor(
+                                context=context,
+                                selected_move=escalated_move,
+                                runtime_state=runtime_state,
+                            ),
+                        )
+                else:
+                    # Terminal move (close_topic) or no escalation
+                    # available — render the safe template at the
+                    # original move. Discard any pending pose.
+                    fallback_used = True
+                    conf_result = retry_conf
+                    conf_result.fallback_used = True
+                    committed_pose = None
+                    attempt_text = render_safe_template(
+                        verdict=verdict,
+                        student_claim_present=(
+                            conf_result.labels.student_claim_present
+                            if conf_result.labels is not None
+                            else False
+                        ),
+                        next_action_text="",
+                        move_anchor=self._build_move_anchor(
+                            context=context,
+                            selected_move=selected_move,
+                            runtime_state=runtime_state,
+                        ),
+                    )
 
         # 4b. Phase B commit (Phase 1 §4): only commits if conformance
         # accepted AND the LLM called the pose_question tool. Updates
@@ -418,6 +581,7 @@ class TutorEngine:
                     "[TutorEngine] commit_pending_pose raised %s — pose dropped",
                     type(exc).__name__,
                 )
+
 
         # 5. Skill-mastery write hook (dashboard-only, isolated).
         if verdict is not None:
@@ -453,6 +617,12 @@ class TutorEngine:
             is_lesson_complete = advanced_to_step_index is None
 
         # 7. Build v2_trace rollup for SessionTurn.judge_outputs.v2_trace.
+        # ``question_extractor`` records the final-attempt action_count
+        # / has_active_end so observability can spot Active-Learning
+        # violations even when conformance passed.
+        final_extraction: ExtractionResult = (
+            retry_extraction if retry_extraction is not None else first_extraction
+        )
         v2_trace = {
             "selected_move": selected_move,
             "verdict": verdict.verdict.value if verdict else None,
@@ -467,6 +637,14 @@ class TutorEngine:
             "fallback_used": fallback_used,
             "is_lesson_complete": is_lesson_complete,
             "advanced_to_step_index": advanced_to_step_index,
+            "question_extractor": {
+                "action_count": final_extraction.action_count,
+                "has_active_end": final_extraction.has_active_end,
+                "available": final_extraction.available,
+            },
+            "doing_rate_5turn": _doing_rate_observability(
+                runtime_state.student_doing_rate_window or []
+            ),
         }
 
         return TurnResult(
@@ -866,6 +1044,123 @@ class TutorEngine:
         # own MAX_TURNS_PER_OBJECTIVE budget.
         runtime_state.safety_valve_counters.turns_on_current_objective = 0
         return next_idx
+
+    def _run_escalation_attempt(
+        self,
+        *,
+        context: TutoringContext,
+        verdict: Optional[GradingResult],
+        escalated_move: str,
+        media_catalog: list,
+        student_input: str,
+        prior_student_turn: str,
+        bank_stems: list[str],
+        recent_student_turns: list[str],
+        attached_media_count: int,
+        figure_facts: list[str],
+        lesson_has_media: bool,
+        runtime_state: SessionRuntimeState,
+    ) -> tuple[str, Any, ConformanceResult, ExtractionResult]:
+        """Run one tutor + conformance + extractor pass at the
+        escalated move (Phase 4 Fix 3).
+
+        The escalation re-enters StudentTutor from scratch — different
+        move prompt, fresh tool path. Returns the same shape as the
+        first / retry pass so the caller can swap it in if conformance
+        passes.
+        """
+        with emit_span("audit", "tutor.escalation") as span:
+            esc_resp = self._invoke_tutor_or_fallback(
+                context=context,
+                verdict=verdict,
+                move=escalated_move,
+                media_catalog=media_catalog,
+                student_input=student_input,
+            )
+            if span is not None:
+                span["payload"] = {"escalated_move": escalated_move}
+        esc_text = esc_resp.text
+
+        esc_extraction = self.question_extractor.extract(
+            tutor_text=esc_text, selected_move=escalated_move,
+        )
+        esc_extractor_violations = self._extractor_violations(
+            extraction=esc_extraction, selected_move=escalated_move,
+        )
+
+        esc_conf = self.conformance.run(
+            candidate_response=esc_text,
+            verdict=verdict,
+            runtime_state=runtime_state,
+            selected_move=escalated_move,
+            prior_student_turn=prior_student_turn,
+            open_question_stem=(
+                runtime_state.open_question.rendered_stem
+                if runtime_state.open_question
+                else ""
+            ),
+            attached_media_count=attached_media_count,
+            figure_facts=figure_facts,
+            bank_stems=bank_stems,
+            recent_student_turns=recent_student_turns,
+            private_canonical=(verdict.private_canonical if verdict else ""),
+            context=context,
+            posed_via_tool=(esc_resp.pending_pose is not None),
+            lesson_has_media=lesson_has_media,
+            pending_pose=esc_resp.pending_pose,
+        )
+        if esc_extractor_violations:
+            esc_conf.violations = list(esc_conf.violations) + list(
+                esc_extractor_violations
+            )
+            esc_conf.passed = False
+        return esc_text, esc_resp.pending_pose, esc_conf, esc_extraction
+
+    def _extractor_violations(
+        self,
+        *,
+        extraction: ExtractionResult,
+        selected_move: str,
+    ) -> list[str]:
+        """Turn extractor output into conformance violations.
+
+        Subject-agnostic. Two violations possible:
+          - ``one_question_per_turn`` when ``action_count > 1`` —
+            stacked questions (run-6 GEO T16 worked_example + Port
+            Louis MCQ; run-6 GEO T18/T20 follow-on).
+          - ``active_end_required`` when ``has_active_end=False``
+            UNLESS the move is ``close_topic`` (which legitimately
+            hands off to the exit-ticket retrieval rather than ending
+            on an inline action prompt).
+
+        Returns empty when no violations or when the extractor was
+        unavailable (fail-soft).
+        """
+        if not extraction.available:
+            return []
+        violations: list[str] = []
+        if extraction.action_count > 1:
+            stacked_preview = "; ".join(extraction.stacked_examples[:3])
+            violations.append(
+                "one_question_per_turn: rendered turn contains "
+                f"{extraction.action_count} action prompts; emit exactly "
+                f"one this turn. (Principle #5 Minimising Cognitive Load — "
+                f"one idea per turn). Stacked examples: "
+                f"{stacked_preview}"
+            )
+        if (
+            extraction.action_count == 0
+            and selected_move != "close_topic"
+            and not extraction.has_active_end
+        ):
+            violations.append(
+                "active_end_required: rendered turn does not close on an "
+                "action the student takes. End with a question, choose-and-"
+                "explain, or 'now you try' the student can act on this "
+                "turn. (Principle #1 Active Learning — student must be "
+                "doing on ≥60% of turns)."
+            )
+        return violations
 
     def _prior_student_turn(self, context: TutoringContext) -> str:
         """Last student turn from the transcript (empty when none)."""
