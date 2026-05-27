@@ -1666,33 +1666,20 @@ def chat_exit_ticket(request, session_id):
         enriched_exit_ticket = dict(response.exit_ticket_data or {})
         enriched_exit_ticket["competency"] = competency
 
-        # Tutor-driven remediation: when the simple-tutor engine is on
-        # AND the student didn't pass AND the session isn't complete,
-        # replace the static "Let's revisit anything you'd like to lock
-        # in" message with an LLM-generated opener that ACKNOWLEDGES
-        # the score and IMMEDIATELY re-teaches the first missed
-        # objective + poses a targeted question. Removes the passive
-        # "want to review?" prompt. See M13 remediation context wiring.
-        message_out = response.content
-        from apps.tutoring import simple_tutor
-        if (
-            simple_tutor.is_enabled()
-            and not response.is_complete
-            and not (response.exit_ticket_data or {}).get('passed', True)
-        ):
-            try:
-                from apps.tutoring.simple_tutor.engine import start_remediation
-                rem = start_remediation(session)
-                if rem and rem.get('content'):
-                    message_out = rem['content']
-            except Exception as e:
-                logger.warning(
-                    f"[simple_tutor] remediation opener failed: {e}",
-                    exc_info=True,
-                )
-
+        # NOTE on tutor-driven remediation: an earlier version of this
+        # view called ``simple_tutor.start_remediation(session)`` here
+        # to replace the static "Let's revisit" message with an
+        # LLM-authored opener. That added a synchronous Opus 4.7 call
+        # (5-15s) on top of the deterministic MCQ grading — making
+        # the "Grading…" spinner feel broken on all-MCQ tickets.
+        # Removed 2026-05-26. The remediation context still fires on
+        # the student's NEXT chat message: simple_tutor.respond auto-
+        # detects the ExitTicketAttempt and enters REMEDIATION mode
+        # via the <exit_ticket_review> system-prompt block. A future
+        # frontend follow-up (fire /respond/ after Continue) could
+        # restore the proactive opener without blocking the submit.
         return JsonResponse({
-            "message": message_out,
+            "message": response.content,
             "phase": response.phase,
             "exit_ticket": enriched_exit_ticket,
             "is_complete": response.is_complete,
