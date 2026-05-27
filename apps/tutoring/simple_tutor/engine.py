@@ -154,13 +154,24 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     step_summaries = step_summary_log(session)
     exit_ticket_review = _build_exit_ticket_review(session)
 
+    # Intent classification — added 2026-05-27 per user direction.
+    # The engine no longer assumes "in_flight present == student is
+    # answering". A deterministic pre-call labels the student's input
+    # so the LLM can route conversationally on clarification / pushback
+    # / off-topic / non-engagement instead of forcing record_answer.
+    from apps.tutoring.simple_tutor.intent import classify_student_message
+    student_intent = classify_student_message(
+        user_input, has_inflight_question=in_flight is not None,
+    )
+
     if exit_ticket_review is not None:
         mode = 'REMEDIATION+GRADE' if in_flight else 'REMEDIATION'
     else:
         mode = 'GRADE' if in_flight else 'POSE'
     logger.info(
-        "[simple_tutor] mode=%s session=%s step=%s pool_size=%s",
-        mode, session.pk, session.current_step_index, len(question_pool),
+        "[simple_tutor] mode=%s intent=%s session=%s step=%s pool_size=%s",
+        mode, student_intent, session.pk,
+        session.current_step_index, len(question_pool),
     )
 
     # ─── 2. Build system prompt + tool schemas ────────────────────
@@ -176,6 +187,7 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         recent_window=recent_window,
         step_summaries=step_summaries,
         exit_ticket_review=exit_ticket_review,
+        student_intent=student_intent,
     )
 
     # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────

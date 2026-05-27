@@ -299,22 +299,40 @@ you posed it.
 </role>
 
 <rules>
-- **Mode-switching via the in-flight slot.** Every turn you are in \
-one of two modes:
+- **Mode-switching via in-flight slot + message intent.** Every \
+turn you are in one of two modes:
     * **GRADE mode** — the system prompt contains an \
-``<in_flight_question>`` block. The student's message is their answer \
-attempt to THAT question. Call record_answer(extracted_answer) — the \
-platform has already persisted reference_answer / question_type / \
-options. After record_answer fires, compose your text reply using \
-the verdict in hand (see hint ladder below for incorrect, brief \
-acknowledgement + next beat for correct). On a CORRECT verdict, pose \
-the next question in the same turn (this is the desired pacing). On \
-an INCORRECT verdict, hint per the ladder and do NOT pose a new \
+``<in_flight_question>`` block AND a ``<message_intent>`` block \
+tagged ``answer`` (or ``answer_or_other`` that you judge as an \
+answer). The student's message is their answer attempt to THAT \
+question. Call record_answer(extracted_answer) — the platform has \
+already persisted reference_answer / question_type / options. After \
+record_answer fires, compose your text reply using the verdict in \
+hand (see hint ladder below for incorrect, brief acknowledgement + \
+next beat for correct). On a CORRECT verdict, pose the next \
+question in the same turn (this is the desired pacing). On an \
+INCORRECT verdict, hint per the ladder and do NOT pose a new \
 question in the same turn — the same in-flight question stays live \
-until graded correct or pivoted. Exception: if the student is \
-clearly asking a clarifying question instead of answering ("what \
-does X mean?", "can you explain that again?"), skip record_answer \
-and respond conversationally.
+until graded correct or pivoted.
+    * **CONVERSATIONAL mode** — the ``<message_intent>`` block is \
+tagged ``clarification`` / ``pushback`` / ``off_topic`` / \
+``non_engagement``. Even though an in-flight slot may exist, the \
+student is NOT trying to answer it. Do NOT call record_answer. \
+Follow the per-intent guidance in the ``<message_intent>`` block to \
+respond appropriately: explain a concept, engage with a substantive \
+correction, redirect off-topic chatter, or acknowledge an emotional \
+register. The in-flight slot stays active for the next turn — once \
+the student returns to the question, the engine will route you \
+back to GRADE mode.
+    * **POSE / TEACH mode** — no ``<in_flight_question>`` block is \
+present. Decide whether to teach (explanation, worked example, \
+warmup) or pose a question. When you decide to pose, call \
+pose_question with the question_text, question_type, options (for \
+MCQ), and reference_answer. Also include the question stem (and \
+options A/B/C/D for MCQ) verbatim in your text reply so the student \
+can read it in the chat — the slot is the platform's grading \
+anchor, but the student-visible question must appear in the chat \
+text. Pose exactly one question per turn.
     * **POSE / TEACH mode** — no ``<in_flight_question>`` block is \
 present. Decide whether to teach (explanation, worked example, \
 warmup) or pose a question. When you decide to pose, call \
@@ -538,6 +556,7 @@ def build_system_prompt(
     recent_window: 'list[SessionTurn] | None' = None,
     step_summaries: list[str] | None = None,
     exit_ticket_review: dict | None = None,
+    student_intent: str | None = None,
 ) -> tuple[list[dict], list[dict]]:
     """Build the system prompt as cache-marked content blocks + the tool
     schemas.
@@ -639,6 +658,10 @@ def build_system_prompt(
     in_flight_text = _render_in_flight_block(in_flight_question)
     if in_flight_text:
         dynamic_parts.append(in_flight_text)
+
+    intent_text = _render_message_intent_block(student_intent)
+    if intent_text:
+        dynamic_parts.append(intent_text)
 
     if dynamic_parts:
         blocks.append({
@@ -846,6 +869,75 @@ def _render_exit_ticket_review_block(review: dict | None) -> str:
 
     parts.append("</exit_ticket_review>")
     return "\n".join(parts)
+
+
+_INTENT_GUIDANCE = {
+    'answer': (
+        "The platform classifies the student's message as an ANSWER "
+        "attempt to the in-flight question. Call record_answer with "
+        "the literal extracted answer."
+    ),
+    'clarification': (
+        "The platform classifies the student's message as a "
+        "CLARIFICATION request (asking for explanation / definition / "
+        "rephrasing). Do NOT call record_answer. Respond "
+        "conversationally — explain the concept or rephrase the "
+        "question — and leave the in-flight slot active so the "
+        "student can answer next turn."
+    ),
+    'pushback': (
+        "The platform classifies the student's message as PUSHBACK "
+        "or a counter-question (substantive correction, follow-up "
+        "hypothetical, disagreement). Do NOT call record_answer. "
+        "Engage with the student's specific point: concede if their "
+        "correction is valid, push back with reasoning if not, and "
+        "address any hypothetical they raised. Treat them as a "
+        "capable interlocutor. Leave the in-flight slot active."
+    ),
+    'off_topic': (
+        "The platform classifies the student's message as OFF-TOPIC. "
+        "Do NOT call record_answer. Acknowledge briefly, redirect to "
+        "the current lesson question. If this is the second off-topic "
+        "turn in a row, also call redirect_off_topic. Leave the slot "
+        "active."
+    ),
+    'non_engagement': (
+        "The platform classifies the student's message as "
+        "NON-ENGAGEMENT (emotional outburst, 'idk', 'thanks', short "
+        "filler). Do NOT call record_answer. Respond to the emotional "
+        "or social register first — warmly acknowledge frustration, "
+        "thank-you, or confusion — then offer a smaller, easier "
+        "next step or a simpler reframing of the question. Leave the "
+        "slot active."
+    ),
+    'answer_or_other': (
+        "The platform could not classify the student's message with "
+        "high confidence. Use your judgement: if it reads as an "
+        "answer attempt, call record_answer; if it reads as a "
+        "clarification or pushback, respond conversationally."
+    ),
+}
+
+
+def _render_message_intent_block(student_intent: str | None) -> str:
+    """Render the per-turn ``<message_intent>`` block.
+
+    Added 2026-05-27 — replaces the prompt's old narrow "skip
+    record_answer only on what does X mean?" escape hatch with a
+    deterministic classifier whose output the LLM consumes.
+
+    Returns '' when student_intent is missing or unknown — the engine
+    treats those as 'answer_or_other' implicitly.
+    """
+    if not student_intent or student_intent not in _INTENT_GUIDANCE:
+        return ""
+    guidance = _INTENT_GUIDANCE[student_intent]
+    return (
+        f"<message_intent>\n"
+        f"  <classification>{student_intent}</classification>\n"
+        f"  <guidance>{_escape_xml(guidance)}</guidance>\n"
+        f"</message_intent>"
+    )
 
 
 def _render_in_flight_block(in_flight_question) -> str:
