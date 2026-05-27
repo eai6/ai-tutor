@@ -437,11 +437,20 @@ REQUIREMENTS:
    Do not put the same value in both.
 4. Use context relevant to Seychelles secondary school students
 5. Vary question phrasing — avoid repetitive stems
+6. MCQ correct-answer distribution: spread the correct letter ROUGHLY
+   EVENLY across A, B, C, and D over the 22 MCQs. Target: 5-6 of each
+   letter, no single letter more than 7 times. Audits of prior
+   generations showed 60%+ of correct answers landed on B because the
+   format example below uses "B" as a placeholder — do NOT let that
+   placeholder bias the actual answers you write. After drafting,
+   tally the distribution and re-balance if any letter exceeds 7.
 
 OUTPUT FORMAT (JSON array — each question has a "question_type" field):
 
-MCQ format:
-{{"question_type": "mcq", "question": "What is...?", "option_a": "...", "option_b": "...", "option_c": "...", "option_d": "...", "correct": "B", "explanation": "...", "difficulty": "easy", "concept_tag": "Understand development indicators", "enabling_objective": "Define the terms Development, Globalization, MEDC, NIC, LEDC"}}
+MCQ format (correct value here is just an illustrative placeholder —
+USE the answer that is genuinely correct for the question you write,
+and spread across A/B/C/D per requirement 6 above):
+{{"question_type": "mcq", "question": "What is...?", "option_a": "...", "option_b": "...", "option_c": "...", "option_d": "...", "correct": "<A|B|C|D>", "explanation": "...", "difficulty": "easy", "concept_tag": "Understand development indicators", "enabling_objective": "Define the terms Development, Globalization, MEDC, NIC, LEDC"}}
 
 FILL_IN_BLANK format:
 {{"question_type": "fill_in_blank", "question": "Complete the sentence:", "answer_data": {{"text_template": "The ___ of a country is measured using ___ per capita figures.", "blanks": ["GNP", "US dollar"], "accept_alternatives": [["gross national product", "Gross National Product"], ["USD", "American dollar"]]}}, "explanation": "...", "difficulty": "easy", "concept_tag": "broad learning objective text", "enabling_objective": "EXACT TEXT OF ONE EO FROM THE LIST ABOVE"}}
