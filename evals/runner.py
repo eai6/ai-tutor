@@ -442,20 +442,39 @@ def _run_multi_turn(scenario: Scenario) -> ScenarioResult:
 
 
 def run(scenarios: list[Scenario]) -> RunResult:
+    from django.db import connections
     started = dt.datetime.now(dt.timezone.utc)
     results: list[ScenarioResult] = []
     for scenario in scenarios:
-        if scenario.mode == 'single_turn':
-            results.append(_run_single_turn(scenario))
-        elif scenario.mode == 'multi_turn':
-            results.append(_run_multi_turn(scenario))
-        else:
+        # Close idle DB connections between scenarios. Azure Postgres
+        # aggressively closes long-idle SSL connections; without this
+        # a multi-turn scenario can succeed but the NEXT scenario's
+        # ORM call dies with "InterfaceError: connection already
+        # closed", killing the whole suite mid-run.
+        connections.close_all()
+        try:
+            if scenario.mode == 'single_turn':
+                results.append(_run_single_turn(scenario))
+            elif scenario.mode == 'multi_turn':
+                results.append(_run_multi_turn(scenario))
+            else:
+                results.append(ScenarioResult(
+                    scenario_id=scenario.id,
+                    passed=False, mode=scenario.mode,
+                    persona=scenario.persona, subject=scenario.subject,
+                    lesson_id=scenario.lesson_id, tags=scenario.tags,
+                    error=f"unknown mode={scenario.mode!r}",
+                ))
+        except Exception as exc:
+            # Per-scenario crash should not kill the suite. Record the
+            # error and keep going so the user gets a complete report.
+            logger.exception("scenario %s crashed", scenario.id)
             results.append(ScenarioResult(
-                scenario_id=scenario.id,
-                passed=False, mode=scenario.mode,
-                persona=scenario.persona, subject=scenario.subject,
-                lesson_id=scenario.lesson_id, tags=scenario.tags,
-                error=f"unknown mode={scenario.mode!r}",
+                scenario_id=scenario.id, passed=False,
+                mode=scenario.mode, persona=scenario.persona,
+                subject=scenario.subject, lesson_id=scenario.lesson_id,
+                tags=scenario.tags,
+                error=f"{type(exc).__name__}: {str(exc)[:200]}",
             ))
     finished = dt.datetime.now(dt.timezone.utc)
     return RunResult(
