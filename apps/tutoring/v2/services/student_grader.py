@@ -260,12 +260,15 @@ class StudentGrader:
         Pipeline:
           1. LLM-A (GRADER_MATH) extracts the canonical DSL from the
              QUESTION → Python executor produces canonical_value.
-          2. Fast-path: when the student input is unambiguously bare
-             ("25", "x = 25"), use the deterministic regex chain to
-             extract their value and run the existing comparator.
-          3. Otherwise, LLM-B (GRADER_STUDENT_CLAIMS) parses the
-             STUDENT response into {claims[], conclusion{}} and the
-             Python comparator decides arithmetic vs conclusion error.
+          2. LLM-B (GRADER_STUDENT_CLAIMS) parses the STUDENT response
+             into {claims[], conclusion{}} and the Python comparator
+             decides arithmetic vs conclusion error.
+
+        (The legacy deterministic fast-path that skipped LLM-B for
+        single-scalar inputs was deleted 2026-05-27 — it silently
+        collapsed multi-slot answers to PARTIAL by extracting one
+        scalar from a multi-value response. The latency saving did
+        not justify the P1 risk.)
 
         ``unverified`` reaches a math attempt only via
           - empty rendered_stem (state_inconsistent),
@@ -316,29 +319,7 @@ class StudentGrader:
             canonical_value = result.canonical_value
             canonical_str = _format_canonical(canonical_value)
 
-            # 3. Fast-path: regex extraction when the input has NO
-            # word-form numerics. The regex chain handles bare answers,
-            # "x = N", "is it N?", "the answer is N", and similar
-            # unambiguous shapes deterministically. Word-form numerics
-            # ("eight", "twenty-five") force the LLM-B path so digit-
-            # form intermediates ("…got 16…") can't be confused with
-            # word-form conclusions ("…is eight").
-            if not _has_word_form_numeric(request.student_input):
-                student_value, student_value_str = _parse_student_math_value(
-                    request.student_input
-                )
-                if student_value is not None:
-                    return self._finalise_math_with_value(
-                        span=span,
-                        canonical_value=canonical_value,
-                        canonical_str=canonical_str,
-                        student_value=student_value,
-                        student_value_str=student_value_str,
-                        bare=bare,
-                        reasoning="math: fast-path numeric value",
-                    )
-
-            # 4. LLM-B — parse the student's response into a structured
+            # 3. LLM-B — parse the student's response into a structured
             # claim graph. Subject-agnostic; handles word-form numerics,
             # multi-slot prose, intermediate-vs-final values, meta input.
             student_extraction = self._extract_student_claims_dsl(
@@ -358,7 +339,7 @@ class StudentGrader:
                     }
                 return self._grade_non_math(context, request)
 
-            # 5. Meta input — the student didn't attempt an answer.
+            # 4. Meta input — the student didn't attempt an answer.
             # Distinct from arithmetic UNVERIFIED.
             if not student_extraction.conclusion.is_attempt:
                 if span is not None:
@@ -375,7 +356,7 @@ class StudentGrader:
                     bare_answer=bare,
                 )
 
-            # 6. Comparator — deterministic Python over LLM-B's claims +
+            # 5. Comparator — deterministic Python over LLM-B's claims +
             # the canonical value(s).
             return self._compare_student_claims_to_canonical(
                 span=span,

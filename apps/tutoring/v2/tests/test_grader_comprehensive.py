@@ -71,6 +71,97 @@ class _FakeClient:
         return _FakeResp(self._queue.pop(0))
 
 
+class _SmartMathClaimsClient:
+    """Stand-in for LLM-B (math student-claims extractor).
+
+    Reads the student response out of the user prompt, runs a small
+    deterministic regex chain to find candidate scalar values, and
+    returns a claims payload shaped like a real LLM-B response.
+
+    Default behaviour mimics what a competent LLM-B would produce for
+    the simple bare/prose-wrapped numeric responses the deleted fast-
+    path used to handle. Tests that need a specific extraction can
+    pass an explicit payload via `_math_grader(student_claims_payload=...)`
+    instead.
+    """
+
+    _NUM_RE = __import__("re").compile(r"-?\d+(?:\.\d+)?")
+
+    def generate(self, **kwargs) -> _FakeResp:
+        import json as _json
+        import re
+        messages = kwargs.get("messages") or []
+        prompt_text = ""
+        for m in messages:
+            if isinstance(m, dict) and "content" in m:
+                prompt_text += str(m["content"])
+        # Real LLM-B user prompt ends with "Student: <resp>\nOutput:".
+        # Earlier "Student:" lines appear in the few-shot examples;
+        # use the LAST "Student:" before the trailing "Output:" so
+        # the mock isn't confused by the prelude.
+        tail = re.split(r"\nStudent:\s*", prompt_text)[-1]
+        match = re.match(r"(.*?)\n+\s*Output:\s*$", tail, re.DOTALL)
+        student_response = (match.group(1) if match else "").strip()
+        # Extract all numbers in the student response. Drop numbers
+        # that appear inside a "Question:" echo line so we don't pick
+        # up problem-setup constants. Simple heuristic — strip any
+        # "Question: ..." prefix before scanning.
+        scan_text = re.sub(
+            r"^Question:.*?\n", "", student_response, flags=re.DOTALL
+        ).strip() or student_response
+        raw_nums = self._NUM_RE.findall(scan_text)
+        values: list = []
+        for s in raw_nums:
+            try:
+                v = float(s)
+                if v.is_integer():
+                    v = int(v)
+                values.append(v)
+            except ValueError:
+                continue
+        # Emit conclusion with a scalar (last value, matching old fast-
+        # path single-slot behaviour) or a list (multi-value answer).
+        if len(values) == 0:
+            extracted: object = None
+            is_attempt = False
+        elif len(values) == 1:
+            extracted = values[0]
+            is_attempt = True
+        else:
+            # Heuristic: if the response looks like a multi-slot answer
+            # (contains "and"/"&"/"," between numbers, or multiple
+            # number-with-suffix tokens), return a list. Otherwise just
+            # take the final number — that's the "answer", earlier ones
+            # are working.
+            multi_signal = (
+                bool(re.search(r"\d[^\d\n]{1,10}(?:and|&|,)\s*", scan_text))
+                or len(
+                    re.findall(
+                        r"\b\d+(?:\.\d+)?\s*(?:SCR|%|cm|m|km|kg)",
+                        scan_text,
+                    )
+                ) >= 2
+            )
+            if multi_signal:
+                extracted = values
+                is_attempt = True
+            else:
+                extracted = values[-1]
+                is_attempt = True
+        payload = {
+            "variables": {},
+            "claims": [],
+            "conclusion": {
+                "statement": student_response,
+                "answer_extracted_value": extracted,
+                "answer_extracted_label": "",
+                "is_attempt": is_attempt,
+            },
+            "domain_check_required": False,
+        }
+        return _FakeResp(_json.dumps(payload))
+
+
 def _context() -> TutoringContext:
     return TutoringContext(
         session_id=1,
@@ -123,13 +214,16 @@ def _math_grader(
     Grounded + verifier clients return None so an UNVERIFIED fall-through
     is observable when the math path defers (matches test_grader.py).
 
-    ``student_claims_payload`` is LLM-B (Two-LLM grader). Defaults to
-    None — which means LLM-B is not configured and any non-fast-path
-    input falls through to the grounded path. Pass an explicit payload
-    when the test exercises the Two-LLM comparator directly.
+    ``student_claims_payload`` is the LLM-B response. When None
+    (default), a smart stand-in that reads the student response out of
+    the user prompt and emits a plausible scalar-or-list extraction is
+    used. This lets the comprehensive suite probe the full two-LLM
+    comparator without per-test mocks while still going through the
+    real LLM-B code path (the deterministic fast-path was deleted
+    2026-05-27 — see student_grader.py:_grade_math docstring).
     """
     if student_claims_payload is None:
-        student_claims_factory = lambda: None
+        student_claims_factory = lambda: _SmartMathClaimsClient()
     else:
         student_claims_factory = lambda: _FakeClient(student_claims_payload)
     return StudentGrader(
@@ -695,6 +789,7 @@ def test_math_path_robust_to_llm_response_shape(dsl_payload, expected_verdict):
     grader = StudentGrader(
         math_client_factory=lambda: _FakeClient(dsl_payload),
         grounded_client_factory=lambda: None,
+        student_claims_client_factory=lambda: _SmartMathClaimsClient(),
     )
     request = GradingRequest(
         open_question=_open_q("12 + 13 = ?"),
@@ -1091,6 +1186,7 @@ def test_observed_profit_loss_multi_slot_responses(student_response, expected_ve
     grader = StudentGrader(
         math_client_factory=lambda: _FakeClient(_DSL_PROFIT_MULTI_27_18),
         grounded_client_factory=lambda: None,
+        student_claims_client_factory=lambda: _SmartMathClaimsClient(),
     )
     request = GradingRequest(
         open_question=_open_q(_PROFIT_STEM_27_18),
@@ -1180,6 +1276,7 @@ def test_observed_single_slot_math_responses(
     grader = StudentGrader(
         math_client_factory=lambda: _FakeClient(dsl_payload),
         grounded_client_factory=lambda: None,
+        student_claims_client_factory=lambda: _SmartMathClaimsClient(),
     )
     request = GradingRequest(
         open_question=_open_q(stem),
@@ -1818,41 +1915,12 @@ def test_two_llm_grader_falls_through_when_llm_b_returns_garbage():
     assert result.verdict == Verdict.UNVERIFIED
 
 
-def test_two_llm_grader_skips_llm_b_on_fast_path_bare_numeric():
-    """When the student answer is unambiguously bare ("25"), LLM-B is
-    skipped — saves a round-trip per the plan §4 step 4 'whenever
-    applicable' caveat. The deterministic regex chain produces the
-    value; comparator confirms CORRECT against the canonical."""
-
-    class _SpyClient:
-        def __init__(self, payload):
-            self._q = [payload]
-
-        def generate(self, **kwargs):
-            return _FakeResp(self._q.pop(0))
-
-        @property
-        def remaining(self):
-            return len(self._q)
-
-    spy = _SpyClient(
-        _claims_payload(answer_value=999, is_attempt=True)
-    )
-    grader = StudentGrader(
-        math_client_factory=lambda: _FakeClient(_DSL_12_PLUS_13),
-        grounded_client_factory=lambda: None,
-        student_claims_client_factory=lambda: spy,
-    )
-    request = GradingRequest(
-        open_question=_open_q("12 + 13 = ?"),
-        student_input="25",
-        is_math=True,
-    )
-    result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.CORRECT
-    assert spy.remaining == 1, (
-        "LLM-B should NOT be called when the student input is bare"
-    )
+# Note: the prior `test_two_llm_grader_skips_llm_b_on_fast_path_bare_numeric`
+# test was deleted 2026-05-27. The deterministic fast-path it guarded
+# collapsed multi-slot answers to PARTIAL by extracting a single scalar
+# from a multi-value response; deleting the fast-path removed the bug,
+# and the test (which asserted the fast-path WAS taken) became
+# meaningless. Every input now goes through LLM-B unconditionally.
 
 
 def test_two_llm_grader_word_form_input_skips_fast_path():

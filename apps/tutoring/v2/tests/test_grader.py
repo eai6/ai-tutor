@@ -106,10 +106,31 @@ def test_safe_json_loads_returns_none_on_garbage():
 # ──────────────────────────────────────────────────────────────────────
 
 
+def _student_claims_payload(value, *, is_attempt=True) -> str:
+    """Canned LLM-B (math) payload with a single scalar conclusion."""
+    import json as _json
+    return _json.dumps({
+        "variables": {},
+        "claims": [],
+        "conclusion": {
+            "statement": str(value),
+            "answer_extracted_value": value,
+            "answer_extracted_label": "",
+            "is_attempt": is_attempt,
+        },
+        "domain_check_required": False,
+    })
+
+
 def test_math_path_correct_with_dsl_match():
-    """LLM emits valid DSL → executes → student value matches → correct."""
+    """LLM-A emits valid DSL; LLM-B parses student "25"; match → correct."""
     dsl = '{"variables": {"a": 12, "b": 13}, "expression": {"op": "add", "args": [{"var": "a"}, {"var": "b"}]}}'
-    grader = StudentGrader(math_client_factory=lambda: _FakeClient(dsl))
+    grader = StudentGrader(
+        math_client_factory=lambda: _FakeClient(dsl),
+        student_claims_client_factory=lambda: _FakeClient(
+            _student_claims_payload(25),
+        ),
+    )
     request = GradingRequest(
         open_question=_open_q("12 + 13 = ?"),
         student_input="25",
@@ -122,9 +143,14 @@ def test_math_path_correct_with_dsl_match():
 
 
 def test_math_path_wrong_with_dsl_match():
-    """Student value differs → verdict=wrong; canonical surfaces privately."""
+    """LLM-A emits valid DSL; LLM-B parses student "50"; mismatch → wrong."""
     dsl = '{"variables": {"a": 12, "b": 13}, "expression": {"op": "add", "args": [{"var": "a"}, {"var": "b"}]}}'
-    grader = StudentGrader(math_client_factory=lambda: _FakeClient(dsl))
+    grader = StudentGrader(
+        math_client_factory=lambda: _FakeClient(dsl),
+        student_claims_client_factory=lambda: _FakeClient(
+            _student_claims_payload(50),
+        ),
+    )
     request = GradingRequest(
         open_question=_open_q("12 + 13 = ?"),
         student_input="50",
