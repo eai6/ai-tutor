@@ -220,9 +220,20 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
 
     try:
         _inject_seed_history(session, scenario.seed_history)
-        tutor = ConversationalTutor(session)
-        msg = tutor.respond(scenario.student_turn)
-        tutor_text = (msg.content or '').strip()
+        # Engine dispatch: honor SIMPLE_TUTOR_ENGINE (same env var the
+        # web views check) so the eval harness exercises whichever
+        # engine is wired in for the staging/prod deploy. Without this
+        # the harness always exercised the legacy CT, even when the
+        # live app was running on simple-tutor — biasing eval results.
+        from apps.tutoring import simple_tutor as _simple_tutor
+        if _simple_tutor.is_enabled():
+            from apps.tutoring.simple_tutor.engine import respond as _simple_respond
+            out = _simple_respond(session, scenario.student_turn)
+            tutor_text = (out.get('content') or '').strip()
+        else:
+            tutor = ConversationalTutor(session)
+            msg = tutor.respond(scenario.student_turn)
+            tutor_text = (msg.content or '').strip()
 
         # Pull the just-written tutor SessionTurn to read its judge signal.
         last_tutor_turn = (
