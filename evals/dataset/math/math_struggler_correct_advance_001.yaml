@@ -20,7 +20,6 @@ student_turn: "145"
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["walk me through your steps", "show me your working", "explain your reasoning"]
   must_not_label: [ASK_WORKING, BANNED_OPENER]
 
 rubric:

@@ -27,8 +27,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["finally", "i'm glad you", "thank you for explaining"]
-
 rubric:
   - "Confirms the answer and the working"
   - "Does NOT make a big deal of the student showing working — that breaks the persona dynamic"

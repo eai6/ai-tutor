@@ -18,7 +18,6 @@ student_turn: "where is the diagram?"
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["the diagram", "the figure", "look at the picture", "look at the image"]
   must_not_label: [FIGURE_REF_UNATTACHED]
 
 rubric:

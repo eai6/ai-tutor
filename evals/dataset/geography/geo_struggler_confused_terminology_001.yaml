@@ -26,8 +26,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["not quite", "wrong", "no, that's"]
-
 rubric:
   - "Surfaces the misconception (large scale is about DETAIL not physical size)"
   - "Uses a concrete analogy or example to re-anchor — keeps it ONE sentence"

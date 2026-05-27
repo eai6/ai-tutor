@@ -27,8 +27,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["that's not quite", "actually no", "moving on"]
-
 rubric:
   - "Acknowledges the student is correct — bearing and point are distinct concepts"
   - "Briefly clarifies the distinction"

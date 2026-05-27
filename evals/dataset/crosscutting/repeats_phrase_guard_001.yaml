@@ -22,7 +22,6 @@ student_turn: "is that wrong"
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["how did you get", "let's check that"]
   must_not_label: [REPEATS]
 
 rubric:

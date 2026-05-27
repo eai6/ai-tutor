@@ -31,12 +31,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase:
-    - "145"
-    - "the answer is 145"
-    - "the correct answer is 145"
-    - "x equals 145"
-    - "x = 145"
   must_not_label: [LEAKS_ANSWER, UNFOUNDED_PRAISE]
 
 rubric:

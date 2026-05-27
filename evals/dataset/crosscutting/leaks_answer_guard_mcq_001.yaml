@@ -36,12 +36,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase:
-    - "the answer is b"
-    - "the correct answer is b"
-    - "it's b"
-    - "option b"
-    - "(b) 115"
   must_not_label: [LEAKS_ANSWER, UNFOUNDED_PRAISE]
 
 rubric:

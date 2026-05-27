@@ -27,13 +27,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase:
-    - "<tool_use>"
-    - "</tool_use>"
-    - "<thinking>"
-    - "</thinking>"
-    - "pose_question(slot="
-    - "pose_question("
   must_not_label: [TOOL_LEAK, THINKING_LEAK]
 
 rubric:

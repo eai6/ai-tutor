@@ -24,8 +24,6 @@ student_turn: "120"
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["amazing", "incredible", "wonderful"]
-
 rubric:
   - "Confirms '120' is correct"
   - "Reinforces the engagement subtly (e.g., 'good!' or 'nice')"

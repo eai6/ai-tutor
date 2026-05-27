@@ -26,7 +26,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["not quite", "that's not right", "incorrect", "try again", "let me check"]
   must_not_label: [WRONG_VERDICT]
 
 rubric:

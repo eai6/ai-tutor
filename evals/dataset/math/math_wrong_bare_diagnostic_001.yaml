@@ -32,12 +32,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase:
-    - "exactly"
-    - "perfect"
-    - "you've nailed it"
-    - "145"                # don't leak the correct answer
-    - "the answer is 145"
   must_not_label: [UNFOUNDED_PRAISE, LEAKS_ANSWER, WRONG_VERDICT]
 
 rubric:

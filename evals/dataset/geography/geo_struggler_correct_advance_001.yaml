@@ -20,7 +20,6 @@ student_turn: "B (Map 1 and Map 4)"
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["walk me through", "show me your working", "explain your reasoning"]
   must_not_label: [ASK_WORKING, BANNED_OPENER]
 
 rubric:

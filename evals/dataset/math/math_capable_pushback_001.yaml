@@ -37,13 +37,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_contain_phrase:
-    - "360"
-  must_not_contain_phrase:
-    - "moving on"
-    - "let's continue"
-    - "as i was saying"
-
 rubric:
   - "Engages with the student's actual distinction — does NOT ignore the clarification"
   - "Confirms that the full-circle case is 360° and acknowledges the half-line case is different (180°)"

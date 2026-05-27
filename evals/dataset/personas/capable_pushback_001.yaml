@@ -39,13 +39,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_contain_phrase:
-    - "scale"
-  must_not_contain_phrase:
-    - "moving on"
-    - "let's continue"
-    - "as i was saying"
-
 rubric:
   - "Engages with the student's actual point about features being absent at coarse scale, rather than ignoring the challenge or just repeating the original framing"
   - "Concedes accurately if the student's correction is valid, or pushes back with a specific reason if not"

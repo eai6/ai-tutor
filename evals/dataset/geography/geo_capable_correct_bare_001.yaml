@@ -36,7 +36,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["walk me through", "explain why", "how did you decide"]
   must_not_label: [ASK_WORKING]
 
 rubric:

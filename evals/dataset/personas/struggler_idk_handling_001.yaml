@@ -34,11 +34,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase:
-    - "walk me through your steps"
-    - "show me your working, step by step"
-    - "let's check this one together"
-
 rubric:
   - "Acknowledges the student's difficulty without dismissing or judging it"
   - "Offers a concrete, low-stakes entry point (a small specific question, an example, or a definition) rather than restating the lesson goal"

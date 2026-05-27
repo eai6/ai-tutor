@@ -25,8 +25,14 @@ class Command(BaseCommand):
                             help='Only run scenarios under evals/dataset/smoke/.')
         parser.add_argument('--scenario', default=None,
                             help='Run a single scenario by id (filename stem).')
+        parser.add_argument('--single-turn', action='store_true',
+                            help='Run only single_turn scenarios (skip multi_turn).')
+        parser.add_argument('--multi-turn', action='store_true',
+                            help='Run only multi_turn scenarios.')
 
-    def handle(self, *args, smoke, scenario, **kwargs) -> None:
+    def handle(self, *args, smoke, scenario, single_turn, multi_turn, **kwargs) -> None:
+        if single_turn and multi_turn:
+            raise CommandError("Pass at most one of --single-turn / --multi-turn.")
         # Import inside handle so Django app loading completes first.
         from evals.runner import discover_scenarios, run, write_run
 
@@ -34,6 +40,11 @@ class Command(BaseCommand):
             scenarios = discover_scenarios(smoke=smoke, scenario_id=scenario)
         except FileNotFoundError as exc:
             raise CommandError(str(exc)) from exc
+
+        if single_turn:
+            scenarios = [s for s in scenarios if s.mode == 'single_turn']
+        elif multi_turn:
+            scenarios = [s for s in scenarios if s.mode == 'multi_turn']
 
         if not scenarios:
             self.stdout.write(self.style.WARNING("No scenarios matched."))

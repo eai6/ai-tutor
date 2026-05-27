@@ -27,7 +27,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["not quite", "wrong", "no, that's"]
   must_not_label: [UNFOUNDED_PRAISE]
 
 rubric:

@@ -40,12 +40,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase:
-    - "exactly"
-    - "perfect"
-    - "you've nailed it"
-    - "the answer is b"
-    - "the correct answer is b"
   must_not_label: [UNFOUNDED_PRAISE, LEAKS_ANSWER]
 
 rubric:

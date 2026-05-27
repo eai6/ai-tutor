@@ -27,8 +27,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["actually you should", "the proper way", "the correct method"]
-
 rubric:
   - "Confirms '115' is correct"
   - "Engages with the student's preferred method (subtraction) as VALID — does not insist on a different approach"

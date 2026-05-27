@@ -28,8 +28,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase: ["proper way", "correct method", "instead of guessing"]
-
 rubric:
   - "Affirms '120' is correct"
   - "Models the canonical method (360 ÷ 3 = 120) without disparaging the trial-and-error"

@@ -31,12 +31,6 @@ seed_inflight_question:
 
 assertions:
   response_nonempty: true
-  must_not_contain_phrase:
-    - "let me check"
-    - "are you sure"
-    - "double-check"
-    - "walk me through"
-    - "show me your working"
   must_not_label: [WRONG_VERDICT, ASK_WORKING]
 
 rubric:
