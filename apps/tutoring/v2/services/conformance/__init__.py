@@ -32,6 +32,9 @@ from apps.tutoring.v2.services.conformance.verdict_matrix import (
 from apps.tutoring.v2.services.conformance.check import (
     ConformanceCheck,
     ConformanceResult,
+    POSE_RELATED_VIOLATIONS,
+    PROSE_ONLY_VIOLATIONS,
+    classify_conformance_failure,
 )
 
 __all__ = [
@@ -48,4 +51,7 @@ __all__ = [
     "MatrixViolation",
     "ConformanceCheck",
     "ConformanceResult",
+    "POSE_RELATED_VIOLATIONS",
+    "PROSE_ONLY_VIOLATIONS",
+    "classify_conformance_failure",
 ]

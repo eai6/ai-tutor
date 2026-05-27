@@ -62,6 +62,16 @@ from apps.tutoring.v2.utilities.tool_call_strip import (
 logger = logging.getLogger(__name__)
 
 
+# Fix 2 (pose-question two-phase commit): maximum number of tool_use
+# rounds within a single tutor turn. Attempt 0 uses tool_choice="auto"
+# (LLM may legitimately decide prose is right). On a Phase A rejection,
+# attempt 1 uses tool_choice={"type":"any"} with a tool_result block
+# surfacing the rejection reason so the LLM can pick a different slot.
+# Hard cap at 2 — if both attempts fail the conformance layer handles
+# recovery via the standard retry path.
+MAX_POSE_ATTEMPTS_PER_TURN: int = 2
+
+
 # Moves that may legitimately pose a fresh assessment question this turn.
 # Post-router cutover (design/tasks/move-router-implementation-plan.md
 # §2.5): every move except ``close_topic`` is pose-capable. The deleted
@@ -128,6 +138,7 @@ class StudentTutor:
         student_input: str = "",
         focus_note: str = "",
         principle_emphasis: Optional[list[str]] = None,
+        hold_pending_pose: Optional[PendingPose] = None,
     ) -> TutorResponse:
         """Produce the tutor's next utterance for the selected move.
 
@@ -162,6 +173,21 @@ class StudentTutor:
             focus_note=focus_note,
             principle_emphasis=principle_emphasis or [],
         )
+        if hold_pending_pose is not None:
+            # Fix 3 — prose-only retry. Tell the LLM the question stem
+            # is already locked in and will be appended automatically;
+            # its job is the lead-in prose only. Without this, the LLM
+            # will re-emit a question stem in prose and we'll trip the
+            # extractor's one_question_per_turn / no_assessment_in_prose
+            # rules on the retry.
+            stem_preview = (hold_pending_pose.rendered_stem or "").strip()
+            user_prompt += (
+                "\n\n[Sticky pose — the assessment question for this turn "
+                "has already been validated and will be appended verbatim "
+                "to your response. Produce ONLY the lead-in prose; do NOT "
+                "restate or re-emit a question stem. The appended stem:\n"
+                f"{stem_preview}\n]"
+            )
 
         with emit_span("audit", "tutor.move_call",
                        payload={"selected_move": move}) as span:
@@ -181,7 +207,17 @@ class StudentTutor:
                 )
 
             tool_dict, slot_map = (None, {})
-            if move in POSE_CAPABLE_MOVES and hasattr(client, "generate_with_tools"):
+            # Fix 3 (pose-question two-phase commit): when the
+            # conformance retry is asking us to HOLD a PendingPose from
+            # the prior attempt (prose-only violations), skip the tool
+            # path entirely — there's nothing to re-validate. The held
+            # pose is reattached after the text-only LLM call so
+            # TutorEngine can commit it on conformance accept.
+            if (
+                hold_pending_pose is None
+                and move in POSE_CAPABLE_MOVES
+                and hasattr(client, "generate_with_tools")
+            ):
                 posed_step_ids = self._posed_step_ids(context)
                 tool_dict, slot_map = build_anthropic_pose_question_tool(
                     lesson_id=context.lesson_id,
@@ -238,6 +274,16 @@ class StudentTutor:
             # student never sees them — they exist to keep the
             # response body honest to the verdict + objective state.
             text, grounding = strip_grounding_lines(text)
+            # Fix 3: prose-only retry path — splice the held pose's
+            # rendered stem onto the end of the retry prose so the
+            # student-visible turn still ends on the same question we
+            # committed to on the first attempt. The held PendingPose
+            # is reattached to the response so TutorEngine's Phase B
+            # commit fires on conformance accept.
+            if hold_pending_pose is not None:
+                stem = (hold_pending_pose.rendered_stem or "").strip()
+                if stem:
+                    text = f"{text}\n\n{stem}" if text else stem
             if span is not None:
                 span["tokens_in"] = response.tokens_in
                 span["tokens_out"] = response.tokens_out
@@ -248,10 +294,13 @@ class StudentTutor:
                     "response_chars": len(text),
                     "leaked_tool_call_chars": leaked_chars,
                     "grounding_missing": grounding.get("missing") or [],
+                    "held_pending_pose": hold_pending_pose is not None,
                 })
                 span["payload"] = payload
             return TutorResponse(
-                text=text, pending_pose=None, grounding=grounding,
+                text=text,
+                pending_pose=hold_pending_pose,
+                grounding=grounding,
             )
 
     # ------------------------------------------------------------------
@@ -283,67 +332,236 @@ class StudentTutor:
         context: TutoringContext,
         move: str,
     ) -> tuple[Any, Optional[PendingPose], str, dict]:
-        """Invoke ``generate_with_tools`` and process the response.
+        """Invoke ``generate_with_tools`` as a bounded multi-turn loop.
 
-        Returns ``(raw_message, pending_pose, response_text, grounding)``.
+        Fix 2 (pose-question two-phase commit): up to
+        ``MAX_POSE_ATTEMPTS_PER_TURN`` tool_use rounds within a single
+        tutor turn. On Phase A rejection, we append a
+        ``tool_result(is_error=True, content=reason)`` block to the
+        conversation and let the LLM pick a different slot. First
+        attempt uses ``tool_choice="auto"`` (the LLM may legitimately
+        decide prose is right); the retry uses ``{"type":"any"}`` so
+        the LLM commits to a fresh slot rather than rephrasing prose
+        with the same rejection unaddressed.
 
-        On a successful tool_use block the rendered stem from the
-        bank is appended to any text blocks the LLM emitted as
-        ``lead_in``. On schema rejection / missing tool_use / Phase A
-        validation failure, ``pending_pose`` is None and the
-        response_text falls back to whatever text blocks the LLM
-        emitted (which conformance will judge on its own merits).
+        Returns ``(raw_message, pending_pose, response_text, grounding)``
+        with ``raw_message`` being the LAST message from the LLM (the
+        one that produced the returned outcome).
         """
-        # Post-router cutover (plan §2.5): all pose-capable moves use
-        # ``tool_choice="auto"``. The conformance gate
-        # ``all__no_assessment_in_prose`` enforces the contract that
-        # any visible assessment question must have come through the
-        # tool; the legacy ``{"type":"any"}`` force-mode for
-        # pose_question is gone (pose_question itself is gone).
-        try:
-            message = client.generate_with_tools(
-                messages=[{"role": "user", "content": user_prompt}],
-                system_prompt=system_prompt,
-                tools=[tool_dict],
-                max_tokens=900,
-                tool_choice={"type": "auto"},
-            )
-        except (NotImplementedError, AttributeError, TypeError) as exc:
-            logger.warning(
-                "[StudentTutor] generate_with_tools unavailable (%s); "
-                "falling back to text path",
-                type(exc).__name__,
-            )
-            return None, None, "", {}
-
-        if not hasattr(message, "content") or not isinstance(
-            getattr(message, "content", None), list
-        ):
-            logger.warning(
-                "[StudentTutor] generate_with_tools returned non-Message %r; "
-                "falling back to text path",
-                type(message).__name__,
-            )
-            return message, None, "", {}
-
-        text_chunks: list[str] = []
-        pending_pose: Optional[PendingPose] = None
-        rendered_stem = ""
+        messages: list[dict] = [{"role": "user", "content": user_prompt}]
+        attempted_slots: list[int] = []
+        # Carry the latest text chunks / grounding so that on
+        # rejection-exhausted exit we still return whatever the LLM
+        # said in prose for conformance to judge on its own merits.
+        last_text_chunks: list[str] = []
+        last_grounding: dict = {}
+        last_message: Any = None
         total_leaked_chars = 0
+
+        for attempt in range(MAX_POSE_ATTEMPTS_PER_TURN):
+            tool_choice = (
+                {"type": "auto"}
+                if attempt == 0
+                else {"type": "any"}
+            )
+            try:
+                message = client.generate_with_tools(
+                    messages=messages,
+                    system_prompt=system_prompt,
+                    tools=[tool_dict],
+                    max_tokens=900,
+                    tool_choice=tool_choice,
+                )
+            except (NotImplementedError, AttributeError, TypeError) as exc:
+                logger.warning(
+                    "[StudentTutor] generate_with_tools unavailable (%s); "
+                    "falling back to text path",
+                    type(exc).__name__,
+                )
+                self._record_tool_loop_attempts_span(
+                    attempts=attempt, exhausted=False,
+                )
+                return None, None, "", {}
+
+            last_message = message
+            if not hasattr(message, "content") or not isinstance(
+                getattr(message, "content", None), list
+            ):
+                logger.warning(
+                    "[StudentTutor] generate_with_tools returned non-Message %r; "
+                    "falling back to text path",
+                    type(message).__name__,
+                )
+                self._record_tool_loop_attempts_span(
+                    attempts=attempt + 1, exhausted=False,
+                )
+                return message, None, "", {}
+
+            (
+                text_chunks,
+                tool_use_block,
+                outcome,
+                rendered_stem,
+                attempted_slot,
+                grounding,
+                leaked_chars,
+            ) = self._process_tool_message(
+                message=message,
+                slot_map=slot_map,
+                context=context,
+            )
+            total_leaked_chars += leaked_chars
+            last_text_chunks = text_chunks
+            last_grounding = grounding
+
+            if isinstance(outcome, PendingPose):
+                self._record_tool_loop_attempts_span(
+                    attempts=attempt + 1, exhausted=False,
+                )
+                response_text = self._assemble_response_text(
+                    text_chunks=text_chunks, rendered_stem=rendered_stem,
+                )
+                if total_leaked_chars:
+                    logger.warning(
+                        "[StudentTutor] LEAKED_TOOL_SYNTAX in tool-path text "
+                        "blocks (move=%s) — stripped %d chars",
+                        move, total_leaked_chars,
+                    )
+                if not grounding:
+                    grounding = {
+                        "grader": "",
+                        "evidence": "",
+                        "missing": ["grader", "evidence"],
+                    }
+                return message, outcome, response_text, grounding
+
+            if tool_use_block is None:
+                # LLM declined to call the tool (auto path) and produced
+                # text only. Return as-is — conformance will judge
+                # whether the prose violates ``all__no_assessment_in_prose``.
+                self._record_tool_loop_attempts_span(
+                    attempts=attempt + 1, exhausted=False,
+                )
+                break
+
+            # Phase A REJECTED — emit observability span, append the
+            # rejection as a tool_result, and loop.
+            rejection: ToolRejection = outcome  # type: ignore[assignment]
+            with emit_span("audit", "pose_question.phase_a_rejection") as span:
+                if span is not None:
+                    span["payload"] = {
+                        "reason": rejection.reason,
+                        "detail": (rejection.detail or "")[:160],
+                        "attempt": attempt,
+                        "slot": attempted_slot,
+                    }
+            if attempted_slot is not None:
+                attempted_slots.append(attempted_slot)
+            # If this was the last allowed attempt, stop — no point
+            # appending tool_result the LLM will never see.
+            if attempt + 1 >= MAX_POSE_ATTEMPTS_PER_TURN:
+                self._record_tool_loop_attempts_span(
+                    attempts=attempt + 1, exhausted=True,
+                )
+                break
+            messages.append({
+                "role": "assistant",
+                "content": message.content,
+            })
+            messages.append({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": getattr(tool_use_block, "id", "") or "",
+                    "is_error": True,
+                    "content": _format_rejection_for_llm(
+                        rejection=rejection,
+                        slot=attempted_slot,
+                        attempted_slots=attempted_slots,
+                    ),
+                }],
+            })
+
+        # Tool loop exhausted (max attempts hit, or LLM emitted no tool
+        # call on the retry path). Fall through with whatever text the
+        # LLM said on the final attempt — no PendingPose committed.
+        if total_leaked_chars:
+            logger.warning(
+                "[StudentTutor] LEAKED_TOOL_SYNTAX in tool-path text "
+                "blocks (move=%s) — stripped %d chars",
+                move, total_leaked_chars,
+            )
+        response_text = "\n\n".join(c for c in last_text_chunks if c).strip()
+        if not last_grounding:
+            last_grounding = {
+                "grader": "",
+                "evidence": "",
+                "missing": ["grader", "evidence"],
+            }
+        return last_message, None, response_text, last_grounding
+
+    @staticmethod
+    def _record_tool_loop_attempts_span(*, attempts: int, exhausted: bool) -> None:
+        """Emit ``pose_question.tool_loop_attempts`` for observability.
+
+        Field semantics:
+          - attempts: number of LLM calls made inside the tool loop
+            (1 for the common case; 2 when a Phase A rejection was
+            recovered or both attempts failed).
+          - exhausted: True when ``MAX_POSE_ATTEMPTS_PER_TURN`` was hit
+            without producing a PendingPose.
+        """
+        with emit_span("audit", "pose_question.tool_loop_attempts") as span:
+            if span is not None:
+                span["payload"] = {
+                    "attempts": attempts,
+                    "exhausted": exhausted,
+                }
+
+    def _process_tool_message(
+        self,
+        *,
+        message,
+        slot_map: dict[int, Any],
+        context: TutoringContext,
+    ) -> tuple[
+        list[str],
+        Any,
+        Optional["PendingPose | ToolRejection"],
+        str,
+        Optional[int],
+        dict,
+        int,
+    ]:
+        """Walk an Anthropic Message's content blocks once.
+
+        Returns:
+          (text_chunks, tool_use_block, outcome, rendered_stem,
+           attempted_slot, grounding, leaked_chars)
+
+          - ``tool_use_block`` is the first pose_question tool_use block
+            seen, or None when the LLM emitted text only.
+          - ``outcome`` is a PendingPose on Phase A pass, a ToolRejection
+            on Phase A fail, or None when there was no tool_use to
+            validate.
+          - ``rendered_stem`` is non-empty only on PendingPose.
+          - ``attempted_slot`` is the slot the LLM requested (when
+            extractable); None if the tool_use was malformed.
+        """
+        text_chunks: list[str] = []
+        tool_use_block = None
+        outcome: Optional[PendingPose | ToolRejection] = None
+        rendered_stem = ""
+        attempted_slot: Optional[int] = None
         grounding: dict = {}
+        leaked_chars = 0
 
         for block in (message.content or []):
             btype = getattr(block, "type", None)
             if btype == "text":
                 raw_chunk = (getattr(block, "text", "") or "").strip()
                 cleaned, leaked = strip_leaked_tool_call_syntax(raw_chunk)
-                if leaked:
-                    total_leaked_chars += leaked
-                # Pull GRADER / EVIDENCE headers off the chunk before
-                # it becomes the lead-in. Only the first chunk with
-                # headers wins; subsequent chunks have their grounding
-                # info merged in case the LLM split the headers
-                # across blocks (rare).
+                leaked_chars += leaked
                 cleaned, chunk_grounding = strip_grounding_lines(cleaned)
                 if not grounding:
                     grounding = chunk_grounding
@@ -361,43 +579,38 @@ class StudentTutor:
                         name,
                     )
                     continue
-                if pending_pose is not None:
+                if tool_use_block is not None:
                     # Only the first pose per turn is honored; extra
                     # tool calls are dropped (mirrors legacy behavior).
                     continue
-                pending_pose, rendered_stem = self._handle_pose_tool_use(
-                    block=block, slot_map=slot_map, context=context,
+                tool_use_block = block
+                outcome, rendered_stem, attempted_slot = (
+                    self._handle_pose_tool_use(
+                        block=block, slot_map=slot_map, context=context,
+                    )
                 )
 
-        if total_leaked_chars:
-            logger.warning(
-                "[StudentTutor] LEAKED_TOOL_SYNTAX in tool-path text "
-                "blocks (move=%s) — stripped %d chars",
-                move, total_leaked_chars,
-            )
+        return (
+            text_chunks,
+            tool_use_block,
+            outcome,
+            rendered_stem,
+            attempted_slot,
+            grounding,
+            leaked_chars,
+        )
 
+    @staticmethod
+    def _assemble_response_text(
+        *, text_chunks: list[str], rendered_stem: str,
+    ) -> str:
+        """Combine LLM lead-in text + the bank stem the tool returned."""
+        joined_lead = "\n\n".join(c for c in text_chunks if c).strip()
         if rendered_stem:
-            # Combine LLM lead-in text + bank stem. The student sees:
-            #   <lead_in?>
-            #
-            #   <bank stem>
-            joined_lead = "\n\n".join(c for c in text_chunks if c).strip()
             if joined_lead:
-                response_text = f"{joined_lead}\n\n{rendered_stem}"
-            else:
-                response_text = rendered_stem
-        else:
-            response_text = "\n\n".join(c for c in text_chunks if c).strip()
-
-        # Default empty grounding when no text chunks were emitted
-        # (forced tool_choice="any" can return only a tool_use block).
-        if not grounding:
-            grounding = {
-                "grader": "",
-                "evidence": "",
-                "missing": ["grader", "evidence"],
-            }
-        return message, pending_pose, response_text, grounding
+                return f"{joined_lead}\n\n{rendered_stem}"
+            return rendered_stem
+        return joined_lead
 
     def _handle_pose_tool_use(
         self,
@@ -405,11 +618,13 @@ class StudentTutor:
         block,
         slot_map: dict[int, Any],
         context: TutoringContext,
-    ) -> tuple[Optional[PendingPose], str]:
-        """Resolve a slot tool_use → PendingPose + rendered stem.
+    ) -> tuple[Optional[PendingPose | ToolRejection], str, Optional[int]]:
+        """Resolve a slot tool_use → ``(PendingPose | ToolRejection | None,
+        rendered_stem, slot_or_None)``.
 
-        On any failure (invalid slot, validate_pose rejection) returns
-        ``(None, "")`` and the caller falls back to text-only blocks.
+        ``ToolRejection`` is surfaced (Fix 2 — Phase A feedback loop) so
+        the caller can package it into a ``tool_result(is_error=True)``
+        block and let the LLM pick a different slot on the next attempt.
         """
         tool_input = getattr(block, "input", {}) or {}
         try:
@@ -419,7 +634,14 @@ class StudentTutor:
                 "[StudentTutor] pose_question tool_use missing/invalid slot: %r",
                 tool_input.get("slot"),
             )
-            return None, ""
+            return (
+                ToolRejection(
+                    reason="schema_invalid",
+                    detail=f"missing/invalid slot: {tool_input.get('slot')!r}",
+                ),
+                "",
+                None,
+            )
 
         step = slot_map.get(slot)
         if step is None:
@@ -427,7 +649,14 @@ class StudentTutor:
                 "[StudentTutor] pose_question tool_use slot=%d not in slot_map",
                 slot,
             )
-            return None, ""
+            return (
+                ToolRejection(
+                    reason="ref_unresolved",
+                    detail=f"slot {slot} not in current slot menu",
+                ),
+                "",
+                slot,
+            )
 
         rendered_stem = _render_bank_stem_with_options(step)
         lead_in = (tool_input.get("lead_in") or "").strip()
@@ -472,14 +701,14 @@ class StudentTutor:
                 "detail=%s",
                 slot, result.reason, (result.detail or "")[:120],
             )
-            return None, ""
+            return result, "", slot
 
         # Optional lead-in is merged in by the caller — we return just
         # the stem so the caller can decide how to splice text blocks.
         display_stem = rendered_stem
         if lead_in and not lead_in.endswith("?"):
             display_stem = f"{lead_in}\n\n{rendered_stem}"
-        return result, display_stem
+        return result, display_stem, slot
 
     def _asked_questions_for_student(
         self, context: TutoringContext,
@@ -843,6 +1072,69 @@ class StudentTutor:
 _MCQ_LETTER_RE = re.compile(r"^\s*([A-Da-d])\s*[).:\-]")
 
 
+# Mapping from ``ToolRejection.reason`` to actionable LLM-facing guidance.
+# Fix 2 — used by ``_format_rejection_for_llm`` to construct a
+# ``tool_result(is_error=True)`` content block so the LLM can read the
+# rejection reason and pick a different slot on the next attempt.
+_REJECTION_TEMPLATES: dict[str, str] = {
+    "mcq_options_missing": (
+        "the stem reads like a multiple-choice question but no options "
+        "were rendered. Pick a different slot."
+    ),
+    "in_session_repeat": (
+        "this question has already been posed this session. "
+        "Pick a different slot."
+    ),
+    "cross_session_repeat": (
+        "this question was asked recently in a prior session. "
+        "Pick a different slot."
+    ),
+    "ref_unresolved": (
+        "tool arguments invalid ({detail}). Pick a different slot."
+    ),
+    "schema_invalid": (
+        "tool arguments invalid ({detail}). Pick a different slot."
+    ),
+    "not_derivable": (
+        "the canonical answer cannot be derived from the visible stem. "
+        "Pick a different slot."
+    ),
+    "token_invalid": (
+        "invalid or already consumed token ({detail}). Use a bank slot "
+        "instead."
+    ),
+}
+
+
+def _format_rejection_for_llm(
+    *,
+    rejection: ToolRejection,
+    slot: Optional[int],
+    attempted_slots: list[int],
+) -> str:
+    """Render a tool_result content string for the LLM after Phase A
+    rejection (Fix 2 — pose-question two-phase commit).
+
+    The content names the slot, the reason, and lists every slot
+    already attempted-and-rejected this turn so the LLM doesn't loop
+    on the same one.
+    """
+    template = _REJECTION_TEMPLATES.get(
+        rejection.reason,
+        "the tool call was rejected ({detail}). Pick a different slot.",
+    )
+    body = template.format(detail=(rejection.detail or "")[:120])
+    slot_label = f"Slot {slot}" if slot is not None else "Tool call"
+    parts = [f"{slot_label} rejected: {body}"]
+    if attempted_slots:
+        unique_sorted = sorted(set(attempted_slots))
+        parts.append(
+            "Slots already attempted and rejected this turn: "
+            f"{unique_sorted}. Choose from the remaining available slots."
+        )
+    return " ".join(parts)
+
+
 # Header lines the SHARED_PREAMBLE_TEMPLATE asks the LLM to emit at
 # the top of every response. The strip step pulls them off the visible
 # text so the student never sees them; the captured values are
@@ -944,10 +1236,25 @@ def _render_bank_stem_with_options(step) -> str:
             # catches this case downstream when the stem actually
             # reads like an MCQ. Return the bare stem here.
             return stem
-        rendered_choices = [
-            c.strip() for c in choices
-            if isinstance(c, str) and c.strip()
-        ]
+        # Synthesize letter prefixes when choices were authored bare.
+        # The save hook on LessonStep normalizes new rows, but live
+        # data + in-memory test rows may still arrive without prefixes
+        # — render-time synthesis keeps the student-visible stem and
+        # the mcq_option_order in lockstep.
+        rendered_choices: list[str] = []
+        synth_idx = 0
+        for c in choices:
+            if not isinstance(c, str):
+                continue
+            cs = c.strip()
+            if not cs:
+                continue
+            if _MCQ_LETTER_RE.match(cs):
+                rendered_choices.append(cs)
+            else:
+                letter = chr(ord("A") + synth_idx)
+                rendered_choices.append(f"{letter}) {cs}")
+            synth_idx += 1
         if not rendered_choices:
             return stem
         return f"{stem}\n\n" + "\n".join(rendered_choices)
@@ -969,6 +1276,11 @@ def _extract_mcq_letters(step) -> list[str]:
     Used to populate ``visible_context.mcq_option_order`` for the
     conformance + repeat-guard surfaces. Returns empty list for
     non-MCQ steps.
+
+    When choices were authored without letter prefixes, synthesizes
+    ``A``, ``B``, ``C`` … in order — must stay in lockstep with
+    ``_render_bank_stem_with_options`` which performs the same
+    synthesis for the student-visible stem.
     """
     answer_type = (getattr(step, "answer_type", "") or "").strip().lower()
     if answer_type != "multiple_choice":
@@ -977,11 +1289,18 @@ def _extract_mcq_letters(step) -> list[str]:
     if not isinstance(choices, list):
         return []
     letters: list[str] = []
+    synth_idx = 0
     for choice in choices:
         if not isinstance(choice, str):
             continue
-        m = _MCQ_LETTER_RE.match(choice)
+        cs = choice.strip()
+        if not cs:
+            continue
+        m = _MCQ_LETTER_RE.match(cs)
         if m:
             letters.append(m.group(1).upper())
+        else:
+            letters.append(chr(ord("A") + synth_idx))
+        synth_idx += 1
     return letters
 

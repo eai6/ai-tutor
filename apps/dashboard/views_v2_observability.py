@@ -88,6 +88,9 @@ def compute_v2_aggregates(
     verdict_counter: Counter[str] = Counter()
     fallback_count = 0
     retry_count = 0
+    # Fix 3 (pose-question two-phase commit) — retry-classification
+    # distribution: prose_only / pose_related / mixed.
+    retry_classification_counter: Counter[str] = Counter()
     p1_correct_to_wrong_caught = 0
     p1_wrong_to_correct_caught = 0
     total_turns = 0
@@ -106,6 +109,9 @@ def compute_v2_aggregates(
             fallback_count += 1
         if trace.get("retry_used"):
             retry_count += 1
+        retry_class = trace.get("retry_classification")
+        if retry_class:
+            retry_classification_counter[str(retry_class)] += 1
         for violation in trace.get("conformance_violations") or []:
             v = str(violation).lower()
             if "affirms_correctness" in v or "wrong_to_correct" in v:
@@ -122,6 +128,11 @@ def compute_v2_aggregates(
     stage_latencies: dict[str, list[int]] = {}
     pre_pose_refusals = 0
     pre_pose_attempts = 0
+    # Fix 2 (pose-question two-phase commit) — Phase A rejection
+    # distribution by reason + tool-loop-attempts histogram.
+    phase_a_rejection_counter: Counter[str] = Counter()
+    tool_loop_attempt_counter: Counter[int] = Counter()
+    tool_loop_exhausted = 0
     for span in spans:
         key = f"{span.kind}.{span.name}"
         stage_latencies.setdefault(key, [])
@@ -134,6 +145,16 @@ def compute_v2_aggregates(
             outcome = (span.payload or {}).get("outcome")
             if outcome and outcome != "pass":
                 pre_pose_refusals += 1
+        elif span.name == "pose_question.phase_a_rejection":
+            reason = (span.payload or {}).get("reason") or "unknown"
+            phase_a_rejection_counter[str(reason)] += 1
+        elif span.name == "pose_question.tool_loop_attempts":
+            payload = span.payload or {}
+            attempts = payload.get("attempts")
+            if isinstance(attempts, int):
+                tool_loop_attempt_counter[attempts] += 1
+            if payload.get("exhausted"):
+                tool_loop_exhausted += 1
 
     latency_summary: dict[str, dict[str, int]] = {}
     for key, values in stage_latencies.items():
@@ -193,6 +214,12 @@ def compute_v2_aggregates(
         "pre_pose_refusal_rate": pre_pose_refusal_rate,
         "unverified_rate": unverified_rate,
         "stage_latency_ms": latency_summary,
+        "retry_classification": dict(retry_classification_counter),
+        "phase_a_rejection_by_reason": dict(phase_a_rejection_counter),
+        "tool_loop_attempts_histogram": {
+            str(k): v for k, v in sorted(tool_loop_attempt_counter.items())
+        },
+        "tool_loop_exhausted": tool_loop_exhausted,
         "alerts": alerts,
     }
 

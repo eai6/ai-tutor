@@ -82,16 +82,43 @@ def test_state_coherence_fails_on_bad_move():
     assert any("state_coherence" in v for v in res.violations)
 
 
-def test_state_coherence_fails_on_verdict_without_open_question():
-    cc = ConformanceCheck()
+def test_state_coherence_fails_on_non_correct_verdict_without_open_question():
+    """A non-correct verdict with no open_question is the pathological
+    shape the gate flags. CORRECT verdicts on cleared open_question are
+    the post-correct contract (TutorEngine clears the open_question
+    immediately after a CORRECT grade so the next pose isn't refused
+    by the in-session stickiness guard) — see
+    ``run_state_coherence_check`` for the rationale."""
+    cc = ConformanceCheck(
+        classifier_client_factory=lambda: _FakeClient(_clean_labels_json()),
+    )
     res = cc.run(
         candidate_response="anything",
-        verdict=_verdict(Verdict.CORRECT),
+        verdict=_verdict(Verdict.WRONG),
         runtime_state=SessionRuntimeState(),  # NO open question
-        selected_move="confirm_and_advance",
+        selected_move="scaffold_hint",
     )
     assert res.passed is False
     assert any("state_coherence" in v for v in res.violations)
+
+
+def test_state_coherence_passes_on_correct_verdict_without_open_question():
+    """The post-correct cleared-open_question state is the documented
+    contract, not a coherence breach. Asserts the gate's intentional
+    relaxation (commit 65a381a)."""
+    cc = ConformanceCheck(
+        classifier_client_factory=lambda: _FakeClient(
+            _clean_labels_json(hands_floor_back_or_transitions=True),
+        ),
+    )
+    res = cc.run(
+        candidate_response="Nice — let's move on.",
+        verdict=_verdict(Verdict.CORRECT),
+        runtime_state=SessionRuntimeState(),  # cleared after CORRECT
+        selected_move="confirm_and_advance",
+    )
+    # state_coherence in particular must NOT be in the violations.
+    assert not any("state_coherence" in v for v in res.violations)
 
 
 def test_rule_check_rejects_authored_number():

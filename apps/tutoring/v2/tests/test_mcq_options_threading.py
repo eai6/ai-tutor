@@ -129,3 +129,90 @@ def test_passing_mention_of_following_not_flagged():
         "feature: a river meander."
     )
     assert _looks_like_mcq_stem_without_options(stem) is False
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Fix 1 (pose-question two-phase commit) — synthesized letter prefixes
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_render_synthesizes_letters_when_choices_are_bare():
+    """LessonStep authored with bare choices (no letter prefix) — the
+    renderer synthesizes letters so the student-visible stem still has
+    actionable options."""
+    step = _step(
+        question="Which of the following describes condensation?",
+        answer_type="multiple_choice",
+        choices=["evaporates", "condenses", "precipitates"],
+    )
+    rendered = _render_bank_stem_with_options(step)
+    assert "A) evaporates" in rendered
+    assert "B) condenses" in rendered
+    assert "C) precipitates" in rendered
+
+
+def test_render_handles_mixed_prefixed_and_bare_choices():
+    """If some choices are prefixed and others bare, synthesize the
+    missing ones in order alongside the kept prefixes."""
+    step = _step(
+        question="Pick one.",
+        answer_type="multiple_choice",
+        choices=["A) keep me", "and me", "B) keep me too"],
+    )
+    rendered = _render_bank_stem_with_options(step)
+    # First and third stay; the second gets a synthesized letter at its
+    # positional index (B — since the existing prefix took position 0
+    # and synth_idx advances on every non-empty entry).
+    assert "A) keep me" in rendered
+    assert "B) and me" in rendered
+    assert "B) keep me too" in rendered or "C) keep me too" in rendered
+
+
+def test_extract_mcq_letters_synthesizes_when_no_prefixes():
+    """Mirror the renderer: bare choices produce A/B/C synthetic
+    letters so mcq_option_order stays in lockstep with what the
+    student saw."""
+    step = _step(
+        question="?",
+        answer_type="multiple_choice",
+        choices=["evaporates", "condenses", "precipitates"],
+    )
+    assert _extract_mcq_letters(step) == ["A", "B", "C"]
+
+
+def test_extract_mcq_letters_mixed_prefixes():
+    """Mixed prefixed + bare entries should produce the same letters
+    the renderer assigns."""
+    step = _step(
+        question="?",
+        answer_type="multiple_choice",
+        choices=["A) one", "two", "C) three"],
+    )
+    assert _extract_mcq_letters(step) == ["A", "B", "C"]
+
+
+def test_looks_like_mcq_accepts_bullet_options():
+    stem = (
+        "Which of the following is true?\n"
+        "\n"
+        "- foo\n"
+        "- bar\n"
+        "- baz"
+    )
+    assert _looks_like_mcq_stem_without_options(stem) is False
+
+
+def test_looks_like_mcq_accepts_numbered_options():
+    stem = (
+        "Which of the following is true?\n"
+        "\n"
+        "1. foo\n"
+        "2. bar\n"
+        "3. baz"
+    )
+    assert _looks_like_mcq_stem_without_options(stem) is False
+
+
+def test_looks_like_mcq_still_refuses_genuinely_missing_options():
+    stem = "Which of the following describes the hydrological cycle?"
+    assert _looks_like_mcq_stem_without_options(stem) is True

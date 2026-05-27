@@ -7,9 +7,16 @@ drives the tutoring sessions. Steps control the flow.
 Hierarchy: Course > Unit > Lesson > LessonStep
 """
 
+import re
+
 from django.db import models
 from django.contrib.auth.models import User
 from apps.accounts.models import Institution
+
+
+# Match a leading letter prefix like "A) ...", "B. ...", "c: ...", "D - ..."
+# Mirrors apps/tutoring/v2/services/student_tutor.py::_MCQ_LETTER_RE.
+_MCQ_LETTER_RE = re.compile(r"^\s*([A-Da-d])\s*[).:\-]")
 
 
 class Course(models.Model):
@@ -676,6 +683,45 @@ class LessonStep(models.Model):
             self.media.get('videos') or
             self.media.get('audio')
         )
+
+    def _normalize_mcq_choices(self):
+        """Normalize MCQ choices to letter-prefixed form on save.
+
+        The renderer in apps/tutoring/v2/services/student_tutor.py and
+        the Phase A safety floor in apps/tutoring/v2/tools/pose_question.py
+        both depend on choices being in ``A) ...`` form so they can
+        detect inlined options and populate ``mcq_option_order``.
+        Some lessons author choices as bare strings without letters,
+        which surfaced as ``mcq_options_missing`` refusals (see
+        design/tasks/pose-question-two-phase-commit-fixes-plan.md Fix 1).
+
+        Idempotent: choices already prefixed with a letter pass through
+        unchanged.
+        """
+        if self.answer_type != self.AnswerType.MULTIPLE_CHOICE or not self.choices:
+            return
+        if not isinstance(self.choices, list):
+            return
+        letters = ["A", "B", "C", "D", "E", "F"]
+        normalized = []
+        for i, choice in enumerate(self.choices):
+            if not isinstance(choice, str):
+                normalized.append(choice)
+                continue
+            stripped = choice.strip()
+            if not stripped:
+                normalized.append(stripped)
+                continue
+            if _MCQ_LETTER_RE.match(stripped):
+                normalized.append(stripped)
+            else:
+                prefix = letters[i] if i < len(letters) else f"Option{i + 1}"
+                normalized.append(f"{prefix}) {stripped}")
+        self.choices = normalized
+
+    def save(self, *args, **kwargs):
+        self._normalize_mcq_choices()
+        super().save(*args, **kwargs)
 
 
 class SeychellesContext(models.Model):

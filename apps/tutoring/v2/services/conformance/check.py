@@ -46,6 +46,133 @@ from apps.tutoring.v2.services.move_prompts import MOVE_PROMPTS
 logger = logging.getLogger(__name__)
 
 
+# ──────────────────────────────────────────────────────────────────────
+# Conformance-failure classification — Fix 3 (pose-question two-phase
+# commit). On a first-attempt conformance failure, TutorEngine asks
+# whether the violations are PROSE_ONLY (re-render prose; hold the
+# first attempt's PendingPose; Phase A does not re-run) or POSE_RELATED
+# / MIXED (full retry; Phase A may pick a different slot).
+#
+# Each set holds the *rule-name prefix* that violations carry on
+# ``ConformanceResult.violations`` (entries are formatted as
+# ``"<rule>: <detail>"`` — see ``ConformanceResult.add_violation``).
+# ──────────────────────────────────────────────────────────────────────
+
+PROSE_ONLY_VIOLATIONS: frozenset[str] = frozenset({
+    # Deterministic gates whose subject is prose shape, not the pose
+    # itself. ``state_coherence`` is engine-internal sanity; the gate's
+    # failure modes are unrelated to which slot was posed. ``safety``,
+    # ``figure_ref``, ``rule_check``, ``praise_filter``, ``answer_leak``
+    # all scan the visible response text.
+    "state_coherence",
+    "safety",
+    "figure_ref",
+    "rule_check",
+    "praise_filter",
+    "answer_leak",
+    # Tutor-claim adjudication — the prose makes a factual claim that
+    # the grounded adjudicator could not verify. Holding the pose and
+    # re-rendering prose is the correct retry: drop / cite the claim.
+    "tutor_claim_contradicted",
+    "tutor_claim_unverified",
+    # Verdict-keyed matrix rules — every one is a shape constraint on
+    # the prose response (affirm / refute / hand-floor-back / partial
+    # feedback shape / uncertainty surfacing). The pose itself is not
+    # what triggers any of these.
+    "correct__no_refutation",
+    "correct__hands_floor_back",
+    "wrong__no_affirmation",
+    "wrong__hands_floor_back",
+    "partial__no_bare_affirm",
+    "partial__no_bare_refute",
+    "partial__feedback_shape",
+    "partial__hands_floor_back",
+    "unverified__no_affirm",
+    "unverified__no_refute",
+    "unverified__surfaces_uncertainty",
+    "unverified__hands_floor_back",
+    "no_verdict_claim__no_affirm",
+    "no_verdict_claim__no_refute",
+    "no_verdict_claim__hands_floor_back",
+})
+
+POSE_RELATED_VIOLATIONS: frozenset[str] = frozenset({
+    # The candidate posed a question in prose despite the pose tool
+    # being available — the LLM must instead emit a tool_use block. A
+    # held pose is moot here (there is none); the retry must re-run
+    # Phase A so the tool path can be taken.
+    "all__no_assessment_in_prose",
+    # Drift: the candidate's pending_pose targets a NEW slot while the
+    # original open question is still live. Holding the drifting pose
+    # would re-fail the same gate; the retry must let Phase A pick the
+    # right slot (or no slot).
+    "open_question_stickiness",
+    # Extractor-derived violations on prose-stacked questions / no
+    # active end. Both are emitted by the question_extractor (see
+    # ``TutorEngine._extractor_violations``) and indicate the LLM
+    # emitted assessment-shaped prose; the retry needs Phase A so a
+    # legitimate tool-routed pose can replace the prose questions.
+    "one_question_per_turn",
+    "active_end_required",
+})
+
+
+def _violation_rule_name(violation: str) -> str:
+    """Extract the rule-name prefix from a violation string.
+
+    Violations are written as ``"<rule>: <detail>"`` by
+    ``ConformanceResult.add_violation``. When no ``:`` separator is
+    present the whole string is the rule name.
+    """
+    head, _sep, _rest = violation.partition(":")
+    return head.strip()
+
+
+def classify_conformance_failure(
+    violations: list[str],
+    *,
+    pending_pose=None,
+) -> str:
+    """Return one of ``'prose_only'``, ``'pose_related'``, ``'mixed'``.
+
+    Sub-case B of §2.3.1: ``all__no_assessment_in_prose`` flips to
+    ``prose_only`` when the candidate already committed a valid
+    ``PendingPose`` (sub-case B) — the prose question is a duplicate
+    of an over-eager LLM that ALSO emitted a tool_use; re-rendering
+    prose with the held pose is the right behaviour.
+    """
+    has_prose = False
+    has_pose = False
+    for v in violations:
+        name = _violation_rule_name(v)
+        if not name:
+            continue
+        if name == "all__no_assessment_in_prose" and pending_pose is not None:
+            # Sub-case B — over-eager LLM emitted BOTH a tool_use and a
+            # prose assessment question. The held pose is valid; the
+            # prose is the duplicate.
+            has_prose = True
+            continue
+        if name in POSE_RELATED_VIOLATIONS:
+            has_pose = True
+        elif name in PROSE_ONLY_VIOLATIONS:
+            has_prose = True
+        else:
+            # Unknown rule names default to mixed so the safe path
+            # (full retry) runs. New conformance rules must be added
+            # to one of the two sets to be classified.
+            has_pose = True
+            has_prose = True
+    if has_pose and not has_prose:
+        return "pose_related"
+    if has_prose and not has_pose:
+        return "prose_only"
+    if not has_pose and not has_prose:
+        # Empty / unknown — be conservative and run the full retry.
+        return "pose_related"
+    return "mixed"
+
+
 @dataclass
 class ConformanceResult:
     """End-state of one conformance pass over a candidate response."""

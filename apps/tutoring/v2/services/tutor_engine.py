@@ -40,6 +40,7 @@ from apps.tutoring.v2.contracts import (
 from apps.tutoring.v2.services.conformance import (
     ConformanceCheck,
     ConformanceResult,
+    classify_conformance_failure,
 )
 from apps.tutoring.v2.services.context_manager import ContextManager
 from apps.tutoring.v2.services.media import MediaService
@@ -466,7 +467,23 @@ class TutorEngine:
             conf_result.passed = False
 
         fallback_used = False
+        retry_classification: Optional[str] = None
         if not conf_result.passed:
+            # Fix 3 (pose-question two-phase commit): classify the
+            # conformance failure so we know whether to HOLD the first
+            # attempt's PendingPose (prose-only violations — re-render
+            # prose, Phase A does NOT re-run) or to run the full
+            # pipeline (pose_related / mixed — Phase A re-runs from
+            # scratch).
+            retry_classification = classify_conformance_failure(
+                list(conf_result.violations),
+                pending_pose=first_resp.pending_pose,
+            )
+            hold_for_retry = (
+                first_resp.pending_pose
+                if retry_classification == "prose_only"
+                else None
+            )
             # One retry on rejection — surface violations to the tutor.
             with emit_span("audit", "tutor.retry") as span:
                 retry_resp = self._invoke_tutor_or_fallback(
@@ -478,9 +495,14 @@ class TutorEngine:
                     violation_hints=conf_result.violations,
                     focus_note=router_focus_note,
                     principle_emphasis=router_principle_emphasis,
+                    hold_pending_pose=hold_for_retry,
                 )
                 if span is not None:
-                    span["payload"] = {"violations": conf_result.violations[:5]}
+                    span["payload"] = {
+                        "violations": conf_result.violations[:5],
+                        "retry_classification": retry_classification,
+                        "held_pending_pose": hold_for_retry is not None,
+                    }
             retry_text = retry_resp.text
 
             retry_extraction = self.question_extractor.extract(
@@ -697,6 +719,7 @@ class TutorEngine:
             ),
             "retry_used": conf_result.retry_used,
             "fallback_used": fallback_used,
+            "retry_classification": retry_classification,
             "is_lesson_complete": is_lesson_complete,
             "advanced_to_step_index": advanced_to_step_index,
             "router": {
@@ -922,12 +945,18 @@ class TutorEngine:
         violation_hints: Optional[list[str]] = None,
         focus_note: str = "",
         principle_emphasis: Optional[list[str]] = None,
+        hold_pending_pose: Any = None,
     ):
         """Call the StudentTutor; on any raise, surface a safe template.
 
         Returns a ``TutorResponse`` (``text`` + optional
         ``pending_pose``). The safe-template fallback has no
         PendingPose attached.
+
+        ``hold_pending_pose`` (Fix 3) — when set, the StudentTutor
+        skips the tool path, generates prose only, and the held pose
+        is reattached to the returned TutorResponse so Phase B can
+        commit it on conformance accept.
         """
         from apps.tutoring.v2.services.student_tutor import TutorResponse
 
@@ -951,6 +980,7 @@ class TutorEngine:
                 student_input=effective_input,
                 focus_note=focus_note,
                 principle_emphasis=principle_emphasis,
+                hold_pending_pose=hold_pending_pose,
             )
         except Exception as exc:
             logger.warning(

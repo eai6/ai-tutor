@@ -480,9 +480,15 @@ def _looks_like_mcq_stem_without_options(rendered_stem: str) -> bool:
         return False
     if not _MCQ_STEM_REQUIRES_OPTIONS_RE.search(text):
         return False
-    # If the renderer has already inlined A)/B)/C)/D) into the visible
-    # stem, the student CAN answer — don't refuse.
-    inlined_options = re.search(
-        r"(?m)^\s*[A-Da-d]\s*[).:\-]\s+\S", text,
+    # If the renderer has already inlined options into the visible
+    # stem — letter-prefixed, bullet-prefixed, or numbered — the
+    # student CAN answer; don't refuse.
+    inlined_patterns = (
+        r"(?m)^\s*[A-Da-d]\s*[).:\-]\s+\S",   # A) foo / b. bar / C: baz
+        r"(?m)^\s*[-*•]\s+\S",                # - foo / * bar / • baz
+        r"(?m)^\s*\d+\s*[).:\-]\s+\S",        # 1) foo / 2. bar / 3: baz
     )
-    return inlined_options is None
+    for pat in inlined_patterns:
+        if re.search(pat, text):
+            return False
+    return True
