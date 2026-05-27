@@ -176,7 +176,43 @@ def simulate_session(
         )
 
     try:
-        tutor = ConversationalTutor(session)
+        # Engine dispatch (mirrors views.py): honor SIMPLE_TUTOR_ENGINE
+        # so eval / synthetic-traffic runs against the same engine the
+        # live web app serves. Wraps simple_tutor's dict payloads into
+        # a TutorMessage-shaped namespace so the driver doesn't need
+        # to know which engine produced the turn.
+        from apps.tutoring import simple_tutor as _simple_tutor
+        _use_simple = _simple_tutor.is_enabled()
+
+        if _use_simple:
+            from apps.tutoring.simple_tutor.engine import (
+                start_for_view as _simple_start,
+                respond_for_view as _simple_respond,
+            )
+            from types import SimpleNamespace as _NS
+
+            def _wrap(d: dict):
+                return _NS(
+                    content=d.get('message', ''),
+                    phase=d.get('phase', ''),
+                    show_exit_ticket=d.get('show_exit_ticket', False),
+                    is_complete=d.get('is_complete', False),
+                    is_correct=d.get('is_correct'),
+                )
+
+            class _SimpleTutorAdapter:
+                def __init__(self, session):
+                    self.session = session
+
+                def start(self):
+                    return _wrap(_simple_start(self.session))
+
+                def respond(self, msg, **_kwargs):
+                    return _wrap(_simple_respond(self.session, msg))
+
+            tutor = _SimpleTutorAdapter(session)
+        else:
+            tutor = ConversationalTutor(session)
 
         # Tutor speaks first (mirrors production: views.py:820 calls .start()).
         opening = tutor.start()
