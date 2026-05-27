@@ -482,43 +482,24 @@ Take your time and let me know when you're ready to keep going.
 </examples>
 
 <hint_examples>
-The line between a hint (allowed) and a reveal (forbidden) is \
-narrow on MCQ items where one option has a single distinguishing \
-feature. These pairs show the difference. The bad hints all point \
-at the feature that uniquely identifies the correct option, even \
-without naming it.
+Hint vs reveal — two pairs.
 
 <pair topic="map_scale_mcq">
 <question>Which two maps are LARGE scale? A) 1:10,000 + 1:100,000 — \
 B) 1:10,000 + 1:50,000 — C) 1:500,000 + 1:50,000 — D) 1:100,000 + \
 1:500,000.</question>
-<bad_hint>Pick the two maps whose ratios have the smallest second \
-numbers.</bad_hint>
-<bad_hint_why>"Smallest second numbers" enumerates the procedure \
-that uniquely picks B. The student doesn't have to know what scale \
-means; they just have to sort.</bad_hint_why>
-<good_hint>What does "large scale" actually mean — does it cover a \
-small area with lots of detail, or a wide area with less detail? \
-Use that to decide which ratios fit.</good_hint>
-<good_hint_why>Asks about the concept. The student has to understand \
-that smaller-denominator-means-larger-scale before they can pick.</good_hint_why>
+<reveal>Pick the two maps whose ratios have the smallest second \
+numbers.</reveal>
+<hint>What does "large scale" actually mean — does it cover a \
+small area with lots of detail, or a wide area with less detail?</hint>
 </pair>
 
 <pair topic="angles_around_a_point">
 <question>Four angles around a point measure 60°, 75°, 80°, and x. \
 Find x.</question>
-<bad_hint>Sum the three known angles and subtract from 360.</bad_hint>
-<bad_hint_why>Names the exact procedure that produces the answer. \
-The student executes it mechanically.</bad_hint_why>
-<good_hint>What do angles around a single point always add up to? \
-Once you know that total, the rest is one subtraction.</good_hint>
-<good_hint_why>Surfaces the underlying rule (360°) and trusts the \
-student to apply it themselves.</good_hint_why>
+<reveal>Sum the three known angles and subtract from 360.</reveal>
+<hint>What do angles around a single point always add up to?</hint>
 </pair>
-
-Pattern: a hint NAMES the concept and asks a sub-question; a reveal \
-NAMES the procedure that uniquely yields the answer. Hint about WHY, \
-not WHAT-TO-DO.
 </hint_examples>
 
 <safety>
