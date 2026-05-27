@@ -31,7 +31,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from apps.tutoring.tracing import emit_span
@@ -88,10 +88,18 @@ class TutorResponse:
     conformance approves the visible text (Phase B). On retry or safe
     template fallback the PendingPose is discarded — Phase A re-runs
     from scratch on retry, and no pose is recorded on fallback.
+
+    ``grounding`` carries the GRADER / EVIDENCE header lines the LLM
+    emitted before its visible response (see ``SHARED_PREAMBLE_TEMPLATE``).
+    The lines are stripped from ``text`` (never reach the student) and
+    logged into ``v2_trace.grounding`` for observability — auditors
+    can spot turns where the LLM's stated grounding contradicts what
+    its visible reply did.
     """
 
     text: str
     pending_pose: Optional[PendingPose] = None
+    grounding: dict = field(default_factory=dict)
 
 
 class StudentTutor:
@@ -176,7 +184,7 @@ class StudentTutor:
                 )
 
             if tool_dict is not None:
-                response_or_msg, pending_pose, response_text = (
+                response_or_msg, pending_pose, response_text, grounding = (
                     self._call_with_tools(
                         client=client,
                         system_prompt=system_prompt,
@@ -194,10 +202,13 @@ class StudentTutor:
                         "tool_path": True,
                         "posed_via_tool": pending_pose is not None,
                         "response_chars": len(response_text),
+                        "grounding_missing": grounding.get("missing") or [],
                     })
                     span["payload"] = payload
                 return TutorResponse(
-                    text=response_text, pending_pose=pending_pose,
+                    text=response_text,
+                    pending_pose=pending_pose,
+                    grounding=grounding,
                 )
 
             response = client.generate(
@@ -218,6 +229,10 @@ class StudentTutor:
                     "(move=%s) — stripped %d chars",
                     move, leaked_chars,
                 )
+            # Pull the GRADER / EVIDENCE grounding headers off so the
+            # student never sees them — they exist to keep the
+            # response body honest to the verdict + objective state.
+            text, grounding = strip_grounding_lines(text)
             if span is not None:
                 span["tokens_in"] = response.tokens_in
                 span["tokens_out"] = response.tokens_out
@@ -227,9 +242,12 @@ class StudentTutor:
                     "tool_path": False,
                     "response_chars": len(text),
                     "leaked_tool_call_chars": leaked_chars,
+                    "grounding_missing": grounding.get("missing") or [],
                 })
                 span["payload"] = payload
-            return TutorResponse(text=text, pending_pose=None)
+            return TutorResponse(
+                text=text, pending_pose=None, grounding=grounding,
+            )
 
     # ------------------------------------------------------------------
     # Tool-use path helpers
@@ -259,10 +277,10 @@ class StudentTutor:
         slot_map: dict[int, Any],
         context: TutoringContext,
         move: str,
-    ) -> tuple[Any, Optional[PendingPose], str]:
+    ) -> tuple[Any, Optional[PendingPose], str, dict]:
         """Invoke ``generate_with_tools`` and process the response.
 
-        Returns ``(raw_message, pending_pose, response_text)``.
+        Returns ``(raw_message, pending_pose, response_text, grounding)``.
 
         On a successful tool_use block the rendered stem from the
         bank is appended to any text blocks the LLM emitted as
@@ -293,7 +311,7 @@ class StudentTutor:
                 "falling back to text path",
                 type(exc).__name__,
             )
-            return None, None, ""
+            return None, None, "", {}
 
         if not hasattr(message, "content") or not isinstance(
             getattr(message, "content", None), list
@@ -303,12 +321,13 @@ class StudentTutor:
                 "falling back to text path",
                 type(message).__name__,
             )
-            return message, None, ""
+            return message, None, "", {}
 
         text_chunks: list[str] = []
         pending_pose: Optional[PendingPose] = None
         rendered_stem = ""
         total_leaked_chars = 0
+        grounding: dict = {}
 
         for block in (message.content or []):
             btype = getattr(block, "type", None)
@@ -317,6 +336,18 @@ class StudentTutor:
                 cleaned, leaked = strip_leaked_tool_call_syntax(raw_chunk)
                 if leaked:
                     total_leaked_chars += leaked
+                # Pull GRADER / EVIDENCE headers off the chunk before
+                # it becomes the lead-in. Only the first chunk with
+                # headers wins; subsequent chunks have their grounding
+                # info merged in case the LLM split the headers
+                # across blocks (rare).
+                cleaned, chunk_grounding = strip_grounding_lines(cleaned)
+                if not grounding:
+                    grounding = chunk_grounding
+                else:
+                    for k in ("grader", "evidence"):
+                        if not grounding.get(k) and chunk_grounding.get(k):
+                            grounding[k] = chunk_grounding[k]
                 if cleaned:
                     text_chunks.append(cleaned)
             elif btype == "tool_use":
@@ -355,7 +386,15 @@ class StudentTutor:
         else:
             response_text = "\n\n".join(c for c in text_chunks if c).strip()
 
-        return message, pending_pose, response_text
+        # Default empty grounding when no text chunks were emitted
+        # (forced tool_choice="any" can return only a tool_use block).
+        if not grounding:
+            grounding = {
+                "grader": "",
+                "evidence": "",
+                "missing": ["grader", "evidence"],
+            }
+        return message, pending_pose, response_text, grounding
 
     def _handle_pose_tool_use(
         self,
@@ -518,6 +557,7 @@ class StudentTutor:
              toward following the move.
         """
         objective_block = self._render_objective_block(context)
+        evidence_block = self._render_objective_evidence_block(context)
         media_block = self._render_media_catalog_block(media_catalog)
         lesson_content_block = self._render_lesson_step_content_block(context)
         transcript_block = self._render_transcript_block(context.full_transcript)
@@ -526,6 +566,7 @@ class StudentTutor:
         )
         return (
             f"{objective_block}\n\n"
+            f"{evidence_block}\n\n"
             f"{media_block}\n\n"
             f"{lesson_content_block}\n\n"
             f"=== Conversation transcript so far ===\n"
@@ -536,7 +577,9 @@ class StudentTutor:
             f"---\n"
             f"Produce ONE response that executes the MOVE in the system "
             f"prompt for this turn. Follow the move's directives "
-            f"exactly; do not invent a different move."
+            f"exactly; do not invent a different move. Remember to "
+            f"begin with the two GRADER / EVIDENCE header lines required "
+            f"by the system prompt."
         )
 
     def _render_lesson_step_content_block(self, context: TutoringContext) -> str:
@@ -598,6 +641,42 @@ class StudentTutor:
             f"Lesson position: {position_hint}\n"
             f"Open question: {open_q.rendered_stem!r} "
             f"(source={open_q.source.value}, id={open_q.id})"
+        )
+
+    def _render_objective_evidence_block(self, context: TutoringContext) -> str:
+        """Objective progress as a small structured block.
+
+        The LLM paraphrases this into the EVIDENCE: grounding line at
+        the top of its response. Subject-agnostic — same shape for
+        math, geography, any subject.
+        (Principle #4 Mastery Learning Ch.13 — the close / mastery
+        signal must correspond to evidence of mastery; surfacing the
+        actual counts forces the response to ground in them rather
+        than improvise praise.)
+        """
+        key = (context.current_objective or "_").strip() or "_"
+        progress = context.runtime_state.objective_progress.get(key)
+        turns_in_session = (
+            context.runtime_state.safety_valve_counters.turns_in_session
+        )
+        if progress is None or progress.attempts == 0:
+            return (
+                "=== Objective evidence ===\n"
+                "No attempts on this objective yet — turns in session: "
+                f"{turns_in_session}."
+            )
+        ratio_pct = round(
+            100.0 * progress.correct / max(1, progress.attempts)
+        )
+        return (
+            "=== Objective evidence ===\n"
+            f"attempts={progress.attempts}, "
+            f"correct={progress.correct}, "
+            f"wrong={progress.wrong}, "
+            f"partial={progress.partial}, "
+            f"unverified={progress.unverified}, "
+            f"correct_ratio={ratio_pct}%, "
+            f"turns_in_session={turns_in_session}"
         )
 
     def _render_media_catalog_block(self, catalog: list[dict]) -> str:
@@ -715,18 +794,91 @@ class StudentTutor:
 _MCQ_LETTER_RE = re.compile(r"^\s*([A-Da-d])\s*[).:\-]")
 
 
+# Header lines the SHARED_PREAMBLE_TEMPLATE asks the LLM to emit at
+# the top of every response. The strip step pulls them off the visible
+# text so the student never sees them; the captured values are
+# returned for ``v2_trace.grounding`` observability.
+_GROUNDING_LINE_RE = re.compile(
+    r"^(?P<key>GRADER|EVIDENCE)\s*:\s*(?P<value>.*?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def strip_grounding_lines(text: str) -> tuple[str, dict]:
+    """Pull GRADER: and EVIDENCE: header lines off the LLM's response.
+
+    Returns ``(clean_text, grounding_dict)``. ``grounding_dict`` has up
+    to three keys:
+      - ``grader``: the GRADER line's value, or empty string if missing.
+      - ``evidence``: the EVIDENCE line's value, or empty string if missing.
+      - ``missing``: list of missing header names (for observability).
+
+    Scans only the FIRST FEW non-empty lines so a literal "GRADER:" or
+    "EVIDENCE:" word later in prose isn't mis-stripped. Tolerant of
+    blank lines between the headers and the body.
+    """
+    found: dict[str, str] = {}
+    if not text:
+        return "", {"grader": "", "evidence": "", "missing": ["grader", "evidence"]}
+
+    lines = text.split("\n")
+    body_start = 0
+    # Scan the first ~6 non-empty lines for header matches. Allow up to
+    # 2 headers to land non-consecutively (defensive against blank-line
+    # noise the LLM may insert).
+    scanned = 0
+    for i, line in enumerate(lines):
+        if not line.strip():
+            # Blank lines before the body are tolerated; advance body
+            # start to skip them later.
+            body_start = i + 1
+            continue
+        if scanned >= 6 or len(found) >= 2:
+            break
+        scanned += 1
+        m = _GROUNDING_LINE_RE.match(line)
+        if not m:
+            # First non-blank, non-header line marks the body.
+            body_start = i
+            break
+        key = m.group("key").lower()
+        if key not in found:
+            found[key] = (m.group("value") or "").strip()
+        body_start = i + 1
+
+    # Trim any blank lines between the headers and the body.
+    while body_start < len(lines) and not lines[body_start].strip():
+        body_start += 1
+
+    clean_text = "\n".join(lines[body_start:]).strip()
+    missing = [k for k in ("grader", "evidence") if k not in found]
+    return clean_text, {
+        "grader": found.get("grader", ""),
+        "evidence": found.get("evidence", ""),
+        "missing": missing,
+    }
+
+
 def _render_bank_stem_with_options(step) -> str:
-    """Render a LessonStep's question with MCQ choices appended.
+    """Render a LessonStep's question with an answer-shape suffix.
 
-    Subject-agnostic. For ``answer_type=multiple_choice`` (or any step
-    whose ``choices`` JSON field is populated), the rendered stem
-    becomes ``"<question>\\n\\n<choice 1>\\n<choice 2>\\n..."``. For
-    non-MCQ steps, returns the bare question text.
+    Subject-agnostic. The student must always be able to tell from the
+    rendered stem *what shape* of answer is expected.
 
-    Resolves the run-6 GEO P1 where T16/T18/T20 posed an MCQ stem with
-    "which of the following best describes..." but no rendered choices,
-    making the question unanswerable. The data was always in
-    ``LessonStep.choices``; the v2 renderer just dropped it.
+    Resolved cases:
+      * ``multiple_choice``: append the ``choices`` list verbatim.
+      * ``true_false``: append "(True or False?)" so the student knows
+        the answer space is binary. The legacy renderer dropped this
+        for True/False steps, producing P1 incomplete-question turns
+        (MATHS-S1 2026-05-27 T1442 — "exit ticket" rendered as a bare
+        statement with no T/F prompt).
+      * Other answer types (short_answer, numeric, etc.): the question
+        stem already encodes the expected shape ("Calculate…", "Name
+        the…") — return as authored.
+
+    (Principle #1 Active Learning Ch.10 — the student must be able to
+    act on the question this turn; missing the answer-shape signal
+    breaks the retrieval loop.)
 
     Returns the empty string when the step has no question text.
     """
@@ -734,22 +886,32 @@ def _render_bank_stem_with_options(step) -> str:
     if not stem:
         return ""
     answer_type = (getattr(step, "answer_type", "") or "").strip().lower()
-    choices = getattr(step, "choices", None) or []
-    if answer_type != "multiple_choice":
-        # Some authored steps store choices on non-MCQ types
-        # accidentally; only render when answer_type explicitly says
-        # multiple_choice. The Phase A safety floor catches the
-        # converse case (an MCQ-shaped stem with no choices).
-        return stem
-    if not isinstance(choices, list) or not choices:
-        return stem
-    rendered_choices = []
-    for choice in choices:
-        if isinstance(choice, str) and choice.strip():
-            rendered_choices.append(choice.strip())
-    if not rendered_choices:
-        return stem
-    return f"{stem}\n\n" + "\n".join(rendered_choices)
+
+    if answer_type == "multiple_choice":
+        choices = getattr(step, "choices", None) or []
+        if not isinstance(choices, list) or not choices:
+            # Authored as MCQ but choices missing — the Phase A
+            # safety floor (``_looks_like_mcq_stem_without_options``)
+            # catches this case downstream when the stem actually
+            # reads like an MCQ. Return the bare stem here.
+            return stem
+        rendered_choices = [
+            c.strip() for c in choices
+            if isinstance(c, str) and c.strip()
+        ]
+        if not rendered_choices:
+            return stem
+        return f"{stem}\n\n" + "\n".join(rendered_choices)
+
+    if answer_type == "true_false":
+        # Only append if the stem doesn't already cue True/False
+        # (some authored stems start with "True or False:").
+        lower = stem.lower()
+        if "true or false" in lower or "true/false" in lower:
+            return stem
+        return f"{stem}\n\n(True or False?)"
+
+    return stem
 
 
 def _extract_mcq_letters(step) -> list[str]:

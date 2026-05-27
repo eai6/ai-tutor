@@ -103,6 +103,7 @@ class ConformanceCheck:
         posed_via_tool: bool = False,
         lesson_has_media: bool = True,
         pending_pose=None,  # PendingPose | None — for open-question stickiness
+        pose_tool_available: bool = True,
     ) -> ConformanceResult:
         """Run one full conformance pass over the candidate.
 
@@ -214,6 +215,7 @@ class ConformanceCheck:
             verdict=verdict,
             posed_via_tool=posed_via_tool,
             selected_move=selected_move,
+            pose_tool_available=pose_tool_available,
         )
         if matrix_violations:
             for mv in matrix_violations:

@@ -82,14 +82,34 @@ def run_state_coherence_check(
             )
 
         # 2. Verdict / open_question consistency.
+        #
+        # A grader verdict is produced against the OPEN question that
+        # was in flight at the start of this turn. ``TutorEngine.respond``
+        # then clears ``open_question`` immediately after a CORRECT
+        # verdict (so the next pose isn't refused by the in-session
+        # stickiness guard). That means by the time conformance runs,
+        # ``open_question`` is None even though the verdict is valid
+        # — this is the post-correct state, not a coherence breach.
+        #
+        # We only flag the pathological case: a NON-correct verdict
+        # with no open_question (the engine should never grade a
+        # student turn when there's nothing being graded against). For
+        # CORRECT verdicts, the cleared state IS the contract.
+        # (Principle #4 Mastery Learning Ch.13 — a satisfied question
+        # is no longer the knowledge frontier.)
         has_verdict = verdict is not None
         has_open = runtime_state.open_question is not None
+        verdict_kind = verdict.verdict if verdict is not None else None
+        verdict_is_correct = verdict_kind == Verdict.CORRECT
 
-        if has_verdict and not has_open:
-            # We graded something but state has no open question — bug.
+        if has_verdict and not has_open and not verdict_is_correct:
+            # Verdict on a non-correct path implies the engine should
+            # still be sitting on the open question (attempts counter
+            # not reset, stickiness still in play). If open_question is
+            # gone, that's the bug we want to catch.
             return _fail(
                 "state_coherence",
-                "verdict produced without open_question in runtime_state",
+                "non-correct verdict produced without open_question in runtime_state",
                 span,
             )
 

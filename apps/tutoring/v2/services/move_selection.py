@@ -90,13 +90,31 @@ def detect_help_request(
     return intent_to_move(intent)
 
 
-# Per analysis §4, objective evidence is sufficient when the student
-# has demonstrated mastery on this objective. Conservative default:
+# Objective-evidence threshold — when to fire ``close_topic`` from the
+# router based on correctness signal alone.
+#
+# Design role (CLAUDE.md guidance — "deterministic gates as safety
+# floors, not flow controllers"): this is the "definitely-enough"
+# floor. The ``close_topic`` move prompt carries the real pedagogical
+# judgement about when to wrap an objective. The router only fires
+# close_topic from here when the evidence is unambiguous mastery
+# (Principle #4 Mastery Learning Ch.13 — hold the same bar; vary the
+# path).
+#
+# Tightened 2026-05-27 — the prior 2 correct / ≥50% ratio threshold
+# closed objectives after a single passing answer on items the bank
+# treated as separate (MATHS-S1 2026-05-27 T1440 — close after one
+# practice item) and let majority-wrong sessions close (GEO-S5
+# 2026-05-27 T1479 — close on a help-request when the verdictless
+# safety valve fired). The new threshold requires:
 #   - ≥ 2 correct verdicts on this objective AND
-#   - correct/(attempts) ratio ≥ 50%
-# Sub-decision per §7 item 3 — tune from pilot data.
+#   - ≥ 3 total attempts (so 2 correct is at least 2-of-3, not 2-of-2)
+#     OR ratio ≥ 0.66 when attempts < 3 (a clean 2/2 still counts).
+# Pivot / close_topic from the LLM-generated move prompts are
+# expected to fire first in normal sessions; this is the upper bound.
 _OBJECTIVE_MIN_CORRECT = 2
-_OBJECTIVE_MIN_RATIO = 0.5
+_OBJECTIVE_MIN_RATIO = 0.66
+_OBJECTIVE_MIN_ATTEMPTS_FOR_CLOSE = 2
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -326,13 +344,21 @@ def select_move(
 def _objective_evidence_sufficient(
     progress: Optional[ObjectiveProgress],
 ) -> bool:
-    """Decide whether the current objective has enough evidence to close."""
+    """Decide whether the current objective has enough evidence to close.
+
+    This is the safety-floor close trigger, not the primary one. The
+    LLM-generated ``close_topic`` move prompt is expected to surface
+    organic closes before this fires; this catches the case where the
+    LLM has been ambivalent for several correct attempts in a row.
+    (Principle #4 Mastery Learning Ch.13 — close on demonstrated
+    mastery; never lower the bar to raise the close rate.)
+    """
     if progress is None:
         return False
     if progress.closed:
         # Already closed — don't double-fire close_topic.
         return False
-    if progress.attempts <= 0:
+    if progress.attempts < _OBJECTIVE_MIN_ATTEMPTS_FOR_CLOSE:
         return False
     if progress.correct < _OBJECTIVE_MIN_CORRECT:
         return False

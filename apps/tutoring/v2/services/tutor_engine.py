@@ -161,6 +161,9 @@ class TutorEngine:
             )
             response_text = tutor_resp.text
             pending_pose = tutor_resp.pending_pose
+            v2_trace["grounding"] = dict(
+                getattr(tutor_resp, "grounding", {}) or {}
+            )
         except Exception as exc:
             logger.warning(
                 "[TutorEngine] start_session tutor.respond raised %s",
@@ -353,6 +356,11 @@ class TutorEngine:
         )
         attempt_text = first_resp.text
         committed_pose = first_resp.pending_pose
+        # Grounding headers the LLM emitted (or didn't) — preserved
+        # for v2_trace.grounding so the observability dashboard can
+        # surface turns where the LLM's stated grounding contradicts
+        # the visible response.
+        grounding = dict(getattr(first_resp, "grounding", {}) or {})
 
         # 3b. Post-render question extraction (Phase 4, Fix 2c).
         # Subject-agnostic Haiku call counts the distinct action prompts
@@ -386,6 +394,9 @@ class TutorEngine:
             attempt_text=attempt_text, catalog=media_catalog,
         )
         lesson_has_media = bool(media_catalog)
+        pose_tool_available = self._pose_tool_available(
+            context=context, runtime_state=runtime_state,
+        )
         conf_result = self.conformance.run(
             candidate_response=attempt_text,
             verdict=verdict,
@@ -406,6 +417,7 @@ class TutorEngine:
             posed_via_tool=(first_resp.pending_pose is not None),
             lesson_has_media=lesson_has_media,
             pending_pose=first_resp.pending_pose,
+            pose_tool_available=pose_tool_available,
         )
         # Phase 4 Fix 2c — fold extractor violations into the
         # conformance result so the existing retry path handles them
@@ -459,6 +471,7 @@ class TutorEngine:
                 posed_via_tool=(retry_resp.pending_pose is not None),
                 lesson_has_media=lesson_has_media,
                 pending_pose=retry_resp.pending_pose,
+                pose_tool_available=pose_tool_available,
             )
             retry_conf.retry_used = True
             if retry_extractor_violations:
@@ -473,6 +486,9 @@ class TutorEngine:
                 # Retry's PendingPose replaces the first attempt's —
                 # Phase A ran from scratch on retry.
                 committed_pose = retry_resp.pending_pose
+                grounding = dict(
+                    getattr(retry_resp, "grounding", {}) or {}
+                )
             else:
                 # Phase 4 Fix 3 — move ESCALATION rather than a
                 # verdict-keyed prose blob. The move-escalation ladder
@@ -492,21 +508,25 @@ class TutorEngine:
                     and escalated_move != selected_move
                     and escalated_move in ALLOWED_MOVES
                 ):
-                    esc_text, esc_pose, esc_conf, esc_extraction = (
-                        self._run_escalation_attempt(
-                            context=context,
-                            verdict=verdict,
-                            escalated_move=escalated_move,
-                            media_catalog=media_catalog,
-                            student_input=student_input,
-                            prior_student_turn=prior_student_turn,
-                            bank_stems=bank_stems,
-                            recent_student_turns=recent_student_turns,
-                            attached_media_count=attached_media_count,
-                            figure_facts=figure_facts,
-                            lesson_has_media=lesson_has_media,
-                            runtime_state=runtime_state,
-                        )
+                    (
+                        esc_text,
+                        esc_pose,
+                        esc_conf,
+                        esc_extraction,
+                        esc_grounding,
+                    ) = self._run_escalation_attempt(
+                        context=context,
+                        verdict=verdict,
+                        escalated_move=escalated_move,
+                        media_catalog=media_catalog,
+                        student_input=student_input,
+                        prior_student_turn=prior_student_turn,
+                        bank_stems=bank_stems,
+                        recent_student_turns=recent_student_turns,
+                        attached_media_count=attached_media_count,
+                        figure_facts=figure_facts,
+                        lesson_has_media=lesson_has_media,
+                        runtime_state=runtime_state,
                     )
                     if esc_conf.passed:
                         attempt_text = esc_text
@@ -518,6 +538,7 @@ class TutorEngine:
                         selected_move = escalated_move
                         committed_pose = esc_pose
                         retry_extraction = esc_extraction
+                        grounding = esc_grounding
                     else:
                         # Escalation also failed — fall through to the
                         # safe terminal template, but keyed to the
@@ -645,6 +666,12 @@ class TutorEngine:
             "doing_rate_5turn": _doing_rate_observability(
                 runtime_state.student_doing_rate_window or []
             ),
+            # GRADER / EVIDENCE grounding lines the LLM emitted (or
+            # didn't) for the final-attempt response. ``missing`` is a
+            # list of header names absent from the response — non-empty
+            # values let the observability dashboard surface turns where
+            # the prompt's grounding directive wasn't followed.
+            "grounding": grounding,
         }
 
         return TurnResult(
@@ -1108,13 +1135,22 @@ class TutorEngine:
             posed_via_tool=(esc_resp.pending_pose is not None),
             lesson_has_media=lesson_has_media,
             pending_pose=esc_resp.pending_pose,
+            pose_tool_available=self._pose_tool_available(
+                context=context, runtime_state=runtime_state,
+            ),
         )
         if esc_extractor_violations:
             esc_conf.violations = list(esc_conf.violations) + list(
                 esc_extractor_violations
             )
             esc_conf.passed = False
-        return esc_text, esc_resp.pending_pose, esc_conf, esc_extraction
+        return (
+            esc_text,
+            esc_resp.pending_pose,
+            esc_conf,
+            esc_extraction,
+            dict(getattr(esc_resp, "grounding", {}) or {}),
+        )
 
     def _extractor_violations(
         self,
@@ -1179,6 +1215,42 @@ class TutorEngine:
                     break
         return out
 
+    def _pose_tool_available(
+        self,
+        *,
+        context: TutoringContext,
+        runtime_state: SessionRuntimeState,
+    ) -> bool:
+        """True when the lesson has at least one un-posed bank slot.
+
+        Mirrors the filter ``build_anthropic_pose_question_tool``
+        applies. When this is False the LLM had no tool surface to
+        call — the conformance ``all__no_assessment_in_prose`` rule
+        should not penalise a prose practice prompt because there was
+        no tool path available. Fail-soft: returns True on DB error
+        so the existing tighter contract holds.
+        (Principle #11 Testing Effect / Retrieval Practice Ch.20 — the
+        retrieval loop only consolidates when the question lands with
+        a verdict; if the only path to a verdict is unavailable, do
+        not penalise the LLM for trying prose.)
+        """
+        try:
+            from apps.curriculum.models import LessonStep
+            posed_ids = {
+                e.id for e in runtime_state.posed_question_ledger
+                if e.source.value == "lesson_step"
+            }
+            return (
+                LessonStep.objects
+                .filter(lesson_id=context.lesson_id)
+                .exclude(id__in=posed_ids)
+                .exclude(question__isnull=True)
+                .exclude(question__exact="")
+                .exists()
+            )
+        except Exception:
+            return True
+
     def _bank_stems_for_context(self, context: TutoringContext) -> list[str]:
         """Fetch bank stems for the lesson — used by rule_check's allowed set.
 
@@ -1223,12 +1295,19 @@ class TutorEngine:
         templates module.
         """
         open_q = runtime_state.open_question
+        obj_key = (context.current_objective or "_").strip() or "_"
+        obj_progress = runtime_state.objective_progress.get(obj_key)
         return MoveAnchor(
             selected_move=selected_move,
             open_question_stem=(open_q.rendered_stem if open_q else ""),
             objective=context.current_objective or "",
             teacher_script=context.current_step_teacher_script or "",
             worked_example=context.current_step_worked_example or "",
+            turns_in_session=(
+                runtime_state.safety_valve_counters.turns_in_session
+            ),
+            objective_correct=(obj_progress.correct if obj_progress else 0),
+            objective_attempts=(obj_progress.attempts if obj_progress else 0),
         )
 
     def _render_next_action_for_template(

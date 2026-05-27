@@ -306,6 +306,10 @@ def build_anthropic_pose_question_tool(
     has nothing to reject during Phase A.
     """
     from apps.curriculum.models import LessonStep
+    from apps.tutoring.tracing import emit_span
+    from apps.tutoring.v2.utilities.question_validity import (
+        is_posable_question,
+    )
 
     posed_step_ids = posed_step_ids or set()
     steps = (
@@ -319,9 +323,33 @@ def build_anthropic_pose_question_tool(
 
     slot_map: dict[int, Any] = {}
     menu_lines: list[str] = []
-    for slot_idx, step in enumerate(steps):
+    slot_idx = 0
+    filtered_count = 0
+    for step in steps:
         stem = (step.question or "").strip()
         if not stem:
+            continue
+        # Boundary filter — the tutor must NEVER see questions that
+        # cannot be answered as authored. ``is_posable_question`` runs
+        # once here; rejected steps never enter the LLM's tool surface,
+        # so no downstream patching is needed.
+        # (Principle #1 Active Learning Ch.10 — the student must be
+        # able to act on the question this turn; Principle #11 Testing
+        # Effect Ch.20 — retrieval only consolidates when the question
+        # is answerable.)
+        posability = is_posable_question(step)
+        if not posability.passes:
+            filtered_count += 1
+            with emit_span("audit", "bank.filtered") as span:
+                if span is not None:
+                    span["payload"] = {
+                        "step_id": step.id,
+                        "lesson_id": lesson_id,
+                        "answer_type": (
+                            getattr(step, "answer_type", "") or ""
+                        ).strip().lower(),
+                        "reason": posability.reason,
+                    }
             continue
         slot_map[slot_idx] = step
         # Phase 4 Fix 4a — surface the answer_type hint in the menu so
@@ -335,6 +363,17 @@ def build_anthropic_pose_question_tool(
         menu_lines.append(
             f"  {slot_idx}{type_tag}: {stem[:max_stem_chars]}"
         )
+        slot_idx += 1
+
+    if filtered_count:
+        # Aggregate count per build for the v2 observability dashboard.
+        with emit_span("audit", "bank.filtered_summary") as span:
+            if span is not None:
+                span["payload"] = {
+                    "lesson_id": lesson_id,
+                    "filtered_count": filtered_count,
+                    "posable_count": len(slot_map),
+                }
 
     if not slot_map:
         return None, {}

@@ -172,6 +172,7 @@ def apply_verdict_matrix(
     verdict: Optional[GradingResult],
     posed_via_tool: bool = False,
     selected_move: str = "",
+    pose_tool_available: bool = True,
 ) -> List[MatrixViolation]:
     """Run the verdict-keyed rules and return all violations.
 
@@ -187,19 +188,25 @@ def apply_verdict_matrix(
     the classifier reads only the visible characters and cannot
     distinguish a tool-rendered stem from a prose-authored one.
 
-    ``selected_move`` — when this is a teaching move (``explain`` or
-    ``worked_example``), the ``all__no_assessment_in_prose`` rule is
-    also skipped. Those moves end with a practice prompt by design
-    (Direct Instruction → practice cycle); if no eligible bank slot
-    exists for the current subskill the LLM cannot author a tool
-    call, and rejecting a prose practice question on a teaching
-    response means the student gets a verdict-keyed safe template
-    with no teaching content instead. The other safety floors —
-    answer-leak, figure-ref, rule_check, praise filter — still run.
+    ``pose_tool_available`` — when False, no posable bank slots remain
+    for the lesson and the LLM had no tool surface to call. Skip the
+    no-prose rule in that case: rejecting the prose practice prompt
+    would strand the student with a safe-template apology when the
+    curriculum genuinely doesn't have a tool slot to offer. When True,
+    the LLM had the tool and chose prose — that IS the failure mode
+    (GEO-S5 2026-05-27 T1463 broke the verdict loop by posing the
+    cycle-ordering question in prose despite a tool slot being
+    available).
+
+    The narrower skip — gated on tool-availability rather than move
+    name — keeps the active-end / verdict-loop contract intact whenever
+    the LLM could have honoured it.
+    (Principle #11 Testing Effect / Retrieval Practice Ch.20 —
+    retrieval needs feedback to consolidate; a prose-posed verifiable
+    Q lands without a verdict and breaks the loop.)
     """
-    teaching_moves = {"explain", "worked_example"}
     rules: List[_Rule] = []
-    if not posed_via_tool and selected_move not in teaching_moves:
+    if not posed_via_tool and pose_tool_available:
         rules.extend(_ruleset_all_verdicts())
 
     if verdict is None:

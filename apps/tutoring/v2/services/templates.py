@@ -114,10 +114,21 @@ _OBJECTIVE_ACTION_FLOORS = (
 class MoveAnchor:
     """Pedagogy anchor passed from TutorEngine to render_safe_template.
 
-    Subject-agnostic: every field defaults empty. When a field is
+    Subject-agnostic: every field defaults empty / zero. When a field is
     populated, the per-move template uses it; when empty, the template
     falls back to a generic "restate the open question" shape that
     still ends with a concrete action for the student.
+
+    ``turns_in_session`` and ``objective_correct`` / ``objective_attempts``
+    let safety-floor templates distinguish the OPENING turn of a session
+    (where re-stating the lesson framing is appropriate) from a
+    mid-session fallback (where the student has already heard the
+    opener and needs a smaller scaffold). They also let
+    ``close_topic`` modulate praise — a force-close on a stuck session
+    with zero correct evidence must not read as "nice work".
+    (Principle #1 Active Learning Ch.10 — feedback must be informative,
+    not stock; Principle #4 Mastery Learning Ch.13 — the close signal
+    has to be honest about whether mastery was demonstrated.)
     """
 
     selected_move: str = ""
@@ -125,6 +136,9 @@ class MoveAnchor:
     objective: str = ""
     teacher_script: str = ""
     worked_example: str = ""
+    turns_in_session: int = 0
+    objective_correct: int = 0
+    objective_attempts: int = 0
 
 
 def _pick(pool: tuple[str, ...]) -> str:
@@ -263,13 +277,18 @@ def _render_worked_example_terminal(anchor: MoveAnchor) -> str:
          wrapper.
       2. ``LessonStep.teacher_script`` (the lesson-authored direct-
          instruction text) — used as the body when no worked-example
-         JSON exists. Better than dropping the worked-example
-         obligation when authored content is partially missing.
+         JSON exists AND we're on the OPENING turn. After turn 1 the
+         student has already heard the framing; replaying it verbatim
+         reads as the engine giving up and restarting (GEO-S5
+         2026-05-27 T1457/T1467 P1). On mid-session fallbacks we skip
+         to step (3) instead.
       3. Restate the open question (or objective) and ask the student
          to attempt the very first step — models the *method shape*
          (one step at a time) when no authored content is available.
 
     Never silently drops the worked-example obligation.
+    (Principle #5 Minimise Cognitive Load Ch.14 — worked example before
+    practice; labelled subgoals are the load-reducer.)
     """
     we = (anchor.worked_example or "").strip()
     if we:
@@ -286,12 +305,14 @@ def _render_worked_example_terminal(anchor: MoveAnchor) -> str:
             body += " — what's the first step you'd take?"
         return body
 
-    # No authored worked-example JSON, but the lesson's teacher_script
-    # may carry the same content in narrative form. Use it as the
-    # worked-example body. This is generic across subjects — every
-    # ``LessonStep`` has the field; the LLM uses whatever's there.
+    # No authored worked-example JSON. Use the lesson's teacher_script
+    # ONLY when this is still the opening turn — re-dumping the engage
+    # paragraph on a confused mid-session student is the failure mode
+    # GEO-S5 2026-05-27 surfaced. (Principle #5 Cognitive Load —
+    # re-loading the framing the student already heard is pure load
+    # with no new affordance.)
     ts = (anchor.teacher_script or "").strip()
-    if ts:
+    if ts and anchor.turns_in_session <= 1:
         body = (
             "Let me walk you through the idea one step at a time:\n\n"
             f"{ts}\n\nNow you try it"
@@ -325,11 +346,16 @@ def _render_explain_terminal(anchor: MoveAnchor) -> str:
     """Explain move floor.
 
     Uses ``LessonStep.teacher_script`` when available (lesson-authored
-    direct-instruction text). Otherwise restates the objective + open
-    question and asks for one concrete reaction.
+    direct-instruction text) AND we're still on the opening turn. After
+    turn 1 the framing has already been heard; we narrow to the open
+    question instead of re-emitting the engage paragraph (GEO-S5
+    2026-05-27 T1473 P1).
+    (Principle #2 Direct Instruction Ch.11 — teach the method
+    explicitly; Principle #5 Cognitive Load Ch.14 — don't re-load
+    framing the student already has.)
     """
     ts = _trim_to_sentences(anchor.teacher_script, max_sentences=4)
-    if ts:
+    if ts and anchor.turns_in_session <= 1:
         body = ts
         oq = (anchor.open_question_stem or "").strip()
         if oq:
@@ -355,16 +381,32 @@ def _render_explain_terminal(anchor: MoveAnchor) -> str:
 
 
 def _render_close_terminal(anchor: MoveAnchor) -> str:
-    """Close-topic move floor.
+    """Close-topic move floor — modulated by objective evidence.
 
-    Names what's done and explicitly signals the exit-ticket
-    transition. The frontend listens for the "exit ticket" / "set it
-    up" cue, and the v2 routing close_topic envelope also surfaces
-    the exit-ticket payload now (apps/tutoring/v2/routing.py).
+    Two shapes:
+      * **Earned close** — the student has at least one correct
+        attempt on the current objective. Praise the work and signal
+        the exit-ticket transition (Principle #1 Active Learning Ch.10
+        — informative feedback consolidates the right pattern).
+      * **Forced close** — no correct attempts on the objective
+        (safety-valve fired because the session was stuck). Praising
+        here is dishonest and was the GEO-S5 2026-05-27 T1479 P1.
+        Acknowledge effort without claiming mastery; hand off to the
+        next step / exit ticket without the "nice work" line.
+        (Principle #4 Mastery Learning Ch.13 — the close signal must
+        be honest about whether the bar was met.)
+
+    The frontend listens for the "exit ticket" / "set it up" cue, so
+    both branches preserve that signal.
     """
+    if anchor.objective_correct >= 1:
+        return (
+            "Nice work on this one. You're ready for the exit ticket — "
+            "I'll set it up."
+        )
     return (
-        "Nice work on this one. You're ready for the exit ticket — "
-        "I'll set it up."
+        "We've spent a good stretch on this one — let's pause here and "
+        "see what the exit ticket asks. I'll set it up."
     )
 
 
