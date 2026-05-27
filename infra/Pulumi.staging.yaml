@@ -2,16 +2,18 @@ config:
   azure-native:location: centralus
   azure-native:subscriptionId: 656f4091-746b-44ef-8add-6d94eb4a7612
   # ── Sizing knobs (override prod defaults for cheaper staging) ─────────
-  # Consumption profile = serverless, scales to 0 when idle. Cold start
-  # ~30-60s when a tester hits a cold replica (sentence-transformers
-  # + vectordb warm-up). Acceptable for staging. Flip min-replicas to
-  # "1" if cold starts annoy testers. Azure doesn't offer a D2 dedicated
-  # profile — only D4/D8/D16/D32 — so Consumption is the cheapest
-  # smaller-than-prod option.
+  # Consumption profile = serverless. min-replicas: 1 keeps one
+  # container always warm so testers don't hit the 10-15s cold start
+  # mid-flow (sentence-transformers + vectordb warm-up). The visible
+  # symptom was exit-ticket submits feeling broken — 1.5s of actual
+  # work hidden under 10s of cold-start spin-up. Cost trade-off: ~$3-5/
+  # month for the always-on container vs UX-debugging time it saves.
+  # Azure doesn't offer a D2 dedicated profile — only D4/D8/D16/D32 —
+  # so Consumption is the cheapest smaller-than-prod option.
   aitutor:workload-profile-type: Consumption
   aitutor:container-cpu: "2.0"
   aitutor:container-memory: 4Gi
-  aitutor:min-replicas: "0"
+  aitutor:min-replicas: "1"
   aitutor:max-replicas: "1"
   aitutor:file-share-quota-gb: "20"
   aitutor:postgres-sku: Standard_B1ms
