@@ -1647,6 +1647,37 @@ def chat_exit_ticket(request, session_id):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     try:
+        # Engine dispatch: when simple_tutor is on, use the lightweight
+        # exit_ticket.submit_exit_ticket — bypasses ConversationalTutor's
+        # ~2-3s cold init + the gamification cascade. For all-MCQ
+        # tickets it runs sub-second instead of the legacy 5-8s.
+        from apps.tutoring import simple_tutor as _simple_tutor
+        if _simple_tutor.is_enabled():
+            from apps.tutoring.simple_tutor.exit_ticket import (
+                submit_exit_ticket as _simple_submit,
+            )
+            simple_resp = _simple_submit(session, answers)
+
+            from apps.tutoring.competency import attempt_response_block
+            from apps.tutoring.models import ExitTicket, StudentLessonProgress
+            exit_ticket = ExitTicket.objects.filter(lesson=session.lesson).first()
+            progress = StudentLessonProgress.objects.filter(
+                student=request.user, lesson=session.lesson,
+            ).first()
+            et_data = simple_resp.get('exit_ticket') or {}
+            results = et_data.get('results', [])
+            score = et_data.get('score', 0)
+            competency = attempt_response_block(score, results, exit_ticket, progress)
+            enriched_exit_ticket = dict(et_data)
+            enriched_exit_ticket['competency'] = competency
+
+            return JsonResponse({
+                'message': simple_resp.get('message', ''),
+                'phase': simple_resp.get('phase', 'exit_ticket'),
+                'exit_ticket': enriched_exit_ticket,
+                'is_complete': simple_resp.get('is_complete', False),
+            })
+
         tutor = ConversationalTutor(session)
         response = tutor.submit_exit_ticket(answers)
 
