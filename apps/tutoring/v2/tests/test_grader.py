@@ -35,7 +35,6 @@ from apps.tutoring.v2.services.student_grader import (
     _match_mcq_letter,
     _match_short_numeric,
     _match_true_false,
-    _parse_grounded_response,
     _parse_student_math_value,
     _safe_json_loads,
 )
@@ -138,17 +137,14 @@ def test_math_path_wrong_with_dsl_match():
 
 
 def test_math_path_falls_through_to_grounded_on_dsl_extract_failure():
-    """Phase 4 — when math DSL extraction fails (prose proofs,
-    explain-and-justify questions), the grader falls through to the
-    grounded / verifier path rather than returning UNVERIFIED outright.
-    With no grounded client supplied, the fallthrough still resolves
-    to UNVERIFIED, matching the pre-Phase-4 contract for callers that
-    have not configured a grounded adjudicator.
-    """
+    """When math DSL extraction fails (prose proofs, explain-and-justify
+    questions), the grader falls through to the non-math path. Without a
+    non-math student-response or judge client supplied, the fallthrough
+    resolves to UNVERIFIED (grader_extraction_failed)."""
     grader = StudentGrader(
         math_client_factory=lambda: _FakeClient("not json"),
         grounded_client_factory=lambda: None,
-        verifier_client_factory=lambda: None,
+        student_response_client_factory=lambda: None,
     )
     request = GradingRequest(
         open_question=_open_q("12 + 13 = ?"),
@@ -160,10 +156,8 @@ def test_math_path_falls_through_to_grounded_on_dsl_extract_failure():
 
 
 def test_math_path_falls_through_to_grounded_on_validation_failure():
-    """Phase 4 — DSL extracted but failed validation. Falls through
-    to grounded / verifier. Without those clients available, lands at
-    UNVERIFIED.
-    """
+    """DSL extracted but failed validation. Falls through to the non-math
+    path. Without LLM-B/LLM-C clients available, lands at UNVERIFIED."""
     dsl = (
         '{"variables": {"a": 99, "b": 13}, '
         '"expression": {"op": "add", "args": [{"var": "a"}, {"var": "b"}]}}'
@@ -171,7 +165,7 @@ def test_math_path_falls_through_to_grounded_on_validation_failure():
     grader = StudentGrader(
         math_client_factory=lambda: _FakeClient(dsl),
         grounded_client_factory=lambda: None,
-        verifier_client_factory=lambda: None,
+        student_response_client_factory=lambda: None,
     )
     request = GradingRequest(
         open_question=_open_q("12 + 13 = ?"),
@@ -182,55 +176,36 @@ def test_math_path_falls_through_to_grounded_on_validation_failure():
     assert result.verdict == Verdict.UNVERIFIED
 
 
-def test_math_path_falls_through_and_verifier_can_upgrade_to_correct():
-    """Phase 4 — the unverified-trap fix on a math lesson.
+# ──────────────────────────────────────────────────────────────────────
+# Non-math two-LLM path (LLM-B student parser + LLM-C judge)
+# ──────────────────────────────────────────────────────────────────────
 
-    The math DSL extraction fails (prose proof), the grader falls
-    through to the grounded path, grounded returns low-confidence,
-    and the verifier confirms the student's answer matches the
-    canonical. Final verdict: CORRECT. This is the run-6 MATHS T6+
-    failure mode the redesign targets.
-    """
-    grounded_payload = (
-        '{"verdict": "unverified", "confidence": 0.3, '
-        '"private_canonical": "Yes; 169 = 169 so the triangle is right-angled", '
-        '"what_right": "", "first_misconception": ""}'
-    )
-    verifier_payload = (
-        '{"confirmed": "yes", "why": "asserts right-angled via 169=169"}'
+
+def _student_attempt_payload(stated_answer: str) -> str:
+    """Canned LLM-B (non-math) payload with is_attempt=True."""
+    import json as _json
+    return _json.dumps({
+        "is_attempt": True, "hedge_marker": False, "claims": [],
+        "conclusion": {
+            "stated_answer": stated_answer, "answer_label": "",
+            "denies_canonical": False,
+        },
+    })
+
+
+def test_non_math_two_llm_correct():
+    """Happy path: LLM-B says is_attempt=True; LLM-C says CORRECT."""
+    judge = (
+        '{"verdict": "correct", "private_canonical": "180", '
+        '"what_right": "angles sum to 180", '
+        '"citation": "[KB-1] sum is 180", "reason_code": ""}'
     )
     grader = StudentGrader(
-        math_client_factory=lambda: _FakeClient("not json"),
-        grounded_client_factory=lambda: _FakeClient(grounded_payload),
-        verifier_client_factory=lambda: _FakeClient(verifier_payload),
-    )
-    request = GradingRequest(
-        open_question=_open_q(
-            "A triangle has sides 5cm, 12cm, 13cm. "
-            "Use Pythagoras' theorem to prove whether it is right-angled."
+        student_response_client_factory=lambda: _FakeClient(
+            _student_attempt_payload("180"),
         ),
-        student_input=(
-            "c=13, a=5, b=12. a²+b² = 25+144 = 169 = 13² = c². "
-            "So the triangle is right-angled."
-        ),
-        is_math=True,
+        grounded_client_factory=lambda: _FakeClient(judge),
     )
-    result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.CORRECT
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Non-math grounded path — confidence threshold
-# ──────────────────────────────────────────────────────────────────────
-
-
-def test_grounded_high_confidence_correct():
-    payload = (
-        '{"verdict": "correct", "confidence": 0.92, '
-        '"private_canonical": "180", "what_right": "angles sum to 180", '
-        '"citation": "[KB-1] sum is 180"}'
-    )
-    grader = StudentGrader(grounded_client_factory=lambda: _FakeClient(payload))
     request = GradingRequest(
         open_question=_open_q("What's the sum of triangle angles?"),
         student_input="180",
@@ -241,177 +216,66 @@ def test_grounded_high_confidence_correct():
     assert result.citation.startswith("[KB-1]")
 
 
-def test_grounded_low_confidence_falls_back_to_unverified_when_verifier_unavailable():
-    """Fail-soft: when no GRADER_VERIFIER client is available, a low-
-    confidence grounded verdict downgrades to UNVERIFIED exactly as
-    before Phase 4. The verifier upgrade path requires an explicit
-    verifier client.
-    """
-    payload = (
-        '{"verdict": "correct", "confidence": 0.3, '
-        '"private_canonical": "180", "what_right": ""}'
+def test_non_math_meta_input_returns_unverified_meta_input_code():
+    """LLM-B with is_attempt=false → UNVERIFIED reason_code='meta_input'.
+    LLM-C is NOT called."""
+    student_payload = (
+        '{"is_attempt": false, "hedge_marker": false, "claims": [], '
+        '"conclusion": {"stated_answer": "", "answer_label": "", '
+        '"denies_canonical": false}}'
     )
+
+    def _exploding_judge():
+        raise AssertionError("LLM-C must not be called on meta input")
+
     grader = StudentGrader(
-        grounded_client_factory=lambda: _FakeClient(payload),
-        verifier_client_factory=lambda: None,
+        student_response_client_factory=lambda: _FakeClient(student_payload),
+        grounded_client_factory=_exploding_judge,
     )
     request = GradingRequest(
-        open_question=_open_q("Trick question with low grounding"),
-        student_input="180",
+        open_question=_open_q("What is condensation?"),
+        student_input="i dont understand. what is condensation",
         is_math=False,
     )
     result = grader.grade_student_response(_context(), request)
     assert result.verdict == Verdict.UNVERIFIED
+    assert result.reason_code == "meta_input"
 
 
-def test_grounded_low_confidence_verifier_yes_upgrades_to_correct():
-    """Phase 4 verifier: when grounded was low-confidence but verifier
-    confirms the student's answer matches the canonical, the final
-    verdict is CORRECT — breaking the unverified-trap.
-    """
-    grounded_payload = (
-        '{"verdict": "correct", "confidence": 0.3, '
-        '"private_canonical": "180", "what_right": "names the sum"}'
-    )
-    verifier_payload = (
-        '{"confirmed": "yes", "why": "asserts 180 same as canonical"}'
-    )
+def test_non_math_extraction_failure_returns_grader_extraction_failed():
+    """No LLM-B client → student-response extraction fails → UNVERIFIED
+    with reason_code='grader_extraction_failed'."""
     grader = StudentGrader(
-        grounded_client_factory=lambda: _FakeClient(grounded_payload),
-        verifier_client_factory=lambda: _FakeClient(verifier_payload),
+        student_response_client_factory=lambda: None,
+        grounded_client_factory=lambda: None,
     )
     request = GradingRequest(
-        open_question=_open_q("What's the sum of triangle angles?"),
-        student_input="the angles in any triangle sum to 180 degrees",
-        is_math=False,
-    )
-    result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.CORRECT
-    assert "verifier=yes" in (result.reasoning or "")
-
-
-def test_grounded_low_confidence_verifier_no_flips_to_wrong():
-    """Phase 4 verifier: a verifier 'no' overrides a grounded 'correct'
-    when grounded was low-confidence. The verifier is the tiebreaker.
-    """
-    grounded_payload = (
-        '{"verdict": "correct", "confidence": 0.2, '
-        '"private_canonical": "180", "what_right": ""}'
-    )
-    verifier_payload = (
-        '{"confirmed": "no", "why": "student says 360, canonical says 180"}'
-    )
-    grader = StudentGrader(
-        grounded_client_factory=lambda: _FakeClient(grounded_payload),
-        verifier_client_factory=lambda: _FakeClient(verifier_payload),
-    )
-    request = GradingRequest(
-        open_question=_open_q("What's the sum of triangle angles?"),
-        student_input="360",
-        is_math=False,
-    )
-    result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.WRONG
-
-
-def test_grounded_low_confidence_verifier_cant_tell_keeps_unverified():
-    """Phase 4 verifier: cant_tell on a meta/vague response keeps the
-    final verdict at UNVERIFIED. The verifier is not an answer-creator.
-    """
-    grounded_payload = (
-        '{"verdict": "wrong", "confidence": 0.2, '
-        '"private_canonical": "180", "first_misconception": ""}'
-    )
-    verifier_payload = (
-        '{"confirmed": "cant_tell", "why": "response is meta"}'
-    )
-    grader = StudentGrader(
-        grounded_client_factory=lambda: _FakeClient(grounded_payload),
-        verifier_client_factory=lambda: _FakeClient(verifier_payload),
-    )
-    request = GradingRequest(
-        open_question=_open_q("What's the sum of triangle angles?"),
-        student_input="hmm not sure",
-        is_math=False,
-    )
-    result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
-
-
-def test_grounded_high_confidence_skips_verifier():
-    """Phase 4 verifier is NOT called when grounded was high-confidence —
-    the verifier is a tiebreaker, not a re-grader. Confirms by passing
-    a verifier factory that would fail loudly if called.
-    """
-    grounded_payload = (
-        '{"verdict": "correct", "confidence": 0.92, '
-        '"private_canonical": "180", "citation": "[KB-1] 180 deg"}'
-    )
-
-    def _exploding_factory():
-        raise AssertionError(
-            "verifier must not be called on high-confidence grounded verdicts"
-        )
-
-    grader = StudentGrader(
-        grounded_client_factory=lambda: _FakeClient(grounded_payload),
-        verifier_client_factory=_exploding_factory,
-    )
-    request = GradingRequest(
-        open_question=_open_q("What's the sum of triangle angles?"),
-        student_input="180",
-        is_math=False,
-    )
-    result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.CORRECT
-
-
-def test_grounded_explicit_unverified_passes_through_when_verifier_unavailable():
-    payload = '{"verdict": "unverified", "confidence": 0.4}'
-    grader = StudentGrader(
-        grounded_client_factory=lambda: _FakeClient(payload),
-        verifier_client_factory=lambda: None,
-    )
-    request = GradingRequest(
-        open_question=_open_q("Open question"),
+        open_question=_open_q("What is condensation?"),
         student_input="something",
         is_math=False,
     )
-    assert grader.grade_student_response(_context(), request).verdict == Verdict.UNVERIFIED
+    result = grader.grade_student_response(_context(), request)
+    assert result.verdict == Verdict.UNVERIFIED
+    assert result.reason_code == "grader_extraction_failed"
 
 
-def test_grounded_unverified_but_verifier_yes_upgrades_to_correct():
-    """The unverified-trap fix in practice: grounded returned
-    'unverified, confidence 0.4' because it lacked KB coverage on a
-    rich free-text proof. The verifier inspects only answer-consistency
-    against the canonical and confirms yes — verdict becomes CORRECT.
-    This is the run-6 MATHS T6/T8/T10/T12 failure mode the redesign
-    targets.
-    """
-    grounded_payload = (
-        '{"verdict": "unverified", "confidence": 0.4, '
-        '"private_canonical": "Yes; 25+144=169=13² so right-angled", '
-        '"what_right": "", "first_misconception": ""}'
-    )
-    verifier_payload = (
-        '{"confirmed": "yes", "why": "asserts right-angled with 169=169"}'
-    )
+def test_non_math_judge_failure_returns_grader_extraction_failed():
+    """LLM-B OK but no LLM-C client → judge call fails → UNVERIFIED
+    with reason_code='grader_extraction_failed'."""
     grader = StudentGrader(
-        grounded_client_factory=lambda: _FakeClient(grounded_payload),
-        verifier_client_factory=lambda: _FakeClient(verifier_payload),
+        student_response_client_factory=lambda: _FakeClient(
+            _student_attempt_payload("rain"),
+        ),
+        grounded_client_factory=lambda: None,
     )
     request = GradingRequest(
-        open_question=_open_q(
-            "A triangle has sides 5cm, 12cm, 13cm. Prove right-angled."
-        ),
-        student_input=(
-            "c=13, a=5, b=12. a²+b² = 25+144 = 169 = 13² = c². "
-            "So the triangle is right-angled."
-        ),
+        open_question=_open_q("What is condensation?"),
+        student_input="rain",
         is_math=False,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.CORRECT
+    assert result.verdict == Verdict.UNVERIFIED
+    assert result.reason_code == "grader_extraction_failed"
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -524,12 +388,6 @@ def test_tutor_claim_unknown_status_normalized_to_unverified():
 # ──────────────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────────────
-
-
-def test_parse_grounded_response_handles_missing_fields():
-    g = _parse_grounded_response('{}')
-    assert g.verdict == Verdict.UNVERIFIED
-    assert g.confidence == 0.0
 
 
 def test_parse_student_math_value_bare_numeric():

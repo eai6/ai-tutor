@@ -55,35 +55,29 @@ from apps.tutoring.v2.contracts import (
 )
 from apps.tutoring.v2.services.bare_answer import is_bare_answer
 from apps.tutoring.v2.services.grader_prompts import (
-    ANSWER_CONSISTENCY_VERIFIER_SYSTEM,
     MATH_DSL_SYSTEM,
-    NON_MATH_GROUNDED_SYSTEM,
+    NON_MATH_JUDGE_SYSTEM,
     PRE_POSE_SYSTEM,
+    STUDENT_CLAIMS_SYSTEM,
+    STUDENT_RESPONSE_SYSTEM,
     TUTOR_CLAIM_SYSTEM,
-    render_answer_consistency_user_prompt,
     render_math_dsl_user_prompt,
-    render_non_math_grounded_user_prompt,
+    render_non_math_judge_user_prompt,
     render_pre_pose_user_prompt,
+    render_student_claims_user_prompt,
+    render_student_response_user_prompt,
     render_tutor_claim_user_prompt,
 )
 from apps.tutoring.v2.tools.math_verification import (
+    DSLValidationError,
+    MathTrace,
     MathVerificationTool,
+    _evaluate as _evaluate_dsl_node,
     values_equivalent,
 )
 from apps.tutoring.v2.tools.token_cache import token_cache
 
 logger = logging.getLogger(__name__)
-
-
-# Below this confidence the grounded path consults the answer-consistency
-# verifier (Phase 4) instead of unconditionally downgrading to UNVERIFIED.
-# The verifier is a Haiku-backed yes/no/cant-tell adjudicator that asks
-# only "does the student's response assert the same answer as the
-# canonical?". It generalises across subjects (math proof, geography
-# reasoning, definition) and breaks the unverified-trap loop that prior
-# runs surfaced on rich natural-language proofs.
-# See memory/v2_unverified_trap_redesign.md §Fix 1.
-_GROUNDED_CONFIDENCE_THRESHOLD = 0.5
 
 
 @dataclass
@@ -94,28 +88,88 @@ class _DSLExtraction:
 
 
 @dataclass
-class _GroundedAdjudication:
+class _StudentClaim:
+    """One discrete arithmetic / logical step the student stated."""
+    description: str
+    expression: Any  # DSL node — bare number, {"var":...}, {"op":..., "args":...}
+    asserted_value: Any
+
+
+@dataclass
+class _StudentConclusion:
+    statement: str
+    answer_extracted_value: Any  # scalar | list[scalar] | None
+    answer_extracted_label: str  # "yes"|"no"|"true"|"false"|"A"|... | ""
+    is_attempt: bool
+
+
+@dataclass
+class _StudentClaimsExtraction:
+    """Output of LLM-B (student-claims extractor)."""
+    variables: dict
+    claims: list[_StudentClaim]
+    conclusion: _StudentConclusion
+    domain_check_required: bool
+    raw_text: str
+    error: Optional[str] = None
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None
+
+
+@dataclass
+class _StudentResponseConclusion:
+    """LLM-B (non-math) conclusion sub-object."""
+    stated_answer: str
+    answer_label: str
+    denies_canonical: bool
+
+
+@dataclass
+class _StudentResponseExtraction:
+    """Output of LLM-B for the non-math path (STUDENT_RESPONSE_SYSTEM)."""
+    is_attempt: bool
+    hedge_marker: bool
+    claims: list[dict]  # [{"id": str, "text": str}, ...]
+    conclusion: _StudentResponseConclusion
+    raw_text: str
+    error: Optional[str] = None
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None
+
+    def to_judge_payload(self) -> dict:
+        """Render the structured object passed to LLM-C as input."""
+        return {
+            "is_attempt": self.is_attempt,
+            "hedge_marker": self.hedge_marker,
+            "claims": list(self.claims),
+            "conclusion": {
+                "stated_answer": self.conclusion.stated_answer,
+                "answer_label": self.conclusion.answer_label,
+                "denies_canonical": self.conclusion.denies_canonical,
+            },
+        }
+
+
+@dataclass
+class _NonMathJudgement:
+    """Output of LLM-C for the non-math path (NON_MATH_JUDGE_SYSTEM)."""
     verdict: Verdict
     private_canonical: str
     what_right: str
     what_missing: str
     first_misconception: str
     citation: str
-    confidence: float
-    reasoning: str = ""
+    reason_code: str  # "" | "known_misconception" | "denies_canonical" | "off_topic"
+    raw_text: str
+    error: Optional[str] = None
 
-
-@dataclass
-class _ConsistencyResult:
-    """Output of the Phase 4 answer-consistency verifier.
-
-    ``confirmed`` is one of "yes" | "partial" | "no" | "cant_tell".
-    The grader maps these to final Verdict values when the grounded
-    adjudicator's confidence is below the threshold.
-    """
-    confirmed: str  # "yes" | "partial" | "no" | "cant_tell"
-    why: str
-    available: bool  # False when the verifier client could not be reached
+    @property
+    def ok(self) -> bool:
+        return self.error is None
 
 
 class StudentGrader:
@@ -127,7 +181,8 @@ class StudentGrader:
         math_client_factory=None,
         grounded_client_factory=None,
         claim_client_factory=None,
-        verifier_client_factory=None,
+        student_claims_client_factory=None,
+        student_response_client_factory=None,
         math_verification_tool: Optional[MathVerificationTool] = None,
     ) -> None:
         """Optional injection seams for tests.
@@ -135,11 +190,20 @@ class StudentGrader:
         Each ``*_client_factory`` returns a ``BaseLLMClient``-shaped
         object on demand. When ``None``, the grader resolves the
         ``ModelConfig`` for the appropriate purpose at call time.
+
+        Math two-LLM grader:
+          * ``math_client_factory``           — LLM-A (canonical extractor)
+          * ``student_claims_client_factory`` — LLM-B (student claim graph)
+
+        Non-math two-LLM grader (companion redesign):
+          * ``student_response_client_factory`` — LLM-B (student response parser)
+          * ``grounded_client_factory``         — LLM-C (judge, KB-grounded)
         """
         self._math_client_factory = math_client_factory
         self._grounded_client_factory = grounded_client_factory
         self._claim_client_factory = claim_client_factory
-        self._verifier_client_factory = verifier_client_factory
+        self._student_claims_client_factory = student_claims_client_factory
+        self._student_response_client_factory = student_response_client_factory
         self._math_verification_tool = math_verification_tool or MathVerificationTool()
 
     # ==================================================================
@@ -151,7 +215,31 @@ class StudentGrader:
         context: TutoringContext,
         request: GradingRequest,
     ) -> GradingResult:
-        """Route to math / non-math path based on ``request.is_math``."""
+        """Route to math / non-math path based on ``request.is_math``.
+
+        State-inconsistent guard (run-7 P1-3 root cause): when the
+        ``open_question.rendered_stem`` is empty or whitespace-only,
+        there is no question to ground against. The grader must NOT
+        spend an LLM call trying to extract a canonical from "". Return
+        UNVERIFIED with ``reasoning`` stamped ``state_inconsistent`` so
+        the downstream engine / conformance pipeline can distinguish
+        "grader couldn't decide" (genuine UNVERIFIED) from "grader had
+        nothing to decide against" (state drift — e.g. open_question
+        was never committed because a tool-call leak broke two-phase
+        commit).
+        """
+        stem = (request.open_question.rendered_stem or "").strip()
+        if not stem:
+            return GradingResult(
+                verdict=Verdict.UNVERIFIED,
+                reasoning=(
+                    "state_inconsistent: open_question has no "
+                    "rendered_stem to grade against"
+                ),
+                student_value=(request.student_input or "").strip(),
+                bare_answer=False,
+                reason_code="state_inconsistent",
+            )
         if request.is_math:
             return self._grade_math(context, request)
         return self._grade_non_math(context, request)
@@ -165,7 +253,27 @@ class StudentGrader:
         context: TutoringContext,
         request: GradingRequest,
     ) -> GradingResult:
-        """LLM → DSL → MathVerificationTool → comparator."""
+        """Two-LLM math grader.
+
+        See design/tasks/two-llm-grader-implementation-plan.md.
+
+        Pipeline:
+          1. LLM-A (GRADER_MATH) extracts the canonical DSL from the
+             QUESTION → Python executor produces canonical_value.
+          2. Fast-path: when the student input is unambiguously bare
+             ("25", "x = 25"), use the deterministic regex chain to
+             extract their value and run the existing comparator.
+          3. Otherwise, LLM-B (GRADER_STUDENT_CLAIMS) parses the
+             STUDENT response into {claims[], conclusion{}} and the
+             Python comparator decides arithmetic vs conclusion error.
+
+        ``unverified`` reaches a math attempt only via
+          - empty rendered_stem (state_inconsistent),
+          - LLM-A extraction failure → grounded fall-through,
+          - LLM-A validation failure → grounded fall-through,
+          - LLM-B extraction failure → grounded fall-through,
+          - is_attempt=false on a real response (meta input).
+        """
         with emit_span("audit", "grader.math") as span:
             bare = is_bare_answer(request.student_input)
             problem_text = request.open_question.rendered_stem or ""
@@ -208,96 +316,489 @@ class StudentGrader:
             canonical_value = result.canonical_value
             canonical_str = _format_canonical(canonical_value)
 
-            # 3. Parse the student's value via the existing
-            #    ast-based working analyzer (R9).
-            student_value, student_value_str = _parse_student_math_value(
-                request.student_input
-            )
+            # 3. Fast-path: regex extraction when the input has NO
+            # word-form numerics. The regex chain handles bare answers,
+            # "x = N", "is it N?", "the answer is N", and similar
+            # unambiguous shapes deterministically. Word-form numerics
+            # ("eight", "twenty-five") force the LLM-B path so digit-
+            # form intermediates ("…got 16…") can't be confused with
+            # word-form conclusions ("…is eight").
+            if not _has_word_form_numeric(request.student_input):
+                student_value, student_value_str = _parse_student_math_value(
+                    request.student_input
+                )
+                if student_value is not None:
+                    return self._finalise_math_with_value(
+                        span=span,
+                        canonical_value=canonical_value,
+                        canonical_str=canonical_str,
+                        student_value=student_value,
+                        student_value_str=student_value_str,
+                        bare=bare,
+                        reasoning="math: fast-path numeric value",
+                    )
 
-            # 4. Comparator.
-            if student_value is None:
-                # The math DSL produced a canonical value but we could
-                # not extract a numeric from the student's prose. Fall
-                # through to the grounded / verifier path so a correct
-                # answer expressed in words ("the triangle is right-
-                # angled because 169 = 169") can be confirmed against
-                # the canonical's substance.
+            # 4. LLM-B — parse the student's response into a structured
+            # claim graph. Subject-agnostic; handles word-form numerics,
+            # multi-slot prose, intermediate-vs-final values, meta input.
+            student_extraction = self._extract_student_claims_dsl(
+                problem_text=problem_text,
+                student_response=request.student_input,
+            )
+            if not student_extraction.ok:
+                # LLM-B failed (no client, JSON refused, schema invalid).
+                # Fall through to the grounded / verifier path — the
+                # same fail-soft escape valve we use for LLM-A.
                 if span is not None:
                     span["payload"] = {
                         "verdict": "deferred",
-                        "stage": "student_value_parse",
+                        "stage": "student_claims_extraction",
                         "fallthrough": "grounded",
+                        "error": student_extraction.error or "",
                     }
                 return self._grade_non_math(context, request)
 
-            # 4. Comparator. Multi-slot questions: when the canonical is
-            # a list of {name, value} entries, accept the student's
-            # single value if it matches ANY slot (verdict=PARTIAL,
-            # what_right names the slot). All slots matched →
-            # verdict=CORRECT. No slot matched → verdict=WRONG.
-            is_multi = isinstance(canonical_value, list) and canonical_value and \
-                       all(isinstance(e, dict) and "value" in e for e in canonical_value)
-            if is_multi:
-                matched_slots = [
-                    e for e in canonical_value
-                    if values_equivalent(e.get("value"), student_value)
-                ]
-                if len(matched_slots) == len(canonical_value):
-                    verdict_kind = Verdict.CORRECT
-                elif matched_slots:
-                    verdict_kind = Verdict.PARTIAL
-                else:
-                    verdict_kind = Verdict.WRONG
-                safe = self._build_math_safe_feedback_multi(
-                    verdict_kind=verdict_kind,
-                    canonical_slots=canonical_value,
-                    matched_slots=matched_slots,
-                    student_value=student_value,
-                    bare_answer=bare,
-                )
+            # 5. Meta input — the student didn't attempt an answer.
+            # Distinct from arithmetic UNVERIFIED.
+            if not student_extraction.conclusion.is_attempt:
                 if span is not None:
                     span["payload"] = {
-                        "verdict": verdict_kind.value,
-                        "bare_answer": bare,
-                        "multi_slot": True,
-                        "matched_slot_count": len(matched_slots),
-                        "total_slot_count": len(canonical_value),
+                        "verdict": Verdict.UNVERIFIED.value,
+                        "reason_code": "meta_input",
                     }
                 return GradingResult(
-                    verdict=verdict_kind,
+                    verdict=Verdict.UNVERIFIED,
                     private_canonical=canonical_str,
-                    student_safe_feedback=safe,
-                    student_value=student_value_str,
-                    reasoning="math: executed multi-slot DSL + comparator",
+                    student_value=(request.student_input or "").strip(),
+                    reasoning="math: student response is not an attempt",
+                    reason_code="meta_input",
                     bare_answer=bare,
                 )
 
-            # Single-slot path (original behaviour).
-            equivalent = values_equivalent(canonical_value, student_value)
-            verdict_kind = Verdict.CORRECT if equivalent else Verdict.WRONG
-
-            # 5. Build redacted student-safe feedback.
-            safe = self._build_math_safe_feedback(
-                verdict_kind=verdict_kind,
+            # 6. Comparator — deterministic Python over LLM-B's claims +
+            # the canonical value(s).
+            return self._compare_student_claims_to_canonical(
+                span=span,
                 canonical_value=canonical_value,
+                canonical_str=canonical_str,
+                extraction=student_extraction,
+                bare=bare,
+                student_input=request.student_input,
+            )
+
+    def _finalise_math_with_value(
+        self,
+        *,
+        span,
+        canonical_value: Any,
+        canonical_str: str,
+        student_value: Any,
+        student_value_str: str,
+        bare: bool,
+        reasoning: str,
+    ) -> GradingResult:
+        """Fast-path finaliser: a single scalar student value vs. the
+        canonical. Single- or multi-slot.
+
+        Mirrors the legacy comparator's branching. Only used when the
+        student input is unambiguously bare (regex extraction is
+        equivalent to LLM-B for that shape) so we skip the LLM-B
+        round-trip.
+        """
+        is_multi = isinstance(canonical_value, list) and canonical_value and \
+            all(isinstance(e, dict) and "value" in e for e in canonical_value)
+        if is_multi:
+            matched_slots = [
+                e for e in canonical_value
+                if values_equivalent(e.get("value"), student_value)
+            ]
+            if len(matched_slots) == len(canonical_value):
+                verdict_kind = Verdict.CORRECT
+            elif matched_slots:
+                verdict_kind = Verdict.PARTIAL
+            else:
+                verdict_kind = Verdict.WRONG
+            safe = self._build_math_safe_feedback_multi(
+                verdict_kind=verdict_kind,
+                canonical_slots=canonical_value,
+                matched_slots=matched_slots,
                 student_value=student_value,
                 bare_answer=bare,
             )
-
             if span is not None:
                 span["payload"] = {
                     "verdict": verdict_kind.value,
                     "bare_answer": bare,
+                    "multi_slot": True,
+                    "matched_slot_count": len(matched_slots),
+                    "total_slot_count": len(canonical_value),
+                    "path": "fast",
                 }
-
             return GradingResult(
                 verdict=verdict_kind,
                 private_canonical=canonical_str,
                 student_safe_feedback=safe,
                 student_value=student_value_str,
-                reasoning="math: executed DSL + comparator",
+                reasoning=reasoning,
                 bare_answer=bare,
             )
+
+        # Single-slot.
+        equivalent = values_equivalent(canonical_value, student_value)
+        verdict_kind = Verdict.CORRECT if equivalent else Verdict.WRONG
+        safe = self._build_math_safe_feedback(
+            verdict_kind=verdict_kind,
+            canonical_value=canonical_value,
+            student_value=student_value,
+            bare_answer=bare,
+        )
+        if span is not None:
+            span["payload"] = {
+                "verdict": verdict_kind.value,
+                "bare_answer": bare,
+                "path": "fast",
+            }
+        return GradingResult(
+            verdict=verdict_kind,
+            private_canonical=canonical_str,
+            student_safe_feedback=safe,
+            student_value=student_value_str,
+            reasoning=reasoning,
+            bare_answer=bare,
+        )
+
+    # ------------------------------------------------------------------
+    # LLM-B — student-claims extractor (Two-LLM grader §2.2)
+    # ------------------------------------------------------------------
+
+    def _extract_student_claims_dsl(
+        self,
+        *,
+        problem_text: str,
+        student_response: str,
+    ) -> _StudentClaimsExtraction:
+        """Call ``GRADER_STUDENT_CLAIMS`` to produce LLM-B's claim graph."""
+        client = self._resolve_student_claims_client()
+        if client is None:
+            return _StudentClaimsExtraction(
+                variables={},
+                claims=[],
+                conclusion=_StudentConclusion(
+                    statement="", answer_extracted_value=None,
+                    answer_extracted_label="", is_attempt=False,
+                ),
+                domain_check_required=False,
+                raw_text="",
+                error="no GRADER_STUDENT_CLAIMS client available",
+            )
+        try:
+            response = client.generate(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": render_student_claims_user_prompt(
+                            problem_text=problem_text,
+                            student_response=student_response,
+                        ),
+                    },
+                ],
+                system_prompt=STUDENT_CLAIMS_SYSTEM,
+                max_tokens=1200,
+            )
+            raw_text = response.content or ""
+        except Exception as exc:
+            return _StudentClaimsExtraction(
+                variables={},
+                claims=[],
+                conclusion=_StudentConclusion(
+                    statement="", answer_extracted_value=None,
+                    answer_extracted_label="", is_attempt=False,
+                ),
+                domain_check_required=False,
+                raw_text="",
+                error=f"student-claims extraction raised: {type(exc).__name__}",
+            )
+
+        payload = _safe_json_loads(raw_text)
+        if not isinstance(payload, dict):
+            return _StudentClaimsExtraction(
+                variables={},
+                claims=[],
+                conclusion=_StudentConclusion(
+                    statement="", answer_extracted_value=None,
+                    answer_extracted_label="", is_attempt=False,
+                ),
+                domain_check_required=False,
+                raw_text=raw_text,
+                error="LLM-B did not return a JSON object",
+            )
+
+        variables = payload.get("variables") or {}
+        if not isinstance(variables, dict):
+            variables = {}
+
+        raw_claims = payload.get("claims") or []
+        claims: list[_StudentClaim] = []
+        if isinstance(raw_claims, list):
+            for entry in raw_claims:
+                if not isinstance(entry, dict):
+                    continue
+                claims.append(_StudentClaim(
+                    description=str(entry.get("description", "")).strip(),
+                    expression=entry.get("expression"),
+                    asserted_value=entry.get("asserted_value"),
+                ))
+
+        raw_conclusion = payload.get("conclusion") or {}
+        if not isinstance(raw_conclusion, dict):
+            raw_conclusion = {}
+        conclusion = _StudentConclusion(
+            statement=str(raw_conclusion.get("statement", "")).strip(),
+            answer_extracted_value=raw_conclusion.get(
+                "answer_extracted_value",
+            ),
+            answer_extracted_label=str(
+                raw_conclusion.get("answer_extracted_label", "") or ""
+            ).strip(),
+            is_attempt=bool(raw_conclusion.get("is_attempt", False)),
+        )
+
+        return _StudentClaimsExtraction(
+            variables=variables,
+            claims=claims,
+            conclusion=conclusion,
+            domain_check_required=bool(
+                payload.get("domain_check_required", False)
+            ),
+            raw_text=raw_text,
+        )
+
+    # ------------------------------------------------------------------
+    # Comparator — pure Python (Two-LLM grader §2.3)
+    # ------------------------------------------------------------------
+
+    def _compare_student_claims_to_canonical(
+        self,
+        *,
+        span,
+        canonical_value: Any,
+        canonical_str: str,
+        extraction: _StudentClaimsExtraction,
+        bare: bool,
+        student_input: str,
+    ) -> GradingResult:
+        """Deterministic comparator over LLM-B's claim graph.
+
+        Step A — verify each claim's asserted_value against its
+                 expression evaluated by the DSL interpreter. Any
+                 mismatch → WRONG with reason_code=arithmetic_failed
+                 and a redacted misconception that names the failing
+                 step.
+        Step B — compare the student's conclusion against the canonical:
+                  * matches canonical → CORRECT
+                  * matches partially (multi-slot, some slots matched)
+                                       → PARTIAL
+                  * doesn't match → WRONG with
+                                    reason_code=conclusion_inconsistent_with_canonical
+        """
+        # Step A — arithmetic verification of each claim.
+        for idx, claim in enumerate(extraction.claims):
+            if claim.expression is None or claim.asserted_value is None:
+                # Can't verify a missing-expression / missing-value
+                # claim. Skip rather than crash; LLM-B is allowed to
+                # omit either when not applicable.
+                continue
+            computed = _evaluate_claim_safely(
+                claim.expression, extraction.variables,
+            )
+            if computed is None:
+                continue
+            if not values_equivalent(claim.asserted_value, computed):
+                # Step-level arithmetic error. Name the slip without
+                # leaking the canonical of the overall problem.
+                desc = claim.description or f"step {idx + 1}"
+                safe = StudentSafeFeedback(
+                    first_misconception_redacted=(
+                        f"the step \"{desc}\" doesn't add up — "
+                        "re-check that calculation"
+                    ),
+                )
+                if span is not None:
+                    span["payload"] = {
+                        "verdict": Verdict.WRONG.value,
+                        "reason_code": "arithmetic_failed",
+                        "failed_claim": desc[:120],
+                        "path": "two_llm",
+                    }
+                return GradingResult(
+                    verdict=Verdict.WRONG,
+                    private_canonical=canonical_str,
+                    student_safe_feedback=safe,
+                    student_value=(student_input or "").strip(),
+                    reasoning=(
+                        "math: claim "
+                        f"{idx + 1} failed arithmetic verification"
+                    ),
+                    reason_code="arithmetic_failed",
+                    bare_answer=bare,
+                )
+
+        # Step B — conclusion vs canonical.
+        conc = extraction.conclusion
+        is_multi = isinstance(canonical_value, list) and canonical_value and \
+            all(isinstance(e, dict) and "value" in e for e in canonical_value)
+
+        # Build the candidate-value list from the conclusion. For Y/N,
+        # T/F, and MCQ-letter canonicals, we may also fall back to the
+        # extracted label.
+        candidate_values: list[Any] = []
+        raw_answer = conc.answer_extracted_value
+        if isinstance(raw_answer, list):
+            candidate_values.extend(raw_answer)
+        elif raw_answer is not None:
+            candidate_values.append(raw_answer)
+
+        if is_multi:
+            matched_slots: list[dict] = []
+            for slot in canonical_value:
+                slot_val = slot.get("value")
+                if any(values_equivalent(slot_val, c) for c in candidate_values):
+                    matched_slots.append(slot)
+            if len(matched_slots) == len(canonical_value):
+                verdict_kind = Verdict.CORRECT
+            elif matched_slots:
+                verdict_kind = Verdict.PARTIAL
+            else:
+                verdict_kind = Verdict.WRONG
+            safe = self._build_math_safe_feedback_multi(
+                verdict_kind=verdict_kind,
+                canonical_slots=canonical_value,
+                matched_slots=matched_slots,
+                student_value=(
+                    candidate_values[0] if candidate_values else None
+                ),
+                bare_answer=bare,
+            )
+            reason_code = None
+            if verdict_kind == Verdict.WRONG:
+                reason_code = "conclusion_inconsistent_with_canonical"
+            if span is not None:
+                span["payload"] = {
+                    "verdict": verdict_kind.value,
+                    "multi_slot": True,
+                    "matched_slot_count": len(matched_slots),
+                    "total_slot_count": len(canonical_value),
+                    "reason_code": reason_code or "",
+                    "path": "two_llm",
+                }
+            return GradingResult(
+                verdict=verdict_kind,
+                private_canonical=canonical_str,
+                student_safe_feedback=safe,
+                student_value=conc.statement or (student_input or "").strip(),
+                reasoning="math: two-llm comparator (multi-slot)",
+                reason_code=reason_code,
+                bare_answer=bare,
+            )
+
+        # Single-slot path.
+        # Build candidate set from numeric answer(s) and the answer
+        # label (yes/no/true/false map to bools for boolean canonicals;
+        # MCQ letters compare string-to-string).
+        match = False
+        if candidate_values:
+            for c in candidate_values:
+                if values_equivalent(canonical_value, c):
+                    match = True
+                    break
+        if not match and conc.answer_extracted_label:
+            label = conc.answer_extracted_label.strip().lower()
+            if isinstance(canonical_value, bool):
+                if label in {"yes", "true"} and canonical_value is True:
+                    match = True
+                elif label in {"no", "false"} and canonical_value is False:
+                    match = True
+            elif isinstance(canonical_value, str):
+                if label.upper() == canonical_value.strip().upper():
+                    match = True
+
+        if match:
+            verdict_kind = Verdict.CORRECT
+            safe = self._build_math_safe_feedback(
+                verdict_kind=verdict_kind,
+                canonical_value=canonical_value,
+                student_value=(
+                    candidate_values[0] if candidate_values else None
+                ),
+                bare_answer=bare,
+            )
+            if span is not None:
+                span["payload"] = {
+                    "verdict": verdict_kind.value,
+                    "path": "two_llm",
+                }
+            return GradingResult(
+                verdict=verdict_kind,
+                private_canonical=canonical_str,
+                student_safe_feedback=safe,
+                student_value=conc.statement or (student_input or "").strip(),
+                reasoning="math: two-llm comparator (single-slot)",
+                bare_answer=bare,
+            )
+
+        # No match — but the student attempted an answer (is_attempt=True
+        # already verified upstream). Distinguish "answered nothing
+        # numeric" (no candidate value AND no label) from
+        # "answered the wrong thing".
+        if not candidate_values and not conc.answer_extracted_label:
+            # Working shown without a stated final answer.
+            if extraction.claims:
+                verdict_kind = Verdict.PARTIAL
+                safe = StudentSafeFeedback(
+                    what_right="your working has the right pieces",
+                    what_missing="state your final answer clearly",
+                )
+                if span is not None:
+                    span["payload"] = {
+                        "verdict": verdict_kind.value,
+                        "path": "two_llm",
+                        "reason_code": "no_conclusion_stated",
+                    }
+                return GradingResult(
+                    verdict=verdict_kind,
+                    private_canonical=canonical_str,
+                    student_safe_feedback=safe,
+                    student_value=conc.statement
+                        or (student_input or "").strip(),
+                    reasoning="math: working shown, no stated conclusion",
+                    bare_answer=bare,
+                )
+
+        # The student stated something that doesn't match the canonical.
+        verdict_kind = Verdict.WRONG
+        safe = self._build_math_safe_feedback(
+            verdict_kind=verdict_kind,
+            canonical_value=canonical_value,
+            student_value=(
+                candidate_values[0] if candidate_values else None
+            ),
+            bare_answer=bare,
+        )
+        if span is not None:
+            span["payload"] = {
+                "verdict": verdict_kind.value,
+                "reason_code": "conclusion_inconsistent_with_canonical",
+                "path": "two_llm",
+            }
+        return GradingResult(
+            verdict=verdict_kind,
+            private_canonical=canonical_str,
+            student_safe_feedback=safe,
+            student_value=conc.statement or (student_input or "").strip(),
+            reasoning="math: two-llm comparator — conclusion mismatch",
+            reason_code="conclusion_inconsistent_with_canonical",
+            bare_answer=bare,
+        )
 
     def _extract_math_dsl(self, problem_text: str) -> _DSLExtraction:
         """Call ``GRADER_MATH`` to produce a JSON DSL for the problem."""
@@ -427,15 +928,32 @@ class StudentGrader:
         context: TutoringContext,
         request: GradingRequest,
     ) -> GradingResult:
-        """Tier order: deterministic direct match → bank → KB-grounded."""
-        with emit_span("audit", "grader.grounded") as span:
-            # Tier 0 — answer_type-aware direct match (LessonStep only).
-            # ``bank_grader`` assumes ``question_type`` exists and
-            # defaults to ``"mcq"`` when absent; LessonStep rows have
-            # ``answer_type`` instead and the default-to-mcq path
-            # collapses every short-numeric / true-false / free-text
-            # step to UNVERIFIED. This tier catches the common shapes
-            # cheaply before ever touching the LLM.
+        """Two-LLM non-math grader.
+
+        Companion to the math two-LLM grader. Same shape: a student
+        parser (LLM-B) feeds a judge (LLM-C). Python pre/post-checks
+        handle the structural cases the LLMs shouldn't decide:
+        meta input, self-reported guesses, canonical leakage.
+
+        Pipeline:
+          1. Tier 0 — deterministic direct match for LessonStep
+             answer_type ∈ {multiple_choice, true_false, short_numeric}.
+             Round-trip-free fast path. Mirrors the math bare-numeric
+             fast-path.
+          2. Tier 1 — bank grader when the OpenQuestion resolves to a
+             bank row with a canonical.
+          3. LLM-B — STUDENT_RESPONSE_SYSTEM parses the student input
+             into structured {is_attempt, hedge_marker, claims,
+             conclusion}.
+          4. Pre-check: ``is_attempt=false`` → UNVERIFIED reason_code=
+             "meta_input". No LLM-C call needed.
+          5. LLM-C — NON_MATH_JUDGE_SYSTEM reads question + KB + LLM-B
+             output and emits the verdict + redacted feedback.
+          6. Post-checks: hedge-marker downgrade, canonical-leak
+             redaction guard, reason_code propagation.
+        """
+        with emit_span("audit", "grader.non_math") as span:
+            # Tier 0 — deterministic direct match (LessonStep only).
             direct = self._try_direct_step_match(request)
             if direct is not None:
                 if span is not None:
@@ -455,68 +973,122 @@ class StudentGrader:
                     }
                 return bank_result
 
-            # Tier 2 — KB-grounded adjudication when KB chunks are present.
-            # Tier 3 — Gemini Google-grounding when KB has no answer.
-            # Both share the same prompt shape; the difference is which
-            # sources the GRADER_GROUNDED client has access to (the
-            # ModelConfig is pinned to Gemini for Google-grounding per
-            # Phase 1 §7).
-            adjudication = self._call_grounded_adjudicator(
-                question_stem=request.open_question.rendered_stem or "",
-                student_input=request.student_input,
+            stem = request.open_question.rendered_stem or ""
+            student_input = request.student_input or ""
+
+            # LLM-B — parse the student response.
+            response = self._extract_student_response_dsl(
+                question_stem=stem, student_response=student_input,
+            )
+            if not response.ok:
+                if span is not None:
+                    span["payload"] = {
+                        "verdict": Verdict.UNVERIFIED.value,
+                        "stage": "student_response_extraction",
+                        "error": response.error or "",
+                    }
+                return GradingResult(
+                    verdict=Verdict.UNVERIFIED,
+                    student_value=student_input.strip(),
+                    reasoning=(
+                        f"non-math: student-response extraction failed "
+                        f"({response.error or 'unknown'})"
+                    ),
+                    reason_code="grader_extraction_failed",
+                    bare_answer=False,
+                )
+
+            # Pre-check 1: meta input — student did not attempt an answer.
+            # Distinct from "grader couldn't decide a real attempt".
+            if not response.is_attempt:
+                if span is not None:
+                    span["payload"] = {
+                        "verdict": Verdict.UNVERIFIED.value,
+                        "reason_code": "meta_input",
+                    }
+                return GradingResult(
+                    verdict=Verdict.UNVERIFIED,
+                    student_value=student_input.strip(),
+                    reasoning="non-math: student response is not an attempt",
+                    reason_code="meta_input",
+                    bare_answer=False,
+                )
+
+            # LLM-C — judge the structured student response.
+            judgement = self._call_nonmath_judge(
+                question_stem=stem,
+                student_response_dsl=response.to_judge_payload(),
                 sources=list(request.kb_chunks or []),
             )
+            if not judgement.ok:
+                if span is not None:
+                    span["payload"] = {
+                        "verdict": Verdict.UNVERIFIED.value,
+                        "stage": "non_math_judge",
+                        "error": judgement.error or "",
+                    }
+                return GradingResult(
+                    verdict=Verdict.UNVERIFIED,
+                    student_value=student_input.strip(),
+                    reasoning=(
+                        f"non-math: judge call failed "
+                        f"({judgement.error or 'unknown'})"
+                    ),
+                    reason_code="grader_extraction_failed",
+                    bare_answer=False,
+                )
 
-            # Phase 4 — when grounded confidence is low AND the
-            # tentative verdict is correct / partial / wrong, consult
-            # the answer-consistency verifier instead of blanket-
-            # downgrading to UNVERIFIED. The verifier is a Haiku-backed
-            # yes/no/cant-tell adjudicator that asks only whether the
-            # student's response asserts the same answer as the
-            # canonical. It is subject-agnostic.
-            verifier_outcome: Optional[_ConsistencyResult] = None
-            verdict_kind = adjudication.verdict
-            verdict_kind, verifier_outcome = self._maybe_consult_verifier(
-                adjudication=adjudication,
-                question_stem=request.open_question.rendered_stem or "",
-                canonical=adjudication.private_canonical,
-                student_input=request.student_input,
+            verdict_kind = judgement.verdict
+            reason_code: Optional[str] = judgement.reason_code or None
+
+            # Post-check 1: self-reported guess. A correct pick that the
+            # student admits is a guess does NOT indicate mastery; the
+            # move layer needs that signal to re-pose at the same
+            # difficulty instead of advancing.
+            if verdict_kind == Verdict.CORRECT and response.hedge_marker:
+                verdict_kind = Verdict.PARTIAL
+                reason_code = "self_reported_guess"
+
+            # Post-check 2: programmatic canonical-leak redaction. The
+            # LLM-C prompt instructs against putting the canonical in
+            # the safe_feedback fields, but we belt-and-braces it.
+            what_right, what_missing, first_misc = _redact_canonical_leak(
+                private_canonical=judgement.private_canonical,
+                what_right=judgement.what_right,
+                what_missing=judgement.what_missing,
+                first_misconception=judgement.first_misconception,
             )
 
             safe = StudentSafeFeedback(
-                what_right=adjudication.what_right,
-                what_missing=adjudication.what_missing,
-                first_misconception_redacted=adjudication.first_misconception,
+                what_right=what_right,
+                what_missing=what_missing,
+                first_misconception_redacted=first_misc,
             )
 
-            if span is not None:
-                payload = {
-                    "verdict": verdict_kind.value,
-                    "tier": "grounded",
-                    "confidence": adjudication.confidence,
-                }
-                if verifier_outcome is not None:
-                    payload["verifier"] = {
-                        "confirmed": verifier_outcome.confirmed,
-                        "why": verifier_outcome.why[:120],
-                        "available": verifier_outcome.available,
-                    }
-                span["payload"] = payload
+            reasoning = "non-math: two-llm judge"
+            if reason_code:
+                reasoning = f"{reasoning} ({reason_code})"
 
-            reasoning = adjudication.reasoning or "non-math grounded adjudication"
-            if verifier_outcome is not None:
-                reasoning = (
-                    f"{reasoning}; verifier={verifier_outcome.confirmed}"
-                    f" ({verifier_outcome.why})"
-                )
+            if span is not None:
+                span["payload"] = {
+                    "verdict": verdict_kind.value,
+                    "tier": "two_llm",
+                    "reason_code": reason_code or "",
+                    "hedge_marker": response.hedge_marker,
+                    "denies_canonical": response.conclusion.denies_canonical,
+                }
 
             return GradingResult(
                 verdict=verdict_kind,
-                private_canonical=adjudication.private_canonical,
+                private_canonical=judgement.private_canonical,
                 student_safe_feedback=safe,
-                student_value=request.student_input,
+                student_value=(
+                    response.conclusion.stated_answer
+                    or student_input.strip()
+                ),
                 reasoning=reasoning,
-                citation=adjudication.citation,
+                citation=judgement.citation,
+                reason_code=reason_code,
                 bare_answer=False,
             )
 
@@ -642,193 +1214,207 @@ class StudentGrader:
         )
 
     # ------------------------------------------------------------------
-    # Phase 4 — Answer-consistency verifier
+    # Non-math two-LLM pipeline (companion to math LLM-A + LLM-B)
     # ------------------------------------------------------------------
 
-    def _maybe_consult_verifier(
-        self,
-        *,
-        adjudication: "_GroundedAdjudication",
-        question_stem: str,
-        canonical: str,
-        student_input: str,
-    ) -> tuple[Verdict, Optional["_ConsistencyResult"]]:
-        """Run the answer-consistency verifier when grounded was unsure.
-
-        Mapping rule:
-          - If grounded.confidence >= threshold → keep grounded verdict
-            as-is, no verifier call.
-          - If grounded.verdict == UNVERIFIED *and* the student input
-            looks meta/empty (no answer attempted) → keep UNVERIFIED.
-            (The verifier can't decide nothing.)
-          - Otherwise consult the verifier:
-              confirmed=yes      → CORRECT  (verifier overrides up)
-              confirmed=partial  → PARTIAL  (verifier overrides up)
-              confirmed=no       → WRONG    (verifier overrides down)
-              confirmed=cant_tell → UNVERIFIED (genuine terminal)
-              verifier unavailable → fall back to the old behaviour
-                                       (downgrade to UNVERIFIED).
-
-        Returns ``(final_verdict, verifier_result_or_None)``. The
-        verifier_result is None when no verifier call was made.
-        """
-        if adjudication.confidence >= _GROUNDED_CONFIDENCE_THRESHOLD:
-            return adjudication.verdict, None
-        if not (student_input or "").strip():
-            return Verdict.UNVERIFIED, None
-        outcome = self._call_consistency_verifier(
-            question_stem=question_stem,
-            canonical=canonical,
-            student_input=student_input,
-            tentative_verdict=adjudication.verdict.value,
-        )
-        if not outcome.available:
-            # Fail-soft: preserve prior behaviour when the verifier
-            # cannot be reached (no GRADER_VERIFIER ModelConfig, model
-            # outage). The grounded verdict still downgrades to
-            # UNVERIFIED, exactly as before Phase 4.
-            return Verdict.UNVERIFIED, outcome
-        mapping = {
-            "yes": Verdict.CORRECT,
-            "partial": Verdict.PARTIAL,
-            "no": Verdict.WRONG,
-            "cant_tell": Verdict.UNVERIFIED,
-        }
-        return mapping.get(outcome.confirmed, Verdict.UNVERIFIED), outcome
-
-    def _call_consistency_verifier(
+    def _extract_student_response_dsl(
         self,
         *,
         question_stem: str,
-        canonical: str,
-        student_input: str,
-        tentative_verdict: str,
-    ) -> "_ConsistencyResult":
-        """Haiku-backed verifier — JUDGE-class temperature (0.0).
-
-        Subject-agnostic. Asks only whether the student's response
-        asserts the same final answer as the canonical, ignoring
-        wording quality and working-shown.
-        """
-        with emit_span("audit", "grader.answer_consistency_verifier") as span:
-            client = self._resolve_verifier_client()
+        student_response: str,
+    ) -> _StudentResponseExtraction:
+        """LLM-B for the non-math path. Parses student prose into a
+        structured object the judge (LLM-C) consumes as data, not text."""
+        with emit_span("audit", "grader.student_response_extractor") as span:
+            client = self._resolve_student_response_client()
             if client is None:
                 if span is not None:
-                    span["payload"] = {
-                        "confirmed": "unavailable",
-                        "reason": "no GRADER_VERIFIER client",
-                    }
-                return _ConsistencyResult(
-                    confirmed="cant_tell",
-                    why="verifier client unavailable",
-                    available=False,
+                    span["payload"] = {"error": "no GRADER_STUDENT_RESPONSE client"}
+                return _StudentResponseExtraction(
+                    is_attempt=False, hedge_marker=False, claims=[],
+                    conclusion=_StudentResponseConclusion(
+                        stated_answer="", answer_label="",
+                        denies_canonical=False,
+                    ),
+                    raw_text="",
+                    error="no GRADER_STUDENT_RESPONSE client available",
                 )
             try:
-                response = client.generate(
+                resp = client.generate(
                     messages=[
                         {
                             "role": "user",
-                            "content": render_answer_consistency_user_prompt(
+                            "content": render_student_response_user_prompt(
                                 question_stem=question_stem,
-                                canonical=canonical,
-                                student_input=student_input,
-                                tentative_verdict=tentative_verdict,
+                                student_response=student_response,
                             ),
                         },
                     ],
-                    system_prompt=ANSWER_CONSISTENCY_VERIFIER_SYSTEM,
-                    max_tokens=400,
+                    system_prompt=STUDENT_RESPONSE_SYSTEM,
+                    max_tokens=1200,
                 )
-                payload = _safe_json_loads(response.content or "") or {}
+                raw_text = resp.content or ""
             except Exception as exc:
-                logger.warning(
-                    "[StudentGrader] answer-consistency verifier raised %s",
-                    type(exc).__name__,
-                )
                 if span is not None:
                     span["payload"] = {
-                        "confirmed": "unavailable",
-                        "reason": f"raise: {type(exc).__name__}",
+                        "error": f"raise: {type(exc).__name__}",
                     }
-                return _ConsistencyResult(
-                    confirmed="cant_tell",
-                    why=f"verifier raise: {type(exc).__name__}",
-                    available=False,
+                return _StudentResponseExtraction(
+                    is_attempt=False, hedge_marker=False, claims=[],
+                    conclusion=_StudentResponseConclusion(
+                        stated_answer="", answer_label="",
+                        denies_canonical=False,
+                    ),
+                    raw_text="",
+                    error=f"student-response extraction raised: {type(exc).__name__}",
                 )
-            confirmed = str(payload.get("confirmed", "cant_tell")).strip().lower()
-            if confirmed not in ("yes", "partial", "no", "cant_tell"):
-                confirmed = "cant_tell"
-            why = str(payload.get("why", "")).strip()
-            if span is not None:
-                span["payload"] = {
-                    "confirmed": confirmed,
-                    "why": why[:120],
-                }
-            return _ConsistencyResult(
-                confirmed=confirmed,
-                why=why,
-                available=True,
+
+            payload = _safe_json_loads(raw_text)
+            if not isinstance(payload, dict):
+                if span is not None:
+                    span["payload"] = {"error": "non-dict JSON"}
+                return _StudentResponseExtraction(
+                    is_attempt=False, hedge_marker=False, claims=[],
+                    conclusion=_StudentResponseConclusion(
+                        stated_answer="", answer_label="",
+                        denies_canonical=False,
+                    ),
+                    raw_text=raw_text,
+                    error="LLM-B did not return a JSON object",
+                )
+
+            raw_claims = payload.get("claims") or []
+            claims: list[dict] = []
+            if isinstance(raw_claims, list):
+                for entry in raw_claims:
+                    if not isinstance(entry, dict):
+                        continue
+                    claims.append({
+                        "id": str(entry.get("id", "")).strip(),
+                        "text": str(entry.get("text", "")).strip(),
+                    })
+
+            raw_conc = payload.get("conclusion") or {}
+            if not isinstance(raw_conc, dict):
+                raw_conc = {}
+            conclusion = _StudentResponseConclusion(
+                stated_answer=str(raw_conc.get("stated_answer", "")).strip(),
+                answer_label=str(
+                    raw_conc.get("answer_label", "") or ""
+                ).strip(),
+                denies_canonical=bool(raw_conc.get("denies_canonical", False)),
             )
 
-    def _call_grounded_adjudicator(
+            extraction = _StudentResponseExtraction(
+                is_attempt=bool(payload.get("is_attempt", False)),
+                hedge_marker=bool(payload.get("hedge_marker", False)),
+                claims=claims,
+                conclusion=conclusion,
+                raw_text=raw_text,
+            )
+            if span is not None:
+                span["payload"] = {
+                    "is_attempt": extraction.is_attempt,
+                    "hedge_marker": extraction.hedge_marker,
+                    "claim_count": len(extraction.claims),
+                    "denies_canonical": conclusion.denies_canonical,
+                }
+            return extraction
+
+    def _call_nonmath_judge(
         self,
         *,
         question_stem: str,
-        student_input: str,
+        student_response_dsl: dict,
         sources: list[str],
-    ) -> _GroundedAdjudication:
-        """Call ``GRADER_GROUNDED`` (Gemini-pinned)."""
-        client = self._resolve_grounded_client()
-        if client is None:
-            return _GroundedAdjudication(
-                verdict=Verdict.UNVERIFIED,
-                private_canonical="",
-                what_right="",
-                what_missing="",
-                first_misconception="",
-                citation="",
-                confidence=0.0,
-                reasoning="no GRADER_GROUNDED client available",
+    ) -> _NonMathJudgement:
+        """LLM-C for the non-math path. Judges the STRUCTURED student
+        output (from LLM-B) against the question + KB sources.
+
+        Reuses the GRADER_GROUNDED ModelConfig (Gemini-pinned for
+        Google-grounding). The prompt is the new
+        NON_MATH_JUDGE_SYSTEM, not the legacy adjudicator prompt.
+        """
+        with emit_span("audit", "grader.non_math_judge") as span:
+            client = self._resolve_grounded_client()
+            if client is None:
+                if span is not None:
+                    span["payload"] = {"error": "no GRADER_GROUNDED client"}
+                return _NonMathJudgement(
+                    verdict=Verdict.UNVERIFIED, private_canonical="",
+                    what_right="", what_missing="", first_misconception="",
+                    citation="", reason_code="", raw_text="",
+                    error="no GRADER_GROUNDED client available",
+                )
+            try:
+                resp = client.generate(
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": render_non_math_judge_user_prompt(
+                                question_stem=question_stem,
+                                student_response_dsl=student_response_dsl,
+                                sources=sources,
+                            ),
+                        },
+                    ],
+                    system_prompt=NON_MATH_JUDGE_SYSTEM,
+                    max_tokens=2048,
+                )
+                raw_text = resp.content or ""
+            except Exception as exc:
+                logger.warning(
+                    "[StudentGrader] non-math judge raised %s",
+                    type(exc).__name__,
+                )
+                if span is not None:
+                    span["payload"] = {"error": f"raise: {type(exc).__name__}"}
+                return _NonMathJudgement(
+                    verdict=Verdict.UNVERIFIED, private_canonical="",
+                    what_right="", what_missing="", first_misconception="",
+                    citation="", reason_code="", raw_text="",
+                    error=f"non-math judge raised: {type(exc).__name__}",
+                )
+
+            payload = _safe_json_loads(raw_text)
+            if not isinstance(payload, dict):
+                if span is not None:
+                    span["payload"] = {"error": "non-dict JSON"}
+                return _NonMathJudgement(
+                    verdict=Verdict.UNVERIFIED, private_canonical="",
+                    what_right="", what_missing="", first_misconception="",
+                    citation="", reason_code="", raw_text=raw_text,
+                    error="LLM-C did not return a JSON object",
+                )
+
+            raw_verdict = str(payload.get("verdict", "unverified")).strip().lower()
+            if raw_verdict not in ("correct", "partial", "wrong", "unverified"):
+                raw_verdict = "unverified"
+
+            reason_code = str(payload.get("reason_code", "") or "").strip().lower()
+            if reason_code not in (
+                "", "known_misconception", "denies_canonical", "off_topic",
+            ):
+                reason_code = ""
+
+            judgement = _NonMathJudgement(
+                verdict=Verdict(raw_verdict),
+                private_canonical=str(payload.get("private_canonical", "")).strip(),
+                what_right=str(payload.get("what_right", "")).strip(),
+                what_missing=str(payload.get("what_missing", "")).strip(),
+                first_misconception=str(
+                    payload.get("first_misconception", "")
+                ).strip(),
+                citation=str(payload.get("citation", "")).strip(),
+                reason_code=reason_code,
+                raw_text=raw_text,
             )
-        try:
-            response = client.generate(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": render_non_math_grounded_user_prompt(
-                            question_stem=question_stem,
-                            student_input=student_input,
-                            sources=sources,
-                        ),
-                    },
-                ],
-                system_prompt=NON_MATH_GROUNDED_SYSTEM,
-                # 2048 tokens. Bumped from 400 — the grounded response
-                # has seven JSON fields plus the new confidence-band
-                # explanation; Gemini's emitted JSON was being
-                # truncated mid-``private_canonical`` on rich free-text
-                # answers, which the parser then dropped to
-                # ``unverified``. 2048 leaves headroom for any
-                # extended reasoning Gemini emits before the JSON;
-                # cheap on Gemini 3 Flash.
-                max_tokens=2048,
-            )
-            return _parse_grounded_response(response.content or "")
-        except Exception as exc:
-            logger.warning(
-                "[StudentGrader] grounded adjudicator raised %s",
-                type(exc).__name__,
-            )
-            return _GroundedAdjudication(
-                verdict=Verdict.UNVERIFIED,
-                private_canonical="",
-                what_right="",
-                what_missing="",
-                first_misconception="",
-                citation="",
-                confidence=0.0,
-                reasoning=f"grounded raise: {type(exc).__name__}",
-            )
+            if span is not None:
+                span["payload"] = {
+                    "verdict": judgement.verdict.value,
+                    "reason_code": reason_code,
+                }
+            return judgement
 
     # ==================================================================
     # 2. Pre-pose check
@@ -1036,10 +1622,15 @@ class StudentGrader:
             return self._claim_client_factory()
         return _build_client_for_purpose("tutor_claim_adjudicator")
 
-    def _resolve_verifier_client(self):
-        if self._verifier_client_factory is not None:
-            return self._verifier_client_factory()
-        return _build_client_for_purpose("grader_verifier")
+    def _resolve_student_claims_client(self):
+        if self._student_claims_client_factory is not None:
+            return self._student_claims_client_factory()
+        return _build_client_for_purpose("grader_student_claims")
+
+    def _resolve_student_response_client(self):
+        if self._student_response_client_factory is not None:
+            return self._student_response_client_factory()
+        return _build_client_for_purpose("grader_student_response")
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1058,13 +1649,26 @@ class PrePoseRefusedError(Exception):
 
 
 def _build_client_for_purpose(purpose: str):
-    """Resolve the ``ModelConfig`` for the purpose and return a client."""
+    """Resolve the ``ModelConfig`` for the purpose and return a client.
+
+    Fail-soft on every error path — including the pytest-django "no
+    database access" RuntimeError that triggers when grading tests
+    omit a client factory injection. The caller treats a None return
+    as "client unavailable" and degrades to the next tier.
+    """
     try:
         from apps.llm.client import get_llm_client
         from apps.llm.models import ModelConfig
     except Exception:
         return None
-    cfg = ModelConfig.get_for(purpose)
+    try:
+        cfg = ModelConfig.get_for(purpose)
+    except Exception as exc:
+        logger.warning(
+            "[StudentGrader] ModelConfig.get_for(%s) raised %s",
+            purpose, type(exc).__name__,
+        )
+        return None
     if cfg is None:
         return None
     try:
@@ -1154,6 +1758,50 @@ def _join_names(names: list[str]) -> str:
     if len(cleaned) == 2:
         return f"{cleaned[0]} and {cleaned[1]}"
     return ", ".join(cleaned[:-1]) + f", and {cleaned[-1]}"
+
+
+# Word-form numeric tokens — when ANY of these appears in the student
+# input, the regex chain is unreliable (it cannot read "eight" as 8 and
+# may pick a digit-form intermediate as the answer). Route to LLM-B in
+# that case. Single-character tokens (a, i) deliberately excluded to
+# avoid false positives.
+_WORD_FORM_NUMERIC_RE = re.compile(
+    r"\b("
+    r"zero|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|"
+    r"eighteen|nineteen|"
+    r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|"
+    r"hundred|thousand|million|"
+    r"half|halves|quarter|third|thirds|fourth|fifths"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _has_word_form_numeric(text: str) -> bool:
+    """True iff the student input contains a word-form numeric token.
+
+    Such inputs (e.g. "the hidden variable is eight") are unreliable
+    under regex extraction and must go through LLM-B so word-form
+    answers and digit-form intermediates can be disambiguated.
+    """
+    return bool(_WORD_FORM_NUMERIC_RE.search(text or ""))
+
+
+def _evaluate_claim_safely(expression: Any, variables: dict) -> Optional[Any]:
+    """Evaluate a single LLM-B expression node via the math interpreter.
+
+    Returns ``None`` when the expression is malformed (so the
+    comparator skips the claim rather than crashing). Variables from
+    LLM-B's ``variables`` block are passed through; the math
+    interpreter dereferences ``{"var": "name"}`` against them.
+    """
+    if expression is None:
+        return None
+    try:
+        return _evaluate_dsl_node(expression, variables or {}, MathTrace())
+    except (DSLValidationError, KeyError, TypeError, ValueError, ZeroDivisionError):
+        return None
 
 
 def _parse_student_math_value(student_input: str) -> tuple[Optional[Any], str]:
@@ -1247,24 +1895,49 @@ _PROSE_NUMERIC_PATTERNS = (
         r"(?ix)(?:the\s+answer\s+is|it\s+is|=)\s+"
         r"(-?\d+(?:\.\d+)?)\s*\.?\s*$"
     ),
-    # Trailing bare number: "… so 6" / "ohhh 6" / final "6."
-    re.compile(r"(?:^|[^\w.])(-?\d+(?:\.\d+)?)\s*[.!?]?\s*$"),
+    # Trailing bare number, optionally with a short unit/word suffix
+    # ("9 SCR", "60%", "37 SCR?", "25 percent", "5 kg"). Anchored at
+    # end-of-string so it picks up the FINAL number, ignoring earlier
+    # numbers in the problem restatement. The optional suffix is at
+    # most 8 alphanumeric / punctuation characters — long enough for
+    # common units (SCR / cm / m³ / km / kg / percent / dollars) but
+    # short enough that it won't accidentally swallow whole clauses.
+    re.compile(
+        r"(?:^|[^\w.])(-?\d+(?:\.\d+)?)"
+        r"\s*[A-Za-z%³²]{0,8}"
+        r"\s*[.!?]?\s*$"
+    ),
 )
 
 
 _MCQ_PROSE_PATTERNS = (
-    # "option B", "answer: B", "choice B", "pick B"
-    re.compile(r"(?i)\b(?:option|answer|choice|pick)\s*[:\-]?\s*([A-Da-d])\b"),
-    # "I pick B", "I choose B", "I'd choose B", "I'll go with B"
+    # "option B", "answer B", "answer: B", "answer is B", "choice B",
+    # "pick B", "go with B", "guess B", "vote B".
+    re.compile(
+        r"(?i)\b(?:option|answer|choice|pick|guess|vote|select)"
+        r"(?:\s+is)?\s*[:\-]?\s*([A-Da-d])\b"
+    ),
+    # "I pick B", "I choose B", "I'd choose B", "I'll go with B",
+    # "I think it's B" (the apostrophe-s contraction observed in run-7),
+    # "I'd say B", "I would go with B".
     re.compile(
         r"(?i)\bi(?:'?ll|'?d|\s+would)?\s+"
-        r"(?:pick|choose|select|go\s+with|say|think)\s+"
-        r"(?:it\s+is\s+|is\s+|the\s+answer\s+is\s+|that\s+)?([A-Da-d])\b"
+        r"(?:pick|choose|select|go\s+with|say|think|guess|vote)\s+"
+        r"(?:it'?s\s+|it\s+is\s+|is\s+|the\s+answer\s+is\s+|that\s+)?([A-Da-d])\b"
     ),
     # "(B)", "[B]" — bracketed letter
     re.compile(r"(?i)^\s*[\(\[]([A-Da-d])[\)\]]"),
     # Bare letter alone or with terminal punctuation: "B", "b.", "B!"
     re.compile(r"(?i)^\s*([A-Da-d])\s*[\.\!]?\s*$"),
+    # Letter at start of response followed by a delimiter (dash, comma,
+    # space + "because" / "since" / etc.) — common rationale form
+    # observed in MATHS-S1 / GEO-S5 transcripts ("B - it's …",
+    # "b because …", "C, since …").
+    re.compile(
+        r"(?i)^\s*([A-Da-d])\s*(?:[\-,:;.]|\s+(?:because|since|as|for|—|–))"
+    ),
+    # "It's B", "it is B" — pronoun form at start
+    re.compile(r"(?i)^\s*it'?s\s+([A-Da-d])\b"),
 )
 
 
@@ -1427,28 +2100,34 @@ def _resolve_bank_question(open_q: OpenQuestion):
     return None
 
 
-def _parse_grounded_response(raw_text: str) -> _GroundedAdjudication:
-    """Parse the structured-JSON response from the grounded adjudicator."""
-    payload = _safe_json_loads(raw_text) or {}
+def _redact_canonical_leak(
+    *,
+    private_canonical: str,
+    what_right: str,
+    what_missing: str,
+    first_misconception: str,
+) -> tuple[str, str, str]:
+    """Programmatic guard: if LLM-C's safe_feedback strings contain the
+    canonical answer substring (case-insensitive), replace those fields
+    with generic templates.
 
-    raw_verdict = str(payload.get("verdict", "unverified")).strip().lower()
-    if raw_verdict not in ("correct", "partial", "wrong", "unverified"):
-        raw_verdict = "unverified"
-    verdict = Verdict(raw_verdict)
-
-    try:
-        confidence = float(payload.get("confidence", 0.0))
-    except (TypeError, ValueError):
-        confidence = 0.0
-    confidence = max(0.0, min(1.0, confidence))
-
-    return _GroundedAdjudication(
-        verdict=verdict,
-        private_canonical=str(payload.get("private_canonical", "")).strip(),
-        what_right=str(payload.get("what_right", "")).strip(),
-        what_missing=str(payload.get("what_missing", "")).strip(),
-        first_misconception=str(payload.get("first_misconception", "")).strip(),
-        citation=str(payload.get("citation", "")).strip(),
-        confidence=confidence,
-        reasoning="grounded adjudicator JSON",
+    The NON_MATH_JUDGE_SYSTEM prompt instructs the LLM not to put the
+    canonical in safe_feedback, but we belt-and-braces it. Canonical
+    leakage on wrong/partial verdicts is a Tier-1 confidentiality bug;
+    we'd rather show a generic "you didn't quite get it" line than
+    leak the answer.
+    """
+    canon = (private_canonical or "").strip().lower()
+    if not canon:
+        return what_right, what_missing, first_misconception
+    def _scrub(field: str, replacement: str) -> str:
+        if not field:
+            return field
+        if canon in field.lower():
+            return replacement
+        return field
+    return (
+        _scrub(what_right, "you have part of the answer"),
+        _scrub(what_missing, "there's more to add"),
+        _scrub(first_misconception, "the answer doesn't quite line up"),
     )

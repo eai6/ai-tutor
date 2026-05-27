@@ -109,72 +109,394 @@ def render_math_dsl_user_prompt(problem_text: str) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Non-math grounded adjudication — KB-cited or Google-grounded
+# Student-claims extractor (LLM-B in the Two-LLM math grader)
+#
+# See design/tasks/two-llm-grader-implementation-plan.md.
+#
+# Pairs with MATH_DSL_SYSTEM (LLM-A canonical extractor). LLM-A reads
+# the QUESTION and emits a canonical value; LLM-B reads the STUDENT
+# response and emits a claim graph the Python comparator verifies.
+# Together they replace the regex-based _parse_student_math_value
+# chain that mis-parsed word-form numerics ("eight"), multi-slot prose
+# ("profit is 9 and percentage is 50%"), and intermediate-vs-final
+# values ("… got 16 … is eight").
+#
+# Schema (subject-agnostic):
+#   variables    — any numeric values the student named while working.
+#   claims       — discrete arithmetic / logical assertions the student
+#                  made, each with an expression tree (reusing the
+#                  MATH_DSL_SYSTEM grammar) and an asserted value so the
+#                  comparator can detect a step-level arithmetic error
+#                  separately from a conclusion-level error.
+#   conclusion   — the student's final stated answer:
+#                    answer_extracted_value  scalar | [scalar, ...] | null
+#                    answer_extracted_label  "yes" | "no" | "A".."D"
+#                                             | "" (when not applicable)
+#                    statement               short prose summary
+#                    is_attempt              false for meta input
+#                                             ("idk", "explain please")
+#   domain_check_required — true when the answer needs a domain check
+#                           (e.g. negative length rejected). Reserved.
 # ──────────────────────────────────────────────────────────────────────
 
-NON_MATH_GROUNDED_SYSTEM = """\
-You judge whether a student's free-text answer is correct, given the
-question and (optionally) a set of grounding sources.
+STUDENT_CLAIMS_SYSTEM = """\
+You read a student's response to a math problem and emit a structured
+JSON object that a deterministic Python comparator can verify.
 
-Source preference order:
-  1. Prefer the supplied grounding sources when they cover the
-     question — cite them in the ``citation`` field as [KB-N].
-  2. When the supplied sources do not cover the question (this is
-     common for general curriculum topics where a KB chunk wasn't
-     authored), use your own well-established knowledge of the
-     subject to judge correctness. Set the citation field empty in
-     that case and use the ``confidence`` field to reflect that the
-     judgement is from general knowledge rather than a source.
-  3. When neither path yields a confident judgement, return
-     verdict = "unverified".
+Output a single JSON object with these top-level keys:
 
-The student's answer should be judged on the substance of what they
-said about the question, not on whether their wording matches a
-specific phrasing. A correct mechanism explanation expressed in the
-student's own words is still correct.
+  variables  — a mapping of variable names to numeric values the
+               student named while working (may be empty).
 
-Output a JSON object with these keys:
+  claims     — an ordered list of the student's individual arithmetic
+               or logical steps. Each entry is an object:
 
-  verdict             — one of: "correct", "partial", "wrong", "unverified".
-  private_canonical   — the correct answer in your own words (one short sentence).
-                         This is private to the tutoring system; the student
-                         never sees this field directly.
-  what_right          — short phrase the tutor can use to credit what
-                         the student got right (empty if wrong / unverified).
-  what_missing        — short phrase the tutor can use to surface
-                         what's still missing (empty if fully correct).
-  first_misconception — short, redacted hint at the first conceptual slip,
-                         without revealing the canonical (empty if not wrong).
-  citation            — verbatim quote (≤30 words) from one of the
-                         sources that supports your judgement, with the
-                         source label in brackets (e.g. "[KB-3]"). Empty
-                         when no source applies (general-knowledge route
-                         or genuine "unverified").
-  confidence          — a number between 0 and 1.
-                         ≥0.8 = strong direct support (sources or
-                                unambiguous general knowledge).
-                         0.5–0.79 = supported but with some hedging
-                                (general knowledge with minor wording
-                                ambiguity, or partial source coverage).
-                         <0.5 = genuinely unsure — the runtime maps
-                                this band to "unverified".
+                 {
+                   "id": "c1",
+                   "description": "<one short phrase, what the
+                                   student claimed in this step>",
+                   "expression": <DSL node>,
+                   "asserted_value": <number>
+                 }
+
+               The ``expression`` field uses the same DSL grammar as
+               the question-side canonical extractor:
+
+                 * a bare number (e.g. 25, 3.14)
+                 * a variable reference: {"var": "name"}
+                 * an operation: {"op": "<opcode>", "args": [<node>, ...]}
+
+               Whitelisted opcodes: add, sub, mul, div, neg, abs,
+               pow, sqrt, log, exp, sin, cos, tan, min, max, round,
+               eq, lt, lte, gt, gte.
+
+               The ``asserted_value`` is the result the STUDENT
+               claimed in that step (not the result Python would
+               compute) — that's how the comparator detects a
+               specific arithmetic mistake.
+
+               Use an empty list when the student gave only a final
+               answer with no shown working.
+
+  conclusion — an object describing the student's final stated answer:
+
+                 {
+                   "statement": "<one short phrase paraphrasing the
+                                  student's bottom-line answer>",
+                   "answer_extracted_value": <number | [n, n, ...] | null>,
+                   "answer_extracted_label": "<yes|no|true|false|A|B|C|D|>",
+                   "is_attempt": <true|false>
+                 }
+
+               ``answer_extracted_value`` is the numeric value(s) the
+               student stated as their final answer. For multi-slot
+               questions where the student supplies two or more
+               distinct quantities (e.g. "profit is 9 and percentage
+               is 50%"), emit a list. Use null when the student gave
+               no numeric answer.
+
+               ``answer_extracted_label`` is filled for Yes/No,
+               True/False, or single-letter multiple-choice answers.
+               Leave empty otherwise. Normalise to lowercase for
+               yes/no/true/false and uppercase A-D for MCQ letters.
+
+               ``is_attempt`` is false when the student did NOT
+               attempt an answer — e.g. "I don't know", "please
+               explain", "what does percent mean?", "give me a hint".
+               Set to true otherwise, even for clearly wrong attempts.
+
+  domain_check_required — boolean. True only when the student named
+               a value that violates the problem's domain (e.g.
+               negative length, fractional person count). Default
+               false.
+
+Read the student response charitably. Treat word-form numerics as
+their numeric equivalent:
+
+  * "eight" → 8
+  * "twenty-five" → 25
+  * "half" → 0.5
+  * "two and a half" → 2.5
+  * "thirty-three percent" → 33
+
+When the student shows working and then states a different final
+answer, the final stated answer goes in ``conclusion``; each working
+step goes in ``claims``. Do NOT confuse intermediate working values
+with the student's bottom-line answer.
+
+Return JSON only — no prose, no markdown fences.
+"""
+
+# Few-shot examples. Per gemini-prompting-expert: Gemini follows the
+# format exactly including punctuation quirks. Per prompting-fundamentals
+# guidance: place the most representative example last (recency bias).
+STUDENT_CLAIMS_FEW_SHOT = """\
+Example 1 (bare numeric — correct addition)
+Question: What is 12 + 13?
+Student: 25
+Output: {"variables": {}, "claims": [], "conclusion": {"statement": "25", "answer_extracted_value": 25, "answer_extracted_label": "", "is_attempt": true}, "domain_check_required": false}
+
+Example 2 (word-form answer with intermediate working)
+Question: 2x = 16. Solve for x.
+Student: I multiplied the variable by two and got 16 which means that the hidden variable is eight
+Output: {"variables": {"x": 8}, "claims": [{"id": "c1", "description": "2 times 8 equals 16", "expression": {"op": "mul", "args": [2, 8]}, "asserted_value": 16}], "conclusion": {"statement": "the hidden variable is eight", "answer_extracted_value": 8, "answer_extracted_label": "", "is_attempt": true}, "domain_check_required": false}
+
+Example 3 (Pythagoras proof — claims with conclusion label)
+Question: Sides 5, 7, 9 — is the triangle right-angled?
+Student: 5^2 + 7^2 = 25 + 49 = 74, 9^2 = 81, 74 != 81 so NOT right-angled.
+Output: {"variables": {}, "claims": [{"id": "c1", "description": "5 squared is 25", "expression": {"op": "pow", "args": [5, 2]}, "asserted_value": 25}, {"id": "c2", "description": "7 squared is 49", "expression": {"op": "pow", "args": [7, 2]}, "asserted_value": 49}, {"id": "c3", "description": "25 plus 49 is 74", "expression": {"op": "add", "args": [25, 49]}, "asserted_value": 74}, {"id": "c4", "description": "9 squared is 81", "expression": {"op": "pow", "args": [9, 2]}, "asserted_value": 81}], "conclusion": {"statement": "not right-angled", "answer_extracted_value": null, "answer_extracted_label": "no", "is_attempt": true}, "domain_check_required": false}
+
+Example 4 (multi-slot prose — two values)
+Question: Buys 18 SCR, sells 27 SCR. Find profit per item and profit percentage.
+Student: profit is 9 and percentage is 50%
+Output: {"variables": {}, "claims": [], "conclusion": {"statement": "profit 9 and percentage 50", "answer_extracted_value": [9, 50], "answer_extracted_label": "", "is_attempt": true}, "domain_check_required": false}
+
+Example 5 (meta input — not an attempt)
+Question: Solve x + 8 = 23.
+Student: i dont know how to do this. what is an equation?
+Output: {"variables": {}, "claims": [], "conclusion": {"statement": "asks for help with the concept", "answer_extracted_value": null, "answer_extracted_label": "", "is_attempt": false}, "domain_check_required": false}
+
+Example 6 (arithmetic-step error — distinguishes from conclusion error)
+Question: Sides 5, 7, 9 — is the triangle right-angled?
+Student: 5^2 + 7^2 = 25 + 49 = 70, 9^2 = 81, 70 != 81 so not right-angled.
+Output: {"variables": {}, "claims": [{"id": "c1", "description": "5 squared is 25", "expression": {"op": "pow", "args": [5, 2]}, "asserted_value": 25}, {"id": "c2", "description": "7 squared is 49", "expression": {"op": "pow", "args": [7, 2]}, "asserted_value": 49}, {"id": "c3", "description": "25 plus 49 is 70 (student computed it wrong)", "expression": {"op": "add", "args": [25, 49]}, "asserted_value": 70}, {"id": "c4", "description": "9 squared is 81", "expression": {"op": "pow", "args": [9, 2]}, "asserted_value": 81}], "conclusion": {"statement": "not right-angled", "answer_extracted_value": null, "answer_extracted_label": "no", "is_attempt": true}, "domain_check_required": false}
+"""
+
+
+def render_student_claims_user_prompt(
+    *,
+    problem_text: str,
+    student_response: str,
+) -> str:
+    """Render the user-turn prompt for student-claims extraction.
+
+    Per prompting-fundamentals query-at-end structure: few-shot
+    examples FIRST, the actual question + student response LAST.
+    """
+    return (
+        f"{STUDENT_CLAIMS_FEW_SHOT}\n"
+        f"Question: {problem_text.strip()}\n"
+        f"Student: {student_response.strip()}\n"
+        f"Output:"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Non-math student-response parser (LLM-B for the non-math path)
+#
+# Mirrors the math LLM-B (STUDENT_CLAIMS_SYSTEM) but emits TEXTUAL
+# claims instead of arithmetic expressions. Subject-agnostic — works
+# for geography, science, language, definitions, prose explanations.
+#
+# Output is consumed by NON_MATH_JUDGE_SYSTEM (LLM-C) — separating
+# student parsing from judgement so LLM-C only has to decide semantic
+# alignment, not first interpret messy student prose.
+# ──────────────────────────────────────────────────────────────────────
+
+STUDENT_RESPONSE_SYSTEM = """\
+You read a student's response to a non-math question and emit a
+structured JSON object that a downstream judge will consume.
+
+Output a single JSON object with these top-level keys:
+
+  is_attempt — true when the student attempted an answer; false when
+               the response is meta — a help-request, a clarification
+               ask, an "I don't know", a stalling phrase, or asks
+               about a concept rather than answering the question.
+               Examples of is_attempt=false:
+                 "i don't understand", "what is condensation",
+                 "explain", "show me", "I'm stuck", "huh?", "idk",
+                 "give me a hint", "what does that mean".
+               Examples of is_attempt=true (even when likely wrong):
+                 "i think it's A", "condensation maybe", "the sky".
+
+  hedge_marker — true when the student signalled the answer is a
+                 guess or random pick, regardless of its correctness.
+                 Examples: "guess B", "i dunno but A", "random pick",
+                 "just picking C", "no idea but B", "could be A".
+                 false otherwise. Use sparingly — only when the
+                 student explicitly acknowledges low confidence.
+
+  claims — an ordered list of the discrete assertions the student
+           made. Each entry is an object:
+             {"id": "s1", "text": "<one short paraphrase of the
+                                    student's claim, in their voice>"}
+           Use an empty list when the student gave only a single-word
+           or single-phrase answer with no surrounding explanation.
+
+  conclusion — the student's bottom-line answer:
+                 {
+                   "stated_answer": "<short paraphrase of the final
+                                     answer, or the answer phrase
+                                     itself>",
+                   "answer_label":  "<yes|no|true|false|A|B|C|D|>",
+                   "denies_canonical": <true|false>
+                 }
+               ``answer_label`` is filled for Yes/No, True/False, or
+               single-letter multiple-choice answers. Use lowercase
+               for yes/no/true/false and uppercase A-D for MCQ
+               letters. Leave empty for free-text / explanation
+               answers.
+
+               ``denies_canonical`` is true when the student
+               explicitly states the answer is NOT a specific thing
+               (e.g. "it's not evaporation", "definitely not B").
+               Default false.
+
+Read the student response charitably. Strip filler ("hmm", "okay",
+"i think") and reduce to substance. Treat paraphrases as equivalent
+to the canonical concept ("water cooling" ≡ "vapor cools").
 
 Return JSON only — no prose, no markdown fences.
 """
 
 
-def render_non_math_grounded_user_prompt(
+# Few-shot. Per prompting-fundamentals query-last structure: examples
+# first, the live question + student response last in the user prompt.
+STUDENT_RESPONSE_FEW_SHOT = """\
+Example 1 (meta input — not an attempt)
+Question: Which stage of the water cycle is condensation?
+Student: i dont understand. what is condensation
+Output: {"is_attempt": false, "hedge_marker": false, "claims": [], "conclusion": {"stated_answer": "", "answer_label": "", "denies_canonical": false}}
+
+Example 2 (self-reported guess)
+Question: Which letter (A/B/C/D) shows the condensation stage?
+Student: guess B
+Output: {"is_attempt": true, "hedge_marker": true, "claims": [], "conclusion": {"stated_answer": "B", "answer_label": "B", "denies_canonical": false}}
+
+Example 3 (free-text correct with explanation)
+Question: What is condensation?
+Student: condensation is when water vapor cools down and forms tiny droplets in the air
+Output: {"is_attempt": true, "hedge_marker": false, "claims": [{"id": "s1", "text": "condensation is water vapor cooling"}, {"id": "s2", "text": "forms tiny droplets in the air"}], "conclusion": {"stated_answer": "condensation is vapor cooling to droplets", "answer_label": "", "denies_canonical": false}}
+
+Example 4 (denies canonical)
+Question: Is groundwater the end of the hydrological cycle?
+Student: no, the water keeps moving — it doesn't just stop underground
+Output: {"is_attempt": true, "hedge_marker": false, "claims": [{"id": "s1", "text": "water keeps moving, doesn't stop underground"}], "conclusion": {"stated_answer": "no, the cycle continues", "answer_label": "no", "denies_canonical": true}}
+
+Example 5 (wrong free-text — misconception)
+Question: What is condensation?
+Student: condensation is when rain falls from clouds
+Output: {"is_attempt": true, "hedge_marker": false, "claims": [{"id": "s1", "text": "condensation is when rain falls from clouds"}], "conclusion": {"stated_answer": "rain falling from clouds", "answer_label": "", "denies_canonical": false}}
+
+Example 6 (T/F with rationale)
+Question: True or false — large-scale maps cover smaller areas.
+Student: True - large-scale maps show smaller areas in more detail
+Output: {"is_attempt": true, "hedge_marker": false, "claims": [{"id": "s1", "text": "large-scale maps show smaller areas in more detail"}], "conclusion": {"stated_answer": "true", "answer_label": "true", "denies_canonical": false}}
+"""
+
+
+def render_student_response_user_prompt(
     *,
     question_stem: str,
-    student_input: str,
+    student_response: str,
+) -> str:
+    """Render the user-turn prompt for non-math student-response extraction."""
+    return (
+        f"{STUDENT_RESPONSE_FEW_SHOT}\n"
+        f"Question: {question_stem.strip()}\n"
+        f"Student: {student_response.strip()}\n"
+        f"Output:"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Non-math judge (LLM-C — replaces the grounded adjudicator + verifier)
+#
+# Reads:
+#   * question stem
+#   * KB chunks (or none — falls back to Google-grounding via Gemini)
+#   * LLM-B's STRUCTURED student output (claims + conclusion)
+#
+# Emits the same shape as the legacy grounded adjudicator so the
+# downstream consumer (GradingResult / StudentSafeFeedback) is
+# unchanged. The structural improvement is the INPUT shape — LLM-C
+# never sees raw student prose, only structured claims, so it doesn't
+# conflate parsing errors with judgement errors.
+# ──────────────────────────────────────────────────────────────────────
+
+NON_MATH_JUDGE_SYSTEM = """\
+You judge whether a student's structured response answers a question
+correctly, given the question and (optionally) a set of grounding
+sources.
+
+You receive a STRUCTURED student response, not raw prose — claims and
+a conclusion already extracted by an upstream parser. Trust that
+extraction: do not re-parse the student's wording. Judge the substance
+of what the structured response asserts.
+
+Source preference order:
+  1. Prefer the supplied grounding sources when they cover the
+     question — cite them in the ``citation`` field as [KB-N].
+  2. When the supplied sources do not cover the question, use your
+     own well-established knowledge of the subject. Set citation
+     empty in that case and use confidence to reflect that the
+     judgement is from general knowledge.
+  3. When neither path yields a confident judgement, return
+     verdict = "unverified".
+
+Verdict decision:
+  * correct   — the student's conclusion (and supporting claims, if
+                any) asserts the same answer as the canonical, read
+                charitably. Equivalent phrasings, paraphrases, and
+                rich free-text explanations all count when they reach
+                the correct conclusion.
+  * partial   — the student covers part of a multi-claim canonical
+                (e.g. one slot of a multi-part question), or names
+                the correct general concept but misses a required
+                qualifier.
+  * wrong     — the student asserts a different answer than the
+                canonical. Use ``reason_code="known_misconception"``
+                when the student's answer matches a recognised wrong
+                pattern (e.g. confused condensation with
+                precipitation). Use
+                ``reason_code="denies_canonical"`` when the structured
+                input's ``denies_canonical`` was true AND the
+                canonical IS the thing being denied.
+  * unverified— only when you genuinely cannot decide.
+
+Output a JSON object with these keys:
+
+  verdict             — "correct" | "partial" | "wrong" | "unverified".
+  private_canonical   — the correct answer in your own words (one
+                         short sentence). System-private; never shown
+                         to the student verbatim.
+  what_right          — short phrase the tutor can use to credit what
+                         the student got right (empty if wrong /
+                         unverified). DO NOT include the canonical
+                         answer in this field.
+  what_missing        — short phrase the tutor can use to surface
+                         what's still missing (empty if fully
+                         correct). DO NOT include the canonical
+                         answer in this field.
+  first_misconception — short, redacted hint at the first conceptual
+                         slip (empty if not wrong). DO NOT include
+                         the canonical answer in this field.
+  citation            — verbatim quote (≤30 words) from one of the
+                         sources, with the source label in brackets
+                         (e.g. "[KB-3]"). Empty when no source
+                         applies.
+  reason_code         — "" | "known_misconception" | "denies_canonical"
+                         | "off_topic". Optional structured diagnostic
+                         the engine branches on.
+
+Return JSON only — no prose, no markdown fences.
+"""
+
+
+def render_non_math_judge_user_prompt(
+    *,
+    question_stem: str,
+    student_response_dsl: dict,
     sources: list[str],
 ) -> str:
-    """Render the long-context user prompt for grounded adjudication.
+    """Render the user-turn prompt for the non-math judge (LLM-C).
 
-    Sources are placed FIRST, the decision question LAST — per the
-    long-context query-at-end rule. Each source is labelled "[KB-N]"
-    so the citation field can reference it cleanly.
+    Sources first, structured student input + decision instruction last
+    per the query-at-end rule. The structured student input is rendered
+    as compact JSON so the model reads it as data, not prose.
     """
+    import json as _json
     blocks = []
     for i, src in enumerate(sources or [], start=1):
         snippet = (src or "").strip()
@@ -185,95 +507,12 @@ def render_non_math_grounded_user_prompt(
     return (
         f"Grounding sources:\n\n{grounding_block}\n\n"
         f"---\n"
-        f"Question: {question_stem.strip()}\n"
-        f"Student answer: {student_input.strip()}\n\n"
-        f"Based on the grounding sources above, judge the student answer "
-        f"and emit the JSON object specified."
-    )
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Answer-consistency verifier (Phase 4)
-#
-# Fires AFTER the grounded adjudicator when its verdict is correct or
-# partial but its confidence is below the threshold. The old behaviour
-# was to blanket-downgrade those verdicts to ``unverified``, which
-# created the unverified-trap loop on rich natural-language proofs
-# (memory/v2_unverified_trap_redesign.md §Cluster A).
-#
-# This prompt does one thing only: decide whether the student's response,
-# interpreted charitably, asserts the same answer or conclusion the
-# canonical asserts. It does NOT judge wording quality, working shown,
-# or pedagogical completeness — those concerns live in the move-prompt
-# layer, not the grader.
-#
-# Subject-agnostic: works for math proofs, geography reasoning,
-# definitions, language. The verifier is a yes/no/cant-tell adjudicator,
-# not a re-grader.
-# ──────────────────────────────────────────────────────────────────────
-
-ANSWER_CONSISTENCY_VERIFIER_SYSTEM = """\
-You decide one narrow question: does the student's response, read
-charitably, assert the SAME final answer or conclusion as the
-canonical? Nothing else matters here — not wording, not whether
-they showed working, not pedagogical completeness.
-
-Charitable reading rules:
-  - Treat paraphrases, restatements, and natural-language proofs as
-    equivalent when they reach the same conclusion.
-  - Ignore filler ("I think", "is it", "maybe").
-  - Treat numeric equivalences as equal across forms (0.5 ≡ 1/2 ≡
-    50%; "169" ≡ "13 squared"; "yes, it's right-angled" ≡ "right
-    angle confirmed").
-  - For MCQ stems: a single letter, a single option restatement, or
-    the option text all count as the same answer.
-  - For a multi-claim canonical, require ALL claims to be asserted
-    for "yes"; if only some are, return "partial".
-
-Return a JSON object with these keys:
-
-  confirmed — one of:
-    "yes"        — the student's response asserts the same final answer
-                   or conclusion as the canonical.
-    "partial"    — the student covers part of a multi-claim canonical
-                   (e.g. one slot of a multi-slot question).
-    "no"         — the student asserts a different answer / conclusion.
-    "cant_tell"  — the response is too vague, off-topic, or
-                   meta ("idk", "can you give me a hint") to decide
-                   answer-consistency. Use this sparingly; if a
-                   reasonable teacher would call the answer right or
-                   wrong, do not return cant_tell.
-
-  why       — one short phrase (≤15 words) naming the basis for the
-              decision. Examples: "states 784 457, same six-figure
-              ref as canonical"; "concludes right-angled with correct
-              5/12/13 working"; "asserts profit, canonical says loss".
-
-Return JSON only — no prose, no markdown fences.
-"""
-
-
-def render_answer_consistency_user_prompt(
-    *,
-    question_stem: str,
-    canonical: str,
-    student_input: str,
-    tentative_verdict: str,
-) -> str:
-    """Render the user-turn prompt for the answer-consistency verifier.
-
-    Question + canonical + student response placed FIRST as context;
-    decision instruction LAST. Tentative verdict from grounded
-    adjudicator is included so the verifier can confirm or override.
-    """
-    return (
         f"Question: {question_stem.strip()}\n\n"
-        f"Canonical answer (private — system-side ground truth):\n"
-        f"{canonical.strip()}\n\n"
-        f"Student response:\n{student_input.strip()}\n\n"
-        f"Tentative grounded verdict: {tentative_verdict.strip() or '(none)'}\n\n"
+        f"Structured student response (already parsed by upstream LLM):\n"
+        f"{_json.dumps(student_response_dsl, indent=2)}\n\n"
         f"---\n"
-        f"Decide answer-consistency only. Emit the JSON object specified."
+        f"Judge the structured student response against the question "
+        f"and emit the JSON object specified."
     )
 
 

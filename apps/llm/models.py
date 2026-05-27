@@ -188,8 +188,26 @@ class ModelConfig(models.Model):
         #                     conformance can reject stacked questions
         #                     and bind open_question to the actual
         #                     rendered question.
-        GRADER_VERIFIER = 'grader_verifier', 'v2 Grader — Answer-Consistency Verifier'
+        # DEPRECATED 2026-05-27 — the non-math grader redesign replaces
+        # the verifier with a dedicated LLM-C judge. No callers remain;
+        # gated for deletion after one release cycle. See
+        # design/tasks/two-llm-grader-implementation-plan.md (non-math
+        # redesign discussion).
+        GRADER_VERIFIER = 'grader_verifier', 'v2 Grader — Answer-Consistency Verifier (DEPRECATED)'
         QUESTION_EXTRACTOR = 'question_extractor', 'v2 Post-render Question Extractor'
+        # Two-LLM grader (design/tasks/two-llm-grader-implementation-plan.md).
+        # GRADER_STUDENT_CLAIMS parses the student's MATH response into a
+        # structured claim graph (claims[], conclusion{}). Paired with
+        # GRADER_MATH (canonical extractor); both feed the Python
+        # comparator. Adjudicator-class — JSON-only, determinism required.
+        GRADER_STUDENT_CLAIMS = 'grader_student_claims', 'v2 Grader — Student-Claims Extractor (Math)'
+        # Non-math grader redesign — student response parser (LLM-B) +
+        # judge (LLM-C reuses grader_grounded for KB-aware judgement).
+        # GRADER_STUDENT_RESPONSE parses the student's NON-MATH response
+        # into is_attempt + hedge_marker + claims + conclusion. Separate
+        # from GRADER_STUDENT_CLAIMS so the prompts can diverge (math has
+        # arithmetic expressions; non-math has textual claims).
+        GRADER_STUDENT_RESPONSE = 'grader_student_response', 'v2 Grader — Student-Response Extractor (Non-Math)'
 
     institution = models.ForeignKey(
         Institution,
@@ -303,6 +321,8 @@ class ModelConfig(models.Model):
             # required for replay + observability.
             self.Purpose.GRADER_VERIFIER.value,
             self.Purpose.QUESTION_EXTRACTOR.value,
+            self.Purpose.GRADER_STUDENT_CLAIMS.value,
+            self.Purpose.GRADER_STUDENT_RESPONSE.value,
         ):
             return self.JUDGE_TEMP
         # v2 TUTOR_MOVE — TUTORING-class clamp [0.1, 0.3].
@@ -357,6 +377,8 @@ class ModelConfig(models.Model):
         'profiler_summary': 'PROFILER_SUMMARY_MODEL_OVERRIDE',
         'grader_verifier': 'GRADER_VERIFIER_MODEL_OVERRIDE',
         'question_extractor': 'QUESTION_EXTRACTOR_MODEL_OVERRIDE',
+        'grader_student_claims': 'GRADER_STUDENT_CLAIMS_MODEL_OVERRIDE',
+        'grader_student_response': 'GRADER_STUDENT_RESPONSE_MODEL_OVERRIDE',
     }
     # Purposes where Google-grounding is the required runtime branch.
     # Non-Gemini overrides are refused at resolve-time (fail-soft to

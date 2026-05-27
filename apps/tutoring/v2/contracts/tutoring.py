@@ -65,6 +65,13 @@ class GradingResult(BaseModel):
     ``bare_answer`` (Phase 2 §2.1.1). The flag is consumed by the
     selected move's *prompt*, not by move *selection* — move selection
     sees only ``verdict``.
+
+    ``reason_code`` is the Two-LLM grader's structured diagnostic
+    (design/tasks/two-llm-grader-implementation-plan.md §2.3 / §2.4):
+    arithmetic_failed, conclusion_inconsistent_with_canonical,
+    meta_input, state_inconsistent, grader_extraction_failed. The
+    move layer can branch deterministically on this code; the human-
+    readable ``reasoning`` string is still authoritative for logs.
     """
 
     verdict: Verdict
@@ -76,6 +83,22 @@ class GradingResult(BaseModel):
     reasoning: str = ""
     citation: str = ""
     bare_answer: bool = False
+    reason_code: Optional[
+        Literal[
+            # math grader codes
+            "arithmetic_failed",
+            "conclusion_inconsistent_with_canonical",
+            # non-math grader codes
+            "self_reported_guess",
+            "known_misconception",
+            "denies_canonical",
+            "off_topic",
+            # shared codes
+            "meta_input",
+            "state_inconsistent",
+            "grader_extraction_failed",
+        ]
+    ] = None
 
 
 class TutoringContext(BaseModel):
