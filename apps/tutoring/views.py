@@ -735,6 +735,27 @@ def chat_start_session(request, lesson_id):
         # Resume active session — include conversation history
         session = existing
         history = _build_session_history(session)
+
+        # Engine dispatch: when the simple-tutor engine is on, route
+        # the resume through ``start_for_view`` so the M13 in-flight
+        # re-anchor branch can fire (deterministic "Welcome back" +
+        # re-display of the slot, no LLM call). Without this branch
+        # the legacy ConversationalTutor.resume() always runs and
+        # the M13 fix has no effect on resume.
+        from apps.tutoring import simple_tutor
+        if simple_tutor.is_enabled():
+            from apps.tutoring.simple_tutor.engine import start_for_view
+            try:
+                payload = start_for_view(session)
+                payload['session_id'] = session.id
+                payload['history'] = history
+                return JsonResponse(payload)
+            except Exception as e:
+                logger.error(
+                    f"[start:simple] resume failed: {e}", exc_info=True,
+                )
+                # Fall through to legacy resume on error.
+
         tutor = ConversationalTutor(session)
         response = tutor.resume()
 
@@ -848,6 +869,26 @@ def chat_start_session(request, lesson_id):
                 'mastery_level': 'in_progress',
             },
         )
+
+        # Engine dispatch: when the simple-tutor engine is enabled,
+        # route the warm-up through it too (otherwise the legacy v1
+        # engine seeds the first turn and the M12 ``InFlightQuestion``
+        # slot never gets written for the warm-up question — the
+        # follow-up /respond/ turn then sees a mismatch between
+        # <recent_turns> and an empty slot).
+        from apps.tutoring import simple_tutor
+        if simple_tutor.is_enabled():
+            from apps.tutoring.simple_tutor.engine import start_for_view
+            try:
+                payload = start_for_view(session)
+                payload['session_id'] = session.id
+                return JsonResponse(payload)
+            except Exception as e:
+                logger.error(f"[start:simple] Failed: {e}", exc_info=True)
+                return JsonResponse(
+                    {"error": "Something went wrong starting the session."},
+                    status=500,
+                )
 
         tutor = ConversationalTutor(session)
         response = tutor.start()
@@ -1127,6 +1168,31 @@ def chat_respond(request, session_id):
     logger = logging.getLogger('apps')
     logger.info(f"[respond] Starting for session {session_id}, message: {message[:50]}")
 
+    # ── Engine dispatch ──────────────────────────────────────────
+    # The simple-tutor engine (apps/tutoring/simple_tutor/) is selected
+    # via the SIMPLE_TUTOR_ENGINE env var. Default OFF → legacy v1.
+    # The student NEVER picks the engine — it's a deploy-level config
+    # set in the Container App env. See
+    # auto-memory/feedback_server_owns_question_state.md.
+    from apps.tutoring import simple_tutor
+    if simple_tutor.is_enabled():
+        from apps.tutoring.simple_tutor.engine import respond_for_view
+        try:
+            t0 = time.time()
+            payload = respond_for_view(session, message)
+            elapsed = time.time() - t0
+            logger.info(
+                f"[respond:simple] Completed in {elapsed:.1f}s "
+                f"step={payload.get('step_number')}/{payload.get('total_steps')}"
+            )
+            return JsonResponse(payload)
+        except Exception as e:
+            logger.error(f"[respond:simple] Failed: {e}", exc_info=True)
+            return JsonResponse(
+                {"error": "Something went wrong. Please try again."},
+                status=500,
+            )
+
     tutor = ConversationalTutor(session)
 
     try:
@@ -1202,6 +1268,26 @@ def chat_start_review(request, session_id):
         id=session_id,
         student=request.user,
     )
+
+    # Engine dispatch: route review through simple_tutor when enabled.
+    # ``start_for_view`` does the right thing for a completed session
+    # — an ``ExitTicketAttempt`` exists, so the engine enters
+    # REMEDIATION mode and the LLM either re-teaches missed objectives
+    # (failed) or congratulates and advances (passed). Without this
+    # branch the legacy CT.start_review runs even when the rest of the
+    # chat flow is on simple_tutor, breaking the engine contract.
+    from apps.tutoring import simple_tutor
+    if simple_tutor.is_enabled():
+        from apps.tutoring.simple_tutor.engine import start_for_view
+        try:
+            payload = start_for_view(session)
+            payload['session_id'] = session.id
+            return JsonResponse(payload)
+        except Exception as e:
+            logger.error(
+                f"[start_review:simple] failed: {e}", exc_info=True,
+            )
+            # Fall through to legacy review on error.
 
     tutor = ConversationalTutor(session)
     result = tutor.start_review()
@@ -1561,6 +1647,37 @@ def chat_exit_ticket(request, session_id):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     try:
+        # Engine dispatch: when simple_tutor is on, use the lightweight
+        # exit_ticket.submit_exit_ticket — bypasses ConversationalTutor's
+        # ~2-3s cold init + the gamification cascade. For all-MCQ
+        # tickets it runs sub-second instead of the legacy 5-8s.
+        from apps.tutoring import simple_tutor as _simple_tutor
+        if _simple_tutor.is_enabled():
+            from apps.tutoring.simple_tutor.exit_ticket import (
+                submit_exit_ticket as _simple_submit,
+            )
+            simple_resp = _simple_submit(session, answers)
+
+            from apps.tutoring.competency import attempt_response_block
+            from apps.tutoring.models import ExitTicket, StudentLessonProgress
+            exit_ticket = ExitTicket.objects.filter(lesson=session.lesson).first()
+            progress = StudentLessonProgress.objects.filter(
+                student=request.user, lesson=session.lesson,
+            ).first()
+            et_data = simple_resp.get('exit_ticket') or {}
+            results = et_data.get('results', [])
+            score = et_data.get('score', 0)
+            competency = attempt_response_block(score, results, exit_ticket, progress)
+            enriched_exit_ticket = dict(et_data)
+            enriched_exit_ticket['competency'] = competency
+
+            return JsonResponse({
+                'message': simple_resp.get('message', ''),
+                'phase': simple_resp.get('phase', 'exit_ticket'),
+                'exit_ticket': enriched_exit_ticket,
+                'is_complete': simple_resp.get('is_complete', False),
+            })
+
         tutor = ConversationalTutor(session)
         response = tutor.submit_exit_ticket(answers)
 
@@ -1580,6 +1697,18 @@ def chat_exit_ticket(request, session_id):
         enriched_exit_ticket = dict(response.exit_ticket_data or {})
         enriched_exit_ticket["competency"] = competency
 
+        # NOTE on tutor-driven remediation: an earlier version of this
+        # view called ``simple_tutor.start_remediation(session)`` here
+        # to replace the static "Let's revisit" message with an
+        # LLM-authored opener. That added a synchronous Opus 4.7 call
+        # (5-15s) on top of the deterministic MCQ grading — making
+        # the "Grading…" spinner feel broken on all-MCQ tickets.
+        # Removed 2026-05-26. The remediation context still fires on
+        # the student's NEXT chat message: simple_tutor.respond auto-
+        # detects the ExitTicketAttempt and enters REMEDIATION mode
+        # via the <exit_ticket_review> system-prompt block. A future
+        # frontend follow-up (fire /respond/ after Continue) could
+        # restore the proactive opener without blocking the submit.
         return JsonResponse({
             "message": response.content,
             "phase": response.phase,

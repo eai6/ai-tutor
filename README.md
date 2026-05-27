@@ -4,6 +4,10 @@ An AI-powered tutoring platform for secondary school students, built with Django
 
 Students learn through structured conversational sessions that follow research-based pedagogy (5E model), with automatic content generation, exit-ticket assessments, prerequisite gating, and real-time progress tracking.
 
+## Staging
+
+https://aitutor-staging-app.icyplant-cffb8b76.centralus.azurecontainerapps.io — deployed from the `dev` branch on push via GitHub Actions.
+
 ---
 
 ## Table of Contents

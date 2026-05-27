@@ -125,6 +125,51 @@ class TutorSession(models.Model):
                   "(e.g. 'struggler'). Empty for real sessions.",
     )
 
+    # Engine selection (M1 of memory/simple_tutor_engine_milestones.md).
+    # 'v1' = the legacy conversational_tutor.py state machine.
+    # 'simple' = apps/tutoring/simple_tutor.py — single-LLM-call engine
+    # with 5 tools (pose_question, record_answer, advance_step,
+    # request_figure, redirect_off_topic) and deterministic grading.
+    # Locked at session creation; do NOT mutate mid-session (would split
+    # state across two engines that don't read each other's tables).
+    class Engine(models.TextChoices):
+        V1 = 'v1', 'conversational_tutor'
+        SIMPLE = 'simple', 'simple_tutor'
+
+    engine = models.CharField(
+        max_length=16,
+        choices=Engine.choices,
+        default=Engine.V1,
+        db_index=True,
+        help_text="Which runtime engine handles this session. Locked at "
+                  "creation; do not change mid-session.",
+    )
+    # The question_id the simple-tutor server has anchored to for the
+    # current turn. Set by pick_current_question; cleared by
+    # record_answer / advance_step / auto-grade. None means no specific
+    # question is in play — next student turn is treated as a
+    # clarification, not an answer attempt. Unused on engine='v1'.
+    current_question_id = models.IntegerField(
+        null=True, blank=True,
+        help_text="LessonStep or ExitTicketQuestion id the simple tutor "
+                  "has anchored to. Disambiguated by current_question_source.",
+    )
+    # Disambiguates which table current_question_id points to. LessonStep
+    # is primary (it carries the per-step question text + expected answer
+    # most lessons author). ExitTicketQuestion is the fallback for lessons
+    # whose steps lack their own question but have linked ticket rows.
+    class QuestionSource(models.TextChoices):
+        LESSON_STEP = 'lesson_step', 'LessonStep'
+        EXIT_TICKET = 'exit_ticket', 'ExitTicketQuestion'
+
+    current_question_source = models.CharField(
+        max_length=16,
+        choices=QuestionSource.choices,
+        null=True, blank=True,
+        help_text="Table current_question_id points to. None when "
+                  "current_question_id is None.",
+    )
+
     @property
     def lesson_duration_minutes(self):
         """Time spent on the lesson in minutes."""
@@ -274,6 +319,89 @@ class SessionTurn(models.Model):
     def __str__(self):
         preview = self.content[:50] + "..." if len(self.content) > 50 else self.content
         return f"[{self.role}] {preview}"
+
+
+class InFlightQuestion(models.Model):
+    """The simple-tutor's currently-posed question, persisted per
+    session at the moment the tutor LLM calls ``pose_question``.
+
+    Replaces the M11.3 design where the tutor passed reference_answer
+    on every ``record_answer`` call. M11.3 hit a structural failure:
+    when one tutor turn mixed praise of a prior answer + a new
+    question, the LLM consistently mis-identified the in-flight
+    question and graded against the wrong reference.
+
+    The pose_question architecture (M12) writes a server-side slot
+    when the tutor poses; ``record_answer`` reads from that slot. The
+    LLM is never asked to re-identify what's in flight.
+
+    OneToOne with TutorSession — there is at most one in-flight
+    question per session at a time. Cleared on grade, replaced on
+    pose (with an analytics warning for ``posed_without_grading``).
+
+    See memory/simple_tutor_m12_pose_question_milestones.md.
+    """
+
+    class QuestionType(models.TextChoices):
+        MCQ = 'mcq', 'mcq'
+        SHORT_NUMERIC = 'short_numeric', 'short_numeric'
+        SHORT_ANSWER = 'short_answer', 'short_answer'
+
+    class Source(models.TextChoices):
+        CATALOG = 'catalog', 'from <question_pool>'
+        INLINE_AUTHORED = 'inline_authored', 'authored by LLM in-line'
+
+    session = models.OneToOneField(
+        TutorSession,
+        on_delete=models.CASCADE,
+        related_name='in_flight_question',
+    )
+    question_text = models.TextField(
+        help_text="The question stem the tutor posed (verbatim).",
+    )
+    question_type = models.CharField(
+        max_length=20,
+        choices=QuestionType.choices,
+        help_text="Selects the grading tier in apps.tutoring.simple_tutor.grader.",
+    )
+    # MCQ options as a list of strings: ['option A text', 'option B text', ...].
+    # Empty list for short_numeric / short_answer.
+    options = models.JSONField(default=list, blank=True)
+    reference_answer = models.TextField(
+        help_text="What the tutor would mark correct. For MCQ: the "
+                  "letter (A/B/C/D). For short_numeric: the numeric "
+                  "value. For short_answer: one canonical phrasing.",
+    )
+    source = models.CharField(
+        max_length=20,
+        choices=Source.choices,
+        help_text="Whether the tutor used a question from <question_pool> "
+                  "or authored its own.",
+    )
+    catalog_question_id = models.IntegerField(
+        null=True, blank=True,
+        help_text="ExitTicketQuestion / LessonStep pk when source=catalog. "
+                  "Used for catalog cross-checks + analytics.",
+    )
+    # Number of incorrect verdicts recorded against this in-flight
+    # question (cleared with the slot). Drives the hint ladder rule
+    # without forcing the LLM to re-count from <recent_turns>.
+    attempt_count = models.PositiveIntegerField(default=0)
+    posed_at_turn = models.ForeignKey(
+        'SessionTurn',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        help_text="The tutor SessionTurn whose pose_question call "
+                  "created this row. Audit trail.",
+    )
+    posed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tutoring_inflightquestion'
+
+    def __str__(self):
+        return f"InFlightQ(session={self.session_id} type={self.question_type})"
 
 
 class TurnSpan(models.Model):
