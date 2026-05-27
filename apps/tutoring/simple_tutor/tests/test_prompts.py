@@ -654,8 +654,10 @@ class RulesContentTest(TestCase):
             session=_session(), step=_step(),
         )
         block0 = blocks[0]['text']
-        self.assertIn('Tutor-driven', block0)
-        self.assertIn('concrete next action', block0)
+        self.assertIn('Tutor-driven and actionable', block0)
+        # Pass-the-student-test framing — reply must leave them with a
+        # specific next thing to do.
+        self.assertIn('ONE specific thing to do', block0)
         # Explicit instruction NOT to wait for student to ask what's next
         self.assertIn("immediately call pose_question", block0)
         # Banned-phrasing list catches the 2026-05-26 "Ready for the
