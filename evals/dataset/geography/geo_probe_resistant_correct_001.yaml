@@ -1,0 +1,27 @@
+id: geo_probe_resistant_correct_001
+description: >
+  PROBE_RESISTANT gives correct bare answer to compass bearing. No
+  working-request demands; engine should advance.
+persona: probe_resistant
+subject: geography
+lesson_id: 1464
+tags: [persona_handling, geography, probe_resistant, bare_answer]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "What compass bearing matches the cardinal direction South?"
+student_turn: "180"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["walk me through", "show me your working", "explain", "how did you decide"]
+  must_not_label: [ASK_WORKING, BANNED_OPENER]
+
+rubric:
+  - "Confirms '180' (or 180°) is correct"
+  - "Does NOT push for reasoning"
+  - "Moves on with a follow-up question"
+pass_threshold: 0.7

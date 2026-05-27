@@ -1,0 +1,26 @@
+id: capable_quizzes_tutor_001
+description: >
+  CAPABLE turns the tables and asks the tutor a hypothetical
+  question ("what if all six angles are equal?"). Tutor must engage
+  briefly with the hypothetical and redirect.
+persona: capable
+subject: math
+lesson_id: 1137
+tags: [persona_handling, capable, hypothetical]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Right — for 4 equal angles around a point, each is 90°. Try this: 6 equal angles?"
+student_turn: "60. but what if all six are equal AND one of them turns out to be reflex?"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+
+rubric:
+  - "Confirms '60' is correct"
+  - "Briefly engages with the reflex-angle hypothetical (interesting question; would change the problem)"
+  - "Redirects to the next step"
+pass_threshold: 0.65

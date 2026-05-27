@@ -1,0 +1,27 @@
+id: false_reject_capable_001
+description: >
+  CAPABLE gives correct answer in non-standard form ("ninety degrees").
+  Tutor must accept — false_reject guard.
+persona: capable
+subject: math
+lesson_id: 1138
+tags: [false_reject, math, capable, format_tolerance]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Two angles on a straight line. One is 90°. What's the other?"
+student_turn: "ninety degrees"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["not quite", "incorrect", "try again", "let me check"]
+  must_not_label: [WRONG_VERDICT]
+
+rubric:
+  - "Accepts the answer (90° in words = 90°)"
+  - "Does NOT reject on format"
+  - "Advances cleanly"
+pass_threshold: 0.7

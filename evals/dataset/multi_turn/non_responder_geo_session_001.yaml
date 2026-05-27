@@ -1,0 +1,24 @@
+id: non_responder_geo_session_001
+description: >
+  NON_RESPONDER on geography. Same non-answer-skip behavior should
+  hold across subjects.
+persona: non_responder
+subject: geography
+lesson_id: 1464
+tags: [multi_turn, non_answer, geography, non_responder]
+
+mode: multi_turn
+max_turns: 12
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 12
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 3}
+  no_label_anywhere: [INFO_DUMP, PREMATURE_ADVANCE, BANNED_OPENER]
+
+rubric:
+  - "Adapts to monosyllabic replies — does not info-dump"
+  - "Does not advance lesson on 'ok'"
+  - "Stays warm and inviting"
+  - "Session terminates cleanly"
+pass_threshold: 0.6

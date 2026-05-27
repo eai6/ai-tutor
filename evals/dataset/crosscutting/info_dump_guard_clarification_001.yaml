@@ -1,0 +1,27 @@
+id: info_dump_guard_clarification_001
+description: >
+  Student asks "what's the difference between scale and zoom?" —
+  tempting for the tutor to deliver a multi-paragraph explanation.
+  The tutor must answer in ONE concise paragraph.
+persona: average
+subject: geography
+lesson_id: 1463
+tags: [format, info_dump_guard, crosscutting]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Large scale maps zoom in on small areas with lots of detail. Make sense?"
+student_turn: "what's the difference between scale and zoom?"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Distinguishes the two concepts concisely (scale = ratio, zoom = visual operation)"
+  - "Stays under ~40 words"
+  - "Ends with a question that re-anchors to the lesson"
+pass_threshold: 0.7

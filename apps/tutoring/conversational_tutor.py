@@ -2030,6 +2030,23 @@ Keep it to 2-3 sentences."""
                     f"[PendingQuestion] post-impl attach failed: "
                     f"{type(_exc).__name__}: {_exc}"
                 )
+            # Final paragraph-collapse on the student-facing content.
+            # Applied AFTER _respond_impl has run all judges + validators
+            # + regen — so the judges saw the original multi-paragraph
+            # text (and didn't false-flag it as incoherent). The DB
+            # retains the validator's chosen text; only the returned
+            # TutorMessage.content gets collapsed for student display.
+            # See memory/eval_harness_plan.md and the eval baseline that
+            # showed ~93% of single-turn failures were max_paragraphs.
+            try:
+                if isinstance(result, TutorMessage) and result.content:
+                    from apps.tutoring.validator import collapse_paragraphs
+                    result.content = collapse_paragraphs(result.content)
+            except Exception as _exc:
+                logger.warning(
+                    f"[CollapseParagraphs] post-impl collapse failed: "
+                    f"{type(_exc).__name__}: {_exc}"
+                )
             return result
         finally:
             reset_span_buffer(token)

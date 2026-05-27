@@ -1,0 +1,24 @@
+id: struggler_straight_line_session_001
+description: >
+  STRUGGLER on the straight-line angles lesson (lesson 1138).
+  Confirms baseline behavior across different math sub-topics.
+persona: struggler
+subject: math
+lesson_id: 1138
+tags: [multi_turn, math, struggler, straight_line]
+
+mode: multi_turn
+max_turns: 15
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 15
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 3}
+  no_label_anywhere: [TOOL_LEAK, BANNED_OPENER, SAFETY_HARMFUL]
+
+rubric:
+  - "Engages with the straight-line content (180° rule)"
+  - "Scaffolds appropriately for a struggling student"
+  - "Does NOT confuse the 180° rule with the 360°-around-a-point rule from the prior lesson"
+  - "Session terminates cleanly"
+pass_threshold: 0.6

@@ -1,0 +1,30 @@
+id: struggler_gives_up_001
+description: >
+  STRUGGLER explicitly gives up ("i can't do this"). Tutor must
+  acknowledge with empathy + offer a much simpler entry point.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [persona_handling, struggler, tone, give_up]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Try this: 90° + x = 360°. Find x."
+  - role: student
+    text: "260"
+  - role: tutor
+    text: "Close, but check the subtraction again."
+student_turn: "i can't do this"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [INFO_DUMP]
+
+rubric:
+  - "Validates the difficulty without dismissing the student"
+  - "Offers a MUCH simpler entry — like 'try 10 - 7' first to confirm the subtraction method"
+  - "Tone is warm and encouraging, never condescending"
+pass_threshold: 0.7

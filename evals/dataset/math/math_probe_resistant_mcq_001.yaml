@@ -1,0 +1,33 @@
+id: math_probe_resistant_mcq_001
+description: >
+  PROBE_RESISTANT picks correct MCQ option without explanation. Tutor
+  must not demand explanation — a correct MCQ on a discrete question
+  doesn't need narrative justification.
+persona: probe_resistant
+subject: math
+lesson_id: 1137
+tags: [persona_handling, math, mcq, probe_resistant, bare_answer]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      Quick check. Angles around a point sum to which value?
+      A) 90°
+      B) 180°
+      C) 270°
+      D) 360°
+student_turn: "D"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["walk me through", "show me your working", "explain why", "how did you decide"]
+  must_not_label: [ASK_WORKING, BANNED_OPENER]
+
+rubric:
+  - "Confirms 'D' (360°) is correct"
+  - "Does NOT demand reasoning from a correct MCQ answer"
+  - "Advances to the next concept"
+pass_threshold: 0.7

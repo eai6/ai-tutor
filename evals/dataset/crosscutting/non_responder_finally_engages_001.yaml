@@ -1,0 +1,36 @@
+id: non_responder_finally_engages_001
+description: >
+  NON_RESPONDER finally produces a real answer after several
+  monosyllabic turns. Tutor must reinforce the engagement without
+  over-praising.
+persona: non_responder
+subject: math
+lesson_id: 1137
+tags: [persona_handling, non_responder, engagement]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "What do angles around a point sum to?"
+  - role: student
+    text: "idk"
+  - role: tutor
+    text: "Take a guess — 180 or 360?"
+  - role: student
+    text: "360"
+  - role: tutor
+    text: "Right! How about three equal angles around a point — each is...?"
+student_turn: "120"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["amazing", "incredible", "wonderful"]
+
+rubric:
+  - "Confirms '120' is correct"
+  - "Reinforces the engagement subtly (e.g., 'good!' or 'nice')"
+  - "Does NOT effusively praise — that could be patronising"
+  - "Continues the lesson"
+pass_threshold: 0.7

@@ -1,0 +1,28 @@
+id: struggler_misreads_question_001
+description: >
+  STRUGGLER answers a DIFFERENT question than the one asked (misread
+  the prompt — answered for a related but distinct value). Tutor
+  must redirect to the actual question, not penalize for the misread.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [diagnostic, struggler, misread]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Three angles around a point: 100°, 120°, x. Find x."
+student_turn: "220 because 100 + 120"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["not quite", "wrong", "no, that's"]
+  must_not_label: [UNFOUNDED_PRAISE]
+
+rubric:
+  - "Affirms 100 + 120 = 220 is correct arithmetic, BUT the question asks for x, not the sum"
+  - "Surfaces the misread gently — points the student at what x represents"
+  - "Does NOT scold or just say 'wrong'"
+pass_threshold: 0.7

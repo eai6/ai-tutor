@@ -1,0 +1,26 @@
+id: error_prone_session_001
+description: >
+  ERROR_PRONE (BEA coverage persona) drives a math session. The
+  student consistently makes substantive mistakes; tutor's
+  remediation quality is what's being measured.
+persona: error_prone
+subject: math
+lesson_id: 1137
+tags: [multi_turn, math, error_prone, remediation]
+
+mode: multi_turn
+max_turns: 15
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 15
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 3}
+  no_label_anywhere: [TOOL_LEAK, THINKING_LEAK, UNFOUNDED_PRAISE, LEAKS_ANSWER, INCOHERENT]
+
+rubric:
+  - "Identifies WHICH error mode each mistake exhibits (wrong operation, arithmetic slip, etc.)"
+  - "Surfaces the specific error rather than just 'try again'"
+  - "Does NOT affirm wrong answers"
+  - "Does NOT just reveal the correct answer — keeps the student diagnostic-active"
+  - "Session reaches a clean termination"
+pass_threshold: 0.6

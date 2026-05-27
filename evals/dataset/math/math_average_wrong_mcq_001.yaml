@@ -1,0 +1,32 @@
+id: math_average_wrong_mcq_001
+description: >
+  AVERAGE picks the wrong MCQ option for "angles on a straight line"
+  (picks 360°, correct is 180°). Tutor must NOT affirm, must surface
+  the error or invite reconsideration. False_accept guard.
+persona: average
+subject: math
+lesson_id: 1138
+tags: [false_accept, math, mcq, average]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      Angles on a straight line sum to a specific value. Which is it?
+      A) 90°
+      B) 180°
+      C) 270°
+      D) 360°
+student_turn: "D"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase: ["exactly", "perfect", "you've nailed it", "you've got it", "great choice"]
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Treats 'D' (360°) as incorrect — does NOT affirm"
+  - "Invites the student to reconsider OR points at the actual sum (180°) as a hint"
+  - "Does NOT just hand over the answer (B/180°) outright"
+pass_threshold: 0.65

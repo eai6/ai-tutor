@@ -1,0 +1,34 @@
+id: repeats_phrase_guard_001
+description: >
+  STRUGGLER has already declined twice to show working. Tutor must
+  not repeat its previous turn verbatim — the engine's REPEATS guard
+  should suppress identical follow-ups.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [repetition, crosscutting, struggler]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Three angles around a point: 70°, 80°, x. Find x."
+  - role: student
+    text: "210"
+  - role: tutor
+    text: "Let's check that. How did you get 210?"
+  - role: student
+    text: "i added them"
+student_turn: "is that wrong"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["how did you get", "let's check that"]
+  must_not_label: [REPEATS]
+
+rubric:
+  - "Confirms the student is on a wrong track (added instead of subtracting from 360)"
+  - "Uses a DIFFERENT phrasing than 'how did you get that' — not a verbatim repeat"
+  - "Gives the student a concrete next step"
+pass_threshold: 0.7

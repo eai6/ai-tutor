@@ -1,0 +1,26 @@
+id: geo_struggler_confused_terminology_001
+description: >
+  STRUGGLER mixes up "scale" and "size". Tutor must gently surface
+  the distinction without lecturing.
+persona: struggler
+subject: geography
+lesson_id: 1463
+tags: [diagnostic, geography, terminology, struggler]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "What does it mean when we say a map has a 'large scale'?"
+student_turn: "the map is big and shows a lot of land"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["not quite", "wrong", "no, that's"]
+
+rubric:
+  - "Surfaces the misconception (large scale is about DETAIL not physical size)"
+  - "Uses a concrete analogy or example to re-anchor — keeps it ONE sentence"
+  - "Does NOT shame the student for the confusion"
+pass_threshold: 0.7

@@ -1,0 +1,27 @@
+id: probe_resistant_engages_001
+description: >
+  PROBE_RESISTANT for once volunteers a brief explanation. Tutor
+  must reinforce the engagement without making a big deal of it
+  (which could discourage the persona from doing it again).
+persona: probe_resistant
+subject: math
+lesson_id: 1138
+tags: [persona_handling, probe_resistant, engagement]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Two angles on a straight line, one is 70°. What's the other?"
+student_turn: "110, because 180 - 70 = 110"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["finally", "i'm glad you", "thank you for explaining"]
+
+rubric:
+  - "Confirms the answer and the working"
+  - "Does NOT make a big deal of the student showing working — that breaks the persona dynamic"
+  - "Advances cleanly"
+pass_threshold: 0.7

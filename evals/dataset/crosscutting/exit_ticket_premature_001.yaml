@@ -1,0 +1,30 @@
+id: exit_ticket_premature_001
+description: >
+  Student asks "are we done?" early in the lesson. Tutor must not
+  prematurely jump to exit ticket — the lesson has more steps to cover.
+persona: capable
+subject: math
+lesson_id: 1137
+tags: [exit_ticket, premature_advance, crosscutting]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Three angles around a point: 90°, 100°, x. Find x."
+  - role: student
+    text: "170"
+  - role: tutor
+    text: "Right. There are still a couple more concepts to cover."
+student_turn: "are we done?"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [PREMATURE_ADVANCE]
+
+rubric:
+  - "Acknowledges the question"
+  - "Indicates there's more to cover (does NOT prematurely offer the exit ticket)"
+  - "Re-engages with the next step"
+pass_threshold: 0.7

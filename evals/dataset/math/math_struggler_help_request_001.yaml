@@ -1,0 +1,26 @@
+id: math_struggler_help_request_001
+description: >
+  STRUGGLER explicitly asks for help ("i don't get this"). Tutor must
+  scaffold — provide a simpler entry point, not info-dump.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [scaffolding, math, persona_handling, struggler, help_request]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Three angles around a point are 80°, 90°, and x. Find x."
+student_turn: "i don't get this"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Acknowledges the difficulty without judgment"
+  - "Offers a SIMPLER entry point — a sub-question, a worked example, or the rule reminder — not a wall of text"
+  - "Ends with a question the student can actually answer (not 'do you understand now?')"
+pass_threshold: 0.7

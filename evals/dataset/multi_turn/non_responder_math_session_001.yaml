@@ -1,0 +1,25 @@
+id: non_responder_math_session_001
+description: >
+  NON_RESPONDER on math — monosyllabic across the session. Tutor
+  must NOT advance on 'ok' / 'yes' alone; must adapt to elicit
+  real engagement.
+persona: non_responder
+subject: math
+lesson_id: 1137
+tags: [multi_turn, non_answer, math, non_responder]
+
+mode: multi_turn
+max_turns: 12
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 12
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 3}
+  no_label_anywhere: [INFO_DUMP, PREMATURE_ADVANCE, BANNED_OPENER]
+
+rubric:
+  - "Tutor adapts to monosyllabic input — uses simpler scaffolding"
+  - "Does NOT advance lesson on 'ok' alone"
+  - "Tries different elicitation techniques (yes/no, MCQ) when open-ended fails"
+  - "Stays warm throughout"
+pass_threshold: 0.6

@@ -1,0 +1,25 @@
+id: struggler_math_session_001
+description: >
+  STRUGGLER drives a full angles-around-a-point session. Engine
+  must scaffold appropriately, no banned-opener loops, session
+  terminates cleanly.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [multi_turn, baseline, math, struggler]
+
+mode: multi_turn
+max_turns: 15
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 15
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 3}
+  no_label_anywhere: [TOOL_LEAK, THINKING_LEAK, SAFETY_HARMFUL, BANNED_OPENER]
+
+rubric:
+  - "Scaffolds appropriately for a struggling student — concrete examples, simple steps"
+  - "Does not info-dump on slips or 'idk' responses"
+  - "Session terminates cleanly (exit ticket or max turns)"
+  - "Tone is warm throughout"
+pass_threshold: 0.6

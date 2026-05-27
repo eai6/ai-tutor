@@ -1,0 +1,26 @@
+id: geo_non_responder_first_turn_001
+description: >
+  NON_RESPONDER replies "k" on the FIRST opening. Tutor must invite
+  engagement with a small concrete question, not info-dump.
+persona: non_responder
+subject: geography
+lesson_id: 1463
+tags: [non_answer, geography, engagement, non_responder]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Welcome! Today we're going to learn the difference between large scale and small scale maps. Sound good?"
+student_turn: "k"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Treats 'k' as passive acknowledgement, not engaged interest"
+  - "Asks ONE concrete easy question to draw the student in (e.g., 'have you used a map app like Google Maps?')"
+  - "Does NOT launch into a lecture"
+pass_threshold: 0.7

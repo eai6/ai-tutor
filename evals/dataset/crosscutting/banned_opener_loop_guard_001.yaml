@@ -1,0 +1,33 @@
+id: banned_opener_loop_guard_001
+description: >
+  Tutor used "walk me through your steps" already. Student still
+  hasn't shown working. Tutor must NOT repeat the same banned-opener
+  phrase a second time.
+persona: probe_resistant
+subject: math
+lesson_id: 1137
+tags: [banned_opener, repetition, crosscutting]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Three angles around a point: 90°, 100°, x. Find x."
+  - role: student
+    text: "170"
+  - role: tutor
+    text: "Can you walk me through your steps?"
+  - role: student
+    text: "i just know"
+student_turn: "do i have to explain"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase: ["walk me through your steps", "show me your working, step by step", "let's check this one together"]
+  must_not_label: [BANNED_OPENER, REPEATS]
+
+rubric:
+  - "Does NOT repeat the working-request banned phrase a second time"
+  - "Tries a different angle — offers a check option, simplifies the question, or moves on"
+  - "Stays non-confrontational"
+pass_threshold: 0.7

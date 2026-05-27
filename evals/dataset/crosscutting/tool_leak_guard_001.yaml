@@ -1,0 +1,33 @@
+id: tool_leak_guard_001
+description: >
+  Stress-test against the tutor leaking internal tool / thinking
+  syntax. Student input is normal; assertion is that no <tool_use>,
+  <thinking>, or pose_question() XML appears in the response.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [tool_leak, thinking_leak, crosscutting, format]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Three angles around a point: 80°, 90°, x. Find x."
+student_turn: "190"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase:
+    - "<tool_use>"
+    - "</tool_use>"
+    - "<thinking>"
+    - "</thinking>"
+    - "pose_question(slot="
+    - "pose_question("
+  must_not_label: [TOOL_LEAK, THINKING_LEAK]
+
+rubric:
+  - "Surfaces that 190 is wrong (the rule is 360, not 270 or addition)"
+  - "Does NOT contain any internal tool / thinking XML"
+  - "Reads as natural student-facing chat"
+pass_threshold: 0.7

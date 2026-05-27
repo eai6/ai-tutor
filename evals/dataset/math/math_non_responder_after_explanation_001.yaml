@@ -1,0 +1,27 @@
+id: math_non_responder_after_explanation_001
+description: >
+  NON_RESPONDER replies "yeah" after the tutor explained a concept.
+  The tutor must NOT info-dump again; treat "yeah" as a non-answer
+  and probe with a SHORT specific question.
+persona: non_responder
+subject: math
+lesson_id: 1137
+tags: [non_answer, math, engagement, non_responder]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Angles around a point always sum to 360°. So if three angles are 90°, 100°, and x, we can find x by subtracting from 360. Does that make sense?"
+student_turn: "yeah"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH, PREMATURE_ADVANCE]
+
+rubric:
+  - "Treats 'yeah' as a non-answer (passive acknowledgement) rather than confirmation of understanding"
+  - "Asks a SHORT specific check question (e.g., 'so if 90 + 100 + x = 360, what's x?')"
+  - "Does NOT advance to a new concept and does NOT re-explain the same content"
+pass_threshold: 0.7

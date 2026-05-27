@@ -1,0 +1,29 @@
+id: math_average_arithmetic_slip_001
+description: >
+  AVERAGE shows correct method but slips on the arithmetic (writes
+  "215" when 60 + 75 + 80 should give 215 — actually correct; then
+  errs on the subtraction). Tutor must surface the SPECIFIC slip,
+  not throw out the whole working.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [diagnostic, math, average, arithmetic_slip]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Four angles around a point: 60°, 75°, 80°, and x. Find x."
+student_turn: "60 + 75 + 80 = 215, then 360 - 215 = 155"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["exactly", "perfect", "well done", "you've nailed it"]
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Affirms the SETUP is correct (60+75+80 and the 360-subtract approach)"
+  - "Points at the SPECIFIC arithmetic slip (360 - 215 = 145, not 155)"
+  - "Does NOT discard the student's working — they had the right method"
+pass_threshold: 0.7

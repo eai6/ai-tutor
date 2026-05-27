@@ -1,0 +1,28 @@
+id: average_off_method_correct_001
+description: >
+  AVERAGE arrives at the correct answer via a non-standard method
+  ("trial and error"). Tutor must affirm the correct answer and
+  briefly model the canonical method, without belittling the student's
+  approach.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [persona_handling, average, method_acceptance]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Three equal angles around a point. Each angle is...?"
+student_turn: "120. i tried 100 first but that gave 300, then 110 gave 330, then 120 gave 360 so that's it"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["proper way", "correct method", "instead of guessing"]
+
+rubric:
+  - "Affirms '120' is correct"
+  - "Models the canonical method (360 ÷ 3 = 120) without disparaging the trial-and-error"
+  - "Validates the student's persistence"
+pass_threshold: 0.7

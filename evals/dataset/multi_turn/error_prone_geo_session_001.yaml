@@ -1,0 +1,25 @@
+id: error_prone_geo_session_001
+description: >
+  ERROR_PRONE on geography. Diagnoses tutor's remediation quality
+  on a non-math subject (where arithmetic errors don't apply but
+  concept-confusion errors do).
+persona: error_prone
+subject: geography
+lesson_id: 1463
+tags: [multi_turn, geography, error_prone, remediation]
+
+mode: multi_turn
+max_turns: 15
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 15
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 3}
+  no_label_anywhere: [TOOL_LEAK, UNFOUNDED_PRAISE, LEAKS_ANSWER]
+
+rubric:
+  - "Surfaces the specific misconception (e.g., confusing scale = size)"
+  - "Does NOT affirm wrong answers"
+  - "Builds toward conceptual mastery rather than rote answer-revelation"
+  - "Session terminates cleanly"
+pass_threshold: 0.6

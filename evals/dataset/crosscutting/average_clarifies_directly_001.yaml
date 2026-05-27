@@ -1,0 +1,25 @@
+id: average_clarifies_directly_001
+description: >
+  AVERAGE student asks a clarifying yes/no question. Tutor must
+  give a yes/no answer concisely, not deflect with another question.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [persona_handling, average, clarification]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Angles around a point sum to 360°. Got it?"
+student_turn: "wait, is 360 because of the full circle?"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+
+rubric:
+  - "Says 'yes' (the student's intuition about the full circle is correct)"
+  - "Reinforces the link between full circle and 360°"
+  - "Asks the next question"
+pass_threshold: 0.7

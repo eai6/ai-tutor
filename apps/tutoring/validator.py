@@ -301,6 +301,45 @@ def _ends_with_question(text: str) -> bool:
     return bool(_QUESTION_RE.search(tail))
 
 
+# Paragraph collapse — applied post-generation in _finalize_response.
+# The system prompt says "One paragraph only" but the LLM often ignores
+# that rule and emits multi-paragraph responses. This collapse is the
+# mechanical safety net: it replaces blank-line paragraph breaks with
+# single newlines so the response becomes one block, while preserving
+# single-newline structure (bullet lists, numbered steps) and the
+# trailing |||MEDIA:N||| signal on its own line for the media parser.
+_PARAGRAPH_BREAK_RE = re.compile(r'\n[ \t]*\n+')
+_MEDIA_SIGNAL_TAIL_RE = re.compile(r'\|\|\|MEDIA:\d+\|\|\|\s*$')
+
+
+def collapse_paragraphs(text: str) -> str:
+    """Collapse multi-paragraph tutor text into one paragraph.
+
+    Replaces ``\\n\\s*\\n+`` paragraph breaks with single ``\\n`` so the
+    response has no blank lines (matches format_rule "One paragraph
+    only"). Preserves:
+      - Single ``\\n`` between lines (bullet / numbered list items).
+      - Trailing ``|||MEDIA:N|||`` signal on its own line so the engine's
+        media parser still finds it.
+
+    Returns the input unchanged when no collapse is needed.
+    """
+    if not text:
+        return text
+    # Detach a trailing media signal so collapse never glues it onto
+    # the preceding sentence.
+    body = text
+    media_line = ''
+    m = _MEDIA_SIGNAL_TAIL_RE.search(text.strip())
+    if m:
+        body = text[: text.rfind(m.group(0))].rstrip()
+        media_line = m.group(0).strip()
+    collapsed = _PARAGRAPH_BREAK_RE.sub('\n', body.strip())
+    if media_line:
+        collapsed = f"{collapsed}\n{media_line}"
+    return collapsed
+
+
 # 2026-05-17 — call-to-action regex + _has_call_to_action helper
 # REMOVED. The structural check was brittle (dangling colons +
 # multi-sentence questions slipped past). Handoff detection is now

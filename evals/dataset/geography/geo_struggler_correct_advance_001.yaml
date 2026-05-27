@@ -1,0 +1,32 @@
+id: geo_struggler_correct_advance_001
+description: >
+  STRUGGLER gets the correct answer after scaffolding. Tutor must
+  briefly confirm and advance — no re-asking for working that was
+  already shown in seed_history.
+persona: struggler
+subject: geography
+lesson_id: 1463
+tags: [advance, geography, pedagogy, struggler]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Remember: large scale maps have a SMALLER second number in the ratio. 1:10,000 vs 1:1,000,000 — which is larger scale?"
+  - role: student
+    text: "the first one because 10,000 is smaller than 1,000,000"
+  - role: tutor
+    text: "Right. Now back to the MCQ: which two maps from the set (1:10,000, 1:100,000, 1:500,000, 1:50,000) are large scale?"
+student_turn: "B (Map 1 and Map 4)"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["walk me through", "show me your working", "explain your reasoning"]
+  must_not_label: [ASK_WORKING, BANNED_OPENER]
+
+rubric:
+  - "Confirms 'B' is correct"
+  - "Does NOT demand more working — student showed the reasoning two turns ago"
+  - "Advances cleanly"
+pass_threshold: 0.7

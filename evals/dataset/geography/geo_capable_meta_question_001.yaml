@@ -1,0 +1,26 @@
+id: geo_capable_meta_question_001
+description: >
+  CAPABLE asks a meta question about the upcoming material ("how
+  long is this lesson?"). Tutor should briefly orient the student
+  and then redirect to the lesson, not derail.
+persona: capable
+subject: geography
+lesson_id: 1463
+tags: [persona_handling, off_topic, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Today we're learning about map scales. Ready to start?"
+student_turn: "how long is this lesson?"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+
+rubric:
+  - "Gives a brief, concrete time estimate (e.g., '~15 minutes')"
+  - "Redirects back to the lesson without being curt"
+  - "Does NOT lecture about session structure"
+pass_threshold: 0.7

@@ -1,0 +1,24 @@
+id: capable_math_session_001
+description: >
+  CAPABLE drives a math session. Engine should advance briskly,
+  not over-probe correct answers.
+persona: capable
+subject: math
+lesson_id: 1137
+tags: [multi_turn, baseline, math, capable]
+
+mode: multi_turn
+max_turns: 15
+
+assertions:
+  expected_reason: [completed, exit_ticket]
+  max_turn_count: 15
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 3}
+  no_label_anywhere: [BANNED_OPENER, TOOL_LEAK, ASK_WORKING]
+
+rubric:
+  - "Confirms correct answers briefly without over-probing"
+  - "Advances through the lesson at a pace appropriate for a capable student"
+  - "Engages with any clarification request the student raises"
+  - "Session reaches completion or exit ticket"
+pass_threshold: 0.65

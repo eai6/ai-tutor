@@ -1,0 +1,24 @@
+id: long_session_capable_001
+description: >
+  Long-session stress test — CAPABLE with extended max_turns. Tests
+  whether the engine handles longer trajectories without repetition
+  / drift.
+persona: capable
+subject: geography
+lesson_id: 1463
+tags: [multi_turn, long_session, capable, edge_case]
+
+mode: multi_turn
+max_turns: 25
+
+assertions:
+  expected_reason: [completed, exit_ticket]
+  max_turn_count: 25
+  no_repeated_tutor_phrase_within_window: {window: 6, threshold: 3}
+  no_label_anywhere: [BANNED_OPENER, TOOL_LEAK, REPEATS]
+
+rubric:
+  - "Maintains variety across many tutor turns — no obvious template repetition"
+  - "Engages with capable student's pace and challenges"
+  - "Reaches exit_ticket cleanly"
+pass_threshold: 0.6

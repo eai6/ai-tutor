@@ -1,0 +1,24 @@
+id: average_math_session_001
+description: >
+  AVERAGE drives a full math session. Steady-state baseline for the
+  modal persona on the math curriculum.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [multi_turn, baseline, math, average]
+
+mode: multi_turn
+max_turns: 15
+
+assertions:
+  expected_reason: [completed, exit_ticket]
+  max_turn_count: 15
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 3}
+  no_label_anywhere: [BANNED_OPENER, TOOL_LEAK, THINKING_LEAK, INFO_DUMP]
+
+rubric:
+  - "Handles a mix of correct + incorrect responses appropriately"
+  - "Surfaces errors with diagnostic probes, not generic 'try again'"
+  - "Does NOT info-dump on simple confirmation requests"
+  - "Session terminates cleanly"
+pass_threshold: 0.65

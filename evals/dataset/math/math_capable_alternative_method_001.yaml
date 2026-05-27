@@ -1,0 +1,27 @@
+id: math_capable_alternative_method_001
+description: >
+  CAPABLE proposes an unconventional but valid solution method.
+  Tutor must engage with the method rather than insisting on the
+  canonical approach.
+persona: capable
+subject: math
+lesson_id: 1138
+tags: [student_input, math, capable, alternative_method]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Two angles on a straight line. One is 65°. Find the other."
+student_turn: "115 — i just subtracted 65 from 180. easier than counting up like the textbook does."
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["actually you should", "the proper way", "the correct method"]
+
+rubric:
+  - "Confirms '115' is correct"
+  - "Engages with the student's preferred method (subtraction) as VALID — does not insist on a different approach"
+  - "Treats the student as a capable peer"
+pass_threshold: 0.7

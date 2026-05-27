@@ -1,0 +1,27 @@
+id: geo_average_correct_with_explanation_001
+description: >
+  AVERAGE gives correct answer with brief explanation. Tutor must
+  affirm, NOT ask for MORE working.
+persona: average
+subject: geography
+lesson_id: 1463
+tags: [advance, geography, average]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Why do hikers prefer large scale maps?"
+student_turn: "because they show more detail, like trails and water sources"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["walk me through", "show me your working", "explain further", "what else"]
+  must_not_label: [ASK_WORKING]
+
+rubric:
+  - "Affirms the answer (more detail, trails/water sources is correct)"
+  - "Does NOT demand more reasoning — the explanation was sufficient"
+  - "Advances to the next idea"
+pass_threshold: 0.7

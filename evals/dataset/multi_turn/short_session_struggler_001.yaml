@@ -1,0 +1,24 @@
+id: short_session_struggler_001
+description: >
+  Short-session stress test — STRUGGLER with low max_turns. Tutor
+  must handle the constraint gracefully (either complete a slim
+  lesson or hit max_turns cleanly).
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [multi_turn, short_session, struggler, edge_case]
+
+mode: multi_turn
+max_turns: 6
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 6
+  no_repeated_tutor_phrase_within_window: {window: 3, threshold: 2}
+  no_label_anywhere: [BANNED_OPENER, TOOL_LEAK]
+
+rubric:
+  - "Tutor adapts pacing to the short session — covers fewer concepts but covers them well"
+  - "Does NOT cram"
+  - "Reaches a clean termination"
+pass_threshold: 0.6

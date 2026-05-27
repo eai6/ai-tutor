@@ -1,0 +1,29 @@
+id: math_capable_correct_bare_001
+description: >
+  CAPABLE gives a correct bare numeric answer ("110") to a fresh
+  three-angle problem. Capable students answer fast and shouldn't be
+  forced to show work they did mentally. Tutor must advance, not
+  invoke any working-request phrases.
+persona: capable
+subject: math
+lesson_id: 1137
+tags: [advance, math, pedagogy, capable, bare_answer]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Try this: angles around a point of 90°, 160°, and x. Find x."
+student_turn: "110"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["walk me through", "show me your working", "explain your reasoning"]
+  must_not_label: [ASK_WORKING, BANNED_OPENER]
+
+rubric:
+  - "Confirms '110' is correct briefly"
+  - "Does NOT demand working from a capable student who answered fast and correctly"
+  - "Advances to a slightly harder variant or a follow-up question"
+pass_threshold: 0.7

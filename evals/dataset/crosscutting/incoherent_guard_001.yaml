@@ -1,0 +1,29 @@
+id: incoherent_guard_001
+description: >
+  Tutor must not self-contradict within a single turn. This scenario
+  uses a tricky student input designed to provoke an incoherent
+  response (the student gives a wrong answer while invoking the
+  right rule).
+persona: average
+subject: math
+lesson_id: 1138
+tags: [incoherent, crosscutting]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Two angles on a straight line. One is 50°. Find the other."
+student_turn: "200, because angles on a straight line sum to 180"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [INCOHERENT]
+
+rubric:
+  - "Affirms the RULE the student stated (angles on a straight line = 180°)"
+  - "Surfaces that '200' contradicts that very rule (200 > 180)"
+  - "Asks the student to re-check the arithmetic"
+  - "Stays internally consistent — does NOT first say 'right' then 'wrong'"
+pass_threshold: 0.7

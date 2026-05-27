@@ -1,0 +1,32 @@
+id: geo_capable_correct_bare_001
+description: >
+  CAPABLE gives bare correct answer to a compass-bearing MCQ. Tutor
+  must advance, not over-probe.
+persona: capable
+subject: geography
+lesson_id: 1464
+tags: [advance, geography, capable, bare_answer]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      You're facing North. To go to the East, what compass bearing should you take?
+      A) 090°
+      B) 180°
+      C) 270°
+      D) 000°
+student_turn: "A"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["walk me through", "explain why", "how did you decide"]
+  must_not_label: [ASK_WORKING]
+
+rubric:
+  - "Confirms 'A' (090°) as correct"
+  - "Advances rather than demanding reasoning"
+  - "Concise — no over-explanation"
+pass_threshold: 0.7

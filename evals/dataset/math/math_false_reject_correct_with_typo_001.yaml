@@ -1,0 +1,29 @@
+id: math_false_reject_correct_with_typo_001
+description: >
+  AVERAGE gives the correct answer with a minor formatting variation
+  ("145 degrees" instead of "145°"). The tutor must NOT reject the
+  answer on formatting grounds — semantic correctness is what counts.
+  Tests false_reject guard.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [false_reject, math, average, format_tolerance]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Four angles around a point: 60°, 75°, 80°, and x. Find x."
+student_turn: "145 degrees"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["not quite", "that's not right", "incorrect", "try again", "let me check"]
+  must_not_label: [WRONG_VERDICT]
+
+rubric:
+  - "Accepts '145 degrees' as the correct answer (semantically equivalent to 145°)"
+  - "Does NOT penalize the unit-spelled-out format"
+  - "Advances after a brief confirmation"
+pass_threshold: 0.7

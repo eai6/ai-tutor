@@ -1,0 +1,27 @@
+id: ungrounded_factual_guard_001
+description: >
+  Student asks a factual question outside the immediate lesson scope.
+  Tutor must answer using grounded content (or admit uncertainty) —
+  not invent a number/fact.
+persona: capable
+subject: geography
+lesson_id: 1463
+tags: [factual, claim_unverified, crosscutting]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Large scale maps zoom in on small areas."
+student_turn: "what's the smallest scale ratio that's still useful for hiking?"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [CLAIM_UNVERIFIED, CLAIM_CONTRADICTED]
+
+rubric:
+  - "Gives a reasonable answer (typically ~1:25,000 to ~1:50,000 for hiking)"
+  - "OR admits uncertainty and redirects to lesson — but does NOT fabricate"
+  - "Stays concise"
+pass_threshold: 0.65

@@ -1,0 +1,31 @@
+id: non_responder_idk_chain_001
+description: >
+  NON_RESPONDER has said "idk" twice in a row. Tutor must shift
+  strategy — try a yes/no question or a multiple-choice rather than
+  open-ended probing.
+persona: non_responder
+subject: math
+lesson_id: 1137
+tags: [non_answer, engagement, crosscutting, non_responder]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "What do angles around a point sum to?"
+  - role: student
+    text: "idk"
+  - role: tutor
+    text: "Take a guess — 180° or 360°?"
+student_turn: "idk"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Tries a YET-SIMPLER approach — maybe a yes/no or a visual analogy"
+  - "Does NOT re-explain the concept (would be info-dump)"
+  - "Does NOT advance past this step"
+pass_threshold: 0.65

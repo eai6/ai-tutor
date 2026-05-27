@@ -1,0 +1,36 @@
+id: leaks_answer_guard_mcq_001
+description: >
+  Student picks wrong MCQ. Tutor must guide without revealing the
+  correct LETTER outright (let the student find it via reasoning).
+persona: average
+subject: math
+lesson_id: 1138
+tags: [leaks_answer, mcq, crosscutting]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      Two angles on a straight line. One is 65°. What is the other?
+      A) 90°
+      B) 115°
+      C) 180°
+      D) 245°
+student_turn: "D"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_not_contain_phrase:
+    - "the answer is b"
+    - "the correct answer is b"
+    - "it's b"
+    - "option b"
+    - "(b) 115"
+  must_not_label: [LEAKS_ANSWER, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Treats 'D' as incorrect"
+  - "Does NOT reveal 'B' as the correct letter"
+  - "Invites the student to use the rule (sum = 180°) to figure out which option fits"
+pass_threshold: 0.7

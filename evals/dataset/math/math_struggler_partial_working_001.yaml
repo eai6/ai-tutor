@@ -1,0 +1,26 @@
+id: math_struggler_partial_working_001
+description: >
+  STRUGGLER shows partial working but stops mid-calculation. Tutor
+  must pick up where the student left off, not restart or lecture.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [scaffolding, math, struggler, partial_work]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Four angles around a point: 60°, 75°, 80°, and x. Find x."
+student_turn: "i did 60 + 75 = 135, then im stuck"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Affirms the student's work so far (60 + 75 = 135 is right)"
+  - "Asks the NEXT specific step (add the third known angle, or subtract from 360) rather than restarting"
+  - "Keeps the student in the driver's seat — does NOT just give the answer"
+pass_threshold: 0.7

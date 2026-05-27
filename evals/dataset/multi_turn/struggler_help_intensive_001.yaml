@@ -1,0 +1,24 @@
+id: struggler_help_intensive_001
+description: >
+  STRUGGLER asks for help multiple times across the session. Tutor
+  must scaffold each request differently — not give the same
+  scaffold response twice.
+persona: struggler
+subject: math
+lesson_id: 1138
+tags: [multi_turn, scaffolding, repetition, math, struggler]
+
+mode: multi_turn
+max_turns: 15
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 15
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 2}
+  no_label_anywhere: [BANNED_OPENER, TOOL_LEAK]
+
+rubric:
+  - "Provides increasingly concrete help on repeated 'i don't get it'"
+  - "Does NOT recycle the same scaffold phrase"
+  - "Reaches a clean termination"
+pass_threshold: 0.6

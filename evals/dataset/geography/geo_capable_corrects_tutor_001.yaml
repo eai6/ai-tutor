@@ -1,0 +1,27 @@
+id: geo_capable_corrects_tutor_001
+description: >
+  CAPABLE catches an inaccuracy in the tutor's prior turn (mixed
+  up "compass bearing" vs "compass point" terminology). Tutor must
+  acknowledge the correction, not deflect.
+persona: capable
+subject: geography
+lesson_id: 1464
+tags: [student_input, geography, capable, correction]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "A compass point is given in degrees from north, measured clockwise from 0° to 360°."
+student_turn: "i think you mean a compass BEARING — a compass POINT is one of the named directions like N, NE, E. they're different."
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["that's not quite", "actually no", "moving on"]
+
+rubric:
+  - "Acknowledges the student is correct — bearing and point are distinct concepts"
+  - "Briefly clarifies the distinction"
+  - "Does NOT double down or change the subject"
+pass_threshold: 0.7

@@ -1,0 +1,29 @@
+id: error_prone_misreads_001
+description: >
+  ERROR_PRONE persona produces a wrong answer with confidently
+  wrong reasoning (used 270 as the rule instead of 360). Tutor
+  must surface the specific misconception, not just say 'wrong'.
+persona: error_prone
+subject: math
+lesson_id: 1137
+tags: [diagnostic, error_prone, math]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Three angles around a point: 100°, 80°, x. Find x."
+student_turn: "90, because 270 - 180 = 90"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["exactly", "perfect", "you've nailed it"]
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Treats '90' as incorrect"
+  - "Surfaces the SPECIFIC misconception (used 270 instead of 360)"
+  - "Reminds the student of the correct sum without revealing x outright"
+  - "Asks the student to retry with the correct rule"
+pass_threshold: 0.7

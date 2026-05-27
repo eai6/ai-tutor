@@ -1,0 +1,24 @@
+id: capable_speedrun_001
+description: >
+  CAPABLE answers everything correctly and fast. Tutor must NOT
+  over-scaffold — should advance through the lesson briskly to
+  exit ticket.
+persona: capable
+subject: math
+lesson_id: 1138
+tags: [multi_turn, capable, pace]
+
+mode: multi_turn
+max_turns: 15
+
+assertions:
+  expected_reason: [completed, exit_ticket]
+  max_turn_count: 15
+  no_repeated_tutor_phrase_within_window: {window: 4, threshold: 2}
+  no_label_anywhere: [BANNED_OPENER, ASK_WORKING, INFO_DUMP]
+
+rubric:
+  - "Confirms each correct answer briefly without re-explaining"
+  - "Advances at a pace appropriate to the student's competence"
+  - "Reaches exit_ticket"
+pass_threshold: 0.65

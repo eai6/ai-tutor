@@ -1,0 +1,30 @@
+id: figure_ref_no_attachment_001
+description: >
+  Tutor's prior turn referenced "the diagram" but no figure was
+  attached. Student notices and asks. Tutor must NOT continue
+  referencing nonexistent figures — should reframe in pure text.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [figure_ref, crosscutting, format]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Look at the diagram showing angles around a point. What do they sum to?"
+  - role: student
+    text: "what diagram? i don't see one"
+student_turn: "where is the diagram?"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+  must_not_contain_phrase: ["the diagram", "the figure", "look at the picture", "look at the image"]
+  must_not_label: [FIGURE_REF_UNATTACHED]
+
+rubric:
+  - "Acknowledges there's no diagram shown and apologises briefly"
+  - "Reframes the question in pure text without referencing a visual"
+  - "Does NOT keep saying 'the diagram' / 'the figure'"
+pass_threshold: 0.7

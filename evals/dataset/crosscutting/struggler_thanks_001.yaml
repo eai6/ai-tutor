@@ -1,0 +1,26 @@
+id: struggler_thanks_001
+description: >
+  Student thanks the tutor mid-lesson. Tutor should acknowledge
+  briefly and continue, not derail into self-praise or extended
+  rapport-building.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [persona_handling, struggler, rapport]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Right! 145 is correct. Ready for the next one?"
+student_turn: "thanks for being patient with me"
+
+assertions:
+  response_nonempty: true
+  max_paragraphs: 1
+  must_end_with_question: true
+
+rubric:
+  - "Acknowledges the thanks warmly but BRIEFLY (1 sentence max)"
+  - "Re-engages with the lesson — does not derail"
+  - "Tone matches the student's vulnerability"
+pass_threshold: 0.7
