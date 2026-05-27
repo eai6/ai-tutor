@@ -27,7 +27,6 @@ student_turn: "C — Map 3 and Map 4"
 
 assertions:
   response_nonempty: true
-  max_paragraphs: 1
   must_not_contain_phrase:
     - "exactly"
     - "perfect"

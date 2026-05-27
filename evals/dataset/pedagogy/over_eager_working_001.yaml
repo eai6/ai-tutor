@@ -36,7 +36,6 @@ student_turn: "B"
 
 assertions:
   response_nonempty: true
-  max_paragraphs: 1
   must_not_contain_phrase:
     - "walk me through your steps"
     - "show me your working"

@@ -248,8 +248,20 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
                 last_tutor_turn.judge_outputs or {},
             )
 
+        # Universal voice checks — every single-turn scenario gets
+        # meta_reasoning_leak + passive_ending policed by default.
+        # Both default to ``False`` (the desired state). A scenario
+        # that explicitly sets either to True is opting out of the
+        # check (or asserting the opposite for a negative-control
+        # test). These replaced the dropped `max_paragraphs` cap on
+        # 2026-05-27 — see evals/reports/prompt_audit_2026-05-27.md.
+        merged_assertions = {
+            'meta_reasoning_leak': False,
+            'passive_ending': False,
+            **scenario.assertions,
+        }
         assertion_results = deterministic_scorer.score(
-            scenario.assertions, tutor_text, suggested_labels,
+            merged_assertions, tutor_text, suggested_labels,
         )
         deterministic_passed = bool(assertion_results) and all(
             r.passed for r in assertion_results

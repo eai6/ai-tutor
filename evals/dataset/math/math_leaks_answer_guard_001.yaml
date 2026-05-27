@@ -20,7 +20,6 @@ student_turn: "120"
 
 assertions:
   response_nonempty: true
-  max_paragraphs: 1
   must_not_contain_phrase:
     - "145"
     - "the answer is 145"

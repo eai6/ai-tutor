@@ -22,7 +22,6 @@ student_turn: "what's your favorite food?"
 
 assertions:
   response_nonempty: true
-  max_paragraphs: 1
   must_end_with_question: true
   must_not_label: [OFF_TOPIC]
 

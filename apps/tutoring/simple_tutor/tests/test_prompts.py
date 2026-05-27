@@ -616,16 +616,20 @@ class AntiInjectionTest(TestCase):
 
 class RulesContentTest(TestCase):
 
-    def test_rules_quantified_not_vague(self):
+    def test_rules_no_length_cap(self):
+        """Per 2026-05-27 prompt audit, the length cap was dropped
+        entirely — tutor is free to explain at whatever length serves
+        the lesson. Quality is enforced by the LLM rubric + the
+        meta_reasoning_leak / passive_ending deterministic checks,
+        not by paragraph or word count. Regression guard.
+        """
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
         )
         block0 = blocks[0]['text']
-        # Quantified instead of vague — concrete sentence / word caps
-        self.assertIn('2-4 sentences', block0)
-        self.assertIn('150 words', block0)
-        # Tutor must keep each turn focused (not "one question per turn")
-        self.assertIn('Keep each turn focused', block0)
+        self.assertNotIn('2-4 sentences', block0)
+        self.assertNotIn('150 words', block0)
+        self.assertNotIn('Keep each turn focused', block0)
 
     def test_rules_describe_5e_phases(self):
         # Tutor must be able to explain content, not just ask questions
@@ -637,14 +641,24 @@ class RulesContentTest(TestCase):
             self.assertIn(phase, block0, f'5E phase {phase!r} missing')
         # The Explain phase must instruct delivery, not just questioning
         self.assertIn('Deliver content', block0)
+        # And the no-length-cap tie-breaker is explicit on Explain turns
+        self.assertIn(
+            'deliver the content AND end with ONE check-for-understanding',
+            block0,
+        )
 
-    def test_rules_responsive_pacing(self):
-        # Adapt to student cognitive load (struggling vs picking up fast)
+    def test_rules_no_responsive_pacing_block(self):
+        """R06 'Responsive pacing' was dropped in the 2026-05-27 audit
+        — pace adapts naturally via the GRADE→POSE loop and the hint
+        ladder. Regression guard so the rule doesn't sneak back.
+        """
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
         )
         block0 = blocks[0]['text']
-        self.assertIn('Responsive pacing', block0)
+        self.assertNotIn('Responsive pacing', block0)
+        self.assertNotIn('smaller pieces', block0)
+        self.assertNotIn('advance faster', block0)
 
     def test_rules_tutor_driven(self):
         """Every reply must end with a concrete next action for the
@@ -708,6 +722,60 @@ class RulesContentTest(TestCase):
         # 'CRITICAL' and 'NEVER' as standalone shouting are anti-patterns
         self.assertNotIn('CRITICAL', block0)
         self.assertNotIn('NEVER ', block0)
+
+    def test_remediation_block_absent_without_exit_ticket_review(self):
+        """Per 2026-05-27 audit, REMEDIATION-mode instructions live in
+        a dynamic block that only renders when ``exit_ticket_review``
+        is populated. Non-remediation turns must not carry remediation
+        guidance anywhere in the prompt — neither in Block 0 (static)
+        nor in the dynamic block.
+        """
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(),
+        )
+        joined = '\n'.join(b['text'] for b in blocks)
+        self.assertNotIn('REMEDIATION', joined)
+        self.assertNotIn('<remediation_mode>', joined)
+        self.assertNotIn('missed_objectives', joined.lower())
+
+    def test_remediation_block_renders_when_exit_ticket_review_present(self):
+        """Conditional rendering: the REMEDIATION instructions appear in
+        the dynamic block (no cache_control) and ride alongside the
+        ``<exit_ticket_review>`` data so the model reads the mode-switch
+        and the failing-objectives data together.
+        """
+        review = {
+            'score': 6,
+            'total': 10,
+            'passed': False,
+            'missed_objectives': [
+                {
+                    'enabling_objective': 'Use a 1:N scale to compute distance',
+                    'asked': 2,
+                    'correct': 0,
+                    'sample_question': 'On a 1:50,000 map, 8cm = ? km',
+                    'student_answer': '40',
+                    'reference': '4',
+                },
+            ],
+            'mastered_objectives': ['Identify large-scale vs small-scale maps'],
+        }
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(),
+            exit_ticket_review=review,
+        )
+        # The dynamic block carries BOTH the remediation instructions
+        # AND the review data — same XML window for the model.
+        dynamic = blocks[-1]['text']
+        self.assertIn('<remediation_mode>', dynamic)
+        self.assertIn('TARGETED RE-TEACHING', dynamic)
+        self.assertIn('<exit_ticket_review>', dynamic)
+        self.assertIn('Use a 1:N scale to compute distance', dynamic)
+        # Dynamic block is uncached (changes every turn).
+        self.assertNotIn('cache_control', blocks[-1])
+        # And the REMEDIATION instructions are NOT in Block 0 — that's
+        # the whole point of moving them to dynamic.
+        self.assertNotIn('REMEDIATION', blocks[0]['text'])
 
     def test_rules_anti_sycophancy(self):
         blocks, _ = build_system_prompt(

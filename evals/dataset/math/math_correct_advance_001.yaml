@@ -20,7 +20,6 @@ student_turn: "145 — i did 60+75+80=215 then 360-215=145"
 
 assertions:
   response_nonempty: true
-  max_paragraphs: 1
   must_not_contain_phrase:
     - "let me check"
     - "are you sure"

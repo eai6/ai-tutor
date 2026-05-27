@@ -60,12 +60,14 @@ Plus **simple-tutor-specific** dimensions (rule-violation flags):
 
 Per claude-prompting-expert guidance:
 
-1. **One rule per concern**, clustered by topic (mode, output discipline, hint ladder, tools, safety).
+1. **One rule per concern**, clustered by topic (mode, teaching, hint ladder, tools, safety).
 2. **Positive imperative first** in each cluster, banned/guardrail list after.
-3. **`<output_format>` block at the end** with hard length cap (`Length: ≤120 words total. If your draft is longer, cut to the essential next step.`).
-4. **No few-shot examples** — Opus 4.7 ignores or over-mimics them.
+3. **No length cap** — tutor explains at whatever length serves the lesson. Quality enforced by the rubric, not by paragraph count.
+4. **Small few-shot block** — one good turn + one bad turn. Cross-model portability: Sonnet (when we use it in the future) benefits from few-shot; Opus 4.7 tolerates a tight, well-chosen pair. Keep to 2 examples max.
 5. **Drop ALL CAPS shouting** — already removed but verify no remnants.
 6. **Strengthen tool descriptions** — each tool's `description` carries the same rigor as the main prompt. Pre-empt the "do work in prose instead of calling the tool" failure mode.
+7. **REMEDIATION mode conditionally rendered** — Block 0 (cache-static) holds only TUTORING/GRADE/POSE rules. The REMEDIATION block appears in Block 2 (dynamic) when `exit_ticket_review` is populated. Reduces non-remediation conflict surface to zero.
+8. **Conflict 4 tie-breaker (no-length-cap version)**: "On Explain turns, deliver the content AND end with ONE check-for-understanding question. Both, in the same turn. The explanation can be as long as it needs to be." Explanation-plus-question is the desired pattern, not a problem to constrain.
 
 ### Phase 3 — Eval rubric expansion
 

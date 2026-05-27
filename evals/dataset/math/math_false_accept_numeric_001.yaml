@@ -21,7 +21,6 @@ student_turn: "165"
 
 assertions:
   response_nonempty: true
-  max_paragraphs: 1
   must_not_contain_phrase:
     - "exactly"
     - "perfect"

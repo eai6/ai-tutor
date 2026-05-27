@@ -10,6 +10,7 @@ Python.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Callable
 
 from apps.benchmark import labels as L
@@ -44,10 +45,46 @@ def _ends_with_question(text: str) -> bool:
     return stripped.endswith('?')
 
 
-def _count_paragraphs(text: str) -> int:
-    """Count paragraphs separated by one or more blank lines."""
-    paragraphs = [p for p in text.split('\n\n') if p.strip()]
-    return len(paragraphs)
+# Successors to the dropped `max_paragraphs` check. The 2026-05-27
+# audit dropped length caps entirely (tutor free to explain), so the
+# deterministic layer now polices the things that *actually* matter
+# regardless of length: meta-reasoning leakage and passive endings.
+# Both come from the "Speak to the student" + "Tutor-driven" rules in
+# the system prompt; this gives us a cheap, no-LLM-call signal that
+# fires in the same eval run as the LLM rubric judge.
+
+_META_REASONING_PATTERNS = [
+    # "The student has only…" / "The student hasn't…"
+    re.compile(r'(?im)^\s*the student\s+(has|hasn\'t|is|isn\'t|wrote|said|answered|gave|seems|appears)\b'),
+    # "I'll grade…" / "Let me prompt…" / "I'm going to…" / "I shouldn't record…"
+    re.compile(r"(?im)^\s*(i'll|i am going to|i'm going to|let me prompt|i shouldn't|i should not|now i need|i need to (call|prompt|record))\b"),
+    # "This is a partial answer — I shouldn't record"
+    re.compile(r"(?i)\bi (shouldn'?t|should not|must not|won'?t) (record|grade|mark|accept)\b"),
+]
+
+_PASSIVE_ENDING_PATTERNS = [
+    re.compile(
+        r"(?i)("
+        r"ready for the next( one)?|"
+        r"want to try another|"
+        r"shall we (continue|move on|go on)|"
+        r"(let me|tell me) know when (you'?re|you are) ready|"
+        r"take your time|"
+        r"whenever (you'?re|you are) ready|"
+        r"do you want to keep going|"
+        r"are you ready"
+        r")\s*[.?!]*\s*$",
+    ),
+]
+
+
+def _matches_any(patterns, text: str) -> str | None:
+    """Return the matched string when any pattern hits, else None."""
+    for pat in patterns:
+        m = pat.search(text)
+        if m:
+            return m.group(0).strip()
+    return None
 
 
 def _normalize_labels(labels: list[str]) -> set[str]:
@@ -135,13 +172,38 @@ def _verb_must_end_with_question(expected, tutor_text, suggested_labels) -> Asse
     )
 
 
-def _verb_max_paragraphs(expected, tutor_text, suggested_labels) -> AssertionResult:
-    limit = int(expected)
-    count = _count_paragraphs(tutor_text)
+def _verb_meta_reasoning_leak(expected, tutor_text, suggested_labels) -> AssertionResult:
+    """Pass when expected matches actual. ``expected: false`` (the typical
+    case) requires the response to have NO meta-reasoning leak; ``expected:
+    true`` requires it to have one (only useful for negative-control
+    tests).
+    """
+    hit = _matches_any(_META_REASONING_PATTERNS, tutor_text)
+    actual = hit is not None
     return AssertionResult(
-        'max_paragraphs',
-        passed=count <= limit,
-        detail=f"paragraphs={count}, limit={limit}",
+        'meta_reasoning_leak',
+        passed=bool(actual) is bool(expected),
+        detail=(
+            f"leaked: {hit!r}" if actual
+            else "no meta-reasoning narration"
+        ),
+    )
+
+
+def _verb_passive_ending(expected, tutor_text, suggested_labels) -> AssertionResult:
+    """Pass when expected matches actual. ``expected: false`` (typical)
+    requires the reply NOT to end with a passive permission-seeking
+    phrase like 'take your time' or 'ready for the next one?'.
+    """
+    hit = _matches_any(_PASSIVE_ENDING_PATTERNS, tutor_text)
+    actual = hit is not None
+    return AssertionResult(
+        'passive_ending',
+        passed=bool(actual) is bool(expected),
+        detail=(
+            f"passive ending: {hit!r}" if actual
+            else "ends with concrete action"
+        ),
     )
 
 
@@ -152,7 +214,8 @@ _HANDLERS: dict[str, Callable] = {
     'must_label':               _verb_must_label,
     'must_not_label':           _verb_must_not_label,
     'must_end_with_question':   _verb_must_end_with_question,
-    'max_paragraphs':           _verb_max_paragraphs,
+    'meta_reasoning_leak':      _verb_meta_reasoning_leak,
+    'passive_ending':           _verb_passive_ending,
 }
 
 

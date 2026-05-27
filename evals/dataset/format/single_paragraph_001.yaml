@@ -25,7 +25,6 @@ student_turn: >
 
 assertions:
   response_nonempty: true
-  max_paragraphs: 1
   must_not_label: [MULTI_PARAGRAPH, INFO_DUMP]
 
 rubric:

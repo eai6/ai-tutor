@@ -24,7 +24,6 @@ student_turn: "idk this is hard"
 assertions:
   response_nonempty: true
   must_end_with_question: true
-  max_paragraphs: 1
   must_not_contain_phrase:
     - "walk me through your steps"
     - "show me your working, step by step"

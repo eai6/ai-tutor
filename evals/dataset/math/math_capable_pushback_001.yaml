@@ -26,7 +26,6 @@ student_turn: >
 
 assertions:
   response_nonempty: true
-  max_paragraphs: 1
   must_contain_phrase:
     - "360"
   must_not_contain_phrase:

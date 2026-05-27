@@ -47,6 +47,8 @@ Per `claude-prompting-expert` guidance on Opus 4.7:
 
 **Decision (2026-05-27 user direction)**: **Drop the length cap entirely.** The tutor is free to explain at whatever length serves the explanation. The 16 max_paragraphs failures had rubric scores at-or-above threshold (often 1.00/0.70) — the LLM-judge thought the responses were pedagogically good, and we trust that signal over an arbitrary paragraph count.
 
+<yes drop the length cap entirely for now. we already dropped it from the evaluation.>
+
 **Fix**:
 - Remove R03 entirely from the prompt.
 - Remove the `max_paragraphs` deterministic assertion from eval scenarios that have it (or mark non-blocking).
@@ -69,7 +71,7 @@ Per `claude-prompting-expert` guidance on Opus 4.7:
 
 **Symptom**: On an Explain step, R05 says deliver content. R02 says when you call pose_question, include the stem in the text. Combined, the tutor writes an explanation paragraph AND a question stem AND options — easy to blow past any length cap.
 
-**Fix**: Add a tie-breaker: "On Explain turns, content first, ONE check-for-understanding question after — total reply ≤120 words. Use a worked example sparingly; never both an example and a multi-step explanation in the same turn."
+**Fix (per 2026-05-27 user direction — no length cap)**: Add a tie-breaker: **"On Explain turns, deliver the content AND end with ONE check-for-understanding question. Both, in the same turn. The explanation can be as long as it needs to be — no word/paragraph cap."** This keeps R02's "always include question stem" and R05's "deliver content" both true without forcing the model to pick. The explanation-plus-question pattern is what we explicitly want.
 
 ## Negative-only rules with no positive counterpart
 
@@ -77,8 +79,8 @@ All current rules have a positive imperative. No purely-negative rules. ✅
 
 ## Vague qualifiers without quantification
 
-- R03: "focused", "2-4 sentences", "~150 words" → **drop entirely**. The tutor explains at whatever length serves the lesson; quality is judged by the rubric dimensions, not by paragraph count.
-- R06: "slow down with smaller pieces", "advance faster" → drop entirely; pace adapts via prompt structure, not via prose instruction.
+- R03: "focused", "2-4 sentences", "~150 words" → **drop entirely**. The tutor explains at whatever length serves the lesson; quality is judged by the rubric dimensions, not by paragraph count. <again don't worry about word limit. let it explain.>
+- R06: "slow down with smaller pieces", "advance faster" → drop entirely; pace adapts via prompt structure, not via prose instruction. <looks like we can drop this one. if it is really not nneeded>
 
 ## CAPS shouting
 
@@ -98,7 +100,7 @@ Per `claude-prompting-expert` ("tool descriptions matter as much as the main pro
 | R11 (call advance_step when ready) | `advance_step.description` |
 | R13 (off-topic → redirect) | `redirect_off_topic.description` |
 
-Result: `<rules>` shrinks from ~190 lines to ~110 lines. Tool descriptions grow from terse one-liners to substantive paragraphs — better cached (tools are in the static prefix).
+Result: `<rules>` shrinks from ~190 lines to ~110 lines. Tool descriptions grow from terse one-liners to substantive paragraphs — better cached (tools are in the static prefix). <good!>
 
 ## Recommended new structure
 
@@ -124,11 +126,13 @@ Result: `<rules>` shrinks from ~190 lines to ~110 lines. Tool descriptions grow 
 
 Drops R03 (length cap — tutor free to explain), R06 (vague pacing). Migrates R08–R11, R13 to tool descriptions. No `<output_format>` block — quality lives in the rubric dimensions, not in a paragraph count.
 
+<<yes do it all>>
+
 ## Open questions
 
-1. Should "REMEDIATION mode" stay in `<rules>` or move to a conditional block that only appears when an `<exit_ticket_review>` is present? Conditional rendering would let us drop ~25 lines from non-remediation turns and reduce conflict surface.
-2. Length cap value: ≤120 words or ≤80 words? Need eval data to tune. Start at ≤120, tighten if `max_paragraphs` continues failing.
-3. Do we add a single `<good_turn>` example (≤40 words) showing voice + tool-call pairing? Skill says skip on Opus 4.7 (reasoning model). Holding.
+1. Should "REMEDIATION mode" stay in `<rules>` or move to a conditional block that only appears when an `<exit_ticket_review>` is present? Conditional rendering would let us drop ~25 lines from non-remediation turns and reduce conflict surface. **Decision (2026-05-27 user direction)**: Yes — make REMEDIATION mode conditionally rendered. Block 0 (cache-static) carries only TUTORING/GRADE/POSE rules. The REMEDIATION block appears in Block 2 (dynamic) when `exit_ticket_review` is populated. Trade-off: a small cache-miss on the first remediation turn, but cleaner static prefix and zero conflict surface on the 95% non-remediation path.
+2. Length cap value: ≤120 words or ≤80 words? Need eval data to tune. Start at ≤120, tighten if `max_paragraphs` continues failing. <remove it. we are no longer doing length dimension.>
+3. Do we add a single `<good_turn>` example (≤40 words) showing voice + tool-call pairing? Skill says skip on Opus 4.7 (reasoning model). **Decision (2026-05-27 user direction)**: include a small `<examples>` block with one good turn + one bad turn. Reason: we may switch to Sonnet (non-reasoning) in the future where few-shot demonstrably helps. Opus 4.7 tolerates short well-chosen examples; the cross-model portability is worth more than the small marginal cost on Opus. Keep it minimal — 2 short examples, no more.
 
 ## Next step
 
