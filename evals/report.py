@@ -316,6 +316,22 @@ def format_summary(s: Summary, prior: Summary | None = None) -> str:
                 out.append(f"  [{marker}] {sid}  ({d['persona']})  -> {reasons[:100]}")
             out.append('')
 
+    # Prompt-rule coverage — process check, NOT a scorer. Surfaces
+    # rules that lack any eval check + typos in the registry. Wired
+    # 2026-05-27 per memory/simple_tutor_systematic_eval_plan.md
+    # Phase 4. A clean coverage report has 0 unknown verbs and 0
+    # unknown dimensions; uncovered rules are listed for transparency
+    # but acknowledged via their notes field.
+    try:
+        from evals.rule_registry import (
+            build_coverage_report, format_coverage_report,
+        )
+        out.append(format_coverage_report(build_coverage_report()))
+        out.append('')
+    except Exception as exc:  # pragma: no cover - defensive
+        out.append(f"  (rule-coverage section unavailable: {exc})")
+        out.append('')
+
     # Pedagogical dimensions.
     if s.by_dimension:
         out.append("PEDAGOGICAL DIMENSIONS (per-dimension pass rate)")
