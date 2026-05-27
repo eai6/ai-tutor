@@ -69,6 +69,14 @@ class Scenario:
     rubric: list[str]
     pass_threshold: float
     rubric_judge: dict[str, Any]
+    # When the seed_history contains a question the tutor "posed" and
+    # the student_turn is the student's answer to it, simple_tutor's
+    # engine needs an InFlightQuestion row to grade against — otherwise
+    # it (correctly) refuses to grade text it never formally posed.
+    # Scenarios opt in by declaring the slot here. Shape mirrors
+    # apps.tutoring.models.InFlightQuestion. Empty dict = no slot is
+    # created. Optional; only relevant for SIMPLE_TUTOR_ENGINE runs.
+    seed_inflight_question: dict[str, Any]
     path: Path  # for error reporting
 
     @classmethod
@@ -93,6 +101,7 @@ class Scenario:
             rubric=[str(x) for x in (raw.get('rubric') or [])],
             pass_threshold=float(raw.get('pass_threshold', 0.7)),
             rubric_judge=dict(raw.get('rubric_judge') or {}),
+            seed_inflight_question=dict(raw.get('seed_inflight_question') or {}),
             path=path,
         )
 
@@ -190,6 +199,45 @@ def _inject_seed_history(session: TutorSession, history: list[dict]) -> None:
         )
 
 
+def _inject_inflight_question(
+    session: TutorSession, spec: dict[str, Any],
+) -> None:
+    """Create the InFlightQuestion row simple_tutor's engine needs to grade
+    against when the scenario's seed_history contains a posed question.
+
+    simple_tutor's engine has two modes — POSE (no InFlightQuestion row)
+    and GRADE (a row exists). The engine refuses to grade text it never
+    formally posed via the pose_question tool. For eval scenarios where
+    seed_history shows the tutor asking a question and student_turn is
+    the answer, we have to set up the GRADE-mode state explicitly —
+    otherwise the engine treats the student's answer as off-topic and
+    re-poses the question, which isn't the behaviour we want to test.
+
+    Spec shape mirrors apps.tutoring.models.InFlightQuestion:
+        question_text: str          # the stem
+        question_type: 'mcq' | 'short_numeric' | 'short_answer'
+        options: list[str]          # MCQ option labels
+        reference_answer: str       # canonical answer
+        source: 'inline_authored' | 'catalog'   # default inline_authored
+
+    Empty / missing spec → no-op.
+    Only relevant for SIMPLE_TUTOR_ENGINE runs; the legacy
+    ConversationalTutor ignores InFlightQuestion entirely.
+    """
+    if not spec:
+        return
+    from apps.tutoring.models import InFlightQuestion
+    InFlightQuestion.objects.create(
+        session=session,
+        question_text=str(spec.get('question_text', '')),
+        question_type=str(spec.get('question_type', 'short_answer')),
+        options=list(spec.get('options') or []),
+        reference_answer=str(spec.get('reference_answer', '')),
+        source=str(spec.get('source', 'inline_authored')),
+        catalog_question_id=spec.get('catalog_question_id'),
+    )
+
+
 def _run_single_turn(scenario: Scenario) -> ScenarioResult:
     """Drive one respond() call and score deterministically."""
     inst, user = _eval_institution_and_user()
@@ -220,6 +268,7 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
 
     try:
         _inject_seed_history(session, scenario.seed_history)
+        _inject_inflight_question(session, scenario.seed_inflight_question)
         # Engine dispatch: honor SIMPLE_TUTOR_ENGINE (same env var the
         # web views check) so the eval harness exercises whichever
         # engine is wired in for the staging/prod deploy. Without this
