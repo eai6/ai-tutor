@@ -141,8 +141,10 @@ def build(output_path: Path) -> Path:
     add_cover_metadata(doc, [
         'Nyansapo Labs — AI Tutor (ai-tutor)',
         '',
-        'Branch: dev   ·   Phases 1–6 shipped + bug-fix revision',
+        'Branch: pixeldesignlabs-dev   ·   Phases 1–7 shipped',
         'Dataset: 80 scenarios   ·   Personas: 6   ·   Subjects: math, geography',
+        'Engine target: simple_tutor (SIMPLE_TUTOR_ENGINE=1)',
+        'Rubric: scenario-specific items + 8 BEA-aligned standard items per scenario',
         '',
         'Audience: engineers, pilot operators, and anyone reviewing tutor quality',
         '',
@@ -596,7 +598,6 @@ student_turn: "145 — i did 60+75+80=215 then 360-215=145"
 assertions:
   response_nonempty: true                 # must produce some text
   max_paragraphs: 1                       # one-paragraph format rule
-  must_end_with_question: true            # last sentence ends in '?'
   must_not_contain_phrase:                # forbidden literal phrases
     - "let me check"
     - "are you sure"
@@ -605,9 +606,24 @@ assertions:
 
 # ─────────────── rubric (Layer 3) ───────────────
 rubric:
+  # SCENARIO-SPECIFIC items — author per scenario:
   - "Confirms '145' is correct — briefly, without effusive praise"
   - "Advances the lesson rather than re-probing already-shown working"
   - "Does NOT second-guess a correct answer"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  # The 8 dimensions below are appended to every scenario by
+  # scripts/migrate_bea_rubric.py. They give cross-scenario coverage on
+  # the BEA-2025 evaluation dimensions: mistake identification, mistake
+  # location, no-answer-reveal, providing guidance, actionability,
+  # coherence, tutor tone, human-likeness.
+  - "If the student made a mistake, the response identifies or recognises it..."
+  - "If a mistake exists, the response points at its specific location..."
+  - "The response does NOT reveal the final answer outright..."
+  - "The response offers correct and relevant guidance..."
+  - "It is clear from the response what the student should do next..."
+  - "The response is logically consistent with the conversation so far..."
+  - "The tutor's tone is warm and encouraging..."
+  - "The response sounds natural and conversational, not robotic..."
 pass_threshold: 0.7                       # rubric mean must be >= this
 ''')
 
@@ -726,9 +742,18 @@ pass_threshold: 0.65
             ['must_not_contain_phrase', 'None of the listed phrases appear.'],
             ['must_label', 'At least one of the listed judge labels fires on the response.'],
             ['must_not_label', 'None of the listed judge labels fire.'],
-            ['must_end_with_question', 'The last sentence ends with `?`.'],
             ['max_paragraphs', 'Response has at most N blank-line-separated paragraphs.'],
         ])
+
+    add_callout(doc,
+        '`must_end_with_question` was removed on 2026-05-27. "Does the '
+        'response leave the student with an action" is a semantic '
+        'judgement no regex can make reliably — imperatives, indirect '
+        'prompts, MCQ patterns, and novel phrasings all overlap with '
+        'non-action prose in ways that escape syntactic detection. The '
+        'check moved to the rubric layer as an actionability item that '
+        'an LLM judge can score by reading the response.',
+        label='Note')
 
     add_para(doc, 'evals/scorers/trajectory.py — Layer 1 + 2 (multi-turn)', bold=True)
     add_para(doc,
@@ -759,9 +784,59 @@ pass_threshold: 0.65
         '(set as `DEFAULT_RUBRIC_JUDGE` in `llm_rubric.py`) so that the '
         'rubric layer is as reproducible as the deterministic layer. '
         'Scenarios can override the judge per-file via a `rubric_judge:` '
-        'block if they need a stronger model for harder rubric items.')
+        'block if they need a stronger model for harder rubric items. '
+        'The default carries `max_tokens=3072` to comfortably accommodate '
+        'the ~12-item rubrics every scenario now has (8 BEA standard '
+        'items plus 3–5 scenario-specific ones).')
 
-    doc.add_heading('12. The lesson fixtures — why we freeze content', level=2)
+    doc.add_heading('12. The BEA-aligned standard rubric', level=2)
+
+    add_para(doc,
+        'Every scenario\'s rubric block carries two kinds of items: '
+        '**scenario-specific items** (3–5 per scenario, written by the '
+        'author to catch a particular failure mode) and the **8 BEA-aligned '
+        'standard items** (universal across all scenarios). The standard '
+        'items derive from the BEA-2025 shared-task evaluation rubric and '
+        'provide uniform cross-scenario coverage on dimensions that no '
+        'single regex can capture.')
+
+    add_para(doc, 'The 8 standard dimensions:')
+    add_table(doc,
+        ['#', 'Dimension', 'What the rubric judge looks for'],
+        [
+            ['1', 'Mistake identification',
+             'If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging.'],
+            ['2', 'Mistake location',
+             'If a mistake exists, the response points at its specific location or nature (a step, a misconception, an arithmetic slip), not just a generic "try again".'],
+            ['3', 'No answer reveal',
+             'The response does NOT reveal the final answer outright. Partial hints calibrated to the student\'s level are acceptable; handing over the canonical value is not.'],
+            ['4', 'Providing guidance',
+             'The response offers correct and relevant guidance — explanation, elaboration, hint, worked example, scaffolding — at the student\'s level.'],
+            ['5', 'Actionability',
+             'It is clear from the response what the student should do next — a specific question, an MCQ option to pick, a calculation to perform, or another structured prompt.'],
+            ['6', 'Coherence',
+             'The response is logically consistent with the conversation so far; does not contradict its own prior turns or ignore what the student just said.'],
+            ['7', 'Tutor tone',
+             'The response is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive or dismissive.'],
+            ['8', 'Human-likeness',
+             'The response sounds natural and conversational, not robotic, templated, or padded with filler openers ("Great question!", "Let me think about this carefully").'],
+        ])
+
+    add_para(doc, 'Why both layers — scenario-specific AND standard', bold=True)
+    add_para(doc,
+        'Scenario-specific items act as fine-grained failure detectors '
+        'tied to a particular pedagogical moment ("Surfaces the SPECIFIC '
+        'misconception (used 270 instead of 360)"). The standard items '
+        'act as an always-on baseline ("If a mistake exists, the response '
+        'points at its specific location or nature"). Both vote into the '
+        'rubric mean, so a scenario can fail on the specific item even '
+        'when the standard items pass — the specific item carries more '
+        'diagnostic weight for that particular failure mode. The standard '
+        'set is appended to every scenario by '
+        '`scripts/migrate_bea_rubric.py`, which is idempotent (it carries '
+        'a sentinel comment and skips already-migrated files).')
+
+    doc.add_heading('13. The lesson fixtures — why we freeze content', level=2)
     add_para(doc,
         'A regression test only works if the inputs are stable. The tutor '
         'engine teaches against lesson content — Course rows, Unit rows, '
@@ -795,7 +870,7 @@ pass_threshold: 0.65
         'colliding with anything else a developer might have created '
         'locally in their dev DB.')
 
-    doc.add_heading('13. The report tool', level=2)
+    doc.add_heading('14. The report tool', level=2)
     add_para(doc,
         '`evals/report.py` is a pure JSON-in, text-out utility. It '
         'reads one or two run JSON blobs and prints a human-readable '
@@ -834,7 +909,7 @@ python -m evals.report run_A.json --diff run_B.json # explicit two-run diff
     # =====================================================================
     doc.add_heading('Part IV — The Evaluation Procedure (Step-by-Step)', level=1)
 
-    doc.add_heading('14. Setup (one-time, per developer machine)', level=2)
+    doc.add_heading('15. Setup (one-time, per developer machine)', level=2)
     add_para(doc, 'Before any eval can be run, three setup steps are needed:')
 
     add_para(doc, 'Step 14.1 — Activate the Python venv', bold=True)
@@ -881,7 +956,7 @@ python manage.py loaddata evals/fixtures/institution.json \\
         '(pk 999001), a simulator-bot user, the four lessons with all '
         'their steps, exit tickets, and exit-ticket questions.')
 
-    doc.add_heading('15. Running an evaluation', level=2)
+    doc.add_heading('16. Running an evaluation', level=2)
     add_para(doc,
         'Three usage patterns, each appropriate for a different moment '
         'in the development loop:')
@@ -939,7 +1014,7 @@ Output: /home/.../evals/runs/2026-05-27T12-34-56_abc1234.json
         'sub-score, every error message. The summary line is human-'
         'readable; the JSON is for the report tool.')
 
-    doc.add_heading('16. Reading the results', level=2)
+    doc.add_heading('17. Reading the results', level=2)
     add_para(doc, 'Three levels of detail, from coarsest to finest:')
 
     add_para(doc, 'Level 16.1 — The live print', bold=True)
@@ -1026,7 +1101,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
     evals/runs/2026-05-27T05-32-00_*.json
 ''')
 
-    doc.add_heading('17. Iterating after a code change', level=2)
+    doc.add_heading('18. Iterating after a code change', level=2)
     add_para(doc, 'The typical loop after touching the tutor or its prompts:')
 
     add_numbered(doc, 'Capture a baseline. Run the full suite once before the change. Save the run JSON path.')
@@ -1052,7 +1127,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
     # =====================================================================
     doc.add_heading('Part V — The Dataset', level=1)
 
-    doc.add_heading('18. The persona × situation matrix (current state)', level=2)
+    doc.add_heading('19. The persona × situation matrix (current state)', level=2)
     add_para(doc,
         'The dataset is organised as a deliberate matrix: each of the '
         'six personas is exercised against situations that are known to '
@@ -1088,7 +1163,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
             ['TOTAL', '80 (81 with smoke)', ''],
         ])
 
-    doc.add_heading('19. Failure category coverage', level=2)
+    doc.add_heading('20. Failure category coverage', level=2)
     add_para(doc,
         'The broader project benchmark — `memory/eval_benchmark_v2_'
         'simplified.md` — defines 19 named failure categories that '
@@ -1140,7 +1215,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'reason — often a hard-won one. Reading this part will save '
         'future contributors from re-deriving the same lessons.')
 
-    doc.add_heading('20. Why curated YAML, not production sampling', level=2)
+    doc.add_heading('21. Why curated YAML, not production sampling', level=2)
     add_para(doc, 'Three reasons.')
     add_bullet(doc,
         'Reproducibility. Same git SHA in, same dataset out. A run '
@@ -1166,7 +1241,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'happening to real students right now". The two systems '
         'complement each other.')
 
-    doc.add_heading('21. Why three scoring layers and not one', level=2)
+    doc.add_heading('22. Why three scoring layers and not one', level=2)
     add_para(doc,
         'Each layer catches what the others can\'t. Specifically:')
 
@@ -1196,7 +1271,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'than false-negative FAIL ones. We\'d rather flag a possibly-good '
         'response than miss a definitely-bad one.')
 
-    doc.add_heading('22. Why one paragraph, no question repetition, MCQ inline', level=2)
+    doc.add_heading('23. Why one paragraph, no question repetition, MCQ inline', level=2)
     add_para(doc,
         'These three rules are stated explicitly in the tutor\'s system '
         'prompt (`apps/tutoring/prompts/anthropic.py`) because they are '
@@ -1231,7 +1306,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'for structured MCQ rendering; the LLM is supposed to use that '
         'tool, not write MCQs in prose.')
 
-    doc.add_heading('23. Why post-impl paragraph collapse (the hard-won lesson)', level=2)
+    doc.add_heading('24. Why post-impl paragraph collapse (the hard-won lesson)', level=2)
     add_para(doc,
         'This is the trickiest engineering decision in the whole bug-fix '
         'revision. It is documented in detail because the obvious '
@@ -1282,7 +1357,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'without changing the engine\'s self-perception, late '
         'application is the right move.')
 
-    doc.add_heading('24. Why the dataset lives in the repo', level=2)
+    doc.add_heading('25. Why the dataset lives in the repo', level=2)
     add_para(doc,
         'The dataset is checked into the git repository, not stored in '
         'a database or external file store. This is for three reasons:')
@@ -1314,7 +1389,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
     # =====================================================================
     doc.add_heading('Part VII — Recent Changes (This Revision)', level=1)
 
-    doc.add_heading('25. The first real baseline', level=2)
+    doc.add_heading('26. The first real baseline', level=2)
     add_para(doc,
         'The first end-to-end eval against real Anthropic Haiku produced '
         'a baseline of 8 passes out of 23 scenarios (34.8% pass rate). '
@@ -1334,7 +1409,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'asserted on per-response format (one paragraph, end-with-question) '
         'and those mostly failed.')
 
-    doc.add_heading('26. The bug pattern: pedagogy sound, format broken', level=2)
+    doc.add_heading('27. The bug pattern: pedagogy sound, format broken', level=2)
     add_para(doc,
         '14 of the 15 single-turn failures were `max_paragraphs: 1` '
         'violations. Crucially, the rubric judge scored those same '
@@ -1361,7 +1436,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
              '2 scenarios with must_end_with_question failures'],
         ])
 
-    doc.add_heading('27. The fixes', level=2)
+    doc.add_heading('28. The fixes', level=2)
 
     add_para(doc, 'Fix A — System prompt tightening', bold=True)
     add_para(doc,
@@ -1396,7 +1471,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'response collapsed from 4 paragraphs to 1, all assertions pass, '
         'rubric scored 1.00/0.70. Scenario flipped FAIL → PASS.')
 
-    doc.add_heading('28. Dataset growth: 23 → 80', level=2)
+    doc.add_heading('29. Dataset growth: 23 → 80', level=2)
     add_para(doc,
         'Alongside the bug fixes, the dataset grew from 23 to 80 '
         'scenarios. The breakdown:')
@@ -1420,7 +1495,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'info_dump, repeats, leaks_answer, false_reject, '
         'premature_advance, and several persona-specific variations.')
 
-    doc.add_heading('29. Personas: 2 → 6 (then merged 6)', level=2)
+    doc.add_heading('30. Personas: 2 → 6 (then merged 6)', level=2)
     add_para(doc,
         'The original simulator had only 2 personas (struggler, capable). '
         'During the eval-harness build, three more were added (average, '
@@ -1430,6 +1505,60 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'also added (a BEA-2025 coverage persona that always commits '
         'to a specific wrong answer). Total: 6 personas.')
 
+    doc.add_heading('31. BEA standard rubric + the action-rubric move', level=2)
+    add_para(doc,
+        'Phase 7 (latest revision) introduced two related changes:')
+
+    add_para(doc,
+        '`must_end_with_action` removed from the assertion layer.', bold=True)
+    add_para(doc,
+        'The deterministic check originally tried to detect "did the '
+        'tutor leave the student with an action" via three regex cases: '
+        'trailing `?`, MCQ options block plus a `?` somewhere, or trailing '
+        'fill-in-blank marker. Real tutor responses produced patterns the '
+        'regex couldn\'t cleanly classify — e.g., the engine sometimes '
+        'ended on an MCQ option line `D) 100 + 80 + x = 270` with the '
+        'question mid-response, which one heuristic caught and another '
+        'didn\'t. The judgement is fundamentally semantic ("does this '
+        'prompt structure a next move?"), so the check moved to the '
+        'rubric layer as a BEA #5 Actionability item that an LLM judge '
+        'can read and reason about.')
+
+    add_para(doc,
+        '8 BEA-aligned standard rubric items appended to every scenario.', bold=True)
+    add_para(doc,
+        'The BEA-2025 shared-task evaluation rubric defines 8 pedagogical '
+        'dimensions every tutor response should be judged on: mistake '
+        'identification, mistake location, no-answer-reveal, providing '
+        'guidance, actionability, coherence, tutor tone, and human-'
+        'likeness. `scripts/migrate_bea_rubric.py` appends these 8 items '
+        'to every scenario\'s `rubric:` block, alongside the scenario-'
+        'specific items. Two effects: (1) every scenario is now scored '
+        'on the same 8 universal dimensions, making cross-scenario '
+        'comparison sharper; (2) coherence and human-likeness — two '
+        'dimensions the pre-Phase-7 dataset didn\'t cover at all — now '
+        'have universal coverage.')
+
+    add_para(doc,
+        'Sidecar fix: `evals/scorers/llm_rubric.py::DEFAULT_RUBRIC_JUDGE` '
+        '`max_tokens` raised 1024 → 3072 to accommodate the ~12-item '
+        'rubrics (3–5 scenario-specific + 8 BEA). The first run after '
+        'the BEA migration failed with JSON parse errors because Haiku\'s '
+        'response truncated mid-string at the 1024-token cap.')
+
+    doc.add_heading('32. Engine target: simple_tutor going forward', level=2)
+    add_para(doc,
+        'A merge with the dev branch (2026-05-27) brought in the '
+        '`simple_tutor` engine — a lighter-weight conversational tutor '
+        'architecture that runs alongside the original `ConversationalTutor`. '
+        'Going forward, evaluations are run against `simple_tutor`, '
+        'controlled by the `SIMPLE_TUTOR_ENGINE` env var. '
+        '`evals/runner.py` honours it for single-turn scenarios; '
+        '`apps/tutoring/student_sim/driver.py` honours it for multi-turn. '
+        'The rubric items themselves are engine-agnostic — they describe '
+        'properties of the response text, not engine internals — so the '
+        'same dataset evaluates either engine.')
+
     add_page_break(doc)
 
     # =====================================================================
@@ -1437,7 +1566,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
     # =====================================================================
     doc.add_heading('Part VIII — Operational Notes', level=1)
 
-    doc.add_heading('30. Where everything lives in the code', level=2)
+    doc.add_heading('33. Where everything lives in the code', level=2)
     add_table(doc,
         ['Path', 'What it is'],
         [
@@ -1469,7 +1598,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
              'The broader failure-category vocabulary the dataset targets.'],
         ])
 
-    doc.add_heading('31. Glossary', level=2)
+    doc.add_heading('34. Glossary', level=2)
     add_table(doc,
         ['Term', 'Definition'],
         [
@@ -1491,7 +1620,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
             ['Failure category', 'A named cluster of related failure modes from memory/eval_benchmark_v2_simplified.md.'],
         ])
 
-    doc.add_heading('32. Future work', level=2)
+    doc.add_heading('35. Future work', level=2)
     add_para(doc, 'Known gaps and natural next steps:')
     add_bullet(doc,
         'Cover the 4 remaining failure categories (figure_mismatch, '
@@ -1516,7 +1645,7 @@ jq '.results[] | select((.rubric_result.mean_score // 0) < 0.5) | {id: .scenario
         'is YAML-authoring time. A web form that asks "what persona, '
         'what situation, what assertions" would lower the bar.')
 
-    doc.add_heading('33. One-paragraph closing', level=2)
+    doc.add_heading('36. One-paragraph closing', level=2)
     add_para(doc,
         'The AI Tutor now has an automated regression suite. It is '
         'curated, reproducible, fast for targeted checks and complete for '
