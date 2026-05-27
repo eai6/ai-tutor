@@ -872,8 +872,28 @@ def respond_for_view(session, user_input: str) -> dict:
         already_submitted = ExitTicketAttempt.objects.filter(
             session=session, completed_at__isnull=False,
         ).exists()
+        # Remediation-complete trigger: handle_advance_step sets this
+        # flag when the LLM calls advance_step after a failed attempt
+        # ("the student has recovered all missed objectives, time to
+        # re-take the quiz"). Bypasses the already_submitted guard so
+        # the modal re-fires. We clear the flag on this transition so
+        # the modal doesn't open in a loop after the next submit.
+        session.refresh_from_db()
+        es = session.engine_state or {}
+        remediation_complete = bool(es.get('remediation_complete'))
 
-        if already_submitted:
+        if remediation_complete:
+            # Clear the flag so this only fires once per cycle.
+            es.pop('remediation_complete', None)
+            session.engine_state = es
+            session.save(update_fields=['engine_state'])
+
+        # Fire the exit-ticket modal when:
+        #   - first time through (not already_submitted), OR
+        #   - LLM signaled remediation complete (re-take)
+        should_fire_modal = (not already_submitted) or remediation_complete
+
+        if not should_fire_modal:
             # Remediation phase — let the chat continue normally.
             show_exit_ticket = False
         else:

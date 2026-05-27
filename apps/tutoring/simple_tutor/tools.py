@@ -704,6 +704,18 @@ def handle_advance_step(
     })
     es['advance_step_hints'] = hints[-20:]   # keep last 20
 
+    # Remediation completion signal: when the LLM calls advance_step
+    # AFTER the student has submitted (and failed) the exit ticket,
+    # treat it as "remediation is done — re-fire the exit ticket so
+    # the student can re-take it." respond_for_view reads this flag
+    # to bypass the already_submitted guard and re-open the modal.
+    from apps.tutoring.models import ExitTicketAttempt
+    has_failed_attempt = ExitTicketAttempt.objects.filter(
+        session=session, completed_at__isnull=False, passed=False,
+    ).exists()
+    if has_failed_attempt:
+        es['remediation_complete'] = True
+
     session.current_step_index = next_idx
     session.engine_state = es
     session.save(update_fields=[
