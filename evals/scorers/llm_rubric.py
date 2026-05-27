@@ -35,7 +35,13 @@ DEFAULT_RUBRIC_JUDGE = {
     'provider': 'anthropic',
     'model': 'claude-haiku-4-5-20251001',
     'temperature': 0.0,
-    'max_tokens': 1024,
+    # Bumped from 1024 → 4096 on 2026-05-27. The 8 BEA-aligned standard
+    # rubric items + 3-5 scenario-specific items × {item, score,
+    # reasoning} fields per entry consistently truncated at exactly
+    # 1024 tokens in the phase-5 run — 42 of 80 scenarios returned
+    # malformed JSON because the closing markdown fence got cut off.
+    # 4096 gives ~3x headroom for the largest scenarios.
+    'max_tokens': 4096,
 }
 
 
@@ -392,6 +398,7 @@ def _build_trajectory_prompt(
 # ---------------------------------------------------------------------------
 
 _FENCE_RE = re.compile(r'```(?:json)?\s*(.*?)\s*```', re.DOTALL)
+_OPEN_FENCE_RE = re.compile(r'```(?:json)?\s*\n?', re.IGNORECASE)
 
 
 def _extract_json(text: str) -> dict | None:
@@ -401,13 +408,21 @@ def _extract_json(text: str) -> dict | None:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
-    # Strip markdown fences if present.
+    # Strip markdown fences if present (closed pair).
     m = _FENCE_RE.search(text)
     if m:
         try:
             return json.loads(m.group(1))
         except json.JSONDecodeError:
             pass
+    # Missing closing fence (truncation at max_tokens). Strip the
+    # leading ```json fence and try repair-then-parse on the tail.
+    om = _OPEN_FENCE_RE.search(text)
+    if om:
+        candidate = text[om.end():].rstrip('` \n')
+        repaired = _repair_truncated_json(candidate)
+        if repaired is not None:
+            return repaired
     # Fall back to "find the largest {...} block".
     first = text.find('{')
     last = text.rfind('}')
@@ -416,7 +431,67 @@ def _extract_json(text: str) -> dict | None:
             return json.loads(text[first:last + 1])
         except json.JSONDecodeError:
             pass
-    return None
+    # Last resort: try repair on the whole thing.
+    return _repair_truncated_json(text)
+
+
+def _repair_truncated_json(text: str) -> dict | None:
+    """Best-effort repair on a JSON string truncated mid-output.
+
+    The truncation pattern we see from the rubric judge is: it returns
+    a valid JSON prefix that hits max_tokens partway through one of the
+    items. The closing brackets are missing. We close them.
+
+    Returns the parsed dict on success, None on failure. Whatever
+    items were complete at truncation time come through; the partial
+    final item is discarded.
+    """
+    s = text.strip().rstrip('`').strip()
+    if not s.startswith('{'):
+        return None
+    # Drop trailing partial entry (anything after the last complete
+    # closing brace of an array element).
+    # Strategy: walk forward tracking brace/bracket depth, recording
+    # the position of the last balanced point inside the top-level
+    # `scores` / `dimensions` array; then close the array + object.
+    depth_curly = 0
+    depth_square = 0
+    in_string = False
+    escape = False
+    last_safe = -1
+    for i, ch in enumerate(s):
+        if escape:
+            escape = False
+            continue
+        if ch == '\\' and in_string:
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            depth_curly += 1
+        elif ch == '}':
+            depth_curly -= 1
+            if depth_square >= 1 and depth_curly == 1:
+                # Just closed an array element at top level.
+                last_safe = i
+        elif ch == '[':
+            depth_square += 1
+        elif ch == ']':
+            depth_square -= 1
+    if last_safe < 0:
+        # Never closed any array element; can't repair.
+        return None
+    head = s[: last_safe + 1]
+    # Close: end the array, end the outer object.
+    repaired = head + ']}'
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        return None
 
 
 # ---------------------------------------------------------------------------
