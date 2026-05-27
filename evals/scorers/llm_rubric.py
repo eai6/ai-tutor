@@ -35,7 +35,13 @@ DEFAULT_RUBRIC_JUDGE = {
     'provider': 'anthropic',
     'model': 'claude-haiku-4-5-20251001',
     'temperature': 0.0,
-    'max_tokens': 1024,
+    # Sized for ~12-item rubrics (the 8 BEA-aligned standard items plus
+    # 3-5 scenario-specific items). Each scored item is roughly 250 chars
+    # (item text + score + one-sentence reasoning), JSON overhead pushes
+    # the realistic ceiling to ~3K tokens. 1024 was sized for the older
+    # 3-4 item rubrics and caused truncation-induced JSON parse errors
+    # on the BEA-expanded dataset.
+    'max_tokens': 3072,
 }
 
 

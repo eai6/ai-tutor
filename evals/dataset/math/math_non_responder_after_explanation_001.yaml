@@ -17,11 +17,19 @@ student_turn: "yeah"
 assertions:
   response_nonempty: true
   max_paragraphs: 1
-  must_end_with_question: true
   must_not_label: [INFO_DUMP, MULTI_PARAGRAPH, PREMATURE_ADVANCE]
 
 rubric:
   - "Treats 'yeah' as a non-answer (passive acknowledgement) rather than confirmation of understanding"
   - "Asks a SHORT specific check question (e.g., 'so if 90 + 100 + x = 360, what's x?')"
   - "Does NOT advance to a new concept and does NOT re-explain the same content"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
 pass_threshold: 0.7

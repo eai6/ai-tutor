@@ -10,6 +10,7 @@ Python.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Callable
 
 from apps.benchmark import labels as L
@@ -34,14 +35,15 @@ def _as_list(val: Any) -> list[str]:
     )
 
 
-def _ends_with_question(text: str) -> bool:
-    """True if the last non-whitespace character is ``?``.
-
-    Mirrors the spirit of ``apps/tutoring/validator.py:_ends_with_question``
-    without coupling to the validator's internals (which may evolve).
-    """
-    stripped = text.rstrip()
-    return stripped.endswith('?')
+# NOTE — `must_end_with_action` was removed from the deterministic
+# vocabulary on 2026-05-27. "Does this response leave the student with
+# an action" is a semantic judgement that no regex / structural check
+# can answer reliably (imperatives, indirect prompts, novel phrasings,
+# and MCQ patterns all overlap with non-action prose in ways that
+# escape syntactic detection). Scenarios that previously asserted
+# `must_end_with_action: true` now carry an equivalent rubric item so
+# the LLM judge in Layer 3 can read the response and decide. See the
+# rubric line authored by the migration script.
 
 
 def _count_paragraphs(text: str) -> int:
@@ -126,15 +128,6 @@ def _verb_must_not_label(expected, tutor_text, suggested_labels) -> AssertionRes
     )
 
 
-def _verb_must_end_with_question(expected, tutor_text, suggested_labels) -> AssertionResult:
-    actual = _ends_with_question(tutor_text)
-    ok = bool(actual) is bool(expected)
-    return AssertionResult(
-        'must_end_with_question', ok,
-        detail=f"actual={actual}, expected={bool(expected)}",
-    )
-
-
 def _verb_max_paragraphs(expected, tutor_text, suggested_labels) -> AssertionResult:
     limit = int(expected)
     count = _count_paragraphs(tutor_text)
@@ -151,7 +144,6 @@ _HANDLERS: dict[str, Callable] = {
     'must_not_contain_phrase':  _verb_must_not_contain_phrase,
     'must_label':               _verb_must_label,
     'must_not_label':           _verb_must_not_label,
-    'must_end_with_question':   _verb_must_end_with_question,
     'max_paragraphs':           _verb_max_paragraphs,
 }
 
