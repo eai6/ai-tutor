@@ -72,7 +72,7 @@ The fails group cleanly into four buckets. Only buckets 3 and 4 are real engine 
 | `math_average_arithmetic_slip_001` | Asserts `must_not_contain_phrase: ['exactly']`. Tutor's affirmation included "exactly right". The scenario was written to catch over-eager praise; "exactly" alone isn't praise. |
 | `math_capable_pushback_001` | Asserts `must_contain_phrase: ['360']`. Tutor responded conceptually without saying the digit. Reasonable hint, harsh assertion. |
 
-**Action**: relax these three assertions in a follow-up commit.
+**Action**: relax these three assertions in a follow-up commit. <I think we should remove the item specific assertions and focus on the 8 dimension of the paper>
 
 ### Bucket 2 — multi-turn trajectory: tutor repeated a phrase (1)
 
@@ -80,7 +80,7 @@ The fails group cleanly into four buckets. Only buckets 3 and 4 are real engine 
 |---|---|
 | `capable_speedrun_001` | Tutor used the same phrase ("Nice work — angles around a point sum to 360°…") on turns 4 and 7. The trajectory verb `no_repeated_tutor_phrase_within_window` (window=4) caught it. |
 
-**Action**: real signal. The tutor over-relies on a stock praise phrase across consecutive correct-verdicts. Either: tighten R07 (anti-passive endings) to also encourage varied affirmations, OR add an explicit "vary your affirmation phrasing" rule. Track separately.
+**Action**: real signal. The tutor over-relies on a stock praise phrase across consecutive correct-verdicts. Either: tighten R07 (anti-passive endings) to also encourage varied affirmations, OR add an explicit "vary your affirmation phrasing" rule. Track separately. <very affirmation>
 
 ### Bucket 3 — rubric just below threshold (5)
 
@@ -101,7 +101,7 @@ Two are within 0.02 of passing (likely judge variance). Three are genuine — th
 | `math_leaks_answer_guard_001` | Rubric 0.35 / 0.75. The math-specific anti-leak threshold (0.75) is stricter than the default 0.70. Dimensions advisory also flagged `reveals_answer`. Genuine reveal — needs inspection. |
 | `wrong_answer_diagnostic_001` | Rubric 0.48 / 0.70. Dimensions flagged `mistake_identification`. Genuine — tutor didn't surface a specific misconception. |
 
-**Action**: these are real engine signal. The math reveals-answer guard is the highest-leverage target — it's exactly what the prompt audit's R14 polices. Worth a focused look at the prompt + a follow-up commit if a pattern emerges.
+**Action**: these are real engine signal. The math reveals-answer guard is the highest-leverage target — it's exactly what the prompt audit's R14 polices. Worth a focused look at the prompt + a follow-up commit if a pattern emerges. <we can't be revealing answers>
 
 ---
 
@@ -116,7 +116,7 @@ Two are within 0.02 of passing (likely judge variance). Three are genuine — th
 | `human_likeness` | 57 / 60 | 95.0% |
 | `mistake_identification` | 57 / 60 | 95.0% |
 | `providing_guidance` | 57 / 60 | 95.0% |
-| `reveals_answer` | **51 / 60** | **85.0%** |
+| `reveals_answer` | **51 / 60** | **85.0%** | <we need to address this issue>
 
 `reveals_answer` is the lowest-scoring dimension at 85%. This aligns with the math reveals-answer guard failures in bucket 4. The signal is consistent across two independent measurement layers (rubric + dimensions) — it's the highest-leverage area for the next prompt iteration.
 
@@ -168,7 +168,7 @@ Both judges parsed cleanly on every scenario this run — the JSON repair + max_
 |---|---|---|
 | 1 | Prompt audit | Rules dropped (R03 length, R06 pacing) didn't degrade quality |
 | 2 | Prompt rewrite | `actionability` + `tutor_tone` both 100%; passive-ending check 0/60 |
-| 3 | Multi-dim rubric | Surfaces `reveals_answer` as the highest-leverage gap |
+| 3 | Multi-dim rubric | Surfaces `reveals_answer` as the highest-leverage gap | <lets fix this>
 | 4 | Rule registry | 0 unknown verbs / dimensions; all 17 rules accounted for |
 | (extra) | seed_inflight_question wiring | +49 scenarios flipped to PASS once GRADE-mode could actually fire |
 | (extra) | JSON repair + dim-advisory | Removed the harness noise that was hiding bucket-3/4 real signal |
@@ -179,8 +179,8 @@ Both judges parsed cleanly on every scenario this run — the JSON repair + max_
 
 In rank order:
 
-1. **`reveals_answer` regression on math** (bucket 4 + dimension at 85%) — the prompt's anti-leak rule (R14) needs sharper language or a few-shot good/bad pair specifically for the math hint ladder. Focused effort, high leverage.
-2. **Audit + relax the 3 bucket-1 assertions** that don't match production-reasonable behaviour (the `must_contain_phrase: ['360']` style). One-commit cleanup.
+1. **`reveals_answer` regression on math** (bucket 4 + dimension at 85%) — the prompt's anti-leak rule (R14) needs sharper language or a few-shot good/bad pair specifically for the math hint ladder. Focused effort, high leverage <yes lets fix this>.
+2. **Audit + relax the 3 bucket-1 assertions** that don't match production-reasonable behaviour (the `must_contain_phrase: ['360']` style). One-commit cleanup. <I think we should clean up the item specific assertinons that doe not make sense>
 3. **Investigate the 3 placeholder-ref scenarios in bucket 3** (`tool_leak_guard_001`, `false_reject_capable_001`, `average_clarifying_question_001`). The placeholder ref may be causing the grader to mark non-answers as "incorrect" and the tutor's wrong-answer response is the gradable artefact. If so, switch those to explicit refs or a special "no_grade" sentinel.
 4. **Vary affirmation phrasing** (bucket 2) — add a rule or rotate templates.
 

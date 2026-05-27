@@ -7,7 +7,6 @@ Students learn through structured conversational sessions that follow research-b
 ## Staging
 
 https://aitutor-staging-app.icyplant-cffb8b76.centralus.azurecontainerapps.io — deployed from the `dev` branch on push via GitHub Actions.
-
 ---
 
 ## Table of Contents

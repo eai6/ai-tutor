@@ -1,3 +1,4 @@
+
 # Simple-tutor systematic eval + prompt cleanup plan
 
 **Branch**: `simple-tutor-systematic-eval`
@@ -6,7 +7,8 @@
 
 ## Why now
 
-The first systematic eval run (`evals/runs/2026-05-27T01-56-58_b03997a3956d.json`) revealed:
+The first systematic eval run (`eva
+ls/runs/2026-05-27T01-56-58_b03997a3956d.json`) revealed:
 
 | Pattern | Count | Diagnosis |
 |---|---|---|
