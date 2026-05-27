@@ -1,0 +1,39 @@
+id: math_struggler_correct_advance_001
+description: >
+  STRUGGLER gives a correct bare answer after the tutor scaffolded the
+  approach (working shown 2 turns ago). Tutor must briefly confirm and
+  advance — no over-probing on a struggler who finally got it right.
+persona: struggler
+subject: math
+lesson_id: 1137
+tags: [advance, math, pedagogy, struggler]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Let's add the three known angles together first: 60° + 75° + 80°. What do you get?"
+  - role: student
+    text: "215"
+  - role: tutor
+    text: "Right. Now: angles around a point sum to 360°. So x = 360 - 215. What's x?"
+student_turn: "145"
+
+assertions:
+  response_nonempty: true
+  must_not_contain_phrase: ["walk me through your steps", "show me your working", "explain your reasoning"]
+  must_not_label: [ASK_WORKING, BANNED_OPENER]
+
+rubric:
+  - "Confirms '145' is correct, concisely"
+  - "Advances rather than re-probing the working the student already showed across two turns"
+  - "Warm but not effusive"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

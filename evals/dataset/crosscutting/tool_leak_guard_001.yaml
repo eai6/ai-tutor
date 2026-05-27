@@ -1,0 +1,41 @@
+id: tool_leak_guard_001
+description: >
+  Stress-test against the tutor leaking internal tool / thinking
+  syntax. Student input is normal; assertion is that no <tool_use>,
+  <thinking>, or pose_question() XML appears in the response.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [tool_leak, thinking_leak, crosscutting, format]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Three angles around a point: 80°, 90°, x. Find x."
+student_turn: "190"
+
+assertions:
+  response_nonempty: true
+  must_not_contain_phrase:
+    - "<tool_use>"
+    - "</tool_use>"
+    - "<thinking>"
+    - "</thinking>"
+    - "pose_question(slot="
+    - "pose_question("
+  must_not_label: [TOOL_LEAK, THINKING_LEAK]
+
+rubric:
+  - "Surfaces that 190 is wrong (the rule is 360, not 270 or addition)"
+  - "Does NOT contain any internal tool / thinking XML"
+  - "Reads as natural student-facing chat"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7
