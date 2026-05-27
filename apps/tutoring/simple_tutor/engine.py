@@ -263,7 +263,25 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         [tr.get('tool') for tr in tool_results],
     )
 
-    # ─── 8. Persist turns + verdicts ──────────────────────────────
+    # ─── 8. Collapse multi-paragraph responses to one block ──────
+    # The system prompt asks for concise turns but the LLM frequently
+    # emits 2–4 paragraphs with blank lines between them. The mobile
+    # chat UX wants one block of text per turn. ``collapse_paragraphs``
+    # replaces ``\n\s*\n+`` with single ``\n`` so the response becomes
+    # one paragraph; single newlines (bullet/list items) are preserved
+    # and a trailing ``|||MEDIA:N|||`` signal stays on its own line for
+    # the media parser. Applied BEFORE persist so DB rows match the
+    # student view exactly — unlike the legacy ConversationalTutor where
+    # collapse runs post-impl to keep the coherence judge from
+    # mis-flagging the collapsed text. simple_tutor's grader operates
+    # on student input, not tutor text, so the early-collapse is safe.
+    # Today's baseline (2026-05-27) showed all 6 representative
+    # scenarios failing solely on max_paragraphs while rubric scored
+    # 0.93–0.99 — pedagogy is sound; this is purely format compliance.
+    from apps.tutoring.validator import collapse_paragraphs
+    text_reply = collapse_paragraphs(text_reply or '')
+
+    # ─── 9. Persist turns + verdicts ──────────────────────────────
     # On the opening (warm-up) call, ``user_input`` is the synthetic
     # "begin the lesson" instruction — do NOT persist it as a student
     # turn so the chat thread starts with the tutor's greeting.
@@ -271,11 +289,11 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         _persist_student_turn(session, user_input, step)
     _persist_tutor_turn(session, text_reply, step, tool_results)
 
-    # ─── 9. Server auto-advance (safety net) ──────────────────────
+    # ─── 10. Server auto-advance (safety net) ─────────────────────
     advanced = maybe_advance_step(session)
 
     return {
-        'content': text_reply or '',
+        'content': text_reply,
         'tool_calls': tool_results,
         'fallback': False,
         'step_advanced': advanced,
