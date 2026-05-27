@@ -208,6 +208,14 @@ class ModelConfig(models.Model):
         # from GRADER_STUDENT_CLAIMS so the prompts can diverge (math has
         # arithmetic expressions; non-math has textual claims).
         GRADER_STUDENT_RESPONSE = 'grader_student_response', 'v2 Grader — Student-Response Extractor (Non-Math)'
+        # LLM Move Router (design/tasks/move-router-implementation-plan.md).
+        # Replaces the deterministic `select_move` ladder and the
+        # standalone Haiku intent-classifier. Transcript-aware, picks the
+        # move + principle emphasis + per-turn focus note. Pinned to a
+        # Sonnet-class model in the seed migration; the deterministic
+        # safety floors downstream catch the highest-cost shapes if the
+        # router's pedagogical judgement is off.
+        MOVE_ROUTER = 'move_router', 'v2 Move Router — Move + Principle Emphasis + Focus Note'
 
     institution = models.ForeignKey(
         Institution,
@@ -323,6 +331,9 @@ class ModelConfig(models.Model):
             self.Purpose.QUESTION_EXTRACTOR.value,
             self.Purpose.GRADER_STUDENT_CLAIMS.value,
             self.Purpose.GRADER_STUDENT_RESPONSE.value,
+            # Move router: structured-JSON output, determinism required
+            # so the per-turn decision is replayable / auditable.
+            self.Purpose.MOVE_ROUTER.value,
         ):
             return self.JUDGE_TEMP
         # v2 TUTOR_MOVE — TUTORING-class clamp [0.1, 0.3].
@@ -379,6 +390,7 @@ class ModelConfig(models.Model):
         'question_extractor': 'QUESTION_EXTRACTOR_MODEL_OVERRIDE',
         'grader_student_claims': 'GRADER_STUDENT_CLAIMS_MODEL_OVERRIDE',
         'grader_student_response': 'GRADER_STUDENT_RESPONSE_MODEL_OVERRIDE',
+        'move_router': 'MOVE_ROUTER_MODEL_OVERRIDE',
     }
     # Purposes where Google-grounding is the required runtime branch.
     # Non-Gemini overrides are refused at resolve-time (fail-soft to

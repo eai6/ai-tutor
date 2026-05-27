@@ -10,7 +10,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from apps.tutoring.v2.contracts.runtime_state import (
     OpenQuestion,
@@ -153,3 +153,128 @@ class ProfileUpdate(BaseModel):
 
     profile_summary_text: str = ""
     asked_questions_delta: dict[str, dict] = Field(default_factory=dict)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Move Router — design/tasks/move-router-implementation-plan.md
+# ──────────────────────────────────────────────────────────────────────
+
+
+# Closed set of move names the router may pick. Mirrors the post-cutover
+# move table in `apps/tutoring/v2/services/move_prompts.py` — every move
+# except the deleted ``pose_question``. The router can never emit
+# ``pose_question`` because there is no remaining case where "ask with
+# no framing" is the right pedagogical move; the other 8 moves all end
+# in a tool-posed question.
+RouterMove = Literal[
+    "confirm_and_advance",
+    "confirm_and_extend",
+    "scaffold_hint",
+    "name_misconception",
+    "worked_example",
+    "explain",
+    "pivot",
+    "close_topic",
+]
+
+
+# The 13 science-of-learning principle names (from design/science-
+# principles.md Table 1). The router emits ``principle_emphasis`` from
+# this closed set; Pydantic validates membership so a hallucinated
+# principle name surfaces as a ValidationError instead of silently
+# steering the move LLM.
+ALLOWED_PRINCIPLES: tuple[str, ...] = (
+    "Active Learning",
+    "Direct Instruction",
+    "Deliberate Practice",
+    "Mastery Learning",
+    "Cognitive Load",
+    "Automaticity",
+    "Layering",
+    "Non-Interference",
+    "Spaced Repetition",
+    "Interleaving",
+    "Testing Effect",
+    "Targeted Remediation",
+    "Gamification",
+)
+
+
+class RouterRequest(BaseModel):
+    """Inputs to ``MoveRouter.route()``.
+
+    Built from ``TutoringContext`` + ``GradingResult`` + the runtime
+    state at one site (``RouterRequest.from_context``) so callers don't
+    re-derive the snapshot at each call site. Frozen — services are
+    stateless and receive immutable snapshots.
+    """
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    # ── conversation surface ─────────────────────────────────────────
+    last_n_turns: list[dict] = Field(default_factory=list)
+    student_input: str = ""
+
+    # ── grader output (None on opening / transitional / help-request) ─
+    grader_verdict: Optional[Verdict] = None
+    grader_reason_code: Optional[str] = None
+    student_safe_feedback: StudentSafeFeedback = Field(
+        default_factory=StudentSafeFeedback
+    )
+
+    # ── student / lesson context ─────────────────────────────────────
+    profile_summary: str = ""
+    objective: str = ""
+    lesson_title: str = ""
+    lesson_subject: str = ""
+    lesson_step_teacher_script: str = ""
+    lesson_step_worked_example: str = ""
+    media_catalog_summary: str = ""
+    is_final_step: bool = True
+
+    # ── runtime state slices ─────────────────────────────────────────
+    move_history: list[str] = Field(default_factory=list)
+    objective_correct: int = 0
+    objective_wrong: int = 0
+    objective_partial: int = 0
+    objective_unverified: int = 0
+    objective_attempts: int = 0
+    turns_in_session: int = 0
+    turns_on_current_objective: int = 0
+    verdictless_turns: int = 0
+    unverified_run_length: int = 0
+    attempts_on_open_question: int = 0
+    open_question_stem: str = ""
+    open_question_has_pending: bool = False
+
+    # ── tool surface availability ────────────────────────────────────
+    pose_tool_available: bool = True
+
+
+class RouterDecision(BaseModel):
+    """Output of ``MoveRouter.route()``.
+
+    The router decides WHAT to do; the move LLM (StudentTutor) decides
+    HOW to say it. ``focus_note`` is what-to-address this turn (1-2
+    sentences, ≤50 tokens / 250 chars). ``principle_emphasis`` is the
+    1-3 names from ``ALLOWED_PRINCIPLES`` to surface in the move prompt.
+    ``rationale`` is for the v2 observability trace — a single sentence
+    the auditor can grep on.
+    """
+
+    chosen_move: RouterMove
+    principle_emphasis: list[str] = Field(default_factory=list, max_length=3)
+    focus_note: str = Field(default="", max_length=250)
+    rationale: str = Field(default="", max_length=400)
+
+    @field_validator("principle_emphasis")
+    @classmethod
+    def _validate_principle_names(cls, v: list[str]) -> list[str]:
+        allowed = set(ALLOWED_PRINCIPLES)
+        bad = [name for name in v if name not in allowed]
+        if bad:
+            raise ValueError(
+                f"principle_emphasis contains unknown principle(s): "
+                f"{bad!r}; must be a subset of {ALLOWED_PRINCIPLES!r}"
+            )
+        return v

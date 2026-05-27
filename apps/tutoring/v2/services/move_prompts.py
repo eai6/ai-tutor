@@ -382,81 +382,6 @@ class MovePrompt:
     principles: tuple[int, ...]
 
 
-POSE_QUESTION = MovePrompt(
-    name="pose_question",
-    principles=(1, 11),  # Active Learning, Testing Effect/Retrieval
-    body="""\
-PRINCIPLE: Testing Effect / Retrieval Practice (Ch.20) — retrieval
-first, hints later. Active Learning (Ch.10) — the student is
-*doing* on this turn.
-
-INTENT: Place one verifiable question in front of the student so
-they retrieve, not absorb.
-
-This turn: pose ONE assessment question for the student to attempt.
-
-How:
-- Call the ``pose_question`` tool with an integer ``slot`` from the
-  bank menu in the tool description. The backend renders the bank
-  stem verbatim — do NOT also type the stem in your text response.
-- ``lead_in`` is OPTIONAL and TINY: one short, natural transition
-  if anything (≤60 chars, no '?', no factual claim, no number).
-  Make it *fit this conversation* — if you've used a phrase
-  already this session, pick a different one. Never lean on a
-  fixed catalogue of openers.
-- Frame the surrounding turn so the student is doing the work:
-  "compute", "choose", "fill in", "explain why".
-- Retrieval first, hints later. (Science of learning principle:
-  Testing Effect / Retrieval Practice — attempt retrieval before
-  any hint.)
-
-When there's a prior verdict, let it shape the lead_in:
-- ``unverified``: open with a brief, plain-language acknowledgement
-  that you want to *check* what they know before going further —
-  in your own words, varied turn to turn. Do not call it
-  "unverified", do not mention a "transcript". Something a student
-  would actually say to another student is the bar.
-- ``wrong``: do not affirm the wrong answer. A neutral transition is
-  fine; no praise, no "almost".
-- No verdict (opening / transitional): a confident short lead_in is
-  fine. Still no factual claim — even correct facts can be flagged
-  and routed to grounded adjudication that may not have coverage.
-
-What NOT to put in this turn:
-- The question stem typed as prose. Use the tool to pose — that is
-  the only legal channel. Do not retype a bank stem as prose.
-- A worked example. Use the ``worked_example`` move for that.
-- The answer or a near-answer hint.
-- A second question or a diagnostic side-question. ONE pose per
-  turn, end of turn.
-- Any sentence that DEFINES a term or STATES a rule. Keep the
-  pose-turn purely transitional; instruction belongs to ``explain``
-  / ``worked_example`` / ``scaffold_hint``.
-- A restatement of the student's own answer to a previous question,
-  even when that answer was correct. The pose-turn is structurally
-  an empty-hands ask; any prose retelling of prior content adds
-  factual-claim risk to a turn that doesn't need any.
-  (Science of learning principle: Minimise Cognitive Load — one idea per turn. The pose turn's ONE idea is the question being
-  asked, not a retrospective of a prior turn.)
-
-Answer-shape fidelity (the rendered stem must be answerable):
-- The backend renders the bank stem verbatim, including any MCQ
-  options or True/False prompt the curriculum authored. Trust the
-  rendered text — do NOT abridge the stem in any ``lead_in`` you
-  emit, and do NOT paraphrase the answer choices.
-- If you are about to author a stem yourself via
-  ``pose_inline_question`` (token path), include the answer-shape
-  signal in the stem itself: option list for MCQ, "True or False?"
-  for binary, blank for fill-in, "What is …" / "Which …" for
-  short-answer. A pose the student cannot tell HOW to answer is an
-  incomplete question.
-  (Science of learning principle: Active Learning Ch.10 — the
-  student must be able to act on the question this turn; missing
-  answer-shape signal breaks the retrieval loop before it starts.)
-""",
-)
-
-
 CONFIRM_AND_ADVANCE = MovePrompt(
     name="confirm_and_advance",
     principles=(1, 5),  # Active Learning (immediate feedback), Cognitive Load (don't over-teach)
@@ -1050,7 +975,6 @@ What NOT to do:
 MOVE_PROMPTS: dict[str, MovePrompt] = {
     p.name: p
     for p in (
-        POSE_QUESTION,
         CONFIRM_AND_ADVANCE,
         CONFIRM_AND_EXTEND,
         SCAFFOLD_HINT,
@@ -1064,5 +988,11 @@ MOVE_PROMPTS: dict[str, MovePrompt] = {
 
 
 def get_move_prompt(move: str) -> MovePrompt:
-    """Resolve a move name to its prompt; defaults to ``pose_question``."""
-    return MOVE_PROMPTS.get(move) or POSE_QUESTION
+    """Resolve a move name to its prompt; defaults to ``scaffold_hint``.
+
+    Post-router cutover the deleted ``pose_question`` move is gone and
+    the safe default for an unknown move is ``scaffold_hint`` — the
+    move's prompt keeps the student on the open question while the
+    engine recovers.
+    """
+    return MOVE_PROMPTS.get(move) or MOVE_PROMPTS["scaffold_hint"]

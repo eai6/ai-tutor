@@ -20,15 +20,20 @@ from apps.tutoring.v2.contracts.runtime_state import (
     VisibleContextSnapshot,
 )
 from apps.tutoring.v2.contracts.tutoring import (
+    ALLOWED_PRINCIPLES,
     GradingRequest,
     GradingResult,
     ProfileUpdate,
+    RouterDecision,
+    RouterMove,
+    RouterRequest,
     StudentSafeFeedback,
     TutoringContext,
     Verdict,
 )
 
 __all__ = [
+    "ALLOWED_PRINCIPLES",
     "BareAnswerCounters",
     "GradingRequest",
     "GradingResult",
@@ -41,6 +46,9 @@ __all__ = [
     "QuestionSource",
     "RemediationState",
     "ResumeMarker",
+    "RouterDecision",
+    "RouterMove",
+    "RouterRequest",
     "SafetyValveCounters",
     "SessionRuntimeState",
     "StudentSafeFeedback",

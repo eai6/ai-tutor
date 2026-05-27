@@ -1,31 +1,29 @@
 """TutorEngine — top-level orchestrator for the v2 conversational tutor.
 
-Per Phase 2 §2.3 the engine:
+The engine:
 
-  - Selects moves deterministically from inputs (no LLM call — see
-    ``move_selection.py``).
-  - Enforces safety valves (§7 item 3): max 40 turns / session, max 12
-    turns / objective, force-close after 6 consecutive verdict-less
-    turns. These are the *outer* fence; ``pivot`` / ``close_topic``
-    are expected to fire first under normal conditions.
+  - Picks moves via the LLM ``MoveRouter`` + 5 deterministic safety
+    floors (design/tasks/move-router-implementation-plan.md). The
+    router decides WHAT to do (move + principle emphasis + focus
+    note); the floors catch the highest-cost shapes (turn caps,
+    objective-evidence saturation, name_misconception repeat without
+    progress, pose-tool saturation, help-request misroute).
   - Routes turns through StudentGrader → StudentTutor → conformance,
-    with a single conformance retry and a verdict-keyed safe template
-    fallback.
+    with a single conformance retry, a move-escalation pass on second
+    failure, and a verdict-keyed safe template as the floor under
+    that.
   - Fires the ``StudentSkillMastery`` write hook after a ``correct``
     or ``wrong`` verdict — dashboard-only side effect, NOT consumed
     by move selection or move prompts.
   - Emits per-stage spans through ``apps.tutoring.tracing.emit_span``
     so the per-turn rollup landing in ``SessionTurn.judge_outputs.v2_trace``
     is complete.
-
-Phase 2 Task #4 ships the move state machine + safety valves +
-StudentSkillMastery write hook. Phase 2 Tasks #5–#8 wire the grader,
-tutor, conformance, and exit-ticket services through ``respond()``.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -34,6 +32,7 @@ from apps.tutoring.v2.contracts import (
     GradingRequest,
     GradingResult,
     ObjectiveProgress,
+    RouterDecision,
     SessionRuntimeState,
     TutoringContext,
     Verdict,
@@ -48,26 +47,76 @@ from apps.tutoring.v2.services.move_escalation import (
     escalation_target,
     is_terminal as is_terminal_move,
 )
-from apps.tutoring.v2.services.move_selection import ALLOWED_MOVES, select_move
+from apps.tutoring.v2.services.move_router import (
+    MoveRouter,
+    build_router_request,
+)
 from apps.tutoring.v2.services.question_extractor import (
     ExtractionResult,
     QuestionExtractor,
+)
+from apps.tutoring.v2.services.safety_floors import (
+    FloorOutcome,
+    apply_safety_floors,
 )
 from apps.tutoring.v2.services.student_grader import StudentGrader
 from apps.tutoring.v2.services.student_tutor import StudentTutor
 from apps.tutoring.v2.services.templates import MoveAnchor, render_safe_template
 
+
+# The full move table after the router cutover (plan §2.5). ``pose_question``
+# is gone; every move is either non-terminal pose-capable or the terminal
+# ``close_topic``.
+ALLOWED_MOVES: tuple[str, ...] = (
+    "confirm_and_advance",
+    "confirm_and_extend",
+    "scaffold_hint",
+    "name_misconception",
+    "worked_example",
+    "explain",
+    "pivot",
+    "close_topic",
+)
+
 logger = logging.getLogger(__name__)
 
 
-# Safety-valve caps per §7 item 3. Sub-decisions to tune from pilot data.
-MAX_TURNS_PER_SESSION = 40
-MAX_TURNS_PER_OBJECTIVE = 12
-MAX_VERDICTLESS_RUN = 6
+_HELP_REQUEST_RE = re.compile(
+    r"\b("
+    r"i\s+don'?t\s+(understand|get|know\s+how)"
+    r"|what\s+(is|does)"
+    r"|explain"
+    r"|show\s+me"
+    r"|teach\s+me"
+    r"|i'?m\s+(lost|stuck)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_help_request(student_input: str) -> bool:
+    """Deterministic help-request backstop.
+
+    Mirrors the regex in ``apps/tutoring/v2/services/safety_floors.py``
+    floor #5. Used at the engine layer to skip the grader on
+    help-requests: grading them produces a meaningless ``unverified``
+    verdict that downstream conformance can't comply with on the
+    explain / worked_example response.
+    """
+    text = (student_input or "").strip()
+    if not text:
+        return False
+    return bool(_HELP_REQUEST_RE.search(text))
 
 
 def _doing_rate_observability(window: list) -> dict:
-    """Compact doing-rate summary for ``v2_trace`` (Phase 4)."""
+    """Compact doing-rate summary for ``v2_trace`` (legacy field).
+
+    Post-router cutover (plan §3) the doing-rate window is no longer
+    written to — the router observes the transcript directly. The
+    observability rollup still surfaces whatever's in the field for
+    backwards compatibility with dashboards.
+    """
     truthy = sum(1 for b in window if bool(b))
     total = len(window)
     return {
@@ -115,6 +164,7 @@ class TutorEngine:
         conformance: Optional[ConformanceCheck] = None,
         media_service: Optional[MediaService] = None,
         question_extractor: Optional[QuestionExtractor] = None,
+        move_router: Optional[MoveRouter] = None,
     ) -> None:
         self.context_manager = context_manager
         self.grader = grader or StudentGrader()
@@ -122,6 +172,7 @@ class TutorEngine:
         self.conformance = conformance or ConformanceCheck(grader=self.grader)
         self.media_service = media_service or MediaService()
         self.question_extractor = question_extractor or QuestionExtractor()
+        self.move_router = move_router or MoveRouter()
 
     # ------------------------------------------------------------------
     # Turn entrypoints (Phase 2)
@@ -130,25 +181,31 @@ class TutorEngine:
     def start_session(self, context: TutoringContext) -> TurnResult:
         """Produce the opening turn for a new session.
 
-        No verdict, no student input — the engine selects an opening
-        move (explain or worked_example based on profile) and asks
-        StudentTutor to render it.
+        No verdict, no student input — the router picks an opening
+        move (almost always ``explain`` or ``worked_example``) and
+        StudentTutor renders it with the router's focus_note +
+        principle emphasis.
         """
         runtime_state = context.runtime_state
         media_catalog = self._build_media_catalog(context)
+        pose_tool_available = self._pose_tool_available(
+            context=context, runtime_state=runtime_state,
+        )
 
-        move = self.pick_move(
+        move, focus_note, principle_emphasis, _decision = self.pick_move(
+            context=context,
             verdict=None,
-            runtime_state=runtime_state,
-            profile_summary=context.profile_summary,
-            objective_just_opened=True,
-            current_objective=context.current_objective,
+            student_input="",
+            pose_tool_available=pose_tool_available,
+            media_catalog=media_catalog,
         )
         v2_trace: dict[str, Any] = {
             "selected_move": move,
             "verdict": None,
             "fallback_used": False,
             "retry_used": False,
+            "router_focus_note": (focus_note or "")[:160],
+            "router_principle_emphasis": list(principle_emphasis or []),
         }
         pending_pose = None
         try:
@@ -158,6 +215,8 @@ class TutorEngine:
                 move=move,
                 media_catalog=media_catalog,
                 student_input="",
+                focus_note=focus_note,
+                principle_emphasis=principle_emphasis,
             )
             response_text = tutor_resp.text
             pending_pose = tutor_resp.pending_pose
@@ -246,42 +305,12 @@ class TutorEngine:
         # forces the unverified verdict-matrix rules onto the
         # downstream explain / worked_example response, which can't
         # comply (a worked example by construction makes factual
-        # claims and does not "surface uncertainty"). Skip the grader
-        # entirely on help-requests; the help-request also overrides
-        # move selection below (see move_selection.detect_help_request).
-        from apps.tutoring.v2.services.intent_classifier import (
-            INTENT_ATTEMPTING,
-            classify_student_intent,
-            intent_to_move,
-        )
-        from apps.tutoring.v2.services.move_selection import (
-            update_doing_rate_window,
-        )
-
-        open_q_stem = (
-            runtime_state.open_question.rendered_stem
-            if runtime_state.open_question is not None
-            else ""
-        )
-        # One LLM call (Haiku-backed intent classifier) per turn.
-        # The intent result drives BOTH the help-request override AND
-        # the Active-Learning doing-rate window (Phase 4 — Principle
-        # #1 Active Learning Ch.10).
-        student_intent = classify_student_intent(
-            student_input=student_input,
-            open_question_stem=open_q_stem,
-        )
-        help_request_move = intent_to_move(student_intent)
-        is_help_request = help_request_move is not None
-
-        # Update the doing-rate window: True when the student attempted
-        # an answer, False when they hedged / asked for help / sent
-        # meta input. Empty / whitespace input counts as False.
-        attempting = (
-            bool((student_input or "").strip())
-            and student_intent == INTENT_ATTEMPTING
-        )
-        update_doing_rate_window(runtime_state, attempting=attempting)
+        # claims and does not "surface uncertainty"). Use the same
+        # deterministic regex backstop the router safety floor uses
+        # (plan §2.3 floor #5) — no LLM call needed at this layer; the
+        # router LLM gets the unredacted student input on the same
+        # turn and picks explain / worked_example accordingly.
+        is_help_request = _looks_like_help_request(student_input)
 
         verdict: Optional[GradingResult] = None
         if (
@@ -335,15 +364,21 @@ class TutorEngine:
                 )
                 verdict = GradingResult(verdict=Verdict.UNVERIFIED)
 
-        # 2. Select move.
-        selected_move = self.pick_move(
+        # 2. Select move via the LLM router + deterministic safety floors.
+        pose_tool_available = self._pose_tool_available(
+            context=context, runtime_state=runtime_state,
+        )
+        (
+            selected_move,
+            router_focus_note,
+            router_principle_emphasis,
+            router_decision,
+        ) = self.pick_move(
+            context=context,
             verdict=verdict,
-            runtime_state=runtime_state,
-            profile_summary=context.profile_summary,
-            objective_just_opened=False,
-            current_objective=context.current_objective,
             student_input=student_input,
-            help_request_move=help_request_move,
+            pose_tool_available=pose_tool_available,
+            media_catalog=media_catalog,
         )
 
         # 3. Tutor → first attempt.
@@ -353,6 +388,8 @@ class TutorEngine:
             move=selected_move,
             media_catalog=media_catalog,
             student_input=student_input,
+            focus_note=router_focus_note,
+            principle_emphasis=router_principle_emphasis,
         )
         attempt_text = first_resp.text
         committed_pose = first_resp.pending_pose
@@ -439,6 +476,8 @@ class TutorEngine:
                     media_catalog=media_catalog,
                     student_input=student_input,
                     violation_hints=conf_result.violations,
+                    focus_note=router_focus_note,
+                    principle_emphasis=router_principle_emphasis,
                 )
                 if span is not None:
                     span["payload"] = {"violations": conf_result.violations[:5]}
@@ -527,6 +566,8 @@ class TutorEngine:
                         figure_facts=figure_facts,
                         lesson_has_media=lesson_has_media,
                         runtime_state=runtime_state,
+                        focus_note=router_focus_note,
+                        principle_emphasis=router_principle_emphasis,
                     )
                     if esc_conf.passed:
                         attempt_text = esc_text
@@ -658,6 +699,18 @@ class TutorEngine:
             "fallback_used": fallback_used,
             "is_lesson_complete": is_lesson_complete,
             "advanced_to_step_index": advanced_to_step_index,
+            "router": {
+                "chosen_move": router_decision.chosen_move,
+                "principle_emphasis": list(
+                    router_decision.principle_emphasis
+                ),
+                "focus_note": (router_decision.focus_note or "")[:160],
+                "rationale": (router_decision.rationale or "")[:200],
+                "floor_overridden": (
+                    router_decision.chosen_move != selected_move
+                    or fallback_used
+                ),
+            },
             "question_extractor": {
                 "action_count": final_extraction.action_count,
                 "has_active_end": final_extraction.has_active_end,
@@ -686,96 +739,78 @@ class TutorEngine:
         )
 
     # ------------------------------------------------------------------
-    # Pure-function move selection (Phase 2 §2.3 — fully shipped)
+    # LLM-driven move selection (design/tasks/move-router-implementation-plan.md)
     # ------------------------------------------------------------------
 
     def pick_move(
         self,
         *,
+        context: TutoringContext,
         verdict: Optional[GradingResult],
-        runtime_state: SessionRuntimeState,
-        profile_summary: str = "",
-        objective_just_opened: bool = False,
-        current_objective: str = "",
-        student_input: str = "",
-        help_request_move: Optional[str] = None,
-    ) -> str:
-        """Pure-function move pick, then safety-valve override.
+        student_input: str,
+        pose_tool_available: bool,
+        media_catalog: Optional[list[dict]] = None,
+    ) -> tuple[str, str, list[str], RouterDecision]:
+        """Route the turn via the LLM ``MoveRouter`` + deterministic floors.
 
-        Safety valves (per §7 item 3) take precedence over the
-        principled move table — a session that has hit the per-objective
-        cap or has drifted 6 verdict-less turns *must* close, even when
-        the move table would otherwise pick something else.
+        Returns ``(final_move, focus_note, principle_emphasis, router_decision)``.
 
-        ``help_request_move`` is an optional pre-computed intent override
-        (set by ``TutorEngine.respond`` after running the Haiku-backed
-        intent classifier once per turn). When provided, ``select_move``
-        skips its on-demand classifier call.
+        The router decides WHAT to do (move + principle emphasis +
+        focus note). The deterministic safety floors then catch the
+        highest-cost shapes (turn caps, evidence saturation,
+        misconception-without-progress, pose-tool saturation, help-
+        request misroute). Each floor that fires emits a
+        ``router.floor_override`` span.
+
+        ``focus_note`` and ``principle_emphasis`` are taken straight
+        from the router's decision — they describe *this turn
+        specifically*, regardless of whether a floor overrode the
+        chosen_move. The move LLM uses them to specialize the per-move
+        prompt body to the current situation.
         """
         with emit_span("audit", "tutor.move_selection") as span:
-            valve_override = self._safety_valve_override(
-                runtime_state=runtime_state, verdict=verdict,
-            )
-            if valve_override is not None:
-                if span is not None:
-                    span["payload"] = {
-                        "selected_move": valve_override,
-                        "valve_override": True,
-                    }
-                return valve_override
-
-            move = select_move(
+            request = build_router_request(
+                context=context,
                 verdict=verdict,
-                runtime_state=runtime_state,
-                profile_summary=profile_summary,
-                objective_just_opened=objective_just_opened,
-                current_objective=current_objective,
                 student_input=student_input,
-                help_request_move=help_request_move,
+                pose_tool_available=pose_tool_available,
+                media_catalog=media_catalog,
             )
-            if move not in ALLOWED_MOVES:
+            decision = self.move_router.route(request)
+            outcome: FloorOutcome = apply_safety_floors(
+                decision=decision,
+                runtime_state=context.runtime_state,
+                student_input=student_input,
+                profile_summary=context.profile_summary,
+                pose_tool_available=pose_tool_available,
+                current_objective=context.current_objective,
+            )
+            if outcome.final_move not in ALLOWED_MOVES:
                 # Defensive normalization — should never fire because
-                # `select_move` returns from a closed set.
+                # both the RouterDecision Literal and the floor outputs
+                # come from a closed set.
                 logger.warning(
-                    "[TutorEngine] select_move returned unknown move %r; "
-                    "falling back to pose_question",
-                    move,
+                    "[TutorEngine] router/floor returned unknown move %r; "
+                    "falling back to scaffold_hint",
+                    outcome.final_move,
                 )
-                move = "pose_question"
+                final_move = "scaffold_hint"
+            else:
+                final_move = outcome.final_move
             if span is not None:
                 span["payload"] = {
-                    "selected_move": move,
-                    "valve_override": False,
+                    "selected_move": final_move,
+                    "router_chosen_move": decision.chosen_move,
+                    "override_floors": list(outcome.override_floors),
+                    "router_principles": list(decision.principle_emphasis),
+                    "router_focus_note": (decision.focus_note or "")[:80],
                 }
-            return move
-
-    # ------------------------------------------------------------------
-    # Safety valves (§7 item 3)
-    # ------------------------------------------------------------------
-
-    def _safety_valve_override(
-        self,
-        *,
-        runtime_state: SessionRuntimeState,
-        verdict: Optional[GradingResult],
-    ) -> Optional[str]:
-        """Return ``close_topic`` when any safety valve trips, else ``None``.
-
-        Outer fence — moves normally fire first. The valves catch:
-          - Per-session cap (40 turns) — force-close current topic.
-          - Per-objective cap (12 turns) — force-close current topic.
-          - Verdict-less drift (6 consecutive) — force-close to break
-            free-chat loops where neither side returns to an answerable
-            question.
-        """
-        counters = runtime_state.safety_valve_counters
-        if counters.turns_in_session >= MAX_TURNS_PER_SESSION:
-            return "close_topic"
-        if counters.turns_on_current_objective >= MAX_TURNS_PER_OBJECTIVE:
-            return "close_topic"
-        if counters.verdictless_turns >= MAX_VERDICTLESS_RUN:
-            return "close_topic"
-        return None
+            return (
+                final_move,
+                decision.focus_note,
+                list(decision.principle_emphasis),
+                decision,
+            )
 
     # ------------------------------------------------------------------
     # Counter bookkeeping
@@ -885,6 +920,8 @@ class TutorEngine:
         media_catalog: list[dict],
         student_input: str,
         violation_hints: Optional[list[str]] = None,
+        focus_note: str = "",
+        principle_emphasis: Optional[list[str]] = None,
     ):
         """Call the StudentTutor; on any raise, surface a safe template.
 
@@ -912,6 +949,8 @@ class TutorEngine:
                 move=move,
                 media_catalog=media_catalog,
                 student_input=effective_input,
+                focus_note=focus_note,
+                principle_emphasis=principle_emphasis,
             )
         except Exception as exc:
             logger.warning(
@@ -1087,6 +1126,8 @@ class TutorEngine:
         figure_facts: list[str],
         lesson_has_media: bool,
         runtime_state: SessionRuntimeState,
+        focus_note: str = "",
+        principle_emphasis: Optional[list[str]] = None,
     ) -> tuple[str, Any, ConformanceResult, ExtractionResult]:
         """Run one tutor + conformance + extractor pass at the
         escalated move (Phase 4 Fix 3).
@@ -1103,6 +1144,8 @@ class TutorEngine:
                 move=escalated_move,
                 media_catalog=media_catalog,
                 student_input=student_input,
+                focus_note=focus_note,
+                principle_emphasis=principle_emphasis,
             )
             if span is not None:
                 span["payload"] = {"escalated_move": escalated_move}
@@ -1316,29 +1359,19 @@ class TutorEngine:
         context: TutoringContext,
         runtime_state: SessionRuntimeState,
     ) -> str:
-        """One-line next-action hint for the safe terminal template."""
-        # The next move TutorEngine would have picked — used to fill
-        # the template's "next action" slot per analysis §3.
-        next_move = select_move(
-            verdict=None,
-            runtime_state=runtime_state,
-            profile_summary=context.profile_summary,
-            objective_just_opened=False,
-            current_objective=context.current_objective,
-        )
-        # Student-facing — no system vocabulary, varied by move. Picked
-        # to read naturally when concatenated after a verdict opener.
-        return {
-            "pose_question": "Here's one for you to try.",
-            "confirm_and_advance": "Let's move on.",
-            "confirm_and_extend": "Let's push that a bit further.",
-            "scaffold_hint": "Let's work the next step.",
-            "name_misconception": "Let me show you the slip I'm seeing.",
-            "worked_example": "Let me walk one through first.",
-            "explain": "Let me set the idea up first.",
-            "pivot": "Let's try a different angle on the same idea.",
-            "close_topic": "We're ready to wrap this objective.",
-        }.get(next_move, "Let's keep going.")
+        """One-line next-action hint for the safe terminal template.
+
+        Post-router cutover the safe-template floor doesn't call the
+        router LLM (the LLM call that produced this fallback already
+        failed twice — burning a third LLM call on a decorative line
+        would compound latency). Pick a verdict-driven generic line
+        instead; the safe template's content elsewhere still anchors
+        on the move that was actually picked this turn.
+        """
+        open_q = runtime_state.open_question
+        if open_q is not None:
+            return "Let's stay with the same question and work the next step."
+        return "Let's keep going."
 
     def _update_objective_progress(
         self,

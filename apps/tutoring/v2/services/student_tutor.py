@@ -63,17 +63,18 @@ logger = logging.getLogger(__name__)
 
 
 # Moves that may legitimately pose a fresh assessment question this turn.
-# When the selected move is in this set AND the lesson has posable bank
-# slots remaining, StudentTutor invokes ``generate_with_tools`` so the
-# LLM's only legal way to ask a verifiable question is via the
-# pose_question tool — the conformance gate
-# ``all__no_assessment_in_prose`` enforces the contract on the response.
+# Post-router cutover (design/tasks/move-router-implementation-plan.md
+# §2.5): every move except ``close_topic`` is pose-capable. The deleted
+# ``pose_question`` move's force-tool role is gone — the conformance
+# gate ``all__no_assessment_in_prose`` is the only enforcement needed
+# now, and all 7 non-terminal moves use ``tool_choice="auto"``.
 POSE_CAPABLE_MOVES: frozenset[str] = frozenset({
-    "pose_question",
+    "confirm_and_advance",
     "confirm_and_extend",
     "scaffold_hint",
     "name_misconception",
     "worked_example",
+    "explain",
     "pivot",
 })
 
@@ -125,6 +126,8 @@ class StudentTutor:
         *,
         media_catalog: Optional[list[dict]] = None,
         student_input: str = "",
+        focus_note: str = "",
+        principle_emphasis: Optional[list[str]] = None,
     ) -> TutorResponse:
         """Produce the tutor's next utterance for the selected move.
 
@@ -145,9 +148,9 @@ class StudentTutor:
         """
         if move not in MOVE_PROMPTS:
             logger.warning(
-                "[StudentTutor] unknown move %r; defaulting to pose_question", move
+                "[StudentTutor] unknown move %r; defaulting to scaffold_hint", move
             )
-            move = "pose_question"
+            move = "scaffold_hint"
 
         system_prompt = self._build_system_prompt(context=context, move=move)
         user_prompt = self._build_user_prompt(
@@ -156,6 +159,8 @@ class StudentTutor:
             move=move,
             media_catalog=media_catalog or [],
             student_input=student_input,
+            focus_note=focus_note,
+            principle_emphasis=principle_emphasis or [],
         )
 
         with emit_span("audit", "tutor.move_call",
@@ -289,21 +294,19 @@ class StudentTutor:
         response_text falls back to whatever text blocks the LLM
         emitted (which conformance will judge on its own merits).
         """
-        # ``tool_choice={"type":"any"}`` for ``pose_question`` move
-        # forces the LLM through a tool call (cannot answer with prose
-        # only). For other pose-capable moves we leave it on
-        # ``auto`` — the move may legitimately prefer prose
-        # (e.g. ``scaffold_hint`` on a wrong attempt).
-        tool_choice = (
-            {"type": "any"} if move == "pose_question" else {"type": "auto"}
-        )
+        # Post-router cutover (plan §2.5): all pose-capable moves use
+        # ``tool_choice="auto"``. The conformance gate
+        # ``all__no_assessment_in_prose`` enforces the contract that
+        # any visible assessment question must have come through the
+        # tool; the legacy ``{"type":"any"}`` force-mode for
+        # pose_question is gone (pose_question itself is gone).
         try:
             message = client.generate_with_tools(
                 messages=[{"role": "user", "content": user_prompt}],
                 system_prompt=system_prompt,
                 tools=[tool_dict],
                 max_tokens=900,
-                tool_choice=tool_choice,
+                tool_choice={"type": "auto"},
             )
         except (NotImplementedError, AttributeError, TypeError) as exc:
             logger.warning(
@@ -543,16 +546,23 @@ class StudentTutor:
         move: str,
         media_catalog: list[dict],
         student_input: str,
+        focus_note: str = "",
+        principle_emphasis: Optional[list[str]] = None,
     ) -> str:
         """Build the per-turn user prompt.
 
         Structure (per prompting-fundamentals long-context guidance):
           1. Current objective + open question (short, near top).
           2. Media catalog block (compact, when present).
-          3. Full transcript (the largest piece).
-          4. Verdict block (only on wrong / partial / unverified; the
+          3. Per-turn focus block (router-provided focus_note +
+             principle emphasis) — placed AFTER the per-move body in
+             the system prompt and BEFORE the transcript so the move's
+             general guidance is contextualized by this turn's specific
+             direction (plan §2.5).
+          4. Full transcript (the largest piece).
+          5. Verdict block (only on wrong / partial / unverified; the
              redacted shape — never the canonical for non-correct).
-          5. The student's just-submitted input + the move directive
+          6. The student's just-submitted input + the move directive
              RESTATED at the END so the model's recency bias steers
              toward following the move.
         """
@@ -560,6 +570,10 @@ class StudentTutor:
         evidence_block = self._render_objective_evidence_block(context)
         media_block = self._render_media_catalog_block(media_catalog)
         lesson_content_block = self._render_lesson_step_content_block(context)
+        focus_block = self._render_focus_block(
+            focus_note=focus_note,
+            principle_emphasis=principle_emphasis or [],
+        )
         transcript_block = self._render_transcript_block(context.full_transcript)
         verdict_block = self._render_verdict_block(
             verdict=verdict, move=move,
@@ -569,6 +583,7 @@ class StudentTutor:
             f"{evidence_block}\n\n"
             f"{media_block}\n\n"
             f"{lesson_content_block}\n\n"
+            f"{focus_block}"
             f"=== Conversation transcript so far ===\n"
             f"{transcript_block}\n\n"
             f"{verdict_block}\n"
@@ -581,6 +596,40 @@ class StudentTutor:
             f"begin with the two GRADER / EVIDENCE header lines required "
             f"by the system prompt."
         )
+
+    def _render_focus_block(
+        self,
+        *,
+        focus_note: str,
+        principle_emphasis: list[str],
+    ) -> str:
+        """Inject the router's per-turn focus + principle emphasis.
+
+        Emits nothing when both fields are empty (legacy callers,
+        opening turns where the router fell back to a default).
+        ``focus_note`` STEERS the move LLM, it does NOT script it —
+        the per-move prompt body in the system prompt remains the
+        load-bearing guide.
+        """
+        focus = (focus_note or "").strip()
+        principles = [
+            p.strip() for p in (principle_emphasis or []) if (p or "").strip()
+        ]
+        if not focus and not principles:
+            return ""
+        lines = ["=== This turn specifically ==="]
+        if focus:
+            lines.append(f"- Focus: {focus}")
+        if principles:
+            lines.append(
+                f"- Principles to emphasize: {', '.join(principles)}"
+            )
+        lines.append(
+            "(This steers the turn — it does not script the wording. "
+            "Use it to specialize the MOVE in the system prompt to "
+            "THIS specific situation.)"
+        )
+        return "\n".join(lines) + "\n\n"
 
     def _render_lesson_step_content_block(self, context: TutoringContext) -> str:
         """Render lesson-authored direct-instruction + worked-example text.
