@@ -44,6 +44,24 @@ SUBJECT_TYPE_FALLBACK = {
 }
 
 
+# Map inferred subject_code → coarse subject_type, so the same backfill
+# pass populates BOTH fields. is_math consults subject_type, so leaving
+# it empty after backfill forces the legacy MATH_KEYWORDS fallback for
+# every read — re-introducing the silent-gap problem v3 audit H3 calls
+# out for courses whose titles don't match the keyword list.
+SUBJECT_CODE_TO_TYPE = {
+    'mathematics':      'math',
+    'physics':          'science',
+    'chemistry':        'science',
+    'biology':          'science',
+    'geography':        'humanities',
+    'history':          'humanities',
+    'english':          'language',
+    'french':           'language',
+    'computer_science': 'other',
+}
+
+
 # Recognised grade tokens. Match case-insensitively, normalise to upper.
 GRADE_PATTERN = re.compile(r'\bs([1-6])\b', re.IGNORECASE)
 
@@ -113,6 +131,9 @@ class Command(BaseCommand):
             for c in courses:
                 proposed_code = infer_subject_code(c.title, c.subject_type or '')
                 proposed_grades = parse_grade_levels(c.grade_level or '')
+                proposed_type = (
+                    SUBJECT_CODE_TO_TYPE.get(proposed_code) if proposed_code else None
+                )
 
                 # Skip when nothing usable — log and move on
                 if not proposed_code and not proposed_grades:
@@ -125,6 +146,12 @@ class Command(BaseCommand):
                         changes.append(f"subject_code: {c.subject_code!r} → {proposed_code!r}")
                         if apply_changes:
                             c.subject_code = proposed_code
+
+                if proposed_type and (overwrite or not c.subject_type):
+                    if c.subject_type != proposed_type:
+                        changes.append(f"subject_type: {c.subject_type!r} → {proposed_type!r}")
+                        if apply_changes:
+                            c.subject_type = proposed_type
 
                 if proposed_grades and (overwrite or not c.grade_levels):
                     if c.grade_levels != proposed_grades:
@@ -140,7 +167,9 @@ class Command(BaseCommand):
                         + "\n".join(f"        {ch}" for ch in changes) + "\n"
                     )
                     if apply_changes:
-                        c.save(update_fields=['subject_code', 'grade_levels'])
+                        c.save(update_fields=[
+                            'subject_code', 'subject_type', 'grade_levels',
+                        ])
                 elif not c.subject_code and not c.grade_levels:
                     # Nothing to write but also nothing was set — log
                     inst = c.institution.name if c.institution else 'PLATFORM-WIDE'

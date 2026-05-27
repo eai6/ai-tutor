@@ -598,4 +598,80 @@ def _violation_line(issue: str, meta: Dict) -> str:
             "Mahé and Praslin?\""
         )
 
+    if issue == "same_template_repeat":
+        return (
+            "- SAME_TEMPLATE_REPEAT: the original posed a question with "
+            "the SAME structural template as the previous tutor turn "
+            "(only the numbers changed). Mid-tier interleaving failure. "
+            "Fix: pose a question on the same concept but with a "
+            "structurally DIFFERENT shape — change the question type "
+            "(reverse problem, word-problem framing, MCQ instead of "
+            "open-ended), the kind of unknown being solved for, or "
+            "switch to a different bank slot. If the bank has no "
+            "structurally-different slot for this concept, ADVANCE to "
+            "the next step.\n"
+            "  Example: BEFORE (just asked): \"Three angles around a "
+            "point are 80°, 80°, and y°. Find y.\" AFTER: \"A pie is "
+            "cut into 6 equal slices. What angle does each slice make "
+            "at the center?\" (different structural shape — equal "
+            "division rather than missing-angle subtraction)."
+        )
+
+    if issue == "truncated":
+        tail = (meta.get("truncated_tail") or "").strip()
+        return (
+            "- TRUNCATED: the original tutor prose was cut off mid-"
+            "sentence (no terminal punctuation on the last line). The "
+            "student would see a dangling fragment. Fix: rewrite the "
+            "turn fully so the prose ends with a complete sentence "
+            "and terminal punctuation before the question tool is "
+            "invoked. Keep the total under the word limit so this "
+            "doesn't recur.\n"
+            + (f"  Truncated tail: {tail[:120]!r}\n" if tail else "")
+            + "  Example: BEFORE: \"Yes — 360° is correct. In\" "
+            "AFTER: \"Yes — 360° is correct, because the four angles "
+            "fill a full turn around a single point.\""
+        )
+
+    if issue == "numeric_mutation":
+        invented = meta.get("numeric_mutation_invented") or []
+        stem = (meta.get("numeric_mutation_stem") or "").strip()
+        return (
+            "- NUMERIC_MUTATION: the original tutor turn introduced "
+            "numeric values that are NOT in the active problem's stem "
+            "(or in any accepted intermediate calculation from the "
+            "previous tutor turn). This means the model invented or "
+            "swapped numbers mid-feedback — students will be confused "
+            "because the new numbers don't match the question they're "
+            "trying to solve. Fix: rewrite using ONLY the numbers from "
+            "the active problem stem. If you need to show an "
+            "intermediate result, derive it explicitly from a stated "
+            "stem number.\n"
+            + (f"  Active stem: {stem[:160]!r}\n" if stem else "")
+            + (f"  Invented numbers: {invented}\n" if invented else "")
+            + "  Example: stem says \"scale 1:10,000, distance 4 cm\". "
+            "BEFORE: \"Since the scale is 1:40,000…\" (40,000 not in "
+            "stem). AFTER: \"Since the scale is 1:10,000, 4 cm "
+            "represents 4 × 10,000 = 40,000 cm = 400 m.\""
+        )
+
+    if issue == "filler_reply_teach":
+        filler = (meta.get("filler_reply_input") or "").strip()
+        return (
+            "- FILLER_REPLY_TEACH: the student's last reply was content-"
+            "free filler (\"ok\", \"yes\", \"got it\", \"...\") — NOT an "
+            "answer attempt. The original tutor turn responded with a "
+            "fresh teach block, which buries the student under more "
+            "content they did not ask for. Fix: do one of these instead "
+            "— (a) re-pose the currently-active question (use the bank "
+            "tool with the active slot), OR (b) ask a short check-in "
+            "(\"Ready to continue?\" / \"Want to try another?\") before "
+            "advancing. Do not deliver new instructional content.\n"
+            + (f"  Filler reply: {filler!r}\n" if filler else "")
+            + "  Example: STUDENT: \"ok\". BEFORE: \"Now let's explore "
+            "the next concept...\" AFTER (via the question tool): "
+            "\"Ready to try one? Which of these angles is acute: "
+            "30°, 90°, or 120°?\""
+        )
+
     return f"- {issue}: fix this issue per the original validator output."

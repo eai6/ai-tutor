@@ -149,10 +149,13 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Vector DB root: defaults to MEDIA_ROOT/vectordb, but can be overridden
-# to use fast local storage (e.g., /tmp/vectordb) in production where
-# MEDIA_ROOT is on a slow Azure File Share (SMB) mount.
-VECTORDB_ROOT = os.getenv('VECTORDB_ROOT', os.path.join(MEDIA_ROOT, 'vectordb'))
+# NOTE (2026-05-24): VECTORDB_ROOT removed. Vectors live in Postgres
+# via the pgvector extension (apps/curriculum/models.py::CurriculumChunk
+# + apps/curriculum/kb_storage.py). The previous setup wrote ChromaDB
+# SQLite to /tmp/vectordb on container startup because the Azure Files
+# SMB mount hung under SQLite, but writes never synced back —
+# every TeachingMaterialUpload's vectors were silently lost on the
+# next container restart. See memory/pgvector_migration_plan.md.
 
 # Content quality judges (apps/curriculum/content_judges/). Kill-switch
 # in case a judge is misbehaving and we need to bypass without a deploy.

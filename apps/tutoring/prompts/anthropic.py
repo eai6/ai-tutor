@@ -165,54 +165,6 @@ MIX IT UP
 - Make the student identify WHICH strategy to apply, not just execute one on repeat.
 </principle>
 
-<principle id="math_specific">
-MATHEMATICS-SPECIFIC TEACHING (apply when subject is Math/Mathematics)
-- If the student showed working (chained arithmetic, equation rearrangement,
-  multi-step derivation), evaluate it. Do NOT ask them to repeat or break it
-  into more steps for you. Confirm what is right; flag the first specific
-  step that is wrong; advance.
-- If the student gave a BARE answer (no working):
-    * CORRECT bare answer → confirm with a one-line "because…" and
-      advance. Do NOT ask for working. Example:
-        student: "120"  →  "Yes — 120° is right, since 360 ÷ 3 = 120. Next:…"
-    * WRONG bare answer → ask once, in your own words, for their
-      working so you can see which step broke. Example:
-        student: "90"   →  "That's not it — show me how you set it up
-                            so I can see where it went sideways."
-  Asking for working is a diagnostic for WRONG answers, not a default
-  gate on every bare reply. Probing a correct bare answer reads as
-  interrogation and breaks momentum on items the student clearly has.
-- PROBE AT THE STEP LEVEL, NOT THE VALUE LEVEL. When the student
-  states a correct elementary result (e.g. "50 / 10 = 5", "190 - 90 =
-  100", "8 × 25 = 200"), accept it and move on — the operation IS
-  the working. Probe questions belong at the strategy / decision
-  level, never on the value of a single elementary calculation.
-  GOOD probes: "Which operation should we apply first?", "Why did
-  you divide?", "What rule are we using here?", "What does this
-  result tell us about the original problem?"
-  BAD probes: "How did you calculate 50 / 10?", "Walk me through
-  8 × 25.", "How did you get 5?" — these are interrogations of
-  elementary arithmetic the student already showed.
-- CHECK INTERMEDIATE STEPS in working that has been shown, not the final
-  answer alone. A correct answer with wrong method means the student
-  doesn't truly understand.
-- COMMON MISTAKES: Proactively address typical errors:
-  * BIDMAS/order of operations: students add before multiplying
-  * Negative numbers: losing the sign during operations
-  * Fractions: adding numerators AND denominators (3/4 + 1/2 ≠ 4/6)
-  * Algebra: distributing negatives incorrectly
-- MULTIPLE APPROACHES: After solving one way, ask "Is there another way to check this?"
-- ESTIMATION: Before calculating, ask "Roughly what answer do you expect?" to build number sense
-- VISUAL AIDS: Describe number lines, diagrams, and tables in text when no image is available
-- WORD PROBLEMS: Help students extract the math from the words:
-  "What do we know? What are we looking for? What operation connects them?"
-- PROGRESSIVE DIFFICULTY within one concept:
-  1. Simple calculation (e.g., 4 × 3)
-  2. Same concept, harder numbers (e.g., 4.5 × 3.2)
-  3. Word problem context (e.g., "A rectangle is 4.5m by 3.2m. What's the area?")
-  4. Reverse problem (e.g., "Area is 14.4m². Width is 3.2m. What's the length?")
-</principle>
-
 <principle id="probe_frequency">
 NO PROBING ON CORRECT ANSWERS — ADVANCE.
 
@@ -574,18 +526,36 @@ class AnthropicTutorPromptBuilder(TutorPromptBuilder):
         self,
         ctx: StablePrefixContext,
         prompt_pack_override: Optional[str] = None,
+        *,
+        subject_pack: str = 'general',
     ) -> str:
-        """Interpolate the stable prefix template.
+        """Interpolate the stable prefix template + append the
+        subject-specific injection.
 
         PromptPack override (institution-scoped raw prompt) takes
-        precedence over the default template when present. Missing
-        interpolation tokens render as empty strings via
-        `defaultdict(str, ...)` — preserves the behaviour of the
-        original `_build_system_prompt` call site.
+        precedence over the default template when present and
+        SUPPRESSES the subject injection (the override is assumed
+        to be a complete prompt). Missing interpolation tokens
+        render as empty strings via `defaultdict(str, ...)` —
+        preserves the behaviour of the original
+        `_build_system_prompt` call site.
         """
-        template = TUTOR_SYSTEM_PROMPT_TEMPLATE
         if prompt_pack_override and prompt_pack_override.strip():
             template = prompt_pack_override
+            injection = ""
+        else:
+            # Deploy-time variant selection via TUTOR_PROMPT_VARIANT env
+            # var. Unset / 'baseline' / 'v3' returns the production
+            # TUTOR_SYSTEM_PROMPT_TEMPLATE unchanged (current behaviour);
+            # 'v6' / 'v7' substitute the unified template from
+            # apps/tutoring/prompts/variants.py. See variants.py for
+            # the full registry + selection rules.
+            from .variants import get_active_variant_template
+            template = get_active_variant_template(
+                baseline=TUTOR_SYSTEM_PROMPT_TEMPLATE,
+            )
+            from .injections import get_subject_injection
+            injection = get_subject_injection(subject_pack, "anthropic")
 
         template_vars = defaultdict(str, {
             "institution_name": ctx.institution_name,
@@ -595,4 +565,4 @@ class AnthropicTutorPromptBuilder(TutorPromptBuilder):
             "grade_level": ctx.grade_level,
             "safety_prompt": ctx.safety_prompt,
         })
-        return template.format_map(template_vars)
+        return template.format_map(template_vars) + injection

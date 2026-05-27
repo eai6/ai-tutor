@@ -43,6 +43,65 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_CYCLES = 2
 
 
+# Previous-turn dedup penalty — task surfaced in
+# ab-test-reports-v5/FINAL_REPORT.md engine recs #1 + #10. Without
+# this, the regen loop can pick a candidate that duplicates the
+# previously-emitted tutor turn (the "regen_did_not_clean" failure
+# mode). Each candidate's trigram-Jaccard similarity vs the previous
+# emitted tutor turn produces a continuous penalty so near-duplicates
+# lose the candidate race even when their judge score is otherwise
+# clean.
+#
+# Re-tuned post-v7 mid-tier (ab-test-reports-v7/): the original
+# (5.0 / 0.4) parameters caused a regen storm on Sonnet L1425
+# struggler under v7's tighter <valid_turn_contract> -- the more
+# uniformly-shaped v7 candidates triggered moderate-similarity
+# penalties (~50-70%) that flipped otherwise-clean candidates into
+# negative scores, which the loop kept trying to escape until
+# max_turns. Re-tuned to:
+#   - WEIGHT 5.0 -> 3.5    (less crushing penalty on near-dupes)
+#   - FLOOR  0.4 -> 0.55   (more tolerant of moderate similarity)
+# Net effect at 70% similarity: -1.17 (was -2.5). At 100% similarity:
+# -3.5 (was -5.0) -- still strongly disqualifying for outright dupes.
+DEDUP_PENALTY_WEIGHT = 3.5
+DEDUP_PENALTY_FLOOR = 0.55  # similarities below this get zero penalty
+
+
+def _trigram_set(text: str) -> set:
+    text = ' '.join((text or '').lower().split())
+    if len(text) < 3:
+        return set()
+    return {text[i:i + 3] for i in range(len(text) - 2)}
+
+
+def _jaccard_similarity(a: str, b: str) -> float:
+    A, B = _trigram_set(a), _trigram_set(b)
+    if not A or not B:
+        return 0.0
+    union = A | B
+    if not union:
+        return 0.0
+    return len(A & B) / len(union)
+
+
+def _dedup_penalty(candidate_text: str, prior_turn_text: str) -> float:
+    """Returns a non-positive penalty for candidate-vs-prior overlap.
+
+    0.0 when similarity < DEDUP_PENALTY_FLOOR (40%). Scales linearly
+    from 0 at the floor up to -DEDUP_PENALTY_WEIGHT (5.0) at 100%
+    overlap. The penalty is added directly to the candidate's judge
+    score so it competes alongside other quality signals.
+    """
+    if not prior_turn_text or not candidate_text:
+        return 0.0
+    sim = _jaccard_similarity(candidate_text, prior_turn_text)
+    if sim < DEDUP_PENALTY_FLOOR:
+        return 0.0
+    # Linear scale from (floor, 0.0) to (1.0, -WEIGHT).
+    span = 1.0 - DEDUP_PENALTY_FLOOR
+    return -DEDUP_PENALTY_WEIGHT * (sim - DEDUP_PENALTY_FLOOR) / span
+
+
 # Detects when the LLM, instead of emitting a real tool_use block,
 # types the tool call as XML / function-call-style text in its prose
 # response. Observed in lesson 540 session 58 turn 946 (2026-05-17):
@@ -68,16 +127,31 @@ _LEAKED_TOOL_FN_RE = re.compile(
     r'\bpose_(?:inline_)?question\s*\(',
     re.IGNORECASE,
 )
+# Browser-e2e variants surfaced 2026-05-20 with the Gemini Flash
+# family — protocol markup the LLM invents in prose instead of
+# emitting a real tool_use block:
+#   - "|||tool_call:pose_question{slot: 1}|||"   (3.5 Flash)
+#   - "tool_use: pose_question(slot=4)"          (Flash Lite Preview)
+# Detect-and-discard the cycle so the retry loop tries again rather
+# than shipping the markup verbatim.
+_LEAKED_TOOL_MARKUP_RE = re.compile(
+    r'\|{2,}\s*tool[_ ]?(?:call|use|code)\s*:'
+    r'|\btool[_ ]?(?:call|use|code)\s*:\s*pose_(?:inline_)?question\b',
+    re.IGNORECASE,
+)
 
 
 def _detect_leaked_tool_call(text: str) -> Optional[str]:
     """Return a short reason string if `text` contains a leaked
-    tool-call syntax (XML or function-call form). Otherwise None.
+    tool-call syntax (XML / function-call / Gemini markup forms).
+    Otherwise None.
     """
     if not text:
         return None
     if _LEAKED_TOOL_XML_RE.search(text):
         return "xml_tool_use_block"
+    if _LEAKED_TOOL_MARKUP_RE.search(text):
+        return "gemini_tool_markup"
     if _LEAKED_TOOL_FN_RE.search(text):
         return "function_call_syntax"
     return None
@@ -252,6 +326,21 @@ def run_tutor_self_retry(
         picked_model=_model_name,
     )
 
+    # Capture the LAST-EMITTED tutor turn so candidates that duplicate
+    # it can be penalised. The current turn is NOT yet persisted when
+    # self-retry runs, so .first() returns the prior turn. Fail-soft:
+    # if the lookup blows up, dedup is just disabled for this cycle.
+    _prior_tutor_text = ""
+    try:
+        from apps.tutoring.models import SessionTurn as _ST
+        _prev = (_ST.objects
+                 .filter(session=tutor.session, role='tutor')
+                 .order_by('-created_at').first())
+        if _prev is not None:
+            _prior_tutor_text = (_prev.content or '').strip()
+    except Exception as _e:
+        logger.debug("[SelfRetry] prior-turn lookup failed: %s", _e)
+
     if not hasattr(tutor.llm_client, 'generate_with_tools'):
         logger.warning(
             "[SelfRetry] llm_client does not support generate_with_tools — "
@@ -314,6 +403,17 @@ def run_tutor_self_retry(
                 prev_score, prev_clean = score_fn(combined_judge_result)
         except Exception as exc:
             logger.debug("[SelfRetry] previous score fn failed: %s", exc)
+
+    # Dedup penalty: the original response can itself be a near-dup
+    # of the prior tutor turn. Apply the same penalty rule so a
+    # genuinely different retry candidate can beat it.
+    _prev_dedup = _dedup_penalty(previous_response, _prior_tutor_text)
+    if _prev_dedup < 0:
+        logger.info(
+            "[SelfRetry] previous_response dedup penalty %.2f vs prior turn",
+            _prev_dedup,
+        )
+    prev_score = prev_score + _prev_dedup if prev_score > float('-inf') else prev_score
 
     # Candidates list. Each entry: dict with text/score/clean/delta/label.
     # Pre-seeded with previous_response. Retry cycles append.
@@ -426,6 +526,15 @@ def run_tutor_self_retry(
 
         score, clean = score_fn(judges)
         cycle.judge_result = judges
+        # Dedup penalty vs previously-emitted tutor turn. A near-clone
+        # of the prior turn is bad even if judges say it's clean.
+        dedup_pen = _dedup_penalty(candidate_text, _prior_tutor_text)
+        if dedup_pen < 0:
+            logger.info(
+                "[SelfRetry] cycle=%d dedup penalty %.2f vs prior turn",
+                cycle_idx, dedup_pen,
+            )
+            score = score + dedup_pen
         cycle.score = score
         cycle.clean = clean
         logger.info(
@@ -441,7 +550,9 @@ def run_tutor_self_retry(
             'label': f'cycle_{cycle_idx}',
         })
 
-        if clean:
+        # Don't early-exit on dedup-penalised candidates: they're judge-
+        # clean but structurally a dupe, so let another cycle try.
+        if clean and dedup_pen >= 0:
             break
 
     elapsed = time.monotonic() - started

@@ -53,3 +53,28 @@ class SubjectTypeTest(TestCase):
             title='Course',
         )
         self.assertEqual(course.subject_type, '')
+
+    def test_expanded_math_keyword_fallback(self):
+        """Audit v3 R4: MATH_KEYWORDS now covers fractions/decimals/etc.
+
+        Previously the fallback was {math, maths, mathematics, algebra,
+        geometry, calculus}. A course titled 'Fractions and Decimals'
+        with no subject_type set returned is_math=False, silently
+        bypassing the math protection layer in the tutor.
+        """
+        for title in (
+            'Equivalent Fractions',
+            'Decimals and Percentages',
+            'Probability Basics',
+            'Statistics for S3',
+            'Trigonometry I',
+            'Mental Arithmetic',
+        ):
+            course = Course.objects.create(
+                institution=self.institution,
+                title=title,
+            )
+            self.assertTrue(
+                course.is_math,
+                msg=f'{title!r} should be detected as math via title heuristic',
+            )

@@ -118,16 +118,19 @@ pip install -r requirements.txt
 Create a `.env` file in the project root:
 
 ```bash
-# Required: at least one LLM provider key
-ANTHROPIC_API_KEY=sk-ant-xxxxx
-
-# Optional providers
-OPENAI_API_KEY=sk-xxxxx
-GOOGLE_API_KEY=xxxxx
+# Required: provider key for the active model stack.
+# The defaults seeded by migration 0028 (tutoring + judge + regen) all
+# use Google Gemini 3.1 Flash Lite Preview, so GOOGLE_API_KEY is the
+# minimum to run the system out of the box. Anthropic is needed if you
+# generate content (default GENERATION ModelConfig is Anthropic) or if
+# you switch any runtime purpose to Claude.
+GOOGLE_API_KEY=xxxxx          # primary: tutoring + judge + regen
+ANTHROPIC_API_KEY=sk-ant-xxxxx  # used by content generation, image judge fallback
+OPENAI_API_KEY=sk-xxxxx        # used by image_generation (gpt-image-2)
 
 # Django settings
 DEBUG=True
-SECRET_KEY=your-secret-key-here
+SECRET_KEY=your-secret-key-here   # generate: python -c "import secrets; print(secrets.token_urlsafe(64))"
 
 # Database (defaults to SQLite if not set)
 # DATABASE_URL=postgres://user:pass@host:5432/dbname
@@ -136,22 +139,30 @@ SECRET_KEY=your-secret-key-here
 EMBEDDING_BACKEND=local
 ```
 
+`GEMINI_API_KEY` is accepted as an alias — the Gemini client reads either.
+
 ### 3. Initialize Database
 
 ```bash
-python manage.py migrate
+python manage.py migrate                # also auto-seeds the ModelConfig defaults
 python manage.py createsuperuser
-python manage.py seed_seychelles  # Seed Seychelles curriculum (7 geo + 8 math units)
+python manage.py seed_seychelles        # Seed Seychelles curriculum (7 geo + 8 math units)
 ```
 
-### 4. Configure LLM Models
+### 4. (Optional) Override the default model stack
 
-Visit Django Admin (`/admin/`) and create `ModelConfig` entries for each purpose:
-- **Tutoring** -- the model students interact with (e.g., Claude Haiku for speed)
-- **Generation** -- for content generation (e.g., Claude Sonnet for quality)
-- **Exit Tickets** -- for generating assessment questions
-- **Skill Extraction** -- for analyzing lesson content
-- **Image Generation** -- for creating diagrams (Google Gemini recommended)
+Migrations seed sensible defaults — you don't *need* to touch ModelConfig to get started. As of migration 0028 (2026-05-20) the runtime defaults are:
+
+| Purpose | Default model |
+|---|---|
+| `tutoring` | `google/gemini-3.1-flash-lite-preview` @ temp 0.2 |
+| `judge` | `google/gemini-3.1-flash-lite-preview` @ temp 0.0 |
+| `regen` | `google/gemini-3.1-flash-lite-preview` @ temp 0.2 |
+| `judge_fallback` | `google/gemini-3.5-flash` @ temp 0.0 |
+| `generation` | `anthropic/claude-sonnet-4` (curriculum + exit-ticket content) |
+| `image_generation` | `openai/gpt-image-2` |
+
+To switch any of these (e.g., back to Opus tutoring): edit the row in Django Admin → ModelConfig, or write a one-shot migration following the pattern in `apps/llm/migrations/0028_swap_runtime_to_gemini_3_1_flash_lite.py`. See [LLM Providers](#llm-providers) below for the per-provider matrix.
 
 ### 5. Run the Server
 
@@ -571,7 +582,7 @@ Provides audit logging for safety events, consent tracking for GDPR compliance, 
 | `CSRF_TRUSTED_ORIGINS` | (empty) | Comma-separated trusted origins for CSRF |
 | `ANTHROPIC_API_KEY` | (empty) | Anthropic API key |
 | `OPENAI_API_KEY` | (empty) | OpenAI API key |
-| `GOOGLE_API_KEY` | (empty) | Google AI API key |
+| `GOOGLE_API_KEY` | (empty) | Google AI API key (alias: `GEMINI_API_KEY`). Required by the default tutoring/judge/regen stack. |
 | `EMBEDDING_BACKEND` | `local` | Embedding backend: `local` (sentence-transformers) or `openai` |
 | `VECTORDB_ROOT` | `media/vectordb` | ChromaDB storage path (use `/tmp/vectordb` in production for fast local disk) |
 | `EMAIL_BACKEND` | console | Email backend for notifications |
@@ -588,26 +599,29 @@ Provides audit logging for safety events, consent tracking for GDPR compliance, 
 
 ## LLM Providers
 
-### Anthropic Claude (Recommended)
+The engine routes every LLM call through `apps/llm/client.py::BaseLLMClient`. The active model for each purpose is stored in `ModelConfig` (one row per active purpose; multiple rows allowed for inactive overrides). The four runtime purposes (`tutoring`, `judge`, `regen`, `judge_fallback`) drive the conversation loop; `generation`, `exit_tickets`, and `image_generation` drive offline curriculum work.
 
-Set `ANTHROPIC_API_KEY` in `.env`. Create a `ModelConfig` in Django admin:
-- Provider: `anthropic`
-- Model: `claude-haiku-4-5-20251001` (tutoring) or `claude-sonnet-4-6` (generation)
-- API key env var: `ANTHROPIC_API_KEY`
+### Google Gemini (default for runtime as of 2026-05-20)
+
+Set `GOOGLE_API_KEY` (or `GEMINI_API_KEY`) in `.env`. Recommended runtime models:
+- `gemini-3.1-flash-lite-preview` — current default for tutoring + judge + regen. ~2.8× faster per turn than Opus, comparable exit-ticket quality on the benchmark
+- `gemini-3.5-flash` — judge fallback / higher-quality alternative
+- `gemini-3-flash-preview` — preview of the next Flash generation
+- `gemini-3.1-pro-preview` / `gemini-3.1-pro-preview-customtools` — premium tier, slower
+
+### Anthropic Claude
+
+Set `ANTHROPIC_API_KEY` in `.env`. Default for the `generation` purpose (Claude Sonnet 4 for curriculum content + exit tickets). Recommended models:
+- `claude-opus-4-7` — best instruction-following; used to be the default tutor before the Gemini swap. Roll back via migration if you want belt-and-braces quality
+- `claude-sonnet-4-20250514` — content generation default
+- `claude-haiku-4-5-20251001` — cheap option; weak at the `pose_question` tool pattern, not recommended for tutoring
 
 ### OpenAI GPT
 
-Set `OPENAI_API_KEY` in `.env`. Create a `ModelConfig`:
-- Provider: `openai`
-- Model: `gpt-4o` or `gpt-4o-mini`
-- API key env var: `OPENAI_API_KEY`
-
-### Google Gemini
-
-Set `GOOGLE_API_KEY` in `.env`. Create a `ModelConfig`:
-- Provider: `google`
-- Model: `gemini-2.0-flash` or `gemini-2.5-pro`
-- API key env var: `GOOGLE_API_KEY`
+Set `OPENAI_API_KEY` in `.env`. Default for `image_generation` (gpt-image-2). Chat-completion runtime support:
+- `gpt-5` and `o-series` use `max_completion_tokens` automatically (handled by `OpenAIClient`)
+- `gpt-4o` / `gpt-4o-mini` — legacy chat-completion models, work with the legacy `max_tokens` path
+- Anthropic-shaped multimodal blocks are auto-translated to OpenAI's `image_url` shape (no manual mapping needed)
 
 ### Local Ollama
 
@@ -618,6 +632,14 @@ Set `GOOGLE_API_KEY` in `.env`. Create a `ModelConfig`:
    - Provider: `local_ollama`
    - Model: `llama3`
    - API base: `http://localhost:11434`
+
+### How to switch the active stack
+
+Two options:
+
+**Option A — Django admin (one-off)**: visit `/admin/llm/modelconfig/`, edit the active row for the purpose you want to change. Restart Gunicorn / dev server is NOT needed; `ModelConfig.get_for(purpose)` queries the DB on every call.
+
+**Option B — Migration (deploy via CI/CD)**: copy `apps/llm/migrations/0028_swap_runtime_to_gemini_3_1_flash_lite.py` as a template. The forward function updates the active row(s); the reverse function restores the prior config. This is the right approach when you want the change to ship through CI and be reproducible across environments.
 
 ---
 
@@ -700,6 +722,111 @@ pulumi up --stack pixel
 # Manual deploy
 az acr build --registry aitutorpixelacr --image aitutor:latest --platform linux/amd64 .
 az containerapp update --name aitutor-pixel-app --resource-group aitutor-pixel-rg --image aitutorpixelacr.azurecr.io/aitutor:latest
+```
+
+### Fork & deploy to your own Azure (full walkthrough)
+
+The `pixel` stack above is hardcoded to the upstream subscription. To fork this repo and deploy to your own Azure tenancy:
+
+**1. Prereqs**
+- Azure subscription with permissions to create resource groups, ACR, Container Apps, PostgreSQL Flexible Server, Storage Account
+- `az`, `pulumi`, `docker`, `gh` CLIs installed and authenticated (`az login`, `pulumi login`)
+- Provider API keys: at minimum `GOOGLE_API_KEY` (matches the default Gemini stack); `ANTHROPIC_API_KEY` for content generation; `OPENAI_API_KEY` for image generation
+
+**2. Create your own Pulumi stack**
+
+```bash
+cd infra
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# Pick a stack name; this maps to a Pulumi.<stack>.yaml file
+pulumi stack init myorg
+
+# Set required encrypted config (Pulumi prompts for a passphrase on first use —
+# store it in a password manager; you'll need it for every deploy).
+# Note: the Pulumi program expects kebab-case keys.
+pulumi config set --secret anthropic-api-key  "sk-ant-xxx"
+pulumi config set --secret google-api-key     "xxx"
+pulumi config set --secret openai-api-key     "sk-xxx"
+pulumi config set --secret elevenlabs-api-key "xxx"   # optional; TTS only
+pulumi config set --secret django-secret-key  "$(python -c 'import secrets; print(secrets.token_urlsafe(64))')"
+pulumi config set --secret db-password        "$(openssl rand -base64 32 | tr -d '=+/')"
+
+# Azure target (any region; centralus is the default in the upstream stack)
+pulumi config set azure-native:subscriptionId "$(az account show --query id -o tsv)"
+pulumi config set azure-native:location centralus
+```
+
+**3. Provision Azure resources**
+
+```bash
+pulumi up   # review + confirm — creates RG, ACR, PostgreSQL, Storage, Container App Environment, Container App
+```
+
+This takes ~10 minutes. The output prints your `acrLoginServer`, `resourceGroupName`, `containerAppName`, and the live URL.
+
+**4. Set up GitHub Actions CI/CD**
+
+Create a service principal so CI can push to ACR and update the Container App:
+
+```bash
+# Fish the actual values out of `pulumi stack output`
+RG=$(pulumi stack output resourceGroupName)
+ACR=$(pulumi stack output acrLoginServer)
+APP=$(pulumi stack output containerAppName)
+SUB=$(az account show --query id -o tsv)
+
+# Create SP with Contributor on the RG + AcrPush on ACR
+az ad sp create-for-rbac \
+  --name "ai-tutor-ci-$(date +%s)" \
+  --role Contributor \
+  --scopes "/subscriptions/$SUB/resourceGroups/$RG" \
+  --sdk-auth
+# Output is JSON — save this verbatim, it goes into GitHub secret AZURE_CREDENTIALS
+
+# Grant the same SP AcrPush on the ACR (replace <APP_ID> with the appId from above)
+ACR_ID=$(az acr show --name ${ACR%%.*} --query id -o tsv)
+az role assignment create --assignee <APP_ID> --role AcrPush --scope $ACR_ID
+```
+
+Then add these GitHub repo secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `AZURE_CREDENTIALS` | the full JSON blob from `az ad sp create-for-rbac --sdk-auth` |
+| `ACR_LOGIN_SERVER` | e.g. `youracr.azurecr.io` |
+| `AZURE_RESOURCE_GROUP` | e.g. `aitutor-myorg-rg` |
+| `CONTAINER_APP_NAME` | e.g. `aitutor-myorg-app` |
+
+`.github/workflows/deploy.yml` will now build + push on every `git push origin main`.
+
+**5. First deploy + DB seed**
+
+```bash
+git push origin main   # CI builds image, pushes to ACR, updates Container App
+# Watch:
+gh run watch
+```
+
+After the first revision lands healthy, seed the curriculum (one-off — the migrations seed ModelConfig automatically but not the lessons):
+
+```bash
+az containerapp exec \
+  --name $APP --resource-group $RG \
+  --command "python manage.py seed_seychelles"
+```
+
+**6. Switch model defaults if you don't want Gemini**
+
+Migration 0028 sets Gemini 3.1 Flash Lite Preview as default. If you'd rather run on Anthropic / OpenAI: write a one-off migration following the 0028 pattern, push, deploy. Or edit the rows manually via `/admin/llm/modelconfig/` after first login (changes take effect on next request — no restart needed).
+
+**7. Custom domain (optional)**
+
+```bash
+# After deploy, you can attach a custom domain with managed TLS via:
+az containerapp hostname add --hostname yourdomain.com --name $APP --resource-group $RG
+az containerapp hostname bind --hostname yourdomain.com --name $APP --resource-group $RG --validation-method CNAME
 ```
 
 ### CI/CD Pipeline (`.github/workflows/deploy.yml`)

@@ -132,6 +132,53 @@ ISSUE_REPEATED_QUESTION = "repeated_question"
 # is present in the response. Hint-probes inside a hint don't count —
 # they're scoped to an active awaiting record.
 ISSUE_NO_QUESTION_TOOL = "no_question_tool"
+# Literal tool-call markup leaked into the rendered tutor text.
+# Observed 2026-05-20 in browser e2e of Gemini Flash family:
+#   - "|||tool_call:pose_question{slot: 1}|||"  (3.5 Flash variant)
+#   - "tool_use: pose_question(slot=4)"         (Flash Lite Preview)
+# The student sees raw protocol markup instead of a real tool call —
+# breaks the affordance + confuses the UI. Detected by a single
+# regex; triggers regen (the candidate is unsalvageable as text).
+ISSUE_TOOL_CALL_LEAK = "tool_call_leak"
+# Tutor posed a question that is structurally the same as one of the
+# last 2 tutor turns' questions (same template stem with only the
+# numeric values varying). Surfaced in ab-test-reports-v5/FINAL_REPORT
+# engine rec #9: even when the prompt asks for interleaving, mid-tier
+# models recycle the same template. Detection is template-signature
+# based (digits normalised to "N", whitespace squashed); the issue
+# triggers regen with the existing "rephrase from a different angle
+# or advance" feedback. Set by the call site in conversational_tutor,
+# not by validate_tutor_response itself (the validator has no access
+# to prior-turn text).
+ISSUE_SAME_TEMPLATE_REPEAT = "same_template_repeat"
+# Tutor's model-generated prose ends mid-sentence (no terminal
+# punctuation on the last non-empty line of the prose portion).
+# Observed across cycles whenever stop_reason='max_tokens' fires AND
+# the cut lands inside a sentence. Examples surfaced in
+# ab-test-reports-v4 rec #3 ("Yes--360 deg is correct. In") and again
+# in v7 (ab-test-reports-v7-top-tier engine rec #1). Detection is
+# done at the call site in conversational_tutor (the validator has
+# no access to bank-rendered tail text, which legitimately may not
+# end in terminal punctuation -- e.g. "D) Marine"). The call site
+# strips the bank-rendered block and checks only the model's prose.
+ISSUE_TRUNCATED = "truncated"
+# Tutor introduced a numeric value not present in the active problem
+# stem (or in any prior tutor turn's accepted intermediate result).
+# Surfaced in v3-v5 cycles (1:40,000 invented when stem was 1:10,000)
+# and reiterated in ab-test-reports-v6 engine rec #6. The validator
+# can't see the active problem; the call site computes the diff and
+# flags this issue when a number appears in the candidate that has
+# no provenance.
+ISSUE_NUMERIC_MUTATION = "numeric_mutation"
+# Tutor responded to a non-answer student input ("ok", "yes", "got
+# it", "...") by emitting a fresh teach block instead of either re-
+# posing the active question or doing a short check-in. Surfaced in
+# ab-test-reports-v7-top-tier engine rec #1. The engine already
+# flags non_answer_input on the student turn (see [Eval] forcing
+# is_correct=None messages); the call site reads that flag, sees
+# whether the candidate response either re-poses the active question
+# or asks a check-in question, and otherwise flags this.
+ISSUE_FILLER_REPLY_TEACH = "filler_reply_teach"
 
 # Deictic figure references — phrases that strongly imply "I am
 # pointing at a visual right now". Used by the figure-ref-without-signal
@@ -220,6 +267,36 @@ class ValidationResult:
         # the LLM to re-pose via a tool so the engine state is
         # authoritative (task #197).
         ISSUE_NO_QUESTION_TOOL,
+        # Tutor typed literal tool-call markup into the response
+        # ("|||tool_call:pose_question{...}|||", "tool_use: pose_..."
+        # etc.). Surfaced by the Gemini Flash family in browser e2e
+        # 2026-05-20. Always regen — markup must never reach UI.
+        ISSUE_TOOL_CALL_LEAK,
+        # Tutor recycled the same question template (same stem modulo
+        # numeric values) as a recent turn. Regen with directive to
+        # pose a structurally different problem on the same concept
+        # or advance.
+        ISSUE_SAME_TEMPLATE_REPEAT,
+        # Tutor prose cut off mid-sentence (no terminal punctuation
+        # on the last non-empty line of the model's text portion).
+        ISSUE_TRUNCATED,
+        # Tutor introduced a numeric value with no provenance in the
+        # active problem stem or accepted intermediate calc results.
+        ISSUE_NUMERIC_MUTATION,
+        # Tutor ignored a filler reply ("ok", "yes") and emitted a
+        # fresh teach block instead of re-posing or checking in.
+        ISSUE_FILLER_REPLY_TEACH,
+    })
+
+    # Issues whose regen-trigger is suspended on non-probe intents.
+    # The tutor is intentionally NOT asking a question this turn
+    # (acknowledging a tangent, recapping after resume, revealing a
+    # canonical on give-up), so flagging it as a failure would just
+    # regen back into "must end with question" — the exact rigidity
+    # PR3 is fixing.
+    _QUESTION_REQUIRED_ISSUES = frozenset({
+        ISSUE_NO_QUESTION,
+        ISSUE_NO_QUESTION_TOOL,
     })
 
     # Issues whose regen-trigger is suspended on non-probe intents.
@@ -266,6 +343,32 @@ _QUESTION_RE = re.compile(r"\?")
 # calling pose_inline_question" violations.
 _PROSE_MCQ_RE = re.compile(
     r'(?m)^\s*A[\.\)]\s+\S.*(?:\r?\n|\r)\s*B[\.\)]\s+\S',
+)
+
+# Tool-call markup leak — the LLM types protocol syntax into prose
+# instead of emitting a real tool_use block. The student sees the
+# raw markup. Observed variants from Gemini Flash family 2026-05-20:
+#   - "|||tool_call:pose_question{slot: 1}|||"     (3.5 Flash)
+#   - "tool_use: pose_question(slot=4)"            (Flash Lite Preview)
+#   - "<tool_use><invoke name='...'>"              (earlier 2026-05-17)
+#   - "pose_inline_question(question=...)"         (earlier function form)
+# Triggers ISSUE_TOOL_CALL_LEAK + regen. Kept broad — false positives
+# here are cheap (regen produces a clean turn) and the alternative
+# (shipping raw markup) breaks the UI.
+_TOOL_CALL_LEAK_RE = re.compile(
+    # Triple-pipe fence form: |||tool_call:NAME{...}||| or |||tool_use:NAME(...)|||
+    r'\|{2,}\s*tool[_ ]?(?:call|use|code)\s*:\s*\w+'
+    # Prefix-and-call form: "tool_use:" or "tool_call:" followed by a
+    # function-style invocation (`pose_question(`, `pose_inline_question(`,
+    # generic `name(`).
+    r'|\btool[_ ]?(?:call|use|code)\s*:\s*pose_(?:inline_)?question\b'
+    # Bare function-call form for our pose tools (matches the
+    # self-retry detector pattern). Covers e.g. `pose_question(slot=N)`
+    # that escaped the engine's narrower strip regex.
+    r'|\bpose_(?:inline_)?question\s*\('
+    # XML-tag form (kept for parity with self-retry detector).
+    r'|<\s*(?:tool_use|invoke|antml:function_calls|function_calls)\b',
+    re.IGNORECASE,
 )
 
 # Verdict-mismatch detection (ISSUE_VERDICT_MISMATCH).
@@ -340,6 +443,76 @@ def collapse_paragraphs(text: str) -> str:
     return collapsed
 
 
+# Terminal punctuation that legitimately closes a tutor sentence.
+# Includes the basic three (. ! ?), curly variants, and tail wrappers
+# (closing quote / paren / bracket) that may follow the terminal char.
+# We check by inspecting the last *non-whitespace* character of the
+# prose portion.
+_TERMINAL_PUNCT = set('.!?…。！？"”\')]}>')
+
+
+def ends_with_terminal_punctuation(text: str) -> bool:
+    """Return True when the last non-whitespace char is a sentence
+    terminator (or a closing wrapper that typically follows one).
+
+    Used by the truncation guard. Empty / whitespace-only input
+    returns True (nothing to be truncated)."""
+    if not text or not text.strip():
+        return True
+    stripped = text.rstrip()
+    return stripped[-1] in _TERMINAL_PUNCT
+
+
+# Numeric extraction for the numeric-mutation guard. Captures integers,
+# decimals, negative numbers, and scale-style ratios written as "N:N".
+# Currency / percent suffixes are stripped before comparison so "70°"
+# and "70" match. We deliberately ignore numbers inside common boiler-
+# plate (turn-counter "1.", list "2)") at the call site, not here.
+_NUMERIC_TOKEN_RE = re.compile(r'-?\d+(?:[\.,:]\d+)*')
+
+
+def extract_numbers(text: str) -> set[str]:
+    """Return the set of normalised numeric tokens in text.
+
+    Normalisation: strip thousands separators, collapse comma/dot
+    to a single canonical form. "1,000" and "1000" compare equal.
+    Returns a set so duplicates collapse."""
+    if not text:
+        return set()
+    out: set[str] = set()
+    for m in _NUMERIC_TOKEN_RE.finditer(text):
+        tok = m.group(0).replace(',', '')
+        out.add(tok)
+    return out
+
+
+# Filler / non-answer student replies. Matches the set the engine's
+# eval layer uses to set is_correct=None ("non_answer_input"). Kept
+# as a small set — additions should mirror what the eval layer treats
+# as filler.
+_FILLER_REPLIES = frozenset({
+    'ok', 'okay', 'k', 'ok.',
+    'yes', 'yeah', 'yep', 'y',
+    'sure', 'right', 'got it', 'i see', 'understood',
+    'cool', 'continue', 'next', 'go on', 'more',
+    '...', '..', '.',
+})
+
+
+def is_filler_reply(student_text: Optional[str]) -> bool:
+    """True when the student turn is content-free filler that should
+    not be treated as an answer attempt. Matched case-insensitively
+    on the stripped, punctuation-light form."""
+    if not student_text:
+        return False
+    s = student_text.strip().lower()
+    if not s:
+        return False
+    # Strip trailing punctuation cluster for matching.
+    s_clean = s.rstrip('.!?,;:')
+    return s_clean in _FILLER_REPLIES or s in _FILLER_REPLIES
+
+
 # 2026-05-17 — call-to-action regex + _has_call_to_action helper
 # REMOVED. The structural check was brittle (dangling colons +
 # multi-sentence questions slipped past). Handoff detection is now
@@ -365,6 +538,7 @@ def validate_tutor_response(
     bank_signal_used: Optional[bool] = None,
     combined_result=None,
     media_attached: bool = True,
+    step_has_media: bool = True,
     tool_use_count: int = 0,
     awaiting_answer_is_set: bool = False,
     turn_intent: str = TURN_INTENT_PROBE,
@@ -455,13 +629,26 @@ def validate_tutor_response(
     ):
         issues.append(ISSUE_NO_QUESTION_TOOL)
 
+    # TOOL_CALL_LEAK — literal protocol markup in the rendered text
+    # (e.g. "|||tool_call:pose_question{slot: 1}|||" or
+    # "tool_use: pose_question(slot=4)"). Always a defect — the
+    # student should never see protocol syntax. Regen.
+    if _TOOL_CALL_LEAK_RE.search(content):
+        issues.append(ISSUE_TOOL_CALL_LEAK)
+
     # Figure reference without |||MEDIA:N||| signal: tutor said "the
     # diagram"/"in the figure" but no media was attached for this turn.
     # The student sees a deictic reference to a visual that isn't there
     # ("Looking at the diagram, you can see…" → "where is the diagram?").
-    # Soft issue for now — surfaced in [TurnSummary] without triggering
-    # regen, so we can quantify before deciding to escalate.
-    if not media_attached and _FIGURE_DEICTIC_RE.search(content):
+    #
+    # 2026-05-20: Gated on `step_has_media` after audit found this was
+    # the dominant false-positive trigger — 57% of all regens, 144 of
+    # those on L540 alone where the lesson is ABOUT maps so "the map"
+    # matches the deictic regex constantly but there's no figure for
+    # the step. Only fire when the step actually has a figure that
+    # COULD have been signaled; otherwise "the map" is a conceptual
+    # reference, not a deictic pointer at a visual.
+    if step_has_media and not media_attached and _FIGURE_DEICTIC_RE.search(content):
         issues.append(ISSUE_FIGURE_REF_WITHOUT_SIGNAL)
 
     # L2 — pedagogical praise gate (universal; previously math-only)

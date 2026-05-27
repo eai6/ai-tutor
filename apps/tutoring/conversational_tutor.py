@@ -2062,6 +2062,13 @@ Keep it to 2-3 sentences."""
         This is the main conversation loop.
         Media selection: LLM signals via |||MEDIA:N||| tail-line, parsed before saving.
         """
+        # Latency instrumentation — stamped at the top of every turn
+        # and emitted via the TurnSummary payload. Per-component
+        # breakdown comes from grepping the `[GeminiTools]` /
+        # `[QuestionTool] llm_response` / `[SelfRetry]` log lines
+        # which already carry their own wall times.
+        import time as _t_latency
+        self._turn_t0 = _t_latency.monotonic()
         self._step_just_advanced = False
 
         # Snapshot awaiting_answer's turn_index so we can detect at the
@@ -2445,6 +2452,14 @@ Keep it to 2-3 sentences."""
                 rule_check=(combined_judge_result is None),
                 # Used by the figure-ref-without-signal check.
                 media_attached=bool(media),
+                # Gate the deictic-figure check on whether this step
+                # actually has media — prevents firing on "the map" in
+                # a geography lesson without figures (2026-05-20 audit
+                # showed this was 57% of all regen triggers).
+                step_has_media=bool(
+                    (getattr(self, '_step_media_ids', {}) or {})
+                    .get(self.current_topic_index)
+                ),
                 # NO_QUESTION_TOOL check (task #197): catches the LLM
                 # typing a fresh MCQ in prose instead of using
                 # pose_question / pose_inline_question.
@@ -2468,10 +2483,24 @@ Keep it to 2-3 sentences."""
         # bank grader verdict was correct (no leak possible), or when
         # wrong_attempts has reached the reveal-allowed threshold (>=3).
         # See memory/hint_vs_reveal_guards_plan.md W1.
+        #
+        # 2026-05-20: Disabled by default. The unified judge already
+        # covers answer-leak detection as dimension 10 (single multi-
+        # axis call, no extra LLM round-trip). Keeping this as a
+        # gated path so we can flip it back on if the unified judge's
+        # leak detection turns out to miss the deterministic edge
+        # cases this detector handled (string-match anchored to
+        # bank.correct_answer, chat-authored Q synthesis from
+        # grader.expected, wrong_attempts gating).
+        # Kill-switch: LEGACY_ANSWER_LEAK_DETECTOR=on
+        import os as _os_leak
+        _legacy_leak_enabled = _os_leak.getenv(
+            'LEGACY_ANSWER_LEAK_DETECTOR', '',
+        ).strip().lower() in ('on', '1', 'true')
         try:
             _bank_grade_for_leak = getattr(self, '_pending_bank_grade', None)
             _bank_verdict_for_leak = getattr(_bank_grade_for_leak, 'is_correct', None) if _bank_grade_for_leak else None
-            if _bank_verdict_for_leak is False:
+            if _legacy_leak_enabled and _bank_verdict_for_leak is False:
                 # Only fire leak check when the student JUST got wrong.
                 from apps.tutoring.answer_leak import detect_answer_leak
                 from apps.tutoring.validator import ISSUE_ANSWER_LEAK
@@ -2622,11 +2651,191 @@ Keep it to 2-3 sentences."""
                 if _sig and _sig not in self.recent_tutor_question_sigs:
                     self.recent_tutor_question_sigs.append(_sig)
             self.recent_tutor_question_sigs = self.recent_tutor_question_sigs[-10:]
+
+            # Template-repeat detection (ab-test-reports-v5 engine rec
+            # #9). Only runs when the cross-turn repeat check above
+            # came up clean — they're complementary: that one catches
+            # same-prose paraphrase, this one catches same-procedure
+            # with different surface details. Pulls the last 3 tutor
+            # turns' raw question text for the LLM judge to compare
+            # against. Skipped when no judge_client is wired.
+            if _repeat_verdict is None and self.judge_client is not None:
+                from apps.tutoring.repeated_question import detect_template_repeat
+                from apps.tutoring.validator import ISSUE_SAME_TEMPLATE_REPEAT
+                _recent_tutor_qs: List[str] = []
+                try:
+                    from apps.tutoring.models import SessionTurn as _ST
+                    _prior_turns = list(
+                        _ST.objects
+                        .filter(session=self.session, role='tutor')
+                        .order_by('-created_at')
+                        .values_list('content', flat=True)[:3]
+                    )
+                    for _txt in _prior_turns:
+                        _recent_tutor_qs.extend(extract_questions(_txt or ''))
+                except Exception:
+                    _recent_tutor_qs = []
+
+                if _recent_tutor_qs:
+                    _tmpl_verdict = detect_template_repeat(
+                        response=clean_response,
+                        recent_tutor_questions=_recent_tutor_qs,
+                        llm_client=self.judge_client,
+                    )
+                    if _tmpl_verdict is not None:
+                        issues_set = set(validation.issues)
+                        issues_set.add(ISSUE_SAME_TEMPLATE_REPEAT)
+                        validation.issues = list(issues_set)
+                        validation.metadata['template_repeat_reason'] = _tmpl_verdict.reason
+                        validation.metadata['template_repeat_matched'] = _tmpl_verdict.matched_question[:200]
+                        validation.metadata['template_repeat_ms'] = _tmpl_verdict.elapsed_ms
+                        logger.info(
+                            "[TemplateRepeat] FLAGGED session=%s reason=%r",
+                            self.session.id, _tmpl_verdict.reason[:200],
+                        )
         except Exception as _exc:
             logger.warning(
                 "[RepeatDetect] guard crashed: %s: %s — continuing without regen flag",
                 type(_exc).__name__, _exc,
             )
+
+        # ------------------------------------------------------------------
+        # Engine wins from ab-test-reports-v6 + v7 (post-iteration review).
+        # All three run AFTER the existing validator + repeat-detect path
+        # so they layer cleanly on top. Each is independent + fail-soft.
+        # ------------------------------------------------------------------
+
+        # GUARD A: truncation -- model prose cut off mid-sentence.
+        # ab-test-reports-v6 engine rec #1 + v7-top-tier engine rec #1.
+        # We strip the trailing bank-rendered tail (which legitimately
+        # may not end in terminal punctuation, e.g. "D) Marine") and
+        # check whether the model's prose portion ends with terminal
+        # punctuation. Empty prose is fine (turn = bank Q only).
+        try:
+            from apps.tutoring.validator import (
+                ISSUE_TRUNCATED, ends_with_terminal_punctuation,
+            )
+            _bank_tail = str(getattr(self, '_last_bank_rendered_text', '') or '').strip()
+            _prose = clean_response
+            if _bank_tail and _bank_tail in _prose:
+                _prose = _prose.replace(_bank_tail, '').rstrip()
+            if _prose.strip() and not ends_with_terminal_punctuation(_prose):
+                issues_set = set(validation.issues)
+                issues_set.add(ISSUE_TRUNCATED)
+                validation.issues = list(issues_set)
+                validation.metadata['truncated_tail'] = _prose.rstrip()[-80:]
+                logger.info(
+                    "[Validator] truncated session=%s tail=%r",
+                    getattr(self.session, 'id', '?'),
+                    _prose.rstrip()[-80:],
+                )
+        except Exception as _exc:
+            logger.debug("[Validator] truncation guard crashed: %s", _exc)
+
+        # GUARD B: numeric mutation -- candidate introduces a number
+        # not present in the active problem stem. ab-test-reports-v6
+        # engine rec #6 (and its v3-v5 lineage on "1:40,000 invented
+        # when stem was 1:10,000"). We pull the active problem text
+        # from _pending_bank_question or _awaiting_answer, extract
+        # its numeric tokens + a set of permissive intermediate-calc
+        # results from the cleaned response itself (so the model can
+        # show its work without false-positive), then flag any
+        # candidate numbers with no provenance.
+        try:
+            from apps.tutoring.validator import (
+                ISSUE_NUMERIC_MUTATION, extract_numbers,
+            )
+            _active_problem_text = ""
+            _bq = getattr(self, '_pending_bank_question', None)
+            if _bq is not None:
+                _active_problem_text = (
+                    getattr(_bq, 'question_text', '')
+                    or getattr(_bq, 'stem', '')
+                    or ''
+                )
+            if not _active_problem_text:
+                _aa = getattr(self, '_awaiting_answer', None) or {}
+                _active_problem_text = str(
+                    _aa.get('chat_authored_q')
+                    or _aa.get('stem')
+                    or ''
+                )
+            # Also pull numbers from the LAST tutor turn's prose --
+            # legitimate when the tutor showed a worked-example step
+            # and the new turn references its intermediate result.
+            _prev_tutor_numbers: set = set()
+            try:
+                from apps.tutoring.models import SessionTurn as _ST
+                _prev = (_ST.objects
+                         .filter(session=self.session, role='tutor')
+                         .order_by('-created_at').first())
+                if _prev is not None:
+                    _prev_tutor_numbers = extract_numbers(_prev.content or '')
+            except Exception:
+                pass
+            # Numbers the tutor MAY use freely: from the active stem,
+            # from MCQ option text (which renders as part of the bank
+            # block), and from the previous tutor turn (worked steps).
+            _allowed = (
+                extract_numbers(_active_problem_text)
+                | extract_numbers(str(getattr(self, '_last_bank_rendered_text', '') or ''))
+                | _prev_tutor_numbers
+            )
+            # Numbers the model produced.
+            _produced = extract_numbers(clean_response)
+            # Filter: a number ≤2 chars (single-digit / "10") is too
+            # common to flag (1., 2., A., 1st, etc.). Keep this loose
+            # to avoid false positives on prose enumerations.
+            _suspicious = {
+                n for n in _produced
+                if n not in _allowed and len(n) >= 3
+            }
+            if _suspicious and _active_problem_text:
+                issues_set = set(validation.issues)
+                issues_set.add(ISSUE_NUMERIC_MUTATION)
+                validation.issues = list(issues_set)
+                validation.metadata['numeric_mutation_invented'] = list(_suspicious)[:6]
+                validation.metadata['numeric_mutation_stem'] = _active_problem_text[:160]
+                logger.info(
+                    "[Validator] numeric_mutation session=%s invented=%s",
+                    getattr(self.session, 'id', '?'),
+                    sorted(_suspicious)[:6],
+                )
+        except Exception as _exc:
+            logger.debug("[Validator] numeric_mutation guard crashed: %s", _exc)
+
+        # GUARD C: filler-reply teach. If the student turn was filler
+        # ("ok", "yes") the tutor should either re-pose the active
+        # question or do a short check-in -- NOT emit a fresh teach
+        # block. ab-test-reports-v7-top-tier engine rec #1.
+        try:
+            from apps.tutoring.validator import (
+                ISSUE_FILLER_REPLY_TEACH, is_filler_reply,
+            )
+            if is_filler_reply(student_input):
+                # Acceptable responses: tool_use_count > 0 (re-posed
+                # via the question tool, including the active one),
+                # OR the prose contains a check-in / continue signal.
+                _tool_used = int(turn_metadata.get('tool_use_count', 0) or 0) > 0
+                _checkin_re = re.compile(
+                    r"\b(?:ready to continue|shall we (?:move on|continue)|"
+                    r"want to try (?:another|the next)|"
+                    r"any questions before|let me know when)\b",
+                    re.IGNORECASE,
+                )
+                _has_checkin = bool(_checkin_re.search(clean_response))
+                if not _tool_used and not _has_checkin:
+                    issues_set = set(validation.issues)
+                    issues_set.add(ISSUE_FILLER_REPLY_TEACH)
+                    validation.issues = list(issues_set)
+                    validation.metadata['filler_reply_input'] = (student_input or '')[:60]
+                    logger.info(
+                        "[Validator] filler_reply_teach session=%s input=%r",
+                        getattr(self.session, 'id', '?'),
+                        (student_input or '')[:60],
+                    )
+        except Exception as _exc:
+            logger.debug("[Validator] filler_reply guard crashed: %s", _exc)
 
         if validation.issues:
             turn_metadata['validator_issues'] = list(validation.issues)
@@ -3287,6 +3496,10 @@ Keep it to 2-3 sentences."""
                 student_input=student_input,
                 bank_stems=self._current_bank_stems(),
                 media_attached=bool(media),
+                step_has_media=bool(
+                    (getattr(self, '_step_media_ids', {}) or {})
+                    .get(self.current_topic_index)
+                ),
                 tool_use_count=int(turn_metadata.get('tool_use_count', 0) or 0),
                 awaiting_answer_is_set=isinstance(
                     getattr(self, '_awaiting_answer', None), dict,
@@ -5410,7 +5623,24 @@ Follow the current step; this concept will be covered in sequence."""
                 messages=messages,
                 system_prompt=system_prompt,
             )
-            return response.content.strip()
+            # Defensive strip: when scaffolding (no tools offered) Gemini
+            # still occasionally invents tool-call markup in prose
+            # ("tool_code: pose_question(slot=N)", "|||tool_call:...|||").
+            # The tool-message path strips inside
+            # _handle_pose_question_message; this path needs the same
+            # treatment so the markup never reaches the student. The
+            # validator below catches what survives and triggers regen.
+            text_path_raw = response.content.strip()
+            text_path_cleaned, _leak_chars = self._strip_leaked_tool_call_syntax(
+                text_path_raw,
+            )
+            if _leak_chars:
+                logger.warning(
+                    "[QuestionTool] TEXT_PATH LEAKED_TOOL_SYNTAX — "
+                    "stripped %d chars from scaffolding response",
+                    _leak_chars,
+                )
+            return text_path_cleaned
 
         except Exception as e:
             logger.error(
@@ -5493,12 +5723,12 @@ Follow the current step; this concept will be covered in sequence."""
         if prompt_pack and prompt_pack.safety_prompt and prompt_pack.safety_prompt.strip():
             safety_prompt = prompt_pack.safety_prompt
 
-        # Phase 1 of task #229 — provider dispatch. The Anthropic
-        # builder preserves the historical TUTOR_SYSTEM_PROMPT_TEMPLATE
-        # behaviour exactly (XML tags, format_map, defaultdict fallback).
-        # Gemini + OpenAI builders ship in later phases; until then,
-        # unknown providers fall back to the Anthropic builder via
-        # get_prompt_builder.
+        # Phase 1 + 2c of task #229 — provider dispatch + subject
+        # injection. The Anthropic / Gemini / OpenAI builders share
+        # a common signature; the dispatcher picks the right one by
+        # provider. Subject-specific rules (currently 'math' only)
+        # attach as an injection AFTER the base prompt when the
+        # course is tagged.
         from apps.tutoring.prompts import (
             StablePrefixContext, get_prompt_builder,
         )
@@ -5520,8 +5750,24 @@ Follow the current step; this concept will be covered in sequence."""
                 prompt_pack.tutor_system_prompt.strip())
             else None
         )
+        # Subject pack: prefer the canonical Course.subject_code
+        # (mathematics / geography / physics / chemistry / biology /
+        # english / french / history / computer_science / other) — same
+        # field used for teaching-material cross-institution sharing.
+        # Fall back to is_math for legacy rows where subject_code
+        # hasn't been backfilled yet (per
+        # `python manage.py backfill_course_subjects`).
+        subject_code = (getattr(course, 'subject_code', '') or '').strip().lower()
+        if subject_code:
+            subject_pack = subject_code
+        elif bool(getattr(course, 'is_math', False)):
+            subject_pack = 'mathematics'
+        else:
+            subject_pack = 'general'
         system_prompt = get_prompt_builder(provider).build_stable_prefix(
-            ctx, prompt_pack_override=prompt_pack_override,
+            ctx,
+            prompt_pack_override=prompt_pack_override,
+            subject_pack=subject_pack,
         )
 
         # Inject tutor personality modifier if student has one selected
@@ -7075,13 +7321,35 @@ Follow the current step; this concept will be covered in sequence."""
             'question_type': 'mcq',
         }
         # Engine-state awaiting_answer for the grader to find.
+        # Initialize wrong_attempts explicitly so the grader's
+        # increment (line 8068) has a numeric base — previously the
+        # missing field caused `wrong_attempts` to stay None through
+        # the entire session (session 196 stuck-loop bug 2026-05-20).
         record = {
             'kind': 'inline_authored',
             'question_id': None,
             'question_type': 'mcq',
             'turn_index': int(turn_index),
             'posed_at': posed_at_iso,
+            'wrong_attempts': 0,
+            # Stash the canonical answer so the grader can resolve
+            # against this record even when turn_metadata lookup
+            # later in the session loses the inline_authored payload
+            # (the second arm of the state-drift bug — without this
+            # the grader falls back to a stale ExitTicketQuestion).
+            'correct_answer': (correct_answer or '').strip().upper(),
         }
+        # Preserve accumulated wrong_attempts when the LLM re-poses
+        # the SAME question (scaffolding gate is supposed to prevent
+        # this but defends-in-depth against pose-loops where the
+        # counter would otherwise reset to 0 every turn).
+        prev_aa = getattr(self, '_awaiting_answer', None)
+        if (
+            isinstance(prev_aa, dict)
+            and prev_aa.get('kind') == 'inline_authored'
+            and (prev_aa.get('correct_answer') or '').upper() == record['correct_answer']
+        ):
+            record['wrong_attempts'] = int(prev_aa.get('wrong_attempts', 0) or 0)
         if not hasattr(self, '_turn_questions') or self._turn_questions is None:
             self._turn_questions = {}
         self._turn_questions[str(turn_index)] = record
@@ -7097,13 +7365,34 @@ Follow the current step; this concept will be covered in sequence."""
     # one clean retry, then ship the regen output as-is. No surgery.
 
     # Defensive strip for leaked tool-call syntax in text blocks.
-    # Some turns the LLM types the literal `pose_question(slot=N)`
-    # syntax instead of emitting a real tool_use block — the student
-    # then sees those characters as raw text. We strip them.
-    # Conservative: only matches the exact pose_question(slot=...)
-    # shape, not other text containing parens or "pose_question".
+    # Multiple LLMs invent multiple markup forms; cover the observed
+    # variants so the student never sees raw protocol syntax.
+    # Observed forms (in production / browser e2e):
+    #   - pose_question(slot=N) / pose_question(slot=N, lead_in="...")
+    #     — original Anthropic-style leak
+    #   - |||tool_call:pose_question{slot: 1}|||
+    #     — Gemini 3.5 Flash fence form (curly braces, colon)
+    #   - tool_use: pose_question(slot=4) / tool_call: pose_inline_question(...)
+    #     — Gemini 3.1 Flash Lite Preview prefix form
+    #   - pose_inline_question(question="...", answer_key="...")
+    #     — explicit function-call form for inline questions
+    # The corresponding ISSUE_TOOL_CALL_LEAK in apps/tutoring/validator.py
+    # triggers regen when these survive the strip (which can happen
+    # when the strip leaves orphan punctuation that still looks like
+    # markup).
     _LEAKED_TOOL_CALL_RE = re.compile(
-        r"\bpose_question\s*\(\s*slot\s*=\s*\d+\s*(?:,\s*lead_in\s*=\s*[\"'][^\"']*[\"']\s*)?\)",
+        # Fence form: |||tool_call:NAME{...}||| (and trailing |||)
+        r"\|{2,}\s*tool[_ ]?(?:call|use|code)\s*:\s*\w+\s*\{[^}]*\}\s*\|{2,}"
+        # Bare function form: pose_question(slot=N[, lead_in="..."])
+        r"|\bpose_(?:inline_)?question\s*\(\s*slot\s*=\s*\d+\s*"
+        r"(?:,\s*lead_in\s*=\s*[\"'][^\"']*[\"']\s*)?\)"
+        # Inline-question full form: pose_inline_question(question="...", ...)
+        r"|\bpose_inline_question\s*\([^)]*\)"
+        # Prefix form: "tool_use:" / "tool_call:" followed by a pose call
+        r"|\btool[_ ]?(?:call|use|code)\s*:\s*pose_(?:inline_)?question[^.\n]*"
+        # Lone fence form (sometimes Gemini emits |||tool_call:pose_question|||
+        # without a body): also strip
+        r"|\|{2,}\s*tool[_ ]?(?:call|use|code)\s*:[^|]*\|{2,}",
         re.IGNORECASE,
     )
 
@@ -7865,6 +8154,10 @@ Follow the current step; this concept will be covered in sequence."""
                 fact_check=False,
                 rule_check=False,
                 media_attached=False,
+                # Welcome turn isn't pinned to a step — assume no media
+                # context. Anti-figure-ref suppression won't fire either
+                # way since the welcome rarely mentions specific figures.
+                step_has_media=False,
                 tool_use_count=int(turn_metadata.get('tool_use_count', 0) or 0),
                 awaiting_answer_is_set=isinstance(
                     getattr(self, '_awaiting_answer', None), dict,
@@ -8429,8 +8722,43 @@ Follow the current step; this concept will be covered in sequence."""
         # chat-authored / inline-MCQ when the LLM didn't call
         # pose_question — without this the hint-vs-reveal threshold
         # never opens (task #173).
+        #
+        # 2026-05-20 (session 196 root cause): also re-sync
+        # _awaiting_answer when the grader resolved to a question
+        # that DIFFERS from the active awaiting record. Previously
+        # the increment would land on a stale inline_authored dict
+        # while the grader graded against a different
+        # ExitTicketQuestion (state drift) — wrong_attempts never
+        # accumulated on the question the student was actually
+        # answering, so the move-on threshold never fired.
         if getattr(result, 'is_correct', None) is False:
-            if not isinstance(getattr(self, '_awaiting_answer', None), dict):
+            aa_now = getattr(self, '_awaiting_answer', None)
+            aa_kind = aa_now.get('kind') if isinstance(aa_now, dict) else None
+            aa_qid = aa_now.get('question_id') if isinstance(aa_now, dict) else None
+            graded_kind = q.source
+            graded_id = q.source_id
+            drift = (
+                isinstance(aa_now, dict)
+                and aa_kind != graded_kind
+                # treat inline_authored↔inline_mcq as same family
+                and not (
+                    {aa_kind, graded_kind}
+                    <= {'inline_authored', 'inline_mcq', SOURCE_CHAT_AUTHORED}
+                )
+            ) or (
+                isinstance(aa_now, dict)
+                and aa_kind == graded_kind
+                and aa_qid is not None
+                and graded_id is not None
+                and aa_qid != graded_id
+            )
+            if drift:
+                logger.warning(
+                    "[GraderDrift] session=%s aa=(%s,%s) graded=(%s,%s) — "
+                    "resync awaiting to graded question",
+                    self.session.id, aa_kind, aa_qid, graded_kind, graded_id,
+                )
+            if not isinstance(aa_now, dict) or drift:
                 from django.utils import timezone as _tz
                 self._awaiting_answer = {
                     'kind': 'inline_mcq' if bootstrap_mcq else (
@@ -8441,7 +8769,12 @@ Follow the current step; this concept will be covered in sequence."""
                     'question_type': q.question_type,
                     'turn_index': len(self.conversation),
                     'posed_at': _tz.now().isoformat(),
-                    'wrong_attempts': 0,
+                    # Preserve accumulated wrong_attempts on drift so
+                    # we don't reset the student's strike counter when
+                    # the engine re-syncs to the actually-graded Q.
+                    'wrong_attempts': int(
+                        (aa_now or {}).get('wrong_attempts', 0) or 0
+                    ) if drift else 0,
                     'authored_question_text': q.stem[:600] if q.source in (
                         SOURCE_CHAT_AUTHORED, SOURCE_INLINE_AUTHORED,
                     ) else '',
@@ -10089,6 +10422,13 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
         # Floor met — also require that the concepts we're remediating got re-covered
         failed_ids = {fq['id'] for fq in getattr(self, 'failed_exit_questions', [])}
         if failed_ids:
+            # Audit v3 R3: the per-turn keyword check over-counts coverage
+            # (mentioning the concept term ≠ teaching it). The remediation
+            # gate is load-bearing, so verify with the LLM before letting
+            # the `covered` flag promote the student back to the exit
+            # ticket. Any concept the LLM disagrees on is un-marked here,
+            # forcing remediation to continue.
+            self._verify_keyword_coverage_with_llm(failed_ids)
             uncovered_failed = [
                 c for c in self.exit_ticket_concepts
                 if c['id'] in failed_ids and not c.get('covered')
@@ -10994,7 +11334,110 @@ Which concept numbers were meaningfully covered?"""
         except Exception as e:
             logger.warning(f"LLM concept coverage check failed, using keyword fallback: {e}")
             self._keyword_concept_coverage_check(conversation_text)
-    
+
+    def _recent_conversation_text(self, limit: int = 12) -> str:
+        """Concatenate the last `limit` SessionTurns for coverage analysis.
+
+        Used by `_verify_keyword_coverage_with_llm` — the per-turn
+        `combined_text` window is too short (one student msg + one tutor
+        msg) to tell whether a concept was meaningfully *taught* vs
+        merely *mentioned* in passing.
+        """
+        try:
+            turns = (
+                SessionTurn.objects
+                .filter(session=self.session)
+                .exclude(role=SessionTurn.Role.SYSTEM)
+                .order_by('-created_at')[:limit]
+            )
+            chunks = []
+            for t in reversed(list(turns)):
+                who = 'STUDENT' if t.role == SessionTurn.Role.STUDENT else 'TUTOR'
+                chunks.append(f"{who}: {(t.content or '')[:300]}")
+            return "\n".join(chunks)
+        except Exception:
+            return ""
+
+    def _verify_keyword_coverage_with_llm(self, concept_ids: set) -> None:
+        """Audit v3 R3: verify keyword-marked coverage with the LLM.
+
+        The per-turn `_keyword_concept_coverage_check` is a cheap signal
+        — it sets `concept['covered'] = True` on ≥30% keyword overlap.
+        That over-counts (mentioning the concept term ≠ teaching it),
+        which would be OK if `covered` were only used for hints, but
+        commit `5d6cbd7` made it load-bearing for the remediation gate.
+
+        This method re-checks the keyword-marked-covered subset with an
+        LLM and *un-marks* any the LLM disagrees on, forcing remediation
+        to continue. Called only at gating decision points (rare event,
+        small candidate set) — cheap relative to per-turn invocation.
+
+        Fail-soft: any error keeps the keyword decision so a transient
+        LLM outage cannot block remediation indefinitely.
+        """
+        if not self.instructor_client or not concept_ids:
+            return
+
+        candidates = [
+            c for c in self.exit_ticket_concepts
+            if c.get('id') in concept_ids and c.get('covered')
+        ]
+        if not candidates:
+            return
+
+        text = self._recent_conversation_text(limit=12)
+        if not text:
+            return
+
+        descriptions = [
+            f"{i+1}. {c['question'][:140]}" for i, c in enumerate(candidates)
+        ]
+        prompt = (
+            "We are deciding whether the student got a real re-teaching of "
+            "concepts they previously failed on the exit ticket.\n\n"
+            "CONVERSATION (recent turns):\n"
+            f"{text[:1500]}\n\n"
+            "CANDIDATE CONCEPTS (currently flagged covered by keyword match):\n"
+            f"{chr(10).join(descriptions)}\n\n"
+            "Return ONLY the numbers of concepts that were MEANINGFULLY "
+            "taught or practiced in this conversation. A concept is "
+            "meaningfully covered when the conversation walked through "
+            "the underlying idea or worked an example — NOT when the "
+            "concept term merely appeared in passing."
+        )
+
+        try:
+            create_kwargs = dict(
+                response_model=ConceptCoverageResult,
+                messages=[
+                    {"role": "system", "content": (
+                        "You are an educational assessment assistant. "
+                        "Identify which concepts were meaningfully taught "
+                        "or practiced (not just mentioned)."
+                    )},
+                    {"role": "user", "content": prompt},
+                ],
+                max_retries=2,
+            )
+            if getattr(self, '_instructor_provider', None) == 'google':
+                create_kwargs['generation_config'] = {'max_tokens': 512}
+            else:
+                create_kwargs['max_tokens'] = 512
+            result = self.instructor_client.chat.completions.create(**create_kwargs)
+            confirmed = set(result.covered_indices or [])
+            for i, c in enumerate(candidates):
+                if (i + 1) not in confirmed:
+                    c['covered'] = False
+                    logger.info(
+                        "[Coverage R3] LLM unmarked: %s",
+                        (c.get('question') or '')[:60],
+                    )
+        except Exception as e:
+            logger.warning(
+                "[Coverage R3] LLM verification failed; keeping keyword "
+                "decision: %s", e,
+            )
+
     # =========================================================================
     # EXIT TICKET
     # =========================================================================
@@ -12579,6 +13022,14 @@ Which concept numbers were meaningfully covered?"""
                 "regeneration_reason": list(metadata.get('regeneration_reason', []) or []),
                 # Step eval (combined judge CHECK 4)
                 "step_complete": metadata.get('step_complete'),
+                # End-to-end turn wall time (seconds). Component
+                # breakdown derives from per-call `[GeminiTools]`
+                # / `[QuestionTool] llm_response` / `[SelfRetry]`
+                # log lines that already carry per-LLM-call timings.
+                "turn_wall_s": (
+                    round(__import__('time').monotonic() - self._turn_t0, 2)
+                    if hasattr(self, '_turn_t0') else None
+                ),
             }
             # JSON-safe single line. Use logger.info — Azure picks it up.
             logger.info("[TurnSummary] %s", _json.dumps(payload, default=str))

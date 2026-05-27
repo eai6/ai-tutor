@@ -19,10 +19,21 @@ from .anthropic import (
     TUTOR_SYSTEM_PROMPT_TEMPLATE,
 )
 from .base import StablePrefixContext, TutorPromptBuilder
+from .gemini import (
+    GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE,
+    GeminiTutorPromptBuilder,
+)
+from .openai import (
+    OPENAI_TUTOR_SYSTEM_PROMPT_TEMPLATE,
+    OpenAITutorPromptBuilder,
+)
 
 
 _REGISTRY: dict[str, type[TutorPromptBuilder]] = {
     "anthropic": AnthropicTutorPromptBuilder,
+    "google": GeminiTutorPromptBuilder,
+    "gemini": GeminiTutorPromptBuilder,  # alias — ModelConfig.provider uses 'google'
+    "openai": OpenAITutorPromptBuilder,
 }
 
 
@@ -44,6 +55,10 @@ __all__ = [
     "StablePrefixContext",
     "TutorPromptBuilder",
     "AnthropicTutorPromptBuilder",
+    "GeminiTutorPromptBuilder",
+    "OpenAITutorPromptBuilder",
     "TUTOR_SYSTEM_PROMPT_TEMPLATE",
+    "GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE",
+    "OPENAI_TUTOR_SYSTEM_PROMPT_TEMPLATE",
     "get_prompt_builder",
 ]

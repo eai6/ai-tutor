@@ -47,9 +47,10 @@ class ArithmeticCorrection:
 _HAS_NUMBER_RE = re.compile(r"\d|[½¼¾⅓⅔⅛⅜⅝⅞]")
 
 
-# Equation-with-unknown detector — drops expressions like "3x + 20 = 80"
-# since those are equations to SOLVE, not closed arithmetic to verify.
-# Matches three signatures of algebra:
+# Algebraic-variable token — matches single-letter variables in three
+# common shapes. Used together with an equals-sign test (below) to
+# detect equations-to-solve, NOT to drop bare arithmetic chunks that
+# happen to contain a substituted variable expression.
 #   1. digit IMMEDIATELY adjacent to letter (no space): "3x", "5y", "10n"
 #   2. isolated letter on LHS of equals: "x = 8", "y = 14"
 #   3. isolated letter followed by + / -: "x + 15", "y - 3", "a + b"
@@ -76,7 +77,14 @@ def _is_real_correction(claimed: str, correct: str, expression: str) -> bool:
        verify. The verifier shouldn't try to "compute" it.
 
     Returns True only when (claimed != correct numerically) AND the
-    expression contains no single-letter algebraic variables.
+    expression isn't an algebraic equation-to-solve.
+
+    An "algebraic equation-to-solve" requires BOTH a single-letter
+    variable AND an equals sign in the expression. A bare ``3x`` or
+    ``3·8`` with no equals is a substituted/in-progress arithmetic
+    expression that we DO want to verify — that case was previously
+    suppressed (audit v3 H4), letting substitution errors like
+    "since x = 8, then 3x = 28" slip through to the student.
     """
     if not claimed or not correct:
         return False
@@ -88,8 +96,9 @@ def _is_real_correction(claimed: str, correct: str, expression: str) -> bool:
             return False
     except (ValueError, TypeError):
         pass
-    # Equations with unknowns aren't arithmetic to check
-    if _ALGEBRAIC_VAR_RE.search(expression):
+    # Equation-to-solve: variable + equals sign together. Substituted
+    # arithmetic (bare "3x", "3·8") falls through and gets verified.
+    if '=' in expression and _ALGEBRAIC_VAR_RE.search(expression):
         return False
     return True
 

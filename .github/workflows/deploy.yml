@@ -1,8 +1,59 @@
 name: Deploy
 
 on:
+  # Auto-deploy on merge to main. The active prompt + model are read
+  # from repo variables (configured under Settings -> Secrets and
+  # variables -> Actions -> Variables) so the PR reviewer can flip
+  # them without editing this file. Empty values fall through to the
+  # current production behaviour (baseline prompt + DB-active model).
   push:
     branches: [main]
+
+  # Manual trigger for ad-hoc revisions (rollback, hotfix, prompt
+  # variant flip without a code change). The dropdowns below are
+  # surfaced in the GitHub Actions UI when the operator clicks
+  # "Run workflow".
+  workflow_dispatch:
+    inputs:
+      tutor_prompt_variant:
+        description: 'Tutor prompt variant'
+        required: false
+        type: choice
+        default: 'baseline'
+        options:
+          - baseline      # current production per-provider template
+          - v6            # highest measured composite quality score
+          - v7            # branch-template restructure (smaller, cleaner)
+      tutor_model_override:
+        description: 'Tutor model override (provider/model_name); leave blank to use DB-active'
+        required: false
+        type: choice
+        default: ''
+        options:
+          - ''                                            # use DB-active config
+          - 'anthropic/claude-sonnet-4-20250514'          # Sonnet 4 (standard)
+          - 'anthropic/claude-sonnet-4-6'                 # Sonnet 4.6 (standard, newer)
+          - 'anthropic/claude-opus-4-7'                   # Opus 4.7 (premium)
+          - 'google/gemini-3-flash-preview'               # Flash (cheapest)
+          - 'google/gemini-3.1-pro-preview'               # Pro (premium)
+      skip_eval:
+        description: 'Skip the post-deploy tutor evaluation (saves ~$5 and ~15 min)'
+        required: false
+        type: boolean
+        default: false
+      eval_matrix_mode:
+        description: 'Eval matrix size: deploy=4 cells (Sonnet+Gemini × 2 lessons × error_prone, ~$15, ~25 min) · full=24 cells (Sonnet+Gemini × 4 lessons × all 3 personas, ~$60, ~100 min)'
+        required: false
+        type: choice
+        default: 'deploy'
+        options:
+          - deploy
+          - full
+      run_pgvector_port:
+        description: 'Run one-time ChromaDB→pgvector port + KB coverage audit after deploy (use after the PR #11 migration lands on this stack)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   ACR: ${{ secrets.ACR_LOGIN_SERVER }}
@@ -48,9 +99,285 @@ jobs:
             --resource-group $RG \
             --mode single
 
+      # Resolve the prompt-variant + model-override values from
+      # (1) workflow_dispatch inputs if present, else
+      # (2) repo variables (`vars.TUTOR_PROMPT_VARIANT`,
+      #     `vars.TUTOR_MODEL_OVERRIDE`), else
+      # (3) defaults that preserve current production behaviour
+      #     (baseline prompt, no model override).
+      # Empty strings on either knob mean "use whatever's in the DB /
+      # built-in" — set explicitly so `az containerapp update` does
+      # not leave a stale value on the previous revision.
+      - name: Resolve deploy-time config
+        id: cfg
+        run: |
+          PROMPT_VARIANT="${{ github.event.inputs.tutor_prompt_variant || vars.TUTOR_PROMPT_VARIANT || 'baseline' }}"
+          MODEL_OVERRIDE="${{ github.event.inputs.tutor_model_override || vars.TUTOR_MODEL_OVERRIDE || '' }}"
+          echo "prompt_variant=$PROMPT_VARIANT" >> $GITHUB_OUTPUT
+          echo "model_override=$MODEL_OVERRIDE" >> $GITHUB_OUTPUT
+          echo "::notice title=Deploy config::TUTOR_PROMPT_VARIANT=$PROMPT_VARIANT  TUTOR_MODEL_OVERRIDE=$MODEL_OVERRIDE"
+
       - name: Deploy to Container App
         run: |
+          # --set-env-vars writes the env vars onto the new revision.
+          # Both knobs are always written (even when empty) so the new
+          # revision does not inherit a stale value from a prior one.
+          # Reading order in the app:
+          #   * apps/tutoring/prompts/variants.py reads TUTOR_PROMPT_VARIANT
+          #   * apps/llm/models.py::ModelConfig.get_for reads
+          #     TUTOR_MODEL_OVERRIDE (purpose=tutoring only)
           az containerapp update \
             --name $APP \
             --resource-group $RG \
-            --image $ACR/aitutor:${{ github.sha }}
+            --image $ACR/aitutor:${{ github.sha }} \
+            --set-env-vars \
+              "TUTOR_PROMPT_VARIANT=${{ steps.cfg.outputs.prompt_variant }}" \
+              "TUTOR_MODEL_OVERRIDE=${{ steps.cfg.outputs.model_override }}"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Post-deploy tutor evaluation
+  # ─────────────────────────────────────────────────────────────────
+  #
+  # Runs after a successful deploy: spins up a fresh local SQLite,
+  # loads a frozen curriculum fixture (L1137 math + L1425 geography),
+  # drives the synthetic-student simulator against the tutor engine,
+  # judges every transcript with Opus 4.7 against the 10-principle
+  # Science-of-Learning rubric, and commits a markdown report to the
+  # long-lived `eval-reports` branch under `runs/<sha>/`.
+  #
+  # `deploy` matrix mode (default): {Sonnet 4, Gemini 3 Flash} × 2
+  #   lessons (1 math + 1 geo) × `error_prone` persona = 4 cells,
+  #   ~25 min, ~$15/run. Optimised for BEA signal per dollar:
+  #   error_prone produces 12-17 BEA in-scope turns per cell where
+  #   struggler/capable gave only 0-3. Both prod-tier models so we
+  #   catch cross-model regressions on every deploy.
+  # `full` matrix mode (ad-hoc): 2 models × 4 lessons × 3 personas
+  #   = 24 cells, ~100 min, ~$60. Use for comprehensive sweeps when
+  #   making a prompt-variant decision.
+  #
+  # Pre-requisites (one-time setup before this job can run green):
+  #   - Repo secrets ANTHROPIC_API_KEY, GOOGLE_API_KEY, OPENAI_API_KEY
+  #   - `eval-fixtures/baseline.json` committed (regenerate with
+  #     `python scripts/extract_eval_fixture.py`)
+  #
+  # Skip via workflow_dispatch input `skip_eval=true`.
+  post_deploy_eval:
+    name: Post-deploy tutor evaluation
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: ${{ success() && github.event.inputs.skip_eval != 'true' }}
+    timeout-minutes: 60  # 4-cell deploy matrix runs ~25 min sim + ~10 min judge; Gemini error_prone cells hit ~10 min each
+    continue-on-error: true  # eval failures must not mark the deploy as failed
+    permissions:
+      contents: write  # push to the eval-reports branch
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_API_KEY:    ${{ secrets.GOOGLE_API_KEY }}
+      OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
+      EVAL_MATRIX_MODE:  ${{ github.event.inputs.eval_matrix_mode || 'deploy' }}
+      AB_REPORT_DIR:     /tmp/eval-out
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need full history so the orphan-branch push works without
+          # GitHub rejecting the first commit.
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          # Match Dockerfile (python:3.12-slim) — requirements.txt pins
+          # Django 6.0.2 which requires Python >= 3.12.
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Migrate fresh local SQLite + seed eval data
+        run: |
+          python manage.py migrate --no-input
+          python manage.py loaddata eval-fixtures/baseline.json
+          python scripts/seed_eval_modelconfig.py
+
+      - name: Run simulator (matrix mode = ${{ env.EVAL_MATRIX_MODE }})
+        run: python scripts/run_ab_test.py
+
+      - name: Run Opus 4.7 judge
+        run: python scripts/judge_transcripts.py
+
+      - name: Generate aggregate report
+        run: python scripts/generate_reports.py
+
+      - name: Commit report to eval-reports branch
+        env:
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          REL_DIR="runs/${SHA}-${EVAL_MATRIX_MODE}"
+
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+
+          # Switch to (or create) the eval-reports branch. The branch
+          # is long-lived and has no protection so CI can push directly.
+          if git ls-remote --exit-code --heads origin eval-reports >/dev/null 2>&1; then
+            git fetch origin eval-reports
+            git checkout -B eval-reports origin/eval-reports
+          else
+            git checkout --orphan eval-reports
+            git rm -rf . >/dev/null 2>&1 || true
+            cat <<'README' > README.md
+          # Eval reports — CI-generated tutor evaluations
+
+          Each commit on this branch is a tutor evaluation run captured by
+          `.github/workflows/deploy.yml::post_deploy_eval`. The run is
+          identified by the commit SHA of the main-branch deploy that
+          triggered it plus the matrix mode.
+
+          Layout:
+
+              runs/<sha>-<mode>/
+              ├── FINAL_REPORT.md      ← ranked prompt-edit recommendations
+              ├── summary.md           ← per-cell + per-principle tables
+              ├── cell_results.jsonl   ← raw programmatic metrics
+              ├── cost_latency.md
+              ├── per_cell/            ← full transcripts + judge evidence
+              └── judge_scores/        ← structured judge output
+
+          Run manually: GitHub Actions -> Deploy -> Run workflow
+          (uncheck `skip_eval`, optionally set `eval_matrix_mode=full`).
+
+          Companion human-written reviews live on `main` under
+          `eval-reports/`.
+          README
+            git add README.md
+            git commit -m "[post-deploy-eval] init eval-reports branch"
+          fi
+
+          mkdir -p "$REL_DIR"
+          cp -r "$AB_REPORT_DIR"/* "$REL_DIR"/
+
+          git add "$REL_DIR"
+          if git diff --staged --quiet; then
+            echo "::notice title=No eval changes::Nothing to commit"
+          else
+            git commit -m "[post-deploy-eval] ${SHA} mode=${EVAL_MATRIX_MODE}"
+            git push -u origin eval-reports
+            echo "::notice title=Eval report committed::eval-reports branch ${REL_DIR}"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────
+  # One-time ChromaDB → pgvector port + KB coverage audit
+  # ─────────────────────────────────────────────────────────────────
+  #
+  # OPT-IN. Set `run_pgvector_port=true` on a workflow_dispatch run,
+  # AFTER the PR #11 (pgvector) deploy has rolled out cleanly on
+  # this stack. Idempotent — re-running is safe (existing chunks
+  # are upserted, count reports 0 new + N updated).
+  #
+  # Why this job runs on the runner (not in the deployed container):
+  #   - `az containerapp exec` requires interactive TTY → unusable in CI
+  #   - `chromadb` was deliberately dropped from requirements.txt in
+  #     Phase 7; we don't want to put it back permanently
+  #   - The runner can pip-install chromadb just for this one job,
+  #     download vectordb from the share via azcopy, and connect
+  #     directly to the target Postgres
+  #
+  # Pre-requisites:
+  #   - Repo secrets: PROD_DB_PASSWORD (the Pulumi-managed db-password
+  #     for this stack — see infra/Pulumi.pixel.yaml)
+  #   - AZURE_CREDENTIALS already grants the SP Contributor on the RG
+  post_deploy_pgvector_port:
+    name: Post-deploy ChromaDB → pgvector port + audit
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: ${{ success() && github.event.inputs.run_pgvector_port == 'true' }}
+    timeout-minutes: 30
+    env:
+      PG_SERVER: aitutor-pixel-pg
+      PG_FQDN: aitutor-pixel-pg.postgres.database.azure.com
+      STORAGE_ACCOUNT: aitutorpixelsa
+      DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install deps + chromadb (CI-only, transitional)
+        run: |
+          pip install -r requirements.txt
+          pip install chromadb==1.5.0
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install azcopy
+        run: |
+          curl -L https://aka.ms/downloadazcopy-v10-linux -o /tmp/azcopy.tgz
+          tar -xzf /tmp/azcopy.tgz -C /tmp
+          sudo mv /tmp/azcopy_linux_amd64_*/azcopy /usr/local/bin/azcopy
+          azcopy --version
+
+      - name: Open Postgres firewall to runner
+        id: fw
+        run: |
+          IP=$(curl -sS https://api.ipify.org)
+          RULE="ci-pgvector-port-${{ github.run_id }}"
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "rule=$RULE" >> $GITHUB_OUTPUT
+          az postgres flexible-server firewall-rule create \
+            --resource-group $RG \
+            --name $PG_SERVER \
+            --rule-name "$RULE" \
+            --start-ip-address $IP --end-ip-address $IP \
+            -o none
+
+      - name: Download vectordb snapshot from share
+        run: |
+          KEY=$(az storage account keys list \
+            --account-name $STORAGE_ACCOUNT --resource-group $RG \
+            --query '[0].value' -o tsv)
+          EXPIRY=$(date -u -d "+2 hour" +"%Y-%m-%dT%H:%MZ")
+          SAS=$(az storage share generate-sas \
+            --name media --account-name $STORAGE_ACCOUNT --account-key "$KEY" \
+            --permissions rl --expiry "$EXPIRY" -o tsv)
+          azcopy copy \
+            "https://${STORAGE_ACCOUNT}.file.core.windows.net/media/vectordb?${SAS}" \
+            ./vectordb_snapshot \
+            --recursive --log-level=ERROR
+          du -sh ./vectordb_snapshot
+
+      - name: Run port + audit
+        env:
+          DATABASE_URL: postgres://aitutoradmin:${{ env.DB_PASSWORD }}@${{ env.PG_FQDN }}:5432/aitutor?sslmode=require
+          SECRET_KEY: ci-port-job-not-secret
+          DEBUG: 'False'
+          ALLOWED_HOSTS: '*'
+          EMBEDDING_BACKEND: local
+        run: |
+          set -euo pipefail
+          echo "::group::ChromaDB → pgvector port"
+          python manage.py port_chromadb_to_pgvector --vectordb-path ./vectordb_snapshot/vectordb
+          echo "::endgroup::"
+          echo "::group::KB coverage audit"
+          python manage.py audit_kb_coverage
+          echo "::endgroup::"
+
+      - name: Close Postgres firewall
+        if: always() && steps.fw.outputs.rule != ''
+        run: |
+          az postgres flexible-server firewall-rule delete \
+            --resource-group $RG \
+            --name $PG_SERVER \
+            --rule-name "${{ steps.fw.outputs.rule }}" \
+            --yes -o none || true

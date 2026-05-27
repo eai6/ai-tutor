@@ -16,8 +16,8 @@ import json
 import time
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Optional, Generator
+from dataclasses import dataclass, field
+from typing import Optional, Generator, List, Union
 import anthropic
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,203 @@ class LLMResponse:
     # subtract cache_read to get the "fresh" billed portion.
     cache_creation_tokens: int = 0
     cache_read_tokens: int = 0
+
+
+# -- Cross-provider response-shape adapter (task #245) -----------------
+# The tutor engine + SelfRetry walk Anthropic Message objects:
+#   message.content → list of blocks
+#   block.type      → 'text' | 'tool_use'
+#   block.text      → str (text blocks)
+#   block.name      → str (tool name)
+#   block.input     → dict (tool args)
+#
+# Gemini returns google.genai.types.GenerateContentResponse and OpenAI
+# returns openai.types.chat.ChatCompletion. Both fail the
+# `isinstance(message.content, list)` shape check at
+# `apps/tutoring/regen/self_retry.py:368-374`, raising TypeError on
+# every regen attempt. The dataclasses below are duck-typed Anthropic
+# Message stand-ins; the per-provider adapter functions translate the
+# native response into one.
+
+@dataclass
+class AdaptedTextBlock:
+    text: str = ''
+    type: str = 'text'
+
+
+@dataclass
+class AdaptedToolUseBlock:
+    name: str = ''
+    input: dict = field(default_factory=dict)
+    id: str = ''
+    type: str = 'tool_use'
+
+
+@dataclass
+class AdaptedUsage:
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
+
+
+@dataclass
+class AdaptedMessage:
+    """Anthropic-Message-shaped adapter for cross-provider tool calls.
+
+    Built by `_adapt_gemini_response` / `_adapt_openai_response`. Lets
+    the tutor engine + SelfRetry consume Gemini / OpenAI tool responses
+    through the same `.content[block].{type,text,name,input}` contract
+    as the Anthropic SDK.
+    """
+    content: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = field(
+        default_factory=list,
+    )
+    stop_reason: str = 'end_turn'
+    usage: AdaptedUsage = field(default_factory=AdaptedUsage)
+    model: str = ''
+
+
+def _adapt_gemini_response(response, *, model_name: str = '') -> AdaptedMessage:
+    """Adapt google.genai GenerateContentResponse → AdaptedMessage.
+
+    Walks `candidates[0].content.parts`. Each part is either:
+      - text part: `.text` set
+      - function_call part: `.function_call.name` + `.function_call.args`
+    Mirrors Anthropic block order (text first, tool_use after — matches
+    Gemini's own ordering when both are emitted).
+    """
+    blocks: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = []
+    stop_reason = 'end_turn'
+
+    candidates = getattr(response, 'candidates', None) or []
+    if candidates:
+        cand = candidates[0]
+        finish = getattr(cand, 'finish_reason', None)
+        finish_name = (
+            getattr(finish, 'name', None) if finish is not None else None
+        ) or (finish if isinstance(finish, str) else None)
+        if finish_name == 'MAX_TOKENS':
+            stop_reason = 'max_tokens'
+        elif finish_name in ('SAFETY', 'RECITATION'):
+            stop_reason = 'stop_sequence'
+
+        content = getattr(cand, 'content', None)
+        parts = getattr(content, 'parts', None) or [] if content else []
+        for idx, part in enumerate(parts):
+            fc = getattr(part, 'function_call', None)
+            fc_name = getattr(fc, 'name', '') if fc is not None else ''
+            if fc is not None and fc_name:
+                args = getattr(fc, 'args', None) or {}
+                if not isinstance(args, dict):
+                    try:
+                        args = dict(args)
+                    except Exception:
+                        try:
+                            args = json.loads(
+                                json.dumps(args, default=str)
+                            )
+                        except Exception:
+                            args = {}
+                blocks.append(AdaptedToolUseBlock(
+                    id=f'gemini_tool_{idx}',
+                    name=fc_name,
+                    input=args,
+                ))
+                if stop_reason == 'end_turn':
+                    stop_reason = 'tool_use'
+                continue
+            text = getattr(part, 'text', None)
+            if text:
+                blocks.append(AdaptedTextBlock(text=text))
+
+    usage = AdaptedUsage()
+    usage_meta = getattr(response, 'usage_metadata', None)
+    if usage_meta is not None:
+        usage.input_tokens = (
+            getattr(usage_meta, 'prompt_token_count', 0) or 0
+        )
+        usage.output_tokens = (
+            getattr(usage_meta, 'candidates_token_count', 0) or 0
+        )
+        # Gemini implicit caching: cached_content_token_count.
+        usage.cache_read_input_tokens = (
+            getattr(usage_meta, 'cached_content_token_count', 0) or 0
+        )
+
+    return AdaptedMessage(
+        content=blocks,
+        stop_reason=stop_reason,
+        usage=usage,
+        model=model_name or getattr(response, 'model_version', '') or '',
+    )
+
+
+def _adapt_openai_response(response, *, model_name: str = '') -> AdaptedMessage:
+    """Adapt openai ChatCompletion → AdaptedMessage.
+
+    Walks `choices[0].message`: `.content` (text or None) and
+    `.tool_calls` (list with .id, .function.name, .function.arguments
+    as JSON string).
+    """
+    blocks: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = []
+    stop_reason = 'end_turn'
+
+    choices = getattr(response, 'choices', None) or []
+    if choices:
+        choice = choices[0]
+        finish = getattr(choice, 'finish_reason', None)
+        if finish == 'length':
+            stop_reason = 'max_tokens'
+        elif finish == 'tool_calls':
+            stop_reason = 'tool_use'
+        elif finish == 'content_filter':
+            stop_reason = 'stop_sequence'
+
+        msg = getattr(choice, 'message', None)
+        text_content = getattr(msg, 'content', None) if msg else None
+        if text_content:
+            blocks.append(AdaptedTextBlock(text=text_content))
+        tool_calls = (
+            getattr(msg, 'tool_calls', None) or [] if msg else []
+        )
+        for tc in tool_calls:
+            fn = getattr(tc, 'function', None)
+            if fn is None:
+                continue
+            name = getattr(fn, 'name', '') or ''
+            raw_args = getattr(fn, 'arguments', '') or ''
+            try:
+                args = json.loads(raw_args) if raw_args else {}
+            except (ValueError, TypeError):
+                args = {}
+            blocks.append(AdaptedToolUseBlock(
+                id=getattr(tc, 'id', '') or f'openai_tool_{len(blocks)}',
+                name=name,
+                input=args,
+            ))
+
+    usage = AdaptedUsage()
+    usage_obj = getattr(response, 'usage', None)
+    if usage_obj is not None:
+        usage.input_tokens = (
+            getattr(usage_obj, 'prompt_tokens', 0) or 0
+        )
+        usage.output_tokens = (
+            getattr(usage_obj, 'completion_tokens', 0) or 0
+        )
+        details = getattr(usage_obj, 'prompt_tokens_details', None)
+        if details is not None:
+            usage.cache_read_input_tokens = (
+                getattr(details, 'cached_tokens', 0) or 0
+            )
+
+    return AdaptedMessage(
+        content=blocks,
+        stop_reason=stop_reason,
+        usage=usage,
+        model=model_name or getattr(response, 'model', '') or '',
+    )
 
 
 class BaseLLMClient(ABC):
@@ -302,7 +499,18 @@ class AnthropicClient(BaseLLMClient):
                     cache_read_tokens=cache_read,
                 )
 
-            except (anthropic.RateLimitError, anthropic.InternalServerError) as e:
+            except (
+                anthropic.RateLimitError,
+                anthropic.InternalServerError,
+                anthropic.APIStatusError,  # catches 529 OverloadedError
+            ) as e:
+                # Only retry on retryable statuses (429, 5xx). Re-raise
+                # auth / validation errors immediately.
+                status = getattr(e, 'status_code', None)
+                if status is not None and status < 429:
+                    raise
+                if status is not None and 400 <= status < 500 and status != 429:
+                    raise
                 if attempt >= self.MAX_RETRIES:
                     raise
                 wait = self.RETRY_BACKOFF[attempt]
@@ -433,7 +641,18 @@ class AnthropicClient(BaseLLMClient):
                     ", ".join(block_summary),
                 )
                 return message
-            except (anthropic.RateLimitError, anthropic.InternalServerError) as e:
+            except (
+                anthropic.RateLimitError,
+                anthropic.InternalServerError,
+                anthropic.APIStatusError,  # catches 529 OverloadedError
+            ) as e:
+                # Only retry on retryable statuses (429, 5xx). Re-raise
+                # auth / validation errors immediately.
+                status = getattr(e, 'status_code', None)
+                if status is not None and status < 429:
+                    raise
+                if status is not None and 400 <= status < 500 and status != 429:
+                    raise
                 if attempt >= self.MAX_RETRIES:
                     raise
                 wait = self.RETRY_BACKOFF[attempt]
@@ -516,6 +735,15 @@ class OllamaClient(BaseLLMClient):
 class OpenAIClient(BaseLLMClient):
     """Client for OpenAI's GPT API."""
 
+    # Model-name prefixes whose Chat Completions endpoint requires
+    # `max_completion_tokens` instead of `max_tokens` and rejects
+    # `temperature` (Phase 2b of task #229 — validation slice
+    # surfaced this on GPT-5).
+    #   - gpt-5, gpt-5.1, gpt-5.2, gpt-5.3-*  (GPT-5 family)
+    #   - o1, o3, o4, o5  (o-series reasoning models)
+    # GPT-4 family + GPT-4o + GPT-4.1 still use the legacy params.
+    _NEW_GEN_PREFIXES = ("gpt-5", "o1", "o3", "o4", "o5")
+
     def __init__(self, config: ModelConfig):
         super().__init__(config)
         if not self.api_key:
@@ -527,6 +755,94 @@ class OpenAIClient(BaseLLMClient):
             self.client = openai.OpenAI(api_key=self.api_key)
         except ImportError:
             raise ImportError("openai package not installed. Run: pip install openai")
+
+    def _is_new_generation(self, model_name: str | None = None) -> bool:
+        """True when the target model uses Chat Completions' newer
+        max_completion_tokens (instead of max_tokens) and rejects
+        custom temperature (reasoning-internal models)."""
+        name = (model_name or self.config.model_name or "").strip().lower()
+        return any(name.startswith(p) for p in self._NEW_GEN_PREFIXES)
+
+    def _translate_messages_for_openai(self, messages: list[dict]) -> list[dict]:
+        """Convert Anthropic-shaped content blocks to OpenAI's
+        Chat Completions shape.
+
+        The tutor engine builds multimodal user messages in Anthropic
+        shape: `content` is either a string or a list of blocks
+        `{"type":"text","text":...}` / `{"type":"image","source":{...}}`.
+        OpenAI Chat Completions accepts `{"type":"text",...}` verbatim
+        but rejects `{"type":"image",...}` — it requires
+        `{"type":"image_url","image_url":{"url":"data:<mime>;base64,<b64>"}}`.
+
+        Block-by-block translation, idempotent (already-translated
+        blocks pass through). String contents and non-image blocks
+        are untouched. Math L638 (figures) was failing every
+        OpenAI tutor call until this landed (task #247).
+        """
+        translated: list[dict] = []
+        for msg in messages or []:
+            content = msg.get('content')
+            if not isinstance(content, list):
+                # Plain-string content — OpenAI accepts as-is.
+                translated.append(msg)
+                continue
+            new_blocks: list[dict] = []
+            for block in content:
+                if not isinstance(block, dict):
+                    new_blocks.append(block)
+                    continue
+                btype = block.get('type')
+                if btype == 'image':
+                    src = block.get('source') or {}
+                    media_type = src.get('media_type') or 'image/png'
+                    if src.get('type') == 'base64':
+                        data = src.get('data') or ''
+                        url = f"data:{media_type};base64,{data}"
+                    elif src.get('type') == 'url':
+                        url = src.get('url') or ''
+                    else:
+                        # Unknown shape — drop the image quietly rather
+                        # than crashing the whole request.
+                        logger.warning(
+                            "[OpenAITranslate] unknown image source "
+                            "type=%s — dropping block", src.get('type'),
+                        )
+                        continue
+                    new_blocks.append({
+                        "type": "image_url",
+                        "image_url": {"url": url},
+                    })
+                else:
+                    # text / image_url / anything else OpenAI knows
+                    # passes through verbatim.
+                    new_blocks.append(block)
+            translated.append({**msg, 'content': new_blocks})
+        return translated
+
+    def _build_completion_kwargs(
+        self,
+        *,
+        max_tokens: int | None,
+        temperature: float | None,
+    ) -> dict:
+        """Return the kwargs to pass to chat.completions.create that
+        match the target model's expectations:
+          - new-gen (GPT-5+, o-series): max_completion_tokens, no
+            temperature override (model reasons internally)
+          - legacy: max_tokens + temperature
+        """
+        resolved_max = max_tokens or self.config.max_tokens
+        if self._is_new_generation():
+            # New-gen — only max_completion_tokens, no temperature.
+            return {"max_completion_tokens": resolved_max}
+        # Legacy: max_tokens + temperature
+        resolved_temp = (
+            temperature if temperature is not None else self.config.temperature
+        )
+        return {
+            "max_tokens": resolved_max,
+            "temperature": resolved_temp,
+        }
 
     def _generate_impl(
         self,
@@ -540,17 +856,20 @@ class OpenAIClient(BaseLLMClient):
 
         # OpenAI uses system message in the messages array
         openai_messages = [{"role": "system", "content": system_prompt}]
-        openai_messages.extend(messages)
+        openai_messages.extend(
+            self._translate_messages_for_openai(messages)
+        )
 
-        resolved_temp = temperature if temperature is not None else self.config.temperature
+        completion_kwargs = self._build_completion_kwargs(
+            max_tokens=max_tokens, temperature=temperature,
+        )
 
         response = self.client.chat.completions.create(
             model=self.config.model_name,
-            max_tokens=max_tokens or self.config.max_tokens,
-            temperature=resolved_temp,
             messages=openai_messages,
+            **completion_kwargs,
         )
-        
+
         return LLMResponse(
             content=response.choices[0].message.content,
             tokens_in=response.usage.prompt_tokens,
@@ -565,6 +884,8 @@ class OpenAIClient(BaseLLMClient):
         system_prompt: str,
         tools: list[dict],
         max_tokens: int | None = None,
+        *,
+        tool_choice: dict | str | None = None,
     ):
         """OpenAI function-calling wrapper.
 
@@ -574,6 +895,16 @@ class OpenAIClient(BaseLLMClient):
         raw ChatCompletion response so the caller can introspect
         choices[0].message.tool_calls (list of tool calls, each with
         .function.name and .function.arguments JSON-string).
+
+        `tool_choice` — accepts the same Anthropic-style values the
+        tutor engine passes, mapped to OpenAI's native parameter
+        (Phase 2b of task #229 — was raising TypeError on the engine's
+        regen path):
+          - {"type": "tool", "name": "X"} → {"type": "function",
+            "function": {"name": "X"}} — force this specific tool
+          - "required" / "any" → "required" (force ANY tool)
+          - "none" → "none" (disable tools entirely)
+          - "auto" / None → omitted (OpenAI default = auto)
         """
         openai_tools = []
         for t in tools or []:
@@ -587,34 +918,54 @@ class OpenAIClient(BaseLLMClient):
             })
 
         openai_messages = [{"role": "system", "content": system_prompt}]
-        openai_messages.extend(messages)
+        openai_messages.extend(
+            self._translate_messages_for_openai(messages)
+        )
 
         kwargs = dict(
             model=self.config.model_name,
             messages=openai_messages,
             tools=openai_tools,
         )
-        # Reasoning models (o1/o3 family) reject `max_tokens` — they
-        # use `max_completion_tokens` and ignore `temperature`. Fall back
-        # gracefully on TypeError so we don't have to maintain a list.
-        max_t = max_tokens or self.config.max_tokens
-        try:
-            response = self.client.chat.completions.create(
-                **kwargs,
-                max_tokens=max_t,
-                temperature=self.config.temperature,
-            )
-        except Exception as e:
-            msg = str(e).lower()
-            if "max_tokens" in msg or "temperature" in msg:
-                # Reasoning model — retry with the supported params only.
-                logger.info(
-                    "[OpenAITools] retrying without max_tokens/temperature for %s",
-                    self.config.model_name,
-                )
-                response = self.client.chat.completions.create(**kwargs)
-            else:
-                raise
+
+        # Translate tool_choice from the Anthropic-shaped value the
+        # engine passes to OpenAI's native shape.
+        if tool_choice is not None:
+            if isinstance(tool_choice, dict):
+                # Anthropic: {"type": "tool", "name": "X"}
+                # OpenAI:    {"type": "function", "function": {"name": "X"}}
+                if tool_choice.get("type") == "tool" and tool_choice.get("name"):
+                    kwargs["tool_choice"] = {
+                        "type": "function",
+                        "function": {"name": tool_choice["name"]},
+                    }
+                elif tool_choice.get("type") in ("any", "required"):
+                    kwargs["tool_choice"] = "required"
+                elif tool_choice.get("type") == "none":
+                    kwargs["tool_choice"] = "none"
+                elif tool_choice.get("type") == "auto":
+                    pass  # omit → OpenAI default = auto
+            elif isinstance(tool_choice, str):
+                # Plain strings ("auto", "none", "required") pass through;
+                # OpenAI accepts the same vocab.
+                low = tool_choice.strip().lower()
+                if low == "any":
+                    kwargs["tool_choice"] = "required"
+                elif low in ("required", "none"):
+                    kwargs["tool_choice"] = low
+                elif low == "auto":
+                    pass  # omit
+        # Pick the right token / temperature kwargs per model
+        # generation — GPT-5+ and o-series use max_completion_tokens
+        # and reject temperature; legacy GPT-4* uses max_tokens +
+        # temperature (Phase 2b of task #229).
+        completion_kwargs = self._build_completion_kwargs(
+            max_tokens=max_tokens, temperature=None,
+        )
+        response = self.client.chat.completions.create(
+            **kwargs,
+            **completion_kwargs,
+        )
         logger.info(
             "[OpenAITools] response: model=%s in=%d out=%d finish=%s tool_calls=%d",
             response.model,
@@ -623,11 +974,27 @@ class OpenAIClient(BaseLLMClient):
             response.choices[0].finish_reason,
             len(response.choices[0].message.tool_calls or []),
         )
-        return response
+        # Wrap in cross-provider adapter so the tutor engine + SelfRetry
+        # can walk .content/.type/.text/.name/.input uniformly across
+        # all three providers (task #245). The raw ChatCompletion fails
+        # the engine's isinstance(.content, list) shape check.
+        return _adapt_openai_response(
+            response, model_name=self.config.model_name,
+        )
 
 
 class GeminiClient(BaseLLMClient):
     """Client for Google's Gemini API."""
+
+    # Retry policy for transient Google capacity issues (Phase 2b of
+    # task #229). 503 UNAVAILABLE is common during peak hours; 429
+    # is per-project quota; 5xx are server-side. The judge fallback
+    # chain handles judge calls when the retries exhaust, but the
+    # tutor path has no fallback so retries are the only defense.
+    MAX_RETRIES = 3
+    RETRY_BACKOFF = [2, 5, 12]  # seconds — shorter than Anthropic's
+                                # since Google capacity recovers faster
+    _RETRYABLE_GEMINI_STATUSES = (429, 500, 502, 503, 504)
 
     def __init__(self, config: ModelConfig):
         super().__init__(config)
@@ -641,6 +1008,39 @@ class GeminiClient(BaseLLMClient):
             self.client = genai.Client(api_key=self.api_key)
         except ImportError:
             raise ImportError("google-genai package not installed. Run: pip install google-genai")
+
+    def _call_with_retry(self, fn, *, label: str = "call"):
+        """Execute `fn()` with retry-with-backoff on transient Google
+        API errors (429, 500/502/503/504). Re-raises non-retryable
+        errors immediately.
+
+        Use this wrapper for any `client.models.generate_content` /
+        `generate_content_stream` call so the tutor doesn't error out
+        on peak-hour 503s.
+        """
+        from google.genai import errors as genai_errors
+
+        last_exc = None
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                return fn()
+            except (genai_errors.ServerError, genai_errors.ClientError) as e:
+                last_exc = e
+                status = getattr(e, 'code', None) or getattr(e, 'status_code', None)
+                if status not in self._RETRYABLE_GEMINI_STATUSES:
+                    raise
+                if attempt >= self.MAX_RETRIES:
+                    raise
+                wait = self.RETRY_BACKOFF[attempt]
+                logger.warning(
+                    "[GeminiRetry] %s status=%s attempt=%d/%d wait=%ds model=%s",
+                    label, status, attempt + 1, self.MAX_RETRIES + 1,
+                    wait, self.config.model_name,
+                )
+                time.sleep(wait)
+        # Unreachable but keeps mypy happy
+        if last_exc:
+            raise last_exc
 
     def _build_contents(self, messages):
         """Map chat messages to Gemini Content objects, supporting multimodal."""
@@ -721,10 +1121,13 @@ class GeminiClient(BaseLLMClient):
         if tools:
             config_kwargs['tools'] = tools
 
-        response = self.client.models.generate_content(
-            model=self.config.model_name,
-            contents=gemini_contents,
-            config=types.GenerateContentConfig(**config_kwargs),
+        response = self._call_with_retry(
+            lambda: self.client.models.generate_content(
+                model=self.config.model_name,
+                contents=gemini_contents,
+                config=types.GenerateContentConfig(**config_kwargs),
+            ),
+            label="_generate_impl",
         )
 
         usage = response.usage_metadata
@@ -796,6 +1199,8 @@ class GeminiClient(BaseLLMClient):
         system_prompt: str,
         tools: list[dict],
         max_tokens: int | None = None,
+        *,
+        tool_choice: dict | str | None = None,
     ):
         """Gemini function-calling wrapper.
 
@@ -803,6 +1208,16 @@ class GeminiClient(BaseLLMClient):
         input_schema} and converts to Gemini's FunctionDeclaration shape.
         Returns the raw GenerateContentResponse so the caller can
         introspect candidates[0].content.parts for FunctionCall blocks.
+
+        `tool_choice` — accepts the same Anthropic-style values the
+        tutor engine passes, mapped to Gemini's
+        `tool_config.function_calling_config` (Phase 2b of task #229 —
+        was raising TypeError on the engine's regen path):
+          - {"type": "tool", "name": "X"} → mode="ANY" +
+            allowed_function_names=["X"]
+          - "required" / "any" → mode="ANY" (force ANY tool)
+          - "none" → mode="NONE" (disable tools entirely)
+          - "auto" / None → mode="AUTO" (default; omitted)
         """
         from google.genai import types
 
@@ -826,10 +1241,47 @@ class GeminiClient(BaseLLMClient):
         if gemini_tools:
             config_kwargs["tools"] = gemini_tools
 
-        response = self.client.models.generate_content(
-            model=self.config.model_name,
-            contents=gemini_contents,
-            config=types.GenerateContentConfig(**config_kwargs),
+        # Translate tool_choice from Anthropic-shaped value to Gemini's
+        # tool_config. None / "auto" / {"type": "auto"} → omit (AUTO).
+        fcc_mode = None
+        allowed_names: list[str] | None = None
+        if isinstance(tool_choice, dict):
+            t_type = tool_choice.get("type")
+            if t_type == "tool" and tool_choice.get("name"):
+                fcc_mode = "ANY"
+                allowed_names = [tool_choice["name"]]
+            elif t_type in ("any", "required"):
+                fcc_mode = "ANY"
+            elif t_type == "none":
+                fcc_mode = "NONE"
+            elif t_type == "auto":
+                pass  # omit
+        elif isinstance(tool_choice, str):
+            low = tool_choice.strip().lower()
+            if low in ("required", "any"):
+                fcc_mode = "ANY"
+            elif low == "none":
+                fcc_mode = "NONE"
+            elif low == "auto":
+                pass  # omit
+
+        if fcc_mode is not None:
+            fcc_kwargs: dict = {"mode": fcc_mode}
+            if allowed_names:
+                fcc_kwargs["allowed_function_names"] = allowed_names
+            config_kwargs["tool_config"] = types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(
+                    **fcc_kwargs,
+                ),
+            )
+
+        response = self._call_with_retry(
+            lambda: self.client.models.generate_content(
+                model=self.config.model_name,
+                contents=gemini_contents,
+                config=types.GenerateContentConfig(**config_kwargs),
+            ),
+            label="generate_with_tools",
         )
         # Summary log
         function_call_count = 0
@@ -852,7 +1304,13 @@ class GeminiClient(BaseLLMClient):
             function_call_count,
             text_chars,
         )
-        return response
+        # Wrap in cross-provider adapter so the tutor engine + SelfRetry
+        # can walk .content/.type/.text/.name/.input uniformly across
+        # all three providers (task #245). The raw GenerateContentResponse
+        # fails the engine's isinstance(.content, list) shape check.
+        return _adapt_gemini_response(
+            response, model_name=self.config.model_name,
+        )
 
 
 class MockLLMClient(BaseLLMClient):

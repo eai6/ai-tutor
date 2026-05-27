@@ -12,9 +12,32 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+import logging
+
 from apps.llm.client import get_llm_client, LLMResponse
 from apps.llm.models import ModelConfig
 from apps.tutoring.student_sim.personas import Persona, get_persona
+
+logger = logging.getLogger(__name__)
+
+
+# Placeholder substituted for empty message content before the history
+# is sent to the LLM. The Anthropic API rejects messages with
+# empty/whitespace-only content with:
+#   400 invalid_request_error: messages.N: user messages must have
+#   non-empty content
+# Observed across all 5 A/B cycles (v3-v7) when the tutor (especially
+# Gemini Flash/Pro) emits a turn that's only a tool call with no prose
+# (chars=0 tool_use_count=0 bank_rendered=False stop_reason=end_turn),
+# which lands in history as content="". A later turn's full-history
+# call then 400s on that historical empty message. Same applies to
+# empty student replies on the assistant side.
+#
+# Substituting a short placeholder keeps the conversation well-formed
+# (alternating user/assistant ordering preserved) AND gives the LLM a
+# semantically reasonable read of the empty turn.
+_EMPTY_USER_PLACEHOLDER = "(no message)"
+_EMPTY_ASSISTANT_PLACEHOLDER = "..."
 
 
 @dataclass
@@ -84,6 +107,16 @@ class StudentClient:
         Updates the in-memory history. Returns the bare reply text
         (no role prefix, no quotes).
         """
+        # Empty-content guard at the append site. If the tutor emits
+        # an empty turn (Gemini Flash/Pro does this on tool-only
+        # responses with no prose), substitute a placeholder so a
+        # later call's full-history payload doesn't 400 on Anthropic.
+        # See module-level note on _EMPTY_USER_PLACEHOLDER.
+        if not (tutor_msg or '').strip():
+            logger.warning(
+                "[StudentSim] empty tutor_msg substituted with placeholder"
+            )
+            tutor_msg = _EMPTY_USER_PLACEHOLDER
         self._history.append(StudentTurn(role='tutor', content=tutor_msg))
         messages = self._build_messages()
         response = self.client.generate(
@@ -100,6 +133,16 @@ class StudentClient:
             reply = reply.split(':', 1)[1].strip()
         if len(reply) >= 2 and reply[0] == reply[-1] and reply[0] in ('"', "'"):
             reply = reply[1:-1].strip()
+        # Empty-reply guard. Same reason as the tutor_msg guard above
+        # but on the assistant side -- some student-sim turns return
+        # zero-char content (rare but observed in Gemini-tutor cells)
+        # and that lands in history as content="" which 400s on the
+        # next call.
+        if not reply:
+            logger.warning(
+                "[StudentSim] empty student reply substituted with placeholder"
+            )
+            reply = _EMPTY_ASSISTANT_PLACEHOLDER
         self._history.append(StudentTurn(role='student', content=reply))
         self.last_response = response
         return reply
@@ -110,11 +153,19 @@ class StudentClient:
         From the student-LLM's perspective:
         - Tutor utterances = `user` messages (incoming).
         - Student utterances = `assistant` messages (own prior outputs).
+
+        Defense in depth: substitute placeholders for any empty content
+        that slipped past the append-site guards. The Anthropic API
+        rejects empty content with a 400 (see module-level note).
         """
         out: list[dict] = []
         for turn in self._history:
             role = 'user' if turn.role == 'tutor' else 'assistant'
-            out.append({'role': role, 'content': turn.content})
+            content = turn.content if (turn.content or '').strip() else (
+                _EMPTY_USER_PLACEHOLDER if role == 'user'
+                else _EMPTY_ASSISTANT_PLACEHOLDER
+            )
+            out.append({'role': role, 'content': content})
         return out
 
     def reset(self) -> None:

@@ -358,3 +358,139 @@ def detect_repeated_question(
             elapsed_ms=elapsed,
         )
     return None
+
+
+# ---------------------------------------------------------------------
+# Template-repeat detection (ab-test-reports-v5 engine rec #9).
+#
+# detect_repeated_question covers cases where the tutor literally re-
+# asks the same question (cross-turn paraphrase, bank repeat, active-
+# paraphrase). detect_template_repeat is its sibling: catches cases
+# where the tutor poses a STRUCTURALLY identical question with
+# different surface details (numbers, names, places, units) — a
+# different surface form but the same template the student just solved.
+# That's an interleaving failure: the student practices the same
+# procedure twice when the lesson intent was to mix structures.
+#
+# Approach mirrors detect_repeated_question:
+#   - Cheap precondition: token-Jaccard between the new question and
+#     each recent tutor question. Below 0.15 means surface words don't
+#     even overlap → no template repeat possible, skip LLM.
+#   - Above 0.15 → ask the LLM judge (JUDGE_TEMPLATE_REPEAT) whether
+#     the procedure is identical.
+#   - LLM verdict is authoritative; deterministic Jaccard only gates
+#     the call (cost control).
+#
+# Returns RepeatVerdict with repeat_kind='template_repeat' on hit,
+# None otherwise. Fail-soft on LLM error → None.
+# ---------------------------------------------------------------------
+
+TEMPLATE_JACCARD_FLOOR = 0.15  # below this, prose is too different to matter
+TEMPLATE_LLM_TOKEN_BUDGET = 1024
+
+
+def detect_template_repeat(
+    response: str,
+    recent_tutor_questions: List[str],
+    llm_client=None,
+) -> Optional[RepeatVerdict]:
+    """Detect whether the tutor's NEW question reuses the same
+    structural template as a recent tutor question.
+
+    Args:
+      response: the tutor turn being validated.
+      recent_tutor_questions: raw question texts from the last few
+        tutor turns (oldest → newest, or unordered — order doesn't
+        matter for this check). Pass the question PORTION (sentence
+        ending in '?') if possible; whole-turn text works too but
+        is noisier.
+      llm_client: BaseLLMClient used for the JUDGE_TEMPLATE_REPEAT
+        call. Without it, this function returns None (no LLM, no
+        judgment — safer than guessing).
+
+    Returns:
+      RepeatVerdict with repeat_kind='template_repeat' when the LLM
+      judge flags a match. None when clean or LLM unavailable.
+    """
+    import time
+    if llm_client is None:
+        return None
+    if not response or not response.strip():
+        return None
+    if not recent_tutor_questions:
+        return None
+
+    new_questions = extract_questions(response)
+    if not new_questions:
+        return None
+
+    t0 = time.monotonic()
+
+    # Cheap precondition: token Jaccard. We don't need a high
+    # threshold — we just want to skip the LLM call when the prose is
+    # obviously unrelated. The LLM is the authoritative judge.
+    candidates = []
+    for new_q in new_questions:
+        new_sig = normalise_question_signature(new_q)
+        if not new_sig:
+            continue
+        for prev_q in recent_tutor_questions:
+            if not prev_q or not prev_q.strip():
+                continue
+            prev_sig = normalise_question_signature(prev_q)
+            if not prev_sig:
+                continue
+            j = _jaccard_tokens(new_sig, prev_sig)
+            if j >= TEMPLATE_JACCARD_FLOOR:
+                candidates.append((new_q, prev_q, j))
+
+    if not candidates:
+        return None
+
+    # Pick the highest-Jaccard candidate for the LLM call (most likely
+    # template match; saves tokens vs sending the full list).
+    candidates.sort(key=lambda x: x[2], reverse=True)
+    new_q, prev_q, top_j = candidates[0]
+
+    from apps.tutoring.exit_ticket_grader import (
+        BatchRepeatItem, JudgmentType, run_grading_batch,
+    )
+    item = BatchRepeatItem(
+        index=0,
+        new_question=new_q,
+        previous_questions=[prev_q],
+    )
+    try:
+        results = run_grading_batch(
+            [item],
+            judgment_type=JudgmentType.JUDGE_TEMPLATE_REPEAT,
+            llm_client=llm_client,
+            max_tokens=TEMPLATE_LLM_TOKEN_BUDGET,
+        )
+    except Exception as exc:
+        logger.warning("[TemplateRepeat] LLM judge crash: %s", exc)
+        return None
+
+    elapsed = int((time.monotonic() - t0) * 1000)
+    if not results or not results[0].repeated:
+        logger.info(
+            "[TemplateRepeat] clean — top jaccard=%.2f — %d ms",
+            top_j, elapsed,
+        )
+        return None
+
+    r = results[0]
+    logger.info(
+        "[TemplateRepeat] FLAGGED — jaccard=%.2f reason=%r — %d ms",
+        top_j, r.reason[:120], elapsed,
+    )
+    return RepeatVerdict(
+        repeated=True,
+        reason=r.reason or 'LLM flagged same template, different surface details',
+        repeat_kind='template_repeat',
+        matched_question=(prev_q or '')[:200],
+        new_question=new_q,
+        jaccard=top_j,
+        sources=['llm'],
+        elapsed_ms=elapsed,
+    )

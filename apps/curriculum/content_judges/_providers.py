@@ -35,14 +35,17 @@ logger = logging.getLogger(__name__)
 # fall through to general-purpose configs to find any provider with
 # vision-LLM access.
 #
-# `judge_fallback` is a dedicated purpose for the third-vendor
-# fallback when both the primary judge vendor and the generator's
-# vendor (excluded by cross-provider rule) are unavailable. With
-# generation=Claude + judge=Gemini, setting judge_fallback=OpenAI
-# yields chain [Gemini, OpenAI] — full 2-vendor judge fallback even
-# under generator-side outage.
+# `judge_fallback` and `judge_fallback_2` are dedicated purposes for
+# tier-2 and tier-3 cross-vendor fallbacks. With judge=Gemini,
+# judge_fallback=OpenAI, judge_fallback_2=Haiku, the chain resolves to
+# [Gemini, OpenAI, Haiku] — full 3-vendor judge fallback regardless of
+# what generation/tutoring happen to be set to. Placing judge_fallback_2
+# BEFORE `generation` is important: it claims the Anthropic provider
+# slot for Haiku so the chain doesn't drift to whatever Claude model
+# generation is configured with (currently Sonnet 4).
 _FALLBACK_PURPOSES = (
-    'judge', 'judge_fallback', 'generation', 'tutoring', 'exit_tickets',
+    'judge', 'judge_fallback', 'judge_fallback_2',
+    'generation', 'tutoring', 'exit_tickets',
 )
 
 
