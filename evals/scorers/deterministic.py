@@ -56,6 +56,10 @@ def _ends_with_question(text: str) -> bool:
 _META_REASONING_PATTERNS = [
     # "The student has only…" / "The student hasn't…"
     re.compile(r'(?im)^\s*the student\s+(has|hasn\'t|is|isn\'t|wrote|said|answered|gave|seems|appears)\b'),
+    # Meta-comment about the message type: "That's a clarification, not
+    # a new answer attempt" / "This is a pushback, not an answer".
+    # Intent-classification language doesn't belong in the visible reply.
+    re.compile(r"(?im)^\s*(that'?s|this is)\s+(a|an|the)\s+(clarification|pushback|correction|off-?topic|non-?answer|attempt)\b"),
     # First-person process narration at the start of a sentence:
     # "I'll grade…" / "I am going to…" / "I'm going to…" / "Let me prompt…" /
     # "I shouldn't…" / "Now I need…" / "I need to (call|prompt|record|

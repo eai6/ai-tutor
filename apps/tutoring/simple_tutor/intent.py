@@ -90,6 +90,8 @@ _PUSHBACK_PATTERNS = [
     re.compile(r"(?i)\b(that'?s|that is)\s+not\s+(right|correct|true|quite)\b"),
     re.compile(r"(?i)\b(no|nope),?\s+(it'?s|it is|you|that)\b"),
     re.compile(r"(?i)\bi\s+(think|believe)\s+(you|that|it)\s+\w+\s+(wrong|mistake|incorrect)\b"),
+    # "i think you mean X" / "you mean X, right?" — corrective restatement.
+    re.compile(r"(?i)\b(i\s+(think|believe)\s+)?you\s+mean\b"),
     # "what if all six are equal AND one turns out to be reflex?"
     re.compile(r"(?i)\bwhat\s+if\b.{0,100}\?"),
     re.compile(r"(?i)\bwell\b,?\s+(actually|technically)\b"),
@@ -97,16 +99,21 @@ _PUSHBACK_PATTERNS = [
 
 # Disengagement / emotional / non-answer fillers.
 _NON_ENGAGEMENT_PATTERNS = [
-    re.compile(r"(?i)^\s*(idk|i don'?t know|dunno|i'?m lost|no idea)\s*[.!]?\s*$"),
-    re.compile(r"(?i)^\s*(thanks|thank you|cheers|ok|okay|sure|yes|no)\s*[.!]?\s*$"),
-    re.compile(r"(?i)^\s*(skip|next|pass|nope)\s*[.!]?\s*$"),
+    # Bare "idk" / "i don't know" + optional explanatory tail ("idk this
+    # is hard" / "i don't know really").
+    re.compile(r"(?i)^\s*(idk|i don'?t know|dunno|i'?m lost|no idea)\b"),
+    re.compile(r"(?i)^\s*(thanks|thank you|cheers|ok|okay|sure|yes|no|yeah|yep|nope|nah)\s*[.!]?\s*$"),
+    re.compile(r"(?i)^\s*(skip|next|pass)\s*[.!]?\s*$"),
     # Thanks/gratitude at the head of the message — covers "thanks for
     # being patient" / "thank you so much" / "cheers, that helps".
     re.compile(r"(?i)^\s*(thanks|thank\s+you|cheers)\b"),
     # Emotional outbursts.
     re.compile(r"(?i)\bi\s+(hate|love)\s+(this|maths?|geography)\b"),
     re.compile(r"(?i)\bi'?m\s+(so\s+)?(stupid|dumb|terrible|bad)\b"),
+    re.compile(r"(?i)\bi\s+can'?t\s+(do\s+this|figure\s+(this|it)\s+out|get\s+it)\b"),
     re.compile(r"(?i)\b(give\s+up|gave\s+up|done\s+with\s+this)\b"),
+    # "this is (too) hard / boring / stupid" — frustration filler.
+    re.compile(r"(?i)\bthis\s+is\s+(too\s+)?(hard|difficult|boring|stupid|impossible)\b"),
 ]
 
 # Off-topic markers — explicit non-curriculum references.

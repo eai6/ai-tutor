@@ -871,50 +871,51 @@ def _render_exit_ticket_review_block(review: dict | None) -> str:
     return "\n".join(parts)
 
 
+# Per-intent guidance — phrased as DIRECT INSTRUCTION to the tutor,
+# NOT as third-person narration about the student. The tutor LLM
+# tends to echo phrases like "The platform classifies the student's
+# message as…" verbatim into its visible reply when the prompt frames
+# things that way, which trips the meta_reasoning_leak check. Imperative
+# voice ("Treat this turn as…", "Do not call…", "Engage with…")
+# reads as instruction the model follows silently.
 _INTENT_GUIDANCE = {
     'answer': (
-        "The platform classifies the student's message as an ANSWER "
-        "attempt to the in-flight question. Call record_answer with "
-        "the literal extracted answer."
+        "Treat this turn as a graded answer attempt to the in-flight "
+        "question. Call record_answer with the literal extracted "
+        "answer."
     ),
     'clarification': (
-        "The platform classifies the student's message as a "
-        "CLARIFICATION request (asking for explanation / definition / "
-        "rephrasing). Do NOT call record_answer. Respond "
-        "conversationally — explain the concept or rephrase the "
-        "question — and leave the in-flight slot active so the "
+        "Treat this turn as a clarification request. Do NOT call "
+        "record_answer. Explain the concept or rephrase the question "
+        "in your text reply. Leave the in-flight slot active so the "
         "student can answer next turn."
     ),
     'pushback': (
-        "The platform classifies the student's message as PUSHBACK "
-        "or a counter-question (substantive correction, follow-up "
-        "hypothetical, disagreement). Do NOT call record_answer. "
-        "Engage with the student's specific point: concede if their "
-        "correction is valid, push back with reasoning if not, and "
-        "address any hypothetical they raised. Treat them as a "
-        "capable interlocutor. Leave the in-flight slot active."
+        "Treat this turn as substantive pushback or a counter-question. "
+        "Do NOT call record_answer. Engage with the specific point "
+        "raised: concede if the correction is valid, push back with "
+        "reasoning if not, and address any hypothetical. Treat the "
+        "student as a capable interlocutor. Leave the slot active."
     ),
     'off_topic': (
-        "The platform classifies the student's message as OFF-TOPIC. "
-        "Do NOT call record_answer. Acknowledge briefly, redirect to "
-        "the current lesson question. If this is the second off-topic "
-        "turn in a row, also call redirect_off_topic. Leave the slot "
-        "active."
+        "Treat this turn as off-topic. Do NOT call record_answer. "
+        "Acknowledge briefly, redirect to the current lesson "
+        "question. If this is the second off-topic turn in a row, "
+        "also call redirect_off_topic. Leave the slot active."
     ),
     'non_engagement': (
-        "The platform classifies the student's message as "
-        "NON-ENGAGEMENT (emotional outburst, 'idk', 'thanks', short "
-        "filler). Do NOT call record_answer. Respond to the emotional "
-        "or social register first — warmly acknowledge frustration, "
-        "thank-you, or confusion — then offer a smaller, easier "
-        "next step or a simpler reframing of the question. Leave the "
-        "slot active."
+        "Treat this turn as a non-engagement signal — an emotional "
+        "register (frustration, distress), 'idk', a thank-you, or a "
+        "short filler. Do NOT call record_answer. Respond to the "
+        "emotional or social register first — warmly acknowledge — "
+        "then offer a smaller, easier next step or a simpler "
+        "reframing of the question. Leave the slot active."
     ),
     'answer_or_other': (
-        "The platform could not classify the student's message with "
-        "high confidence. Use your judgement: if it reads as an "
-        "answer attempt, call record_answer; if it reads as a "
-        "clarification or pushback, respond conversationally."
+        "Intent could not be classified deterministically. Use "
+        "judgement: if it reads as an answer attempt, call "
+        "record_answer; if it reads as a clarification or pushback, "
+        "respond conversationally."
     ),
 }
 
