@@ -898,6 +898,31 @@ def respond_for_view(session, user_input: str) -> dict:
                 # submit the exit ticket. The chat_complete_session
                 # endpoint flips the session to COMPLETED once the
                 # ticket is scored.
+                #
+                # Replace the LLM's text with a clean transition
+                # message. Without this, the last tutor turn's text
+                # was often a freshly-posed question (the LLM didn't
+                # know the exit ticket was about to fire), so the
+                # student saw two prompts back-to-back: the LLM's
+                # question + the exit-quiz modal. Also overwrite the
+                # persisted tutor turn so resume doesn't surface the
+                # dangling question on reload.
+                from apps.tutoring.models import SessionTurn
+                transition_msg = (
+                    "Great — you've worked through the lesson! Now "
+                    "let's check what you've locked in with a short "
+                    "quiz. Take your time on each question, then submit."
+                )
+                last_tutor_turn = (
+                    SessionTurn.objects
+                    .filter(session=session, role=SessionTurn.Role.TUTOR)
+                    .order_by('-id').first()
+                )
+                if last_tutor_turn is not None:
+                    last_tutor_turn.content = transition_msg
+                    last_tutor_turn.save(update_fields=['content'])
+                out = dict(out)
+                out['content'] = transition_msg
             else:
                 # No exit ticket attached → end the lesson here.
                 is_complete = True
