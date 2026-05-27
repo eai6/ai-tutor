@@ -435,6 +435,28 @@ def _build_app_env_vars(*, csrf_origins=None, include_job_dispatch_env=False):
         app.EnvironmentVarArgs(name="POSTHOG_DISABLED", value="true"),
         app.EnvironmentVarArgs(name="INSTRUCTOR_TELEMETRY", value="false"),
     ]
+    # Simple-tutor engine + exit-ticket tunables — opt-in via Pulumi
+    # config so prod stays on the legacy ConversationalTutor until
+    # explicitly flipped. Staging sets these in Pulumi.staging.yaml
+    # so `pulumi up` doesn't silently wipe the manual `az containerapp
+    # update --set-env-vars` we used during M12 rollout.
+    _simple_tutor = config.get("simple-tutor-engine")
+    if _simple_tutor:
+        env_vars.append(
+            app.EnvironmentVarArgs(name="SIMPLE_TUTOR_ENGINE", value=_simple_tutor),
+        )
+    _exit_ticket_types = config.get("exit-ticket-types")
+    if _exit_ticket_types:
+        env_vars.append(
+            app.EnvironmentVarArgs(name="EXIT_TICKET_TYPES", value=_exit_ticket_types),
+        )
+    _exit_ticket_max = config.get("exit-ticket-max-questions")
+    if _exit_ticket_max:
+        env_vars.append(
+            app.EnvironmentVarArgs(
+                name="EXIT_TICKET_MAX_QUESTIONS", value=_exit_ticket_max,
+            ),
+        )
     if include_job_dispatch_env:
         env_vars.extend([
             app.EnvironmentVarArgs(name="AZURE_RESOURCE_GROUP", value=rg.name),

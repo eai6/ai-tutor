@@ -22,6 +22,13 @@ config:
   # provisioning the material-processor Job entirely. Bump to 2.0 if
   # you want full parity with prod's upload pipeline.
   aitutor:material-job-cpu: "0"
+  # ── Engine flags (staging only — prod stays on legacy CT for now) ────
+  # Without these baked into Pulumi state, manual `az containerapp
+  # update --set-env-vars SIMPLE_TUTOR_ENGINE=on …` gets silently
+  # wiped on the next `pulumi up`. M12 rollout hit this 2026-05-27.
+  aitutor:simple-tutor-engine: "on"
+  aitutor:exit-ticket-types: "mcq"
+  aitutor:exit-ticket-max-questions: "10"
   # ── Secrets — set via CLI on the staging stack ──────────────────────
   # Run from infra/:
   #   pulumi stack select staging
