@@ -63,6 +63,261 @@ class RubricResult:
     error: str = ''
 
 
+# ----------------------------------------------------------------------
+# Pedagogical dimensions — structured multi-dimensional rubric
+# ----------------------------------------------------------------------
+#
+# Added 2026-05-27 per `memory/simple_tutor_systematic_eval_plan.md`.
+# Eight binary pedagogical dimensions evaluated in one judge call per
+# single-turn scenario. Output is per-dimension yes/no, so a scenario
+# passes iff every "desirable" dimension is at its desired value.
+#
+# The simple_tutor-specific rule-violation flags (meta_reasoning_leak,
+# passive_ending) are NOT here — they live in the deterministic scorer
+# (cheaper, regex-based, no LLM call needed). The judge call is reserved
+# for the dimensions that genuinely need a model in the loop.
+
+
+@dataclass
+class DimensionScore:
+    """One judged dimension. ``value`` is the judge's verdict
+    (typically "yes" / "no", or "encouraging" / "neutral" / "offensive"
+    for ``tutor_tone``). ``desirable`` is the value(s) that pass the
+    dimension. ``passed`` = value is in the desirable set.
+    """
+    name: str
+    value: str
+    desirable: tuple[str, ...]
+    reasoning: str = ''
+    passed: bool = False
+
+
+@dataclass
+class DimensionsResult:
+    dimensions: list[DimensionScore] = field(default_factory=list)
+    passed: bool = False
+    provider: str = ''
+    model: str = ''
+    tokens_in: int = 0
+    tokens_out: int = 0
+    error: str = ''
+
+
+# Each entry: (name, prompt-facing question, desirable values).
+# Desirable values are case-sensitive lowercase. The judge is asked to
+# return a single value per dimension matching this set.
+PEDAGOGICAL_DIMENSIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        'mistake_identification',
+        'STEP 1: Did the student make a mistake on their last turn? '
+        'STEP 2: If NO mistake was made, answer "yes" (recognition was correctly not needed). '
+        'If a mistake WAS made, answer "yes" when the tutor acknowledged it or asked the '
+        'student to reconsider, "no" when the tutor missed the mistake or affirmed the '
+        'wrong answer.',
+        ('yes',),
+    ),
+    (
+        'mistake_location',
+        'STEP 1: Did the tutor identify a mistake in their reply? '
+        'STEP 2: If the tutor did NOT identify a mistake, answer "yes" (vacuously — '
+        'nothing to misattribute). If the tutor DID identify a mistake, answer "yes" '
+        'when the identified mistake matches the genuine error the student made, "no" '
+        'when the tutor critiqued the wrong thing or invented a mistake the student '
+        'did not make.',
+        ('yes',),
+    ),
+    (
+        'reveals_answer',
+        'Did the tutor reveal the answer to a question that the student has NOT YET '
+        'answered correctly? '
+        'Answer "yes" if the tutor explicitly stated, named, or paraphrased the '
+        'correct option/value for a question still being worked on (a hint turn '
+        'after a wrong attempt, or before any attempt). '
+        'Answer "no" if (a) the tutor only scaffolded with hints, (b) the student '
+        'just answered correctly and the tutor is now affirming + advancing — '
+        'affirming a correct answer is NOT revealing.',
+        ('no',),
+    ),
+    (
+        'providing_guidance',
+        'Did the tutor offer correct, useful guidance — a hint, explanation, worked '
+        'example, or framing — that moves the student forward? Answer "yes" or "no".',
+        ('yes',),
+    ),
+    (
+        'actionability',
+        'After reading the tutor\'s reply, is it clear what the student should DO next '
+        '(answer a specific question, compute a value, try an example)? Answer "yes" if '
+        'the reply ends with a concrete action. Answer "no" if it ends passively '
+        '("take your time", "let me know when ready", or generally trails off).',
+        ('yes',),
+    ),
+    (
+        'coherence',
+        'Is the tutor\'s reply logically consistent with the prior conversation and '
+        'the student\'s last turn? Answer "no" if it contradicts itself, ignores the '
+        'student\'s actual question, or repeats prior content without acknowledging it.',
+        ('yes',),
+    ),
+    (
+        'tutor_tone',
+        'What is the dominant tone of the tutor\'s reply? Answer one of: '
+        '"encouraging" (warm, supportive), "neutral" (factual, no warmth/coldness), or '
+        '"offensive" (dismissive, sarcastic, condescending).',
+        ('encouraging', 'neutral'),
+    ),
+    (
+        'human_likeness',
+        'Does the reply read as natural human teaching — or robotic/templated? '
+        'Answer "yes" for natural, "no" for robotic.',
+        ('yes',),
+    ),
+)
+
+
+_DIMENSIONS_SYSTEM_PROMPT = """\
+You are an evaluator of AI tutor responses for a secondary-school tutoring \
+platform. For each dimension listed in the user message, judge the TUTOR \
+RESPONSE TO EVALUATE against the prior CONVERSATION and the student's last turn.
+
+Each dimension is a discrete categorical judgement (typically yes/no, sometimes \
+yes/no/encouraging/neutral). Do NOT score on a 0-1 scale — pick the single \
+value that best describes the response.
+
+Output ONLY a JSON object with EXACTLY this shape:
+{"dimensions": [{"name": "<dimension name>", "value": "<one value>", "reasoning": "<one sentence>"}, ...]}
+
+Use the exact dimension name as the `name` key. Return one entry per dimension, \
+in the same order. Do not wrap in markdown code fences. Do not include any text \
+outside the JSON.\
+"""
+
+
+def _build_dimensions_user_prompt(
+    conversation: list[dict],
+    student_turn: str,
+    tutor_text: str,
+) -> str:
+    conv_str = _format_conversation(conversation)
+    dim_str = '\n'.join(
+        f"- {name}: {question} (allowed values: {', '.join(desirable + (_negate(desirable),))})"
+        for name, question, desirable in PEDAGOGICAL_DIMENSIONS
+    )
+    return (
+        f"CONVERSATION:\n{conv_str}\n"
+        f"Student: {student_turn}\n\n"
+        f"TUTOR RESPONSE TO EVALUATE:\n{tutor_text}\n\n"
+        f"DIMENSIONS:\n{dim_str}\n\n"
+        f"Return JSON."
+    )
+
+
+def _negate(desirable: tuple[str, ...]) -> str:
+    """The plausible "undesirable" answer to list alongside the desired
+    one, so the judge knows the full enum. For tutor_tone the negate is
+    "offensive"; for the rest it's the opposite of yes/no.
+    """
+    if 'yes' in desirable and 'no' not in desirable:
+        return 'no'
+    if 'no' in desirable and 'yes' not in desirable:
+        return 'yes'
+    if 'encouraging' in desirable or 'neutral' in desirable:
+        return 'offensive'
+    return ''
+
+
+def score_pedagogical_dimensions(
+    *,
+    conversation: list[dict],
+    student_turn: str,
+    tutor_text: str,
+    judge_config: dict[str, Any] | None = None,
+) -> DimensionsResult:
+    """Score a tutor response against the eight pedagogical dimensions.
+
+    Single judge call, structured JSON output. Returns a populated
+    ``DimensionsResult`` where ``passed`` is True iff every dimension's
+    value is in its desirable set.
+
+    On any failure (LLM error, malformed JSON), returns a result with
+    ``error`` set and ``passed=False``.
+    """
+    cfg = {**DEFAULT_RUBRIC_JUDGE, **(judge_config or {})}
+    provider = str(cfg['provider'])
+    model = str(cfg['model'])
+    temperature = float(cfg.get('temperature', 0.0))
+    max_tokens = int(cfg.get('max_tokens', 1024))
+
+    result = DimensionsResult(provider=provider, model=model)
+
+    model_config = ModelConfig.resolve_runtime(provider, model)
+    if model_config is None:
+        result.error = (
+            f"could not resolve ModelConfig for provider={provider!r}, "
+            f"model={model!r}"
+        )
+        return result
+
+    try:
+        client = get_llm_client(model_config)
+    except Exception as exc:
+        result.error = f"client init failed: {type(exc).__name__}: {exc}"
+        return result
+
+    user_prompt = _build_dimensions_user_prompt(
+        conversation, student_turn, tutor_text,
+    )
+
+    try:
+        resp = client.generate(
+            messages=[{'role': 'user', 'content': user_prompt}],
+            system_prompt=_DIMENSIONS_SYSTEM_PROMPT,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+    except Exception as exc:
+        result.error = f"judge call failed: {type(exc).__name__}: {exc}"
+        return result
+
+    result.tokens_in = resp.tokens_in
+    result.tokens_out = resp.tokens_out
+
+    parsed = _extract_json(resp.content)
+    if parsed is None or 'dimensions' not in parsed:
+        result.error = f"could not parse JSON response: {resp.content[:200]!r}"
+        return result
+
+    raw = parsed.get('dimensions') or []
+    if not isinstance(raw, list):
+        result.error = f"`dimensions` is not a list: {raw!r}"
+        return result
+
+    # Index by name (case-insensitive) so the judge can return them
+    # in any order without breaking the mapping.
+    by_name: dict[str, dict] = {}
+    for entry in raw:
+        if isinstance(entry, dict):
+            key = str(entry.get('name', '')).strip().lower()
+            if key:
+                by_name[key] = entry
+
+    for name, _question, desirable in PEDAGOGICAL_DIMENSIONS:
+        entry = by_name.get(name.lower(), {})
+        value = str(entry.get('value', '')).strip().lower() or '?'
+        reasoning = str(entry.get('reasoning', '')).strip()
+        passed = value in desirable
+        result.dimensions.append(DimensionScore(
+            name=name,
+            value=value,
+            desirable=desirable,
+            reasoning=reasoning,
+            passed=passed,
+        ))
+
+    result.passed = all(d.passed for d in result.dimensions)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Prompt
 # ---------------------------------------------------------------------------

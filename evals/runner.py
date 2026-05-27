@@ -110,6 +110,7 @@ class ScenarioResult:
     suggested_labels: list[str] = field(default_factory=list)   # single_turn: last turn. multi_turn: empty.
     assertion_results: list[AssertionResult] = field(default_factory=list)
     rubric_result: dict | None = None   # serialised llm_rubric.RubricResult
+    dimensions_result: dict | None = None   # serialised llm_rubric.DimensionsResult
 
     # Multi-turn only.
     transcript: list[dict] = field(default_factory=list)
@@ -267,17 +268,20 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
             r.passed for r in assertion_results
         )
 
-        # Layer 3 — LLM rubric, only if the scenario defines one.
+        conversation_for_judge = [
+            {'role': t.get('role'),
+             'content': t.get('text') or t.get('content', '')}
+            for t in scenario.seed_history
+        ]
+
+        # Layer 3a — LLM rubric (scenario-specific items), only if the
+        # scenario defines one.
         rubric_payload: dict | None = None
         rubric_passed = True  # absent rubric = no veto
         if scenario.rubric:
             rubric_result = llm_rubric.score(
                 scenario.rubric,
-                conversation=[
-                    {'role': t.get('role'),
-                     'content': t.get('text') or t.get('content', '')}
-                    for t in scenario.seed_history
-                ],
+                conversation=conversation_for_judge,
                 student_turn=scenario.student_turn,
                 tutor_text=tutor_text,
                 pass_threshold=scenario.pass_threshold,
@@ -288,7 +292,32 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
             # layer (treat error as "could not satisfy").
             rubric_passed = rubric_result.passed and not rubric_result.error
 
-        passed = deterministic_passed and rubric_passed
+        # Layer 3b — Universal pedagogical dimensions (8 categorical
+        # dimensions evaluated on every single-turn scenario). Added
+        # 2026-05-27 per memory/simple_tutor_systematic_eval_plan.md.
+        # All "desirable" dimensions must be at their desired value
+        # for the scenario to pass on this layer.
+        dimensions_payload: dict | None = None
+        dimensions_passed = True
+        try:
+            dim_result = llm_rubric.score_pedagogical_dimensions(
+                conversation=conversation_for_judge,
+                student_turn=scenario.student_turn,
+                tutor_text=tutor_text,
+                judge_config=scenario.rubric_judge or None,
+            )
+            dimensions_payload = asdict(dim_result)
+            dimensions_passed = dim_result.passed and not dim_result.error
+        except Exception as exc:
+            # Don't let a judge crash kill the whole run — record and
+            # fail the dimensions layer for this scenario.
+            logger.warning(
+                "dimensions judge failed for %s: %s",
+                scenario.id, exc,
+            )
+            dimensions_passed = False
+
+        passed = deterministic_passed and rubric_passed and dimensions_passed
         return ScenarioResult(
             scenario_id=scenario.id,
             passed=passed,
@@ -300,6 +329,7 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
             suggested_labels=suggested_labels,
             assertion_results=assertion_results,
             rubric_result=rubric_payload,
+            dimensions_result=dimensions_payload,
             session_id=session.pk,
         )
     except Exception as exc:

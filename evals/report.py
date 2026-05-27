@@ -68,6 +68,11 @@ class Summary:
     rubric_tokens_in: int = 0
     rubric_tokens_out: int = 0
     rubric_errors: int = 0
+    # Per-dimension stats: dim_name -> Bucket of pass/fail across scenarios.
+    by_dimension: dict[str, Bucket] = field(default_factory=dict)
+    dimensions_tokens_in: int = 0
+    dimensions_tokens_out: int = 0
+    dimensions_errors: int = 0
 
 
 def _scenario_status(r: dict) -> str:
@@ -92,6 +97,8 @@ def summarize(run: dict) -> Summary:
     by_mode: dict[str, Bucket] = defaultdict(Bucket)
     scenarios: dict[str, dict] = {}
     rubric_in = rubric_out = rubric_err = 0
+    by_dim: dict[str, Bucket] = defaultdict(Bucket)
+    dim_in = dim_out = dim_err = 0
 
     for r in run.get('results') or []:
         scenario_id = r.get('scenario_id') or '?'
@@ -111,6 +118,16 @@ def summarize(run: dict) -> Summary:
         rubric_out += int(rubric.get('tokens_out') or 0)
         if rubric.get('error'):
             rubric_err += 1
+
+        # Pedagogical dimensions — per-scenario per-dimension stats.
+        dimensions = r.get('dimensions_result') or {}
+        dim_in += int(dimensions.get('tokens_in') or 0)
+        dim_out += int(dimensions.get('tokens_out') or 0)
+        if dimensions.get('error'):
+            dim_err += 1
+        for d in (dimensions.get('dimensions') or []):
+            name = d.get('name', '?')
+            _bump(by_dim[name], 'pass' if d.get('passed') else 'fail')
 
         scenarios[scenario_id] = {
             'status': status,
@@ -138,6 +155,10 @@ def summarize(run: dict) -> Summary:
         rubric_tokens_in=rubric_in,
         rubric_tokens_out=rubric_out,
         rubric_errors=rubric_err,
+        by_dimension=dict(by_dim),
+        dimensions_tokens_in=dim_in,
+        dimensions_tokens_out=dim_out,
+        dimensions_errors=dim_err,
     )
 
 
@@ -149,6 +170,14 @@ def _short_fail_reasons(r: dict) -> list[str]:
             fails.append('rubric(err)')
         else:
             fails.append(f"rubric({rubric.get('mean_score', 0):.2f}<{rubric.get('pass_threshold', 0):.2f})")
+    dimensions = r.get('dimensions_result') or {}
+    if dimensions and not dimensions.get('passed'):
+        if dimensions.get('error'):
+            fails.append('dimensions(err)')
+        else:
+            bad = [d['name'] for d in (dimensions.get('dimensions') or [])
+                   if not d.get('passed')]
+            fails.append(f"dim({','.join(bad)})")
     return fails
 
 
@@ -286,6 +315,24 @@ def format_summary(s: Summary, prior: Summary | None = None) -> str:
                 marker = 'ERR ' if d['status'] == 'error' else 'FAIL'
                 out.append(f"  [{marker}] {sid}  ({d['persona']})  -> {reasons[:100]}")
             out.append('')
+
+    # Pedagogical dimensions.
+    if s.by_dimension:
+        out.append("PEDAGOGICAL DIMENSIONS (per-dimension pass rate)")
+        dim_width = max(len(n) for n in s.by_dimension)
+        for name in sorted(s.by_dimension):
+            b = s.by_dimension[name]
+            line = f"  {name:<{dim_width}}  {_fmt_bucket(b)}"
+            if prior and name in prior.by_dimension:
+                pb = prior.by_dimension[name]
+                line += f"   prior {_fmt_bucket(pb)}  Δ {_delta(b.passed, pb.passed)}"
+            out.append(line)
+        out.append(
+            f"  judge tokens: in={s.dimensions_tokens_in:,} "
+            f"out={s.dimensions_tokens_out:,}"
+            f"  (errors: {s.dimensions_errors}/{s.total})"
+        )
+        out.append('')
 
     # Rubric usage.
     out.append("RUBRIC LAYER")
