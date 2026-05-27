@@ -14,6 +14,17 @@ seed_history:
     text: "Large scale maps zoom in on small areas with lots of detail. Make sense?"
 student_turn: "what's the difference between scale and zoom?"
 
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading. Inferred by scripts/migrate_seed_inflight_question.py;
+# review the reference_answer for accuracy.
+seed_inflight_question:
+  question_text: "Large scale maps zoom in on small areas with lots of detail. Make sense?"
+  question_type: short_answer
+  reference_answer: "PLACEHOLDER_REF"
+  source: inline_authored
+
 assertions:
   response_nonempty: true
   must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]

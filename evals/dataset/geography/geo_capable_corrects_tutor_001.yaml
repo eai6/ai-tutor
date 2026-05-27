@@ -14,6 +14,17 @@ seed_history:
     text: "A compass point is given in degrees from north, measured clockwise from 0° to 360°."
 student_turn: "i think you mean a compass BEARING — a compass POINT is one of the named directions like N, NE, E. they're different."
 
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading. Inferred by scripts/migrate_seed_inflight_question.py;
+# review the reference_answer for accuracy.
+seed_inflight_question:
+  question_text: "A compass point is given in degrees from north, measured clockwise from 0\xB0 to 360\xB0."
+  question_type: short_answer
+  reference_answer: "PLACEHOLDER_REF"
+  source: inline_authored
+
 assertions:
   response_nonempty: true
   must_not_contain_phrase: ["that's not quite", "actually no", "moving on"]

@@ -26,6 +26,17 @@ student_turn: >
   are still drawn at scale, so on a small scale map a building might not
   appear at all because the scale is too coarse. That's the issue, not size.
 
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading. Inferred by scripts/migrate_seed_inflight_question.py;
+# review the reference_answer for accuracy.
+seed_inflight_question:
+  question_text: "A small scale map covers a large area, so things like roads and buildings appear smaller on the page. Why might a small scale map be less useful for hiking?"
+  question_type: short_answer
+  reference_answer: "PLACEHOLDER_REF"
+  source: inline_authored
+
 assertions:
   response_nonempty: true
   must_contain_phrase:

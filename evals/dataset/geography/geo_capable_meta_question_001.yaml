@@ -14,6 +14,17 @@ seed_history:
     text: "Today we're learning about map scales. Ready to start?"
 student_turn: "how long is this lesson?"
 
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading. Inferred by scripts/migrate_seed_inflight_question.py;
+# review the reference_answer for accuracy.
+seed_inflight_question:
+  question_text: "Today we're learning about map scales. Ready to start?"
+  question_type: short_answer
+  reference_answer: "PLACEHOLDER_REF"
+  source: inline_authored
+
 assertions:
   response_nonempty: true
 

@@ -64,6 +64,19 @@ class Scenario:
     mode: str  # 'single_turn' | 'multi_turn'
     seed_history: list[dict]
     student_turn: str
+    # Optional in-flight slot for single_turn scenarios. When the
+    # seed_history ends with the tutor posing a question, the simple_tutor
+    # engine expects an InFlightQuestion row already persisted so the
+    # student's next turn is graded against the right reference. Without
+    # this, the engine re-poses instead of grading and the scenario fails
+    # spuriously. Multi-turn scenarios don't need it — they drive
+    # pose_question themselves through the student_sim driver. Shape:
+    #   {'question_text': str,
+    #    'question_type': 'mcq' | 'short_numeric' | 'short_answer',
+    #    'reference_answer': str,
+    #    'options': [str, ...]   # required for mcq
+    #    'source': 'catalog' | 'inline_authored'}
+    seed_inflight_question: dict[str, Any] | None
     max_turns: int  # multi_turn only; ignored for single_turn
     assertions: dict[str, Any]
     rubric: list[str]
@@ -88,6 +101,11 @@ class Scenario:
             mode=str(raw.get('mode', 'single_turn')),
             seed_history=list(raw.get('seed_history') or []),
             student_turn=str(raw.get('student_turn', '')),
+            seed_inflight_question=(
+                dict(raw['seed_inflight_question'])
+                if isinstance(raw.get('seed_inflight_question'), dict)
+                else None
+            ),
             max_turns=int(raw.get('max_turns', 15)),
             assertions=dict(raw.get('assertions') or {}),
             rubric=[str(x) for x in (raw.get('rubric') or [])],
@@ -191,6 +209,72 @@ def _inject_seed_history(session: TutorSession, history: list[dict]) -> None:
         )
 
 
+def _inject_inflight_question(
+    session: TutorSession, payload: dict[str, Any] | None,
+) -> None:
+    """When a scenario seeds a posed question into seed_history, mirror the
+    state that ``handle_pose_question`` would have created at runtime.
+
+    The simple_tutor engine looks up ``InFlightQuestion`` to decide
+    GRADE vs POSE mode. If seed_history says the tutor asked an MCQ and
+    student_turn is "A", but no slot exists, the engine sees no
+    in-flight question, falls into POSE mode, refuses to grade, and
+    re-poses — the student's answer is never evaluated. That spuriously
+    fails the scenario.
+
+    Multi-turn scenarios should NOT call this — they drive
+    pose_question themselves through the student_sim driver.
+
+    Returns silently if payload is None or empty.
+    """
+    if not payload:
+        return
+    from apps.tutoring.models import InFlightQuestion
+
+    qtext = str(payload.get('question_text', '') or '').strip()
+    ref = str(payload.get('reference_answer', '') or '').strip()
+    qtype = str(payload.get('question_type', '') or '').strip().lower()
+    src = str(payload.get('source', 'inline_authored') or 'inline_authored').strip().lower()
+
+    if not qtext or not ref:
+        raise ValueError(
+            f"seed_inflight_question requires question_text and reference_answer "
+            f"(got text={qtext[:40]!r}, ref={ref!r}) on session={session.pk}"
+        )
+    if qtype not in ('mcq', 'short_numeric', 'short_answer'):
+        raise ValueError(
+            f"seed_inflight_question question_type must be mcq / short_numeric / "
+            f"short_answer, got {qtype!r}"
+        )
+    if src not in ('catalog', 'inline_authored'):
+        src = 'inline_authored'
+
+    options_raw = payload.get('options') or []
+    if not isinstance(options_raw, list):
+        options_raw = []
+    options = [str(o)[:300] for o in options_raw]
+    if qtype == 'mcq' and len(options) < 2:
+        raise ValueError(
+            f"seed_inflight_question.options must have at least 2 entries "
+            f"for mcq, got {options!r}"
+        )
+
+    catalog_id = payload.get('catalog_question_id')
+    if not isinstance(catalog_id, int):
+        catalog_id = None
+
+    InFlightQuestion.objects.create(
+        session=session,
+        question_text=qtext,
+        question_type=qtype,
+        options=options,
+        reference_answer=ref,
+        source=src,
+        catalog_question_id=catalog_id,
+        posed_at_turn_id=None,
+    )
+
+
 def _run_single_turn(scenario: Scenario) -> ScenarioResult:
     """Drive one respond() call and score deterministically."""
     inst, user = _eval_institution_and_user()
@@ -221,6 +305,7 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
 
     try:
         _inject_seed_history(session, scenario.seed_history)
+        _inject_inflight_question(session, scenario.seed_inflight_question)
         # Engine dispatch: honor SIMPLE_TUTOR_ENGINE (same env var the
         # web views check) so the eval harness exercises whichever
         # engine is wired in for the staging/prod deploy. Without this
