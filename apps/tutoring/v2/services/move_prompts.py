@@ -518,11 +518,11 @@ SHAPE (must-do):
   the partial-credit rule; a generic "doesn't match the expected
   answer" on a half-correct answer fails this move's contract.
 
-The grader returned WRONG, PARTIAL, or UNVERIFIED. This turn:
-scaffold the next step they'd need on THE SAME OPEN QUESTION — fade
-the scaffold as their attempts grow. Do not introduce a new
-problem; the open question stays the focus until it is resolved,
-``pivot``, or ``close_topic``.
+The grader returned WRONG or PARTIAL. This turn: scaffold the next
+step they'd need on THE SAME OPEN QUESTION — fade the scaffold as
+their attempts grow. Do not introduce a new problem; the open
+question stays the focus until it is resolved, ``pivot``, or
+``close_topic``.
 (Science of learning principles applied: Minimise Cognitive Load —
 fade scaffolding as proficiency grows; Targeted Remediation — keep
 the same bar, add scaffolding, don't change the question.)
@@ -570,19 +570,6 @@ Mastery Learning — vary the *path* to mastery, hold the
   introduced a new item. Rework it so the sub-question's answer
   *requires* the open question's inputs.
 
-How (UNVERIFIED verdict — the grader couldn't decide):
-- Briefly acknowledge their effort and say, in plain conversational
-  language, that you want to check what they know before going on.
-  Phrase this in your own words — vary it turn to turn, and don't
-  use system vocabulary ("transcript", "verdict", "grader", "I
-  couldn't verify from the transcript"). Speak as a teacher would
-  to a student.
-- Do NOT refute the student's claim. Do NOT call it wrong. Do NOT
-  state a fact about the topic — the tutor-claim adjudicator will
-  reject any prose factual claim made on an unverified verdict.
-- End with a tool call to a question that re-tests one sub-skill of
-  the open question. The posed question IS the diagnostic.
-
 Tool-call floor (every verdict on this move):
 - You must end with something the student can act on. If you cannot
   produce a tool call (no eligible slot), then in prose: restate
@@ -598,7 +585,6 @@ What NOT to do:
   bank slot). ONE question per turn, end of turn.
 - Pivot to a new problem or new prompt while the open question is
   still live. Stay on it.
-- On UNVERIFIED: make any factual claim, even a correct one.
 """,
 )
 
@@ -620,10 +606,10 @@ worked-example walkthrough of the relevant subgoal — labelled
 steps, anchored to the open question. (Active Learning Ch.10 —
 the student still ends the turn with an action.)
 
-Three wrong attempts on the same item or subskill — OR three
-consecutive unverified turns with the open question still in
-flight. This turn: name the underlying misconception specifically,
-then give the student one more attempt at the SAME open question.
+Three wrong attempts on the same item or subskill, with the open
+question still in flight. This turn: name the underlying
+misconception specifically, then give the student one more attempt
+at the SAME open question.
 
 How (wrong / partial verdicts):
 - Name the misconception in one short sentence, in your own words.
@@ -641,17 +627,8 @@ How (wrong / partial verdicts):
 - One thing for the student to act on. No second question stacked
   on the named slip.
 
-How (UNVERIFIED verdict):
-- DO NOT name a misconception. The grader couldn't decide, so any
-  asserted misconception is a guess.
-- Instead: restate the OPEN QUESTION in plainer words ("the
-  question is asking …"), then pose a simpler diagnostic that
-  targets one sub-step of it.
-
 What NOT to do:
 - Reveal the canonical.
-- On UNVERIFIED: make any factual claim about why the student is
-  wrong — the grounded adjudicator will reject.
 - Move on without giving the student another attempt.
 """,
 )
@@ -849,15 +826,6 @@ themselves):
   *expertise-reversal effect*: a student who has shown they own a
   rule does not benefit from re-instruction on it; AND Layering —
   exercise the prerequisite by composing it with the next idea.)
-
-How (UNVERIFIED verdict on a prior attempt):
-- DO NOT restate the concept generally — prose factual claims will
-  be rejected on unverified turns when grounding is sparse.
-- Instead, restate the OPEN QUESTION in simpler words ("the
-  question is asking …") and pose a one-step diagnostic via the
-  tool.
-- Acknowledge uncertainty in plain student-facing language — vary
-  the phrasing turn to turn.
 
 What NOT to do:
 - Author new numerical examples in this explanation — the rule

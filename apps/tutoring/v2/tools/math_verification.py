@@ -90,7 +90,7 @@ class MathVerificationResult:
     trace: MathTrace
     error: Optional[str] = None
     # When ``error`` is set, the verifier failed (DSL-invalid, etc.).
-    # The grader maps this onto verdict=unverified.
+    # The grader falls through to the grounded non-math path.
 
     @property
     def ok(self) -> bool:

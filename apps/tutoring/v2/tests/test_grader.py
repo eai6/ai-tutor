@@ -2,11 +2,11 @@
 
 Covers:
   - Math path comparator branches (numeric + symbolic).
-  - DSL extraction → unverified on parse failure.
-  - Non-math grounded confidence threshold → unverified below 0.6.
+  - DSL extraction failure → falls through to non-math grader.
+  - Non-math grounded LLM ternary verdict resolution.
   - Pre-pose hidden-KB suppression (the prompt contract).
   - Tutor-claim adjudication shape (supported / contradicted /
-    unverified).
+    unverified — adjudicator status field, NOT the grader verdict).
 """
 
 from __future__ import annotations
@@ -160,9 +160,10 @@ def test_math_path_wrong_with_dsl_match():
 
 def test_math_path_falls_through_to_grounded_on_dsl_extract_failure():
     """When math DSL extraction fails (prose proofs, explain-and-justify
-    questions), the grader falls through to the non-math path. Without a
-    non-math student-response or judge client supplied, the fallthrough
-    resolves to UNVERIFIED (grader_extraction_failed)."""
+    questions), the grader falls through to the non-math path. Without
+    a non-math student-response or judge client supplied, the
+    fallthrough resolves to WRONG under the strict ternary contract
+    (no clients available → engine retries via wrong-verdict path)."""
     grader = StudentGrader(
         math_client_factory=lambda: _FakeClient("not json"),
         grounded_client_factory=lambda: None,
@@ -174,12 +175,13 @@ def test_math_path_falls_through_to_grounded_on_dsl_extract_failure():
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
 
 
 def test_math_path_falls_through_to_grounded_on_validation_failure():
     """DSL extracted but failed validation. Falls through to the non-math
-    path. Without LLM-B/LLM-C clients available, lands at UNVERIFIED."""
+    path. Without LLM-B/LLM-C clients available, lands at WRONG under
+    the strict ternary contract."""
     dsl = (
         '{"variables": {"a": 99, "b": 13}, '
         '"expression": {"op": "add", "args": [{"var": "a"}, {"var": "b"}]}}'
@@ -195,7 +197,7 @@ def test_math_path_falls_through_to_grounded_on_validation_failure():
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -238,8 +240,8 @@ def test_non_math_two_llm_correct():
     assert result.citation.startswith("[KB-1]")
 
 
-def test_non_math_meta_input_returns_unverified_meta_input_code():
-    """LLM-B with is_attempt=false → UNVERIFIED reason_code='meta_input'.
+def test_non_math_meta_input_returns_wrong_with_meta_input_code():
+    """LLM-B with is_attempt=false → WRONG reason_code='meta_input'.
     LLM-C is NOT called."""
     student_payload = (
         '{"is_attempt": false, "hedge_marker": false, "claims": [], '
@@ -260,13 +262,14 @@ def test_non_math_meta_input_returns_unverified_meta_input_code():
         is_math=False,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
     assert result.reason_code == "meta_input"
 
 
 def test_non_math_extraction_failure_returns_grader_extraction_failed():
-    """No LLM-B client → student-response extraction fails → UNVERIFIED
-    with reason_code='grader_extraction_failed'."""
+    """No LLM-B client → student-response extraction fails → WRONG
+    with reason_code='grader_extraction_failed' under the strict
+    ternary contract."""
     grader = StudentGrader(
         student_response_client_factory=lambda: None,
         grounded_client_factory=lambda: None,
@@ -277,13 +280,13 @@ def test_non_math_extraction_failure_returns_grader_extraction_failed():
         is_math=False,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
     assert result.reason_code == "grader_extraction_failed"
 
 
 def test_non_math_judge_failure_returns_grader_extraction_failed():
-    """LLM-B OK but no LLM-C client → judge call fails → UNVERIFIED
-    with reason_code='grader_extraction_failed'."""
+    """LLM-B OK but no LLM-C client → judge call fails → WRONG with
+    reason_code='grader_extraction_failed'."""
     grader = StudentGrader(
         student_response_client_factory=lambda: _FakeClient(
             _student_attempt_payload("rain"),
@@ -296,7 +299,7 @@ def test_non_math_judge_failure_returns_grader_extraction_failed():
         is_math=False,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
     assert result.reason_code == "grader_extraction_failed"
 
 

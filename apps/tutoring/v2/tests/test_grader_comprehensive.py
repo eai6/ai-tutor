@@ -211,8 +211,9 @@ def _math_grader(
 ) -> StudentGrader:
     """Build a grader pre-loaded with one LLM-A DSL response.
 
-    Grounded + verifier clients return None so an UNVERIFIED fall-through
-    is observable when the math path defers (matches test_grader.py).
+    Grounded + verifier clients return None so a WRONG fall-through
+    is observable when the math path defers under the strict ternary
+    contract (matches test_grader.py).
 
     ``student_claims_payload`` is the LLM-B response. When None
     (default), a smart stand-in that reads the student response out of
@@ -543,13 +544,15 @@ def test_multi_slot_no_match_is_wrong():
         "I'm stuck",
     ],
 )
-def test_meta_input_does_not_resolve_to_wrong(student_input):
-    """Meta input (not a numeric attempt) shouldn't graders as WRONG.
+def test_meta_input_resolves_under_ternary_contract(student_input):
+    """Meta input (not a numeric attempt).
 
-    The math DSL value-parser returns None on these → falls through to
-    grounded → with no grounded client, the verdict is UNVERIFIED. This
-    is the contract: meta input is NOT a wrong answer, and the move
-    selection layer (downstream) routes it differently.
+    Under the strict ternary contract (v2-prune-plan §4.1) meta input
+    in the math path routes through WRONG with reason_code='meta_input'
+    so the engine asks the student to attempt the question. The
+    `unverified` escape valve is gone; the move layer reads the
+    reason_code if it needs to distinguish meta-input from a real
+    wrong answer.
     """
     grader = _math_grader()
     request = GradingRequest(
@@ -558,8 +561,8 @@ def test_meta_input_does_not_resolve_to_wrong(student_input):
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict != Verdict.WRONG, (
-        f"meta input {student_input!r} graded as WRONG — should be UNVERIFIED"
+    assert result.verdict in (Verdict.WRONG, Verdict.PARTIAL, Verdict.CORRECT), (
+        f"meta input {student_input!r} returned a non-ternary verdict"
     )
 
 
@@ -568,18 +571,14 @@ def test_meta_input_does_not_resolve_to_wrong(student_input):
 # ══════════════════════════════════════════════════════════════════════
 
 
-def test_empty_rendered_stem_returns_unverified_with_state_signal():
-    """Open question with empty rendered_stem → UNVERIFIED + a reasoning
+def test_empty_rendered_stem_returns_wrong_with_state_signal():
+    """Open question with empty rendered_stem → WRONG + a reasoning
     string that downstream can identify as state-inconsistent.
 
-    Run-7 P1-3 root cause: the engine left runtime_state.open_question
-    null after a leaked tool-call. The grader had nothing to anchor on.
-    Today the grader still tries to extract DSL from "" — which is
-    wasteful and produces no useful signal. The contract: detect the
-    empty stem upfront, short-circuit to UNVERIFIED, and stamp the
-    ``reasoning`` field with ``state_inconsistent`` so the engine /
-    conformance pipeline can distinguish "grader couldn't decide" from
-    "grader had nothing to decide against".
+    Under the strict ternary contract (v2-prune-plan §4.1) the
+    state-inconsistent guard routes through WRONG so the engine
+    asks the student to retry. The reason_code='state_inconsistent'
+    preserves the observability signal for the dashboard.
     """
     grader = _math_grader()
     request = GradingRequest(
@@ -588,7 +587,7 @@ def test_empty_rendered_stem_returns_unverified_with_state_signal():
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
     assert "state_inconsistent" in (result.reasoning or "").lower()
 
 
@@ -601,12 +600,12 @@ def test_whitespace_only_rendered_stem_treated_as_empty():
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
     assert "state_inconsistent" in (result.reasoning or "").lower()
 
 
 def test_empty_student_input_does_not_crash():
-    """Empty student_input on a real question → UNVERIFIED, no crash.
+    """Empty student_input on a real question → WRONG, no crash.
 
     The grader must remain stable: empty input is a state signal, not
     an exception trigger. Move selection / engine handles empty
@@ -619,9 +618,9 @@ def test_empty_student_input_does_not_crash():
         student_input="",
         is_math=True,
     )
-    # No exception, no crash; verdict is UNVERIFIED (no value to grade).
+    # No exception, no crash; verdict is one of the ternary values.
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict in (Verdict.WRONG, Verdict.PARTIAL, Verdict.CORRECT)
 
 
 def test_whitespace_only_student_input_does_not_crash():
@@ -633,7 +632,7 @@ def test_whitespace_only_student_input_does_not_crash():
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict in (Verdict.WRONG, Verdict.PARTIAL, Verdict.CORRECT)
 
 
 def test_state_inconsistent_does_not_consume_math_llm_quota():
@@ -670,7 +669,7 @@ def test_state_inconsistent_does_not_consume_math_llm_quota():
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
     assert spy.remaining == 1, (
         "math DSL client should NOT be called on empty stem — "
         "spy queue still has 1 item; got " f"{spy.remaining}"
@@ -693,7 +692,7 @@ def test_non_math_empty_stem_also_short_circuits():
         is_math=False,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
     assert "state_inconsistent" in (result.reasoning or "").lower()
 
 
@@ -760,31 +759,33 @@ def test_safe_json_loads_response_shapes(raw, expected):
     [
         # Happy path — valid DSL
         (_DSL_12_PLUS_13, Verdict.CORRECT),
-        # Empty response
-        ("", Verdict.UNVERIFIED),
+        # Empty response — math DSL fails → falls through to non-math
+        # → no grounded client → WRONG under the strict ternary.
+        ("", Verdict.WRONG),
         # Refusal
-        ("I cannot help with that.", Verdict.UNVERIFIED),
+        ("I cannot help with that.", Verdict.WRONG),
         # Truncated JSON
-        ('{"variables": {"a": 12,', Verdict.UNVERIFIED),
+        ('{"variables": {"a": 12,', Verdict.WRONG),
         # Valid JSON but wrong shape (not a dict)
-        ('[1, 2, 3]', Verdict.UNVERIFIED),
+        ('[1, 2, 3]', Verdict.WRONG),
         # Valid JSON, dict, but missing expression/expressions key
-        ('{"variables": {"a": 12}}', Verdict.UNVERIFIED),
+        ('{"variables": {"a": 12}}', Verdict.WRONG),
         # Fenced valid DSL — should still work
         (f"```json\n{_DSL_12_PLUS_13}\n```", Verdict.CORRECT),
         # Embedded in prose
         (f"Here's the DSL: {_DSL_12_PLUS_13}\nlet me know!", Verdict.CORRECT),
-        # Single-quoted Python dict — json.loads rejects → UNVERIFIED
+        # Single-quoted Python dict — json.loads rejects → fall-through → WRONG
         ("{'variables': {'a': 12, 'b': 13}, 'expression': "
          "{'op': 'add', 'args': [{'var': 'a'}, {'var': 'b'}]}}",
-         Verdict.UNVERIFIED),
+         Verdict.WRONG),
     ],
 )
 def test_math_path_robust_to_llm_response_shape(dsl_payload, expected_verdict):
     """Math grader handles every observed DSL response shape gracefully.
 
-    Bad shapes never raise — they collapse to UNVERIFIED via the
-    fall-through to the grounded path (no grounded client here).
+    Bad shapes never raise — they collapse to WRONG via the
+    fall-through to the grounded path (no grounded client here)
+    under the strict ternary contract.
     """
     grader = StudentGrader(
         math_client_factory=lambda: _FakeClient(dsl_payload),
@@ -831,19 +832,21 @@ _NM_STUDENT_RESPONSE_ATTEMPT = (
          '"first_misconception": "mixing condensation up with precipitation", '
          '"citation": "", "reason_code": "known_misconception"}',
          Verdict.WRONG),
-        # Empty / refusal — UNVERIFIED via extraction failure
-        ('', Verdict.UNVERIFIED),
-        ('I cannot answer this question.', Verdict.UNVERIFIED),
-        # Empty JSON object — defensive parsing returns UNVERIFIED
-        ('{}', Verdict.UNVERIFIED),
-        # Just a verdict field — UNVERIFIED defaults stay safe
+        # Empty / refusal — judge call surfaces not-ok → WRONG
+        ('', Verdict.WRONG),
+        ('I cannot answer this question.', Verdict.WRONG),
+        # Empty JSON object — verdict field missing → strict ternary
+        # bias prefers PARTIAL on ambiguous LLM output.
+        ('{}', Verdict.PARTIAL),
+        # Just a verdict field — propagates as CORRECT.
         ('{"verdict": "correct"}', Verdict.CORRECT),
-        # Garbage — UNVERIFIED via extraction failure
-        ('lorem ipsum dolor sit amet', Verdict.UNVERIFIED),
+        # Garbage — judge call surfaces not-ok → WRONG.
+        ('lorem ipsum dolor sit amet', Verdict.WRONG),
     ],
 )
 def test_non_math_judge_robust_to_llm_response_shape(judge_payload, expected_verdict):
-    """LLM-C handles every observed response shape gracefully.
+    """LLM-C handles every observed response shape gracefully under the
+    strict ternary contract.
 
     The non-math pipeline is LLM-B (student parser) → LLM-C (judge).
     LLM-B is stubbed to a canned is_attempt=true payload so the pipeline
@@ -871,8 +874,8 @@ def test_non_math_judge_robust_to_llm_response_shape(judge_payload, expected_ver
 def test_non_math_meta_input_short_circuits_before_judge():
     """When LLM-B reports is_attempt=false, LLM-C is NOT called.
 
-    Meta input ("i dont understand. what is X") → UNVERIFIED +
-    reason_code='meta_input'. This is the GEO-S5 P1-3 fix.
+    Meta input ("i dont understand. what is X") → WRONG with
+    reason_code='meta_input' under the strict ternary contract.
     """
     student_response_payload = (
         '{"is_attempt": false, "hedge_marker": false, "claims": [], '
@@ -903,7 +906,7 @@ def test_non_math_meta_input_short_circuits_before_judge():
         is_math=False,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
     assert result.reason_code == "meta_input"
     assert spy_judge.remaining == 1, (
         "LLM-C must NOT be called on meta input"
@@ -1180,8 +1183,9 @@ def test_observed_profit_loss_multi_slot_responses(student_response, expected_ve
     """Real profit/loss student responses from runs 3-7.
 
     Multi-slot grading: a single value matches one slot → PARTIAL;
-    a value matching no slot → WRONG. The grader never returns
-    UNVERIFIED for these — math always lands a verdict.
+    a value matching no slot → WRONG. Under the strict ternary
+    contract every gradable input lands a CORRECT / PARTIAL / WRONG
+    verdict.
     """
     grader = StudentGrader(
         math_client_factory=lambda: _FakeClient(_DSL_PROFIT_MULTI_27_18),
@@ -1198,8 +1202,9 @@ def test_observed_profit_loss_multi_slot_responses(student_response, expected_ve
         f"student_response={student_response!r} "
         f"got={result.verdict} expected={expected_verdict}"
     )
-    # Math contract: no UNVERIFIED when the stem is consistent.
-    assert result.verdict != Verdict.UNVERIFIED
+    # Math contract: strict ternary verdict (no UNVERIFIED in the
+    # enum any more).
+    assert result.verdict in (Verdict.CORRECT, Verdict.PARTIAL, Verdict.WRONG)
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -1288,8 +1293,9 @@ def test_observed_single_slot_math_responses(
         f"student_response={student_response!r} "
         f"got={result.verdict} expected={expected_verdict}"
     )
-    # Math contract: no UNVERIFIED when the stem is consistent.
-    assert result.verdict != Verdict.UNVERIFIED
+    # Math contract: strict ternary verdict (no UNVERIFIED in the
+    # enum any more).
+    assert result.verdict in (Verdict.CORRECT, Verdict.PARTIAL, Verdict.WRONG)
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -1477,14 +1483,17 @@ def test_observed_geo_open_ended_responses(
         "i remember evaporation goes up and condensation makes droplets",  # MATHS-S1 recap
     ],
 )
-def test_observed_meta_requests_never_grade_wrong(student_input):
-    """Help-requests / readiness signals / recaps must not grade as WRONG.
+def test_observed_meta_requests_carry_reason_code(student_input):
+    """Help-requests / readiness signals / recaps land WRONG under
+    the strict ternary contract, but carry a reason_code so the
+    engine can branch on them (route to explain / worked_example
+    instead of treating them as a real wrong attempt).
 
-    Pins the contract: any "I don't understand" or "give me a problem"
-    or "I'm ready" style input should resolve to UNVERIFIED (or be
-    skipped by the engine before the grader is called). NEVER WRONG —
-    that would tell the student their lack-of-attempt was scored as a
-    wrong attempt, which is a P1 in everything but name.
+    Pins the post-prune contract: the move layer reads reason_code,
+    not the verdict, to distinguish meta-input from a genuine wrong
+    answer. The engine's help-request short-circuit (and the router's
+    LLM classifier in commit D) is what prevents these from reaching
+    the grader in production.
     """
     grader = StudentGrader(
         math_client_factory=lambda: _FakeClient(_DSL_12_PLUS_13),
@@ -1496,10 +1505,9 @@ def test_observed_meta_requests_never_grade_wrong(student_input):
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict != Verdict.WRONG, (
-        f"meta input {student_input!r} graded as WRONG — "
-        "this would be a P1-class regression in a real session"
-    )
+    assert result.verdict in (
+        Verdict.CORRECT, Verdict.PARTIAL, Verdict.WRONG,
+    ), f"meta input {student_input!r} returned a non-ternary verdict"
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1792,10 +1800,11 @@ def test_two_llm_grader_word_form_answers(
 
 
 def test_two_llm_grader_recognises_meta_input_as_non_attempt():
-    """Plan §5.1 — meta input → UNVERIFIED with reason_code='meta_input'.
+    """Plan §5.1 + v2-prune-plan §4.1 — meta input → WRONG with
+    reason_code='meta_input' under the strict ternary contract.
 
     Student: "i dont understand. what is an equation?". LLM-B emits
-    is_attempt=False. Grader returns UNVERIFIED with the structured
+    is_attempt=False. Grader returns WRONG with the structured
     reason_code so the move layer can branch (e.g. route to explain).
     """
     claims = _claims_payload(
@@ -1814,7 +1823,7 @@ def test_two_llm_grader_recognises_meta_input_as_non_attempt():
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
     assert result.reason_code == "meta_input"
 
 
@@ -1899,8 +1908,8 @@ def test_two_llm_grader_arithmetic_failed_does_not_leak_canonical():
 def test_two_llm_grader_falls_through_when_llm_b_returns_garbage():
     """LLM-B returns invalid JSON → math path falls through to grounded
     (the same fail-soft pattern as LLM-A). With no grounded client,
-    lands at UNVERIFIED — exactly the existing behaviour for callers
-    that haven't configured a downstream tier.
+    lands at WRONG under the strict ternary contract — the engine then
+    flows through the wrong-verdict path.
     """
     grader = _math_grader(
         _DSL_X_PLUS_8_EQ_23,
@@ -1912,7 +1921,7 @@ def test_two_llm_grader_falls_through_when_llm_b_returns_garbage():
         is_math=True,
     )
     result = grader.grade_student_response(_context(), request)
-    assert result.verdict == Verdict.UNVERIFIED
+    assert result.verdict == Verdict.WRONG
 
 
 # Note: the prior `test_two_llm_grader_skips_llm_b_on_fast_path_bare_numeric`

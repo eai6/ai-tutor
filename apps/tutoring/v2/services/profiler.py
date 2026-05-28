@@ -330,8 +330,7 @@ def _render_summary_user_prompt(
         for key, prog in progress.items():
             lines.append(
                 f"  - {key}: attempts={prog.attempts}, correct={prog.correct}, "
-                f"wrong={prog.wrong}, partial={prog.partial}, "
-                f"unverified={prog.unverified}"
+                f"wrong={prog.wrong}, partial={prog.partial}"
             )
     lines.append("")
     if runtime_state.remediation_state and runtime_state.remediation_state.misconception:

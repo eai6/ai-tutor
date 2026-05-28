@@ -254,13 +254,11 @@ def _fallback_decision(
     """Conservative ``RouterDecision`` when the router LLM is unavailable.
 
     Plan §5.1 fail-soft contract:
-      - correct  → confirm_and_advance
-      - wrong    → scaffold_hint
-      - partial  → scaffold_hint
-      - unverified / None on objective_just_opened → explain
-      - unverified / None otherwise              → scaffold_hint when an
-                                                    open_question is in
-                                                    flight, else explain
+      - correct           → confirm_and_advance
+      - wrong             → scaffold_hint
+      - partial           → scaffold_hint
+      - None / unknown    → scaffold_hint when an open_question is in
+                            flight, else explain
 
     principle_emphasis defaults to ['Active Learning']. focus_note is
     empty. rationale carries ``router_unavailable_fallback`` + the
@@ -277,15 +275,8 @@ def _fallback_decision(
     elif verdict == Verdict.PARTIAL:
         chosen = "scaffold_hint"
         principles = ["Targeted Remediation"]
-    else:  # UNVERIFIED or None
-        objective_just_opened = (
-            not request.move_history
-            and request.objective_attempts == 0
-        )
-        if objective_just_opened:
-            chosen = "explain"
-            principles = ["Direct Instruction", "Cognitive Load"]
-        elif request.open_question_has_pending:
+    else:  # None / unrecognised — verdict-less / non-graded turn
+        if request.open_question_has_pending:
             chosen = "scaffold_hint"
             principles = ["Targeted Remediation"]
         else:

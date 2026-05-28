@@ -1,6 +1,6 @@
 """TutorEngine — top-level orchestrator for the v2 conversational tutor.
 
-Post-prune (v2-prune-plan.md, Commit A — steps 1+2+3):
+Post-prune (v2-prune-plan.md):
 
   - Conformance package, safe templates, safety floors, move
     escalation, and the question extractor are all gone. The engine
@@ -10,20 +10,18 @@ Post-prune (v2-prune-plan.md, Commit A — steps 1+2+3):
     ``run_gates_with_recovery`` (3 deterministic gates with per-gate
     one-retry-then-degrade) → persist + ship. The response ALWAYS
     ships; the frontend never sees a gate-failed error.
-  - Help-request short-circuit (regex) still runs at the engine layer
-    so the grader isn't called on a help turn — this layer goes away
-    in Commit D when the router prompt classifies help-requests
-    explicitly.
+  - No engine-side help-request short-circuit. The router is the
+    single source of truth for move selection (per plan §2 / §4.2).
+    The router's ``verdict_needed`` signal — landing in Commit D —
+    is what decides whether the grader runs.
 
 The deeper engine rewrite to a ~300-LOC thin orchestrator lands in
-Commit H (plan §4.5 + step 10). Commit A keeps the existing shape so
-the diff is contained.
+Commit H (plan §4.5 + step 10).
 """
 
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -67,31 +65,6 @@ ALLOWED_MOVES: tuple[str, ...] = (
 )
 
 logger = logging.getLogger(__name__)
-
-
-_HELP_REQUEST_RE = re.compile(
-    r"\b("
-    r"i\s+don'?t\s+(understand|get|know\s+how)"
-    r"|what\s+(is|does)"
-    r"|explain"
-    r"|show\s+me"
-    r"|teach\s+me"
-    r"|i'?m\s+(lost|stuck)"
-    r")\b",
-    re.IGNORECASE,
-)
-
-
-def _looks_like_help_request(student_input: str) -> bool:
-    """Deterministic help-request backstop — skip grading on help turns.
-
-    Goes away in Commit D when the router prompt classifies the
-    help-request case explicitly.
-    """
-    text = (student_input or "").strip()
-    if not text:
-        return False
-    return bool(_HELP_REQUEST_RE.search(text))
 
 
 def _doing_rate_observability(window: list) -> dict:
@@ -238,15 +211,14 @@ class TutorEngine:
         media_catalog = self._build_media_catalog(context)
 
         # 1. Grade — only when there's an open question AND the student
-        # input is plausibly an attempt at it. Skipped on help-requests
-        # (regex backstop until Commit D updates the router prompt).
-        is_help_request = _looks_like_help_request(student_input)
-
+        # produced some input. No engine-side help-request short-circuit:
+        # the router is the single source of truth for move selection
+        # and (in Commit D, via the router's verdict_needed signal) for
+        # whether the grader runs at all.
         verdict: Optional[GradingResult] = None
         if (
             runtime_state.open_question is not None
             and student_input.strip()
-            and not is_help_request
         ):
             try:
                 verdict = self.grader.grade_student_response(
@@ -276,10 +248,11 @@ class TutorEngine:
                     )
             except Exception as exc:
                 logger.warning(
-                    "[TutorEngine] grader raised %s — proceeding as unverified",
+                    "[TutorEngine] grader raised %s — proceeding "
+                    "without a verdict",
                     type(exc).__name__,
                 )
-                verdict = GradingResult(verdict=Verdict.UNVERIFIED)
+                verdict = None
 
         # 2. Pick the move via the LLM router. No safety_floors layer —
         # the router's decision is the single source of truth.
@@ -528,10 +501,10 @@ class TutorEngine:
             counters.verdictless_turns += 1
         else:
             counters.verdictless_turns = 0
-            if verdict.verdict == Verdict.UNVERIFIED:
-                runtime_state.unverified_run_length += 1
-            else:
-                runtime_state.unverified_run_length = 0
+            # unverified_run_length stays on the model until commit G
+            # — always reset under the ternary contract since no
+            # verdict path produces unverified any more.
+            runtime_state.unverified_run_length = 0
 
         runtime_state.safety_valve_counters = counters
         return runtime_state
@@ -777,8 +750,6 @@ class TutorEngine:
             progress.wrong += 1
         elif verdict.verdict == Verdict.PARTIAL:
             progress.partial += 1
-        elif verdict.verdict == Verdict.UNVERIFIED:
-            progress.unverified += 1
         runtime_state.objective_progress[key] = progress
 
     # ------------------------------------------------------------------

@@ -181,7 +181,10 @@ class ExitTicketService:
         """
         grader = self._resolve_grader()
         if grader is None:
-            return GradingResult(verdict=Verdict.UNVERIFIED)
+            # Ternary contract — no grader available routes through
+            # WRONG so the exit ticket flow handles the unanswered
+            # state explicitly.
+            return GradingResult(verdict=Verdict.WRONG)
 
         open_q = OpenQuestion(
             source=QuestionSource.EXIT_TICKET_QUESTION,

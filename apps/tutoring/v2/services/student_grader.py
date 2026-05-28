@@ -7,8 +7,9 @@ Three closely-related responsibilities (refactor-analysis §3):
      Python-executed). Non-math path is tiered: deterministic
      ``bank_grader`` first when a canonical exists, KB-grounded
      adjudication for curriculum content, Gemini Google-grounding for
-     general world knowledge. ``unverified`` is a first-class verdict
-     and the conservative escape valve.
+     general world knowledge. The grader returns the strict ternary
+     CORRECT | PARTIAL | WRONG per v2-prune-plan §4.1 — no fourth
+     option, no `unverified` escape valve.
 
   2. **Pre-pose check.** Enforces the student-visible derivability
      invariant — the canonical must be derivable from the visible
@@ -218,17 +219,16 @@ class StudentGrader:
         ``open_question.rendered_stem`` is empty or whitespace-only,
         there is no question to ground against. The grader must NOT
         spend an LLM call trying to extract a canonical from "". Return
-        UNVERIFIED with ``reasoning`` stamped ``state_inconsistent`` so
-        the downstream engine / conformance pipeline can distinguish
-        "grader couldn't decide" (genuine UNVERIFIED) from "grader had
-        nothing to decide against" (state drift — e.g. open_question
-        was never committed because a tool-call leak broke two-phase
-        commit).
+        WRONG with ``reasoning`` stamped ``state_inconsistent`` so the
+        downstream engine flows through the wrong-verdict path and the
+        student is asked to retry rather than the system silently
+        affirming. The state_inconsistent reason_code preserves the
+        observability signal.
         """
         stem = (request.open_question.rendered_stem or "").strip()
         if not stem:
             return GradingResult(
-                verdict=Verdict.UNVERIFIED,
+                verdict=Verdict.WRONG,
                 reasoning=(
                     "state_inconsistent: open_question has no "
                     "rendered_stem to grade against"
@@ -267,12 +267,15 @@ class StudentGrader:
         scalar from a multi-value response. The latency saving did
         not justify the P1 risk.)
 
-        ``unverified`` reaches a math attempt only via
-          - empty rendered_stem (state_inconsistent),
-          - LLM-A extraction failure → grounded fall-through,
-          - LLM-A validation failure → grounded fall-through,
-          - LLM-B extraction failure → grounded fall-through,
-          - is_attempt=false on a real response (meta input).
+        Strict ternary contract (v2-prune-plan §4.1): every path
+        returns CORRECT | PARTIAL | WRONG.
+          - empty rendered_stem (state_inconsistent) → WRONG;
+          - LLM-A extraction / validation failure → grounded
+            fall-through (non-math path);
+          - LLM-B extraction failure → grounded fall-through;
+          - is_attempt=false (meta input) → WRONG so the engine
+            asks for an attempt;
+          - comparator outcomes → CORRECT / PARTIAL / WRONG.
         """
         with emit_span("audit", "grader.math") as span:
             bare = is_bare_answer(request.student_input)
@@ -337,15 +340,17 @@ class StudentGrader:
                 return self._grade_non_math(context, request)
 
             # 4. Meta input — the student didn't attempt an answer.
-            # Distinct from arithmetic UNVERIFIED.
+            # Ternary contract: route through WRONG so the engine asks
+            # the student to attempt the question. reason_code preserves
+            # the meta-input observability signal.
             if not student_extraction.conclusion.is_attempt:
                 if span is not None:
                     span["payload"] = {
-                        "verdict": Verdict.UNVERIFIED.value,
+                        "verdict": Verdict.WRONG.value,
                         "reason_code": "meta_input",
                     }
                 return GradingResult(
-                    verdict=Verdict.UNVERIFIED,
+                    verdict=Verdict.WRONG,
                     private_canonical=canonical_str,
                     student_value=(request.student_input or "").strip(),
                     reasoning="math: student response is not an attempt",
@@ -923,7 +928,7 @@ class StudentGrader:
           3. LLM-B — STUDENT_RESPONSE_SYSTEM parses the student input
              into structured {is_attempt, hedge_marker, claims,
              conclusion}.
-          4. Pre-check: ``is_attempt=false`` → UNVERIFIED reason_code=
+          4. Pre-check: ``is_attempt=false`` → WRONG reason_code=
              "meta_input". No LLM-C call needed.
           5. LLM-C — NON_MATH_JUDGE_SYSTEM reads question + KB + LLM-B
              output and emits the verdict + redacted feedback.
@@ -959,14 +964,18 @@ class StudentGrader:
                 question_stem=stem, student_response=student_input,
             )
             if not response.ok:
+                # Ternary contract: no client / parse refusal → WRONG so
+                # the engine flows through the wrong-verdict path and
+                # asks the student to retry. The grader_extraction_failed
+                # reason_code preserves the observability signal.
                 if span is not None:
                     span["payload"] = {
-                        "verdict": Verdict.UNVERIFIED.value,
+                        "verdict": Verdict.WRONG.value,
                         "stage": "student_response_extraction",
                         "error": response.error or "",
                     }
                 return GradingResult(
-                    verdict=Verdict.UNVERIFIED,
+                    verdict=Verdict.WRONG,
                     student_value=student_input.strip(),
                     reasoning=(
                         f"non-math: student-response extraction failed "
@@ -977,15 +986,16 @@ class StudentGrader:
                 )
 
             # Pre-check 1: meta input — student did not attempt an answer.
-            # Distinct from "grader couldn't decide a real attempt".
+            # Ternary contract: route through WRONG so the engine asks
+            # for an attempt.
             if not response.is_attempt:
                 if span is not None:
                     span["payload"] = {
-                        "verdict": Verdict.UNVERIFIED.value,
+                        "verdict": Verdict.WRONG.value,
                         "reason_code": "meta_input",
                     }
                 return GradingResult(
-                    verdict=Verdict.UNVERIFIED,
+                    verdict=Verdict.WRONG,
                     student_value=student_input.strip(),
                     reasoning="non-math: student response is not an attempt",
                     reason_code="meta_input",
@@ -999,14 +1009,18 @@ class StudentGrader:
                 sources=list(request.kb_chunks or []),
             )
             if not judgement.ok:
+                # Ternary contract: judge failure → WRONG (no client /
+                # raise). The plan biases ambiguous LLM output toward
+                # PARTIAL, but a missing judge means we have no signal
+                # at all — WRONG is the conservative engine-retry path.
                 if span is not None:
                     span["payload"] = {
-                        "verdict": Verdict.UNVERIFIED.value,
+                        "verdict": Verdict.WRONG.value,
                         "stage": "non_math_judge",
                         "error": judgement.error or "",
                     }
                 return GradingResult(
-                    verdict=Verdict.UNVERIFIED,
+                    verdict=Verdict.WRONG,
                     student_value=student_input.strip(),
                     reasoning=(
                         f"non-math: judge call failed "
@@ -1087,8 +1101,9 @@ class StudentGrader:
             to ``_try_bank_grading`` / grounded adjudication.
 
         Does NOT call any LLM — purely deterministic string / regex
-        work. Avoids the no-KB-grounding UNVERIFIED trap (the dominant
-        verdict regression observed in S1 + S5 evaluation sessions).
+        work. Avoids the no-KB-grounding wrong-verdict trap (the
+        dominant verdict regression observed in S1 + S5 evaluation
+        sessions).
         """
         open_q = request.open_question
         if open_q.source != QuestionSource.LESSON_STEP:
@@ -1318,8 +1333,9 @@ class StudentGrader:
             if client is None:
                 if span is not None:
                     span["payload"] = {"error": "no GRADER_GROUNDED client"}
+                # Surfaced to caller as not-ok → engine flows WRONG.
                 return _NonMathJudgement(
-                    verdict=Verdict.UNVERIFIED, private_canonical="",
+                    verdict=Verdict.WRONG, private_canonical="",
                     what_right="", what_missing="", first_misconception="",
                     citation="", reason_code="", raw_text="",
                     error="no GRADER_GROUNDED client available",
@@ -1348,7 +1364,7 @@ class StudentGrader:
                 if span is not None:
                     span["payload"] = {"error": f"raise: {type(exc).__name__}"}
                 return _NonMathJudgement(
-                    verdict=Verdict.UNVERIFIED, private_canonical="",
+                    verdict=Verdict.WRONG, private_canonical="",
                     what_right="", what_missing="", first_misconception="",
                     citation="", reason_code="", raw_text="",
                     error=f"non-math judge raised: {type(exc).__name__}",
@@ -1356,18 +1372,22 @@ class StudentGrader:
 
             payload = _safe_json_loads(raw_text)
             if not isinstance(payload, dict):
+                # Surfaced as not-ok so the caller routes WRONG.
                 if span is not None:
                     span["payload"] = {"error": "non-dict JSON"}
                 return _NonMathJudgement(
-                    verdict=Verdict.UNVERIFIED, private_canonical="",
+                    verdict=Verdict.WRONG, private_canonical="",
                     what_right="", what_missing="", first_misconception="",
                     citation="", reason_code="", raw_text=raw_text,
                     error="LLM-C did not return a JSON object",
                 )
 
-            raw_verdict = str(payload.get("verdict", "unverified")).strip().lower()
-            if raw_verdict not in ("correct", "partial", "wrong", "unverified"):
-                raw_verdict = "unverified"
+            # Strict ternary — bias toward PARTIAL on ambiguous LLM
+            # output per v2-prune-plan §4.1 ("if you cannot decide
+            # between PARTIAL and WRONG, prefer PARTIAL").
+            raw_verdict = str(payload.get("verdict", "partial")).strip().lower()
+            if raw_verdict not in ("correct", "partial", "wrong"):
+                raw_verdict = "partial"
 
             reason_code = str(payload.get("reason_code", "") or "").strip().lower()
             if reason_code not in (
@@ -1662,7 +1682,7 @@ def _parse_student_math_value(student_input: str) -> tuple[Optional[Any], str]:
          framings ("is it 21?", "ohhh x = 6", "the answer is 7",
          "= 6", trailing "… 6"). These are the patterns that show up in
          real S1–S3 chat transcripts; without this fallback every
-         prose-wrapped answer collapses to UNVERIFIED.
+         prose-wrapped answer falls through to grounded grading.
       3. Multi-step chain fallback — when the student typed actual
          working (``"3x = 18 → x = 18 ÷ 3 = 6"``), use the working
          analyzer to walk steps and take the final ``Step.computed``.

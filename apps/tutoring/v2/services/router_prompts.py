@@ -79,9 +79,9 @@ confirm_and_extend
   not mastery evidence.
 
 scaffold_hint
-  Pick on WRONG / PARTIAL / UNVERIFIED when the student is still in
-  reach of solving the open question with a small nudge. The move
-  LLM credits any partial, names the slip (without revealing the
+  Pick on WRONG / PARTIAL when the student is still in reach of
+  solving the open question with a small nudge. The move LLM
+  credits any partial, names the slip (without revealing the
   canonical), and offers the smallest next step on the SAME open
   question.
 
@@ -202,11 +202,6 @@ DECISION GUIDANCE — soft heuristics, not gates.
   "what is X") overrides verdict-driven defaults: pick explain or
   worked_example. The deterministic safety floor downstream will
   enforce this if you miss it, but you should not miss it.
-
-- An UNVERIFIED verdict on a turn with an open question still in
-  flight: scaffold the open question; do NOT open a new one. The
-  next pose is the diagnostic; the prose surrounding it should
-  surface uncertainty, not assert facts.
 
 - A resume turn (open_question_has_pending=false but move_history
   shows prior poses) where the student just delivered correct
@@ -335,12 +330,10 @@ def _render_counters_block(request: RouterRequest) -> str:
         f"correct={request.objective_correct}, "
         f"wrong={request.objective_wrong}, "
         f"partial={request.objective_partial}, "
-        f"unverified={request.objective_unverified}, "
         f"correct_ratio={ratio:.2f}\n"
         f"turns_in_session={request.turns_in_session}, "
         f"turns_on_current_objective={request.turns_on_current_objective}, "
         f"verdictless_turns={request.verdictless_turns}, "
-        f"unverified_run_length={request.unverified_run_length}, "
         f"attempts_on_open_question={request.attempts_on_open_question}\n"
         f"recent_moves (most recent last): {recent_moves}\n"
         f"pose_tool_available={request.pose_tool_available}"

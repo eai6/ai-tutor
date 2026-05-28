@@ -19,16 +19,16 @@ from apps.tutoring.v2.contracts.runtime_state import (
 
 
 class Verdict(str, Enum):
-    """Grader verdict — first-class ``unverified`` is intentional.
+    """Grader verdict — strict ternary.
 
-    Per refactor-analysis §3, ``unverified`` means "we don't know" — it
-    is NOT an error, and conformance has explicit rules for it.
+    Per v2-prune-plan §4.1 the grader MUST return one of
+    CORRECT, PARTIAL, or WRONG for every gradable student turn.
+    The router determines whether grading happens at all.
     """
 
     CORRECT = "correct"
     WRONG = "wrong"
     PARTIAL = "partial"
-    UNVERIFIED = "unverified"
 
 
 class StudentSafeFeedback(BaseModel):

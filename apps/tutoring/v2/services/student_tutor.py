@@ -515,8 +515,8 @@ class StudentTutor:
              general guidance is contextualized by this turn's specific
              direction (plan §2.5).
           4. Full transcript (the largest piece).
-          5. Verdict block (only on wrong / partial / unverified; the
-             redacted shape — never the canonical for non-correct).
+          5. Verdict block (only on wrong / partial; the redacted
+             shape — never the canonical for non-correct).
           6. The student's just-submitted input + the move directive
              RESTATED at the END so the model's recency bias steers
              toward following the move.
@@ -678,7 +678,6 @@ class StudentTutor:
             f"correct={progress.correct}, "
             f"wrong={progress.wrong}, "
             f"partial={progress.partial}, "
-            f"unverified={progress.unverified}, "
             f"correct_ratio={ratio_pct}%, "
             f"turns_in_session={turns_in_session}"
         )

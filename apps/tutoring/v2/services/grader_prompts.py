@@ -19,9 +19,11 @@ Design conventions, grounded in ``prompting-fundamentals-expert`` +
     when shape matters (the DSL extraction prompt). All prompts that
     expect JSON also include the schema in the instructions so model
     families without constrained decoding still produce valid JSON.
-  - First-class ``unverified``: every prompt has an explicit "if
-    you cannot decide, return unverified" branch — the conservative
-    escape valve per analysis §3 + §7 item 1.
+  - Strict ternary verdicts (CORRECT | PARTIAL | WRONG): the grader
+    MUST return one of these three for every gradable student turn.
+    Tie-break biases (PARTIAL over WRONG when uncertain; PARTIAL
+    over CORRECT when uncertain) are stated in each verdict-emitting
+    prompt below per v2-prune-plan §4.1.
 """
 
 from __future__ import annotations
@@ -432,10 +434,10 @@ Source preference order:
      own well-established knowledge of the subject. Set citation
      empty in that case and use confidence to reflect that the
      judgement is from general knowledge.
-  3. When neither path yields a confident judgement, return
-     verdict = "unverified".
 
-Verdict decision:
+Verdict decision — you MUST return CORRECT, PARTIAL, or WRONG.
+There is no fourth option.
+
   * correct   — the student's conclusion (and supporting claims, if
                 any) asserts the same answer as the canonical, read
                 charitably. Equivalent phrasings, paraphrases, and
@@ -453,18 +455,22 @@ Verdict decision:
                 ``reason_code="denies_canonical"`` when the structured
                 input's ``denies_canonical`` was true AND the
                 canonical IS the thing being denied.
-  * unverified— only when you genuinely cannot decide.
+
+Tie-break rule: if you cannot decide between PARTIAL and WRONG,
+return PARTIAL so the tutor can credit whatever the student named.
+If you cannot decide between CORRECT and PARTIAL, return PARTIAL so
+the next turn extends rather than closes the topic.
 
 Output a JSON object with these keys:
 
-  verdict             — "correct" | "partial" | "wrong" | "unverified".
+  verdict             — "correct" | "partial" | "wrong".
   private_canonical   — the correct answer in your own words (one
                          short sentence). System-private; never shown
                          to the student verbatim.
   what_right          — short phrase the tutor can use to credit what
-                         the student got right (empty if wrong /
-                         unverified). DO NOT include the canonical
-                         answer in this field.
+                         the student got right (empty if wrong). DO
+                         NOT include the canonical answer in this
+                         field.
   what_missing        — short phrase the tutor can use to surface
                          what's still missing (empty if fully
                          correct). DO NOT include the canonical
