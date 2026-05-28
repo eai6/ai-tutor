@@ -73,6 +73,28 @@ POSE_CAPABLE_MOVES: frozenset[str] = frozenset({
 })
 
 
+# Pose-dominant moves: the move's pedagogical intent REQUIRES a pose,
+# so we force a tool call via ``tool_choice={"type": "any"}``.
+#
+# - ``confirm_and_advance``: Active Learning Ch.10 — "advance" means
+#   pose the next item; without a pose the move name is a lie.
+# - ``confirm_and_extend``: Deliberate Practice Ch.12 — the extension
+#   IS a pose on a single twist.
+# - ``pivot``: Targeted Remediation Ch.21 — pivot means pose a different
+#   item on the same concept.
+#
+# The other pose-capable moves (``scaffold_hint``, ``name_misconception``,
+# ``worked_example``, ``explain``) keep ``tool_choice="auto"`` because
+# their prompts allow prose-only paths (a hint can be prose; an
+# explanation may end without a pose if no eligible slot fits the
+# subskill just taught).
+POSE_DOMINANT_MOVES: frozenset[str] = frozenset({
+    "confirm_and_advance",
+    "confirm_and_extend",
+    "pivot",
+})
+
+
 @dataclass(frozen=True)
 class TutorResponse:
     text: str
@@ -256,7 +278,22 @@ class StudentTutor:
         ``PendingPose`` → splice stem into response. On no ``tool_use``
         → ship the text the LLM produced. On ``exhausted`` → ship the
         lead-in text only with no PendingPose.
+
+        ``tool_choice`` is move-conditional (Commit 2 of pedagogy-driven
+        router refactor):
+        - Pose-DOMINANT moves use ``{"type": "any"}`` — Anthropic's
+          force-a-tool-call shape. The model must call the pose tool;
+          it may still emit lead-in text alongside the tool_use block.
+          This restores the structural enforcement the prune deleted
+          when it removed the conformance gate ``all__no_assessment_in_prose``.
+        - Pose-CAPABLE-but-not-dominant moves use ``{"type": "auto"}``
+          — model decides whether to pose. Their prompts permit
+          prose-only paths.
         """
+        if move in POSE_DOMINANT_MOVES:
+            tool_choice = {"type": "any"}
+        else:
+            tool_choice = {"type": "auto"}
         messages = [{"role": "user", "content": user_prompt}]
         try:
             message = client.generate_with_tools(
@@ -264,7 +301,7 @@ class StudentTutor:
                 system_prompt=system_prompt,
                 tools=[tool_dict],
                 max_tokens=900,
-                tool_choice={"type": "auto"},
+                tool_choice=tool_choice,
             )
         except (NotImplementedError, AttributeError, TypeError) as exc:
             logger.warning(

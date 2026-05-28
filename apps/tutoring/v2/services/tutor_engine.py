@@ -123,6 +123,22 @@ class TutorEngine:
             "verdict": None,
             "fallback_used": False,
             "router_reason": (reason or "")[:200],
+            # Router observability — pedagogy-driven router refactor.
+            # ``_decision`` is populated only when ``pick_move`` actually
+            # returned a router decision; defensive None-check below.
+            "router": {
+                "case": _decision.case if _decision is not None else None,
+                "rule_fired": (
+                    _decision.rule_fired if _decision is not None else None
+                ),
+                "intent": (
+                    _decision.intent if _decision is not None else None
+                ),
+                "method_evidence_present": (
+                    _decision.method_evidence_present
+                    if _decision is not None else None
+                ),
+            },
         }
         pending_pose = None
         try:
@@ -341,13 +357,41 @@ class TutorEngine:
         self.context_manager.save_runtime_state(runtime_state)
 
         # 6b. Step advancement on close_topic.
+        #
+        # Mastery Learning Ch.13: a close_topic decision transitions to
+        # either the next objective (if more assessable steps remain) or
+        # the exit ticket (lesson assessment complete). The router emits
+        # close_topic; the engine determines the scope.
+        #
+        # M4 fix: ``_advance_step_if_possible`` mutates runtime_state
+        # (clears open_question, resets per-objective counters); those
+        # mutations were lost in the post-prune codebase because
+        # ``save_runtime_state`` was called earlier (line 341) without a
+        # follow-up save here. We re-save below so the mutations persist.
         is_lesson_complete = False
         advanced_to_step_index: Optional[int] = None
         if selected_move == "close_topic":
-            advanced_to_step_index = self._advance_step_if_possible(
-                runtime_state=runtime_state,
+            # Lesson-exhaustion check (Mastery Learning Ch.13). If the
+            # current step has no remaining assessable slots AND there's
+            # no open question, the assessment budget is spent — mark
+            # the lesson complete rather than advancing through
+            # instruction-only steps with no questions to pose.
+            remaining = self._assessable_slots_remaining(
+                context=context, runtime_state=runtime_state,
             )
-            is_lesson_complete = advanced_to_step_index is None
+            if remaining == 0 and runtime_state.open_question is None:
+                is_lesson_complete = True
+                advanced_to_step_index = None
+            else:
+                advanced_to_step_index = self._advance_step_if_possible(
+                    runtime_state=runtime_state,
+                )
+                is_lesson_complete = advanced_to_step_index is None
+            # M4: persist runtime_state mutations made by
+            # ``_advance_step_if_possible`` (open_question cleared,
+            # safety_valve_counters.turns_on_current_objective reset,
+            # objective_progress closed flags set).
+            self.context_manager.save_runtime_state(runtime_state)
 
         # 7. Build v2_trace rollup for SessionTurn.judge_outputs.v2_trace.
         v2_trace = {
@@ -380,6 +424,14 @@ class TutorEngine:
                 # Router is now the single source of truth — selected_move
                 # always equals the move resolved from the router decision.
                 "floor_overridden": False,
+                # ── Pedagogy-driven content judgments + rule citation ──
+                # Threaded through to v2_trace so the observability
+                # dashboard can show which principle fired on each turn.
+                "intent": router_decision.intent,
+                "method_evidence_present": router_decision.method_evidence_present,
+                "named_their_reasoning": router_decision.named_their_reasoning,
+                "richness": router_decision.richness,
+                "rule_fired": router_decision.rule_fired,
             },
         }
 
@@ -443,6 +495,10 @@ class TutorEngine:
                 student_input=student_input,
                 pose_tool_available=pose_tool_available,
                 media_catalog=media_catalog,
+                assessable_slots_remaining=self._assessable_slots_remaining(
+                    context=context,
+                    runtime_state=context.runtime_state,
+                ),
             )
             decision = self.move_router.route(request)
             if span is not None:
@@ -790,6 +846,22 @@ class TutorEngine:
         runtime_state: SessionRuntimeState,
     ) -> bool:
         """True when the lesson has at least one un-posed bank slot."""
+        return self._assessable_slots_remaining(
+            context=context, runtime_state=runtime_state,
+        ) > 0
+
+    def _assessable_slots_remaining(
+        self,
+        *,
+        context: TutoringContext,
+        runtime_state: SessionRuntimeState,
+    ) -> int:
+        """Count un-delivered LessonSteps that have a non-empty question.
+
+        Drives Mastery Learning Ch.13 "lesson_complete" detection in the
+        router prompt. The router reads ``assessable_slots_remaining``
+        and applies Rule 1 when it's 0 with no open question.
+        """
         try:
             from apps.curriculum.models import LessonStep
             posed_ids = set(runtime_state.delivered_lesson_step_ids or [])
@@ -799,10 +871,12 @@ class TutorEngine:
                 .exclude(id__in=posed_ids)
                 .exclude(question__isnull=True)
                 .exclude(question__exact="")
-                .exists()
+                .count()
             )
         except Exception:
-            return True
+            # Fail-open: assume slots remain. The router prompt's other
+            # rules will still pick a sensible move.
+            return 1
 
     def _update_objective_progress(
         self,

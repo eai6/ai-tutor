@@ -147,15 +147,101 @@ class MoveRouter:
             if attempt.decision is not None and self._is_valid_decision(
                 attempt.decision
             ):
-                # Happy path — first call produced a usable decision.
-                if span is not None and attempt.tokens_in is not None:
-                    span["tokens_in"] = attempt.tokens_in
-                    span["tokens_out"] = attempt.tokens_out
-                _stamp_span(
-                    span, request, attempt.decision,
-                    fail_soft=False, reason="",
+                # Schema + closed-set check passed. Now apply the
+                # principle-citation invariants (I-1 .. I-5 from the
+                # router prompt). A violation triggers the same single
+                # retry path as a malformed payload — but with a
+                # principle-citation reminder rather than a schema one.
+                invariant_violation = self._check_principle_invariants(
+                    attempt.decision, request,
                 )
-                return attempt.decision
+                if invariant_violation is None:
+                    # Happy path — first call produced a usable, principle-
+                    # consistent decision.
+                    if span is not None and attempt.tokens_in is not None:
+                        span["tokens_in"] = attempt.tokens_in
+                        span["tokens_out"] = attempt.tokens_out
+                    _stamp_span(
+                        span, request, attempt.decision,
+                        fail_soft=False, reason="",
+                    )
+                    return attempt.decision
+                # Fall through to retry — treat as a principle violation.
+                first_failure = "principle_invariant_violation"
+                first_payload_echo = invariant_violation
+                reminder = _build_retry_reminder(
+                    failure=first_failure,
+                    last_payload=first_payload_echo,
+                )
+                retry_prompt = f"{base_prompt}\n\n{reminder}"
+                retry = self._call_router_once(
+                    client=client, user_prompt=retry_prompt,
+                )
+                # Reuse the standard retry handling below.
+                attempt = _RouterAttempt(
+                    content_failure=first_failure,
+                    last_payload=first_payload_echo,
+                    decision=attempt.decision,
+                )
+                # The variable ``retry`` is the second-call result; fall
+                # through to the standard retry-outcome handling.
+                if retry.infrastructure_failure:
+                    fallback = _fallback_decision(
+                        request,
+                        reason=f"retry_{retry.failure_reason}",
+                    )
+                    _stamp_span(
+                        span, request, fallback, fail_soft=True,
+                        reason=f"retry_{retry.failure_reason}",
+                    )
+                    return fallback
+                if retry.decision is not None and self._is_valid_decision(
+                    retry.decision
+                ):
+                    retry_violation = self._check_principle_invariants(
+                        retry.decision, request,
+                    )
+                    if retry_violation is None:
+                        with emit_span(
+                            "audit", "router.retry_recovered",
+                            payload={
+                                "first_failure": first_failure,
+                                "first_move": _decision_move_repr(
+                                    attempt.decision,
+                                ),
+                            },
+                        ):
+                            pass
+                        _stamp_span(
+                            span, request, retry.decision,
+                            fail_soft=False, reason="retry_recovered",
+                        )
+                        return retry.decision
+                # Retry also violated principle invariants OR was
+                # malformed. Hard-fail the same way the legacy path does.
+                retry_failure = (
+                    retry.content_failure
+                    or ("move_not_in_set" if retry.decision is not None
+                        else "unknown")
+                )
+                with emit_span(
+                    "audit", "router.malformed_after_retry",
+                    payload={
+                        "first_failure": first_failure,
+                        "retry_failure": retry_failure,
+                        "first_move": _decision_move_repr(attempt.decision),
+                        "retry_move": _decision_move_repr(retry.decision),
+                    },
+                ):
+                    pass
+                _stamp_span(
+                    span, request, None, fail_soft=False,
+                    reason="malformed_after_retry",
+                )
+                raise RouterMalformedError(
+                    "router output invalid after one retry; "
+                    f"first={first_failure!r} retry={retry_failure!r}"
+                )
 
             # Determine the failure code + payload echo for the retry
             # reminder. ``move_not_in_set`` is a post-validation check —
@@ -261,6 +347,112 @@ class MoveRouter:
             )
         return bool(decision.move) and decision.move in _ALLOWED_MOVES
 
+    @staticmethod
+    def _check_principle_invariants(
+        decision: RouterDecision,
+        request: "RouterRequest",
+    ) -> Optional[str]:
+        """Validate Invariants I-1 .. I-5 from the router prompt.
+
+        Returns a violation message (suitable for the retry reminder)
+        when an invariant is broken, or None when the decision is
+        principle-consistent. The engine treats a violation the same as
+        a malformed payload — one retry with a principle-citation
+        reminder; if the retry also violates, raise
+        ``RouterMalformedError``.
+
+        Invariants:
+          I-1: case=lesson_complete requires assessable_slots_remaining==0
+               AND open_question_present==false
+          I-2: close_topic via correct branch requires
+               unscaffolded_correct_on_objective >= 1
+          I-3: explain via Rule 5 (case=opening_turn) requires
+               prior_explain_count_on_lesson == 0 AND
+               prior_delivered_lesson_step_count == 0
+          I-4: name_misconception requires named_their_reasoning == true
+          I-5: confirm_and_extend requires richness == "rich"
+
+        Implementation note: we only enforce invariants whose violation
+        would produce an observable P1 (e.g. a premature close, an
+        unjustified explain on a returning learner). Soft guidance from
+        the prompt (e.g. preferred reason text) is left to the LLM.
+        """
+        # I-1: lesson_complete sanity
+        if decision.case == "lesson_complete":
+            if (
+                request.assessable_slots_remaining != 0
+                or request.open_question_has_pending
+            ):
+                return (
+                    "Invariant I-1 violated: case='lesson_complete' "
+                    "requires assessable_slots_remaining==0 AND "
+                    "open_question_present==false; got "
+                    f"assessable_slots_remaining="
+                    f"{request.assessable_slots_remaining}, "
+                    f"open_question_present="
+                    f"{request.open_question_has_pending}."
+                )
+
+        # I-3: opening_turn requires no prior explain + no delivered steps
+        if decision.case == "opening_turn":
+            if (
+                request.prior_explain_count_on_lesson != 0
+                or request.prior_delivered_lesson_step_count != 0
+            ):
+                return (
+                    "Invariant I-3 violated: case='opening_turn' "
+                    "(Rule 5) requires prior_explain_count_on_lesson==0 "
+                    "AND prior_delivered_lesson_step_count==0; got "
+                    f"prior_explain_count_on_lesson="
+                    f"{request.prior_explain_count_on_lesson}, "
+                    f"prior_delivered_lesson_step_count="
+                    f"{request.prior_delivered_lesson_step_count}. "
+                    "Pick a pose move (Rule 6) instead — the student "
+                    "has already seen this lesson's framing."
+                )
+
+        # I-2: close_topic via correct branch
+        # I-4: name_misconception requires named_their_reasoning
+        # I-5: confirm_and_extend requires richness == "rich"
+        if decision.verdict_needed and decision.moves_by_verdict:
+            mbv = decision.moves_by_verdict
+            if (
+                mbv.get("correct") == "close_topic"
+                and request.unscaffolded_correct_on_objective < 1
+            ):
+                return (
+                    "Invariant I-2 violated: close_topic on the correct "
+                    "branch requires unscaffolded_correct_on_objective "
+                    ">= 1 (so THIS would be the 2nd unscaffolded "
+                    f"correct); got "
+                    f"{request.unscaffolded_correct_on_objective}. "
+                    "Pick confirm_and_advance (or confirm_and_extend if "
+                    "richness=='rich') instead — Mastery Learning Ch.13 "
+                    "requires ≥2 unscaffolded correct to close."
+                )
+            if (
+                mbv.get("wrong") == "name_misconception"
+                and decision.named_their_reasoning is not True
+            ):
+                return (
+                    "Invariant I-4 violated: name_misconception on the "
+                    "wrong branch requires named_their_reasoning==true; "
+                    f"got {decision.named_their_reasoning!r}. Pick "
+                    "scaffold_hint or worked_example instead."
+                )
+            if (
+                mbv.get("correct") == "confirm_and_extend"
+                and decision.richness != "rich"
+            ):
+                return (
+                    "Invariant I-5 violated: confirm_and_extend on the "
+                    f"correct branch requires richness=='rich'; got "
+                    f"{decision.richness!r}. Pick confirm_and_advance "
+                    "instead."
+                )
+
+        return None
+
     def _call_router_once(
         self, *, client, user_prompt: str,
     ) -> "_RouterAttempt":
@@ -343,6 +535,7 @@ def build_router_request(
     student_input: str,
     pose_tool_available: bool,
     media_catalog: Optional[list[dict]] = None,
+    assessable_slots_remaining: int = 0,
 ) -> RouterRequest:
     """Snapshot a ``RouterRequest`` from the current context.
 
@@ -354,6 +547,12 @@ def build_router_request(
     per-objective counter fields are read from runtime_state — the
     engine writes them after each turn in
     ``TutorEngine.update_counters_post_turn``.
+
+    ``assessable_slots_remaining`` is supplied by the engine (which
+    owns the LessonStep filter). The other pedagogy counters
+    (``consecutive_non_pose_turns``, ``prior_explain_count_on_lesson``,
+    ``prior_delivered_lesson_step_count``) are derived from
+    runtime_state here so the engine doesn't need to re-derive them.
     """
     runtime_state: SessionRuntimeState = context.runtime_state
     obj_key = (context.current_objective or "_").strip() or "_"
@@ -369,6 +568,34 @@ def build_router_request(
     # Derive the two counters that come straight from existing state.
     prior_attempts = (progress.attempts if progress else 0)
     correct_on_obj = (progress.correct if progress else 0)
+
+    # Pedagogy-driven counters derived from move_history. The router's
+    # principle-cited rules read these by name.
+    move_hist = list(runtime_state.move_history or [])
+    pose_capable_moves = {
+        "confirm_and_advance",
+        "confirm_and_extend",
+        "scaffold_hint",
+        "name_misconception",
+        "worked_example",
+        "explain",
+        "pivot",
+    }
+    # consecutive_non_pose_turns: count trailing moves NOT in the pose-
+    # dominant set. Approximation — the move itself isn't a perfect
+    # signal of whether the tool was actually called, but trailing
+    # ``explain`` runs are the dominant non-pose case in observed
+    # failures (run-9 sessions had 4-7 consecutive ``explain`` moves).
+    # Active Learning Ch.10 floor fires off this counter.
+    non_pose_signal = {"explain", "close_topic"}
+    consecutive_non_pose = 0
+    for m in reversed(move_hist):
+        if m in non_pose_signal:
+            consecutive_non_pose += 1
+        else:
+            break
+    prior_explain_count = sum(1 for m in move_hist if m == "explain")
+    delivered_count = len(runtime_state.delivered_lesson_step_ids or [])
 
     return RouterRequest(
         last_n_turns=last_n,
@@ -414,6 +641,11 @@ def build_router_request(
         ),
         recent_verdicts=list(runtime_state.recent_verdicts or []),
         pose_tool_available=pose_tool_available,
+        # ── Pedagogy-driven counters ──
+        assessable_slots_remaining=assessable_slots_remaining,
+        consecutive_non_pose_turns=consecutive_non_pose,
+        prior_explain_count_on_lesson=prior_explain_count,
+        prior_delivered_lesson_step_count=delivered_count,
     )
 
 
@@ -490,6 +722,19 @@ def _build_retry_reminder(*, failure: str, last_payload: str) -> str:
             f"the closed set: {{{moves_list}}}. Every ``move`` and every "
             "value in ``moves_by_verdict`` must be one of these exact "
             "strings — no synonyms, no new moves, no underscored variants."
+        )
+    elif failure == "principle_invariant_violation":
+        # ``last_payload`` is the invariant-violation message produced
+        # by ``_check_principle_invariants`` — it already cites the
+        # principle, the invariant id (I-1..I-5), and the offending
+        # counter values. Pass it through verbatim so the LLM gets a
+        # precise, principle-grounded reminder.
+        return (
+            "=== RETRY — principle invariant violated ===\n"
+            f"{last_payload}\n"
+            "Re-pick the move from the closed set "
+            f"{{{moves_list}}} so the invariant holds. Emit the "
+            "corrected JSON now."
         )
     else:
         body = (

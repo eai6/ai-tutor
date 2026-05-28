@@ -175,6 +175,29 @@ RouterCase = Literal[
     "help_request",
     "opening_turn",
     "forced_close",
+    # New principle-cited cases (Commit 3 of pedagogy-driven router refactor):
+    # - "lesson_complete": all assessable bank slots delivered + no open
+    #   question pending → Mastery Learning Ch.13 close on lesson scope.
+    # - "post_step_pose": method evidence present + no open question →
+    #   Testing Effect Ch.20 default to a pose (no re-explain).
+    # - "doing_rate_floor": ≥2 consecutive non-pose turns → Active Learning
+    #   Ch.10 forces a doing turn.
+    "lesson_complete",
+    "post_step_pose",
+    "doing_rate_floor",
+]
+
+
+# Content-judgment fields the router emits for the answer-attempt /
+# wrong-branch rules. The router reads the student's last few turns and
+# emits these booleans alongside its move decision; the engine threads
+# them into observability so the dashboard can show which principle
+# fired on each turn.
+RouterIntent = Literal[
+    "answer_attempt",
+    "help_request",
+    "forward_signal",
+    "noise",
 ]
 
 
@@ -238,6 +261,29 @@ class RouterRequest(BaseModel):
     # ── tool surface availability ────────────────────────────────────
     pose_tool_available: bool = True
 
+    # ── Pedagogy-driven router counters (principle-cited rules) ──────
+    # Engine is the sole writer; the router reads them by name and MUST
+    # NOT re-derive from transcript.
+    #
+    # ``assessable_slots_remaining``: count of un-delivered LessonSteps
+    #   on this lesson that have a non-empty ``question`` field. Drives
+    #   Mastery Learning Ch.13 "lesson_complete" detection.
+    #
+    # ``consecutive_non_pose_turns``: count of trailing tutor turns
+    #   whose ``selected_move`` did not pose via the pose_question tool.
+    #   Drives Active Learning Ch.10 doing-rate floor.
+    #
+    # ``prior_explain_count_on_lesson``: how many times ``explain`` has
+    #   been emitted during this session. Drives Cognitive Load Ch.14
+    #   expertise-reversal guard ("explain is a one-time setup").
+    #
+    # ``prior_delivered_lesson_step_count``: ``len(delivered_lesson_step_ids)``.
+    #   Distinguishes "fresh lesson" from "mid-lesson between steps".
+    assessable_slots_remaining: int = 0
+    consecutive_non_pose_turns: int = 0
+    prior_explain_count_on_lesson: int = 0
+    prior_delivered_lesson_step_count: int = 0
+
 
 class RouterDecision(BaseModel):
     """Output of ``MoveRouter.route()``.
@@ -265,6 +311,30 @@ class RouterDecision(BaseModel):
     move: Optional[RouterMove] = None
     moves_by_verdict: Optional[dict[str, RouterMove]] = None
     reason: str = Field(default="", max_length=400)
+
+    # ── Pedagogy-driven content judgments (optional; default-empty so
+    # legacy clients keep validating) ─────────────────────────────────
+    # The principle-cited router prompt asks the LLM to emit these
+    # alongside its move decision. The engine threads them into
+    # ``v2_trace.router`` for observability.
+    #
+    # ``intent``: the router's classification of the student turn.
+    # ``method_evidence_present``: did the student show working /
+    #   state the rule / apply a definition correctly in the last 3
+    #   turns? Drives Direct Instruction Ch.11 vs Cognitive Load Ch.14
+    #   expertise-reversal branching.
+    # ``named_their_reasoning``: did the student explicitly state the
+    #   rule / chain they applied? Required for ``name_misconception``.
+    # ``richness``: ``"rich"`` (student named the mechanism /
+    #   chain of reasoning) vs ``"bare"`` (just the answer). Drives
+    #   Deliberate Practice Ch.12 ``confirm_and_extend`` selection.
+    # ``rule_fired``: the principle-cited rule label that produced the
+    #   move (e.g. ``"Rule 5: Testing Effect Ch.20"``). Observability.
+    intent: Optional[RouterIntent] = None
+    method_evidence_present: Optional[bool] = None
+    named_their_reasoning: Optional[bool] = None
+    richness: Optional[str] = None  # "rich" | "bare" | None
+    rule_fired: Optional[str] = Field(default=None, max_length=80)
 
     @model_validator(mode="after")
     def _validate_case_shape(self) -> "RouterDecision":
