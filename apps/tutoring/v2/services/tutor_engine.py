@@ -1,27 +1,22 @@
 """TutorEngine — top-level orchestrator for the v2 conversational tutor.
 
-Post-prune (v2-prune-plan.md, Commit D):
-
 Per-turn pipeline:
+
   1. Build a ``RouterRequest`` and call the router FIRST,
      unconditionally. The router classifies the case
      (answer_attempt / help_request / opening_turn / forced_close)
      and either emits a single ``move`` (non-answer-attempt) or a
      ``moves_by_verdict`` enumeration (answer-attempt).
   2. If ``verdict_needed`` is True the engine grades, then looks up
-     the matching row in ``moves_by_verdict``. The engine does NO
-     decision logic — it is a trivial dict lookup. The grader-raise
-     fallback picks ``moves_by_verdict["wrong"]`` (most-conservative).
-  3. The tutor LLM emits a response (may call ``pose_question``
-     tool), steered by the router's ``reason`` as a single-sentence
-     hint.
+     the matching row in ``moves_by_verdict``. No decision logic on
+     the engine side — trivial dict lookup. On a grader raise the
+     engine picks ``moves_by_verdict["wrong"]`` (most-conservative).
+  3. The tutor LLM emits a response (may call ``pose_question``),
+     steered by the router's one-sentence ``reason``.
   4. ``run_gates_with_recovery`` runs safety / figure_ref /
      answer_leak with per-gate one-retry-then-degrade.
-  5. Phase B commits any PendingPose, the engine updates the
-     per-open-question + per-objective counters, persists state, ships.
-
-The deeper engine rewrite to a ~300-LOC thin orchestrator lands in
-Commit H (plan §4.5 + step 10).
+  5. Phase B commits any PendingPose, the engine updates per-open-
+     question + per-objective counters, persists state, ships.
 """
 
 from __future__ import annotations
@@ -183,19 +178,7 @@ class TutorEngine:
         context: TutoringContext,
         student_input: str,
     ) -> TurnResult:
-        """Run one full turn end-to-end.
-
-        Pipeline (Commit D):
-          1. Router runs FIRST, unconditionally — single source of
-             truth for move + case + whether the grader runs.
-          2. Grade ONLY if ``decision.verdict_needed``; then look up
-             the move from ``moves_by_verdict`` by the verdict.
-          3. Tutor LLM emits a response (may call ``pose_question``
-             tool), steered by ``decision.reason``.
-          4. ``run_gates_with_recovery`` runs safety / figure_ref /
-             answer_leak with per-gate one-retry-then-degrade.
-          5. Commit PendingPose (if any), persist counters, ship.
-        """
+        """Run one full turn end-to-end. See module docstring."""
         runtime_state = context.runtime_state
         objective_changed = False
         media_catalog = self._build_media_catalog(context)
@@ -481,16 +464,10 @@ class TutorEngine:
         decision: RouterDecision,
         verdict: Optional[GradingResult],
     ) -> str:
-        """Look up the move from the router's decision + grader verdict.
+        """Look up the final move from the router's decision + verdict.
 
-        - Non-answer-attempt: returns ``decision.move``.
-        - Answer-attempt with verdict: returns
-          ``decision.moves_by_verdict[verdict.verdict.value]``.
-        - Answer-attempt without verdict (grader raised): returns
-          ``decision.moves_by_verdict["wrong"]`` as the most-
-          conservative fallback (per Commit D §4.2).
-        - Validation pass: any move not in ``ALLOWED_MOVES`` is
-          normalised to ``scaffold_hint``.
+        Grader-raise fallback picks ``moves_by_verdict["wrong"]``.
+        Unknown moves normalize to ``scaffold_hint``.
         """
         if decision.verdict_needed:
             mbv = decision.moves_by_verdict or {}
