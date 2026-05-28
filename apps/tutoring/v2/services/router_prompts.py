@@ -114,9 +114,28 @@ relevant prior turns. Emit these judgments in your decision payload:
 
 (c) named_their_reasoning: true | false   (set only if the student's
     last turn was wrong / partial; otherwise null)
-    Did the student explicitly state the rule or chain they applied
-    ("I added 3 because…", "I think it's halfway", "because the side
-    is longer")? Required for name_misconception.
+    Did the student explicitly state the rule or chain they applied,
+    via a causal phrase that links a claim to its supporting
+    reasoning? This judgment is strict:
+      - TRUE only when the student's response contains an explicit
+        causal phrase — "because …", "since …", "I think it's X
+        because …", "because the <feature/quantity> is …", "due to
+        …", "the reason is …", or an equivalent construction that
+        links an answer to a reason in their own words. Examples:
+        "I added 3 because it's the next number", "I think it's
+        halfway because <…>", "it's True since deforestation
+        removes the roots", "D the quarrying because humans
+        weakened the rock".
+      - FALSE for bare answers, even when those answers include the
+        named option/term. A 2-3 word MCQ pick like "D the
+        quarrying", "B oxidation", "True", or "halfway" is the
+        student naming an OPTION, not their reasoning — set FALSE.
+        Likewise "I think A" or "maybe rain?" is a guess with no
+        stated reasoning — FALSE.
+      - The presence of the named noun is not sufficient. The
+        causal phrase ("because", "since", "due to", "the reason
+        is …") is what flips this to TRUE.
+    Required for name_misconception.
 
 (d) richness: "rich" | "bare" | null   (set only if you'll classify
     correct; otherwise null)
@@ -259,6 +278,14 @@ I-4: name_misconception requires named_their_reasoning == true.
 
 I-5: confirm_and_extend requires richness == "rich".
 
+I-6: close_topic via the correct branch (Rule 7) additionally requires
+     the wrong-to-correct ratio on the current objective to be ≤ 2:1
+     once THIS correct lands (i.e. objective_wrong ≤ 2 ×
+     (correct_on_objective + 1)). When the ratio is worse, the student
+     has not yet demonstrated the Mastery Learning Ch.13 standard on
+     this objective — pick confirm_and_advance on the next eligible
+     slot so they earn additional correct retrievals before close.
+
 ────────────────────────────────────────────────────────────────────
 OUTPUT SCHEMA — strict JSON, no prose before or after.
 
@@ -301,7 +328,7 @@ HARD RULES — non-negotiable.
 - Every `move` / `moves_by_verdict` value must be one of the 8
   closed move names. Any other value is rejected.
 - `reason` ≤ 400 characters; `rule_fired` ≤ 80 characters.
-- Apply the invariants I-1 .. I-5 — a violation is grounds for retry
+- Apply the invariants I-1 .. I-6 — a violation is grounds for retry
   with a principle-citation reminder.
 - Do NOT include the canonical answer or grader internals in any
   field. The tutor LLM works from its own grounding; leaking

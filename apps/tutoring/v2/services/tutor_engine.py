@@ -47,7 +47,11 @@ from apps.tutoring.v2.services.safety_gates import (
     run_gates_with_recovery,
 )
 from apps.tutoring.v2.services.student_grader import StudentGrader
-from apps.tutoring.v2.services.student_tutor import StudentTutor, TutorResponse
+from apps.tutoring.v2.services.student_tutor import (
+    POSE_DOMINANT_MOVES,
+    StudentTutor,
+    TutorResponse,
+)
 
 
 # The full move table per design/tasks/move-router-implementation-plan.md
@@ -246,6 +250,20 @@ class TutorEngine:
         # Resolve the final move from the router's decision.
         selected_move = self._resolve_move(
             decision=router_decision, verdict=verdict,
+        )
+        # Deterministic precondition floor: a pose-dominant move whose
+        # name promises a pose ("advance" / "extend" / "pivot") cannot
+        # honor that promise when no bank slot remains to pose. The
+        # router can land here when ``open_question_present == true``
+        # blocks Rule 1 (lesson_complete) while ``assessable_slots_
+        # remaining == 0``. In that state ``select_pose_slot`` returns
+        # ``exhausted=True``, the forced-tool LLM call emits no
+        # lead-in text, and the student sees an empty turn. Override to
+        # ``close_topic`` BEFORE invoking the tutor.
+        selected_move = self._apply_pose_dominant_floor(
+            selected_move=selected_move,
+            context=context,
+            runtime_state=runtime_state,
         )
         router_reason = (router_decision.reason or "")
 
@@ -549,6 +567,46 @@ class TutorEngine:
                 f"ALLOWED_MOVES — MoveRouter contract violated"
             )
         return chosen
+
+    def _apply_pose_dominant_floor(
+        self,
+        *,
+        selected_move: str,
+        context: TutoringContext,
+        runtime_state: SessionRuntimeState,
+    ) -> str:
+        """Override a pose-dominant move to ``close_topic`` when no slot remains.
+
+        Pose-dominant moves (``confirm_and_advance``, ``confirm_and_extend``,
+        ``pivot``) force a tool call via ``tool_choice="any"``. When
+        ``assessable_slots_remaining == 0`` the tool returns
+        ``exhausted=True``, the forced-tool LLM call emits no lead-in
+        text, and the student sees an empty turn. Honor the move's own
+        invariant (a pose-dominant move requires a pose) by closing the
+        topic instead.
+
+        Emits a ``router.floor_override`` audit span so the v2
+        observability dashboard surfaces every override.
+        """
+        if selected_move not in POSE_DOMINANT_MOVES:
+            return selected_move
+        remaining = self._assessable_slots_remaining(
+            context=context, runtime_state=runtime_state,
+        )
+        if remaining > 0:
+            return selected_move
+        with emit_span(
+            "audit",
+            "router.floor_override",
+            payload={
+                "original_move": selected_move,
+                "override_move": "close_topic",
+                "reason": "pose_dominant_with_no_slots",
+                "assessable_slots_remaining": remaining,
+            },
+        ):
+            pass
+        return "close_topic"
 
     # ------------------------------------------------------------------
     # Counter bookkeeping

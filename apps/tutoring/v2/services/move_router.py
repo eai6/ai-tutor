@@ -352,7 +352,7 @@ class MoveRouter:
         decision: RouterDecision,
         request: "RouterRequest",
     ) -> Optional[str]:
-        """Validate Invariants I-1 .. I-5 from the router prompt.
+        """Validate Invariants I-1 .. I-6 from the router prompt.
 
         Returns a violation message (suitable for the retry reminder)
         when an invariant is broken, or None when the decision is
@@ -371,6 +371,10 @@ class MoveRouter:
                prior_delivered_lesson_step_count == 0
           I-4: name_misconception requires named_their_reasoning == true
           I-5: confirm_and_extend requires richness == "rich"
+          I-6: close_topic via correct branch requires the wrong:correct
+               ratio on the objective to be ≤ 2:1 once THIS correct
+               lands (objective_wrong ≤ 2 × (correct_on_objective + 1)).
+               Mastery Learning Ch.13 — hold the bar, vary the path.
 
         Implementation note: we only enforce invariants whose violation
         would produce an observable P1 (e.g. a premature close, an
@@ -450,6 +454,30 @@ class MoveRouter:
                     f"{decision.richness!r}. Pick confirm_and_advance "
                     "instead."
                 )
+            # I-6: Mastery Learning Ch.13 — hold the bar. A close on the
+            # correct branch must land with a wrong:correct ratio ≤ 2:1
+            # once THIS correct counts. ``objective_wrong`` and
+            # ``correct_on_objective`` come from
+            # ``runtime_state.objective_progress`` (engine writes them
+            # AFTER the router runs, so the current turn isn't included
+            # — we add 1 to ``correct_on_objective`` to model the close
+            # landing).
+            if mbv.get("correct") == "close_topic":
+                wrong_count = request.objective_wrong
+                effective_correct = request.correct_on_objective + 1
+                if wrong_count > 2 * effective_correct:
+                    return (
+                        "Invariant I-6 violated: close_topic on the "
+                        "correct branch requires wrong:correct ratio "
+                        "≤ 2:1 on the objective once this correct "
+                        f"lands; got objective_wrong={wrong_count}, "
+                        "effective_correct="
+                        f"{effective_correct}. Pick confirm_and_advance "
+                        "instead — the student has not yet demonstrated "
+                        "the Mastery Learning Ch.13 standard on this "
+                        "objective; more correct retrievals are needed "
+                        "before close."
+                    )
 
         return None
 
