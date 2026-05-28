@@ -7,10 +7,10 @@ the "routing" entry point the engine code refers to:
      — Phase 1 contract: ``NEW_TUTOR=off`` keeps legacy; ``NEW_TUTOR=on``
      stamps engine_version='v2' and initializes runtime_state.
 
-  2. MOVE dispatch via ``TutorEngine.pick_move`` — design/tasks/
-     move-router-implementation-plan.md §5.4: the router LLM picks a
-     move and the deterministic safety floors can override. The tests
-     use a ``FakeRouter`` so we don't burn an LLM in unit tests.
+  2. MOVE dispatch via ``TutorEngine.pick_move`` — post-prune (commit
+     A of v2-prune-plan.md): the router LLM picks a move and the
+     engine does not override (no safety_floors layer). The tests use
+     a ``FakeRouter`` so we don't burn an LLM in unit tests.
 """
 
 from types import SimpleNamespace
@@ -170,36 +170,6 @@ def test_pick_move_passes_through_focus_note_and_principles():
     assert move == "explain"
     assert "condensation" in focus
     assert "Direct Instruction" in principles
-
-
-def test_pick_move_help_regex_floor_overrides_when_router_misses():
-    """Router picked scaffold_hint but the student said "explain it" —
-    floor #5 backstops to explain."""
-    router = _FakeRouter(_decision(move="scaffold_hint"))
-    engine = _engine_with(router)
-    move, _, _, _ = engine.pick_move(
-        context=_context(),
-        verdict=None,
-        student_input="explain it to me",
-        pose_tool_available=True,
-    )
-    assert move == "explain"
-
-
-def test_pick_move_turn_caps_floor_overrides_to_close():
-    state = SessionRuntimeState()
-    state.safety_valve_counters = SafetyValveCounters(
-        turns_on_current_objective=12,
-    )
-    router = _FakeRouter(_decision(move="scaffold_hint"))
-    engine = _engine_with(router)
-    move, _, _, _ = engine.pick_move(
-        context=_context(runtime_state=state),
-        verdict=None,
-        student_input="12",
-        pose_tool_available=True,
-    )
-    assert move == "close_topic"
 
 
 def test_pick_move_threads_objective_progress_into_router_request():

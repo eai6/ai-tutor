@@ -1,23 +1,23 @@
 """TutorEngine — top-level orchestrator for the v2 conversational tutor.
 
-The engine:
+Post-prune (v2-prune-plan.md, Commit A — steps 1+2+3):
 
-  - Picks moves via the LLM ``MoveRouter`` + 5 deterministic safety
-    floors (design/tasks/move-router-implementation-plan.md). The
-    router decides WHAT to do (move + principle emphasis + focus
-    note); the floors catch the highest-cost shapes (turn caps,
-    objective-evidence saturation, name_misconception repeat without
-    progress, pose-tool saturation, help-request misroute).
-  - Routes turns through StudentGrader → StudentTutor → conformance,
-    with a single conformance retry, a move-escalation pass on second
-    failure, and a verdict-keyed safe template as the floor under
-    that.
-  - Fires the ``StudentSkillMastery`` write hook after a ``correct``
-    or ``wrong`` verdict — dashboard-only side effect, NOT consumed
-    by move selection or move prompts.
-  - Emits per-stage spans through ``apps.tutoring.tracing.emit_span``
-    so the per-turn rollup landing in ``SessionTurn.judge_outputs.v2_trace``
-    is complete.
+  - Conformance package, safe templates, safety floors, move
+    escalation, and the question extractor are all gone. The engine
+    no longer runs an audit-over-generation classifier and never
+    falls back to a fake teacher line.
+  - Each turn: optional grade → router (LLM) → tutor LLM →
+    ``run_gates_with_recovery`` (3 deterministic gates with per-gate
+    one-retry-then-degrade) → persist + ship. The response ALWAYS
+    ships; the frontend never sees a gate-failed error.
+  - Help-request short-circuit (regex) still runs at the engine layer
+    so the grader isn't called on a help turn — this layer goes away
+    in Commit D when the router prompt classifies help-requests
+    explicitly.
+
+The deeper engine rewrite to a ~300-LOC thin orchestrator lands in
+Commit H (plan §4.5 + step 10). Commit A keeps the existing shape so
+the diff is contained.
 """
 
 from __future__ import annotations
@@ -37,37 +37,24 @@ from apps.tutoring.v2.contracts import (
     TutoringContext,
     Verdict,
 )
-from apps.tutoring.v2.services.conformance import (
-    ConformanceCheck,
-    ConformanceResult,
-    classify_conformance_failure,
-)
 from apps.tutoring.v2.services.context_manager import ContextManager
 from apps.tutoring.v2.services.media import MediaService
-from apps.tutoring.v2.services.move_escalation import (
-    escalation_target,
-    is_terminal as is_terminal_move,
-)
 from apps.tutoring.v2.services.move_router import (
     MoveRouter,
     build_router_request,
 )
-from apps.tutoring.v2.services.question_extractor import (
-    ExtractionResult,
-    QuestionExtractor,
-)
-from apps.tutoring.v2.services.safety_floors import (
-    FloorOutcome,
-    apply_safety_floors,
+from apps.tutoring.v2.services.safety_gates import (
+    GateContext,
+    RecoveryResult,
+    run_gates_with_recovery,
 )
 from apps.tutoring.v2.services.student_grader import StudentGrader
-from apps.tutoring.v2.services.student_tutor import StudentTutor
-from apps.tutoring.v2.services.templates import MoveAnchor, render_safe_template
+from apps.tutoring.v2.services.student_tutor import StudentTutor, TutorResponse
 
 
-# The full move table after the router cutover (plan §2.5). ``pose_question``
-# is gone; every move is either non-terminal pose-capable or the terminal
-# ``close_topic``.
+# The full move table per design/tasks/move-router-implementation-plan.md
+# §2.5. ``pose_question`` is gone; every move is either non-terminal
+# pose-capable or the terminal ``close_topic``.
 ALLOWED_MOVES: tuple[str, ...] = (
     "confirm_and_advance",
     "confirm_and_extend",
@@ -96,13 +83,10 @@ _HELP_REQUEST_RE = re.compile(
 
 
 def _looks_like_help_request(student_input: str) -> bool:
-    """Deterministic help-request backstop.
+    """Deterministic help-request backstop — skip grading on help turns.
 
-    Mirrors the regex in ``apps/tutoring/v2/services/safety_floors.py``
-    floor #5. Used at the engine layer to skip the grader on
-    help-requests: grading them produces a meaningless ``unverified``
-    verdict that downstream conformance can't comply with on the
-    explain / worked_example response.
+    Goes away in Commit D when the router prompt classifies the
+    help-request case explicitly.
     """
     text = (student_input or "").strip()
     if not text:
@@ -111,13 +95,7 @@ def _looks_like_help_request(student_input: str) -> bool:
 
 
 def _doing_rate_observability(window: list) -> dict:
-    """Compact doing-rate summary for ``v2_trace`` (legacy field).
-
-    Post-router cutover (plan §3) the doing-rate window is no longer
-    written to — the router observes the transcript directly. The
-    observability rollup still surfaces whatever's in the field for
-    backwards compatibility with dashboards.
-    """
+    """Compact doing-rate summary for ``v2_trace`` (legacy field)."""
     truthy = sum(1 for b in window if bool(b))
     total = len(window)
     return {
@@ -129,24 +107,13 @@ def _doing_rate_observability(window: list) -> dict:
 
 @dataclass
 class TurnResult:
-    """Bundle returned from TutorEngine.respond() / start_session().
-
-    ``is_lesson_complete`` is True only when ``close_topic`` fired on
-    the FINAL lesson step. Intermediate ``close_topic`` turns (still
-    more steps to teach) leave this False so the router keeps the
-    session active and re-opens the next step's tutoring. This is the
-    contract that lets one ``close_topic`` move advance per-step
-    rather than ending the whole lesson on the first objective hit
-    (Science of learning principle: Mastery Learning — gate
-    every step on its own evidence; Active Learning — practice
-    counts must accumulate per session, not collapse to one).
-    """
+    """Bundle returned from TutorEngine.respond() / start_session()."""
 
     response_text: str
     runtime_state: SessionRuntimeState
     selected_move: str
     verdict: Optional[GradingResult] = None
-    fallback_used: bool = False
+    fallback_used: bool = False  # always False post-prune (no templates)
     v2_trace: dict = field(default_factory=dict)
     is_lesson_complete: bool = False
     advanced_to_step_index: Optional[int] = None
@@ -162,31 +129,21 @@ class TutorEngine:
         *,
         grader: Optional[StudentGrader] = None,
         tutor: Optional[StudentTutor] = None,
-        conformance: Optional[ConformanceCheck] = None,
         media_service: Optional[MediaService] = None,
-        question_extractor: Optional[QuestionExtractor] = None,
         move_router: Optional[MoveRouter] = None,
     ) -> None:
         self.context_manager = context_manager
         self.grader = grader or StudentGrader()
         self.tutor = tutor or StudentTutor()
-        self.conformance = conformance or ConformanceCheck(grader=self.grader)
         self.media_service = media_service or MediaService()
-        self.question_extractor = question_extractor or QuestionExtractor()
         self.move_router = move_router or MoveRouter()
 
     # ------------------------------------------------------------------
-    # Turn entrypoints (Phase 2)
+    # Turn entrypoints
     # ------------------------------------------------------------------
 
     def start_session(self, context: TutoringContext) -> TurnResult:
-        """Produce the opening turn for a new session.
-
-        No verdict, no student input — the router picks an opening
-        move (almost always ``explain`` or ``worked_example``) and
-        StudentTutor renders it with the router's focus_note +
-        principle emphasis.
-        """
+        """Produce the opening turn for a new session."""
         runtime_state = context.runtime_state
         media_catalog = self._build_media_catalog(context)
         pose_tool_available = self._pose_tool_available(
@@ -204,7 +161,6 @@ class TutorEngine:
             "selected_move": move,
             "verdict": None,
             "fallback_used": False,
-            "retry_used": False,
             "router_focus_note": (focus_note or "")[:160],
             "router_principle_emphasis": list(principle_emphasis or []),
         }
@@ -229,23 +185,11 @@ class TutorEngine:
                 "[TutorEngine] start_session tutor.respond raised %s",
                 type(exc).__name__,
             )
-            response_text = render_safe_template(
-                verdict=None,
-                student_claim_present=False,
-                next_action_text="Let's get started together.",
-                move_anchor=self._build_move_anchor(
-                    context=context,
-                    selected_move=move,
-                    runtime_state=runtime_state,
-                ),
-            )
-            v2_trace["fallback_used"] = True
+            response_text = "Welcome — let's get started together."
 
-        # Phase B commit (if a tool-call PendingPose came back).
-        # ``start_session`` skips conformance — the opening message
-        # has no verdict to gate. We still commit because the LLM
-        # used the tool channel; the bank stem is verbatim from a
-        # validated step.
+        # Phase B commit (if a tool-call PendingPose came back). The
+        # opening turn has no verdict; gates are skipped (no canonical
+        # to leak, no figure to misref) — committing the pose is safe.
         if pending_pose is not None:
             try:
                 runtime_state = self.context_manager.commit_pending_pose(
@@ -257,7 +201,6 @@ class TutorEngine:
                     type(exc).__name__,
                 )
 
-        # Persist state — opening turn updates counters, no verdict.
         runtime_state.current_move = move
         runtime_state.move_history = list(runtime_state.move_history) + [move]
         runtime_state = self.update_counters_post_turn(
@@ -270,7 +213,7 @@ class TutorEngine:
             runtime_state=runtime_state,
             selected_move=move,
             verdict=None,
-            fallback_used=v2_trace["fallback_used"],
+            fallback_used=False,
             v2_trace=v2_trace,
         )
 
@@ -281,36 +224,22 @@ class TutorEngine:
     ) -> TurnResult:
         """Run one full turn end-to-end.
 
-        Order (per analysis §3 turn-by-turn flow):
-          1. Grade (only when an assessment question is open).
-          2. Select move from inputs (pure function + safety valves).
-          3. Tutor generates one response.
-          4. Conformance check; on reject → ONE retry; on second
-             reject → safe terminal template.
-          5. Record skill practice (correct/wrong only — dashboard).
-          6. Persist runtime state.
-          7. Return ``TurnResult`` with v2_trace rollup.
-
-        The caller (views.py) is responsible for persisting the
-        ``SessionTurn`` row and flushing buffered spans against it.
+        Pipeline (Commit A — steps 1+2+3):
+          1. Grade — only when an assessment question is open AND the
+             student input is plausibly an attempt at it.
+          2. Pick the move via the LLM router (no engine-side floors).
+          3. Tutor LLM emits a response (may call ``pose_question`` tool).
+          4. ``run_gates_with_recovery`` runs safety / figure_ref /
+             answer_leak with per-gate one-retry-then-degrade.
+          5. Commit PendingPose (if any), persist counters, ship.
         """
         runtime_state = context.runtime_state
         objective_changed = False
         media_catalog = self._build_media_catalog(context)
 
         # 1. Grade — only when there's an open question AND the student
-        # input is plausibly an attempt at it. Explicit help-requests
-        # ("can you explain", "show me how", "I don't understand") are
-        # not answer attempts and must not be graded: grading them
-        # produces a meaningless ``unverified`` verdict that then
-        # forces the unverified verdict-matrix rules onto the
-        # downstream explain / worked_example response, which can't
-        # comply (a worked example by construction makes factual
-        # claims and does not "surface uncertainty"). Use the same
-        # deterministic regex backstop the router safety floor uses
-        # (plan §2.3 floor #5) — no LLM call needed at this layer; the
-        # router LLM gets the unredacted student input on the same
-        # turn and picks explain / worked_example accordingly.
+        # input is plausibly an attempt at it. Skipped on help-requests
+        # (regex backstop until Commit D updates the router prompt).
         is_help_request = _looks_like_help_request(student_input)
 
         verdict: Optional[GradingResult] = None
@@ -326,10 +255,9 @@ class TutorEngine:
                         open_question=runtime_state.open_question,
                         student_input=student_input,
                         is_math=self._is_math_lesson(context),
-                        kb_chunks=[],  # Phase 3: KB retrieval pass
+                        kb_chunks=[],
                     ),
                 )
-                # Update per-objective progress + attempts counter.
                 self._update_objective_progress(
                     runtime_state=runtime_state,
                     verdict=verdict,
@@ -337,22 +265,10 @@ class TutorEngine:
                 )
                 if verdict.verdict == Verdict.CORRECT:
                     runtime_state.attempts_on_open_question = 0
-                    # Phase 4 Fix 2a (moved upstream) — clear the
-                    # open_question NOW, before move selection picks
-                    # confirm_and_advance / confirm_and_extend.
-                    # Otherwise the in-turn new pose trips the
-                    # stickiness gate against the stale open
-                    # question. Principle #4 Mastery Learning Ch.13:
-                    # a satisfied question is no longer the
-                    # knowledge frontier and must not anchor the next
-                    # tutor turn's posing.
                     if runtime_state.open_question is not None:
                         runtime_state.open_question = None
                 else:
                     runtime_state.attempts_on_open_question += 1
-                # Bare-answer signal counter (Phase 2 §2.1.1). Counter
-                # lives on runtime_state for future tuning; not consumed
-                # by move selection or move prompts.
                 if verdict.bare_answer:
                     key = (context.current_objective or "_").strip() or "_"
                     runtime_state.bare_answer_counts_by_objective[key] = (
@@ -365,7 +281,8 @@ class TutorEngine:
                 )
                 verdict = GradingResult(verdict=Verdict.UNVERIFIED)
 
-        # 2. Select move via the LLM router + deterministic safety floors.
+        # 2. Pick the move via the LLM router. No safety_floors layer —
+        # the router's decision is the single source of truth.
         pose_tool_available = self._pose_tool_available(
             context=context, runtime_state=runtime_state,
         )
@@ -382,8 +299,9 @@ class TutorEngine:
             media_catalog=media_catalog,
         )
 
-        # 3. Tutor → first attempt.
-        first_resp = self._invoke_tutor_or_fallback(
+        # 3. Tutor → emit a response. Raises become a one-line safe
+        # string (no template module any more).
+        first_resp = self._invoke_tutor(
             context=context,
             verdict=verdict,
             move=selected_move,
@@ -394,267 +312,64 @@ class TutorEngine:
         )
         attempt_text = first_resp.text
         committed_pose = first_resp.pending_pose
-        # Grounding headers the LLM emitted (or didn't) — preserved
-        # for v2_trace.grounding so the observability dashboard can
-        # surface turns where the LLM's stated grounding contradicts
-        # the visible response.
         grounding = dict(getattr(first_resp, "grounding", {}) or {})
 
-        # 3b. Post-render question extraction (Phase 4, Fix 2c).
-        # Subject-agnostic Haiku call counts the distinct action prompts
-        # in the rendered turn. Two invariants enforced here, BEFORE
-        # the deterministic conformance gates:
-        #   - One action prompt per turn
-        #     (Principle #5 Minimising Cognitive Load Ch.14 —
-        #     one idea per turn).
-        #   - Active end on every turn
-        #     (Principle #1 Active Learning Ch.10 — student must be
-        #     *doing* on ≥60% of turns).
-        # The extractor outcome is surfaced to conformance as violation
-        # hints; the existing retry → escalation path handles it. The
-        # extractor is FAIL-SOFT: on outage it reports a single action
-        # prompt so conformance behaviour is unchanged. This preserves
-        # the design principle of deterministic gates as safety floors,
-        # not flow controllers.
-        first_extraction = self.question_extractor.extract(
-            tutor_text=attempt_text, selected_move=selected_move,
-        )
-        extractor_violations = self._extractor_violations(
-            extraction=first_extraction, selected_move=selected_move,
-        )
-        retry_extraction: Optional[ExtractionResult] = None
-
-        # 4. Conformance check.
-        prior_student_turn = self._prior_student_turn(context)
-        bank_stems = self._bank_stems_for_context(context)
-        recent_student_turns = self._recent_student_turns(context)
+        # 4. Safety gates with per-gate one-retry-then-degrade recovery.
         attached_media_count, figure_facts = self._media_counts_and_facts(
             attempt_text=attempt_text, catalog=media_catalog,
         )
         lesson_has_media = bool(media_catalog)
-        pose_tool_available = self._pose_tool_available(
-            context=context, runtime_state=runtime_state,
-        )
-        conf_result = self.conformance.run(
-            candidate_response=attempt_text,
+        gate_ctx = GateContext(
             verdict=verdict,
-            runtime_state=runtime_state,
-            selected_move=selected_move,
-            prior_student_turn=prior_student_turn,
             open_question_stem=(
                 runtime_state.open_question.rendered_stem
                 if runtime_state.open_question
                 else ""
             ),
+            private_canonical=(verdict.private_canonical if verdict else ""),
             attached_media_count=attached_media_count,
             figure_facts=figure_facts,
-            bank_stems=bank_stems,
-            recent_student_turns=recent_student_turns,
-            private_canonical=(verdict.private_canonical if verdict else ""),
-            context=context,
-            posed_via_tool=(first_resp.pending_pose is not None),
+            available_figure_descriptions=[
+                (m.get("description") or m.get("title") or "")[:200]
+                for m in (media_catalog or [])
+            ],
+            posed_via_tool=(committed_pose is not None),
             lesson_has_media=lesson_has_media,
-            pending_pose=first_resp.pending_pose,
-            pose_tool_available=pose_tool_available,
         )
-        # Phase 4 Fix 2c — fold extractor violations into the
-        # conformance result so the existing retry path handles them
-        # identically to deterministic-gate violations.
-        if extractor_violations:
-            conf_result.violations = list(conf_result.violations) + list(
-                extractor_violations
-            )
-            conf_result.passed = False
 
-        fallback_used = False
-        retry_classification: Optional[str] = None
-        if not conf_result.passed:
-            # Fix 3 (pose-question two-phase commit): classify the
-            # conformance failure so we know whether to HOLD the first
-            # attempt's PendingPose (prose-only violations — re-render
-            # prose, Phase A does NOT re-run) or to run the full
-            # pipeline (pose_related / mixed — Phase A re-runs from
-            # scratch).
-            retry_classification = classify_conformance_failure(
-                list(conf_result.violations),
-                pending_pose=first_resp.pending_pose,
-            )
-            hold_for_retry = (
-                first_resp.pending_pose
-                if retry_classification == "prose_only"
-                else None
-            )
-            # One retry on rejection — surface violations to the tutor.
-            with emit_span("audit", "tutor.retry") as span:
-                retry_resp = self._invoke_tutor_or_fallback(
+        def _retry_fn(reminder: str) -> str:
+            try:
+                retried = self._invoke_tutor(
                     context=context,
                     verdict=verdict,
                     move=selected_move,
                     media_catalog=media_catalog,
                     student_input=student_input,
-                    violation_hints=conf_result.violations,
                     focus_note=router_focus_note,
                     principle_emphasis=router_principle_emphasis,
-                    hold_pending_pose=hold_for_retry,
+                    extra_reminder=reminder,
+                    hold_pending_pose=committed_pose,
                 )
-                if span is not None:
-                    span["payload"] = {
-                        "violations": conf_result.violations[:5],
-                        "retry_classification": retry_classification,
-                        "held_pending_pose": hold_for_retry is not None,
-                    }
-            retry_text = retry_resp.text
-
-            retry_extraction = self.question_extractor.extract(
-                tutor_text=retry_text, selected_move=selected_move,
-            )
-            retry_extractor_violations = self._extractor_violations(
-                extraction=retry_extraction, selected_move=selected_move,
-            )
-
-            retry_conf = self.conformance.run(
-                candidate_response=retry_text,
-                verdict=verdict,
-                runtime_state=runtime_state,
-                selected_move=selected_move,
-                prior_student_turn=prior_student_turn,
-                open_question_stem=(
-                    runtime_state.open_question.rendered_stem
-                    if runtime_state.open_question
-                    else ""
-                ),
-                attached_media_count=attached_media_count,
-                figure_facts=figure_facts,
-                bank_stems=bank_stems,
-                recent_student_turns=recent_student_turns,
-                private_canonical=(verdict.private_canonical if verdict else ""),
-                context=context,
-                posed_via_tool=(retry_resp.pending_pose is not None),
-                lesson_has_media=lesson_has_media,
-                pending_pose=retry_resp.pending_pose,
-                pose_tool_available=pose_tool_available,
-            )
-            retry_conf.retry_used = True
-            if retry_extractor_violations:
-                retry_conf.violations = list(retry_conf.violations) + list(
-                    retry_extractor_violations
+                return retried.text or ""
+            except Exception as exc:
+                logger.warning(
+                    "[TutorEngine] gate retry tutor.respond raised %s",
+                    type(exc).__name__,
                 )
-                retry_conf.passed = False
+                return ""
 
-            if retry_conf.passed:
-                attempt_text = retry_text
-                conf_result = retry_conf
-                # Retry's PendingPose replaces the first attempt's —
-                # Phase A ran from scratch on retry.
-                committed_pose = retry_resp.pending_pose
-                grounding = dict(
-                    getattr(retry_resp, "grounding", {}) or {}
-                )
-            else:
-                # Phase 4 Fix 3 — move ESCALATION rather than a
-                # verdict-keyed prose blob. The move-escalation ladder
-                # picks the principled neighbour move (test → teach
-                # the method → re-frame → hand off) and runs ONE more
-                # tutor + conformance attempt. The escalated move's
-                # safe-terminal template is the floor if THAT also
-                # fails — so the student still gets the escalated
-                # move's pedagogy, not a generic apology.
-                #
-                # Active Learning preserved: every move in the ladder
-                # ends with an action the student takes
-                # (Principle #1 Active Learning Ch.10).
-                escalated_move = escalation_target(selected_move)
-                if (
-                    escalated_move
-                    and escalated_move != selected_move
-                    and escalated_move in ALLOWED_MOVES
-                ):
-                    (
-                        esc_text,
-                        esc_pose,
-                        esc_conf,
-                        esc_extraction,
-                        esc_grounding,
-                    ) = self._run_escalation_attempt(
-                        context=context,
-                        verdict=verdict,
-                        escalated_move=escalated_move,
-                        media_catalog=media_catalog,
-                        student_input=student_input,
-                        prior_student_turn=prior_student_turn,
-                        bank_stems=bank_stems,
-                        recent_student_turns=recent_student_turns,
-                        attached_media_count=attached_media_count,
-                        figure_facts=figure_facts,
-                        lesson_has_media=lesson_has_media,
-                        runtime_state=runtime_state,
-                        focus_note=router_focus_note,
-                        principle_emphasis=router_principle_emphasis,
-                    )
-                    if esc_conf.passed:
-                        attempt_text = esc_text
-                        conf_result = esc_conf
-                        conf_result.retry_used = True
-                        # Record the escalation in the trace via the
-                        # selected_move surface so observability shows
-                        # WHICH move was emitted.
-                        selected_move = escalated_move
-                        committed_pose = esc_pose
-                        retry_extraction = esc_extraction
-                        grounding = esc_grounding
-                    else:
-                        # Escalation also failed — fall through to the
-                        # safe terminal template, but keyed to the
-                        # ESCALATED move so the floor delivers that
-                        # move's pedagogy minimum (worked example body
-                        # / explain framing / etc.).
-                        fallback_used = True
-                        conf_result = esc_conf
-                        conf_result.fallback_used = True
-                        committed_pose = None
-                        retry_extraction = esc_extraction
-                        selected_move = escalated_move
-                        attempt_text = render_safe_template(
-                            verdict=verdict,
-                            student_claim_present=(
-                                conf_result.labels.student_claim_present
-                                if conf_result.labels is not None
-                                else False
-                            ),
-                            next_action_text="",
-                            move_anchor=self._build_move_anchor(
-                                context=context,
-                                selected_move=escalated_move,
-                                runtime_state=runtime_state,
-                            ),
-                        )
-                else:
-                    # Terminal move (close_topic) or no escalation
-                    # available — render the safe template at the
-                    # original move. Discard any pending pose.
-                    fallback_used = True
-                    conf_result = retry_conf
-                    conf_result.fallback_used = True
-                    committed_pose = None
-                    attempt_text = render_safe_template(
-                        verdict=verdict,
-                        student_claim_present=(
-                            conf_result.labels.student_claim_present
-                            if conf_result.labels is not None
-                            else False
-                        ),
-                        next_action_text="",
-                        move_anchor=self._build_move_anchor(
-                            context=context,
-                            selected_move=selected_move,
-                            runtime_state=runtime_state,
-                        ),
-                    )
+        recovery: RecoveryResult = run_gates_with_recovery(
+            attempt_text,
+            ctx=gate_ctx,
+            retry_fn=_retry_fn,
+        )
+        attempt_text = recovery.text
 
-        # 4b. Phase B commit (Phase 1 §4): only commits if conformance
-        # accepted AND the LLM called the pose_question tool. Updates
-        # ``runtime_state.open_question`` + appends to the ledger so
-        # the next turn's grader has something to grade against.
+        # 4b. Phase B commit — only if the LLM called the pose tool. The
+        # pose validation already happened inside StudentTutor (Phase A);
+        # commit here unconditionally so the next turn's grader has the
+        # canonical answer. A degraded response still references the
+        # posed question for the student to answer.
         if committed_pose is not None:
             try:
                 runtime_state = self.context_manager.commit_pending_pose(
@@ -665,7 +380,6 @@ class TutorEngine:
                     "[TutorEngine] commit_pending_pose raised %s — pose dropped",
                     type(exc).__name__,
                 )
-
 
         # 5. Skill-mastery write hook (dashboard-only, isolated).
         if verdict is not None:
@@ -685,13 +399,7 @@ class TutorEngine:
         )
         self.context_manager.save_runtime_state(runtime_state)
 
-        # 6b. Step advancement on close_topic — when more steps remain
-        # in the lesson, advance to the next step rather than ending
-        # the lesson. Only the FINAL step's close_topic marks the
-        # session lesson-complete. (Mastery Learning — every
-        # step gets its own evidence bar; Active Learning —
-        # multi-step lessons must accumulate practice across steps,
-        # not collapse to the first objective hit.)
+        # 6b. Step advancement on close_topic.
         is_lesson_complete = False
         advanced_to_step_index: Optional[int] = None
         if selected_move == "close_topic":
@@ -701,25 +409,22 @@ class TutorEngine:
             is_lesson_complete = advanced_to_step_index is None
 
         # 7. Build v2_trace rollup for SessionTurn.judge_outputs.v2_trace.
-        # ``question_extractor`` records the final-attempt action_count
-        # / has_active_end so observability can spot Active-Learning
-        # violations even when conformance passed.
-        final_extraction: ExtractionResult = (
-            retry_extraction if retry_extraction is not None else first_extraction
-        )
         v2_trace = {
             "selected_move": selected_move,
             "verdict": verdict.verdict.value if verdict else None,
             "verdict_bare_answer": verdict.bare_answer if verdict else False,
-            "conformance_violations": list(conf_result.violations),
-            "conformance_labels": (
-                conf_result.labels.model_dump()
-                if conf_result.labels is not None
-                else None
-            ),
-            "retry_used": conf_result.retry_used,
-            "fallback_used": fallback_used,
-            "retry_classification": retry_classification,
+            "gate_failures": [
+                {
+                    "gate": f.gate,
+                    "attempt": f.attempt,
+                    "reason": (f.reason or "")[:200],
+                    "degraded": f.degraded,
+                }
+                for f in recovery.failures
+            ],
+            "gate_first_attempt_failures": recovery.first_attempt_failure_gates,
+            "gate_degraded_gates": recovery.degraded_gates,
+            "fallback_used": False,
             "is_lesson_complete": is_lesson_complete,
             "advanced_to_step_index": advanced_to_step_index,
             "router": {
@@ -729,24 +434,13 @@ class TutorEngine:
                 ),
                 "focus_note": (router_decision.focus_note or "")[:160],
                 "rationale": (router_decision.rationale or "")[:200],
-                "floor_overridden": (
-                    router_decision.chosen_move != selected_move
-                    or fallback_used
-                ),
-            },
-            "question_extractor": {
-                "action_count": final_extraction.action_count,
-                "has_active_end": final_extraction.has_active_end,
-                "available": final_extraction.available,
+                # Router is now the single source of truth — selected_move
+                # always equals router's chosen_move (no engine override).
+                "floor_overridden": False,
             },
             "doing_rate_5turn": _doing_rate_observability(
                 runtime_state.student_doing_rate_window or []
             ),
-            # GRADER / EVIDENCE grounding lines the LLM emitted (or
-            # didn't) for the final-attempt response. ``missing`` is a
-            # list of header names absent from the response — non-empty
-            # values let the observability dashboard surface turns where
-            # the prompt's grounding directive wasn't followed.
             "grounding": grounding,
         }
 
@@ -755,14 +449,14 @@ class TutorEngine:
             runtime_state=runtime_state,
             selected_move=selected_move,
             verdict=verdict,
-            fallback_used=fallback_used,
+            fallback_used=False,
             v2_trace=v2_trace,
             is_lesson_complete=is_lesson_complete,
             advanced_to_step_index=advanced_to_step_index,
         )
 
     # ------------------------------------------------------------------
-    # LLM-driven move selection (design/tasks/move-router-implementation-plan.md)
+    # LLM-driven move selection
     # ------------------------------------------------------------------
 
     def pick_move(
@@ -774,22 +468,11 @@ class TutorEngine:
         pose_tool_available: bool,
         media_catalog: Optional[list[dict]] = None,
     ) -> tuple[str, str, list[str], RouterDecision]:
-        """Route the turn via the LLM ``MoveRouter`` + deterministic floors.
+        """Route the turn via the LLM ``MoveRouter`` — no engine-side floors.
 
-        Returns ``(final_move, focus_note, principle_emphasis, router_decision)``.
-
-        The router decides WHAT to do (move + principle emphasis +
-        focus note). The deterministic safety floors then catch the
-        highest-cost shapes (turn caps, evidence saturation,
-        misconception-without-progress, pose-tool saturation, help-
-        request misroute). Each floor that fires emits a
-        ``router.floor_override`` span.
-
-        ``focus_note`` and ``principle_emphasis`` are taken straight
-        from the router's decision — they describe *this turn
-        specifically*, regardless of whether a floor overrode the
-        chosen_move. The move LLM uses them to specialize the per-move
-        prompt body to the current situation.
+        Returns ``(final_move, focus_note, principle_emphasis,
+        router_decision)``. ``final_move`` is the router's chosen move
+        verbatim; the engine no longer overrides it.
         """
         with emit_span("audit", "tutor.move_selection") as span:
             request = build_router_request(
@@ -800,36 +483,23 @@ class TutorEngine:
                 media_catalog=media_catalog,
             )
             decision = self.move_router.route(request)
-            outcome: FloorOutcome = apply_safety_floors(
-                decision=decision,
-                runtime_state=context.runtime_state,
-                student_input=student_input,
-                profile_summary=context.profile_summary,
-                pose_tool_available=pose_tool_available,
-                current_objective=context.current_objective,
-            )
-            if outcome.final_move not in ALLOWED_MOVES:
-                # Defensive normalization — should never fire because
-                # both the RouterDecision Literal and the floor outputs
-                # come from a closed set.
+            chosen = decision.chosen_move
+            if chosen not in ALLOWED_MOVES:
                 logger.warning(
-                    "[TutorEngine] router/floor returned unknown move %r; "
+                    "[TutorEngine] router returned unknown move %r; "
                     "falling back to scaffold_hint",
-                    outcome.final_move,
+                    chosen,
                 )
-                final_move = "scaffold_hint"
-            else:
-                final_move = outcome.final_move
+                chosen = "scaffold_hint"
             if span is not None:
                 span["payload"] = {
-                    "selected_move": final_move,
+                    "selected_move": chosen,
                     "router_chosen_move": decision.chosen_move,
-                    "override_floors": list(outcome.override_floors),
                     "router_principles": list(decision.principle_emphasis),
                     "router_focus_note": (decision.focus_note or "")[:80],
                 }
             return (
-                final_move,
+                chosen,
                 decision.focus_note,
                 list(decision.principle_emphasis),
                 decision,
@@ -846,13 +516,7 @@ class TutorEngine:
         verdict: Optional[GradingResult],
         objective_changed: bool,
     ) -> SessionRuntimeState:
-        """Apply counter updates after a turn completes.
-
-        Call ordering is important — this runs *after* the response is
-        finalized + conformance has passed (or the safe template has
-        fired). The counters belong to the runtime state and are
-        persisted via ContextManager.save_runtime_state by the caller.
-        """
+        """Apply counter updates after a turn completes."""
         counters = runtime_state.safety_valve_counters
         counters.turns_in_session += 1
         if objective_changed:
@@ -873,7 +537,7 @@ class TutorEngine:
         return runtime_state
 
     # ------------------------------------------------------------------
-    # StudentSkillMastery write hook (dashboard-only — §2.3)
+    # StudentSkillMastery write hook (dashboard-only)
     # ------------------------------------------------------------------
 
     def record_skill_practice(
@@ -883,16 +547,7 @@ class TutorEngine:
         lesson_step: Any = None,
         hints_used: int = 0,
     ) -> None:
-        """Fire ``SkillAssessmentService.record_practice`` for correct/wrong.
-
-        Per Phase 2 §2.3: this write keeps the teacher dashboard,
-        prerequisite gating, and per-objective competency aggregates
-        live. It is **NOT** consumed by ``TutorEngine`` move selection
-        or by ``StudentTutor`` move prompts.
-
-        Skipped for ``partial`` and ``unverified`` verdicts (the
-        dashboard signal is binary).
-        """
+        """Fire ``SkillAssessmentService.record_practice`` for correct/wrong."""
         if verdict is None:
             return
         if verdict.verdict not in (Verdict.CORRECT, Verdict.WRONG):
@@ -900,7 +555,6 @@ class TutorEngine:
         if lesson_step is None:
             return
 
-        # Local imports — heavy module, defer until we actually fire.
         from apps.tutoring.personalization import SkillAssessmentService
 
         student = self.context_manager.session.student
@@ -908,11 +562,6 @@ class TutorEngine:
 
         skill = self._resolve_skill_for_step(lesson_step)
         if skill is None:
-            logger.debug(
-                "[TutorEngine] no skill resolved for step=%s — "
-                "skipping record_practice",
-                getattr(lesson_step, "id", None),
-            )
             return
 
         try:
@@ -924,17 +573,17 @@ class TutorEngine:
                 hints_used=hints_used,
                 practice_type="initial",
             )
-        except Exception as exc:  # never block a turn on a dashboard write
+        except Exception as exc:
             logger.warning(
                 "[TutorEngine] record_practice failed for skill=%s: %s",
                 getattr(skill, "id", None), exc,
             )
 
     # ------------------------------------------------------------------
-    # Orchestration helpers (Phase 2 §2.3 / §2.7)
+    # Orchestration helpers
     # ------------------------------------------------------------------
 
-    def _invoke_tutor_or_fallback(
+    def _invoke_tutor(
         self,
         *,
         context: TutoringContext,
@@ -942,34 +591,25 @@ class TutorEngine:
         move: str,
         media_catalog: list[dict],
         student_input: str,
-        violation_hints: Optional[list[str]] = None,
         focus_note: str = "",
         principle_emphasis: Optional[list[str]] = None,
+        extra_reminder: str = "",
         hold_pending_pose: Any = None,
-    ):
-        """Call the StudentTutor; on any raise, surface a safe template.
+    ) -> TutorResponse:
+        """Call the StudentTutor; on raise, surface a one-line safe string.
 
-        Returns a ``TutorResponse`` (``text`` + optional
-        ``pending_pose``). The safe-template fallback has no
-        PendingPose attached.
-
-        ``hold_pending_pose`` (Fix 3) — when set, the StudentTutor
-        skips the tool path, generates prose only, and the held pose
-        is reattached to the returned TutorResponse so Phase B can
-        commit it on conformance accept.
+        ``extra_reminder`` (used by the gate-recovery retry) is appended
+        to ``student_input`` so the tutor's user prompt incorporates it.
+        ``hold_pending_pose`` skips the tool path so the held pose is
+        re-attached to the returned TutorResponse (used by gate retries
+        that want to preserve the original pose).
         """
-        from apps.tutoring.v2.services.student_tutor import TutorResponse
-
-        # Violation hints — surfaced as a tail-appended directive to
-        # the user prompt so the model can reshape. We do this by
-        # patching the student_input parameter — the tutor's user
-        # prompt incorporates it; cheap + keeps the surface narrow.
-        effective_input = student_input
-        if violation_hints:
-            tail = "\n\n[Conformance retry — your previous response was rejected for: "
-            tail += "; ".join(violation_hints[:5])
-            tail += ". Rewrite per the MOVE directives.]"
-            effective_input = (student_input or "") + tail
+        effective_input = student_input or ""
+        if extra_reminder:
+            effective_input = (
+                effective_input
+                + f"\n\n[Gate retry — {extra_reminder}]"
+            )
 
         try:
             return self.tutor.respond(
@@ -984,33 +624,16 @@ class TutorEngine:
             )
         except Exception as exc:
             logger.warning(
-                "[TutorEngine] tutor.respond raised %s — safe template",
+                "[TutorEngine] tutor.respond raised %s — one-line safe string",
                 type(exc).__name__,
             )
-            next_action = self._render_next_action_for_template(
-                context=context, runtime_state=context.runtime_state,
-            )
             return TutorResponse(
-                text=render_safe_template(
-                    verdict=verdict,
-                    student_claim_present=False,
-                    next_action_text=next_action,
-                    move_anchor=self._build_move_anchor(
-                        context=context,
-                        selected_move=move,
-                        runtime_state=context.runtime_state,
-                    ),
-                ),
+                text="Let's stay with the same question and work the next step.",
                 pending_pose=None,
             )
 
     def _build_media_catalog(self, context: TutoringContext) -> list[dict]:
-        """Build the per-turn media catalog via ``MediaService``.
-
-        Passes the current objective + last student turn as the
-        ranking signal so KB-similarity selects the most-relevant
-        figures first (Phase 3 §3.2).
-        """
+        """Build the per-turn media catalog via ``MediaService``."""
         try:
             return self.media_service.build_catalog(
                 lesson_id=context.lesson_id,
@@ -1028,7 +651,7 @@ class TutorEngine:
     def _media_counts_and_facts(
         self, *, attempt_text: str, catalog: list[dict],
     ) -> tuple[int, list[str]]:
-        """Parse ``|||MEDIA:N|||`` and resolve figure_facts for conformance."""
+        """Parse ``|||MEDIA:N|||`` and resolve figure_facts for gate use."""
         try:
             _, indices = self.media_service.parse_signal(attempt_text or "")
         except Exception:
@@ -1043,7 +666,6 @@ class TutorEngine:
         return len(indices), facts
 
     def _is_math_lesson(self, context: TutoringContext) -> bool:
-        """Heuristic: lesson's course flagged math. Fail-soft to False."""
         try:
             from apps.curriculum.models import Lesson
             lesson = (
@@ -1060,7 +682,6 @@ class TutorEngine:
             return False
 
     def _current_lesson_step(self, context: TutoringContext):
-        """Resolve the current LessonStep from the session (or None)."""
         session = self.context_manager.session
         idx = getattr(session, "current_step_index", 0) or 0
         try:
@@ -1074,28 +695,7 @@ class TutorEngine:
         *,
         runtime_state: SessionRuntimeState,
     ) -> Optional[int]:
-        """Advance ``session.current_step_index`` to the next step.
-
-        Called when ``close_topic`` fires. Returns the new step index
-        when an advance happened, or ``None`` when the active step was
-        the final step (signalling lesson completion to the caller).
-
-        Side effects when advancing:
-          * Increments ``session.current_step_index`` and persists.
-          * Clears ``runtime_state.open_question`` — the previous
-            step's open question is no longer in play.
-          * Resets ``runtime_state.attempts_on_open_question`` to 0.
-          * Resets ``runtime_state.unverified_run_length`` to 0.
-          * Marks the just-closed objective progress as ``closed=True``
-            so ``_objective_evidence_sufficient`` no longer fires on it.
-          * Resets ``safety_valve_counters.turns_on_current_objective``
-            so the per-objective cap restarts for the new step.
-
-        Subject-agnostic — works the same way for math, geography, or
-        any other lesson type. Fail-soft on any DB error: returns
-        ``None`` (treated as final-step) so a flaky lesson model never
-        blocks lesson completion.
-        """
+        """Advance ``session.current_step_index`` to the next step."""
         session = self.context_manager.session
         lesson = getattr(session, "lesson", None)
         if lesson is None or not hasattr(lesson, "steps"):
@@ -1107,9 +707,8 @@ class TutorEngine:
         current_idx = getattr(session, "current_step_index", 0) or 0
         next_idx = current_idx + 1
         if next_idx >= total_steps:
-            return None  # final step — lesson is done
+            return None
 
-        # Persist the step advance to the session row.
         try:
             session.current_step_index = next_idx
             session.save(update_fields=["current_step_index"])
@@ -1120,173 +719,21 @@ class TutorEngine:
             )
             return None
 
-        # Reset per-step runtime state. The just-closed objective is
-        # marked closed in objective_progress so future move-selection
-        # passes don't keep firing close_topic on it; the new step's
-        # objective starts fresh on the next assemble_context.
         runtime_state.open_question = None
         runtime_state.attempts_on_open_question = 0
         runtime_state.unverified_run_length = 0
-        # Mark the just-closed objective as closed (the
-        # ``_objective_evidence_sufficient`` check skips closed ones).
-        # We don't know the objective key without re-reading the prior
-        # context, so close any progress entry that matched the prior
-        # step's enabling_objective.
         for key, prog in runtime_state.objective_progress.items():
             if prog is not None and not prog.closed and prog.correct >= 1:
                 prog.closed = True
                 runtime_state.objective_progress[key] = prog
-        # Reset per-objective turn counter so the new step gets its
-        # own MAX_TURNS_PER_OBJECTIVE budget.
         runtime_state.safety_valve_counters.turns_on_current_objective = 0
         return next_idx
 
-    def _run_escalation_attempt(
-        self,
-        *,
-        context: TutoringContext,
-        verdict: Optional[GradingResult],
-        escalated_move: str,
-        media_catalog: list,
-        student_input: str,
-        prior_student_turn: str,
-        bank_stems: list[str],
-        recent_student_turns: list[str],
-        attached_media_count: int,
-        figure_facts: list[str],
-        lesson_has_media: bool,
-        runtime_state: SessionRuntimeState,
-        focus_note: str = "",
-        principle_emphasis: Optional[list[str]] = None,
-    ) -> tuple[str, Any, ConformanceResult, ExtractionResult]:
-        """Run one tutor + conformance + extractor pass at the
-        escalated move (Phase 4 Fix 3).
-
-        The escalation re-enters StudentTutor from scratch — different
-        move prompt, fresh tool path. Returns the same shape as the
-        first / retry pass so the caller can swap it in if conformance
-        passes.
-        """
-        with emit_span("audit", "tutor.escalation") as span:
-            esc_resp = self._invoke_tutor_or_fallback(
-                context=context,
-                verdict=verdict,
-                move=escalated_move,
-                media_catalog=media_catalog,
-                student_input=student_input,
-                focus_note=focus_note,
-                principle_emphasis=principle_emphasis,
-            )
-            if span is not None:
-                span["payload"] = {"escalated_move": escalated_move}
-        esc_text = esc_resp.text
-
-        esc_extraction = self.question_extractor.extract(
-            tutor_text=esc_text, selected_move=escalated_move,
-        )
-        esc_extractor_violations = self._extractor_violations(
-            extraction=esc_extraction, selected_move=escalated_move,
-        )
-
-        esc_conf = self.conformance.run(
-            candidate_response=esc_text,
-            verdict=verdict,
-            runtime_state=runtime_state,
-            selected_move=escalated_move,
-            prior_student_turn=prior_student_turn,
-            open_question_stem=(
-                runtime_state.open_question.rendered_stem
-                if runtime_state.open_question
-                else ""
-            ),
-            attached_media_count=attached_media_count,
-            figure_facts=figure_facts,
-            bank_stems=bank_stems,
-            recent_student_turns=recent_student_turns,
-            private_canonical=(verdict.private_canonical if verdict else ""),
-            context=context,
-            posed_via_tool=(esc_resp.pending_pose is not None),
-            lesson_has_media=lesson_has_media,
-            pending_pose=esc_resp.pending_pose,
-            pose_tool_available=self._pose_tool_available(
-                context=context, runtime_state=runtime_state,
-            ),
-        )
-        if esc_extractor_violations:
-            esc_conf.violations = list(esc_conf.violations) + list(
-                esc_extractor_violations
-            )
-            esc_conf.passed = False
-        return (
-            esc_text,
-            esc_resp.pending_pose,
-            esc_conf,
-            esc_extraction,
-            dict(getattr(esc_resp, "grounding", {}) or {}),
-        )
-
-    def _extractor_violations(
-        self,
-        *,
-        extraction: ExtractionResult,
-        selected_move: str,
-    ) -> list[str]:
-        """Turn extractor output into conformance violations.
-
-        Subject-agnostic. Two violations possible:
-          - ``one_question_per_turn`` when ``action_count > 1`` —
-            stacked questions (run-6 GEO T16 worked_example + Port
-            Louis MCQ; run-6 GEO T18/T20 follow-on).
-          - ``active_end_required`` when ``has_active_end=False``
-            UNLESS the move is ``close_topic`` (which legitimately
-            hands off to the exit-ticket retrieval rather than ending
-            on an inline action prompt).
-
-        Returns empty when no violations or when the extractor was
-        unavailable (fail-soft).
-        """
-        if not extraction.available:
-            return []
-        violations: list[str] = []
-        if extraction.action_count > 1:
-            stacked_preview = "; ".join(extraction.stacked_examples[:3])
-            violations.append(
-                "one_question_per_turn: rendered turn contains "
-                f"{extraction.action_count} action prompts; emit exactly "
-                f"one this turn. (Principle #5 Minimising Cognitive Load — "
-                f"one idea per turn). Stacked examples: "
-                f"{stacked_preview}"
-            )
-        if (
-            extraction.action_count == 0
-            and selected_move != "close_topic"
-            and not extraction.has_active_end
-        ):
-            violations.append(
-                "active_end_required: rendered turn does not close on an "
-                "action the student takes. End with a question, choose-and-"
-                "explain, or 'now you try' the student can act on this "
-                "turn. (Principle #1 Active Learning — student must be "
-                "doing on ≥60% of turns)."
-            )
-        return violations
-
     def _prior_student_turn(self, context: TutoringContext) -> str:
-        """Last student turn from the transcript (empty when none)."""
         for turn in reversed(context.full_transcript or []):
             if turn.get("role") == "student":
                 return turn.get("content") or ""
         return ""
-
-    def _recent_student_turns(self, context: TutoringContext) -> list[str]:
-        """Last few student turns — used by rule_check's allowed-number set."""
-        out: list[str] = []
-        for turn in reversed(context.full_transcript or []):
-            if turn.get("role") == "student":
-                out.append(turn.get("content") or "")
-                if len(out) >= 5:
-                    break
-        return out
 
     def _pose_tool_available(
         self,
@@ -1294,19 +741,7 @@ class TutorEngine:
         context: TutoringContext,
         runtime_state: SessionRuntimeState,
     ) -> bool:
-        """True when the lesson has at least one un-posed bank slot.
-
-        Mirrors the filter ``build_anthropic_pose_question_tool``
-        applies. When this is False the LLM had no tool surface to
-        call — the conformance ``all__no_assessment_in_prose`` rule
-        should not penalise a prose practice prompt because there was
-        no tool path available. Fail-soft: returns True on DB error
-        so the existing tighter contract holds.
-        (Principle #11 Testing Effect / Retrieval Practice Ch.20 — the
-        retrieval loop only consolidates when the question lands with
-        a verdict; if the only path to a verdict is unavailable, do
-        not penalise the LLM for trying prose.)
-        """
+        """True when the lesson has at least one un-posed bank slot."""
         try:
             from apps.curriculum.models import LessonStep
             posed_ids = {
@@ -1324,85 +759,6 @@ class TutorEngine:
         except Exception:
             return True
 
-    def _bank_stems_for_context(self, context: TutoringContext) -> list[str]:
-        """Fetch bank stems for the lesson — used by rule_check's allowed set.
-
-        Includes BOTH ``teacher_script`` (narrative/explanation text)
-        AND ``question`` (actual posable bank stems). Earlier versions
-        looked at ``teacher_script`` only, which made rule_check flag
-        every number that appeared in a tool-posed question stem as
-        "authored" — false-positive rejections on the legitimate
-        tool path.
-        """
-        try:
-            from apps.curriculum.models import LessonStep
-            rows = list(
-                LessonStep.objects
-                .filter(lesson_id=context.lesson_id)
-                .values_list("teacher_script", "question")[:40]
-            )
-            stems: list[str] = []
-            for teacher_script, question in rows:
-                if teacher_script:
-                    stems.append(teacher_script)
-                if question:
-                    stems.append(question)
-            return stems
-        except Exception:
-            return []
-
-    def _build_move_anchor(
-        self,
-        *,
-        context: TutoringContext,
-        selected_move: str,
-        runtime_state: SessionRuntimeState,
-    ) -> MoveAnchor:
-        """Build the pedagogy anchor handed to ``render_safe_template``.
-
-        Subject-agnostic: pulls open-question stem from runtime state
-        and step-level content (``teacher_script`` /
-        ``worked_example``) from the pre-resolved TutoringContext
-        fields. The safety floor uses whichever fields are populated;
-        empty fields trigger generic-shape fallbacks within the
-        templates module.
-        """
-        open_q = runtime_state.open_question
-        obj_key = (context.current_objective or "_").strip() or "_"
-        obj_progress = runtime_state.objective_progress.get(obj_key)
-        return MoveAnchor(
-            selected_move=selected_move,
-            open_question_stem=(open_q.rendered_stem if open_q else ""),
-            objective=context.current_objective or "",
-            teacher_script=context.current_step_teacher_script or "",
-            worked_example=context.current_step_worked_example or "",
-            turns_in_session=(
-                runtime_state.safety_valve_counters.turns_in_session
-            ),
-            objective_correct=(obj_progress.correct if obj_progress else 0),
-            objective_attempts=(obj_progress.attempts if obj_progress else 0),
-        )
-
-    def _render_next_action_for_template(
-        self,
-        *,
-        context: TutoringContext,
-        runtime_state: SessionRuntimeState,
-    ) -> str:
-        """One-line next-action hint for the safe terminal template.
-
-        Post-router cutover the safe-template floor doesn't call the
-        router LLM (the LLM call that produced this fallback already
-        failed twice — burning a third LLM call on a decorative line
-        would compound latency). Pick a verdict-driven generic line
-        instead; the safe template's content elsewhere still anchors
-        on the move that was actually picked this turn.
-        """
-        open_q = runtime_state.open_question
-        if open_q is not None:
-            return "Let's stay with the same question and work the next step."
-        return "Let's keep going."
-
     def _update_objective_progress(
         self,
         *,
@@ -1410,7 +766,6 @@ class TutorEngine:
         verdict: GradingResult,
         current_objective: str,
     ) -> None:
-        """Bump the per-objective counters after a graded turn."""
         key = (current_objective or "_").strip() or "_"
         progress = runtime_state.objective_progress.get(key)
         if progress is None:
@@ -1429,13 +784,6 @@ class TutorEngine:
     # ------------------------------------------------------------------
 
     def _resolve_skill_for_step(self, lesson_step: Any):
-        """Resolve ``Skill`` row from a ``LessonStep`` via enabling-objective.
-
-        Mirrors the legacy resolution path used by
-        ``ConversationalTutor`` (exact match on ``enabling_objective_text``
-        with a partial-icontains fallback). Scoped to the lesson's
-        course for multi-tenancy safety.
-        """
         from apps.tutoring.skills_models import Skill
 
         eo_text = (getattr(lesson_step, "enabling_objective", "") or "").strip()
@@ -1463,17 +811,11 @@ class TutorEngine:
         ).first()
 
     # ------------------------------------------------------------------
-    # Session completion (Phase 3 §3.1 — profiler trigger)
+    # Session completion
     # ------------------------------------------------------------------
 
     def complete_session(self) -> None:
-        """Mark the session COMPLETED and run the end-of-session profiler.
-
-        Idempotent — repeat calls are no-ops once status is COMPLETED.
-        Profiler failure must not block completion: ``StudentProfiler``
-        already swallows its own exceptions, but we wrap the call too
-        as a belt-and-braces guard against import / wiring errors.
-        """
+        """Mark the session COMPLETED and run the end-of-session profiler."""
         from django.utils import timezone
 
         from apps.tutoring.models import TutorSession

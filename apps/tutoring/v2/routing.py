@@ -11,7 +11,7 @@ helpers that the views actually call:
 
   - ``v2_start_dispatch(session)`` — produces the opening tutor turn.
   - ``v2_respond_dispatch(session, message)`` — runs a full
-    StudentGrader → StudentTutor → ConformanceCheck loop and persists
+    StudentGrader → StudentTutor → safety-gates loop and persists
     one student + one tutor SessionTurn.
   - ``v2_resume_dispatch(session)`` — surfaces a continuation message
     on session resume.
