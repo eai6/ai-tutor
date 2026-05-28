@@ -353,6 +353,59 @@ class TutorEngine:
         )
         attempt_text = recovery.text
 
+        # 4c. Empty pose-dominant body recovery (run-11 R3).
+        #
+        # Pose-dominant moves (confirm_and_advance, confirm_and_extend,
+        # pivot) force a tool call via tool_choice="any". The pre-check
+        # ``_apply_pose_dominant_floor`` already overrides such a move
+        # to close_topic when ``assessable_slots_remaining == 0`` AT
+        # ROUTING TIME. But the pre-check's count can diverge by one
+        # from ``select_pose_slot``'s live query, and the forced LLM
+        # call may emit ONLY a tool_use block with no accompanying
+        # prose. When the tool then returns ``exhausted=True``, the
+        # pipeline has nothing to ship — the student sees an empty
+        # turn (run-11 MATHS-S1 §1 P1-borderline observation).
+        #
+        # Belt-and-suspenders: detect the empty-body shape here and
+        # convert to a deterministic safe close. Synthetic text bypasses
+        # further gating (the text is hand-authored and known-good);
+        # downstream close_topic handling (step advance, exit-ticket
+        # dispatch) still runs against the overridden move.
+        #
+        # Doc cross-refs:
+        #   - The pre-check pair lives in ``_apply_pose_dominant_floor``
+        #     and ``_apply_mastery_close_floor``. R3 is the post-check
+        #     companion for the pose-dominant case only — keep them in
+        #     sync when changing pose-dominant semantics.
+        #   - The synthetic text below skips conformance gates by
+        #     design: ``run_gates_with_recovery`` already ran above; we
+        #     do not re-run it on a deterministic safe template.
+        if (
+            selected_move in POSE_DOMINANT_MOVES
+            and not (attempt_text or "").strip()
+            and committed_pose is None
+        ):
+            logger.warning(
+                "[TutorEngine] empty pose-dominant body — converting "
+                "%s to close_topic (reason_code=pose_dominant_no_pose_no_text)",
+                selected_move,
+            )
+            with emit_span(
+                "audit",
+                "router.empty_pose_dominant_recovery",
+                payload={
+                    "original_move": selected_move,
+                    "override_move": "close_topic",
+                    "reason_code": "pose_dominant_no_pose_no_text",
+                },
+            ):
+                pass
+            selected_move = "close_topic"
+            attempt_text = (
+                "We've worked through what's available on this objective "
+                "— let's wrap here for now."
+            )
+
         # 4b. Phase B commit — only if the LLM called the pose tool. The
         # pose validation already happened inside StudentTutor (Phase A);
         # commit here unconditionally so the next turn's grader has the

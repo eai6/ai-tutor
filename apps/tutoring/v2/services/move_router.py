@@ -519,6 +519,17 @@ class MoveRouter:
                 tokens_out=getattr(response, "tokens_out", 0),
             )
 
+        # Defensive truncation of `reason` before pydantic validation.
+        # The contract's max_length=400 exists for cache stability + log
+        # noise; the router LLM's natural multi-counter reasoning
+        # regularly overshoots. Truncating preserves the cap's intent
+        # while preventing user-visible RouterMalformedError → safe-
+        # template fallback ("Something went wrong on my end") that
+        # run-11 observed twice.
+        reason_raw = payload.get("reason")
+        if isinstance(reason_raw, str) and len(reason_raw) > 400:
+            payload["reason"] = reason_raw[:397].rstrip() + "..."
+
         try:
             decision = RouterDecision.model_validate(payload)
         except ValidationError as exc:

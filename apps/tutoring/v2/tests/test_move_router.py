@@ -290,7 +290,14 @@ def test_router_rejects_moves_by_verdict_with_missing_key():
     assert decision.reason.startswith("router_unavailable_fallback")
 
 
-def test_router_rejects_overlong_reason():
+def test_router_truncates_overlong_reason():
+    """Run-11 R4 — the router LLM's natural multi-counter reasoning
+    regularly overshoots the 400-char cap. ``_call_router`` now
+    truncates the ``reason`` field to 397 + "..." before pydantic
+    validation, so the decision is ACCEPTED rather than producing a
+    user-visible RouterMalformedError → "Something went wrong"
+    fallback.
+    """
     payload = json.dumps({
         "case": "help_request",
         "move": "explain",
@@ -299,7 +306,12 @@ def test_router_rejects_overlong_reason():
     })
     client = _FakeClient(payload)
     decision = _router(client).route(_request())
-    assert decision.reason.startswith("router_unavailable_fallback")
+    # Reason was truncated, decision validated, no fallback.
+    assert not decision.reason.startswith("router_unavailable_fallback")
+    assert len(decision.reason) <= 400
+    assert decision.reason.endswith("...")
+    assert decision.case == "help_request"
+    assert decision.move == "explain"
 
 
 def test_router_decision_direct_construction_answer_attempt():
