@@ -1,14 +1,17 @@
 """MoveRouter — LLM move-selection for the v2 engine.
 
-Companion to ``design/tasks/move-router-implementation-plan.md``.
+Post-prune Commit D §4.2: the router runs FIRST on every turn,
+unconditionally, BEFORE the grader. Its output encodes both the case
+classification AND the move(s):
 
-Two LLM calls per routed turn (grader + router), plus the existing
-StudentTutor call. The router is transcript-aware: it sees the last 10
-turns, the grader verdict, the runtime counters, and the lesson
-context, and emits a structured ``RouterDecision`` (chosen_move,
-principle_emphasis, focus_note, rationale). Deterministic safety
-floors run AFTER the router; the LLM picks the principled move and the
-floors catch the highest-cost shapes if the LLM's judgement is off.
+- Non-answer-attempt turns (help_request / opening_turn / forced_close):
+  ``{case, move, verdict_needed: false, reason}``. The engine skips
+  the grader and calls the tutor directly with ``move``.
+
+- Answer-attempt turns: ``{case: "answer_attempt", verdict_needed:
+  true, moves_by_verdict: {correct, partial, wrong}, reason}``. The
+  engine grades, then picks the matching row — no engine-side mapping
+  table, no override.
 
 Mirrors ``StudentGrader``'s shape: stateless, constructor-injectable
 LLM client factory, single public method, Pydantic-typed output, span
@@ -26,13 +29,11 @@ from pydantic import ValidationError
 
 from apps.tutoring.tracing import emit_span
 from apps.tutoring.v2.contracts import (
-    GradingResult,
     ObjectiveProgress,
     RouterDecision,
     RouterRequest,
     SessionRuntimeState,
     TutoringContext,
-    Verdict,
 )
 from apps.tutoring.v2.services.router_prompts import (
     SHARED_ROUTER_SYSTEM,
@@ -164,15 +165,20 @@ class MoveRouter:
 def build_router_request(
     *,
     context: TutoringContext,
-    verdict: Optional[GradingResult],
     student_input: str,
     pose_tool_available: bool,
     media_catalog: Optional[list[dict]] = None,
 ) -> RouterRequest:
-    """Snapshot a ``RouterRequest`` from the current context + grader output.
+    """Snapshot a ``RouterRequest`` from the current context.
 
     Single site so the engine doesn't re-derive the snapshot at each
     call site. Window size = ``ROUTER_TRANSCRIPT_WINDOW``.
+
+    Note (Commit D): the router runs BEFORE the grader, so the
+    request no longer carries a verdict. The new per-open-question +
+    per-objective counter fields are read from runtime_state — the
+    engine writes them after each turn in
+    ``TutorEngine.update_counters_post_turn``.
     """
     runtime_state: SessionRuntimeState = context.runtime_state
     obj_key = (context.current_objective or "_").strip() or "_"
@@ -185,17 +191,16 @@ def build_router_request(
     open_q = runtime_state.open_question
     counters = runtime_state.safety_valve_counters
 
+    # Derive the two counters that come straight from existing state.
+    prior_attempts = (progress.attempts if progress else 0)
+    correct_on_obj = (progress.correct if progress else 0)
+
     return RouterRequest(
         last_n_turns=last_n,
         student_input=student_input,
-        grader_verdict=verdict.verdict if verdict is not None else None,
-        grader_reason_code=(
-            verdict.reason_code if verdict is not None else None
-        ),
-        student_safe_feedback=(
-            verdict.student_safe_feedback if verdict is not None
-            else None  # let default_factory fire
-        ) or _default_safe_feedback(),
+        grader_verdict=None,
+        grader_reason_code=None,
+        student_safe_feedback=_default_safe_feedback(),
         profile_summary=context.profile_summary or "",
         objective=context.current_objective or "",
         lesson_title=context.lesson_title or "",
@@ -221,6 +226,23 @@ def build_router_request(
         attempts_on_open_question=runtime_state.attempts_on_open_question,
         open_question_stem=(open_q.rendered_stem if open_q else ""),
         open_question_has_pending=open_q is not None,
+        # ── NEW counter fields (Commit D) ──
+        wrong_attempts_on_open_question=(
+            runtime_state.wrong_attempts_on_open_question
+        ),
+        partial_attempts_on_open_question=(
+            runtime_state.partial_attempts_on_open_question
+        ),
+        consecutive_wrong_on_open_question=(
+            runtime_state.consecutive_wrong_on_open_question
+        ),
+        objective_turn_count=counters.turns_on_current_objective,
+        prior_answer_attempts_on_objective=prior_attempts,
+        correct_on_objective=correct_on_obj,
+        unscaffolded_correct_on_objective=(
+            runtime_state.unscaffolded_correct_on_open_question_objective
+        ),
+        recent_verdicts=list(runtime_state.recent_verdicts or []),
         pose_tool_available=pose_tool_available,
     )
 
@@ -253,40 +275,35 @@ def _fallback_decision(
 ) -> RouterDecision:
     """Conservative ``RouterDecision`` when the router LLM is unavailable.
 
-    Plan §5.1 fail-soft contract:
-      - correct           → confirm_and_advance
-      - wrong             → scaffold_hint
-      - partial           → scaffold_hint
-      - None / unknown    → scaffold_hint when an open_question is in
-                            flight, else explain
+    Post-Commit D shape — the router runs before the grader, so the
+    fallback's shape depends on whether an open question is in flight:
 
-    principle_emphasis defaults to ['Active Learning']. focus_note is
-    empty. rationale carries ``router_unavailable_fallback`` + the
-    underlying reason so the observability dashboard can spot a
-    fallback storm.
+    - Open question pending → answer-attempt fallback. ``verdict_needed
+      = True``, ``moves_by_verdict`` = {correct: confirm_and_advance,
+      partial: scaffold_hint, wrong: scaffold_hint}.
+
+    - Otherwise → help-request / opening-turn shape. ``verdict_needed =
+      False``, ``move = "explain"``.
+
+    ``reason`` carries ``router_unavailable_fallback`` + the underlying
+    cause so the observability dashboard can spot a fallback storm.
     """
-    verdict = request.grader_verdict
-    if verdict == Verdict.CORRECT:
-        chosen = "confirm_and_advance"
-        principles = ["Active Learning", "Testing Effect"]
-    elif verdict == Verdict.WRONG:
-        chosen = "scaffold_hint"
-        principles = ["Targeted Remediation", "Cognitive Load"]
-    elif verdict == Verdict.PARTIAL:
-        chosen = "scaffold_hint"
-        principles = ["Targeted Remediation"]
-    else:  # None / unrecognised — verdict-less / non-graded turn
-        if request.open_question_has_pending:
-            chosen = "scaffold_hint"
-            principles = ["Targeted Remediation"]
-        else:
-            chosen = "explain"
-            principles = ["Direct Instruction"]
+    if request.open_question_has_pending:
+        return RouterDecision(
+            case="answer_attempt",
+            verdict_needed=True,
+            moves_by_verdict={
+                "correct": "confirm_and_advance",
+                "partial": "scaffold_hint",
+                "wrong": "scaffold_hint",
+            },
+            reason=f"router_unavailable_fallback:{reason}",
+        )
     return RouterDecision(
-        chosen_move=chosen,
-        principle_emphasis=principles,
-        focus_note="",
-        rationale=f"router_unavailable_fallback:{reason}",
+        case="opening_turn",
+        verdict_needed=False,
+        move="explain",
+        reason=f"router_unavailable_fallback:{reason}",
     )
 
 
@@ -307,19 +324,19 @@ def _stamp_span(
     if span is None:
         return
     payload: dict[str, Any] = {
-        "chosen_move": decision.chosen_move,
-        "principle_emphasis": list(decision.principle_emphasis),
-        "focus_note": _truncate(decision.focus_note, 80),
-        "rationale": _truncate(decision.rationale, 200),
-        "fail_soft": fail_soft,
-        "grader_verdict": (
-            request.grader_verdict.value if request.grader_verdict else None
+        "case": decision.case,
+        "verdict_needed": decision.verdict_needed,
+        "move": decision.move,
+        "moves_by_verdict": (
+            dict(decision.moves_by_verdict)
+            if decision.moves_by_verdict else None
         ),
-        "grader_reason_code": request.grader_reason_code or "",
+        "reason": _truncate(decision.reason, 200),
+        "fail_soft": fail_soft,
         "pose_tool_available": request.pose_tool_available,
     }
     if reason:
-        payload["reason"] = reason
+        payload["fail_soft_reason"] = reason
     if raw_chars:
         payload["raw_chars"] = raw_chars
     span["payload"] = payload

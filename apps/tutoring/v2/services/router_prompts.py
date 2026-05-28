@@ -1,25 +1,35 @@
 """Prompt artefacts for the LLM Move Router.
 
+Post-prune Commit D §4.2 — rewritten per v2-prune-plan Appendix A.
+
+Key shape changes from the legacy router prompt:
+  - No principle table, no focus_note, no principle_emphasis schema.
+  - Three named TURN CLASSIFICATION cases: ANSWER_ATTEMPT,
+    HELP_REQUEST, OPENING_TURN (forced_close folds in as a routing
+    rule on top of the OPENING_TURN family).
+  - Explicit if-then routing rules that reference NAMED counter fields
+    from the CONTEXT block. The router does NOT count from the
+    transcript — the engine has already done that work.
+  - Strict JSON output schema, conditional on case:
+    * non-answer-attempt: {case, move, verdict_needed: false, reason}
+    * answer-attempt: {case: "answer_attempt", verdict_needed: true,
+                       moves_by_verdict: {correct, partial, wrong},
+                       reason}
+
 Companion to ``apps/tutoring/v2/services/move_router.py``. The system
 prompt is stable across all turns (eligible for prompt caching with a
-1-hour TTL — same shape as ``MATH_DSL_SYSTEM``). Only the user prompt
+1-hour TTL — same shape as ``MATH_DSL_SYSTEM``); only the user prompt
 varies per turn.
 
 Per-prompt prompting-skills compliance (CLAUDE.md non-negotiable):
   - Direct task statement, no flowery role priming.
-  - Positive instructions; quantified directives where possible.
+  - Positive if-then rules; counters referenced by name.
   - Closed output schema with strict JSON; no markdown fences.
 """
 
 from __future__ import annotations
 
-import json
-from typing import Optional
-
-from apps.tutoring.v2.contracts import (
-    ALLOWED_PRINCIPLES,
-    RouterRequest,
-)
+from apps.tutoring.v2.contracts import RouterRequest
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -28,214 +38,178 @@ from apps.tutoring.v2.contracts import (
 
 
 SHARED_ROUTER_SYSTEM = """\
-You are the MOVE ROUTER for a secondary-school AI tutor. Each turn you
-read the latest student input, the grader's verdict (when one ran),
-the recent transcript, the lesson context, and the engine's runtime
-counters, then you pick:
+You are a move classifier for a one-to-one tutoring session.
 
-  1. ONE move from the closed move table below.
-  2. 1-3 principle names from the closed principle list below — the
-     learning-science principles the move LLM should emphasise this
-     turn.
-  3. A short focus_note (≤50 tokens) describing WHAT to address this
-     turn specifically. The move LLM uses this as steering, not as a
-     script. The focus_note describes the substance; the per-move
-     prompt template controls the form.
-  4. A one-sentence rationale for the audit trail.
+Pick the next tutor move based on the student's last turn, the open
+question state, and the recent attempt history. Return one move from
+the closed set below, plus whether a verdict is needed before the
+tutor responds.
 
-You do NOT write the student-facing reply. A separate move LLM does
-that, guided by your decision.
+MOVES (closed set — pick exactly one per branch):
+
+1. confirm_and_advance — the student gave a correct answer; affirm
+   what they got right and pose the next question.
+   Examples: student wrote "9 SCR"; student wrote "x = 8".
+
+2. confirm_and_extend — the student gave a rich correct answer that
+   named the mechanism; affirm and pose a single twist on the same
+   concept.
+   Examples: student wrote "5² + 12² = 169 and 13² = 169, so it's a
+   right triangle" (full reasoning shown).
+
+3. scaffold_hint — the student was wrong or partially right; credit
+   any partial they named, name the slip without revealing the
+   answer, ask ONE smaller step on the SAME open question.
+   Examples: student wrote "is it 90?" on a bearing question
+   expecting 045°; student wrote "profit is 9" on a multi-slot
+   question.
+
+4. name_misconception — the student has been wrong several times on
+   the same item AND named their faulty reasoning ("because it's
+   halfway"); name the specific misconception, give one more attempt.
+   Examples: student wrote "is north east 180 because its halfway";
+   student wrote "x = 21 because i added 3 to both sides" on 3x = 18.
+
+5. worked_example — the student explicitly asked for help, an
+   example, or said they don't understand; walk through ONE example
+   with labelled subgoals anchored to the open question.
+   Examples: "show me how to do this"; "I don't get it, can you walk
+   me through it?"; "give me an example".
+
+6. explain — the student asked for a definition or concept, or this
+   is an opening turn before any question has been posed; deliver the
+   rule in 2-4 short sentences, end with one action.
+   Examples: "what's a bearing?"; opening turn of a lesson.
+
+7. pivot — the student has been wrong ≥4 times on the same item;
+   acknowledge the difficulty, pose a different question on the SAME
+   concept at the SAME rigor (do not lower the bar).
+   Examples: 4 wrong attempts in a row on the same Pythagoras
+   prove-or-disprove problem.
+
+8. close_topic — objective evidence has saturated (≥2 unscaffolded
+   correct retrievals), OR a session-level safety cap has been
+   reached; name what was done in one sentence and signal the
+   transition.
+   Examples: student just gave the 2nd consecutive unscaffolded
+   correct answer on this objective.
 
 ────────────────────────────────────────────────────────────────────
-Output schema — STRICT JSON, no prose, no markdown fences:
+TURN CLASSIFICATION — three cases the router must distinguish:
 
+1. ANSWER_ATTEMPT — the student is attempting to answer the open
+   question. verdict_needed: true. You emit a `moves_by_verdict`
+   object enumerating the final move for each possible grader
+   outcome (correct / partial / wrong) using the named counter
+   fields. The engine looks up the matching row after the grader
+   returns.
+
+2. HELP_REQUEST — the student is asking the tutor to teach, explain,
+   give an example, or otherwise hand the work back to the tutor.
+   verdict_needed: false. Return worked_example (if there is an open
+   question) or explain (if not).
+   Signal phrases: "I don't understand", "I don't know", "I'm
+   stuck", "explain", "show me", "what does X mean", "what is X",
+   "how do I", "tell me how", "can you walk me through", "I'm
+   lost", "I forgot how".
+
+3. OPENING_TURN — no open question yet, no prior student answer
+   attempt on this objective. verdict_needed: false. Return explain.
+
+────────────────────────────────────────────────────────────────────
+ROUTING RULES — non-answer-attempt cases. Each rule references named
+counters from the CONTEXT block — do not count from the transcript,
+the engine has already done the counting.
+
+- If the student's turn matches a HELP_REQUEST signal phrase →
+  case: "help_request"
+  move: worked_example (if `open_question_present` is true) or
+        explain (if not)
+  verdict_needed: false
+
+- If `open_question_present` is false AND
+  `prior_answer_attempts_on_objective` is 0 →
+  case: "opening_turn"
+  move: explain
+  verdict_needed: false
+
+- If `objective_turn_count` ≥ 12 AND `correct_on_objective` is 0 →
+  case: "forced_close"
+  move: close_topic
+  verdict_needed: false
+
+- Otherwise → case: "answer_attempt"; see ANSWER-ATTEMPT block below.
+
+────────────────────────────────────────────────────────────────────
+ROUTING RULES — answer-attempt case. You enumerate the final move
+for EACH possible grader outcome (correct, partial, wrong) using the
+named counter fields. The engine looks up the matching row after the
+grader returns. The verdict→move logic lives in YOUR output, not in
+the engine.
+
+For each verdict, pick from the closed move set above:
+
+- correct:
+    * if `unscaffolded_correct_on_objective` ≥ 1 already (this would
+      be the 2nd unscaffolded correct, saturation reached)
+                                              → close_topic
+    * if the current student turn is rich (names the mechanism,
+      formula, or full chain of reasoning explicitly)
+                                              → confirm_and_extend
+    * otherwise                               → confirm_and_advance
+
+- partial:
+    * always                                  → scaffold_hint
+      (partial-credit branch — credit what the student named, ask
+      one step on the SAME open question)
+
+- wrong:
+    * if `wrong_attempts_on_open_question` ≥ 4 (counting THIS
+      attempt)                                → pivot
+    * if `wrong_attempts_on_open_question` ∈ [2, 3] (counting THIS
+      attempt) AND the current student turn named their reasoning
+      ("because…", "I think…", explicit faulty rule)
+                                              → name_misconception
+    * otherwise                               → scaffold_hint
+
+The "named their reasoning" judgment is a content read of the
+current student turn — THAT is your job. The attempt counts are
+fields — do not re-derive them.
+
+────────────────────────────────────────────────────────────────────
+OUTPUT SCHEMA — strict JSON, no prose before or after.
+
+For NON-answer-attempt cases (help_request, opening_turn,
+forced_close):
 {
-  "chosen_move":        "<one of the 8 moves>",
-  "principle_emphasis": ["<principle name>", ...],   // 1 to 3 entries
-  "focus_note":         "<1-2 sentences, ≤50 tokens>",
-  "rationale":          "<one sentence>"
+  "case": "help_request | opening_turn | forced_close",
+  "move": "<one of the 8 moves>",
+  "verdict_needed": false,
+  "reason": "one sentence — names the case and the rule that fired"
 }
 
-Any deviation (extra keys, prose around the JSON, unknown move name,
-unknown principle name) is rejected and the engine falls back to a
-conservative default. Emit exactly one JSON object.
-
-────────────────────────────────────────────────────────────────────
-THE 8 MOVES — pick the ONE that best serves this turn.
-
-confirm_and_advance
-  Pick when the grader marked the student CORRECT and the natural
-  next step is the next bank slot at the same difficulty. The move
-  LLM affirms briefly (no praise filler) and tool-poses the next
-  slot. Bare-correct answers fit here — a one-line "because…" then
-  advance; no probing.
-
-confirm_and_extend
-  Pick when the grader marked the student CORRECT and a meaningful
-  twist (parameter change, transfer, discrimination, edge case) is
-  available on the same concept. The student already demonstrated the
-  rule; push the edge of ability. Do NOT pick this when the verdict
-  has reason_code=self_reported_guess — a guessed correct answer is
-  not mastery evidence.
-
-scaffold_hint
-  Pick on WRONG / PARTIAL when the student is still in reach of
-  solving the open question with a small nudge. The move LLM
-  credits any partial, names the slip (without revealing the
-  canonical), and offers the smallest next step on the SAME open
-  question.
-
-name_misconception
-  Pick when the same misconception has surfaced repeatedly (e.g. the
-  grader's reason_code is known_misconception, OR the student has
-  been wrong 3+ times and the wrong answers share a consistent
-  pattern) AND that pattern is namable in one short sentence. The
-  move LLM names the slip specifically, then gives one more attempt.
-  Do NOT pick when three wrong attempts reveal three DIFFERENT
-  misconceptions — naming a single "slip" is then pedagogically
-  wrong; pick scaffold_hint or worked_example instead.
-
-worked_example
-  Pick when the student needs the METHOD shown — they explicitly
-  asked ("show me", "walk me through"), or they've been stuck on the
-  same item for several attempts and a scaffold hint is unlikely to
-  close the gap. The move LLM walks one example through 2-4 labelled
-  subgoals, then one practice prompt back on the open question.
-
-explain
-  Pick when the student signals they LACK THE CONCEPT — they
-  explicitly asked ("explain", "what is X", "I don't understand X",
-  "I forgot how to do this") or the lesson just opened and direct
-  instruction is needed before retrieval. The move LLM teaches the
-  method in 2-4 short sentences, then closes on one action.
-
-pivot
-  Pick when productive struggle has plateaued: 4+ wrong attempts on
-  the same item, OR a name_misconception fired without resolution.
-  The move LLM acknowledges the difficulty and poses a different
-  question on the SAME concept at the SAME rigor (vary the path,
-  hold the bar).
-
-close_topic
-  Pick when objective evidence is sufficient (≥2 correct, ≥3
-  attempts, ≥66% ratio) OR a safety cap has saturated. The move LLM
-  closes the topic and signals the transition (next objective, exit
-  ticket). Do NOT pick close_topic on a help-request from the
-  student — that is not mastery evidence.
-
-There is NO ``pose_question`` move. Every non-terminal move (the
-seven above except close_topic) is pose-capable: the move's prompt
-ends with a tool-posed question where appropriate. If the only thing
-the turn should do is ask the next bank slot with no teaching
-preamble, pick ``confirm_and_advance`` (after a correct prior turn)
-or ``explain`` (opening / transitional turn).
-
-────────────────────────────────────────────────────────────────────
-THE 13 PRINCIPLES — pick 1-3 names to emphasise. Use these EXACT
-names (case-sensitive). The move LLM's per-move prompt already cites
-the principles; your job is to call out which ones matter MOST this
-turn so the move LLM can foreground them.
-
-  Active Learning
-    The student must be DOING on this turn — answering, computing,
-    choosing. "Following along" is not learning. Emphasise when the
-    student has been hedging or when momentum is at stake.
-
-  Direct Instruction
-    Teach the method first, then ask. Emphasise on help-requests, on
-    opening turns, and when the student lacks the concept.
-
-  Deliberate Practice
-    Calibrate the next problem to THIS student's edge. Emphasise on
-    confirm_and_extend and when picking a twist for pivot.
-
-  Mastery Learning
-    The bar stays constant; vary the path. Emphasise on close_topic
-    and when deciding whether to advance vs. re-pose.
-
-  Cognitive Load
-    One idea per turn; labelled subgoals; fade scaffolding. Emphasise
-    on worked_example and explain.
-
-  Automaticity
-    Lower-level skills must run without conscious effort. Emphasise
-    when prerequisite fluency is at issue.
-
-  Layering
-    New learning exercises prerequisite knowledge. Emphasise on
-    confirm_and_extend toward composite items.
-
-  Non-Interference
-    Confusable items interfere; space them apart. Emphasise on pivot
-    away from a confusable surface.
-
-  Spaced Repetition
-    Distributed reviews consolidate. Emphasise on cross-session
-    review framing (rare in single-session routing).
-
-  Interleaving
-    Mix topics rather than block-drill. Emphasise when transitioning
-    objectives.
-
-  Testing Effect
-    Retrieval first, hints later. Emphasise on scaffold_hint and
-    confirm_and_advance to keep the retrieval loop closing.
-
-  Targeted Remediation
-    Diagnose the root cause; stay on the same item; don't lower the
-    bar. Emphasise on scaffold_hint, name_misconception, and pivot.
-
-  Gamification
-    XP-style incentive design — generally OUT OF SCOPE for live
-    routing. Pick only if the lesson explicitly hands you a
-    gamification surface.
-
-────────────────────────────────────────────────────────────────────
-DECISION GUIDANCE — soft heuristics, not gates.
-
-- A correct answer with reason_code=self_reported_guess is NOT
-  mastery evidence. Acceptable picks: confirm_and_advance (re-pose
-  same difficulty), scaffold_hint (verify understanding). NOT
-  confirm_and_extend.
-
-- A help-request ("explain X", "show me", "I don't understand X",
-  "what is X") overrides verdict-driven defaults: pick explain or
-  worked_example. The deterministic safety floor downstream will
-  enforce this if you miss it, but you should not miss it.
-
-- A resume turn (open_question_has_pending=false but move_history
-  shows prior poses) where the student just delivered correct
-  working: pick confirm_and_extend or close_topic, NOT explain
-  (re-emitting the engage paragraph reads as the engine giving up).
-
-- When the lesson just opened (move_history empty) and no verdict
-  ran: pick explain (or worked_example if profile_summary mentions
-  struggle). End-of-turn must still be an action the student takes.
-
-- When objective_correct ≥ 2 AND objective_attempts ≥ 3 AND
-  objective_correct / objective_attempts ≥ 0.66: prefer close_topic.
-  The deterministic safety floor will enforce this if you miss it,
-  but agreeing with the floor produces a cleaner trace.
-
-- When the pose tool is unavailable (pose_tool_available=false) AND
-  you would otherwise pick a pose-capable move: prefer close_topic
-  (if objective_correct ≥ 1) or pivot. Choosing scaffold_hint /
-  worked_example / explain is fine on a pose-unavailable turn as
-  long as the move LLM can close on a prose action (the per-move
-  prompt handles this).
+For the ANSWER_ATTEMPT case:
+{
+  "case": "answer_attempt",
+  "verdict_needed": true,
+  "moves_by_verdict": {
+    "correct": "<move from closed set>",
+    "partial": "<move from closed set>",
+    "wrong":   "<move from closed set>"
+  },
+  "reason": "one sentence — names the counter values that drove each branch"
+}
 
 ────────────────────────────────────────────────────────────────────
 HARD RULES — non-negotiable.
 
 - Emit JSON only. No prose preface, no markdown fences, no comments.
-- ``chosen_move`` must be one of the 8 names above. Any other value
-  is rejected.
-- Each name in ``principle_emphasis`` must match one of the 13
-  principle names above EXACTLY (case-sensitive).
-- ``focus_note`` ≤ 250 characters. ``rationale`` ≤ 400 characters.
-- Do NOT include the canonical answer in any field. The move LLM
-  works from student-safe feedback; leaking the canonical into the
-  focus_note defeats the redaction layer.
+- Every `move` / `moves_by_verdict` value must be one of the 8 move
+  names above. Any other value is rejected.
+- `reason` ≤ 400 characters.
+- Do NOT include the canonical answer or grader internals in any
+  field. The tutor LLM works from its own grounding; leaking
+  internals into `reason` defeats the redaction layer.
 """
 
 
@@ -248,44 +222,32 @@ def render_router_user_prompt(request: RouterRequest) -> str:
     """Render the dynamic per-turn payload the router sees.
 
     Long-context query-last shape: lesson + counters first, transcript
-    in the middle (largest piece), latest student input + the decision
-    ask at the END so the model's recency bias steers toward the
-    actual task.
+    in the middle, latest student input + the decision ask at the END
+    so the model's recency bias steers toward the actual task.
     """
-    safe = request.student_safe_feedback
-    grader_block = _render_grader_block(request)
     transcript_block = _render_transcript_block(request.last_n_turns)
     counters_block = _render_counters_block(request)
     lesson_block = _render_lesson_block(request)
     open_q_block = _render_open_q_block(request)
-    safe_block = json.dumps(
-        {
-            "what_right": safe.what_right,
-            "what_missing": safe.what_missing,
-            "first_misconception_redacted": safe.first_misconception_redacted,
-        },
-        ensure_ascii=False,
+    profile_block = (
+        (request.profile_summary or "").strip()
+        or "(no profile summary yet)"
     )
-    profile_block = (request.profile_summary or "").strip() or "(no profile summary yet)"
 
     return (
         f"{lesson_block}\n\n"
-        f"{counters_block}\n\n"
         f"{open_q_block}\n\n"
+        f"{counters_block}\n\n"
         f"=== Student profile summary ===\n{profile_block}\n\n"
-        f"=== Conversation transcript (last {len(request.last_n_turns)} turns) ===\n"
+        f"=== Recent transcript (last {len(request.last_n_turns)} turns; "
+        f"for qualitative context only — do NOT count from this) ===\n"
         f"{transcript_block}\n\n"
-        f"=== Grader output for the latest student input ===\n"
-        f"{grader_block}\n\n"
-        f"Student-safe feedback (use as material for focus_note; do NOT "
-        f"copy verbatim, and do NOT include any canonical answer):\n"
-        f"{safe_block}\n\n"
-        f"=== Latest student input ===\n"
+        f"=== CURRENT STUDENT TURN ===\n"
         f"{(request.student_input or '').strip() or '(no input — opening / transitional turn)'}\n\n"
         f"---\n"
-        f"Decide chosen_move, principle_emphasis (1-3 names), focus_note "
-        f"(≤50 tokens), and rationale (one sentence). Return strict JSON "
-        f"per the schema in the system prompt — no prose, no fences."
+        f"Classify the turn (answer_attempt / help_request / "
+        f"opening_turn / forced_close) and return strict JSON per the "
+        f"schema in the system prompt. No prose, no fences."
     )
 
 
@@ -299,7 +261,10 @@ def _render_lesson_block(request: RouterRequest) -> str:
     )
     teacher_script = (request.lesson_step_teacher_script or "").strip()
     worked_example = (request.lesson_step_worked_example or "").strip()
-    media = (request.media_catalog_summary or "").strip() or "(no figures available)"
+    media = (
+        (request.media_catalog_summary or "").strip()
+        or "(no figures available)"
+    )
     parts = [
         "=== Lesson context ===",
         f"Title: {title}",
@@ -309,34 +274,36 @@ def _render_lesson_block(request: RouterRequest) -> str:
         f"Media catalog: {media}",
     ]
     if teacher_script:
-        parts.append("Authored direct-instruction draft (anchor for explain):")
-        parts.append(_clip(teacher_script, 600))
+        parts.append(f"Authored direct-instruction draft: {_clip(teacher_script, 400)}")
     if worked_example:
-        parts.append("Authored worked example (anchor for worked_example):")
-        parts.append(_clip(worked_example, 600))
+        parts.append(f"Authored worked example: {_clip(worked_example, 400)}")
     return "\n".join(parts)
 
 
 def _render_counters_block(request: RouterRequest) -> str:
-    ratio = (
-        request.objective_correct / max(1, request.objective_attempts)
-        if request.objective_attempts
-        else 0.0
-    )
+    """Named counter fields the routing rules reference.
+
+    Every counter the router's routing rules use is here, named the
+    same way as in the system prompt. The router MUST NOT count from
+    the transcript — these are authoritative.
+    """
     recent_moves = request.move_history[-5:] if request.move_history else []
+    recent_verdicts = (
+        request.recent_verdicts[-10:] if request.recent_verdicts else []
+    )
     return (
-        "=== Runtime counters ===\n"
-        f"objective: attempts={request.objective_attempts}, "
-        f"correct={request.objective_correct}, "
-        f"wrong={request.objective_wrong}, "
-        f"partial={request.objective_partial}, "
-        f"correct_ratio={ratio:.2f}\n"
-        f"turns_in_session={request.turns_in_session}, "
-        f"turns_on_current_objective={request.turns_on_current_objective}, "
-        f"verdictless_turns={request.verdictless_turns}, "
-        f"attempts_on_open_question={request.attempts_on_open_question}\n"
-        f"recent_moves (most recent last): {recent_moves}\n"
-        f"pose_tool_available={request.pose_tool_available}"
+        "=== Runtime counters (authoritative — do not re-derive) ===\n"
+        f"open_question_present: {request.open_question_has_pending}\n"
+        f"wrong_attempts_on_open_question: {request.wrong_attempts_on_open_question}\n"
+        f"partial_attempts_on_open_question: {request.partial_attempts_on_open_question}\n"
+        f"consecutive_wrong_on_open_question: {request.consecutive_wrong_on_open_question}\n"
+        f"objective_turn_count: {request.objective_turn_count}\n"
+        f"prior_answer_attempts_on_objective: {request.prior_answer_attempts_on_objective}\n"
+        f"correct_on_objective: {request.correct_on_objective}\n"
+        f"unscaffolded_correct_on_objective: {request.unscaffolded_correct_on_objective}\n"
+        f"recent_verdicts (oldest first, up to last 10): {recent_verdicts}\n"
+        f"recent_moves (oldest first, up to last 5): {recent_moves}\n"
+        f"pose_tool_available: {request.pose_tool_available}"
     )
 
 
@@ -350,20 +317,6 @@ def _render_open_q_block(request: RouterRequest) -> str:
     )
 
 
-def _render_grader_block(request: RouterRequest) -> str:
-    if request.grader_verdict is None:
-        return (
-            "verdict: (none — no graded attempt this turn; either the "
-            "input is a help-request / meta input, or the turn is "
-            "opening / transitional)"
-        )
-    reason = request.grader_reason_code or ""
-    return (
-        f"verdict: {request.grader_verdict.value}\n"
-        f"reason_code: {reason or '(none)'}"
-    )
-
-
 def _render_transcript_block(turns: list[dict]) -> str:
     if not turns:
         return "(empty — fresh session or no recent turns retained)"
@@ -371,7 +324,7 @@ def _render_transcript_block(turns: list[dict]) -> str:
     for turn in turns:
         role = (turn.get("role") or "?").strip()
         content = (turn.get("content") or "").strip()
-        lines.append(f"[{role}] {_clip(content, 600)}")
+        lines.append(f"[{role}] {_clip(content, 500)}")
     return "\n".join(lines)
 
 
@@ -383,10 +336,7 @@ def _clip(text: str, limit: int) -> str:
     return text[: limit - 1] + "…"
 
 
-# Re-export ALLOWED_PRINCIPLES so callers that import this module can
-# reference the canonical list without reaching into contracts.
 __all__ = [
-    "ALLOWED_PRINCIPLES",
     "SHARED_ROUTER_SYSTEM",
     "render_router_user_prompt",
 ]

@@ -121,8 +121,7 @@ class StudentTutor:
         *,
         media_catalog: Optional[list[dict]] = None,
         student_input: str = "",
-        focus_note: str = "",
-        principle_emphasis: Optional[list[str]] = None,
+        reason: str = "",
         hold_pending_pose: Optional[PendingPose] = None,
     ) -> TutorResponse:
         """Produce the tutor's next utterance for the selected move.
@@ -155,8 +154,7 @@ class StudentTutor:
             move=move,
             media_catalog=media_catalog or [],
             student_input=student_input,
-            focus_note=focus_note,
-            principle_emphasis=principle_emphasis or [],
+            reason=reason,
         )
         if hold_pending_pose is not None:
             # Fix 3 — prose-only retry. Tell the LLM the question stem
@@ -501,19 +499,18 @@ class StudentTutor:
         move: str,
         media_catalog: list[dict],
         student_input: str,
-        focus_note: str = "",
-        principle_emphasis: Optional[list[str]] = None,
+        reason: str = "",
     ) -> str:
         """Build the per-turn user prompt.
 
         Structure (per prompting-fundamentals long-context guidance):
           1. Current objective + open question (short, near top).
           2. Media catalog block (compact, when present).
-          3. Per-turn focus block (router-provided focus_note +
-             principle emphasis) — placed AFTER the per-move body in
-             the system prompt and BEFORE the transcript so the move's
-             general guidance is contextualized by this turn's specific
-             direction (plan §2.5).
+          3. Per-turn reason block (router-provided one-sentence
+             steering hint) — placed AFTER the per-move body in the
+             system prompt and BEFORE the transcript so the move's
+             general guidance is contextualized by this turn's
+             specific direction.
           4. Full transcript (the largest piece).
           5. Verdict block (only on wrong / partial; the redacted
              shape — never the canonical for non-correct).
@@ -525,10 +522,7 @@ class StudentTutor:
         evidence_block = self._render_objective_evidence_block(context)
         media_block = self._render_media_catalog_block(media_catalog)
         lesson_content_block = self._render_lesson_step_content_block(context)
-        focus_block = self._render_focus_block(
-            focus_note=focus_note,
-            principle_emphasis=principle_emphasis or [],
-        )
+        reason_block = self._render_reason_block(reason=reason)
         transcript_block = self._render_transcript_block(context.full_transcript)
         verdict_block = self._render_verdict_block(
             verdict=verdict, move=move,
@@ -538,7 +532,7 @@ class StudentTutor:
             f"{evidence_block}\n\n"
             f"{media_block}\n\n"
             f"{lesson_content_block}\n\n"
-            f"{focus_block}"
+            f"{reason_block}"
             f"=== Conversation transcript so far ===\n"
             f"{transcript_block}\n\n"
             f"{verdict_block}\n"
@@ -552,39 +546,21 @@ class StudentTutor:
             f"by the system prompt."
         )
 
-    def _render_focus_block(
-        self,
-        *,
-        focus_note: str,
-        principle_emphasis: list[str],
-    ) -> str:
-        """Inject the router's per-turn focus + principle emphasis.
+    def _render_reason_block(self, *, reason: str) -> str:
+        """Inject the router's one-sentence steering hint for this turn.
 
-        Emits nothing when both fields are empty (legacy callers,
-        opening turns where the router fell back to a default).
-        ``focus_note`` STEERS the move LLM, it does NOT script it —
-        the per-move prompt body in the system prompt remains the
-        load-bearing guide.
+        Emits nothing when ``reason`` is empty. The reason STEERS the
+        move LLM — the per-move prompt body in the system prompt
+        remains the load-bearing guide.
         """
-        focus = (focus_note or "").strip()
-        principles = [
-            p.strip() for p in (principle_emphasis or []) if (p or "").strip()
-        ]
-        if not focus and not principles:
+        text = (reason or "").strip()
+        if not text:
             return ""
-        lines = ["=== This turn specifically ==="]
-        if focus:
-            lines.append(f"- Focus: {focus}")
-        if principles:
-            lines.append(
-                f"- Principles to emphasize: {', '.join(principles)}"
-            )
-        lines.append(
-            "(This steers the turn — it does not script the wording. "
-            "Use it to specialize the MOVE in the system prompt to "
-            "THIS specific situation.)"
+        return (
+            "=== This turn specifically ===\n"
+            f"Reason for this move: {text}\n"
+            "(This steers the turn; it does not script the wording.)\n\n"
         )
-        return "\n".join(lines) + "\n\n"
 
     def _render_lesson_step_content_block(self, context: TutoringContext) -> str:
         """Render lesson-authored direct-instruction + worked-example text.

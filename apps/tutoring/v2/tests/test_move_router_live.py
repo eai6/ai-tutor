@@ -110,6 +110,18 @@ def _route(request: RouterRequest):
     return router.route(request)
 
 
+def _effective_move_for_verdict(decision, verdict_value: str) -> str:
+    """Resolve the move the engine would pick for a given grader verdict.
+
+    Mirrors ``TutorEngine._resolve_move``: non-answer-attempt → use
+    ``decision.move``; answer-attempt → look up the matching row in
+    ``decision.moves_by_verdict``.
+    """
+    if decision.verdict_needed:
+        return (decision.moves_by_verdict or {}).get(verdict_value, "")
+    return decision.move or ""
+
+
 # ──────────────────────────────────────────────────────────────────────
 # GEO-S5 P1-3 — help-request misroute
 # ──────────────────────────────────────────────────────────────────────
@@ -173,9 +185,10 @@ def test_router_live_geo_p1_3_help_request_picks_teaching_move():
         pose_tool_available=True,
     )
     decision = _route(request)
-    assert decision.chosen_move in {"explain", "worked_example"}, (
+    # Help-request → non-answer-attempt shape; decision.move is set.
+    assert decision.move in {"explain", "worked_example"}, (
         f"help-request must route to a teaching move; got "
-        f"{decision.chosen_move!r} (rationale={decision.rationale!r})"
+        f"{decision.move!r} (decision={decision!r})"
     )
 
 
@@ -256,11 +269,12 @@ def test_router_live_maths_p1_1_resume_after_correct_streak():
         pose_tool_available=True,
     )
     decision = _route(request)
-    assert decision.chosen_move in {
+    effective = _effective_move_for_verdict(decision, "correct")
+    assert effective in {
         "confirm_and_extend", "confirm_and_advance", "close_topic",
     }, (
-        f"resume after correct streak must NOT re-explain; got "
-        f"{decision.chosen_move!r} (rationale={decision.rationale!r})"
+        f"resume after correct streak must NOT re-explain; effective "
+        f"correct-move={effective!r} (decision={decision!r})"
     )
 
 
@@ -319,17 +333,13 @@ def test_router_live_maths_p1_4_objective_evidence_close():
         pose_tool_available=True,
     )
     decision = _route(request)
-    # The router could legitimately pick close_topic or
-    # confirm_and_extend here (a final twist before closing); both are
-    # acceptable because floor #2 will force-close regardless. The
-    # test pins that the router is at least NOT picking something
-    # incoherent (e.g. scaffold_hint after 3 correct, or pose-only).
-    assert decision.chosen_move in {
+    effective = _effective_move_for_verdict(decision, "correct")
+    assert effective in {
         "close_topic", "confirm_and_extend", "confirm_and_advance",
     }, (
         f"objective evidence saturated — router must pick close/extend; "
-        f"got {decision.chosen_move!r} "
-        f"(rationale={decision.rationale!r})"
+        f"effective correct-move={effective!r} "
+        f"(decision={decision!r})"
     )
 
 
@@ -380,15 +390,15 @@ def test_router_live_geo_p1_4_self_reported_guess_does_not_extend():
         pose_tool_available=True,
     )
     decision = _route(request)
-    assert decision.chosen_move != "confirm_and_extend", (
+    effective = _effective_move_for_verdict(decision, "correct")
+    assert effective != "confirm_and_extend", (
         f"self-reported guess MUST NOT advance via confirm_and_extend; "
-        f"got {decision.chosen_move!r} "
-        f"(rationale={decision.rationale!r})"
+        f"effective correct-move={effective!r} (decision={decision!r})"
     )
-    assert decision.chosen_move in {
+    assert effective in {
         "confirm_and_advance", "scaffold_hint", "worked_example",
         "explain",
     }, (
         f"unexpected move for self-reported guess: "
-        f"{decision.chosen_move!r} (rationale={decision.rationale!r})"
+        f"effective correct-move={effective!r} (decision={decision!r})"
     )

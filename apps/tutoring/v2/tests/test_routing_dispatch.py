@@ -22,11 +22,8 @@ import pytest
 from apps.tutoring.v2.contracts import (
     ObjectiveProgress,
     RouterDecision,
-    SafetyValveCounters,
     SessionRuntimeState,
-    StudentSafeFeedback,
     TutoringContext,
-    Verdict,
 )
 from apps.tutoring.v2.routing import (
     ensure_engine_version_set,
@@ -102,14 +99,35 @@ class _FakeRouter:
 
 def _decision(
     move: str = "scaffold_hint",
-    principles=None,
-    focus_note: str = "stay on the open question",
+    *,
+    case: str = "help_request",
+    reason: str = "stay on the open question",
+) -> RouterDecision:
+    """Build a non-answer-attempt RouterDecision."""
+    return RouterDecision(
+        case=case,
+        verdict_needed=False,
+        move=move,
+        reason=reason,
+    )
+
+
+def _attempt_decision(
+    *,
+    correct: str = "confirm_and_advance",
+    partial: str = "scaffold_hint",
+    wrong: str = "scaffold_hint",
+    reason: str = "test answer-attempt decision",
 ) -> RouterDecision:
     return RouterDecision(
-        chosen_move=move,
-        principle_emphasis=principles or ["Targeted Remediation"],
-        focus_note=focus_note,
-        rationale="test",
+        case="answer_attempt",
+        verdict_needed=True,
+        moves_by_verdict={
+            "correct": correct,
+            "partial": partial,
+            "wrong": wrong,
+        },
+        reason=reason,
     )
 
 
@@ -139,37 +157,33 @@ def _engine_with(router: _FakeRouter):
     return engine
 
 
-def test_pick_move_returns_router_chosen_move_unchanged_when_no_floor():
+def test_pick_move_returns_router_move_for_non_attempt():
     router = _FakeRouter(_decision(move="scaffold_hint"))
     engine = _engine_with(router)
-    move, focus, principles, decision = engine.pick_move(
+    move, reason, decision = engine.pick_move(
         context=_context(),
-        verdict=None,
         student_input="12",
         pose_tool_available=True,
     )
     assert move == "scaffold_hint"
-    assert focus == "stay on the open question"
-    assert principles == ["Targeted Remediation"]
-    assert decision.chosen_move == "scaffold_hint"
+    assert reason == "stay on the open question"
+    assert decision.case == "help_request"
+    assert decision.move == "scaffold_hint"
 
 
-def test_pick_move_passes_through_focus_note_and_principles():
+def test_pick_move_passes_through_router_reason():
     router = _FakeRouter(_decision(
         move="explain",
-        principles=["Direct Instruction", "Cognitive Load"],
-        focus_note="define condensation in plain language",
+        reason="define condensation in plain language",
     ))
     engine = _engine_with(router)
-    move, focus, principles, _ = engine.pick_move(
+    move, reason, _ = engine.pick_move(
         context=_context(),
-        verdict=None,
         student_input="i don't understand",
         pose_tool_available=True,
     )
     assert move == "explain"
-    assert "condensation" in focus
-    assert "Direct Instruction" in principles
+    assert "condensation" in reason
 
 
 def test_pick_move_threads_objective_progress_into_router_request():
@@ -181,12 +195,14 @@ def test_pick_move_threads_objective_progress_into_router_request():
     engine = _engine_with(router)
     engine.pick_move(
         context=_context(runtime_state=state),
-        verdict=None,
         student_input="12",
         pose_tool_available=True,
     )
     assert router.last_request.objective_attempts == 2
     assert router.last_request.objective_correct == 1
+    # New counter fields derived from progress.
+    assert router.last_request.prior_answer_attempts_on_objective == 2
+    assert router.last_request.correct_on_objective == 1
 
 
 def test_pick_move_threads_pose_tool_available_into_request():
@@ -194,7 +210,6 @@ def test_pick_move_threads_pose_tool_available_into_request():
     engine = _engine_with(router)
     engine.pick_move(
         context=_context(),
-        verdict=None,
         student_input="12",
         pose_tool_available=False,
     )
@@ -204,20 +219,37 @@ def test_pick_move_threads_pose_tool_available_into_request():
 def test_pick_move_fail_soft_when_router_returns_unknown_move():
     """Defensive normalization — should never fire in production but
     must produce a valid move under any router output."""
-    # Construct a RouterDecision that bypasses Pydantic's Literal check
-    # by hand-crafting via model_construct (unsafe constructor).
     bad_decision = RouterDecision.model_construct(
-        chosen_move="not_a_real_move",
-        principle_emphasis=["Active Learning"],
-        focus_note="",
-        rationale="",
+        case="help_request",
+        verdict_needed=False,
+        move="not_a_real_move",
+        reason="",
+        moves_by_verdict=None,
     )
     router = _FakeRouter(bad_decision)
     engine = _engine_with(router)
-    move, _, _, _ = engine.pick_move(
+    move, _, _ = engine.pick_move(
         context=_context(),
-        verdict=None,
         student_input="12",
         pose_tool_available=True,
     )
     assert move == "scaffold_hint"
+
+
+def test_pick_move_resolves_answer_attempt_to_wrong_branch_without_verdict():
+    """start_session-style call (no verdict): when the router returns
+    an answer-attempt decision, the engine resolves to the wrong
+    branch (most-conservative)."""
+    router = _FakeRouter(_attempt_decision(
+        correct="confirm_and_advance",
+        partial="scaffold_hint",
+        wrong="pivot",
+    ))
+    engine = _engine_with(router)
+    move, _, _ = engine.pick_move(
+        context=_context(),
+        student_input="hi",
+        pose_tool_available=True,
+    )
+    # No verdict on this code path → use moves_by_verdict["wrong"].
+    assert move == "pivot"

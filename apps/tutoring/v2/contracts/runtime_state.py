@@ -252,6 +252,20 @@ class SessionRuntimeState(BaseModel):
     # Principle #1 *Active Learning* (Ch.10).
     student_doing_rate_window: list[bool] = Field(default_factory=list)
 
+    # ── Per-open-question + per-objective counters (Commit D §4.2) ───
+    # The engine is the single writer; the router reads them via
+    # ``build_router_request`` and the router prompt references them
+    # by name. Reset on open-question change.
+    wrong_attempts_on_open_question: int = 0
+    partial_attempts_on_open_question: int = 0
+    consecutive_wrong_on_open_question: int = 0
+    # Per-objective; reset when current_objective changes.
+    unscaffolded_correct_on_open_question_objective: int = 0
+    # Rolling list of the last ≤10 verdict values ("correct" / "partial"
+    # / "wrong"), oldest first. Engine caps in the writer — Pydantic v2
+    # does not enforce caps inline.
+    recent_verdicts: list[str] = Field(default_factory=list)
+
     # Schema version for forward-compat. Bump when adding additive
     # fields; ContextManager loaders tolerate older versions.
     schema_version: int = 1

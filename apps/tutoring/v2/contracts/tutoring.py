@@ -10,7 +10,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from apps.tutoring.v2.contracts.runtime_state import (
     OpenQuestion,
@@ -200,13 +200,27 @@ ALLOWED_PRINCIPLES: tuple[str, ...] = (
 )
 
 
+RouterCase = Literal[
+    "answer_attempt",
+    "help_request",
+    "opening_turn",
+    "forced_close",
+]
+
+
 class RouterRequest(BaseModel):
     """Inputs to ``MoveRouter.route()``.
 
-    Built from ``TutoringContext`` + ``GradingResult`` + the runtime
-    state at one site (``RouterRequest.from_context``) so callers don't
-    re-derive the snapshot at each call site. Frozen — services are
-    stateless and receive immutable snapshots.
+    Built from ``TutoringContext`` + the runtime state at one site
+    (``build_router_request``) so callers don't re-derive the snapshot
+    at each call site. Frozen — services are stateless and receive
+    immutable snapshots.
+
+    Note (post-prune Commit D): the router runs FIRST on every turn,
+    BEFORE the grader. The grader's ``verdict`` is therefore not in
+    the request — the router's job is to decide whether the grader
+    runs at all (``verdict_needed`` on its output) and what move to
+    pick for each possible grader outcome on answer-attempt turns.
     """
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
@@ -215,7 +229,9 @@ class RouterRequest(BaseModel):
     last_n_turns: list[dict] = Field(default_factory=list)
     student_input: str = ""
 
-    # ── grader output (None on opening / transitional / help-request) ─
+    # ── grader output (legacy — kept additively until commit G;
+    #    populated only when the engine grades before this call which
+    #    no longer happens post-Commit D. Defaults to None) ─────────
     grader_verdict: Optional[Verdict] = None
     grader_reason_code: Optional[str] = None
     student_safe_feedback: StudentSafeFeedback = Field(
@@ -232,7 +248,7 @@ class RouterRequest(BaseModel):
     media_catalog_summary: str = ""
     is_final_step: bool = True
 
-    # ── runtime state slices ─────────────────────────────────────────
+    # ── runtime state slices (legacy — additive, kept until commit G) ──
     move_history: list[str] = Field(default_factory=list)
     objective_correct: int = 0
     objective_wrong: int = 0
@@ -247,6 +263,19 @@ class RouterRequest(BaseModel):
     open_question_stem: str = ""
     open_question_has_pending: bool = False
 
+    # ── NEW counter fields (Commit D §4.2) — named, engine-supplied ──
+    # The router prompt references these by name and MUST NOT re-derive
+    # them from the transcript. Engine is the sole writer.
+    wrong_attempts_on_open_question: int = 0
+    partial_attempts_on_open_question: int = 0
+    consecutive_wrong_on_open_question: int = 0
+    objective_turn_count: int = 0
+    prior_answer_attempts_on_objective: int = 0
+    correct_on_objective: int = 0
+    unscaffolded_correct_on_objective: int = 0
+    # Last ≤10 verdict values ("correct" / "partial" / "wrong"), oldest first.
+    recent_verdicts: list[str] = Field(default_factory=list)
+
     # ── tool surface availability ────────────────────────────────────
     pose_tool_available: bool = True
 
@@ -254,27 +283,67 @@ class RouterRequest(BaseModel):
 class RouterDecision(BaseModel):
     """Output of ``MoveRouter.route()``.
 
-    The router decides WHAT to do; the move LLM (StudentTutor) decides
-    HOW to say it. ``focus_note`` is what-to-address this turn (1-2
-    sentences, ≤50 tokens / 250 chars). ``principle_emphasis`` is the
-    1-3 names from ``ALLOWED_PRINCIPLES`` to surface in the move prompt.
-    ``rationale`` is for the v2 observability trace — a single sentence
-    the auditor can grep on.
+    Post-prune Commit D §4.2: the router is the single source of truth
+    for both case classification AND move selection. Shape is
+    case-conditional:
+
+    - Non-answer-attempt (help_request / opening_turn / forced_close):
+      ``{case, move, verdict_needed: false, reason}``. The grader does
+      not run; the engine calls the tutor directly with the move.
+
+    - Answer-attempt: ``{case: "answer_attempt", verdict_needed: true,
+      moves_by_verdict: {correct, partial, wrong}, reason}``. The
+      engine grades after the router returns and looks up the matching
+      row — no engine-side mapping table.
+
+    ``reason`` (≤400 chars) is threaded into the tutor LLM's user
+    prompt as a single-sentence steering hint and stamped on the
+    ``router.decision`` trace span.
     """
 
-    chosen_move: RouterMove
-    principle_emphasis: list[str] = Field(default_factory=list, max_length=3)
-    focus_note: str = Field(default="", max_length=250)
-    rationale: str = Field(default="", max_length=400)
+    case: RouterCase
+    verdict_needed: bool
+    move: Optional[RouterMove] = None
+    moves_by_verdict: Optional[dict[str, RouterMove]] = None
+    reason: str = Field(default="", max_length=400)
 
-    @field_validator("principle_emphasis")
-    @classmethod
-    def _validate_principle_names(cls, v: list[str]) -> list[str]:
-        allowed = set(ALLOWED_PRINCIPLES)
-        bad = [name for name in v if name not in allowed]
-        if bad:
-            raise ValueError(
-                f"principle_emphasis contains unknown principle(s): "
-                f"{bad!r}; must be a subset of {ALLOWED_PRINCIPLES!r}"
-            )
-        return v
+    @model_validator(mode="after")
+    def _validate_case_shape(self) -> "RouterDecision":
+        if self.verdict_needed:
+            if self.case != "answer_attempt":
+                raise ValueError(
+                    f"verdict_needed=True requires case='answer_attempt'; "
+                    f"got {self.case!r}"
+                )
+            if self.move is not None:
+                raise ValueError(
+                    "verdict_needed=True requires move=None — "
+                    "use moves_by_verdict to enumerate per-verdict moves"
+                )
+            if not self.moves_by_verdict:
+                raise ValueError(
+                    "verdict_needed=True requires moves_by_verdict "
+                    "with keys 'correct', 'partial', 'wrong'"
+                )
+            required = {"correct", "partial", "wrong"}
+            keys = set(self.moves_by_verdict.keys())
+            if keys != required:
+                raise ValueError(
+                    f"moves_by_verdict keys must be exactly {required!r}; "
+                    f"got {keys!r}"
+                )
+        else:
+            if self.case == "answer_attempt":
+                raise ValueError(
+                    "case='answer_attempt' requires verdict_needed=True"
+                )
+            if self.move is None:
+                raise ValueError(
+                    "verdict_needed=False requires a non-None `move`"
+                )
+            if self.moves_by_verdict is not None:
+                raise ValueError(
+                    "verdict_needed=False forbids moves_by_verdict "
+                    "(use `move` instead)"
+                )
+        return self
