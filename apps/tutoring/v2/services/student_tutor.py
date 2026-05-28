@@ -594,10 +594,9 @@ class StudentTutor:
         close_topic move's response-quality checklist can reference it
         verbatim: when ``true``, the close will trigger the exit-ticket
         modal end-to-end; when ``false``, the close will advance to the
-        next step (no exit-ticket promise). Computed from
-        ``is_final_step`` — the engine's runtime decision matches this
-        for the dominant close-via-correct path documented in run-10
-        GEO-S5 §1 P1-3.
+        next step (no exit-ticket promise). The signal fires on EITHER
+        the lesson's final step OR slot exhaustion mid-lesson — both
+        paths trigger the engine's ``is_lesson_complete`` decision.
         """
         open_q = context.runtime_state.open_question
         objective = context.current_objective or "(no objective set)"
@@ -609,7 +608,27 @@ class StudentTutor:
             if context.is_final_step
             else "more steps remain in the lesson after this one"
         )
-        lesson_complete_signal = "true" if context.is_final_step else "false"
+        # lesson_complete_signal fires on EITHER the final-step
+        # boundary OR slot exhaustion (no more assessable bank items).
+        # The engine's runtime ``is_lesson_complete`` decision uses the
+        # same disjunction; this keeps the LLM's transition phrase
+        # ("exit ticket — I'll set it up." vs "Let's move on to the
+        # next part.") aligned with what the engine will actually
+        # dispatch.
+        #
+        # Default to 1 ("more work remains") on a missing attribute so
+        # legacy / mocked contexts never spoof a premature complete.
+        # ``getattr`` default-substitutes only when the attribute is
+        # absent; the explicit ``is None`` branch handles a None-valued
+        # attribute. ``or 1`` is NOT used — it would collapse the
+        # legitimate value 0 (slot exhausted) into 1 (slots remain).
+        slots_raw = getattr(context, "assessable_slots_remaining", 1)
+        if slots_raw is None:
+            slots_raw = 1
+        slot_exhausted = int(slots_raw) == 0
+        lesson_complete_signal = (
+            "true" if (context.is_final_step or slot_exhausted) else "false"
+        )
         if open_q is None:
             return (
                 f"=== Current objective ===\n{objective}\n"

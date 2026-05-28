@@ -145,6 +145,17 @@ class TutoringContext(BaseModel):
     # contexts that don't know (mid-session legacy / mocked tests) —
     # treating a session as "final" never leaks half-done lessons.
     is_final_step: bool = True
+    # Count of un-delivered LessonSteps that still have a non-empty
+    # ``question`` — i.e. assessable bank slots remaining for this
+    # lesson. The engine's ``is_lesson_complete`` decision fires the
+    # exit ticket when this hits 0 AND no open question is in flight,
+    # EVEN ON intermediate steps (instruction-only steps may follow).
+    # Plumbed into ``lesson_complete_signal`` so the close_topic prompt
+    # uses the exit-ticket phrasing whenever the engine will actually
+    # fire the modal, not just on the final-step boundary. Default 1 is
+    # the safe assumption ("more work remains") for legacy / mocked
+    # contexts that don't compute it.
+    assessable_slots_remaining: int = 1
 
 
 # ──────────────────────────────────────────────────────────────────────

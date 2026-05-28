@@ -232,6 +232,28 @@ Tool-vs-prose dedup — when posing via the pose_question tool:
 - When you are NOT calling the tool (rare — prose-only moves like a
   reflective scaffold), author the question with options once and
   only once in prose.
+
+Mid-move pose dedup — exactly one question per turn, full stop:
+- A diagnostic / practice prompt authored in YOUR PROSE counts as a
+  question. A pose_question TOOL call also counts as a question. A
+  single turn carries AT MOST ONE of them, never both.
+- If your move body would naturally end with a prose practice
+  prompt (a scaffolded sub-question, a "what is X ÷ Y?" check, a
+  "True or False?" diagnostic), and the engine also calls
+  pose_question to deliver a fresh bank slot, the student sees TWO
+  questions. Cut the prose practice prompt; keep only the tool-
+  posed stem. The tool's emitted stem IS this turn's practice
+  prompt.
+- Self-check before emitting: count question marks in your prose
+  body. If the prose body has 1 or more ``?`` AND the tool was
+  called, you have stacked. Remove every ``?``-bearing sentence
+  from the prose and let the tool's stem stand alone.
+- This rule applies on every move that may both author prose AND
+  call the tool (worked_example, name_misconception, scaffold_hint,
+  confirm_and_advance, confirm_and_extend, explain, pivot). The only
+  exception is when the prose ``?`` is a reflective open-ended
+  prompt with no canonical answer AND the tool was NOT called — in
+  that case the reflective prompt IS the turn.
 {mobile_directive}
 """
 

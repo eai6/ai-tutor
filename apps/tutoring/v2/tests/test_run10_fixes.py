@@ -376,3 +376,60 @@ def test_mastery_close_floor_ignores_non_correct_verdict() -> None:
             runtime_state=_runtime_state_with_unscaffolded_correct(0),
         )
         assert result == "close_topic", f"verdict={non_correct} should pass through"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Run-11 R2 — lesson_complete_signal honors assessable_slots_remaining
+# ──────────────────────────────────────────────────────────────────────
+
+def _objective_block(
+    *,
+    is_final_step: bool,
+    assessable_slots_remaining: int,
+) -> str:
+    """Render the objective block via StudentTutor on a synthetic context."""
+    from apps.tutoring.v2.contracts.tutoring import TutoringContext
+    from apps.tutoring.v2.contracts.runtime_state import SessionRuntimeState
+    from apps.tutoring.v2.services.student_tutor import StudentTutor
+
+    ctx = TutoringContext(
+        session_id=1,
+        student_id=1,
+        institution_id=0,
+        lesson_id=1,
+        runtime_state=SessionRuntimeState(),
+        is_final_step=is_final_step,
+        assessable_slots_remaining=assessable_slots_remaining,
+        current_objective="test objective",
+    )
+    tutor = StudentTutor.__new__(StudentTutor)
+    return StudentTutor._render_objective_block(tutor, ctx)
+
+
+def test_lesson_complete_signal_true_on_final_step() -> None:
+    """Final step with slots remaining → signal=true (existing behavior)."""
+    block = _objective_block(is_final_step=True, assessable_slots_remaining=2)
+    assert "lesson_complete_signal: true" in block
+
+
+def test_lesson_complete_signal_true_on_slot_exhaustion_mid_lesson() -> None:
+    """Non-final step but all assessable slots delivered → signal=true.
+
+    Closes the run-11 GEO §2.2 gap where the engine fired the exit
+    ticket on slot exhaustion but the LLM prompt read signal=false and
+    emitted "next part of the lesson".
+    """
+    block = _objective_block(is_final_step=False, assessable_slots_remaining=0)
+    assert "lesson_complete_signal: true" in block
+
+
+def test_lesson_complete_signal_false_when_slots_remain_mid_lesson() -> None:
+    """Non-final step with slots remaining → signal=false."""
+    block = _objective_block(is_final_step=False, assessable_slots_remaining=3)
+    assert "lesson_complete_signal: false" in block
+
+
+def test_lesson_complete_signal_true_on_both_conditions() -> None:
+    """Final step AND slot exhaustion → signal=true."""
+    block = _objective_block(is_final_step=True, assessable_slots_remaining=0)
+    assert "lesson_complete_signal: true" in block

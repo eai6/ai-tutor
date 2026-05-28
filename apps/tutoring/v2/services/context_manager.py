@@ -172,6 +172,11 @@ class ContextManager:
 
         teacher_script, worked_example = self._current_step_pedagogy(session)
 
+        runtime_state = self.load_runtime_state()
+        assessable_slots_remaining = self._count_assessable_slots_remaining(
+            lesson=lesson, runtime_state=runtime_state,
+        )
+
         return TutoringContext(
             session_id=session.id,
             student_id=student.id,
@@ -183,7 +188,7 @@ class ContextManager:
             tutor_persona=tutor_persona,
             client_kind=client_kind if client_kind in ("web", "mobile") else "web",
             full_transcript=full_transcript,
-            runtime_state=self.load_runtime_state(),
+            runtime_state=runtime_state,
             profile_summary=profile_summary,
             current_objective=current_objective,
             lesson_title=lesson_title,
@@ -191,7 +196,42 @@ class ContextManager:
             current_step_teacher_script=teacher_script,
             current_step_worked_example=worked_example,
             is_final_step=is_final_step,
+            assessable_slots_remaining=assessable_slots_remaining,
         )
+
+    def _count_assessable_slots_remaining(
+        self, *, lesson, runtime_state,
+    ) -> int:
+        """Count un-delivered LessonSteps that still have a non-empty
+        ``question`` field.
+
+        Mirrors ``TutorEngine._assessable_slots_remaining`` (single
+        source of truth) but lives here so the value is on
+        ``TutoringContext`` before the engine runs. The close_topic
+        prompt's ``lesson_complete_signal`` reads this so the LLM uses
+        the exit-ticket phrasing whenever the engine will actually fire
+        the modal — including the case where intermediate steps remain
+        but they are instruction-only (no questions to assess).
+
+        Fail-open returns 1 ("more work remains") on any DB / model
+        miss so an instrumentation glitch never spoofs a premature
+        lesson-complete signal.
+        """
+        if lesson is None or not hasattr(lesson, "steps"):
+            return 1
+        try:
+            from apps.curriculum.models import LessonStep
+            delivered = set(runtime_state.delivered_lesson_step_ids or [])
+            return (
+                LessonStep.objects
+                .filter(lesson_id=lesson.id)
+                .exclude(id__in=delivered)
+                .exclude(question__isnull=True)
+                .exclude(question__exact="")
+                .count()
+            )
+        except Exception:
+            return 1
 
     def _current_step_objective_and_position(
         self, session,
