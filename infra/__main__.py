@@ -457,6 +457,13 @@ def _build_app_env_vars(*, csrf_origins=None, include_job_dispatch_env=False):
                 name="EXIT_TICKET_MAX_QUESTIONS", value=_exit_ticket_max,
             ),
         )
+    _tutoring_q_types = config.get("tutoring-question-types")
+    if _tutoring_q_types:
+        env_vars.append(
+            app.EnvironmentVarArgs(
+                name="TUTORING_QUESTION_TYPES", value=_tutoring_q_types,
+            ),
+        )
     if include_job_dispatch_env:
         env_vars.extend([
             app.EnvironmentVarArgs(name="AZURE_RESOURCE_GROUP", value=rg.name),

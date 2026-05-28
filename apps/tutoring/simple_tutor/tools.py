@@ -53,12 +53,23 @@ DEFAULT_STEP_TURN_CAP = 8
 # ============================================================================
 
 
-# ExitTicketQuestion types the tutor should NEVER see in the pool. Per
-# user direction (2026-05-26): fill_in_blank and matching are too
-# ambiguous to grade from free-form text answers. The tutor sticks to
-# MCQ + short_answer + short_numeric (exclusion list keeps the filter
-# forward-compatible with new question types).
-EXCLUDED_QUESTION_TYPES = ('fill_in_blank', 'matching')
+# Tutoring-question allowlist. Controlled by the TUTORING_QUESTION_TYPES
+# env var (default: 'mcq'). The 2026-05-28 staging E2E surfaced the
+# failure mode this gates: short_answer questions accumulate `partial`
+# verdicts that don't trigger competence advance, leaving the student
+# stuck on one step for 5+ turns. MCQ verdicts are deterministic
+# (`correct` / `incorrect` via letter match), so the advance trigger
+# fires cleanly on the first correct attempt.
+#
+# Set TUTORING_QUESTION_TYPES='mcq,short_numeric,short_answer' to
+# restore the old broader behaviour.
+def _allowed_tutoring_types() -> tuple[str, ...]:
+    import os
+    raw = (os.environ.get('TUTORING_QUESTION_TYPES') or 'mcq').strip().lower()
+    return tuple(
+        t.strip() for t in raw.split(',')
+        if t.strip() in {'mcq', 'short_numeric', 'short_answer'}
+    ) or ('mcq',)
 
 # Cap on the number of pool entries surfaced to the LLM each turn.
 # Keeps the prompt focused + cache-friendly.
@@ -117,12 +128,18 @@ def build_question_pool(
         qtext = (getattr(q, 'question_text', '') or '').strip().lower()
         return bool(qtext) and qtext in graded_texts
 
+    allowed_types = _allowed_tutoring_types()
     pool: list = []
 
-    # Source 1 — LessonStep.question (one entry max).
+    # Source 1 — LessonStep.question (one entry max). StepQuestion
+    # produces short_numeric or short_answer; skip when the allowlist
+    # rejects those (e.g. MCQ-only mode).
     if step_has_question(step):
         sq = StepQuestion.from_step(step)
-        if not _is_already_graded(sq):
+        if (
+            getattr(sq, 'question_type', '') in allowed_types
+            and not _is_already_graded(sq)
+        ):
             pool.append(sq)
 
     # Source 2 — ETQs matching this step's enabling_objective.
@@ -133,8 +150,8 @@ def build_question_pool(
             .filter(
                 exit_ticket__lesson=lesson,
                 enabling_objective=objective,
+                question_type__in=allowed_types,
             )
-            .exclude(question_type__in=EXCLUDED_QUESTION_TYPES)
             .order_by('order_index', 'id')
         ):
             if _is_already_graded(q):
@@ -143,12 +160,14 @@ def build_question_pool(
             if len(pool) >= max_questions:
                 break
 
-    # Source 3 — ANY un-excluded ETQ on the lesson (fills the rest).
+    # Source 3 — ANY allowed ETQ on the lesson (fills the rest).
     if len(pool) < max_questions:
         for q in (
             ExitTicketQuestion.objects
-            .filter(exit_ticket__lesson=lesson)
-            .exclude(question_type__in=EXCLUDED_QUESTION_TYPES)
+            .filter(
+                exit_ticket__lesson=lesson,
+                question_type__in=allowed_types,
+            )
             .exclude(pk__in=[
                 getattr(p, 'pk', None) for p in pool
                 if getattr(p, 'source', '') != 'lesson_step'

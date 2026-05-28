@@ -680,13 +680,48 @@ def build_system_prompt(
     # request_figure tool from the available set. The LLM doesn't see
     # the affordance, so it can't call it.
     if figures_enabled:
-        tools_for_llm = TOOL_SCHEMAS
+        tools_for_llm = list(TOOL_SCHEMAS)
     else:
         tools_for_llm = [
             t for t in TOOL_SCHEMAS if t['name'] != 'request_figure'
         ]
 
+    # Narrow pose_question.question_type enum to the env-configured
+    # tutoring allowlist (TUTORING_QUESTION_TYPES, default 'mcq').
+    # Without this the LLM can ignore the pool's MCQ-only filter and
+    # author a short_answer question whose partial verdicts won't
+    # trigger step advance — exactly the 2026-05-28 staging failure
+    # mode (session 424 stuck on step 0 across 5 partial verdicts).
+    import copy
+    from apps.tutoring.simple_tutor.tools import _allowed_tutoring_types
+    allowed = _allowed_tutoring_types()
+    tools_for_llm = [
+        _narrow_pose_question_types(t, allowed) if t['name'] == 'pose_question' else t
+        for t in tools_for_llm
+    ]
+    _ = copy  # imported above for the helper
+
     return blocks, tools_for_llm
+
+
+def _narrow_pose_question_types(tool_schema: dict, allowed: tuple[str, ...]) -> dict:
+    """Return a copy of the pose_question tool schema with question_type
+    enum narrowed to ``allowed``. Original constant is left untouched.
+    """
+    import copy as _copy
+    new = _copy.deepcopy(tool_schema)
+    props = new.get('input_schema', {}).get('properties', {})
+    qtype = props.get('question_type')
+    if isinstance(qtype, dict) and 'enum' in qtype:
+        qtype['enum'] = list(allowed)
+        if len(allowed) == 1 and allowed[0] == 'mcq':
+            qtype['description'] = (
+                "MCQ only — A/B/C/D letter match. Pass 4 entries in "
+                "the options field. reference_answer is the letter "
+                "(A/B/C/D). Other question types are disabled for "
+                "tutoring on this deployment."
+            )
+    return new
 
 
 # ============================================================================

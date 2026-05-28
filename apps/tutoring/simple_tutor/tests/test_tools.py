@@ -23,7 +23,6 @@ from apps.tutoring.simple_tutor.tools import (
     DEFAULT_COMPETENCE_THRESHOLD,
     DEFAULT_POOL_SIZE,
     DEFAULT_STEP_TURN_CAP,
-    EXCLUDED_QUESTION_TYPES,
     build_question_pool,
     handle_advance_step,
     handle_pose_question,
@@ -159,19 +158,47 @@ class BuildQuestionPoolTest(DjangoTestCase):
             self.assertIn(etq.pk, pks)
 
     def test_includes_lesson_step_question_as_first_entry(self):
+        """Under broader TUTORING_QUESTION_TYPES, the StepQuestion (which
+        produces short_numeric/short_answer) is allowed and lands as the
+        first pool entry. The 2026-05-28 staging fix narrowed the default
+        to MCQ-only, so this test explicitly opts back into the broader
+        allowlist to validate the legacy behaviour is still reachable.
+        """
+        import os
+        from unittest import mock
         from apps.curriculum.models import LessonStep
-        session, _ = _make_session(
+        with mock.patch.dict(
+            os.environ, {'TUTORING_QUESTION_TYPES': 'mcq,short_numeric,short_answer'},
+        ):
+            session, _ = _make_session(
+                n_questions=2,
+                step_question='What is 7 × 8?',
+                step_expected_answer='56',
+            )
+            step = LessonStep.objects.get(lesson=session.lesson, order_index=0)
+            pool = build_question_pool(session)
+            self.assertGreater(len(pool), 0)
+            self.assertEqual(getattr(pool[0], 'source', None), 'lesson_step')
+            self.assertEqual(pool[0].pk, step.pk)
+            self.assertEqual(pool[0].question_text, 'What is 7 × 8?')
+
+    def test_mcq_only_default_skips_lesson_step_question(self):
+        """Under the 2026-05-28 MCQ-only default, the StepQuestion path
+        (short_numeric / short_answer) is filtered out. The pool falls
+        back to MCQ ExitTicketQuestions.
+        """
+        session, etqs = _make_session(
             n_questions=2,
             step_question='What is 7 × 8?',
             step_expected_answer='56',
         )
-        step = LessonStep.objects.get(lesson=session.lesson, order_index=0)
         pool = build_question_pool(session)
-        self.assertGreater(len(pool), 0)
-        # First entry: the LessonStep-backed StepQuestion adapter
-        self.assertEqual(getattr(pool[0], 'source', None), 'lesson_step')
-        self.assertEqual(pool[0].pk, step.pk)
-        self.assertEqual(pool[0].question_text, 'What is 7 × 8?')
+        # No lesson_step entry should appear when default = mcq-only.
+        sources = [getattr(q, 'source', None) for q in pool]
+        self.assertNotIn('lesson_step', sources)
+        # Pool still has MCQ ETQs from the fixture.
+        types = {getattr(q, 'question_type', '') for q in pool}
+        self.assertLessEqual(types, {'mcq'}, msg=f"unexpected types: {types}")
 
     def test_empty_when_lesson_has_no_questions(self):
         session, _ = _make_session(n_questions=0)

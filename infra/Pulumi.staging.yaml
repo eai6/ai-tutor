@@ -29,6 +29,13 @@ config:
   aitutor:simple-tutor-engine: "on"
   aitutor:exit-ticket-types: "mcq"
   aitutor:exit-ticket-max-questions: "10"
+  # MCQ-only tutoring (2026-05-28). Set after a staging E2E showed
+  # short_answer questions accumulating `partial` verdicts that never
+  # triggered step advance. MCQ verdicts are deterministic
+  # (`correct` / `incorrect` via letter match), so the engine's
+  # auto-advance fires cleanly. To loosen, set
+  # 'mcq,short_numeric,short_answer'.
+  aitutor:tutoring-question-types: "mcq"
   # ── Secrets — set via CLI on the staging stack ──────────────────────
   # Run from infra/:
   #   pulumi stack select staging
