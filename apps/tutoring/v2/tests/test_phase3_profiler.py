@@ -37,7 +37,6 @@ from apps.tutoring.v2.services.profiler import (
     MAX_ASKED_QUESTIONS_ENTRIES,
     StudentProfiler,
 )
-from apps.tutoring.v2.tools.repeat_guards import cross_session_repeat_guard
 
 
 def _build_session(*, ledger: list[PosedQuestionLedgerEntry] | None = None):
@@ -127,55 +126,6 @@ class ProfilerWritesBothColumnsTest(TestCase):
         )
         # Lowest indices are oldest — must be evicted.
         self.assertNotIn("lesson_step:0", profile.asked_questions)
-
-
-class ProfilerSessionCrossRoundtripTest(TestCase):
-    """Two-session round-trip — the Phase 3 cross-session repeat test."""
-
-    def test_session1_poses_then_session2_refuses_via_guard(self):
-        # Session 1: ledger has one posed question.
-        posed_at = datetime(2026, 5, 25, 12, 0, tzinfo=timezone.utc)
-        ledger_entry = PosedQuestionLedgerEntry(
-            source=QuestionSource.EXIT_TICKET_QUESTION,
-            id=99,
-            jaccard_signature="sig",
-            posed_at=posed_at,
-        )
-        session1 = _build_session(ledger=[ledger_entry])
-
-        # Profiler runs end-of-session — writes asked_questions.
-        # No LLM client available in test; deterministic path covers this.
-        with patch(
-            "apps.tutoring.v2.services.profiler._build_client_for_purpose",
-            return_value=None,
-        ):
-            StudentProfiler().run_for_session(session1)
-
-        profile = StudentProfile.objects.get(user=session1.student)
-        self.assertIn("exit_ticket_question:99", profile.asked_questions)
-
-        # Session 2 (same student, within 14-day avoidance window):
-        # the guard refuses the same question.
-        candidate_ref = QuestionRef(
-            source=QuestionSource.EXIT_TICKET_QUESTION, id=99,
-        )
-        check_now = posed_at + timedelta(days=5)
-        result = cross_session_repeat_guard(
-            candidate_ref,
-            asked_questions=profile.asked_questions,
-            now=check_now,
-        )
-        self.assertTrue(result.refused)
-        self.assertIn("exit_ticket_question:99", result.reason)
-
-        # After the avoidance window expires, the same ref is allowed.
-        later = posed_at + timedelta(days=30)
-        post_window = cross_session_repeat_guard(
-            candidate_ref,
-            asked_questions=profile.asked_questions,
-            now=later,
-        )
-        self.assertFalse(post_window.refused)
 
 
 class ProfilerSessionReadWindowTest(TestCase):

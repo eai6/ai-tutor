@@ -1,15 +1,18 @@
-"""MCQ options threading + Phase A safety floor — Phase 4 Fix 4a/4b."""
+"""MCQ options threading — bank stem rendering + letter extraction.
+
+Helpers under test moved from student_tutor.py to pose_question.py in
+the v2-prune step 4. The ``_looks_like_mcq_stem_without_options``
+safety floor and its tests went away with the deletion of Phase A
+validation.
+"""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 
-from apps.tutoring.v2.services.student_tutor import (
-    _extract_mcq_letters,
-    _render_bank_stem_with_options,
-)
 from apps.tutoring.v2.tools.pose_question import (
-    _looks_like_mcq_stem_without_options,
+    _render_bank_stem_with_options,
+    extract_mcq_letters as _extract_mcq_letters,
 )
 
 
@@ -88,49 +91,6 @@ def test_extract_mcq_letters_empty_for_non_mcq():
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Phase A safety floor: MCQ stem missing options
-# ──────────────────────────────────────────────────────────────────────
-
-
-def test_mcq_stem_without_options_detected():
-    """Run-6 GEO T16/T18/T20 P1: stem says 'which of the following'
-    with no options inlined."""
-    stem = (
-        "Using a six-figure grid reference, which of the following best "
-        "describes what happens to the search area?"
-    )
-    assert _looks_like_mcq_stem_without_options(stem) is True
-
-
-def test_mcq_stem_with_inline_options_passes():
-    """Stem with A)/B)/C)/D) inline — student can answer; do not
-    refuse."""
-    stem = (
-        "Which of the following is correct?\n"
-        "A) first option\n"
-        "B) second option\n"
-        "C) third option\n"
-        "D) fourth option"
-    )
-    assert _looks_like_mcq_stem_without_options(stem) is False
-
-
-def test_non_mcq_stem_not_flagged():
-    """A short-numeric question shouldn't trigger the safety floor."""
-    stem = "What is the six-figure grid reference for the boat?"
-    assert _looks_like_mcq_stem_without_options(stem) is False
-
-
-def test_passing_mention_of_following_not_flagged():
-    """A stem that mentions 'the following' in passing (not as MCQ
-    list intro) shouldn't be falsely flagged."""
-    stem = (
-        "Describe how erosion shapes the following geographical "
-        "feature: a river meander."
-    )
-    assert _looks_like_mcq_stem_without_options(stem) is False
-
-
 # ──────────────────────────────────────────────────────────────────────
 # Fix 1 (pose-question two-phase commit) — synthesized letter prefixes
 # ──────────────────────────────────────────────────────────────────────
@@ -191,28 +151,3 @@ def test_extract_mcq_letters_mixed_prefixes():
     assert _extract_mcq_letters(step) == ["A", "B", "C"]
 
 
-def test_looks_like_mcq_accepts_bullet_options():
-    stem = (
-        "Which of the following is true?\n"
-        "\n"
-        "- foo\n"
-        "- bar\n"
-        "- baz"
-    )
-    assert _looks_like_mcq_stem_without_options(stem) is False
-
-
-def test_looks_like_mcq_accepts_numbered_options():
-    stem = (
-        "Which of the following is true?\n"
-        "\n"
-        "1. foo\n"
-        "2. bar\n"
-        "3. baz"
-    )
-    assert _looks_like_mcq_stem_without_options(stem) is False
-
-
-def test_looks_like_mcq_still_refuses_genuinely_missing_options():
-    stem = "Which of the following describes the hydrological cycle?"
-    assert _looks_like_mcq_stem_without_options(stem) is True

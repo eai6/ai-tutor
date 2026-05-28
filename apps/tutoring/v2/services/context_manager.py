@@ -65,26 +65,15 @@ class ContextManager:
     # ------------------------------------------------------------------
 
     def commit_pending_pose(self, pending: PendingPose) -> SessionRuntimeState:
-        """Phase B commit of a Phase-A validated PendingPose.
+        """Phase B commit of a PendingPose returned by the pose tool.
 
-        Consumes the single-use token (if any), appends to the
-        ``posed_question_ledger``, and writes ``open_question`` with
-        the captured ``visible_context_at_pose`` snapshot.
-
-        Called only by ``TutorEngine`` after structural conformance
-        approves the candidate response. On second conformance
-        failure / safe-template fallback, this hook is NOT called and
-        no state mutation occurs.
+        Appends to ``posed_question_ledger`` + ``delivered_lesson_step_ids``
+        and writes ``open_question``. The token-consumption path is
+        gone (v2-prune step 4); the pose tool no longer uses tokens.
         """
-        # Local import to avoid circular import at module load.
-        from apps.tutoring.v2.tools.token_cache import token_cache
+        from apps.tutoring.v2.contracts import QuestionSource
 
         with emit_span("audit", "tool.commit") as span:
-            if pending.token:
-                # Atomic single-use consumption — raises if already
-                # consumed or unknown.
-                token_cache.consume(self.session.id, pending.token)
-
             state = self.load_runtime_state()
 
             now = datetime.now(timezone.utc)
@@ -95,6 +84,12 @@ class ContextManager:
                 posed_at=now,
             )
             state.posed_question_ledger.append(ledger_entry)
+            if (
+                pending.question_ref.source == QuestionSource.LESSON_STEP
+                and pending.question_ref.id
+                and pending.question_ref.id not in state.delivered_lesson_step_ids
+            ):
+                state.delivered_lesson_step_ids.append(int(pending.question_ref.id))
             state.open_question = OpenQuestion(
                 source=pending.question_ref.source,
                 id=pending.question_ref.id,
@@ -110,7 +105,6 @@ class ContextManager:
                 span["payload"] = {
                     "source": pending.question_ref.source,
                     "question_id": pending.question_ref.id,
-                    "token_consumed": bool(pending.token),
                     "ledger_size": len(state.posed_question_ledger),
                 }
             return state

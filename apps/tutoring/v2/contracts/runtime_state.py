@@ -194,6 +194,11 @@ class SessionRuntimeState(BaseModel):
     # In-session repeat avoidance — Jaccard signatures + source/id.
     posed_question_ledger: list[PosedQuestionLedgerEntry] = Field(default_factory=list)
 
+    # Server-side pose-tool dedup ledger (v2-prune-plan step 4). The
+    # new pose_question tool appends LessonStep.id here on each call
+    # and excludes already-delivered ids when picking the next slot.
+    delivered_lesson_step_ids: list[int] = Field(default_factory=list)
+
     # Per-objective evidence carry — populated by TutorEngine after each
     # graded turn (Phase 2). Keyed by enabling-objective slug.
     objective_progress: dict[str, ObjectiveProgress] = Field(default_factory=dict)

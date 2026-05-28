@@ -57,13 +57,11 @@ from apps.tutoring.v2.services.bare_answer import is_bare_answer
 from apps.tutoring.v2.services.grader_prompts import (
     MATH_DSL_SYSTEM,
     NON_MATH_JUDGE_SYSTEM,
-    PRE_POSE_SYSTEM,
     STUDENT_CLAIMS_SYSTEM,
     STUDENT_RESPONSE_SYSTEM,
     TUTOR_CLAIM_SYSTEM,
     render_math_dsl_user_prompt,
     render_non_math_judge_user_prompt,
-    render_pre_pose_user_prompt,
     render_student_claims_user_prompt,
     render_student_response_user_prompt,
     render_tutor_claim_user_prompt,
@@ -75,7 +73,6 @@ from apps.tutoring.v2.tools.math_verification import (
     _evaluate as _evaluate_dsl_node,
     values_equivalent,
 )
-from apps.tutoring.v2.tools.token_cache import token_cache
 
 logger = logging.getLogger(__name__)
 
@@ -1398,130 +1395,7 @@ class StudentGrader:
             return judgement
 
     # ==================================================================
-    # 2. Pre-pose check
-    # ==================================================================
-
-    def pre_pose_check(
-        self,
-        context: TutoringContext,
-        question_ref: QuestionRef,
-        canonical: str,
-        visible_prompt: str,
-        attached_media_ids: list[int],
-        recent_transcript: list[str],
-        attached_figure_description: str = "",
-        *,
-        issue_token: bool = True,
-    ) -> Optional[str]:
-        """Derivability gate. Optionally issues a signed single-use token.
-
-        Hidden KB chunks are NOT passed to this check — only the
-        student-visible context. Per Phase 1 §4.2 the issued token is
-        single-use; ``ContextManager.commit_pending_pose`` consumes it.
-
-        Args:
-          issue_token: True for runtime-generated / token-path questions
-            (caller will pose with ``pre_pose_token``). False for bank
-            verification (the tool boundary already has the canonical
-            from the DB; only the derivability decision matters).
-
-        Returns the token string when ``issue_token=True``; ``None``
-        when ``issue_token=False``. Raises ``PrePoseRefusedError`` on
-        derivability failure so the caller (the tool boundary in
-        ``v2/tools/pose_question.py``) can refuse the tool call
-        cleanly.
-        """
-        with emit_span("audit", "grader.pre_pose_check") as span:
-            client = self._resolve_grounded_client()
-            if client is None:
-                if span is not None:
-                    span["payload"] = {
-                        "derivable": False,
-                        "reason": "no GRADER_GROUNDED client",
-                    }
-                raise PrePoseRefusedError(
-                    "no grounded client available for pre-pose check"
-                )
-            try:
-                response = client.generate(
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": render_pre_pose_user_prompt(
-                                visible_prompt=visible_prompt,
-                                attached_figure_description=attached_figure_description,
-                                recent_transcript=recent_transcript,
-                                canonical=canonical,
-                            ),
-                        },
-                    ],
-                    system_prompt=PRE_POSE_SYSTEM,
-                    # Bumped from 200 → 2048 alongside the grader and
-                    # tutor-claim adjudicator; the pre-pose response is
-                    # short but the bigger budget eliminates the
-                    # truncation-mid-JSON failure mode.
-                    max_tokens=2048,
-                )
-                payload = _safe_json_loads(response.content or "") or {}
-            except Exception as exc:
-                logger.warning(
-                    "[StudentGrader] pre-pose call raised %s",
-                    type(exc).__name__,
-                )
-                raise PrePoseRefusedError(
-                    f"pre-pose adjudication raised: {type(exc).__name__}"
-                ) from exc
-
-            derivable = bool(payload.get("derivable"))
-            reason = str(payload.get("reason", "")).strip()
-            if span is not None:
-                span["payload"] = {
-                    "derivable": derivable, "reason": reason[:200],
-                }
-            if not derivable:
-                raise PrePoseRefusedError(
-                    reason or "canonical not derivable from visible context"
-                )
-
-            if not issue_token:
-                return None
-
-            # Issue the single-use token. The cache binds the token
-            # to (session_id, canonical, visible_context snapshot).
-            visible_context = VisibleContextSnapshot(
-                visible_prompt=visible_prompt,
-                attached_media_ids=list(attached_media_ids or []),
-                recent_transcript=list(recent_transcript or []),
-            )
-            token = token_cache.issue(
-                session_id=context.session_id,
-                canonical=canonical,
-                visible_context_json=visible_context.model_dump_json(),
-            )
-            return token
-
-    def build_pending_pose(
-        self,
-        *,
-        question_ref: QuestionRef,
-        canonical: str,
-        rendered_stem: str,
-        jaccard_signature: str,
-        visible_context: VisibleContextSnapshot,
-        token: Optional[str] = None,
-    ) -> PendingPose:
-        """Convenience constructor — keeps the type at one site."""
-        return PendingPose(
-            question_ref=question_ref,
-            canonical=canonical,
-            rendered_stem=rendered_stem,
-            jaccard_signature=jaccard_signature,
-            visible_context=visible_context,
-            token=token,
-        )
-
-    # ==================================================================
-    # 3. Tutor-claim adjudication
+    # Tutor-claim adjudication
     # ==================================================================
 
     def adjudicate_tutor_claim(
@@ -1612,16 +1486,6 @@ class StudentGrader:
         if self._student_response_client_factory is not None:
             return self._student_response_client_factory()
         return _build_client_for_purpose("grader_student_response")
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Exceptions
-# ──────────────────────────────────────────────────────────────────────
-
-
-class PrePoseRefusedError(Exception):
-    """Raised by ``StudentGrader.pre_pose_check`` when the canonical is
-    not derivable from the student-visible context."""
 
 
 # ──────────────────────────────────────────────────────────────────────

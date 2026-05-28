@@ -26,10 +26,6 @@ from apps.tutoring import repeated_question  # noqa: F401
 from apps.tutoring import praise_filter  # noqa: F401
 # Answer-leak scoped post-check (Phase 2 §2.4 conformance).
 from apps.tutoring import answer_leak  # noqa: F401
-# Leaked tool-call syntax stripper (Phase 2 §2.4 defensive surface).
-from apps.tutoring.v2.utilities.tool_call_strip import (  # noqa: F401
-    strip_leaked_tool_call_syntax,
-)
 
 __all__ = [
     "BankGradeResult",
@@ -39,6 +35,5 @@ __all__ = [
     "grade_lesson_step_response",
     "praise_filter",
     "repeated_question",
-    "strip_leaked_tool_call_syntax",
     "student_working_analyzer",
 ]

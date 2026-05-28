@@ -24,11 +24,7 @@ from apps.tutoring.v2.contracts import (
     TutoringContext,
     Verdict,
 )
-from apps.tutoring.v2.services.grader_prompts import (
-    render_pre_pose_user_prompt,
-)
 from apps.tutoring.v2.services.student_grader import (
-    PrePoseRefusedError,
     StudentGrader,
     _extract_canonical_numeric,
     _extract_prose_numeric,
@@ -302,77 +298,6 @@ def test_non_math_judge_failure_returns_grader_extraction_failed():
     result = grader.grade_student_response(_context(), request)
     assert result.verdict == Verdict.UNVERIFIED
     assert result.reason_code == "grader_extraction_failed"
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Pre-pose check — derivability + hidden KB suppression
-# ──────────────────────────────────────────────────────────────────────
-
-
-def test_pre_pose_check_passes_with_token():
-    """Derivable=True + issue_token=True → returns a non-empty token string."""
-    payload = '{"derivable": true, "reason": "all info present"}'
-    grader = StudentGrader(grounded_client_factory=lambda: _FakeClient(payload))
-    token = grader.pre_pose_check(
-        _context(),
-        question_ref=QuestionRef(source=QuestionSource.PRE_POSE_TOKEN, id=0),
-        canonical="25",
-        visible_prompt="What is 12+13?",
-        attached_media_ids=[],
-        recent_transcript=[],
-    )
-    assert isinstance(token, str) and len(token) > 0
-
-
-def test_pre_pose_check_passes_without_token_when_flagged_off():
-    """issue_token=False → returns None on pass (bank-path use)."""
-    payload = '{"derivable": true, "reason": "ok"}'
-    grader = StudentGrader(grounded_client_factory=lambda: _FakeClient(payload))
-    out = grader.pre_pose_check(
-        _context(),
-        question_ref=QuestionRef(source=QuestionSource.LESSON_STEP, id=42),
-        canonical="25",
-        visible_prompt="What is 12+13?",
-        attached_media_ids=[],
-        recent_transcript=[],
-        issue_token=False,
-    )
-    assert out is None
-
-
-def test_pre_pose_check_refuses_on_not_derivable():
-    payload = '{"derivable": false, "reason": "missing the second number"}'
-    grader = StudentGrader(grounded_client_factory=lambda: _FakeClient(payload))
-    with pytest.raises(PrePoseRefusedError):
-        grader.pre_pose_check(
-            _context(),
-            question_ref=QuestionRef(source=QuestionSource.LESSON_STEP, id=42),
-            canonical="25",
-            visible_prompt="What is 12 + ?",  # missing the second operand
-            attached_media_ids=[],
-            recent_transcript=[],
-        )
-
-
-def test_pre_pose_prompt_suppresses_hidden_kb_chunks():
-    """The pre-pose prompt template MUST contain only visible context
-    — visible_prompt + figure + recent_transcript + canonical — and
-    NOT accept a kb_chunks parameter."""
-    rendered = render_pre_pose_user_prompt(
-        visible_prompt="Visible Q",
-        attached_figure_description="Figure: a triangle",
-        recent_transcript=["[student] hi"],
-        canonical="42",
-    )
-    # Sanity — visible context is present.
-    assert "Visible Q" in rendered
-    assert "Figure: a triangle" in rendered
-    assert "[student] hi" in rendered
-    # And there is no slot for hidden KB chunks (which would let
-    # the canonical leak into the derivability check from sources
-    # the student can't see).
-    assert "kb_chunk" not in rendered.lower()
-    assert "knowledge_base" not in rendered.lower()
 
 
 # ──────────────────────────────────────────────────────────────────────
