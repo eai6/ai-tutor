@@ -1,0 +1,54 @@
+config:
+  azure-native:location: centralus
+  azure-native:subscriptionId: 656f4091-746b-44ef-8add-6d94eb4a7612
+  # ── Sizing knobs (preview = the cheapest viable shape) ────────────────
+  # Preview is for exercising Roy's `refactor/conversational-tutor-redesign`
+  # branch in isolation from staging. Two cheap choices vs staging:
+  #
+  #   - min-replicas: 0 (vs staging's 1). Preview cold-starts on the
+  #     first request (~10-15 s); fine for human-driven smoke testing,
+  #     saves ~$5/mo on the always-on container.
+  #   - DB still B1ms (smallest Azure Postgres flexible-server tier).
+  #
+  # Consumption profile (serverless) keeps the Container App billed
+  # only when serving traffic. Azure doesn't offer a D2 dedicated
+  # profile — Consumption is the cheapest smaller-than-prod option.
+  aitutor:workload-profile-type: Consumption
+  aitutor:container-cpu: "2.0"
+  aitutor:container-memory: 4Gi
+  aitutor:min-replicas: "0"
+  aitutor:max-replicas: "1"
+  aitutor:file-share-quota-gb: "20"
+  aitutor:postgres-sku: Standard_B1ms
+  aitutor:postgres-storage-gb: "32"
+  # Preview doesn't need the textbook OCR job either.
+  aitutor:material-job-cpu: "0"
+  # ── Engine flags ──────────────────────────────────────────────────────
+  # Preview is for Roy's v2 engine — DON'T set SIMPLE_TUTOR_ENGINE /
+  # TUTORING_QUESTION_TYPES here. Those belong to the
+  # `apps/tutoring/simple_tutor/` engine that ships from `dev`. The v2
+  # engine lives at `apps/tutoring/v2/` and routes through
+  # `tutor_engine.py` independently. If v2 grows its own env-var
+  # toggles, add them here as `aitutor:v2-...` keys.
+  #
+  # ── Secrets — set via CLI on the preview stack ──────────────────────
+  # Run from infra/ on a machine that has the Pulumi passphrase:
+  #   pulumi stack init preview               # only the first time
+  #   pulumi stack select preview
+  #   pulumi config set --secret aitutor:db-password "$(openssl rand -base64 24)"
+  #   pulumi config set --secret aitutor:django-secret-key "$(python -c 'import secrets;print(secrets.token_urlsafe(50))')"
+  #   pulumi config set --secret aitutor:anthropic-api-key "<reuse staging key>"
+  #   pulumi config set --secret aitutor:openai-api-key    "<reuse staging key>"
+  #   pulumi config set --secret aitutor:google-api-key    "<reuse staging key>"
+  #   pulumi config set --secret aitutor:elevenlabs-api-key "<reuse staging key>"
+  #
+  # The DB password + Django secret key MUST differ from prod and
+  # staging (defense in depth — preview dump exposure must not leak
+  # other-env creds). The LLM API keys can be the same as staging —
+  # read-only calls to the providers; cheaper than separate budgets.
+
+  # No custom domain on preview — Container App default URL only.
+  # Format: aitutor-preview-app.<env-hash>.centralus.azurecontainerapps.io
+  aitutor:custom-domains: []
+</content>
+</invoke>
