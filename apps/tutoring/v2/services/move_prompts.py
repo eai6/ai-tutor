@@ -63,47 +63,6 @@ from typing import Optional
 SHARED_PREAMBLE_TEMPLATE = """\
 You are a tutor working with a secondary-school student.
 
-Response shape — two grounding lines BEFORE your visible reply:
-
-Begin EVERY response with exactly two header lines that ground your
-reasoning. These lines WILL be stripped before the student sees the
-reply — they exist to keep your visible turn consistent with what
-the grader and the engine actually said this turn.
-
-  GRADER: <one plain-language line paraphrasing the verdict block
-          below. Examples:
-            "wrong — student picked B; the correct answer is A
-             because the longest side must be c"
-            "correct — student named the inverse-operation step"
-            "no verdict this turn — student input was a help-request,
-             not an answer attempt"
-            "no verdict this turn — opening of the lesson, no
-             question has been asked yet">
-  EVIDENCE: <one plain-language line summarising the objective-
-            progress block below. Examples:
-              "objective: 2/3 correct, mastery floor met"
-              "objective: 0/4 correct, no mastery shown yet"
-              "objective just opened — no attempts yet">
-
-Then your visible response follows on the next line.
-
-Hard self-consistency rule: your visible response below those two
-lines must agree with what they say.
-  - If GRADER says "no verdict this turn", do NOT affirm or refute
-    the student's last claim. You did not run a grader; you are not
-    the adjudicator.
-  - If GRADER says "wrong" or "partial", do NOT open with praise or
-    say the student got it.
-  - If EVIDENCE says "no mastery shown" or "0/* correct", do NOT
-    say the student is ready for the exit ticket, has nailed it,
-    or is done with this objective.
-A visible response that contradicts its own GRADER or EVIDENCE line
-is a self-inconsistent turn and is not acceptable.
-(Science of learning principles: Active Learning Ch.10 — feedback
-must be INFORMATIVE; praise without grader evidence is anti-
-feedback. Mastery Learning Ch.13 — the close / mastery signal must
-correspond to evidence of mastery.)
-
 Lesson context:
 - Subject: {lesson_subject}.
 - Lesson title: {lesson_title}.
@@ -219,27 +178,7 @@ metadata is not student-facing prose):
   context — the lesson title, the open question, or the worked
   example.
 
-Active Learning context (every turn — Principle #1 Ch.10):
-- Recent doing-rate signal: {doing_rate_note}.
-- When the doing-rate signal says the student has been hedging
-  (≤2 of the last 5 turns were answer-attempts), size the next
-  ask SMALLER and EASIER than the open question — break it into a
-  step the student is likely to succeed on, even if that step is
-  a sub-skill they'd ordinarily breeze past. Momentum builds on
-  successful retrievals, not on understanding-claims.
-- When the doing-rate signal says the student is fully engaged
-  (5/5 of the last 5 turns were correct answer-attempts), they
-  are owning the current rung. Match the next ask to demonstrated
-  competence: push a parameter twist, a transfer to a new context,
-  a discrimination between two close options, or a multi-step
-  composition — not a sibling of the item they just nailed.
-  Re-asking the same difficulty after a clean run reads as
-  condescension and squanders the practice window.
-  (Science of learning principles: Deliberate Practice Ch.12 —
-  keep the next problem at the edge of *this* student's ability,
-  not the middle; Minimise Cognitive Load Ch.14 — the
-  expertise-reversal effect makes redundant scaffolding load, not
-  support.)
+Active Learning (every turn — Principle #1 Ch.10):
 - End every turn with one action the student takes — answer,
   choose, fill in, compute, restate, identify, name. A turn that
   ends on a statement, explanation, or trailing colon is not a
@@ -296,24 +235,9 @@ def render_shared_preamble(
     lesson_title: str = "",
     lesson_subject: str = "",
     current_objective: str = "",
-    doing_rate_window: Optional[list[bool]] = None,
 ) -> str:
-    """Render the per-turn shared preamble.
-
-    Lesson-context fields default to placeholder strings so the template
-    still renders cleanly when called from legacy code paths that
-    haven't been updated to thread the new context. The 'Subject
-    anchoring' block in ``SHARED_PREAMBLE_TEMPLATE`` then becomes a
-    no-op directive rather than a hallucination trigger.
-
-    ``doing_rate_window`` is the last-5 student attempt flags from
-    ``SessionRuntimeState.student_doing_rate_window``. When supplied,
-    a one-line doing-rate note is rendered into the Active Learning
-    context block. When omitted (legacy callers), a generic "no
-    history yet" note is used.
-    """
+    """Render the per-turn shared preamble."""
     mobile = MOBILE_DIRECTIVE if client_kind == "mobile" else ""
-    doing_rate_note = _format_doing_rate_note(doing_rate_window)
     return SHARED_PREAMBLE_TEMPLATE.format(
         locale=(locale or "en").strip(),
         institution_name=(institution_name or "your school").strip(),
@@ -323,42 +247,6 @@ def render_shared_preamble(
         lesson_subject=(lesson_subject or "(see the lesson title)").strip(),
         current_objective=(current_objective or "(see the lesson title)").strip(),
         mobile_directive=mobile,
-        doing_rate_note=doing_rate_note,
-    )
-
-
-def _format_doing_rate_note(window: Optional[list[bool]]) -> str:
-    """One-line summary of the doing-rate window for the preamble.
-
-    Surfaces three regimes:
-      * HIGH — the window is full and every entry is True (the
-        student is on a clean streak). The preamble's matching branch
-        instructs the LLM to push harder.
-      * NORMAL — engagement at ≥60% but not full streak. Default
-        cadence.
-      * LOW — engagement <60%. The preamble's matching branch
-        instructs the LLM to size the next ask smaller.
-    """
-    if not window:
-        return "no recent history yet — proceed at default cadence"
-    attempted = sum(1 for b in window if bool(b))
-    total = len(window)
-    if total >= 4 and attempted == total:
-        return (
-            f"{attempted}/{total} of last student turns were answer-"
-            f"attempts — student is owning this rung; size the next "
-            f"ask LARGER (a parameter twist, transfer, or "
-            f"discrimination), not a sibling"
-        )
-    if attempted / max(1, total) >= 0.6:
-        return (
-            f"{attempted}/{total} of last student turns were answer-"
-            f"attempts — student is engaged, continue at normal cadence"
-        )
-    return (
-        f"only {attempted}/{total} of last student turns were "
-        f"answer-attempts — the student has been hedging; size the "
-        f"next ask smaller and easier"
     )
 
 

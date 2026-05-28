@@ -30,8 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
-import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from apps.tutoring.tracing import emit_span
@@ -76,26 +75,8 @@ POSE_CAPABLE_MOVES: frozenset[str] = frozenset({
 
 @dataclass(frozen=True)
 class TutorResponse:
-    """One tutor turn's output: visible text + optional PendingPose.
-
-    ``pending_pose`` is set when the LLM called the pose_question tool
-    and Phase A validation passed. ``TutorEngine`` commits it via
-    ``ContextManager.commit_pending_pose(...)`` ONLY after structural
-    conformance approves the visible text (Phase B). On retry or safe
-    template fallback the PendingPose is discarded — Phase A re-runs
-    from scratch on retry, and no pose is recorded on fallback.
-
-    ``grounding`` carries the GRADER / EVIDENCE header lines the LLM
-    emitted before its visible response (see ``SHARED_PREAMBLE_TEMPLATE``).
-    The lines are stripped from ``text`` (never reach the student) and
-    logged into ``v2_trace.grounding`` for observability — auditors
-    can spot turns where the LLM's stated grounding contradicts what
-    its visible reply did.
-    """
-
     text: str
     pending_pose: Optional[PendingPose] = None
-    grounding: dict = field(default_factory=dict)
 
 
 class StudentTutor:
@@ -204,15 +185,13 @@ class StudentTutor:
                 tool_dict = build_pose_question_tool()
 
             if tool_dict is not None:
-                response_or_msg, pending_pose, response_text, grounding = (
-                    self._call_with_tools(
-                        client=client,
-                        system_prompt=system_prompt,
-                        user_prompt=user_prompt,
-                        tool_dict=tool_dict,
-                        context=context,
-                        move=move,
-                    )
+                _msg, pending_pose, response_text = self._call_with_tools(
+                    client=client,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    tool_dict=tool_dict,
+                    context=context,
+                    move=move,
                 )
                 if span is not None:
                     payload = span.get("payload") or {}
@@ -221,13 +200,11 @@ class StudentTutor:
                         "tool_path": True,
                         "posed_via_tool": pending_pose is not None,
                         "response_chars": len(response_text),
-                        "grounding_missing": grounding.get("missing") or [],
                     })
                     span["payload"] = payload
                 return TutorResponse(
                     text=response_text,
                     pending_pose=pending_pose,
-                    grounding=grounding,
                 )
 
             response = client.generate(
@@ -235,17 +212,10 @@ class StudentTutor:
                 system_prompt=system_prompt,
                 max_tokens=600,
             )
-            raw_text = (response.content or "").strip()
-            # Pull the GRADER / EVIDENCE grounding headers off so the
-            # student never sees them — they exist to keep the
-            # response body honest to the verdict + objective state.
-            text, grounding = strip_grounding_lines(raw_text)
-            # Prose-only retry path — splice the held pose's rendered
-            # stem onto the end of the retry prose so the
-            # student-visible turn still ends on the same question we
-            # committed to on the first attempt. The held PendingPose
-            # is reattached to the response so TutorEngine's Phase B
-            # commit fires on conformance accept.
+            text = (response.content or "").strip()
+            # Gate-recovery retry — when the engine asks us to hold the
+            # original pose, splice its stem onto the prose so the
+            # student-visible turn still ends on the same question.
             if hold_pending_pose is not None:
                 stem = (hold_pending_pose.rendered_stem or "").strip()
                 if stem:
@@ -258,14 +228,12 @@ class StudentTutor:
                     "selected_move": move,
                     "tool_path": False,
                     "response_chars": len(text),
-                    "grounding_missing": grounding.get("missing") or [],
                     "held_pending_pose": hold_pending_pose is not None,
                 })
                 span["payload"] = payload
             return TutorResponse(
                 text=text,
                 pending_pose=hold_pending_pose,
-                grounding=grounding,
             )
 
     # ------------------------------------------------------------------
@@ -281,7 +249,7 @@ class StudentTutor:
         tool_dict: dict,
         context: TutoringContext,
         move: str,
-    ) -> tuple[Any, Optional[PendingPose], str, dict]:
+    ) -> tuple[Any, Optional[PendingPose], str]:
         """Single tool-use round.
 
         On ``tool_use`` → ``select_pose_slot`` → construct
@@ -303,7 +271,7 @@ class StudentTutor:
                 "[StudentTutor] generate_with_tools unavailable (%s); "
                 "falling back to text path", type(exc).__name__,
             )
-            return None, None, "", {}
+            return None, None, ""
 
         if not hasattr(message, "content") or not isinstance(
             getattr(message, "content", None), list
@@ -312,70 +280,46 @@ class StudentTutor:
                 "[StudentTutor] generate_with_tools returned non-Message %r; "
                 "falling back to text path", type(message).__name__,
             )
-            return message, None, "", {}
+            return message, None, ""
 
-        (
-            text_chunks,
-            tool_use_block,
-            pending_pose,
-            rendered_stem,
-            grounding,
-        ) = self._process_tool_message(
-            message=message, context=context,
+        text_chunks, tool_use_block, pending_pose, rendered_stem = (
+            self._process_tool_message(message=message, context=context)
         )
 
         if pending_pose is not None:
             response_text = self._assemble_response_text(
                 text_chunks=text_chunks, rendered_stem=rendered_stem,
             )
-            if not grounding:
-                grounding = {
-                    "grader": "", "evidence": "",
-                    "missing": ["grader", "evidence"],
-                }
-            return message, pending_pose, response_text, grounding
+            return message, pending_pose, response_text
 
         # No PendingPose — either the LLM declined to call the tool,
         # the call was malformed, or the tool returned exhausted=True.
         # Ship whatever prose the LLM produced.
         response_text = "\n\n".join(c for c in text_chunks if c).strip()
-        if not grounding:
-            grounding = {
-                "grader": "", "evidence": "",
-                "missing": ["grader", "evidence"],
-            }
-        return message, None, response_text, grounding
+        return message, None, response_text
 
     def _process_tool_message(
         self,
         *,
         message,
         context: TutoringContext,
-    ) -> tuple[list[str], Any, Optional[PendingPose], str, dict]:
+    ) -> tuple[list[str], Any, Optional[PendingPose], str]:
         """Walk an Anthropic Message's content blocks once.
 
         Returns ``(text_chunks, tool_use_block, pending_pose,
-        rendered_stem, grounding)``.
+        rendered_stem)``.
         """
         text_chunks: list[str] = []
         tool_use_block = None
         pending_pose: Optional[PendingPose] = None
         rendered_stem = ""
-        grounding: dict = {}
 
         for block in (message.content or []):
             btype = getattr(block, "type", None)
             if btype == "text":
-                raw_chunk = (getattr(block, "text", "") or "").strip()
-                cleaned, chunk_grounding = strip_grounding_lines(raw_chunk)
-                if not grounding:
-                    grounding = chunk_grounding
-                else:
-                    for k in ("grader", "evidence"):
-                        if not grounding.get(k) and chunk_grounding.get(k):
-                            grounding[k] = chunk_grounding[k]
-                if cleaned:
-                    text_chunks.append(cleaned)
+                chunk = (getattr(block, "text", "") or "").strip()
+                if chunk:
+                    text_chunks.append(chunk)
             elif btype == "tool_use":
                 name = getattr(block, "name", "") or ""
                 if name != POSE_QUESTION_LLM_TOOL_NAME:
@@ -392,7 +336,7 @@ class StudentTutor:
                     block=block, context=context,
                 )
 
-        return text_chunks, tool_use_block, pending_pose, rendered_stem, grounding
+        return text_chunks, tool_use_block, pending_pose, rendered_stem
 
     @staticmethod
     def _assemble_response_text(
@@ -480,9 +424,6 @@ class StudentTutor:
             lesson_title=context.lesson_title,
             lesson_subject=context.lesson_subject,
             current_objective=context.current_objective,
-            doing_rate_window=list(
-                context.runtime_state.student_doing_rate_window or []
-            ),
         )
         move_prompt = get_move_prompt(move)
         return (
@@ -541,9 +482,7 @@ class StudentTutor:
             f"---\n"
             f"Produce ONE response that executes the MOVE in the system "
             f"prompt for this turn. Follow the move's directives "
-            f"exactly; do not invent a different move. Remember to "
-            f"begin with the two GRADER / EVIDENCE header lines required "
-            f"by the system prompt."
+            f"exactly; do not invent a different move."
         )
 
     def _render_reason_block(self, *, reason: str) -> str:
@@ -624,16 +563,7 @@ class StudentTutor:
         )
 
     def _render_objective_evidence_block(self, context: TutoringContext) -> str:
-        """Objective progress as a small structured block.
-
-        The LLM paraphrases this into the EVIDENCE: grounding line at
-        the top of its response. Subject-agnostic — same shape for
-        math, geography, any subject.
-        (Principle #4 Mastery Learning Ch.13 — the close / mastery
-        signal must correspond to evidence of mastery; surfacing the
-        actual counts forces the response to ground in them rather
-        than improvise praise.)
-        """
+        """Objective progress as a small structured block."""
         key = (context.current_objective or "_").strip() or "_"
         progress = context.runtime_state.objective_progress.get(key)
         turns_in_session = (
@@ -763,70 +693,5 @@ class StudentTutor:
             _build_client_for_purpose,
         )
         return _build_client_for_purpose("tutor_move")
-
-
-# Header lines the SHARED_PREAMBLE_TEMPLATE asks the LLM to emit at
-# the top of every response. The strip step pulls them off the visible
-# text so the student never sees them; the captured values are
-# returned for ``v2_trace.grounding`` observability.
-_GROUNDING_LINE_RE = re.compile(
-    r"^(?P<key>GRADER|EVIDENCE)\s*:\s*(?P<value>.*?)\s*$",
-    re.IGNORECASE,
-)
-
-
-def strip_grounding_lines(text: str) -> tuple[str, dict]:
-    """Pull GRADER: and EVIDENCE: header lines off the LLM's response.
-
-    Returns ``(clean_text, grounding_dict)``. ``grounding_dict`` has up
-    to three keys:
-      - ``grader``: the GRADER line's value, or empty string if missing.
-      - ``evidence``: the EVIDENCE line's value, or empty string if missing.
-      - ``missing``: list of missing header names (for observability).
-
-    Scans only the FIRST FEW non-empty lines so a literal "GRADER:" or
-    "EVIDENCE:" word later in prose isn't mis-stripped. Tolerant of
-    blank lines between the headers and the body.
-    """
-    found: dict[str, str] = {}
-    if not text:
-        return "", {"grader": "", "evidence": "", "missing": ["grader", "evidence"]}
-
-    lines = text.split("\n")
-    body_start = 0
-    # Scan the first ~6 non-empty lines for header matches. Allow up to
-    # 2 headers to land non-consecutively (defensive against blank-line
-    # noise the LLM may insert).
-    scanned = 0
-    for i, line in enumerate(lines):
-        if not line.strip():
-            # Blank lines before the body are tolerated; advance body
-            # start to skip them later.
-            body_start = i + 1
-            continue
-        if scanned >= 6 or len(found) >= 2:
-            break
-        scanned += 1
-        m = _GROUNDING_LINE_RE.match(line)
-        if not m:
-            # First non-blank, non-header line marks the body.
-            body_start = i
-            break
-        key = m.group("key").lower()
-        if key not in found:
-            found[key] = (m.group("value") or "").strip()
-        body_start = i + 1
-
-    # Trim any blank lines between the headers and the body.
-    while body_start < len(lines) and not lines[body_start].strip():
-        body_start += 1
-
-    clean_text = "\n".join(lines[body_start:]).strip()
-    missing = [k for k in ("grader", "evidence") if k not in found]
-    return clean_text, {
-        "grader": found.get("grader", ""),
-        "evidence": found.get("evidence", ""),
-        "missing": missing,
-    }
 
 

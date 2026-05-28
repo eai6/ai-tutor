@@ -72,17 +72,6 @@ ALLOWED_MOVES: tuple[str, ...] = (
 logger = logging.getLogger(__name__)
 
 
-def _doing_rate_observability(window: list) -> dict:
-    """Compact doing-rate summary for ``v2_trace`` (legacy field)."""
-    truthy = sum(1 for b in window if bool(b))
-    total = len(window)
-    return {
-        "attempted": truthy,
-        "total": total,
-        "rate": (truthy / total) if total else None,
-    }
-
-
 @dataclass
 class TurnResult:
     """Bundle returned from TutorEngine.respond() / start_session()."""
@@ -152,9 +141,6 @@ class TutorEngine:
             )
             response_text = tutor_resp.text
             pending_pose = tutor_resp.pending_pose
-            v2_trace["grounding"] = dict(
-                getattr(tutor_resp, "grounding", {}) or {}
-            )
         except Exception as exc:
             logger.warning(
                 "[TutorEngine] start_session tutor.respond raised %s",
@@ -286,7 +272,6 @@ class TutorEngine:
         )
         attempt_text = first_resp.text
         committed_pose = first_resp.pending_pose
-        grounding = dict(getattr(first_resp, "grounding", {}) or {})
 
         # 4. Safety gates with per-gate one-retry-then-degrade recovery.
         attached_media_count, figure_facts = self._media_counts_and_facts(
@@ -413,10 +398,6 @@ class TutorEngine:
                 # always equals the move resolved from the router decision.
                 "floor_overridden": False,
             },
-            "doing_rate_5turn": _doing_rate_observability(
-                runtime_state.student_doing_rate_window or []
-            ),
-            "grounding": grounding,
         }
 
         return TurnResult(
