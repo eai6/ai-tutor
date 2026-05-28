@@ -534,10 +534,6 @@ class TutorEngine:
             counters.verdictless_turns += 1
         else:
             counters.verdictless_turns = 0
-            # unverified_run_length stays on the model until commit G
-            # — always reset under the ternary contract since no
-            # verdict path produces unverified any more.
-            runtime_state.unverified_run_length = 0
 
         runtime_state.safety_valve_counters = counters
         return runtime_state
@@ -783,7 +779,6 @@ class TutorEngine:
 
         runtime_state.open_question = None
         runtime_state.attempts_on_open_question = 0
-        runtime_state.unverified_run_length = 0
         # Reset per-open-question + per-objective counters on step
         # advance (Commit D §4.2).
         runtime_state.wrong_attempts_on_open_question = 0
@@ -812,10 +807,7 @@ class TutorEngine:
         """True when the lesson has at least one un-posed bank slot."""
         try:
             from apps.curriculum.models import LessonStep
-            posed_ids = {
-                e.id for e in runtime_state.posed_question_ledger
-                if e.source.value == "lesson_step"
-            }
+            posed_ids = set(runtime_state.delivered_lesson_step_ids or [])
             return (
                 LessonStep.objects
                 .filter(lesson_id=context.lesson_id)

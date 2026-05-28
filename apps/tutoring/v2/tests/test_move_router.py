@@ -19,14 +19,11 @@ import json
 import pytest
 
 from apps.tutoring.v2.contracts import (
-    GradingResult,
     ObjectiveProgress,
     RouterDecision,
     RouterRequest,
     SessionRuntimeState,
-    StudentSafeFeedback,
     TutoringContext,
-    Verdict,
 )
 from apps.tutoring.v2.services.move_router import (
     MoveRouter,
@@ -129,9 +126,6 @@ def _request(
     return RouterRequest(
         last_n_turns=[],
         student_input=student_input,
-        grader_verdict=None,
-        grader_reason_code=None,
-        student_safe_feedback=StudentSafeFeedback(),
         profile_summary=profile_summary,
         objective="test objective",
         move_history=list(move_history or []),

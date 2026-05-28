@@ -13,8 +13,6 @@ from apps.tutoring.v2.contracts import (
     ObjectiveProgress,
     OpenQuestion,
     PendingPose,
-    PosedQuestionLedgerEntry,
-    ProfileUpdate,
     QuestionRef,
     QuestionSource,
     RemediationState,
@@ -54,28 +52,19 @@ class SessionRuntimeStateRoundtripTest(TestCase):
             id=42,
             canonical="5",
             rendered_stem="What is 2+3?",
-            jaccard_signature="what is 2 3",
             visible_context_at_pose=snap,
         )
-        ledger = [
-            PosedQuestionLedgerEntry(
-                source=QuestionSource.EXIT_TICKET_QUESTION,
-                id=7,
-                jaccard_signature="x y z",
-            )
-        ]
         op = {"obj1": ObjectiveProgress(objective="obj1", attempts=2, correct=1)}
         state = SessionRuntimeState(
             open_question=oq,
             attempts_on_open_question=2,
-            posed_question_ledger=ledger,
+            delivered_lesson_step_ids=[42, 43],
             objective_progress=op,
             media_shown=[1, 2, 3],
             remediation_state=RemediationState(misconception="off-by-one",
                                                fired_at_turn=5),
             current_move="scaffold_hint",
             move_history=["pose_question", "scaffold_hint"],
-            unverified_run_length=1,
             safety_valve_counters=SafetyValveCounters(turns_in_session=4),
             resume_marker=ResumeMarker(last_step_index=2, last_move="pose_question"),
             bare_answer_counts_by_objective={"obj1": 3},
@@ -87,8 +76,7 @@ class SessionRuntimeStateRoundtripTest(TestCase):
                          QuestionSource.LESSON_STEP)
         self.assertEqual(revived.bare_answer_counts_by_objective, {"obj1": 3})
         self.assertEqual(revived.current_move, "scaffold_hint")
-        self.assertEqual(revived.posed_question_ledger[0].source,
-                         QuestionSource.EXIT_TICKET_QUESTION)
+        self.assertEqual(revived.delivered_lesson_step_ids, [42, 43])
 
 
 class QuestionRefTest(TestCase):
@@ -112,7 +100,6 @@ class PendingPoseTest(TestCase):
             question_ref=QuestionRef(source=QuestionSource.LESSON_STEP, id=1),
             canonical="42",
             rendered_stem="What is the answer?",
-            jaccard_signature="what is the answer",
             visible_context=VisibleContextSnapshot(visible_prompt="?"),
         )
         revived = PendingPose.model_validate(pending.model_dump(mode="json"))
@@ -157,7 +144,12 @@ class GradingContractsTest(TestCase):
         with self.assertRaises(Exception):
             ctx.session_id = 99
 
-    def test_profile_update_default(self):
-        upd = ProfileUpdate()
-        self.assertEqual(upd.profile_summary_text, "")
-        self.assertEqual(upd.asked_questions_delta, {})
+    def test_session_runtime_state_recent_verdicts_default(self):
+        state = SessionRuntimeState()
+        self.assertEqual(state.recent_verdicts, [])
+        self.assertEqual(state.wrong_attempts_on_open_question, 0)
+        self.assertEqual(state.partial_attempts_on_open_question, 0)
+        self.assertEqual(state.consecutive_wrong_on_open_question, 0)
+        self.assertEqual(
+            state.unscaffolded_correct_on_open_question_objective, 0,
+        )

@@ -1,5 +1,4 @@
-"""Service-call contracts: TutoringContext, GradingRequest, GradingResult,
-ProfileUpdate.
+"""Service-call contracts: TutoringContext, GradingRequest, GradingResult.
 
 Phase 1 ships these as the data-shape boundary; Phase 2 fills in the
 services that consume / produce them.
@@ -148,13 +147,6 @@ class TutoringContext(BaseModel):
     is_final_step: bool = True
 
 
-class ProfileUpdate(BaseModel):
-    """End-of-session output from StudentProfiler (Phase 3 §3.1)."""
-
-    profile_summary_text: str = ""
-    asked_questions_delta: dict[str, dict] = Field(default_factory=dict)
-
-
 # ──────────────────────────────────────────────────────────────────────
 # Move Router — design/tasks/move-router-implementation-plan.md
 # ──────────────────────────────────────────────────────────────────────
@@ -176,28 +168,6 @@ RouterMove = Literal[
     "pivot",
     "close_topic",
 ]
-
-
-# The 13 science-of-learning principle names (from design/science-
-# principles.md Table 1). The router emits ``principle_emphasis`` from
-# this closed set; Pydantic validates membership so a hallucinated
-# principle name surfaces as a ValidationError instead of silently
-# steering the move LLM.
-ALLOWED_PRINCIPLES: tuple[str, ...] = (
-    "Active Learning",
-    "Direct Instruction",
-    "Deliberate Practice",
-    "Mastery Learning",
-    "Cognitive Load",
-    "Automaticity",
-    "Layering",
-    "Non-Interference",
-    "Spaced Repetition",
-    "Interleaving",
-    "Testing Effect",
-    "Targeted Remediation",
-    "Gamification",
-)
 
 
 RouterCase = Literal[
@@ -229,15 +199,6 @@ class RouterRequest(BaseModel):
     last_n_turns: list[dict] = Field(default_factory=list)
     student_input: str = ""
 
-    # ── grader output (legacy — kept additively until commit G;
-    #    populated only when the engine grades before this call which
-    #    no longer happens post-Commit D. Defaults to None) ─────────
-    grader_verdict: Optional[Verdict] = None
-    grader_reason_code: Optional[str] = None
-    student_safe_feedback: StudentSafeFeedback = Field(
-        default_factory=StudentSafeFeedback
-    )
-
     # ── student / lesson context ─────────────────────────────────────
     profile_summary: str = ""
     objective: str = ""
@@ -253,12 +214,10 @@ class RouterRequest(BaseModel):
     objective_correct: int = 0
     objective_wrong: int = 0
     objective_partial: int = 0
-    objective_unverified: int = 0
     objective_attempts: int = 0
     turns_in_session: int = 0
     turns_on_current_objective: int = 0
     verdictless_turns: int = 0
-    unverified_run_length: int = 0
     attempts_on_open_question: int = 0
     open_question_stem: str = ""
     open_question_has_pending: bool = False

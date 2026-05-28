@@ -198,9 +198,6 @@ def build_router_request(
     return RouterRequest(
         last_n_turns=last_n,
         student_input=student_input,
-        grader_verdict=None,
-        grader_reason_code=None,
-        student_safe_feedback=_default_safe_feedback(),
         profile_summary=context.profile_summary or "",
         objective=context.current_objective or "",
         lesson_title=context.lesson_title or "",
@@ -217,12 +214,10 @@ def build_router_request(
         objective_correct=(progress.correct if progress else 0),
         objective_wrong=(progress.wrong if progress else 0),
         objective_partial=(progress.partial if progress else 0),
-        objective_unverified=(progress.unverified if progress else 0),
         objective_attempts=(progress.attempts if progress else 0),
         turns_in_session=counters.turns_in_session,
         turns_on_current_objective=counters.turns_on_current_objective,
         verdictless_turns=counters.verdictless_turns,
-        unverified_run_length=runtime_state.unverified_run_length,
         attempts_on_open_question=runtime_state.attempts_on_open_question,
         open_question_stem=(open_q.rendered_stem if open_q else ""),
         open_question_has_pending=open_q is not None,
@@ -245,12 +240,6 @@ def build_router_request(
         recent_verdicts=list(runtime_state.recent_verdicts or []),
         pose_tool_available=pose_tool_available,
     )
-
-
-def _default_safe_feedback():
-    """Resolve the StudentSafeFeedback default without re-importing it."""
-    from apps.tutoring.v2.contracts import StudentSafeFeedback
-    return StudentSafeFeedback()
 
 
 def _summarise_media_catalog(catalog: list[dict]) -> str:

@@ -10,7 +10,6 @@ from apps.tutoring.v2.contracts.runtime_state import (
     ObjectiveProgress,
     OpenQuestion,
     PendingPose,
-    PosedQuestionLedgerEntry,
     QuestionRef,
     QuestionSource,
     RemediationState,
@@ -20,10 +19,8 @@ from apps.tutoring.v2.contracts.runtime_state import (
     VisibleContextSnapshot,
 )
 from apps.tutoring.v2.contracts.tutoring import (
-    ALLOWED_PRINCIPLES,
     GradingRequest,
     GradingResult,
-    ProfileUpdate,
     RouterCase,
     RouterDecision,
     RouterMove,
@@ -34,15 +31,12 @@ from apps.tutoring.v2.contracts.tutoring import (
 )
 
 __all__ = [
-    "ALLOWED_PRINCIPLES",
     "BareAnswerCounters",
     "GradingRequest",
     "GradingResult",
     "ObjectiveProgress",
     "OpenQuestion",
     "PendingPose",
-    "PosedQuestionLedgerEntry",
-    "ProfileUpdate",
     "QuestionRef",
     "QuestionSource",
     "RemediationState",

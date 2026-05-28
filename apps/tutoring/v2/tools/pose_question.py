@@ -219,13 +219,11 @@ def build_pending_pose(
         ),
         canonical=selection.canonical_answer,
         rendered_stem=selection.stem,
-        jaccard_signature="",  # no signature index any more
         visible_context=VisibleContextSnapshot(
             visible_prompt=selection.stem,
             recent_transcript=list(recent_transcript or [])[-6:],
             mcq_option_order=list(mcq_option_order or []),
         ),
-        token=None,
     )
 
 

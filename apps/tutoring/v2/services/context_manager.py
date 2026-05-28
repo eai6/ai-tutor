@@ -23,7 +23,6 @@ from apps.tutoring.tracing import emit_span
 from apps.tutoring.v2.contracts import (
     OpenQuestion,
     PendingPose,
-    PosedQuestionLedgerEntry,
     SessionRuntimeState,
     TutoringContext,
 )
@@ -67,9 +66,9 @@ class ContextManager:
     def commit_pending_pose(self, pending: PendingPose) -> SessionRuntimeState:
         """Phase B commit of a PendingPose returned by the pose tool.
 
-        Appends to ``posed_question_ledger`` + ``delivered_lesson_step_ids``
-        and writes ``open_question``. The token-consumption path is
-        gone (v2-prune step 4); the pose tool no longer uses tokens.
+        Appends to ``delivered_lesson_step_ids`` and writes
+        ``open_question``. The token-consumption path is gone
+        (v2-prune step 4); the pose tool no longer uses tokens.
         """
         from apps.tutoring.v2.contracts import QuestionSource
 
@@ -77,13 +76,6 @@ class ContextManager:
             state = self.load_runtime_state()
 
             now = datetime.now(timezone.utc)
-            ledger_entry = PosedQuestionLedgerEntry(
-                source=pending.question_ref.source,
-                id=pending.question_ref.id,
-                jaccard_signature=pending.jaccard_signature,
-                posed_at=now,
-            )
-            state.posed_question_ledger.append(ledger_entry)
             if (
                 pending.question_ref.source == QuestionSource.LESSON_STEP
                 and pending.question_ref.id
@@ -95,7 +87,6 @@ class ContextManager:
                 id=pending.question_ref.id,
                 canonical=pending.canonical,
                 rendered_stem=pending.rendered_stem,
-                jaccard_signature=pending.jaccard_signature,
                 visible_context_at_pose=pending.visible_context,
                 posed_at=now,
             )
@@ -105,7 +96,7 @@ class ContextManager:
                 span["payload"] = {
                     "source": pending.question_ref.source,
                     "question_id": pending.question_ref.id,
-                    "ledger_size": len(state.posed_question_ledger),
+                    "delivered_count": len(state.delivered_lesson_step_ids),
                 }
             return state
 

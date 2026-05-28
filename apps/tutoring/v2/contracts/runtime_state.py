@@ -29,7 +29,6 @@ class QuestionSource(str, Enum):
     LESSON_STEP = "lesson_step"
     EXIT_TICKET_QUESTION = "exit_ticket_question"
     INLINE_GENERATED = "inline_generated"
-    PRE_POSE_TOKEN = "pre_pose_token"
 
 
 class QuestionRef(BaseModel):
@@ -74,22 +73,9 @@ class OpenQuestion(BaseModel):
     id: int
     canonical: str = ""  # private — never surfaced to StudentTutor on wrong/partial
     rendered_stem: str = ""
-    jaccard_signature: str = ""
     visible_context_at_pose: VisibleContextSnapshot = Field(
         default_factory=VisibleContextSnapshot
     )
-    posed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class PosedQuestionLedgerEntry(BaseModel):
-    """An entry in the in-session posed-question ledger.
-
-    Drives ``in_session_repeat_guard()`` (Phase 1 §4.3 / Phase 2 §2.1.1).
-    """
-
-    source: QuestionSource
-    id: int
-    jaccard_signature: str
     posed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -105,7 +91,6 @@ class ObjectiveProgress(BaseModel):
     correct: int = 0
     wrong: int = 0
     partial: int = 0
-    unverified: int = 0
     closed: bool = False
 
 
@@ -172,9 +157,7 @@ class PendingPose(BaseModel):
     question_ref: QuestionRef
     canonical: str
     rendered_stem: str
-    jaccard_signature: str
     visible_context: VisibleContextSnapshot
-    token: Optional[str] = None  # set when this pose came from a pre_pose_token
 
 
 class SessionRuntimeState(BaseModel):
@@ -190,9 +173,6 @@ class SessionRuntimeState(BaseModel):
     # Currently-posed question awaiting a student response.
     open_question: Optional[OpenQuestion] = None
     attempts_on_open_question: int = 0
-
-    # In-session repeat avoidance — Jaccard signatures + source/id.
-    posed_question_ledger: list[PosedQuestionLedgerEntry] = Field(default_factory=list)
 
     # Server-side pose-tool dedup ledger (v2-prune-plan step 4). The
     # new pose_question tool appends LessonStep.id here on each call
@@ -213,10 +193,6 @@ class SessionRuntimeState(BaseModel):
     # Move-table state (Phase 2 §2.3).
     current_move: str = ""
     move_history: list[str] = Field(default_factory=list)
-
-    # Tracks consecutive grader 'unverified' verdicts so conformance
-    # can escalate (Phase 2 §2.4).
-    unverified_run_length: int = 0
 
     # Hard caps (Phase 2 §2.3, §7 item 3).
     safety_valve_counters: SafetyValveCounters = Field(

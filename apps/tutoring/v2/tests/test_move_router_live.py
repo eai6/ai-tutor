@@ -47,8 +47,6 @@ import pytest
 
 from apps.tutoring.v2.contracts import (
     RouterRequest,
-    StudentSafeFeedback,
-    Verdict,
 )
 from apps.tutoring.v2.services.move_router import MoveRouter
 
@@ -163,9 +161,6 @@ def test_router_live_geo_p1_3_help_request_picks_teaching_move():
             {"role": "student", "content": "i dont understand. what is condensation"},
         ],
         student_input="i dont understand. what is condensation",
-        grader_verdict=None,  # help-request — engine skipped grading
-        grader_reason_code=None,
-        student_safe_feedback=StudentSafeFeedback(),
         profile_summary="",
         objective="Identify the steps of the water cycle",
         lesson_title="The Water Cycle",
@@ -242,11 +237,6 @@ def test_router_live_maths_p1_1_resume_after_correct_streak():
             "c=13, a=5, b=12. a²+b² = 25+144 = 169. c² = 169. "
             "Since 169=169, the triangle IS right-angled."
         ),
-        grader_verdict=Verdict.CORRECT,
-        grader_reason_code=None,
-        student_safe_feedback=StudentSafeFeedback(
-            what_right="your working applies the converse cleanly",
-        ),
         profile_summary="",
         objective="Apply the converse of Pythagoras' theorem",
         lesson_title="Pythagoras' Theorem — Right-angled Triangles",
@@ -307,11 +297,6 @@ def test_router_live_maths_p1_4_objective_evidence_close():
             {"role": "student", "content": "Yes — 36+64=100=10²."},
         ],
         student_input="Yes — 36+64=100=10².",
-        grader_verdict=Verdict.CORRECT,
-        grader_reason_code=None,
-        student_safe_feedback=StudentSafeFeedback(
-            what_right="you applied the converse correctly",
-        ),
         profile_summary="",
         objective="Apply the converse of Pythagoras' theorem",
         lesson_title="Pythagoras' Theorem — Right-angled Triangles",
@@ -368,11 +353,6 @@ def test_router_live_geo_p1_4_self_reported_guess_does_not_extend():
             {"role": "student", "content": "guess B"},
         ],
         student_input="guess B",
-        grader_verdict=Verdict.CORRECT,
-        grader_reason_code="self_reported_guess",
-        student_safe_feedback=StudentSafeFeedback(
-            what_right="you picked the right letter",
-        ),
         profile_summary="",
         objective="Identify the steps of the water cycle",
         lesson_title="The Water Cycle",
