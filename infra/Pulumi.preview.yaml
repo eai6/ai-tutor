@@ -50,5 +50,16 @@ config:
   # No custom domain on preview — Container App default URL only.
   # Format: aitutor-preview-app.<env-hash>.centralus.azurecontainerapps.io
   aitutor:custom-domains: []
-</content>
-</invoke>
+  aitutor:db-password:
+    secure: v1:PXn+lQC+ben9xj1+:JBcpGvQIBQ9dcCCnGyM/JKpHlMwBOL9cWz398J2e8u2q61WZEItD1oMl/3PkzH+9
+  aitutor:django-secret-key:
+    secure: v1:Fta5L2fUX+wDzzmj:BOWrLkTnxy7tcKFv4jaEMjIqhgagXgKWB79/zPk7PaHnANzK+aciZ3X2SZfBX1DJuyr1NTvGcdoAMIFw9i129y4pQY4YUPscA9hN6Py6tujwc6M=
+  aitutor:anthropic-api-key:
+    secure: v1:H4Ic+zVaYSX/v7pF:LVOBEhJ4MqgivQHxaXsQWKPExPnbqWIo2kHKYtB8YT/iw2yk72RyjlntaPkr51qbs/RqeDHnFNKQrPZcasIOPlY806NzTu4qb3d/0OpzPurte2FpvQABC0PUk7ESLced56dECdr3+LE+LlGqK6I8MoGyFv7POp8ae5f6VQ==
+  aitutor:openai-api-key:
+    secure: v1:STP2imj2/p6sxKrW:Z1zEs/Qz3DzhF8tavSM/A3Qf0KXv4CsgpZJqhMZyEnhwUXIyK70der0kWK0UNhyITGSacZ9Lx3iDBivD1sHEoWZ/PwTSiHtC/fc3HGq7RlistE4Pi9tRYI0lbniETH9gZhaZ8T1hUCWOFKCNc2w7aS0UXtsofJgxplUiB3juUszm97wbq3uNYPkE84yRCJkGtelAYxa6xhvXtXfzvoLt+asaRqVuThXcsV82MVcqCMHwYQxZgAUK
+  aitutor:google-api-key:
+    secure: v1:skgHTMfEthpT2Ymz:/hrwLR22K3PQzE6/zoiczJUw09lRPJKdNg+KzOsTpWxi02EONGz3HGtShMXnfbv7VCYI3pb+zg==
+  aitutor:elevenlabs-api-key:
+    secure: v1:o6Ck8cqXZl3WitFy:/yU+ONKEPz30MUUA1Re+lei06o/J7wNoy80SZby4zY+++wnWtVzQRh4Xd6PlVAyDcRUPcw78Xdo/vI+5RUT3FV2xUQ==
+encryptionsalt: v1:ljtYuW3m2Bw=:v1:G9iN9r1do1+8RM5e:rUVVR0Lb570JK6CnraH/Itz79VYIeA==
