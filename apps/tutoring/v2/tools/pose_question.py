@@ -115,6 +115,10 @@ class PoseSelection:
     stem: str
     canonical_answer: str
     lesson_step_id: int
+    # Authored answer shape from LessonStep.answer_type — propagated all
+    # the way to OpenQuestion so the grader's LLM-A can pick the right
+    # canonical-structuring branch (label vs numeric vs multi-slot).
+    answer_type: str = ""
     exhausted: bool = False
 
 
@@ -187,10 +191,12 @@ def select_pose_slot(
     pick = candidates[0]
     stem = _render_bank_stem_with_options(pick)
     canonical = (getattr(pick, "expected_answer", "") or "").strip()
+    answer_type = (getattr(pick, "answer_type", "") or "").strip().lower()
     return PoseSelection(
         stem=stem,
         canonical_answer=canonical,
         lesson_step_id=int(pick.id),
+        answer_type=answer_type,
         exhausted=False,
     )
 
@@ -219,6 +225,7 @@ def build_pending_pose(
         ),
         canonical=selection.canonical_answer,
         rendered_stem=selection.stem,
+        answer_type=selection.answer_type,
         visible_context=VisibleContextSnapshot(
             visible_prompt=selection.stem,
             recent_transcript=list(recent_transcript or [])[-6:],

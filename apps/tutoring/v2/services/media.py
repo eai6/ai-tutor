@@ -109,61 +109,111 @@ class MediaService:
             return []
 
         # Pull lesson-scoped media references from each LessonStep's
-        # legacy ``media`` JSON blob — that's where authoring sites
-        # currently land image-asset IDs. Multi-tenancy-safe lookup.
+        # ``media`` JSON blob. Two authoring shapes coexist:
+        #   1) MediaAsset-backed:   {"asset_id": 42} or {"id": 42}
+        #      → resolved against the MediaAsset table below.
+        #   2) Inline / generated:  {"url": "/media/...", "caption": ...,
+        #                            "description": ..., "alt_text": ...}
+        #      → synthesized into a catalog entry directly. The geo P1-1
+        #      regression from the 2026-05-27 evaluation was that
+        #      legacy-generated images use shape 2 (url-only) and were
+        #      silently dropped here, so the tutor saw an empty catalog
+        #      while authoring questions like "look at the marked point
+        #      on the map".
         asset_ids: set[int] = set()
+        inline_entries: list[dict] = []
+        signal_tokens = _tokenize(f"{topic_hint} {recent_text}")
         for step in lesson.steps.all() if hasattr(lesson, "steps") else []:
             media = getattr(step, "media", None) or {}
             images = media.get("images", []) if isinstance(media, dict) else []
             for img in images[:6]:
-                if isinstance(img, dict):
-                    aid = img.get("asset_id") or img.get("id")
+                if not isinstance(img, dict):
+                    continue
+                aid = img.get("asset_id") or img.get("id")
+                if aid is not None:
                     try:
-                        if aid is not None:
-                            asset_ids.add(int(aid))
-                    except (TypeError, ValueError):
+                        asset_ids.add(int(aid))
                         continue
+                    except (TypeError, ValueError):
+                        pass
+                # Shape 2 — synthesize from inline metadata. Skip when
+                # we have neither a URL nor a description (nothing the
+                # tutor or the figure_ref gate could ground on).
+                url = (img.get("url") or "").strip()
+                title = (img.get("caption") or img.get("title") or "").strip()
+                desc = (
+                    img.get("description")
+                    or img.get("scene_description")
+                    or ""
+                ).strip()
+                alt_text = (img.get("alt_text") or "").strip()
+                if not url and not desc and not title:
+                    continue
+                facts: list[str] = []
+                if alt_text:
+                    facts.append(alt_text)
+                # Synthetic id: negative to avoid collision with real
+                # MediaAsset ids; not used for downstream lookups.
+                synth_id = -(len(inline_entries) + 1)
+                inline_entries.append({
+                    "id": synth_id,
+                    "title": title or "Lesson figure",
+                    "description": desc,
+                    "url": url,
+                    "figure_facts": facts,
+                    "score": (
+                        _relevance_score(
+                            signal_tokens,
+                            _tokenize(" ".join([title, desc, *facts])),
+                        )
+                        if signal_tokens
+                        else 0.0
+                    ),
+                })
 
-        if not asset_ids:
+        if not asset_ids and not inline_entries:
             return []
 
-        try:
-            qs = (
-                MediaAsset.objects
-                .filter(pk__in=asset_ids)
-                .filter(
-                    Q(institution_id=institution_id)
-                    | Q(institution__isnull=True)
-                )
-            )
-        except Exception as exc:
-            logger.warning(
-                "[MediaService] catalog query raised %s — returning empty",
-                type(exc).__name__,
-            )
-            return []
-
-        signal_tokens = _tokenize(f"{topic_hint} {recent_text}")
         entries: list[dict] = []
-        for asset in qs:
-            title = getattr(asset, "title", "") or ""
-            desc = getattr(asset, "scene_description", "") or ""
-            facts = _coerce_figure_facts(getattr(asset, "figure_facts", None))
-            score = (
-                _relevance_score(
-                    signal_tokens,
-                    _tokenize(" ".join([title, desc, *facts])),
+        if asset_ids:
+            try:
+                qs = (
+                    MediaAsset.objects
+                    .filter(pk__in=asset_ids)
+                    .filter(
+                        Q(institution_id=institution_id)
+                        | Q(institution__isnull=True)
+                    )
                 )
-                if signal_tokens
-                else 0.0
-            )
-            entries.append({
-                "id": asset.pk,
-                "title": title,
-                "description": desc,
-                "figure_facts": facts,
-                "score": score,
-            })
+            except Exception as exc:
+                logger.warning(
+                    "[MediaService] catalog query raised %s — "
+                    "MediaAsset entries dropped (inline entries still served)",
+                    type(exc).__name__,
+                )
+                qs = []
+            for asset in qs:
+                title = getattr(asset, "title", "") or ""
+                desc = getattr(asset, "scene_description", "") or ""
+                facts = _coerce_figure_facts(
+                    getattr(asset, "figure_facts", None)
+                )
+                score = (
+                    _relevance_score(
+                        signal_tokens,
+                        _tokenize(" ".join([title, desc, *facts])),
+                    )
+                    if signal_tokens
+                    else 0.0
+                )
+                entries.append({
+                    "id": asset.pk,
+                    "title": title,
+                    "description": desc,
+                    "figure_facts": facts,
+                    "score": score,
+                })
+        entries.extend(inline_entries)
 
         # Rank by overlap when we had a signal; otherwise preserve
         # the lesson's authoring order (stable for unscored entries).

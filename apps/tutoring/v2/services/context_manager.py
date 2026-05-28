@@ -87,6 +87,7 @@ class ContextManager:
                 id=pending.question_ref.id,
                 canonical=pending.canonical,
                 rendered_stem=pending.rendered_stem,
+                answer_type=pending.answer_type,
                 visible_context_at_pose=pending.visible_context,
                 posed_at=now,
             )

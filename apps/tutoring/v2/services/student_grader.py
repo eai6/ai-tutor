@@ -280,9 +280,20 @@ class StudentGrader:
         with emit_span("audit", "grader.math") as span:
             bare = is_bare_answer(request.student_input)
             problem_text = request.open_question.rendered_stem or ""
+            authored_canonical = (request.open_question.canonical or "").strip()
+            answer_type = (
+                getattr(request.open_question, "answer_type", "") or ""
+            ).strip().lower()
 
-            # 1. Extract the DSL from the LLM.
-            extraction = self._extract_math_dsl(problem_text)
+            # 1. LLM-A — structure the authored canonical for comparison.
+            #    Passes answer_type + authored_canonical so the LLM
+            #    targets the right shape ("label" / "numeric" /
+            #    "multi_slot") instead of re-deriving from problem text.
+            extraction = self._extract_math_dsl(
+                problem_text,
+                answer_type=answer_type,
+                authored_canonical=authored_canonical,
+            )
             if extraction.program is None:
                 # Phase 4 — math DSL extraction failed (often because
                 # the problem is a prose proof, definition, or
@@ -299,7 +310,73 @@ class StudentGrader:
                     }
                 return self._grade_non_math(context, request)
 
-            # 2. Validate + execute the DSL.
+            shape = (extraction.program.get("shape") or "").strip().lower()
+
+            # 2a. Label shape — skip the arithmetic verifier; the
+            # canonical IS the authored label (structured by LLM-A).
+            # Still run LLM-B and the comparator so student prose like
+            # "B because 8²+15²=17²" or "i think condensation" gets
+            # parsed and compared semantically — no regex bypass.
+            if shape == "label":
+                canonical_label = (
+                    extraction.program.get("canonical_label") or ""
+                ).strip()
+                canonical_synonyms = extraction.program.get(
+                    "canonical_synonyms"
+                ) or []
+                if not isinstance(canonical_synonyms, list):
+                    canonical_synonyms = []
+                if not canonical_label:
+                    # LLM-A produced a label shape but no label — fall
+                    # through; we cannot grade against nothing.
+                    if span is not None:
+                        span["payload"] = {
+                            "verdict": "deferred",
+                            "stage": "label_canonical_missing",
+                            "fallthrough": "grounded",
+                        }
+                    return self._grade_non_math(context, request)
+                student_extraction = self._extract_student_claims_dsl(
+                    problem_text=problem_text,
+                    student_response=request.student_input,
+                )
+                if not student_extraction.ok:
+                    if span is not None:
+                        span["payload"] = {
+                            "verdict": "deferred",
+                            "stage": "student_claims_extraction",
+                            "fallthrough": "grounded",
+                            "error": student_extraction.error or "",
+                        }
+                    return self._grade_non_math(context, request)
+                if not student_extraction.conclusion.is_attempt:
+                    if span is not None:
+                        span["payload"] = {
+                            "verdict": Verdict.WRONG.value,
+                            "reason_code": "meta_input",
+                            "shape": "label",
+                        }
+                    return GradingResult(
+                        verdict=Verdict.WRONG,
+                        private_canonical=canonical_label,
+                        student_value=(request.student_input or "").strip(),
+                        reasoning="math: student response is not an attempt",
+                        reason_code="meta_input",
+                        bare_answer=bare,
+                    )
+                return self._compare_label_canonical(
+                    span=span,
+                    canonical_label=canonical_label,
+                    canonical_synonyms=[
+                        s for s in canonical_synonyms
+                        if isinstance(s, str) and s.strip()
+                    ],
+                    extraction=student_extraction,
+                    bare=bare,
+                    student_input=request.student_input,
+                )
+
+            # 2b. Numeric / multi-slot — validate + execute the DSL.
             result = self._math_verification_tool.evaluate(
                 problem_text, extraction.program,
             )
@@ -560,6 +637,107 @@ class StudentGrader:
     # Comparator — pure Python (Two-LLM grader §2.3)
     # ------------------------------------------------------------------
 
+    def _compare_label_canonical(
+        self,
+        *,
+        span,
+        canonical_label: str,
+        canonical_synonyms: list[str],
+        extraction: _StudentClaimsExtraction,
+        bare: bool,
+        student_input: str,
+    ) -> GradingResult:
+        """Compare LLM-B's extracted answer against a label canonical.
+
+        Used by ``_grade_math`` when LLM-A emits ``shape="label"`` —
+        MCQ, true/false, yes/no, and single-term free-text answers. The
+        canonical (from ``LessonStep.expected_answer`` via Phase A pose
+        validation) is the authority; we just normalize both sides and
+        compare. ``canonical_synonyms`` is LLM-A's optional list of
+        equivalent student phrasings ("right-angled" ≡ "yes").
+
+        Comparison priority on the student side:
+          1. LLM-B's ``answer_extracted_label`` ("A", "B", "yes",
+             "true", etc.) — exact match against ``canonical_label``.
+          2. LLM-B's ``stated_answer`` — case-insensitive match against
+             ``canonical_label`` or any synonym.
+          3. ``claims[*].description`` and ``claims[*].asserted_value``
+             — scanned for synonym mentions when the conclusion didn't
+             pin a label (e.g. student wrote a proof without saying
+             "yes" but the working makes the answer clear).
+        """
+        conc = extraction.conclusion
+        canon_norm = (canonical_label or "").strip().lower()
+        synonym_norms = [s.strip().lower() for s in canonical_synonyms if s]
+
+        student_label = (conc.answer_extracted_label or "").strip().lower()
+        student_stmt = (conc.statement or "").strip().lower()
+
+        matched_by = ""
+        # Path 1: extracted_label exact match.
+        if student_label and (
+            student_label == canon_norm
+            or student_label in synonym_norms
+        ):
+            matched_by = "answer_label"
+        # Path 2: stated_answer contains canonical or synonym.
+        elif student_stmt and (
+            canon_norm in student_stmt
+            or any(s in student_stmt for s in synonym_norms)
+        ):
+            matched_by = "stated_answer"
+        else:
+            # Path 3: claim descriptions / asserted values mention a synonym.
+            for claim in extraction.claims:
+                desc = (claim.description or "").strip().lower()
+                asserted = str(claim.asserted_value or "").strip().lower()
+                if not desc and not asserted:
+                    continue
+                if canon_norm and (canon_norm in desc or canon_norm in asserted):
+                    matched_by = "claim"
+                    break
+                if synonym_norms and any(
+                    s in desc or s in asserted for s in synonym_norms
+                ):
+                    matched_by = "claim_synonym"
+                    break
+
+        verdict_kind = Verdict.CORRECT if matched_by else Verdict.WRONG
+        if verdict_kind == Verdict.CORRECT:
+            safe = StudentSafeFeedback(
+                what_right="your answer matches the expected response",
+            )
+        else:
+            safe = StudentSafeFeedback(
+                first_misconception_redacted=(
+                    "that doesn't match the expected answer — "
+                    "re-check what the question is asking"
+                ),
+            )
+        if span is not None:
+            span["payload"] = {
+                "verdict": verdict_kind.value,
+                "shape": "label",
+                "matched_by": matched_by or "none",
+                "synonyms_count": len(synonym_norms),
+            }
+        return GradingResult(
+            verdict=verdict_kind,
+            private_canonical=canonical_label,
+            student_safe_feedback=safe,
+            student_value=(
+                conc.statement
+                or conc.answer_extracted_label
+                or (student_input or "").strip()
+            ),
+            reasoning=f"math: label comparator (matched_by={matched_by or 'none'})",
+            reason_code=(
+                None if verdict_kind == Verdict.CORRECT
+                else "conclusion_inconsistent_with_canonical"
+            ),
+            bare_answer=bare,
+        )
+
     def _compare_student_claims_to_canonical(
         self,
         *,
@@ -783,8 +961,21 @@ class StudentGrader:
             bare_answer=bare,
         )
 
-    def _extract_math_dsl(self, problem_text: str) -> _DSLExtraction:
-        """Call ``GRADER_MATH`` to produce a JSON DSL for the problem."""
+    def _extract_math_dsl(
+        self,
+        problem_text: str,
+        *,
+        answer_type: str = "",
+        authored_canonical: str = "",
+    ) -> _DSLExtraction:
+        """Call ``GRADER_MATH`` to produce a JSON DSL for the problem.
+
+        Passes the authored ``answer_type`` and ``authored_canonical``
+        so LLM-A structures the curriculum-authored answer rather than
+        re-deriving it. The output JSON carries a top-level ``shape``
+        field — "label" / "numeric" / "multi_slot" — that the math
+        path dispatches on.
+        """
         client = self._resolve_math_client()
         if client is None:
             return _DSLExtraction(
@@ -795,7 +986,14 @@ class StudentGrader:
         try:
             response = client.generate(
                 messages=[
-                    {"role": "user", "content": render_math_dsl_user_prompt(problem_text)},
+                    {
+                        "role": "user",
+                        "content": render_math_dsl_user_prompt(
+                            problem_text,
+                            answer_type=answer_type,
+                            authored_canonical=authored_canonical,
+                        ),
+                    },
                 ],
                 system_prompt=MATH_DSL_SYSTEM,
                 max_tokens=600,

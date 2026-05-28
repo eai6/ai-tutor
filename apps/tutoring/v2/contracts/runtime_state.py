@@ -73,6 +73,12 @@ class OpenQuestion(BaseModel):
     id: int
     canonical: str = ""  # private — never surfaced to StudentTutor on wrong/partial
     rendered_stem: str = ""
+    # Authored answer shape from LessonStep.answer_type. The grader uses
+    # this to decide which canonical schema LLM-A should emit (label vs
+    # numeric vs multi-slot). Empty string when the source is not a
+    # LessonStep or the step has no answer_type set; the grader then
+    # falls back to inferring from the rendered stem.
+    answer_type: str = ""
     visible_context_at_pose: VisibleContextSnapshot = Field(
         default_factory=VisibleContextSnapshot
     )
@@ -157,6 +163,10 @@ class PendingPose(BaseModel):
     question_ref: QuestionRef
     canonical: str
     rendered_stem: str
+    # Authored answer shape from LessonStep.answer_type. Propagated to
+    # OpenQuestion at Phase B commit; the grader reads it to dispatch to
+    # the right canonical-structuring branch in LLM-A.
+    answer_type: str = ""
     visible_context: VisibleContextSnapshot
 
 

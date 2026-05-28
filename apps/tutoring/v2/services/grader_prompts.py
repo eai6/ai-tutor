@@ -33,30 +33,51 @@ from __future__ import annotations
 # ──────────────────────────────────────────────────────────────────────
 
 MATH_DSL_SYSTEM = """\
-You decompose a math problem into a constrained JSON DSL that a
-Python interpreter executes.
+You structure the canonical answer for a math problem into a JSON
+schema that a Python comparator consumes. You also receive the
+AUTHORED canonical answer from the curriculum — your job is to
+structure it for comparison, not to re-derive it.
 
-Output a JSON object with these top-level keys:
+Output a single JSON object. The first key is always ``shape``:
 
-  variables  — a mapping of variable names to numeric values that
+  shape — "label" | "numeric" | "multi_slot"
+
+When ``shape`` is "label":
+  canonical_label — the authored answer, normalized:
+                      * MCQ:        single uppercase letter, e.g. "B".
+                                    Multiple-pick MCQs: comma-joined
+                                    uppercase letters in ascending
+                                    order, e.g. "A,C".
+                      * True/False: "true" or "false" (lowercase).
+                      * Yes/No:     "yes" or "no" (lowercase).
+                      * Word label: lowercase, single concept, e.g.
+                                    "condensation", "evaporation".
+                                    For multi-word concepts retain
+                                    spaces ("water vapor").
+  canonical_synonyms — optional array of equivalent phrasings the
+                       student might use, e.g. ["right-angled",
+                       "right triangle"] when the canonical is "yes".
+                       Leave as ``[]`` when no obvious synonyms.
+
+When ``shape`` is "numeric":
+  variables  — mapping of variable names to numeric values that
                appear in the visible problem text. Every value must
-               be derivable from the problem statement; do not invent
-               numbers that are not named or implied by the problem.
+               be derivable from the problem statement.
+  expression — a tree of operations (see node grammar below).
+  canonical_value — the authored answer as a number when it parses
+                    cleanly (e.g. authored "41 m" → 41,
+                    authored "x = 6" → 6). Use ``null`` when the
+                    authored answer is not numerically parseable.
 
-  expression — (single-answer problems) a tree of operations.
-  expressions — (multi-answer problems) an array of named expression
-                trees, one per required answer slot. Use this form
-                when the problem asks for more than one numeric value
-                (e.g. "Calculate the loss amount AND the loss
-                percentage", "Find the area AND the perimeter"). Each
-                entry is an object: {"name": "<short slot name>",
-                "expression": <node>}. Slot names should be plain
-                words a student would use: "loss_amount",
-                "loss_percentage", "area", "perimeter", etc.
-
-  Provide EITHER ``expression`` OR ``expressions`` — not both. Use
-  ``expressions`` whenever the problem text names two or more
-  distinct quantities the student must produce.
+When ``shape`` is "multi_slot":
+  variables  — same as above.
+  expressions — array of {"name", "expression"} — one entry per
+                required answer slot. Use this only when the problem
+                explicitly asks for two or more distinct numeric
+                quantities.
+  canonical_slots — optional array of {"name", "value"} mirroring
+                    the authored canonical's slot values when those
+                    parse cleanly. Empty array when not available.
 
 Each expression node is ONE of:
   * a bare number (e.g. 42, 3.14)
@@ -67,44 +88,101 @@ Each expression node is ONE of:
 Whitelisted opcodes: add, sub, mul, div, neg, abs, pow, sqrt, log,
 exp, sin, cos, tan, min, max, round, eq, lt, lte, gt, gte, solve.
 
-For ``solve``, use sympy-compatible syntax in ``equation``
+For ``solve`` use sympy-compatible syntax in ``equation``
 (e.g. "2*x + 3 = 11"). The ``var`` field names the variable to
 solve for.
+
+How to choose the shape:
+
+  - ``answer_type`` is "multiple_choice", "true_false", "yes_no", or
+    any free-text answer that is a single label/term → "label".
+  - ``answer_type`` is "short_numeric" AND the problem asks for ONE
+    numeric value → "numeric".
+  - ``answer_type`` is "short_numeric" or "free_text" AND the problem
+    asks for two or more distinct numeric quantities → "multi_slot".
+  - When ``answer_type`` is empty or unrecognized, infer the shape
+    from the problem text: presence of MCQ option markers (A) B) C)
+    or a "(True or False?)" / "Yes/No" suffix → "label"; otherwise
+    "numeric" if a computation is requested, "multi_slot" if multiple
+    computations are requested.
+
+Authored-canonical cross-check (numeric / multi_slot):
+  If your ``expression`` evaluates to a value that disagrees with the
+  AUTHORED canonical (when one was provided), trust the AUTHORED
+  canonical and adjust ``variables`` or ``expression`` to match. The
+  authored canonical is the source of truth; your DSL is a structural
+  rewrite of that answer, not an independent derivation.
 
 Return JSON only — no prose, no markdown fences.
 """
 
 # Few-shot examples — pinned format. Per gemini-prompting-expert:
 # Gemini follows the format exactly including punctuation quirks.
-# Per prompting-fundamentals-expert: keep recency-bias in mind, place
-# the most representative example last.
+# Per prompting-fundamentals-expert: most representative example last.
 MATH_DSL_FEW_SHOT = """\
-Example 1
-Problem: What is 12 + 13?
-Output: {"variables": {"a": 12, "b": 13}, "expression": {"op": "add", "args": [{"var": "a"}, {"var": "b"}]}}
+Example 1 (label — yes/no with synonym list)
+answer_type: short_numeric
+authored_canonical: Yes, the triangle is right-angled.
+Problem: A triangle has sides of length 5 cm, 12 cm, and 13 cm. Use Pythagoras' theorem to prove whether this triangle is right-angled. Show all your working.
+Output: {"shape": "label", "canonical_label": "yes", "canonical_synonyms": ["right-angled", "right triangle", "the triangle is right-angled"]}
 
-Example 2
+Example 2 (label — MCQ letter)
+answer_type: multiple_choice
+authored_canonical: B
+Problem: A triangle has sides 8 cm, 15 cm, and 17 cm. Which statement is true?
+
+A) right-angled because 8 + 15 = 23 close to 17
+B) right-angled because 8² + 15² = 17²
+C) NOT right-angled because sides differ
+D) NOT right-angled because 8² + 15² ≠ 17²
+Output: {"shape": "label", "canonical_label": "B", "canonical_synonyms": []}
+
+Example 3 (label — true/false)
+answer_type: true_false
+authored_canonical: True
+Problem: A roof frame has sides 7 m, 24 m, and 25 m. This frame contains a right angle because 7² + 24² = 25². (True or False?)
+Output: {"shape": "label", "canonical_label": "true", "canonical_synonyms": []}
+
+Example 4 (numeric — single value)
+answer_type: short_numeric
+authored_canonical: 65
 Problem: The angles in a triangle sum to 180°. Two of the angles are 40° and 75°. What is the third angle?
-Output: {"variables": {"total": 180, "a": 40, "b": 75}, "expression": {"op": "sub", "args": [{"var": "total"}, {"var": "a"}, {"var": "b"}]}}
+Output: {"shape": "numeric", "variables": {"total": 180, "a": 40, "b": 75}, "expression": {"op": "sub", "args": [{"var": "total"}, {"var": "a"}, {"var": "b"}]}, "canonical_value": 65}
 
-Example 3
-Problem: Solve for x:  2x + 3 = 11.
-Output: {"variables": {}, "expression": {"op": "solve", "equation": "2*x + 3 = 11", "var": "x"}}
+Example 5 (numeric — solve)
+answer_type: short_numeric
+authored_canonical: x = 4
+Problem: Solve for x: 2x + 3 = 11.
+Output: {"shape": "numeric", "variables": {}, "expression": {"op": "solve", "equation": "2*x + 3 = 11", "var": "x"}, "canonical_value": 4}
 
-Example 4
+Example 6 (multi_slot)
+answer_type: short_numeric
+authored_canonical: loss_amount = 30, loss_percentage = 25
 Problem: A trader buys spices for 120 SCR per package and sells them for 90 SCR per package. Calculate the loss amount and the loss percentage.
-Output: {"variables": {"cp": 120, "sp": 90}, "expressions": [{"name": "loss_amount", "expression": {"op": "sub", "args": [{"var": "cp"}, {"var": "sp"}]}}, {"name": "loss_percentage", "expression": {"op": "mul", "args": [{"op": "div", "args": [{"op": "sub", "args": [{"var": "cp"}, {"var": "sp"}]}, {"var": "cp"}]}, 100]}}]}
+Output: {"shape": "multi_slot", "variables": {"cp": 120, "sp": 90}, "expressions": [{"name": "loss_amount", "expression": {"op": "sub", "args": [{"var": "cp"}, {"var": "sp"}]}}, {"name": "loss_percentage", "expression": {"op": "mul", "args": [{"op": "div", "args": [{"op": "sub", "args": [{"var": "cp"}, {"var": "sp"}]}, {"var": "cp"}]}, 100]}}], "canonical_slots": [{"name": "loss_amount", "value": 30}, {"name": "loss_percentage", "value": 25}]}
 """
 
 
-def render_math_dsl_user_prompt(problem_text: str) -> str:
-    """Render the user-turn prompt for math DSL extraction.
+def render_math_dsl_user_prompt(
+    problem_text: str,
+    *,
+    answer_type: str = "",
+    authored_canonical: str = "",
+) -> str:
+    """Render the user-turn prompt for math DSL / label structuring.
 
-    Query placed AFTER the few-shot block per prompting-fundamentals
-    structure-conventions guidance (role → task → examples → input).
+    The grader passes the authored ``answer_type`` (from
+    ``LessonStep.answer_type``) and ``authored_canonical`` (from
+    ``OpenQuestion.canonical``) so the LLM structures the canonical
+    rather than deriving it. Query placed AFTER the few-shot block per
+    prompting-fundamentals structure-conventions guidance.
     """
+    at = (answer_type or "").strip().lower() or "(unknown — infer from problem)"
+    ac = (authored_canonical or "").strip() or "(no authored canonical — derive from problem text and set shape accordingly)"
     return (
         f"{MATH_DSL_FEW_SHOT}\n"
+        f"answer_type: {at}\n"
+        f"authored_canonical: {ac}\n"
         f"Problem: {problem_text.strip()}\n"
         f"Output:"
     )

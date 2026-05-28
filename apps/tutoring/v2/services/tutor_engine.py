@@ -466,8 +466,16 @@ class TutorEngine:
     ) -> str:
         """Look up the final move from the router's decision + verdict.
 
-        Grader-raise fallback picks ``moves_by_verdict["wrong"]``.
-        Unknown moves normalize to ``scaffold_hint``.
+        Pure plumbing — dictionary access on
+        ``decision.moves_by_verdict[verdict.value]`` for answer-attempt
+        turns, or ``decision.move`` otherwise. Grader-raise picks the
+        ``"wrong"`` row as the most conservative branch.
+
+        No silent coercion here. ``MoveRouter.route`` validates that
+        every move name it emits is in the closed set (one retry on
+        violation), so by the time the decision reaches this method
+        the move is guaranteed valid. If somehow it isn't, that's a
+        contract violation worth raising rather than masking.
         """
         if decision.verdict_needed:
             mbv = decision.moves_by_verdict or {}
@@ -478,12 +486,12 @@ class TutorEngine:
         else:
             chosen = decision.move or ""
         if chosen not in ALLOWED_MOVES:
-            logger.warning(
-                "[TutorEngine] router-derived move %r not in ALLOWED_MOVES; "
-                "falling back to scaffold_hint",
-                chosen,
+            # Contract violation — MoveRouter promised a closed-set
+            # move and didn't deliver one. Surface loudly; do not coerce.
+            raise RuntimeError(
+                f"router decision contained move {chosen!r} not in "
+                f"ALLOWED_MOVES — MoveRouter contract violated"
             )
-            chosen = "scaffold_hint"
         return chosen
 
     # ------------------------------------------------------------------

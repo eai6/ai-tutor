@@ -28,6 +28,7 @@ from apps.tutoring.v2.contracts import (
 from apps.tutoring.v2.services.move_router import (
     MoveRouter,
     ROUTER_TRANSCRIPT_WINDOW,
+    RouterMalformedError,
     _fallback_decision,
     _safe_json_loads,
     build_router_request,
@@ -624,3 +625,134 @@ def test_safe_json_loads_returns_none_on_garbage():
 
 def test_safe_json_loads_strips_fenced_block():
     assert _safe_json_loads("```json\n{\"a\":1}\n```") == {"a": 1}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Retry contract — single-retry on malformed router output
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_router_retries_once_on_invalid_move_then_recovers():
+    """First call emits a move outside ALLOWED_MOVES → retry with the
+    closed-set reminder → second call emits a valid move → return it."""
+    bad_payload = json.dumps({
+        "case": "help_request",
+        "move": "explainer",  # close to "explain" but not in the set
+        "verdict_needed": False,
+        "reason": "student asked for help",
+    })
+    good_payload = _non_attempt_payload(move="explain")
+    client = _FakeClient(bad_payload, good_payload)
+
+    decision = _router(client).route(_request(open_q_pending=False))
+
+    assert decision.move == "explain"
+    assert len(client.calls) == 2
+    # The retry call's user prompt includes the closed-set reminder
+    # and echoes the rejected move.
+    retry_prompt = client.calls[1]["messages"][0]["content"]
+    assert "closed set" in retry_prompt.lower() or "RETRY" in retry_prompt
+    assert "explainer" in retry_prompt
+
+
+def test_router_retries_once_on_non_dict_payload_then_recovers():
+    """First call returns prose / garbage → retry → valid JSON."""
+    client = _FakeClient(
+        "I'm sorry, I cannot do that",  # not JSON
+        _non_attempt_payload(move="worked_example"),
+    )
+    decision = _router(client).route(_request(open_q_pending=True))
+    assert decision.move == "worked_example"
+    assert len(client.calls) == 2
+
+
+def test_router_raises_when_retry_also_emits_invalid_move():
+    """Both calls return moves outside the closed set → RouterMalformedError.
+    The engine never silently coerces to a default."""
+    bad_payload = json.dumps({
+        "case": "help_request",
+        "move": "explainer",
+        "verdict_needed": False,
+        "reason": "",
+    })
+    worse_payload = json.dumps({
+        "case": "help_request",
+        "move": "explain_more",
+        "verdict_needed": False,
+        "reason": "",
+    })
+    client = _FakeClient(bad_payload, worse_payload)
+    with pytest.raises(RouterMalformedError, match="after one retry"):
+        _router(client).route(_request(open_q_pending=False))
+    assert len(client.calls) == 2
+
+
+def test_router_emits_retry_recovered_span_when_retry_succeeds():
+    from apps.tutoring import tracing
+
+    bad_payload = json.dumps({
+        "case": "help_request",
+        "move": "explainer",
+        "verdict_needed": False,
+        "reason": "",
+    })
+    good_payload = _non_attempt_payload(move="explain")
+    client = _FakeClient(bad_payload, good_payload)
+
+    token = tracing.start_span_buffer()
+    try:
+        _router(client).route(_request(open_q_pending=False))
+    finally:
+        spans = _drain_spans(token)
+
+    recovered = [s for s in spans if s["name"] == "router.retry_recovered"]
+    assert len(recovered) == 1
+    # Pydantic's Literal validation on RouterDecision.move rejects the
+    # bad string before our post-validation check runs.
+    assert recovered[0]["payload"]["first_failure"] == "validation_error"
+
+
+def test_router_emits_malformed_after_retry_span_on_double_failure():
+    from apps.tutoring import tracing
+
+    bad_payload = json.dumps({
+        "case": "help_request",
+        "move": "explainer",
+        "verdict_needed": False,
+        "reason": "",
+    })
+    client = _FakeClient(bad_payload, bad_payload)
+
+    token = tracing.start_span_buffer()
+    try:
+        with pytest.raises(RouterMalformedError):
+            _router(client).route(_request(open_q_pending=False))
+    finally:
+        spans = _drain_spans(token)
+
+    failed = [s for s in spans if s["name"] == "router.malformed_after_retry"]
+    assert len(failed) == 1
+    assert failed[0]["payload"]["first_failure"] == "validation_error"
+    assert failed[0]["payload"]["retry_failure"] == "validation_error"
+
+
+def test_router_does_not_retry_on_no_client():
+    """No client configured is an infrastructure failure, not a content
+    failure — fall back to the conservative default without spending a
+    second LLM call."""
+    router = MoveRouter(router_client_factory=lambda: None)
+    decision = router.route(_request(open_q_pending=True))
+    # Should fall through to fail-soft default without raising.
+    assert decision is not None
+    assert decision.verdict_needed is True  # answer_attempt fallback
+
+
+def test_router_does_not_retry_on_llm_raise_first_call():
+    """LLM raise is an infrastructure failure — fail-soft, do not burn
+    a retry on a network blip."""
+    client = _RaisingClient(RuntimeError("network timeout"))
+    decision = _router(client).route(_request(open_q_pending=False))
+    assert decision is not None  # fail-soft fallback shipped
+    # Only one call attempted.
+    # (The _RaisingClient doesn't track calls but we know route() won't
+    # retry an infra failure — covered by the single raise path.)

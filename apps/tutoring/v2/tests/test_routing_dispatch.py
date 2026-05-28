@@ -216,9 +216,18 @@ def test_pick_move_threads_pose_tool_available_into_request():
     assert router.last_request.pose_tool_available is False
 
 
-def test_pick_move_fail_soft_when_router_returns_unknown_move():
-    """Defensive normalization — should never fire in production but
-    must produce a valid move under any router output."""
+def test_pick_move_raises_on_unknown_move_from_router():
+    """Closed-set contract: MoveRouter.route promises every move it
+    returns is in ALLOWED_MOVES (validated + one retry on violation).
+    If a move outside the set somehow reaches the engine — a contract
+    violation — the engine raises rather than silently coercing to a
+    default. The dispatch layer's exception handler then ships the
+    standard graceful envelope.
+
+    This test exercises the engine in isolation via a _FakeRouter that
+    bypasses the validating route() loop; in production the LLM
+    router enforces the set itself.
+    """
     bad_decision = RouterDecision.model_construct(
         case="help_request",
         verdict_needed=False,
@@ -228,12 +237,12 @@ def test_pick_move_fail_soft_when_router_returns_unknown_move():
     )
     router = _FakeRouter(bad_decision)
     engine = _engine_with(router)
-    move, _, _ = engine.pick_move(
-        context=_context(),
-        student_input="12",
-        pose_tool_available=True,
-    )
-    assert move == "scaffold_hint"
+    with pytest.raises(RuntimeError, match="not in ALLOWED_MOVES"):
+        engine.pick_move(
+            context=_context(),
+            student_input="12",
+            pose_tool_available=True,
+        )
 
 
 def test_pick_move_resolves_answer_attempt_to_wrong_branch_without_verdict():
