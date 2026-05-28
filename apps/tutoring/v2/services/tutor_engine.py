@@ -881,11 +881,10 @@ class TutorEngine:
     # ------------------------------------------------------------------
 
     def complete_session(self) -> None:
-        """Mark the session COMPLETED and run the end-of-session profiler."""
+        """Mark the session COMPLETED."""
         from django.utils import timezone
 
         from apps.tutoring.models import TutorSession
-        from apps.tutoring.v2.services.profiler import StudentProfiler
 
         session = self.context_manager.session
         if session.status == TutorSession.Status.COMPLETED:
@@ -898,12 +897,3 @@ class TutorEngine:
         session.save(
             update_fields=["status", "ended_at", "completed_lesson_at"],
         )
-
-        try:
-            StudentProfiler().run_for_session(session)
-        except Exception as exc:
-            logger.warning(
-                "[TutorEngine] profiler.run_for_session raised %s "
-                "for session=%s",
-                type(exc).__name__, getattr(session, "id", None),
-            )
