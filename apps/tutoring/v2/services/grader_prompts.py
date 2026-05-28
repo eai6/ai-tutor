@@ -113,6 +113,23 @@ Authored-canonical cross-check (numeric / multi_slot):
   authored canonical is the source of truth; your DSL is a structural
   rewrite of that answer, not an independent derivation.
 
+RESPONSE QUALITY CHECKLIST — verify before returning:
+  □ When ``shape="label"`` AND the question is MCQ, ``canonical_label``
+    is exactly one of "A" / "B" / "C" / "D" (single uppercase letter)
+    or a comma-joined sorted subset for multi-pick.
+  □ ``canonical_label`` was lifted from the ``authored_canonical`` input,
+    not re-derived by recomputing the answer from the problem text.
+  □ ``canonical_synonyms`` only contains phrasings of the SAME option
+    (e.g. the option's text or its numeric value as the student might
+    write it). Distractors' values and other options' letters are
+    NEVER in ``canonical_synonyms``.
+  □ For ``shape="numeric"``, ``canonical_value`` matches what
+    ``expression`` evaluates to under ``variables``. If they disagree,
+    I adjusted ``expression`` / ``variables`` to match the authored
+    canonical — I did not silently emit a mismatched ``canonical_value``.
+  □ My DSL ``variables`` only name quantities present in the visible
+    problem text — I introduced no invented constants.
+
 Return JSON only — no prose, no markdown fences.
 """
 
@@ -303,6 +320,31 @@ When the student shows working and then states a different final
 answer, the final stated answer goes in ``conclusion``; each working
 step goes in ``claims``. Do NOT confuse intermediate working values
 with the student's bottom-line answer.
+
+RESPONSE QUALITY CHECKLIST — verify before returning:
+  □ ``answer_extracted_label`` is the letter / token the STUDENT
+    LITERALLY typed when an explicit pick is present (e.g. they wrote
+    "B" → label is "B"). I have NOT replaced it with what I think the
+    canonical answer is.
+  □ If the student typed "B" and their reasoning is wrong, my
+    ``answer_extracted_label`` is still "B" — I never swap the student's
+    letter for the canonical letter based on their reasoning quality.
+  □ If the student gave numeric working (e.g. "23 + 8 = 31"), I captured
+    each step in ``claims`` with both ``expression`` (DSL) and the
+    ``asserted_value`` the student stated — so the comparator can verify
+    the arithmetic independently of the letter pick.
+  □ When the student's stated working contradicts the option they picked
+    (e.g. "B because 23+8=31" on x+8=23: 31 is the value of option B,
+    but solving x+8=23 gives x=15), I still record the student's letter
+    as "B" and let ``claims`` carry the wrong arithmetic — the comparator
+    decides.
+  □ ``statement`` quotes the student's own words, not my paraphrase or
+    summary of what they "must have meant".
+  □ ``is_attempt`` is true for any genuine answer try, even when
+    confused or wrong. It is false ONLY for meta input ("idk",
+    "explain", "give me a hint", "what does X mean").
+  □ I did not silently swap the student's pick for what I think is
+    correct.
 
 Return JSON only — no prose, no markdown fences.
 """

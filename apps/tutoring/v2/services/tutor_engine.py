@@ -265,6 +265,19 @@ class TutorEngine:
             context=context,
             runtime_state=runtime_state,
         )
+        # Mastery Learning Ch.13 — enforce router invariant I-2
+        # deterministically. Rule 7 close-via-correct requires
+        # ``unscaffolded_correct_on_open_question_objective >= 1`` BEFORE
+        # this turn (so THIS correct becomes the 2nd). If the router LLM
+        # violates the invariant (close on the 1st correct), override to
+        # ``confirm_and_advance`` — the Rule 7 ELSE branch. Run-10 GEO-S5
+        # §2 documents the failure mode.
+        selected_move = self._apply_mastery_close_floor(
+            selected_move=selected_move,
+            router_decision=router_decision,
+            verdict=verdict,
+            runtime_state=runtime_state,
+        )
         router_reason = (router_decision.reason or "")
 
         # 2b. Apply per-open-question counter updates + clear the open
@@ -607,6 +620,60 @@ class TutorEngine:
         ):
             pass
         return "close_topic"
+
+    def _apply_mastery_close_floor(
+        self,
+        *,
+        selected_move: str,
+        router_decision: RouterDecision,
+        verdict: Optional[GradingResult],
+        runtime_state: SessionRuntimeState,
+    ) -> str:
+        """Enforce router invariant I-2 (Mastery Ch.13 close threshold).
+
+        Rule 7 correct branch is permitted to pick ``close_topic`` only
+        when ``unscaffolded_correct_on_open_question_objective >= 1``
+        BEFORE this turn (so THIS correct verdict becomes the 2nd —
+        the lesson has ≥2 unscaffolded corrects on the objective).
+        When the LLM router violates that invariant by selecting
+        ``close_topic`` on the 1st correct, override to
+        ``confirm_and_advance`` (the same branch's ELSE outcome).
+
+        Only fires on the answer-attempt close-via-correct path; close
+        decisions on Rules 1/3/9 (lesson-complete / forced-close /
+        default) are untouched.
+
+        Emits ``router.floor_override`` so the v2 observability
+        dashboard surfaces every I-2 override.
+        """
+        if selected_move != "close_topic":
+            return selected_move
+        if not router_decision.verdict_needed:
+            return selected_move
+        if verdict is None or verdict.verdict != Verdict.CORRECT:
+            return selected_move
+        prior_unscaffolded_correct = int(
+            getattr(
+                runtime_state,
+                "unscaffolded_correct_on_open_question_objective",
+                0,
+            )
+            or 0
+        )
+        if prior_unscaffolded_correct >= 1:
+            return selected_move
+        with emit_span(
+            "audit",
+            "router.floor_override",
+            payload={
+                "original_move": "close_topic",
+                "override_move": "confirm_and_advance",
+                "reason": "i2_violation_prior_unscaffolded_correct_zero",
+                "prior_unscaffolded_correct": prior_unscaffolded_correct,
+            },
+        ):
+            pass
+        return "confirm_and_advance"
 
     # ------------------------------------------------------------------
     # Counter bookkeeping

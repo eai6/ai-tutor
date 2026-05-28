@@ -403,6 +403,21 @@ class StudentTutor:
         if difficulty not in ("easier", "same", "harder"):
             difficulty = "same"
 
+        # The student's UI difficulty signal (too_hard/too_easy → stored as
+        # runtime_state.difficulty_level) is authoritative over the LLM's
+        # per-turn difficulty_hint. The LLM has no view of the persisted
+        # signal; without this override, "too_hard" drove level → -1 but
+        # the next pose still inherited the LLM's "same" choice and the
+        # slot selector picked an identical-difficulty item. Run-10
+        # MATHS-S1 §3 documents the failure.
+        runtime_level = int(
+            getattr(context.runtime_state, "difficulty_level", 0) or 0
+        )
+        if runtime_level < 0:
+            difficulty = "easier"
+        elif runtime_level > 0:
+            difficulty = "harder"
+
         delivered_ids = list(
             context.runtime_state.delivered_lesson_step_ids or []
         )
@@ -573,28 +588,39 @@ class StudentTutor:
     # ------------------------------------------------------------------
 
     def _render_objective_block(self, context: TutoringContext) -> str:
-        """Compact header with the active objective + open question."""
+        """Compact header with the active objective + open question.
+
+        Surfaces ``lesson_complete_signal`` as an explicit boolean so the
+        close_topic move's response-quality checklist can reference it
+        verbatim: when ``true``, the close will trigger the exit-ticket
+        modal end-to-end; when ``false``, the close will advance to the
+        next step (no exit-ticket promise). Computed from
+        ``is_final_step`` — the engine's runtime decision matches this
+        for the dominant close-via-correct path documented in run-10
+        GEO-S5 §1 P1-3.
+        """
         open_q = context.runtime_state.open_question
         objective = context.current_objective or "(no objective set)"
         # Lesson position — the close_topic move uses this to phrase
         # its transition correctly ("move on to next step" vs. "ready
-        # for exit ticket"). When unknown (legacy / test contexts) we
-        # surface the safe default so the tutor still reads as
-        # coherent.
+        # for exit ticket").
         position_hint = (
             "this is the FINAL step of the lesson"
             if context.is_final_step
             else "more steps remain in the lesson after this one"
         )
+        lesson_complete_signal = "true" if context.is_final_step else "false"
         if open_q is None:
             return (
                 f"=== Current objective ===\n{objective}\n"
                 f"Lesson position: {position_hint}\n"
+                f"lesson_complete_signal: {lesson_complete_signal}\n"
                 f"Open question: (none)"
             )
         return (
             f"=== Current objective ===\n{objective}\n"
             f"Lesson position: {position_hint}\n"
+            f"lesson_complete_signal: {lesson_complete_signal}\n"
             f"Open question: {open_q.rendered_stem!r} "
             f"(source={open_q.source.value}, id={open_q.id})"
         )

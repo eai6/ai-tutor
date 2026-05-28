@@ -490,8 +490,10 @@ def test_router_system_prompt_is_byte_stable():
         "explain", "pivot", "close_topic",
     ):
         assert move in once
-    # The three turn-classification cases are present.
-    for case in ("ANSWER_ATTEMPT", "HELP_REQUEST", "OPENING_TURN"):
+    # Turn-classification cases (intents + cases). Match the
+    # lowercase tokens the prompt actually emits — earlier prompt
+    # versions used UPPERCASE; the live prompt uses lowercase.
+    for case in ("answer_attempt", "help_request", "opening_turn"):
         assert case in once
 
 

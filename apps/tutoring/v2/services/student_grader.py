@@ -374,6 +374,7 @@ class StudentGrader:
                     extraction=student_extraction,
                     bare=bare,
                     student_input=request.student_input,
+                    answer_type=answer_type,
                 )
 
             # 2b. Numeric / multi-slot — validate + execute the DSL.
@@ -646,6 +647,7 @@ class StudentGrader:
         extraction: _StudentClaimsExtraction,
         bare: bool,
         student_input: str,
+        answer_type: str = "",
     ) -> GradingResult:
         """Compare LLM-B's extracted answer against a label canonical.
 
@@ -703,9 +705,45 @@ class StudentGrader:
                     break
 
         verdict_kind = Verdict.CORRECT if matched_by else Verdict.WRONG
+
+        # Defense-in-depth: deterministic MCQ letter-disagreement guard.
+        # Run-10 MATHS-S1 §1 P1-1/P1-2 documented two wrong-graded-correct
+        # failures where LLM-B silently swapped the student's explicit
+        # letter pick for the canonical letter. The LLM-B checklist
+        # (grader_prompts.STUDENT_CLAIMS_SYSTEM) reduces this; the
+        # boundary check below makes it deterministic for the narrow
+        # MCQ-letter case.
+        #
+        # Scope is intentionally tight:
+        #   - canonical must be a single A-D letter
+        #   - answer_type signals MCQ / label
+        #   - student's response contains exactly one unambiguous letter
+        #     in an MCQ-pick context (see _extract_unambiguous_mcq_letter)
+        #   - that letter ≠ the canonical letter
+        # The guard NEVER flips WRONG → CORRECT; only CORRECT → WRONG.
+        override_applied = ""
+        if verdict_kind == Verdict.CORRECT:
+            override_letter = self._maybe_letter_disagreement_override(
+                canon_norm=canon_norm,
+                answer_type=answer_type,
+                student_input=student_input,
+            )
+            if override_letter is not None:
+                verdict_kind = Verdict.WRONG
+                override_applied = (
+                    f"letter_disagreement_override "
+                    f"(student={override_letter} canonical={canon_norm.upper()})"
+                )
+
         if verdict_kind == Verdict.CORRECT:
             safe = StudentSafeFeedback(
                 what_right="your answer matches the expected response",
+            )
+        elif override_applied:
+            safe = StudentSafeFeedback(
+                first_misconception_redacted=(
+                    "your letter pick doesn't match the expected option"
+                ),
             )
         else:
             safe = StudentSafeFeedback(
@@ -718,8 +756,12 @@ class StudentGrader:
             span["payload"] = {
                 "verdict": verdict_kind.value,
                 "shape": "label",
-                "matched_by": matched_by or "none",
+                "matched_by": (
+                    f"{matched_by or 'none'}|{override_applied}"
+                    if override_applied else (matched_by or "none")
+                ),
                 "synonyms_count": len(synonym_norms),
+                "letter_disagreement_override": bool(override_applied),
             }
         return GradingResult(
             verdict=verdict_kind,
@@ -730,13 +772,169 @@ class StudentGrader:
                 or conc.answer_extracted_label
                 or (student_input or "").strip()
             ),
-            reasoning=f"math: label comparator (matched_by={matched_by or 'none'})",
+            reasoning=(
+                f"math: label comparator (matched_by={matched_by or 'none'}"
+                + (f"; {override_applied}" if override_applied else "")
+                + ")"
+            ),
             reason_code=(
                 None if verdict_kind == Verdict.CORRECT
-                else "conclusion_inconsistent_with_canonical"
+                else (
+                    "mcq_letter_disagreement" if override_applied
+                    else "conclusion_inconsistent_with_canonical"
+                )
             ),
             bare_answer=bare,
         )
+
+    # ------------------------------------------------------------------
+    # MCQ letter-disagreement helpers — scoped to single-letter A-D MCQ
+    # ------------------------------------------------------------------
+
+    # Reasoning markers — words that follow the student's letter pick
+    # and signal "this letter is my pick + here is my reasoning".
+    # Word-boundary anchored; case-insensitive at call site.
+    _MCQ_REASONING_MARKERS: tuple[str, ...] = (
+        "because", "since", "cuz", "coz", "due to",
+        "is", "=", "so", "i think", "i chose", "i picked", "i get",
+        "and", "as", "→", "->",
+    )
+
+    # Verb / noun prefixes that introduce an MCQ pick.
+    # Word-boundary anchored; case-insensitive at call site.
+    _MCQ_PICK_VERBS: tuple[str, ...] = (
+        "answer is", "answer:", "i pick", "i choose",
+        "option", "letter", "i select", "i go with",
+        "my pick is", "my answer is", "i'd pick",
+    )
+
+    @classmethod
+    def _maybe_letter_disagreement_override(
+        cls,
+        *,
+        canon_norm: str,
+        answer_type: str,
+        student_input: str,
+    ) -> Optional[str]:
+        """Return the student's overriding letter when the guard fires.
+
+        Returns ``None`` (no override) when:
+          - canonical is not a single A-D letter;
+          - the open question's answer_type doesn't signal MCQ / label;
+          - no unambiguous letter pick can be extracted from the student
+            response;
+          - the extracted letter matches the canonical (no disagreement).
+
+        Returns the uppercase student letter (e.g. "B") when the override
+        should fire — the caller flips CORRECT → WRONG.
+        """
+        if canon_norm not in {"a", "b", "c", "d"}:
+            return None
+        normalized_type = (answer_type or "").strip().lower()
+        if normalized_type not in {"mcq", "multiple_choice", "label"}:
+            return None
+        letter = cls._extract_unambiguous_mcq_letter(student_input)
+        if not letter:
+            return None
+        if letter.lower() == canon_norm:
+            return None
+        return letter
+
+    @classmethod
+    def _extract_unambiguous_mcq_letter(cls, student_input: str) -> str:
+        """Extract a single A-D letter pick from a student response.
+
+        Three accepted shapes (run-10 design doc §"Math Fix 1c scope"):
+          Shape 1 — Response is ONLY the letter (± punctuation):
+                    ``"B"``, ``"B."``, ``" d "``.
+          Shape 2 — Response STARTS with the letter, then a reasoning
+                    marker (``because``, ``since``, ``is``, ``=`` …):
+                    ``"B because 23+8=31"``,
+                    ``"D, x = 42 because that's the starting number"``.
+                    Distinguishes the article-A failure ("A triangle…"
+                    has next word "triangle", not a reasoning marker).
+          Shape 3 — After an explicit MCQ-pick verb:
+                    ``"the answer is C"``, ``"I pick D"``, ``"option B"``.
+
+        Returns ``""`` when:
+          - zero shapes match;
+          - two or more distinct letters match (conflict / ambiguity).
+
+        Letter is returned uppercase. Whitespace and surrounding
+        formatting are normalized before regex.
+        """
+        if not student_input:
+            return ""
+        text = student_input.strip()
+        if not text:
+            return ""
+
+        # Strip simple markdown emphasis so "**B**" → "B".
+        cleaned = re.sub(r"[*_`]+", "", text)
+
+        found: set[str] = set()
+
+        # Shape 1 — response is only the letter ± simple punctuation.
+        m = re.match(r"^\s*([A-Da-d])\s*[.!?,;:]?\s*$", cleaned)
+        if m:
+            found.add(m.group(1).upper())
+
+        # Shape 2a — letter at the start, IMMEDIATELY followed by a
+        # reasoning marker (no punctuation gate). Distinguishes the
+        # article-A case ("A triangle…" — next word is a noun, never a
+        # marker).
+        marker_alt = "|".join(re.escape(w) for w in cls._MCQ_REASONING_MARKERS)
+        pat2a = (
+            r"^\s*([A-Da-d])\s+("
+            + marker_alt
+            + r")\b"
+        )
+        m2a = re.match(pat2a, cleaned, flags=re.IGNORECASE)
+        if m2a:
+            found.add(m2a.group(1).upper())
+
+        # Shape 2b — letter at the start, followed by PUNCTUATION (comma,
+        # dot, dash, colon, equals), then arbitrary content that contains
+        # a reasoning marker. The punctuation gate is the disambiguator
+        # vs the English article-A: ``"A, triangle"`` / ``"A. triangle"``
+        # almost never occur as natural prose, but ``"D, x = 42 because…"``
+        # does. Restricted to a window so a far-off "because" in unrelated
+        # prose doesn't reach back to the start letter.
+        pat2b = (
+            r"^\s*([A-Da-d])\s*[,;:.\-—=]\s*[^.?!]{0,80}\b("
+            + marker_alt
+            + r")\b"
+        )
+        m2b = re.match(pat2b, cleaned, flags=re.IGNORECASE)
+        if m2b:
+            found.add(m2b.group(1).upper())
+
+        # Shape 2c — letter at the start, then PUNCTUATION, then an
+        # arithmetic operator (``=`` / ``+`` / ``-`` / ``*`` / ``/`` /
+        # ``×`` / ``÷``) within the same clause. Catches the
+        # ``"B, profit = 270 SCR"`` shape where the student names the
+        # option and then shows working without a verbal marker. Same
+        # punctuation gate excludes article-A.
+        pat2c = (
+            r"^\s*([A-Da-d])\s*[,;:.\-—]\s*[^.?!\n]{0,80}[=+\-*/×÷]"
+        )
+        m2c = re.match(pat2c, cleaned, flags=re.IGNORECASE)
+        if m2c:
+            found.add(m2c.group(1).upper())
+
+        # Shape 3 — explicit MCQ-pick verb followed by a letter.
+        verb_alt = "|".join(re.escape(w) for w in cls._MCQ_PICK_VERBS)
+        pat3 = (
+            r"\b(?:"
+            + verb_alt
+            + r")\s+([A-Da-d])\b"
+        )
+        for m3 in re.finditer(pat3, cleaned, flags=re.IGNORECASE):
+            found.add(m3.group(1).upper())
+
+        if len(found) != 1:
+            return ""
+        return next(iter(found))
 
     def _compare_student_claims_to_canonical(
         self,
