@@ -14,6 +14,15 @@ config:
     secure: v1:+GXti9A1tYEOgRjm:yLXnTL6UW3rmNDWQQyxAD95iWrQolFHMqTcCRLbjpIa/NFIXRPqt0gCiG5CK9h8xAyS0PXvXwQ==
   aitutor:elevenlabs-api-key:
     secure: v1:Ka2PrnsMS+3vT/fi:gVocY1bUSRB1O90kw0wPIQsiZaTmCh6Iicr/LAhIwDHjjeFs69OoigkdSPWn5uXxpe6jyIRCHE62YHcwbZOIICuVyg==
+  # Engine flags (added 2026-05-29 with v0.1.0 release). Without these
+  # baked into Pulumi state, the manual
+  #   az containerapp update --set-env-vars SIMPLE_TUTOR_ENGINE=on ...
+  # gets silently wiped on the next `pulumi up`. M12 staging rollout
+  # hit this same failure 2026-05-27.
+  aitutor:simple-tutor-engine: "on"
+  aitutor:tutoring-question-types: "mcq"
+  aitutor:exit-ticket-types: "mcq"
+  aitutor:exit-ticket-max-questions: "10"
   # Legacy single-value form is kept for safety; the `custom-domains`
   # list below takes precedence and merges with this entry (de-duped
   # in infra/__main__.py). Safe to remove the legacy line once you've
