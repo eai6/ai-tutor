@@ -1,4 +1,21 @@
-"""Base classes for provider-specific tutor prompt builders.
+"""
+DEPRECATED (Phase 3 §3.5 — refactor implementation plan).
+
+This module is part of the legacy tutoring pipeline. The v2 grader /
+tutor / conformance engine in ``apps.tutoring.v2`` replaces it. Kept
+loaded for resume of in-flight legacy sessions and as the kill-switch
+fallback (``NEW_TUTOR=off``). **Do not add new features here.**
+
+Deletion gate (Phase 3 §3.5):
+  1. v2 has served prod traffic ≥ 4 weeks post-cutover.
+  2. Zero kill-switch flips during that window.
+  3. Three consecutive weekly benchmark runs within ±2 pp of
+     cutover numbers on each P1 category.
+  4. No open P1 incidents tied to the v2 engine.
+
+Original module docstring follows:
+
+Base classes for provider-specific tutor prompt builders.
 
 The tutor system prompt has historically been one Anthropic-shaped
 XML string interpolated by `_build_system_prompt` in
@@ -23,7 +40,6 @@ Per-provider builders live in sibling modules (`anthropic.py`,
 later `gemini.py`, `openai.py`). The `get_prompt_builder(provider)`
 dispatcher lives in `__init__.py`.
 """
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

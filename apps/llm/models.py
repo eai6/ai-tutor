@@ -164,6 +164,59 @@ class ModelConfig(models.Model):
         CONTENT_JUDGE_PEDAGOGY_STEP = 'content_judge_pedagogy_step', 'Content Judge — Pedagogical Soundness (Lesson Step)'
         CONTENT_JUDGE_SAFETY_CONTENT = 'content_judge_safety_content', 'Content Judge — Safety + Cultural Fit (Content)'
 
+        # v2 engine purposes (refactor-implementation-plan.md Phase 1
+        # §7). Six new purposes for the grader / tutor / conformance /
+        # profiler decomposition. GRADER_GROUNDED + TUTOR_CLAIM_ADJUDICATOR
+        # MUST be Gemini (Google-grounding is provider-required). The
+        # other four are provider-tuned during Phase 2 against the
+        # benchmark (§7 sub-decision).
+        GRADER_MATH = 'grader_math', 'v2 Grader — Math Path'
+        GRADER_GROUNDED = 'grader_grounded', 'v2 Grader — Grounded (KB + Google) — Gemini-pinned'
+        TUTOR_MOVE = 'tutor_move', 'v2 StudentTutor — Per-Move Response'
+        CONFORMANCE_CLASSIFIER = 'conformance_classifier', 'v2 Conformance Classifier'
+        TUTOR_CLAIM_ADJUDICATOR = 'tutor_claim_adjudicator', 'v2 Tutor-Claim Adjudicator — Gemini-pinned'
+        PROFILER_SUMMARY = 'profiler_summary', 'v2 StudentProfiler — End-of-Session Summary'
+        # Phase 4 — unverified-trap + open-question-pivot redesign
+        # (memory/v2_unverified_trap_redesign.md).
+        # GRADER_VERIFIER:    Haiku-backed "did the student claim the
+        #                     same answer as the canonical?" check that
+        #                     fires AFTER the grounded adjudicator when
+        #                     confidence is low. Replaces the blanket
+        #                     confidence-threshold downgrade.
+        # QUESTION_EXTRACTOR: Haiku-backed post-render extractor that
+        #                     counts action-prompts in a tutor turn so
+        #                     conformance can reject stacked questions
+        #                     and bind open_question to the actual
+        #                     rendered question.
+        # DEPRECATED 2026-05-27 — the non-math grader redesign replaces
+        # the verifier with a dedicated LLM-C judge. No callers remain;
+        # gated for deletion after one release cycle. See
+        # design/tasks/two-llm-grader-implementation-plan.md (non-math
+        # redesign discussion).
+        GRADER_VERIFIER = 'grader_verifier', 'v2 Grader — Answer-Consistency Verifier (DEPRECATED)'
+        QUESTION_EXTRACTOR = 'question_extractor', 'v2 Post-render Question Extractor'
+        # Two-LLM grader (design/tasks/two-llm-grader-implementation-plan.md).
+        # GRADER_STUDENT_CLAIMS parses the student's MATH response into a
+        # structured claim graph (claims[], conclusion{}). Paired with
+        # GRADER_MATH (canonical extractor); both feed the Python
+        # comparator. Adjudicator-class — JSON-only, determinism required.
+        GRADER_STUDENT_CLAIMS = 'grader_student_claims', 'v2 Grader — Student-Claims Extractor (Math)'
+        # Non-math grader redesign — student response parser (LLM-B) +
+        # judge (LLM-C reuses grader_grounded for KB-aware judgement).
+        # GRADER_STUDENT_RESPONSE parses the student's NON-MATH response
+        # into is_attempt + hedge_marker + claims + conclusion. Separate
+        # from GRADER_STUDENT_CLAIMS so the prompts can diverge (math has
+        # arithmetic expressions; non-math has textual claims).
+        GRADER_STUDENT_RESPONSE = 'grader_student_response', 'v2 Grader — Student-Response Extractor (Non-Math)'
+        # LLM Move Router (design/tasks/move-router-implementation-plan.md).
+        # Replaces the deterministic `select_move` ladder and the
+        # standalone Haiku intent-classifier. Transcript-aware, picks the
+        # move + principle emphasis + per-turn focus note. Pinned to a
+        # Sonnet-class model in the seed migration; the deterministic
+        # safety floors downstream catch the highest-cost shapes if the
+        # router's pedagogical judgement is off.
+        MOVE_ROUTER = 'move_router', 'v2 Move Router — Move + Principle Emphasis + Focus Note'
+
     institution = models.ForeignKey(
         Institution,
         on_delete=models.CASCADE,
@@ -261,6 +314,31 @@ class ModelConfig(models.Model):
         # future content_judge_* purposes inherit the rule automatically.
         if purpose.startswith('content_judge'):
             return self.JUDGE_TEMP
+        # v2 engine — JUDGE-class verification consistency (Phase 1 §7).
+        # GRADER_MATH / GRADER_GROUNDED / CONFORMANCE_CLASSIFIER /
+        # TUTOR_CLAIM_ADJUDICATOR all want deterministic verdicts.
+        # PROFILER_SUMMARY is also 0 (memory artifact, not creative).
+        if purpose in (
+            self.Purpose.GRADER_MATH.value,
+            self.Purpose.GRADER_GROUNDED.value,
+            self.Purpose.CONFORMANCE_CLASSIFIER.value,
+            self.Purpose.TUTOR_CLAIM_ADJUDICATOR.value,
+            self.Purpose.PROFILER_SUMMARY.value,
+            # Phase 4 — both new verifier/extractor steps are
+            # adjudicator-class: structured-JSON output, determinism
+            # required for replay + observability.
+            self.Purpose.GRADER_VERIFIER.value,
+            self.Purpose.QUESTION_EXTRACTOR.value,
+            self.Purpose.GRADER_STUDENT_CLAIMS.value,
+            self.Purpose.GRADER_STUDENT_RESPONSE.value,
+            # Move router: structured-JSON output, determinism required
+            # so the per-turn decision is replayable / auditable.
+            self.Purpose.MOVE_ROUTER.value,
+        ):
+            return self.JUDGE_TEMP
+        # v2 TUTOR_MOVE — TUTORING-class clamp [0.1, 0.3].
+        if purpose == self.Purpose.TUTOR_MOVE.value:
+            return max(0.1, min(0.3, temp))
         if purpose == self.Purpose.TUTORING.value:
             return max(self.TUTORING_TEMP_MIN, min(self.TUTORING_TEMP_MAX, temp))
         return temp
@@ -293,49 +371,80 @@ class ModelConfig(models.Model):
             return os.getenv(self.api_key_env_var, '')
         return ''
 
-    # Deploy-time tutoring-model override via env var. Mirrors the
-    # UNIFIED_JUDGE kill-switch pattern (apps/tutoring/combined_judge.py
-    # :555). Format: "provider/model_name", e.g.
-    # "anthropic/claude-sonnet-4-6" or "google/gemini-3.1-pro-preview".
-    # Empty / unset = use the DB-active config (current production
-    # behaviour). Scoped to purpose='tutoring' only -- judge / regen /
-    # generation purposes keep their DB-active config so an operator
-    # accidentally setting the env var doesn't quietly retarget every
-    # LLM call in the system.
-    _TUTOR_MODEL_OVERRIDE_ENV = 'TUTOR_MODEL_OVERRIDE'
+    # Deploy-time tutoring-model overrides via env var. Format:
+    # "provider/model_name" (e.g. "anthropic/claude-sonnet-4-6").
+    # Empty / unset = use the DB-active config (mirrors the historical
+    # TUTOR_MODEL_OVERRIDE pattern). Phase 3 §3.6.1 replaces the
+    # single legacy env var with one per v2 ModelConfig.Purpose so
+    # each dispatched call can be retargeted independently.
+    _LEGACY_TUTORING_OVERRIDE_ENV = 'TUTOR_MODEL_OVERRIDE'
+    _PURPOSE_OVERRIDE_ENVS = {
+        'tutoring': _LEGACY_TUTORING_OVERRIDE_ENV,
+        'tutor_move': 'TUTOR_MOVE_MODEL_OVERRIDE',
+        'grader_math': 'GRADER_MATH_MODEL_OVERRIDE',
+        'grader_grounded': 'GRADER_GROUNDED_MODEL_OVERRIDE',
+        'conformance_classifier': 'CONFORMANCE_CLASSIFIER_MODEL_OVERRIDE',
+        'tutor_claim_adjudicator': 'TUTOR_CLAIM_ADJUDICATOR_MODEL_OVERRIDE',
+        'profiler_summary': 'PROFILER_SUMMARY_MODEL_OVERRIDE',
+        'grader_verifier': 'GRADER_VERIFIER_MODEL_OVERRIDE',
+        'question_extractor': 'QUESTION_EXTRACTOR_MODEL_OVERRIDE',
+        'grader_student_claims': 'GRADER_STUDENT_CLAIMS_MODEL_OVERRIDE',
+        'grader_student_response': 'GRADER_STUDENT_RESPONSE_MODEL_OVERRIDE',
+        'move_router': 'MOVE_ROUTER_MODEL_OVERRIDE',
+    }
+    # Purposes where Google-grounding is the required runtime branch.
+    # Non-Gemini overrides are refused at resolve-time (fail-soft to
+    # DB-active) so a deploy typo can't silently disable grounding.
+    _GROUNDING_REQUIRED_PURPOSES = frozenset({
+        'grader_grounded', 'tutor_claim_adjudicator',
+    })
 
     @classmethod
     def get_for(cls, purpose: str):
         """Get active config for a specific purpose, with fallback to any active config.
 
-        For purpose='tutoring', TUTOR_MODEL_OVERRIDE env var takes
-        precedence (format "provider/model_name"). See
-        `_TUTOR_MODEL_OVERRIDE_ENV` docstring above. On unknown
-        provider/model, logs a warning and falls through to the
-        DB-active config -- fail-soft so a typo doesn't break tutoring.
+        Each purpose may be retargeted by its own env var (see
+        ``_PURPOSE_OVERRIDE_ENVS``). On unknown provider/model the
+        runtime logs a warning and falls through to the DB-active
+        config — fail-soft so a typo doesn't break the path. The
+        legacy ``TUTOR_MODEL_OVERRIDE`` env var is still honoured for
+        ``purpose='tutoring'`` so in-flight legacy sessions resume
+        with the same dispatch surface they were running on.
         """
-        if purpose == cls.Purpose.TUTORING.value:
-            raw = (os.getenv(cls._TUTOR_MODEL_OVERRIDE_ENV, '') or '').strip()
+        env_name = cls._PURPOSE_OVERRIDE_ENVS.get(purpose)
+        if env_name:
+            raw = (os.getenv(env_name, '') or '').strip()
             if raw:
+                import logging
+                log = logging.getLogger(__name__)
                 if '/' not in raw:
-                    import logging
-                    logging.getLogger(__name__).warning(
+                    log.warning(
                         "[ModelConfig] %s=%r is malformed (expected "
                         "'provider/model_name'); falling back to DB-active",
-                        cls._TUTOR_MODEL_OVERRIDE_ENV, raw,
+                        env_name, raw,
                     )
                 else:
                     provider, model_name = raw.split('/', 1)
-                    runtime = cls.resolve_runtime(provider, model_name)
-                    if runtime is not None:
-                        return runtime
-                    import logging
-                    logging.getLogger(__name__).warning(
-                        "[ModelConfig] %s=%r did not resolve to a "
-                        "ModelConfig (unknown provider or missing API "
-                        "key env var); falling back to DB-active",
-                        cls._TUTOR_MODEL_OVERRIDE_ENV, raw,
-                    )
+                    if (
+                        purpose in cls._GROUNDING_REQUIRED_PURPOSES
+                        and provider.lower() != 'google'
+                    ):
+                        log.warning(
+                            "[ModelConfig] %s=%r non-Gemini provider on "
+                            "grounding-required purpose; falling back to "
+                            "DB-active to preserve Google-grounding",
+                            env_name, raw,
+                        )
+                    else:
+                        runtime = cls.resolve_runtime(provider, model_name)
+                        if runtime is not None:
+                            return runtime
+                        log.warning(
+                            "[ModelConfig] %s=%r did not resolve to a "
+                            "ModelConfig (unknown provider or missing API "
+                            "key env var); falling back to DB-active",
+                            env_name, raw,
+                        )
 
         config = cls.objects.filter(is_active=True, purpose=purpose).first()
         if not config:

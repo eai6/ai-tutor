@@ -66,7 +66,28 @@ class TutorSession(models.Model):
     
     # Structured engine state (for phase tracking, etc.)
     engine_state = models.JSONField(default=dict, blank=True)
-    
+
+    # v2 typed runtime state — Pydantic SessionRuntimeState serialized.
+    # Owned exclusively by the new engine (apps.tutoring.v2). Legacy
+    # sessions ignore this column; no backfill from engine_state.
+    # See design/refactor/refactor-implementation-plan.md Phase 1 §2.
+    runtime_state = models.JSONField(default=dict, blank=True)
+
+    # Which engine version owns this session. Sticky-per-session so a
+    # session that started on legacy stays on legacy across resumes.
+    # Phase 1: default 'legacy'; Phase 3 flips default to 'v2'.
+    # See apps/tutoring/v2/config/flags.py::select_engine_version.
+    engine_version = models.CharField(
+        max_length=20,
+        default='',
+        blank=True,
+        help_text="Which tutoring engine owns this session ('legacy' or 'v2'). "
+                  "Sticky across resumes — set at session start by "
+                  "apps.tutoring.v2.routing.ensure_engine_version_set. "
+                  "Empty string = not yet decided (env-var picks at first "
+                  "entry-point call).",
+    )
+
     # Timing
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)

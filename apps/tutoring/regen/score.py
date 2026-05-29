@@ -1,4 +1,21 @@
-"""Score a regen candidate from its judge findings.
+"""
+DEPRECATED (Phase 3 §3.5 — refactor implementation plan).
+
+This module is part of the legacy tutoring pipeline. The v2 grader /
+tutor / conformance engine in ``apps.tutoring.v2`` replaces it. Kept
+loaded for resume of in-flight legacy sessions and as the kill-switch
+fallback (``NEW_TUTOR=off``). **Do not add new features here.**
+
+Deletion gate (Phase 3 §3.5):
+  1. v2 has served prod traffic ≥ 4 weeks post-cutover.
+  2. Zero kill-switch flips during that window.
+  3. Three consecutive weekly benchmark runs within ±2 pp of
+     cutover numbers on each P1 category.
+  4. No open P1 incidents tied to the v2 engine.
+
+Original module docstring follows:
+
+Score a regen candidate from its judge findings.
 
 Higher score = better candidate. The orchestrator picks the
 highest-scoring CLEAN candidate per cycle, and falls back to the
@@ -9,7 +26,6 @@ under the current validator policy). A "scored but not clean" candidate
 might still have soft issues (unverified claims) — those don't force
 another retry but do affect the score.
 """
-
 from __future__ import annotations
 
 from typing import Tuple

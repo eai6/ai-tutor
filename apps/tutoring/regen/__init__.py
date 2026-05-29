@@ -1,4 +1,21 @@
-"""Regen ensemble — multi-model concurrent rewrite of bad tutor turns.
+"""
+DEPRECATED (Phase 3 §3.5 — refactor implementation plan).
+
+This module is part of the legacy tutoring pipeline. The v2 grader /
+tutor / conformance engine in ``apps.tutoring.v2`` replaces it. Kept
+loaded for resume of in-flight legacy sessions and as the kill-switch
+fallback (``NEW_TUTOR=off``). **Do not add new features here.**
+
+Deletion gate (Phase 3 §3.5):
+  1. v2 has served prod traffic ≥ 4 weeks post-cutover.
+  2. Zero kill-switch flips during that window.
+  3. Three consecutive weekly benchmark runs within ±2 pp of
+     cutover numbers on each P1 category.
+  4. No open P1 incidents tied to the v2 engine.
+
+Original module docstring follows:
+
+Regen ensemble — multi-model concurrent rewrite of bad tutor turns.
 
 Why this exists: the previous regen path appended a `<regeneration_required>`
 block to the 30KB tutor system prompt and asked the tutor LLM to rewrite
@@ -46,7 +63,6 @@ Usage from the engine:
   turn_metadata['regen_clean'] = result.clean
   turn_metadata['regen_fallback'] = result.fallback_used
 """
-
 from __future__ import annotations
 
 import concurrent.futures

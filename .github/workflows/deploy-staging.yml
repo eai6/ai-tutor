@@ -1,0 +1,216 @@
+name: Deploy (staging)
+
+# Mirrors deploy.yml but targets the staging Container App on the
+# Pixel subscription. Triggered by pushes to the `dev` branch — that
+# branch is our integration/staging surface: PRs are merged into dev
+# first for external party testing, then promoted to main for prod.
+#
+# The post-deploy tutor evaluation is OFF by default on staging — it's
+# expensive (~$15/run) and we already run it on prod deploys. Enable
+# explicitly via workflow_dispatch if you want a staging eval pass.
+
+on:
+  push:
+    branches: [dev]
+
+  workflow_dispatch:
+    inputs:
+      tutor_prompt_variant:
+        description: 'Tutor prompt variant'
+        required: false
+        type: choice
+        default: 'baseline'
+        options:
+          - baseline
+          - v6
+          - v7
+      tutor_model_override:
+        description: 'Tutor model override (provider/model_name); leave blank to use DB-active'
+        required: false
+        type: choice
+        default: ''
+        options:
+          - ''
+          - 'anthropic/claude-sonnet-4-20250514'
+          - 'anthropic/claude-sonnet-4-6'
+          - 'anthropic/claude-opus-4-7'
+          - 'google/gemini-3-flash-preview'
+          - 'google/gemini-3.1-pro-preview'
+      run_pgvector_port:
+        description: 'Run one-time ChromaDB→pgvector port + KB coverage audit after deploy (use after PR #11 lands on dev)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  ACR: ${{ secrets.STAGING_ACR_LOGIN_SERVER }}
+  RG:  ${{ secrets.STAGING_AZURE_RESOURCE_GROUP }}
+  APP: ${{ secrets.STAGING_CONTAINER_APP_NAME }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Free runner disk before the Docker build — same as prod workflow.
+      - name: Free Android-SDK disk space (runner only)
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          df -h /
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        run: az acr login --name ${ACR%%.*}
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t $ACR/aitutor:${{ github.sha }} -t $ACR/aitutor:latest .
+          docker push $ACR/aitutor:${{ github.sha }}
+          docker push $ACR/aitutor:latest
+
+      - name: Set revision mode to single (auto-deactivate old revisions)
+        run: |
+          az containerapp revision set-mode \
+            --name $APP \
+            --resource-group $RG \
+            --mode single
+
+      - name: Resolve deploy-time config
+        id: cfg
+        run: |
+          PROMPT_VARIANT="${{ github.event.inputs.tutor_prompt_variant || vars.STAGING_TUTOR_PROMPT_VARIANT || 'baseline' }}"
+          MODEL_OVERRIDE="${{ github.event.inputs.tutor_model_override || vars.STAGING_TUTOR_MODEL_OVERRIDE || '' }}"
+          echo "prompt_variant=$PROMPT_VARIANT" >> $GITHUB_OUTPUT
+          echo "model_override=$MODEL_OVERRIDE" >> $GITHUB_OUTPUT
+          echo "::notice title=Staging deploy config::TUTOR_PROMPT_VARIANT=$PROMPT_VARIANT  TUTOR_MODEL_OVERRIDE=$MODEL_OVERRIDE"
+
+      - name: Deploy to Container App (staging)
+        run: |
+          az containerapp update \
+            --name $APP \
+            --resource-group $RG \
+            --image $ACR/aitutor:${{ github.sha }} \
+            --set-env-vars \
+              "TUTOR_PROMPT_VARIANT=${{ steps.cfg.outputs.prompt_variant }}" \
+              "TUTOR_MODEL_OVERRIDE=${{ steps.cfg.outputs.model_override }}"
+
+      - name: Print staging URL
+        run: |
+          FQDN=$(az containerapp show --name $APP --resource-group $RG \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "::notice title=Staging deployed::https://$FQDN"
+
+  # ─────────────────────────────────────────────────────────────────
+  # One-time ChromaDB → pgvector port + KB coverage audit (staging)
+  # ─────────────────────────────────────────────────────────────────
+  #
+  # OPT-IN. Set `run_pgvector_port=true` on a workflow_dispatch run,
+  # AFTER PR #11 (pgvector) lands on the dev branch. Mirrors the
+  # equivalent job on deploy.yml (prod) — see that file for the
+  # detailed design rationale.
+  #
+  # Idempotent: the port command upserts via the
+  # (institution_id, content_hash) unique constraint, so re-runs are
+  # safe — they report 0 new + N updated.
+  #
+  # Pre-requisites:
+  #   - Repo secret STAGING_DB_PASSWORD = the Pulumi-managed
+  #     aitutor:db-password from the staging stack
+  #   - AZURE_CREDENTIALS service principal has Contributor on
+  #     aitutor-staging-rg (set up during staging provisioning)
+  post_deploy_pgvector_port:
+    name: Post-deploy ChromaDB → pgvector port + audit (staging)
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: ${{ success() && github.event.inputs.run_pgvector_port == 'true' }}
+    timeout-minutes: 30
+    env:
+      PG_SERVER: aitutor-staging-pg
+      PG_FQDN: aitutor-staging-pg.postgres.database.azure.com
+      STORAGE_ACCOUNT: aitutorstagingsa
+      DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install deps + chromadb (CI-only, transitional)
+        run: |
+          pip install -r requirements.txt
+          pip install chromadb==1.5.0
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install azcopy
+        run: |
+          curl -L https://aka.ms/downloadazcopy-v10-linux -o /tmp/azcopy.tgz
+          tar -xzf /tmp/azcopy.tgz -C /tmp
+          sudo mv /tmp/azcopy_linux_amd64_*/azcopy /usr/local/bin/azcopy
+          azcopy --version
+
+      - name: Open Postgres firewall to runner
+        id: fw
+        run: |
+          IP=$(curl -sS https://api.ipify.org)
+          RULE="ci-pgvector-port-${{ github.run_id }}"
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "rule=$RULE" >> $GITHUB_OUTPUT
+          az postgres flexible-server firewall-rule create \
+            --resource-group $RG \
+            --name $PG_SERVER \
+            --rule-name "$RULE" \
+            --start-ip-address $IP --end-ip-address $IP \
+            -o none
+
+      - name: Download vectordb snapshot from share
+        run: |
+          KEY=$(az storage account keys list \
+            --account-name $STORAGE_ACCOUNT --resource-group $RG \
+            --query '[0].value' -o tsv)
+          EXPIRY=$(date -u -d "+2 hour" +"%Y-%m-%dT%H:%MZ")
+          SAS=$(az storage share generate-sas \
+            --name media --account-name $STORAGE_ACCOUNT --account-key "$KEY" \
+            --permissions rl --expiry "$EXPIRY" -o tsv)
+          azcopy copy \
+            "https://${STORAGE_ACCOUNT}.file.core.windows.net/media/vectordb?${SAS}" \
+            ./vectordb_snapshot \
+            --recursive --log-level=ERROR
+          du -sh ./vectordb_snapshot
+
+      - name: Run port + audit
+        env:
+          DATABASE_URL: postgres://aitutoradmin:${{ env.DB_PASSWORD }}@${{ env.PG_FQDN }}:5432/aitutor?sslmode=require
+          SECRET_KEY: ci-port-job-not-secret
+          DEBUG: 'False'
+          ALLOWED_HOSTS: '*'
+          EMBEDDING_BACKEND: local
+        run: |
+          set -euo pipefail
+          echo "::group::ChromaDB → pgvector port"
+          python manage.py port_chromadb_to_pgvector --vectordb-path ./vectordb_snapshot/vectordb
+          echo "::endgroup::"
+          echo "::group::KB coverage audit"
+          python manage.py audit_kb_coverage
+          echo "::endgroup::"
+
+      - name: Close Postgres firewall
+        if: always() && steps.fw.outputs.rule != ''
+        run: |
+          az postgres flexible-server firewall-rule delete \
+            --resource-group $RG \
+            --name $PG_SERVER \
+            --rule-name "${{ steps.fw.outputs.rule }}" \
+            --yes -o none || true

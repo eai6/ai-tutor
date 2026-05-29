@@ -10,15 +10,15 @@ The v2 audit's headline finding — *"much of the science-of-learning infrastruc
 
 However, three new categories of drift have emerged:
 
-1. **The system prompt has grown to ~460 lines of XML-tagged constraints with internal contradictions.** A 40-word/turn hard cap (`anthropic.py:455-491`) fights structurally against worked-example scaffolding. Each principle block was locally reasonable; the cumulative cross-cutting rule count exceeds what any model — even Opus — follows reliably turn after turn. This is the most likely structural cause of the reported quality regression and is **independent of which model is serving**.
+1. **Math-quality regression caused by a 2026-05-20 model swap.** Migration `apps/llm/migrations/0028_swap_runtime_to_gemini_3_1_flash_lite.py` swapped the tutoring, judge, and regen purposes from Opus 4.7 (temp 0.0) to **Gemini 3.1 Flash Lite Preview (temp 0.2)** the day before this audit. The same small model now serves the responder, the arithmetic verifier, and the regen path — so the safety net and the responder share blind spots. The migration is cleanly reversible.
 
-2. **Concept coverage is still keyword-based** (`_keyword_concept_coverage_check` at `conversational_tutor.py:10549`), but is now **load-bearing** — it gates the new remediation floor introduced in commit `5d6cbd7`. The LLM-based version (`:10587`) exists but is not on the per-turn path. v2 R12 flagged this as over-counting; it has gotten more important without getting more reliable.
+2. **The system prompt has grown to ~460 lines of XML-tagged constraints with internal contradictions.** A 40-word/turn hard cap (`anthropic.py:455-491`) fights structurally against worked-example scaffolding. Multiple negative-instruction blocks ("never X", "do NOT Y") over-index on Gemini-class models, which `.claude/skills/gemini-prompting-expert/SKILL.md` warns against. Together H1 + H2 explain the bulk of the reported math errors.
 
-3. **Migration 0028 (2026-05-20)** swapped tutoring + judge + regen to Gemini 3.1 Flash Lite Preview. Initially this was suspected as the dominant cause of math errors (H1 below), but the user-reported regression *predates this swap by weeks*, so the swap is at most a contributing factor. The migration is cleanly reversible if the cross-model A/B reveals an Opus advantage.
+3. **Concept coverage is still keyword-based** (`_keyword_concept_coverage_check` at `conversational_tutor.py:10549`), but is now **load-bearing** — it gates the new remediation floor introduced in commit `5d6cbd7`. The LLM-based version (`:10587`) exists but is not on the per-turn path. v2 R12 flagged this as over-counting; it has gotten more important without getting more reliable.
 
 Three principles remain structurally unwired: **automaticity** (no latency tracking), **non-interference** (no scheduler), and **mastery-based phase transitions** (still exchange-floor-driven). A standalone "Daily Review" session type (v2 R15) has not been built.
 
-The headline recommendation for this round is **R2 (v3): slim the system prompt** to attack the cumulative-complexity drift. R1 (model rollback) is cheap reversible insurance but no longer the primary fix. Empirical validation of R2 requires a real-content A/B harness — see `AB_TESTING_PLAN.md` for the protocol.
+The headline recommendation for this round is **R1 (v3): roll back tutoring to Opus 4.7 immediately** while keeping judge on Flash Lite, then trim the system prompt to a leaner Gemini-shaped version (Section 4 below) before re-attempting the smaller-model swap.
 
 ---
 
@@ -113,16 +113,7 @@ The architectural progress since v2 is substantial; the new gaps are concentrate
 
 The user reports that since the v2 audit, "the AI Tutor has drifted from following the principles of the science of learning … makes more errors especially in Maths … provides a poorer user experience in general." Below are the most plausible causes, ranked by confidence, each backed with file/line evidence.
 
-> **Note (post-review):** The user has confirmed that the math regression
-> *predates 2026-05-20 by weeks*, which invalidates H1 as the dominant
-> cause and promotes **H2 (prompt complexity drift)** to the top of the
-> list. H1 is preserved below for completeness — the model swap may still
-> be a contributing factor, but it cannot be *the* cause. Confidence
-> labels below reflect the original framing; treat H2 as the most
-> plausible root cause until the A/B experiment in `AB_TESTING_PLAN.md`
-> provides empirical evidence either way.
-
-### H1 — The 2026-05-20 model swap (LOWER confidence; predates regression)
+### H1 — The 2026-05-20 model swap (HIGH confidence)
 
 **Evidence.** Migration `apps/llm/migrations/0028_swap_runtime_to_gemini_3_1_flash_lite.py` (applied **the day before this audit**) replaced production `ModelConfig` for three purposes:
 

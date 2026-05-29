@@ -3,6 +3,8 @@ Tutoring Views - Web endpoints for the chat-based conversational tutor.
 """
 
 import json
+from typing import Optional
+
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
@@ -734,6 +736,19 @@ def chat_start_session(request, lesson_id):
     if existing:
         # Resume active session — include conversation history
         session = existing
+        # v2 dispatch (sticky-per-session). Phase 1 only ensures the
+        # engine_version is read; routing back to legacy is the
+        # default for sessions started before the new engine landed.
+        from apps.tutoring.v2.routing import (
+            ensure_engine_version_set,
+            is_v2_session,
+            v2_resume_dispatch,
+        )
+        ensure_engine_version_set(session)
+        if is_v2_session(session):
+            payload = v2_resume_dispatch(session)
+            payload["history"] = _build_session_history(session)
+            return JsonResponse(payload)
         history = _build_session_history(session)
         tutor = ConversationalTutor(session)
         response = tutor.resume()
@@ -849,6 +864,18 @@ def chat_start_session(request, lesson_id):
             },
         )
 
+        # v2 dispatch — set the sticky engine_version field for this
+        # brand-new session. NEW_TUTOR=off (default) routes to legacy;
+        # NEW_TUTOR=on routes to v2 and initializes runtime_state.
+        from apps.tutoring.v2.routing import (
+            ensure_engine_version_set,
+            is_v2_session,
+            v2_start_dispatch,
+        )
+        ensure_engine_version_set(session)
+        if is_v2_session(session):
+            return JsonResponse(v2_start_dispatch(session))
+
         tutor = ConversationalTutor(session)
         response = tutor.start()
 
@@ -947,6 +974,19 @@ def chat_respond(request, session_id):
         id=session_id,
         student=request.user,
     )
+
+    # v2 dispatch (sticky-per-session). Phase 2 wires
+    # TutorEngine.respond() here via v2_respond_dispatch.
+    #
+    # NOTE: the v2 path runs its own conformance.safety + answer-leak
+    # checks on the *tutor* response. We still parse + safety-check
+    # the *student* input below (line 1022+) before routing because
+    # the student-input safety treatment is the same on both engines.
+    from apps.tutoring.v2.routing import (
+        is_v2_session,
+        v2_respond_dispatch,
+    )
+    _is_v2 = is_v2_session(session)
 
     # Check if student is suspended
     try:
@@ -1121,6 +1161,12 @@ def chat_respond(request, session_id):
     if _pii_pass.filtered_content and _pii_pass.filtered_content != message:
         message = _pii_pass.filtered_content
 
+    # v2 dispatch — runs the full TutorEngine flow + returns the
+    # legacy-shape JSON envelope. Bypasses the ConversationalTutor
+    # path entirely.
+    if _is_v2:
+        return JsonResponse(v2_respond_dispatch(session, message))
+
     # Generate response (non-streaming for Azure Container Apps compatibility)
     import logging
     import time
@@ -1203,6 +1249,17 @@ def chat_start_review(request, session_id):
         student=request.user,
     )
 
+    # v2 dispatch (sticky-per-session). Phase 1: route v2 sessions
+    # to the placeholder.
+    from apps.tutoring.v2.routing import (
+        is_v2_session,
+        v2_review_dispatch,
+    )
+    if is_v2_session(session):
+        payload = v2_review_dispatch(session)
+        payload["artifact_html"] = None
+        return JsonResponse(payload)
+
     tutor = ConversationalTutor(session)
     result = tutor.start_review()
 
@@ -1225,14 +1282,29 @@ def chat_start_review(request, session_id):
 def chat_difficulty_signal(request, session_id):
     """Handle student difficulty signal (too easy / too hard / reset).
 
-    R1 (2026-05-15): in addition to bumping engine_state.difficulty_level,
-    we INJECT a synthetic student turn so the tutor responds immediately
-    instead of waiting for the next real student message. The synthetic
-    turn is marked metadata.synthetic_source='difficulty_button' so the
-    chat UI can suppress re-displaying its literal text — the button
-    click is the visual signal.
+    R1 (2026-05-15): inject a synthetic student turn so the tutor
+    responds immediately instead of waiting for the next real student
+    message.
+
+    Phase 4 — v2 sessions are now routed through ``v2_respond_dispatch``
+    instead of ``ConversationalTutor``
+    (memory/v2_unverified_trap_redesign.md Fix 2b). The legacy code
+    posed the level-changed MCQ as prose without updating
+    ``runtime_state.open_question``, which caused the next student
+    answer to be graded against the stale prior canonical (MATHS run-6
+    T17 P1: "B) 244" graded against the Pythagoras canonical). Routing
+    through v2 makes ``tutor_engine.respond()`` the single writer of
+    ``open_question`` for both real student turns and system events.
+
+    The signal also clears ``runtime_state.open_question`` before
+    dispatch — the student has abandoned the prior question by asking
+    for a different difficulty, so it must not anchor the next turn's
+    grader. (Principle #4 *Mastery Learning* — re-estimate the
+    knowledge frontier; the prior open question is no longer the
+    frontier.)
     """
     from apps.tutoring.conversational_tutor import ConversationalTutor
+    from apps.tutoring.v2.routing import is_v2_session, v2_respond_dispatch
 
     session = get_object_or_404(
         TutorSession,
@@ -1249,6 +1321,8 @@ def chat_difficulty_signal(request, session_id):
     if signal not in ("too_easy", "too_hard", "reset"):
         return JsonResponse({"error": "Invalid signal"}, status=400)
 
+    # Legacy engine_state path — kept for in-flight legacy sessions and
+    # for any cross-engine code that still reads engine_state.
     state = session.engine_state or {}
     current_level = state.get('difficulty_level', 0)
 
@@ -1263,16 +1337,31 @@ def chat_difficulty_signal(request, session_id):
     session.engine_state = state
     session.save(update_fields=['engine_state'])
 
-    # Synthetic student message → drive an immediate tutor response.
-    # Phrasing matches how a real student might say it; the LLM handles
-    # paraphrases robustly and the difficulty context block will already
-    # be loaded with the new level.
+    # Synthetic student message — phrasing matches how a real student
+    # might say it. The intent classifier reads this as a meta signal,
+    # not as an answer attempt.
     synthetic_text = {
         "too_easy": "This is too easy — could you make it more challenging?",
         "too_hard": "This is too hard for me — could you go simpler?",
         "reset": "Let's go back to a normal pace.",
     }[signal]
 
+    # v2 routing — go through the single-writer respond() path.
+    if is_v2_session(session):
+        tutor_message = _v2_difficulty_dispatch(
+            session=session,
+            signal=signal,
+            difficulty_level=current_level,
+            synthetic_text=synthetic_text,
+        )
+        return JsonResponse({
+            "ok": True,
+            "signal": signal,
+            "difficulty_level": current_level,
+            "tutor_message": tutor_message,
+        })
+
+    # Legacy path — ConversationalTutor handles its own state.
     tutor_message = None
     try:
         tutor = ConversationalTutor(session)
@@ -1302,9 +1391,6 @@ def chat_difficulty_signal(request, session_id):
             "pending_question": getattr(result, 'pending_question', None),
         }
     except Exception as exc:
-        # Fail-soft: even if the synthetic-turn generation fails, the
-        # difficulty level update succeeded. Frontend will fall back to
-        # the legacy "wait for next student message" path.
         import logging as _lg
         _lg.getLogger('apps').warning(
             f"[chat_difficulty_signal] synthetic respond failed: {exc}",
@@ -1317,6 +1403,58 @@ def chat_difficulty_signal(request, session_id):
         "difficulty_level": current_level,
         "tutor_message": tutor_message,
     })
+
+
+def _v2_difficulty_dispatch(
+    *,
+    session,
+    signal: str,
+    difficulty_level: int,
+    synthetic_text: str,
+) -> Optional[dict]:
+    """Run a v2 turn for a difficulty-signal system event.
+
+    Pre-flight state mutations (single-writer guarantees):
+      * Clear ``runtime_state.open_question`` so the engine's grader
+        does NOT run against a stale canonical that the student has
+        just abandoned.
+      * Write the new difficulty_level into runtime_state.
+      * Record ``last_system_event`` for observability.
+
+    Then call ``v2_respond_dispatch`` with the synthetic student text
+    so the rest of the pipeline (grader / move selection / tutor /
+    conformance / commit) runs end-to-end exactly as on a real student
+    turn. The two-phase commit on the new pose is what binds the new
+    open_question correctly. Fail-soft.
+    """
+    from apps.tutoring.v2.routing import v2_respond_dispatch
+    from apps.tutoring.v2.services.context_manager import ContextManager
+
+    try:
+        cm = ContextManager(session)
+        runtime_state = cm.load_runtime_state()
+        runtime_state.open_question = None
+        runtime_state.attempts_on_open_question = 0
+        runtime_state.difficulty_level = difficulty_level
+        runtime_state.last_system_event = f"difficulty_change:{signal}"
+        cm.save_runtime_state(runtime_state)
+    except Exception as exc:
+        import logging as _lg
+        _lg.getLogger('apps').warning(
+            f"[chat_difficulty_signal] v2 pre-flight state mutation failed: {exc}",
+            exc_info=True,
+        )
+
+    try:
+        envelope = v2_respond_dispatch(session, synthetic_text)
+    except Exception as exc:
+        import logging as _lg
+        _lg.getLogger('apps').warning(
+            f"[chat_difficulty_signal] v2 dispatch failed: {exc}",
+            exc_info=True,
+        )
+        return None
+    return envelope
 
 
 @login_required
@@ -1579,6 +1717,26 @@ def chat_exit_ticket(request, session_id):
 
         enriched_exit_ticket = dict(response.exit_ticket_data or {})
         enriched_exit_ticket["competency"] = competency
+
+        # Defense-in-depth: refresh StudentProfile.skills_snapshot here
+        # too. Legacy ConversationalTutor._submit_exit_ticket_inner
+        # already calls this at conversational_tutor.py:11989, so this
+        # is idempotent today. It becomes the SOLE call site once the
+        # legacy module is deleted under the 4-week deprecation gate
+        # (CLAUDE.md Phase 3 §3.5), at which point v2 sessions would
+        # otherwise silently stop refreshing the snapshot the v2 router
+        # + StudentTutor prompts now read.
+        # Plan: memory/skills_snapshot_v2_wiring_plan.md Phase 1.
+        try:
+            from apps.tutoring.competency_tracker import refresh_student_snapshot
+            unit = getattr(session.lesson, "unit", None)
+            course = getattr(unit, "course", None) if unit else None
+            if course is not None:
+                refresh_student_snapshot(request.user, course)
+        except Exception as exc:
+            logger.warning(
+                "skills_snapshot refresh in chat_exit_ticket failed: %s", exc,
+            )
 
         return JsonResponse({
             "message": response.content,
