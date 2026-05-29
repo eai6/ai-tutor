@@ -37,6 +37,7 @@ from apps.tutoring.tracing import emit_span
 from apps.tutoring.v2.contracts import GradingResult, Verdict
 from apps.tutoring.v2.services.conformance_check import (
     _last_question_sentence,
+    contains_mcq_option_block,
     find_non_reflective_prose_questions,
     find_prose_stem_duplicates,
     find_verifiable_prose_questions,
@@ -429,6 +430,129 @@ def run_stem_duplication_check(
 
 
 # ──────────────────────────────────────────────────────────────────────
+# One-question-per-turn — deterministic floor + Haiku extractor ceiling
+# ──────────────────────────────────────────────────────────────────────
+
+
+def run_one_question_check(
+    response_text: str,
+    *,
+    selected_move: str,
+    posed_via_tool: bool,
+    pose_tool_stem: str = "",
+    llm_client=None,
+) -> GateResult:
+    """Enforce ONE action prompt per turn + the active-end rule.
+
+    Belt-and-suspenders (open_question_authority_redesign.md §7 step 5),
+    chosen over deterministic-only because a regex scan optimises for one
+    bug class (stacked '?'/MCQ) and misses what an LLM generalises to:
+
+      1. **Deterministic floor (runs first, no LLM):** scan the LLM-
+         authored prose for ≥2 non-reflective '?'-sentences, or an MCQ
+         option block (which ends on an option line, not '?', so the
+         trailing-'?' scan misses it). Catches the session-100 T1560 /
+         image-#2 buried-MCQ shapes the dormant Haiku extractor provably
+         missed. On a tool-posed turn the bank stem is the ONE allowed
+         prompt, so the prose must add zero; on a no-tool turn one prose
+         prompt is the turn's single (perceived-and-graded) assessment.
+
+      2. **Haiku extractor ceiling (runs when the floor passes):**
+         generalises to action prompts the regex cannot see — imperatives
+         ("now you try"), fill-ins, retrieval asks — via ``action_count``,
+         and enforces the active-end rule (Active Learning Ch.10) via
+         ``has_active_end``. Fail-soft: extractor unavailable → the
+         deterministic floor's verdict stands (never blocks on LLM error).
+
+    Principle #5 Minimising Cognitive Load (Ch.14) — one idea per turn.
+    Skips the active-end requirement on ``close_topic`` (it legitimately
+    ends the scope without a new ask); the stacking check still runs.
+    """
+    move = (selected_move or "").strip()
+    with emit_span("audit", "gate.one_question_per_turn") as span:
+        # The bank stem (when tool-posed) is the ONE allowed assessment;
+        # scan only the LLM-authored prose for ADDITIONAL prompts.
+        prose = (
+            strip_trailing_tool_stem(response_text, pose_tool_stem)
+            if posed_via_tool else response_text
+        )
+        non_reflective = find_non_reflective_prose_questions(prose)
+        has_mcq_block = contains_mcq_option_block(prose)
+        # Prompt count in the prose: each non-reflective '?'-sentence is
+        # one; an MCQ block with no '?' stem counts as one on its own.
+        prose_prompts = max(len(non_reflective), 1 if has_mcq_block else 0)
+        # Allowance: tool-posed → 0 extra prose prompts (bank stem is the
+        # one); no-tool → 1 prose prompt is the turn's single assessment.
+        allowed = 0 if posed_via_tool else 1
+
+        if prose_prompts > allowed:
+            offenders = list(non_reflective)
+            if has_mcq_block:
+                offenders.append("<MCQ option block authored in prose>")
+            offenders_clip = [s[:200] for s in offenders] or ["<extra prompt>"]
+            return _fail(
+                "one_question_per_turn",
+                f"stacked action prompts ({prose_prompts} in prose, "
+                f"{allowed} allowed): {offenders_clip[0][:120]!r}",
+                span,
+                payload={
+                    "kind": "stacked",
+                    "offending_questions": offenders_clip,
+                    "trailing_question": offenders_clip[0],
+                    "move": move,
+                    "match_count": prose_prompts,
+                },
+            )
+
+        # Deterministic floor passed — ask Haiku for the broader classes.
+        from apps.tutoring.v2.services.question_extractor import (
+            extract_action_prompts,
+        )
+        extracted = extract_action_prompts(
+            tutor_text=response_text,
+            selected_move=move,
+            llm_client=llm_client,
+        )
+        if extracted is None:
+            # Fail-soft: extractor unavailable → floor verdict stands.
+            return GateResult(passed=True, name="one_question_per_turn")
+
+        if extracted.action_count > 1:
+            return _fail(
+                "one_question_per_turn",
+                f"extractor found {extracted.action_count} action prompts; "
+                f"emit exactly one",
+                span,
+                payload={
+                    "kind": "stacked",
+                    "offending_questions": list(extracted.stacked_examples),
+                    "trailing_question": (
+                        extracted.stacked_examples[0]
+                        if extracted.stacked_examples else extracted.primary_action
+                    ),
+                    "primary_action": extracted.primary_action,
+                    "move": move,
+                    "match_count": extracted.action_count,
+                },
+            )
+
+        if move != "close_topic" and not extracted.has_active_end:
+            return _fail(
+                "one_question_per_turn",
+                "turn does not end on an action the student takes "
+                "(active-end rule)",
+                span,
+                payload={
+                    "kind": "passive_end",
+                    "move": move,
+                    "primary_action": extracted.primary_action,
+                },
+            )
+
+        return GateResult(passed=True, name="one_question_per_turn")
+
+
+# ──────────────────────────────────────────────────────────────────────
 # run_gates_with_recovery — per-gate one-retry-then-degrade loop
 # ──────────────────────────────────────────────────────────────────────
 
@@ -501,6 +625,13 @@ def _run_gate(gate_name: str, response_text: str, ctx: GateContext) -> GateResul
         )
     if gate_name == "stem_duplication":
         return run_stem_duplication_check(
+            response_text,
+            selected_move=ctx.selected_move,
+            posed_via_tool=ctx.posed_via_tool,
+            pose_tool_stem=ctx.pose_tool_stem,
+        )
+    if gate_name == "one_question_per_turn":
+        return run_one_question_check(
             response_text,
             selected_move=ctx.selected_move,
             posed_via_tool=ctx.posed_via_tool,
@@ -628,6 +759,31 @@ def _reminder_for(gate_name: str, gate_result: GateResult, ctx: GateContext) -> 
             "'Next:', 'Here's a quick check:'. The tool's emitted "
             "stem IS your turn's prompt to the student."
         )
+    if gate_name == "one_question_per_turn":
+        payload = gate_result.payload or {}
+        if payload.get("kind") == "passive_end":
+            return (
+                "Your previous reply ended on a statement or explanation "
+                "with nothing for the student to DO. Principle #1 Active "
+                "Learning (Ch.10): every turn ends on one action the "
+                "student takes. Rewrite so the turn ends with a single "
+                "clear ask — a question, a 'now you try', or a step to "
+                "attempt. Keep the same teaching move."
+            )
+        offending = payload.get("offending_questions") or []
+        quoted = "; ".join(f'"{q[:120].rstrip()}"' for q in offending[:4])
+        flagged = f" Flagged: {quoted}." if quoted else ""
+        return (
+            "Your previous reply contained more than one thing for the "
+            "student to answer (stacked questions / a worked step PLUS a "
+            "question / two questions / an embedded multiple-choice). "
+            "Principle #5 Minimising Cognitive Load (Ch.14): exactly ONE "
+            "action prompt per turn."
+            + flagged +
+            " Rewrite so the turn poses a SINGLE prompt — keep the most "
+            "important one, convert the rest to statements or drop them. "
+            "Keep the same teaching move."
+        )
     if gate_name == "safety":
         return (
             "Your previous reply was flagged by the safety check. "
@@ -684,6 +840,26 @@ def _degrade_for(
     text = response_text or ""
     if not text.strip():
         return "Let's keep going — try the next step."
+
+    if gate_name == "one_question_per_turn":
+        payload = gate_result.payload or {}
+        if payload.get("kind") == "passive_end":
+            # No safe way to synthesise an action deterministically; the
+            # retry already had its chance. Ship as-is (a missing ask is
+            # a pedagogy miss, not a P1 safety issue).
+            return text
+        # Stacked: keep the LAST verbatim '?'-prompt (typically the live
+        # pose the student answers) and strip the earlier ones.
+        offenders = [
+            o for o in (payload.get("offending_questions") or [])
+            if o and not o.startswith("<")
+        ]
+        verbatim = [o for o in offenders if o in text]
+        if len(verbatim) >= 2:
+            for o in verbatim[:-1]:
+                text = text.replace(o, "", 1)
+            return re.sub(r"\n{3,}", "\n\n", text).strip()
+        return text
 
     if gate_name == "curriculum_fidelity":
         payload = gate_result.payload or {}
@@ -844,6 +1020,7 @@ def _degrade_for(
 _GATE_ORDER: tuple[str, ...] = (
     "curriculum_fidelity",
     "stem_duplication",
+    "one_question_per_turn",
     "safety",
     "figure_ref",
     "answer_leak",

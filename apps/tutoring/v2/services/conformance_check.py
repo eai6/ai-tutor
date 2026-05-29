@@ -288,6 +288,34 @@ def find_non_reflective_prose_questions(text: str) -> list[str]:
     ]
 
 
+_MCQ_BLOCK_LINE_RE = re.compile(r"^\s*([A-Ea-e])\s*[).:\-]\s+\S")
+
+
+def contains_mcq_option_block(text: str) -> bool:
+    """True if ``text`` contains an authored MCQ option block.
+
+    An option block is two or more lines that open with distinct option
+    letters (``A) ...``, ``b. ...``). This is a deterministic signal of
+    an assessment question that the trailing-``?`` scan misses entirely:
+    an MCQ's rendered text ends with the LAST option line, not a ``?``,
+    so ``is_verifiable_prose_question`` (which requires a trailing ``?``)
+    returns False and the question slips through (the session-100 T1560 /
+    image-#2 stacked-MCQ failure, open_question_authority_redesign.md §7
+    step 5).
+
+    Distinct letters are required so a single line that merely starts
+    with "A." (e.g. a sentence) does not trip it.
+    """
+    if not text:
+        return False
+    letters: list[str] = []
+    for line in text.splitlines():
+        m = _MCQ_BLOCK_LINE_RE.match(line)
+        if m:
+            letters.append(m.group(1).upper())
+    return len(set(letters)) >= 2
+
+
 def find_prose_stem_duplicates(
     prose: str,
     tool_stem: str,

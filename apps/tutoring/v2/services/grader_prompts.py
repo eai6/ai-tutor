@@ -643,62 +643,15 @@ def render_non_math_judge_user_prompt(
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Pre-pose derivability check
-# ──────────────────────────────────────────────────────────────────────
-
-PRE_POSE_SYSTEM = """\
-You decide whether the canonical answer to an assessment question
-can be derived strictly from what the student can see — the visible
-question prompt, any attached figure description, and the recent
-conversation transcript.
-
-Hidden knowledge-base chunks must NOT factor into your decision; the
-student does not see them.
-
-Return a JSON object:
-
-  derivable  — true | false
-  reason     — one short sentence. When derivable=false, name what
-               piece of information would have to be added to the
-               visible prompt for the answer to be derivable.
-"""
-
-
-def render_pre_pose_user_prompt(
-    *,
-    visible_prompt: str,
-    attached_figure_description: str,
-    recent_transcript: list[str],
-    canonical: str,
-) -> str:
-    """Render the user-turn prompt for the pre-pose derivability check.
-
-    Visible context is placed FIRST and exhaustively; the decision
-    question (canonical + derivability ask) is placed LAST.
-    """
-    transcript_block = "\n".join(
-        f"  - {t.strip()}" for t in (recent_transcript or []) if t and t.strip()
-    ) or "  (no recent transcript)"
-    figure_block = (attached_figure_description or "").strip() or "(no attached figure)"
-    return (
-        f"Visible question prompt:\n{visible_prompt.strip()}\n\n"
-        f"Attached figure description (what the student can see in the figure):\n"
-        f"{figure_block}\n\n"
-        f"Recent transcript (most recent first):\n{transcript_block}\n\n"
-        f"---\n"
-        f"Canonical answer the system intends to grade against: {canonical.strip()}\n\n"
-        f"Based ONLY on the visible context above, is this canonical "
-        f"derivable? Emit the JSON object specified."
-    )
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Post-render question extractor (Phase 4 — Fix 2c)
+# Post-render question extractor — one-action-per-turn + active-end
 #
-# Runs AFTER the StudentTutor produces a turn and BEFORE the conformance
-# classifier. Identifies every distinct action prompt in the rendered
-# tutor text — a "question, instruction, or pose-the-tool-stem the
-# student is expected to act on this turn".
+# Runs AFTER the StudentTutor produces a turn, as the LLM ceiling of the
+# ``one_question_per_turn`` gate (open_question_authority_redesign.md §7
+# step 5). The deterministic floor in ``safety_gates.run_one_question_
+# check`` catches stacked '?'/MCQ shapes; this Haiku pass generalises to
+# action prompts the regex can't see. Identifies every distinct action
+# prompt in the rendered tutor text — a "question, instruction, or
+# pose-the-tool-stem the student is expected to act on this turn".
 #
 # Enforces:
 #   - One action prompt per turn (Principle #5 Minimising Cognitive Load
@@ -707,9 +660,8 @@ def render_pre_pose_user_prompt(
 #     tutor turn ends with an action the student takes).
 #
 # Subject-agnostic: works for math, geography, language, any subject.
-# Replaces a regex-based stacked-question detector with a Haiku call so
-# the rule generalises across phrasings ("which of the following…",
-# "try …", "now you do it", "fill in the blank", "say it back to me").
+# Generalises across phrasings ("which of the following…", "try …",
+# "now you do it", "fill in the blank", "say it back to me").
 # ──────────────────────────────────────────────────────────────────────
 
 QUESTION_EXTRACTOR_SYSTEM = """\

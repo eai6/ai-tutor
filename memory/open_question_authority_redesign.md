@@ -92,7 +92,7 @@ Mirrors codebase patterns: `OpenQuestion` stays a typed `contracts/` dataclass (
 **Stays:**
 - **`safety`, `figure_ref`** — genuine safety floors, unrelated to assessment provenance.
 - **`answer_leak`** — re-scoped: the tutor still must not reveal the canonical the grader resolved. Keep.
-- **One-question-per-turn check (Issue 3)** — *orthogonal* to this redesign; it's a cognitive-load constraint (Principle #5), not a provenance one, so it survives whatever we do with `open_question`. Replace the fallible Haiku `question_extractor` carve-out (`grader_prompts.py:733-734`, which let the session-100 T1560 mid-prose MCQ through) with a deterministic "more than one `?`-sentence / MCQ option-block ⇒ flag" pre-check.
+- **One-question-per-turn check (Issue 3)** — *orthogonal* to this redesign; it's a cognitive-load constraint (Principle #5), not a provenance one, so it survives whatever we do with `open_question`. **Decided 2026-05-29 (belt-and-suspenders, not replace):** a deterministic floor ("≥2 non-reflective `?`-sentences / MCQ option-block ⇒ flag", catches the session-100 T1560 shape the Haiku extractor missed) PLUS the re-wired Haiku `question_extractor` as the ceiling (generalises to imperative/fill-in/"now you try" prompts the regex can't see + the active-end rule). Pure-deterministic was rejected — it optimises for one bug class and contradicts the "prefer fast Haiku over regex" guideline; LLM-only let the T1560 carve-out through. Lives in a dedicated `one_question_per_turn` gate (`safety_gates.run_one_question_check`), separate from provenance, so curriculum_fidelity can demote (step 4) without touching it.
 
 Net: 5 provenance gates + 1 conformance classifier + 1 question-extractor → ~2 safety floors + `answer_leak` + 1 deterministic one-question check. The simplification the orchestration skill prescribes — perceive state with the LLM that already runs every turn, rather than police it with a critic loop sharing the writer's blind spot.
 
@@ -159,4 +159,12 @@ Proceed with **transcript-derivation (§5)** as the primary design: the router r
 
 Watch the two soft spots before committing: **perception noise** (§9.1) and **non-bank canonical grounding** (§9.2). If transcript-derivation proves too noisy in eval, fall back to the commit-before-render alternative (§5b).
 
-**Suggested build order:** (1) router gets transcript + emits `{has_pending, question_text}` perception, behind `engine_version` gate; (2) grader matches `question_text`→`LessonStep` + resolves canonical, `unverified` fallback on no match; (3) resume runs the router; (4) demote provenance gates once eval shows the perception holds; (5) replace the Haiku question-extractor with the deterministic one-question check. Validate each on the eval benchmark before the next.
+**Suggested build order:** (1) router gets transcript + emits `{has_pending, question_text}` perception, behind `engine_version` gate; (2) grader matches `question_text`→`LessonStep` + resolves canonical, `unverified` fallback on no match; (3) resume runs the router; (4) demote provenance gates once eval shows the perception holds; (5) one-question gate = deterministic floor + re-wired Haiku extractor. Validate each on the eval benchmark before the next.
+
+**Implementation status (2026-05-29):**
+- ✅ **Steps 1 + 2** — committed `ea7fe42` (router perception + grader bank-matching + engine grade-gate + trace). 752 tests; live-validated on Lesson 1426.
+- ✅ **Step 3 — resume** — `v2_resume_dispatch` no-open-question branch delegates to `v2_start_dispatch` (state-driven: poses the next bank question; idempotent after commit). Live-validated: first resume posed + committed (step 13784); reload re-rendered, no re-pose.
+- ✅ **Step 5 — one-question gate** — new `run_one_question_check` (deterministic floor + Haiku `question_extractor` re-wired as a live service), added to `_GATE_ORDER` after `stem_duplication`. Catches image-#2 / T1560 stacking + active-end. 12 new tests.
+- 🧹 Removed dead `PRE_POSE_SYSTEM` prompt (pre-pose check gone in the prune; not returning under the redesign).
+- ⏳ **Step 4 (demote provenance gates)** — pending, gated on eval.
+- ⏳ **Eval benchmark** — the GEO/MATHS harness has NOT been run; validation so far is unit tests (764) + live session walkthroughs. Run before ship.

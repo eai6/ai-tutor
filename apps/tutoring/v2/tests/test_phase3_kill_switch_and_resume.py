@@ -145,9 +145,31 @@ class ResumeArtifactPreservationTest(TestCase):
         )
         self.assertEqual(envelope["open_question"]["id"], 42)
 
-    def test_no_open_question_produces_neutral_resume(self):
+    def test_no_open_question_poses_next_question_on_resume(self):
+        """With no committed open question, resume continues the lesson by
+        posing the next question (open_question_authority_redesign.md §5
+        step 3) — not the old dead-end statement. Delegates to the
+        state-driven opening-turn path; mocked here so the unit test
+        makes no LLM calls.
+        """
         session = _build_session(engine_version="v2")
-        envelope = v2_resume_dispatch(session)
-        self.assertIn("Welcome back", envelope["message"])
+        posed = {
+            "session_id": session.id,
+            "message": "A bearing of 180° points in which compass direction?",
+            "phase": "engage",
+            "selected_move": "confirm_and_advance",
+        }
+        with patch(
+            "apps.tutoring.v2.routing.v2_start_dispatch", return_value=posed,
+        ) as start_mock:
+            envelope = v2_resume_dispatch(session)
+        start_mock.assert_called_once_with(session)
+        # Resume delegated to the pose-next path and tagged the envelope.
+        self.assertEqual(
+            envelope["message"],
+            "A bearing of 180° points in which compass direction?",
+        )
+        self.assertTrue(envelope["resume"])
+        # No artifact-preservation fields when there was no open question.
         self.assertNotIn("mcq_options", envelope)
         self.assertNotIn("attached_media_ids", envelope)

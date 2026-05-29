@@ -288,37 +288,55 @@ def _build_exit_ticket_payload(session) -> Optional[dict]:
 
 
 def v2_resume_dispatch(session) -> dict:
-    """Re-render the last open question (if any) on session resume.
+    """Resume a v2 session — re-render the open question, or pose the next.
 
-    Per the Phase 3 §3.4 resume-artifact-preservation test: when an
-    open question exists, surface it verbatim on resume — identical
-    visible text, attached media IDs, and (for MCQ) the same option
-    order. No new pre-pose check, no new question selection, no
-    canonical leak in the resume opener. When no open question is
-    set, emit a neutral re-entry message.
+    Two branches (open_question_authority_redesign.md §5, step 3):
+
+    - **A committed open question exists** → surface it verbatim
+      (Phase 3 §3.4 resume-artifact-preservation): identical visible
+      text, attached media IDs, and (for MCQ) the same option order.
+      No new question selection, no canonical leak. Idempotent — every
+      reload re-renders the same artifact.
+
+    - **No committed open question** → produce a real continuation turn
+      that POSES the next question, instead of the old dead-end
+      statement ("…keep going from where we paused", which left the
+      student with nothing to do — the Issue-1 failure). This reuses
+      the opening-turn path (``v2_start_dispatch`` → ``start_session``),
+      which is state-driven: a fresh session opens with ``explain``; a
+      mid-lesson session with delivered steps poses the next bank
+      question (Rule 6, Testing Effect Ch.20); a lesson with no
+      assessable slots left closes / ships the exit ticket. Posing
+      commits the ``open_question``, so the NEXT reload falls into the
+      re-render branch above — resume stays idempotent after the first
+      continuation turn.
     """
     cm = ContextManager(session)
     state = cm.load_runtime_state()
     open_q = state.open_question
+    if open_q is None:
+        # Continue the lesson by posing the next question (idempotent
+        # after commit). Tag the envelope as a resume for the frontend.
+        payload = v2_start_dispatch(session)
+        payload["resume"] = True
+        return payload
+
+    snapshot = open_q.visible_context_at_pose
     extra: dict = {"resume": True}
-    if open_q is not None:
-        snapshot = open_q.visible_context_at_pose
-        msg = (
-            f"Welcome back — let's pick up where we left off. "
-            f"The open question: {open_q.rendered_stem}"
-        )
-        # MCQ option order is preserved verbatim across resume.
-        if snapshot.mcq_option_order:
-            extra["mcq_options"] = list(snapshot.mcq_option_order)
-        if snapshot.attached_media_ids:
-            extra["attached_media_ids"] = list(snapshot.attached_media_ids)
-        extra["open_question"] = {
-            "source": open_q.source.value,
-            "id": open_q.id,
-            "rendered_stem": open_q.rendered_stem,
-        }
-    else:
-        msg = "Welcome back — let's keep going from where we paused."
+    msg = (
+        f"Welcome back — let's pick up where we left off. "
+        f"The open question: {open_q.rendered_stem}"
+    )
+    # MCQ option order is preserved verbatim across resume.
+    if snapshot.mcq_option_order:
+        extra["mcq_options"] = list(snapshot.mcq_option_order)
+    if snapshot.attached_media_ids:
+        extra["attached_media_ids"] = list(snapshot.attached_media_ids)
+    extra["open_question"] = {
+        "source": open_q.source.value,
+        "id": open_q.id,
+        "rendered_stem": open_q.rendered_stem,
+    }
     return _envelope(
         session=session,
         message=msg,
