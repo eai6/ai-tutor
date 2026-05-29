@@ -237,9 +237,65 @@ class StudentGrader:
                 bare_answer=False,
                 reason_code="state_inconsistent",
             )
+
+        # R1 (2026-05-29) — deterministic fast path BEFORE the math /
+        # non-math LLM dispatch. ~90% of curriculum lesson questions
+        # are MCQ with single-letter or single-digit option keys; when
+        # both canonical and student input resolve to a key, grading
+        # is a string comparison and should never reach the 2-LLM
+        # pipeline. Covers both LESSON_STEP (direct step match) and
+        # EXIT_TICKET_QUESTION (bank grader) sources. Returns None
+        # when the question / answer shape needs LLM judgment; the
+        # downstream math / non-math dispatch then runs as before.
+        deterministic = self._try_deterministic_match(request)
+        if deterministic is not None:
+            return deterministic
+
         if request.is_math:
             return self._grade_math(context, request)
         return self._grade_non_math(context, request)
+
+    def _try_deterministic_match(
+        self,
+        request: GradingRequest,
+    ) -> Optional[GradingResult]:
+        """Entry-point deterministic-match orchestrator (R1).
+
+        Tries (in order):
+          1. LESSON_STEP direct match via ``_try_direct_step_match``
+             (answer_type-aware: MCQ letter/digit, true/false,
+             short_numeric).
+          2. EXIT_TICKET_QUESTION (or any bank-resolvable) via
+             ``_try_bank_grading``.
+
+        Returns ``None`` when neither tier produces a verdict — the
+        caller then dispatches to the math / non-math LLM pipeline.
+
+        Failsoft: any unexpected exception inside a tier returns None
+        rather than propagating, so an MCQ matcher edge case never
+        prevents the LLM fallback from running.
+        """
+        try:
+            step_match = self._try_direct_step_match(request)
+        except Exception as exc:
+            logger.warning(
+                "[StudentGrader] _try_direct_step_match raised %s — "
+                "falling back to LLM dispatch",
+                type(exc).__name__,
+            )
+            step_match = None
+        if step_match is not None:
+            return step_match
+        try:
+            bank_match = self._try_bank_grading(request)
+        except Exception as exc:
+            logger.warning(
+                "[StudentGrader] _try_bank_grading raised %s — "
+                "falling back to LLM dispatch",
+                type(exc).__name__,
+            )
+            bank_match = None
+        return bank_match
 
     # ------------------------------------------------------------------
     # Math path (Phase 2 §2.1 — math)
@@ -1348,43 +1404,25 @@ class StudentGrader:
         meta input, self-reported guesses, canonical leakage.
 
         Pipeline:
-          1. Tier 0 — deterministic direct match for LessonStep
-             answer_type ∈ {multiple_choice, true_false, short_numeric}.
-             Round-trip-free fast path. Mirrors the math bare-numeric
-             fast-path.
-          2. Tier 1 — bank grader when the OpenQuestion resolves to a
-             bank row with a canonical.
-          3. LLM-B — STUDENT_RESPONSE_SYSTEM parses the student input
+          1. LLM-B — STUDENT_RESPONSE_SYSTEM parses the student input
              into structured {is_attempt, hedge_marker, claims,
              conclusion}.
-          4. Pre-check: ``is_attempt=false`` → WRONG reason_code=
+          2. Pre-check: ``is_attempt=false`` → WRONG reason_code=
              "meta_input". No LLM-C call needed.
-          5. LLM-C — NON_MATH_JUDGE_SYSTEM reads question + KB + LLM-B
+          3. LLM-C — NON_MATH_JUDGE_SYSTEM reads question + KB + LLM-B
              output and emits the verdict + redacted feedback.
-          6. Post-checks: hedge-marker downgrade, canonical-leak
+          4. Post-checks: hedge-marker downgrade, canonical-leak
              redaction guard, reason_code propagation.
+
+        Deterministic Tier 0 (direct step match) + Tier 1 (bank
+        grader) now run upstream in
+        :meth:`_try_deterministic_match` (R1 2026-05-29), invoked
+        from :meth:`grade_student_response` BEFORE the math /
+        non-math dispatch. By the time this method is reached, those
+        tiers have already returned ``None`` — they would do so
+        again here, so the pre-R1 inline calls were removed.
         """
         with emit_span("audit", "grader.non_math") as span:
-            # Tier 0 — deterministic direct match (LessonStep only).
-            direct = self._try_direct_step_match(request)
-            if direct is not None:
-                if span is not None:
-                    span["payload"] = {
-                        "verdict": direct.verdict.value,
-                        "tier": "direct",
-                    }
-                return direct
-
-            # Tier 1 — deterministic bank grader when a canonical exists.
-            bank_result = self._try_bank_grading(request)
-            if bank_result is not None:
-                if span is not None:
-                    span["payload"] = {
-                        "verdict": bank_result.verdict.value,
-                        "tier": "bank",
-                    }
-                return bank_result
-
             stem = request.open_question.rendered_stem or ""
             student_input = request.student_input or ""
 
@@ -2279,6 +2317,18 @@ def _match_mcq_letter(canonical: str, student_input: str) -> Optional[bool]:
     option text rather than a key, and we let the grounded grader
     decide.
 
+    Two-stage extraction (R5 2026-05-29):
+      1. Simple prose patterns in :data:`_MCQ_PROSE_PATTERNS` — the
+         common shapes ("B", "option B", "I pick 2", "(C)", etc.).
+      2. Fallback to :meth:`StudentGrader._extract_unambiguous_mcq_letter`
+         — the stricter shape-aware extractor that also covers
+         head-position + reasoning-marker shapes like "B, profit =
+         270 SCR" or "D, x = 42 because that's the starting number".
+         The extractor is shape-aware about ambiguity (returns "" on
+         "A or B"), so a hit there is just as safe as a simple-pattern
+         hit. The fallback closes the recall gap for math MCQ inputs
+         where the student names the pick + shows working.
+
     The function name is preserved for call-site continuity even though
     the matcher now handles digit-keyed MCQ in addition to letters.
     """
@@ -2292,6 +2342,14 @@ def _match_mcq_letter(canonical: str, student_input: str) -> Optional[bool]:
         m = pat.search(text)
         if m:
             return m.group(1).upper() == canon
+    # R5 fallback: the unambiguous extractor catches reasoning-marker
+    # shapes that the simple prose patterns above don't (Shape 2c —
+    # "B, profit = 270 SCR" — and the wider _MCQ_REASONING_MARKERS
+    # alternation). Returns empty string on ambiguity, so a non-empty
+    # result is safe to compare.
+    extracted = StudentGrader._extract_unambiguous_mcq_letter(text)
+    if extracted:
+        return extracted == canon
     return None
 
 
