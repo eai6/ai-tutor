@@ -3,11 +3,13 @@ config:
   azure-native:subscriptionId: 656f4091-746b-44ef-8add-6d94eb4a7612
   # ── Sizing knobs (preview = the cheapest viable shape) ────────────────
   # Preview is for exercising Roy's `refactor/conversational-tutor-redesign`
-  # branch in isolation from staging. Two cheap choices vs staging:
+  # branch in isolation from staging. Mirrors staging's sizing:
   #
-  #   - min-replicas: 0 (vs staging's 1). Preview cold-starts on the
-  #     first request (~10-15 s); fine for human-driven smoke testing,
-  #     saves ~$5/mo on the always-on container.
+  #   - min-replicas: 1 — keeps one container warm so testers don't
+  #     hit the 10-15 s cold start mid-flow (sentence-transformers +
+  #     vectordb warm-up). Bumped from 0 → 1 on 2026-05-29 after the
+  #     v2 evaluation testers hit the cold-start lag. Cost trade-off:
+  #     ~$3-5/mo for the always-on container vs UX debug time saved.
   #   - DB still B1ms (smallest Azure Postgres flexible-server tier).
   #
   # Consumption profile (serverless) keeps the Container App billed
@@ -16,7 +18,7 @@ config:
   aitutor:workload-profile-type: Consumption
   aitutor:container-cpu: "2.0"
   aitutor:container-memory: 4Gi
-  aitutor:min-replicas: "0"
+  aitutor:min-replicas: "1"
   aitutor:max-replicas: "1"
   aitutor:file-share-quota-gb: "20"
   aitutor:postgres-sku: Standard_B1ms
