@@ -73,11 +73,11 @@ def test_substantive_engagement_subcase_present() -> None:
     assert "REFERENCES what they shared" in body
 
 
-def test_substantive_engagement_bounded_to_one_clause() -> None:
-    """The acknowledgment is bounded — ≤12 words, ONE clause."""
+def test_substantive_engagement_bounded_to_one_sentence() -> None:
+    """The acknowledgment is bounded — 3-12 words, ONE sentence."""
     body = CONFIRM_AND_ADVANCE.body
-    assert "≤12 words" in body
-    assert "ONE short clause" in body
+    assert "3-12 words" in body
+    assert "ONE content-bearing acknowledgment sentence" in body
 
 
 def test_substantive_engagement_forbids_mechanism_rederivation() -> None:
@@ -115,12 +115,38 @@ def test_checklist_has_subcase_specific_items() -> None:
     checklist_start = body.find("RESPONSE QUALITY CHECKLIST")
     assert checklist_start > -1
     checklist = _normalize(body[checklist_start:])
-    # Forward-signal sub-case item.
-    assert "forward signal" in checklist
-    # Substantive-engagement sub-case item.
-    assert "substantive engagement on a reflective prompt" in checklist
+    # Forward-signal sub-case item — PURE forward signal language.
+    assert "PURE forward signal" in checklist
+    # Substantive-engagement sub-case item — broad trigger language.
+    assert "ANY content beyond a pure forward signal" in checklist
     # The acknowledgment-bounded shape is named in the checklist.
-    assert "≤12-word acknowledgment" in checklist or "12-word" in checklist
+    assert "3-12 words" in checklist
+    # The dominant failure mode is called out explicitly.
+    assert "silently emit only the tool stem" in checklist
+
+
+def test_substantive_engagement_marks_silent_stem_as_dominant_failure() -> None:
+    """The body explicitly names 'emit only the tool stem' as the worst failure.
+
+    Production observation 2026-05-28 (session 122 T2): Sonnet emitted
+    only the bank stem with no prose lead-in after the student offered
+    a substantive 2-word answer to a reflective opener. The tightened
+    prompt frames this as the dominant failure mode so the LLM
+    recognizes it.
+    """
+    body = CONFIRM_AND_ADVANCE.body
+    assert "DOMINANT FAILURE MODE" in body
+    assert "silently emit only the tool stem" in body
+    # The body distinguishes "pure forward signal" from "any content".
+    assert "PURE forward signal" in body
+    assert "ANY content beyond a pure forward signal" in body
+
+
+def test_substantive_engagement_requires_acknowledgment_non_optional() -> None:
+    """The body uses 'MUST emit' / 'non-optional' for the acknowledgment."""
+    body = CONFIRM_AND_ADVANCE.body
+    assert "MUST emit" in body
+    assert "non-optional" in body
 
 
 # ---------------------------------------------------------------------------

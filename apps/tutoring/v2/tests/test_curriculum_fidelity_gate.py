@@ -505,45 +505,69 @@ def test_gate_stacking_reminder_says_stacked() -> None:
 # ---------------------------------------------------------------------------
 
 
-MULTI_VIOLATION_PROSE = (
-    "Today we're learning about Map Scale and Map Types. "
+# Multi-violation tests use the TOOL-FIRED path where the full-prose
+# scan applies. The no-tool path is trailing-only (Path A — the Map
+# Scale screenshot shape), so multi-violation reporting is by design
+# scoped to stacking turns (Path C).
+MULTI_VIOLATION_STACKED_PROSE = (
+    "Let me walk through this step by step.\n\n"
     "What is 1:25,000 in plain English? "
     "Maps come in different shapes. "
-    "Which type of map — large-scale or small-scale — would help "
-    "you find a particular street in your town?"
+    "Given that small-scale maps cover huge areas with less detail, "
+    "what does that tell you about which map you'd use to plan a "
+    "journey across the Indian Ocean instead?"
+)
+MULTI_VIOLATION_BANK_STEM = (
+    "A large-scale map (such as 1:25,000) shows a smaller "
+    "geographic area in greater detail than a small-scale map "
+    "(such as 1:5,000,000).\n\n(True or False?)"
+)
+MULTI_VIOLATION_STACKED_RESPONSE = (
+    MULTI_VIOLATION_STACKED_PROSE
+    + "\n\nTry this one:\n\n"
+    + MULTI_VIOLATION_BANK_STEM
 )
 
 
-def test_gate_collects_all_violations_on_multi_question_prose() -> None:
-    """When the LLM authors >1 verifiable prose Q, all are surfaced."""
+def test_gate_collects_all_violations_on_tool_fired_stacking() -> None:
+    """Tool-fired turn with multiple non-reflective prose Qs surfaces ALL."""
     result = run_curriculum_fidelity_check(
-        MULTI_VIOLATION_PROSE,
-        selected_move="explain",
-        posed_via_tool=False,
+        MULTI_VIOLATION_STACKED_RESPONSE,
+        selected_move="worked_example",
+        posed_via_tool=True,
+        pose_tool_stem=MULTI_VIOLATION_BANK_STEM,
     )
     assert result.passed is False
     payload = result.payload
+    # Two prose Qs: the verifiable "What is 1:25,000…" and the
+    # Socratic-unclassified "what does that tell you about which map…"
+    # — both flagged because Option 2 treats unclassified as offender.
     assert payload["match_count"] >= 2
     offending = payload["offending_questions"]
     assert any("plain English" in q for q in offending)
-    assert any("large-scale or small-scale" in q for q in offending)
+    assert any("tell you about which map" in q for q in offending)
+    # The bank stem itself is NOT in the offending list.
+    assert not any("True or False" in q for q in offending)
 
 
 def test_gate_reminder_lists_all_violations() -> None:
-    """The retry reminder names every offending sentence."""
+    """The retry reminder names every offending sentence on stacking turns."""
     from apps.tutoring.v2.services.safety_gates import _reminder_for
     result = run_curriculum_fidelity_check(
-        MULTI_VIOLATION_PROSE,
-        selected_move="explain",
-        posed_via_tool=False,
+        MULTI_VIOLATION_STACKED_RESPONSE,
+        selected_move="worked_example",
+        posed_via_tool=True,
+        pose_tool_stem=MULTI_VIOLATION_BANK_STEM,
     )
     reminder = _reminder_for(
         "curriculum_fidelity",
         result,
-        _gate_ctx(move="explain"),
+        _gate_ctx(
+            move="worked_example",
+            posed_via_tool=True,
+            pose_tool_stem=MULTI_VIOLATION_BANK_STEM,
+        ),
     )
-    # Every offending question appears in the reminder so the LLM
-    # rewrites all of them in one shot.
     for q in result.payload["offending_questions"]:
         snippet = q[:60]
         assert snippet in reminder, (
@@ -553,25 +577,28 @@ def test_gate_reminder_lists_all_violations() -> None:
 
 
 def test_recovery_loop_degrade_strips_all_violations() -> None:
-    """Degrade pass on a multi-violation response removes every offender."""
+    """Degrade pass on a multi-violation stacking response removes every offender."""
 
     def retry_fn(reminder: str) -> str:
-        # Retry returns the same multi-violation text — forces degrade.
-        return MULTI_VIOLATION_PROSE
+        return MULTI_VIOLATION_STACKED_RESPONSE
 
     recovery = run_gates_with_recovery(
-        MULTI_VIOLATION_PROSE,
-        ctx=_gate_ctx(),
+        MULTI_VIOLATION_STACKED_RESPONSE,
+        ctx=_gate_ctx(
+            move="worked_example",
+            posed_via_tool=True,
+            pose_tool_stem=MULTI_VIOLATION_BANK_STEM,
+        ),
         retry_fn=retry_fn,
         gates=("curriculum_fidelity",),
     )
 
     assert recovery.degraded is True
-    # Neither verifiable prose Q survives in the final text.
+    # Neither prose Q survives in the final text.
     assert "plain English" not in recovery.text
-    assert "large-scale or small-scale" not in recovery.text
-    # The framing sentences (statements) are preserved.
-    assert "Map Scale" in recovery.text or recovery.text.strip()
+    assert "tell you about which map" not in recovery.text
+    # The bank stem (the legitimate assessment) survives.
+    assert "True or False" in recovery.text
 
 
 def test_recovery_loop_degrade_on_stacking_preserves_tool_stem() -> None:
@@ -608,13 +635,24 @@ def test_recovery_loop_degrade_on_stacking_preserves_tool_stem() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_gate_unclassified_trailing_flagged_only_on_no_tool() -> None:
-    """An unclassified trailing Q on a no-tool turn is flagged.
+def test_gate_unclassified_qs_flagged_in_both_paths() -> None:
+    """Under Option 2, unclassified Qs are flagged in BOTH paths.
 
-    Same unclassified shape on a tool-fired turn is allowed — the
-    tool stem already provides a legitimate assessment, so the cost
-    of a precision-favoring default is recall-degrading false
-    positives on conversational rhetoric.
+    Tool-fired path: an unclassified Socratic prose Q stacked next to
+    the bank stem is a one-question-per-turn violation regardless of
+    whether the explicit verifiable patterns match.
+
+    No-tool path: an unclassified trailing Q is the silent-skip risk
+    (Path A — the Map Scale screenshot) and is precision-favoring
+    flagged.
+
+    The earlier asymmetric semantics (let unclassified slip through
+    on the tool-fired path because "the bank stem is already a valid
+    assessment") were tightened on 2026-05-28 after live verification
+    surfaced a Socratic "what does that tell you about which map…"
+    construction that the explicit verifiable patterns did not catch.
+    The SHARED_PREAMBLE "Mid-move pose dedup" rule already promised
+    the LLM this enforcement; the gate now matches the contract.
     """
     # Unclassified-shape trailing Q (no explicit verifiable or
     # reflective patterns match).
@@ -629,9 +667,9 @@ def test_gate_unclassified_trailing_flagged_only_on_no_tool() -> None:
         posed_via_tool=False,
     )
     assert result_no_tool.passed is False
-    assert result_no_tool.payload.get("unclassified_fallback") is True
+    assert result_no_tool.payload["stacked_with_tool"] is False
 
-    # Tool fired: pass (the bank stem is the legitimate assessment).
+    # Tool fired: ALSO flag (Option 2 — closes the Socratic-Q stacking gap).
     bank_stem = "What is 18 ÷ 3?"
     result_with_tool = run_curriculum_fidelity_check(
         unclassified_text + f"\n\n{bank_stem}",
@@ -639,4 +677,82 @@ def test_gate_unclassified_trailing_flagged_only_on_no_tool() -> None:
         posed_via_tool=True,
         pose_tool_stem=bank_stem,
     )
-    assert result_with_tool.passed is True
+    assert result_with_tool.passed is False
+    assert result_with_tool.payload["stacked_with_tool"] is True
+    # The bank stem itself ("What is 18 ÷ 3?") must NOT be flagged —
+    # only the prose Q ("Why might that be the case?").
+    assert any(
+        "Why might that be" in q
+        for q in result_with_tool.payload["offending_questions"]
+    )
+    assert not any(
+        "18 ÷ 3" in q
+        for q in result_with_tool.payload["offending_questions"]
+    )
+
+
+def test_socratic_tell_you_about_blocked_on_tool_fired() -> None:
+    """The Map Scale L1425 live-verification miss case is now caught.
+
+    Captured 2026-05-28 — Sonnet authored a Socratic
+    "Given that …, what does that tell you about which map you'd
+    use to plan a journey across the Indian Ocean instead?" inside
+    a worked_example body alongside a tool-posed bank T/F. The
+    explicit verifiable patterns did not match (no disjunction, no
+    compute-value, no MCQ shape). Option 2's non-reflective default
+    catches it.
+    """
+    bank_stem = (
+        "A large-scale map (such as 1:25,000) shows a smaller "
+        "geographic area in greater detail than a small-scale map "
+        "(such as 1:5,000,000).\n\n(True or False?)"
+    )
+    response = (
+        "You're on the right track with large-scale — that instinct "
+        "is solid.\n\n"
+        "**Subgoal 3 — Match the map type to the task**\n"
+        "The task here is navigating a specific hiking trail inside "
+        "Morne Seychellois National Park — a small area where detail "
+        "matters. Given that large-scale = small area + high detail, "
+        "and small-scale = large area + low detail, what does that "
+        "tell you about which map you'd use to plan a journey across "
+        "the Indian Ocean instead?\n\n"
+        "Try this one:\n\n"
+        + bank_stem
+    )
+    result = run_curriculum_fidelity_check(
+        response,
+        selected_move="worked_example",
+        posed_via_tool=True,
+        pose_tool_stem=bank_stem,
+    )
+    assert result.passed is False
+    assert result.payload["stacked_with_tool"] is True
+    assert any(
+        "tell you about which map" in q
+        for q in result.payload["offending_questions"]
+    )
+
+
+def test_gate_passes_reflective_mid_prose_q_on_tool_fired() -> None:
+    """Explicitly reflective mid-prose Qs are still allowed on tool turns.
+
+    The detector's reflective patterns are the ONLY escape valve
+    under Option 2. A turn that combines a recognized reflective
+    construction with the tool pose passes through. (In practice
+    SHARED_PREAMBLE discourages even this, but the gate doesn't
+    block it — only non-reflective constructions trip the gate.)
+    """
+    bank_stem = "What is 18 ÷ 3?"
+    response = (
+        "We've covered the rule. Which of these matches your "
+        "intuition?\n\n"
+        + bank_stem
+    )
+    result = run_curriculum_fidelity_check(
+        response,
+        selected_move="confirm_and_advance",
+        posed_via_tool=True,
+        pose_tool_stem=bank_stem,
+    )
+    assert result.passed is True

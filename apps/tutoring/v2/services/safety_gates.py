@@ -37,6 +37,7 @@ from apps.tutoring.tracing import emit_span
 from apps.tutoring.v2.contracts import GradingResult, Verdict
 from apps.tutoring.v2.services.conformance_check import (
     _last_question_sentence,
+    find_non_reflective_prose_questions,
     find_verifiable_prose_questions,
     is_verifiable_prose_question,
     strip_trailing_tool_stem,
@@ -268,21 +269,31 @@ def run_curriculum_fidelity_check(
     must contain ZERO verifiable questions, regardless of whether
     the tool also fired.
 
-    Unified two-stage detection:
+    Detection (asymmetric by tool-fired vs no-tool):
 
-    1. Strip the tool-appended stem (no-op when no tool fired) and
-       scan EVERY '?'-ending sentence in the LLM-authored prose. Any
-       sentence matching an explicit verifiable pattern is a
-       violation. Multi-violation reporting: all offending sentences
-       are surfaced in the payload so the retry reminder names them
-       all and the degrade pass can strip them all in one shot.
+    1. Tool fired (``posed_via_tool == True``). Strip the tool-
+       appended stem and scan the LLM-authored prose for ANY
+       non-reflective '?'-ending sentence. Verifiable Qs and
+       unclassified Qs both count as offenders — one question per
+       turn is the rule, the bank stem is that question, and any
+       additional prose Q (Socratic, rhetorical, or otherwise) is
+       stacking. Only sentences matching an explicit reflective
+       pattern are allowed through. The Map Scale L1425 live
+       verification on 2026-05-28 surfaced a Socratic
+       "what does that tell you about which …" construction that
+       the explicit verifiable patterns did not catch — moving to
+       non-reflective detection here closes that recall gap and
+       aligns the gate with the SHARED_PREAMBLE "Mid-move pose
+       dedup" rule, which already promised the LLM that prose ``?``
+       alongside a tool call is rejected.
 
-    2. (No-tool path only) If stage 1 found nothing but the response
-       ends with '?' and the trailing sentence is unclassified, fall
-       back to precision-favoring trailing-only detection. The tool-
-       fired path skips this fallback — the bank stem is already a
-       valid assessment, so unclassified prose Qs there are more
-       likely conversational rhetoric than missed assessments.
+    2. No tool fired (``posed_via_tool == False``). Trailing-only
+       precision-favoring detection. The trailing question is the
+       LLM's authored assessment (Path A — the screenshot case).
+       Verifiable trailing → fail. Reflective trailing → pass.
+       Unclassified trailing → fail (precision-favoring fallback).
+       Non-trailing prose Qs on no-tool turns are not flagged here —
+       only the trailing Q drives student input on the next turn.
 
     Skip on terminal move (``close_topic``) — no assessment authored.
     """
@@ -296,57 +307,46 @@ def run_curriculum_fidelity_check(
                 reason="terminal_move",
             )
 
-        prose_only = strip_trailing_tool_stem(
-            response_text, pose_tool_stem,
-        )
-        offending = find_verifiable_prose_questions(prose_only)
-        if offending:
-            offending_clip = [s[:200] for s in offending]
-            reason_label = (
-                "stacked prose question alongside tool-posed stem"
-                if posed_via_tool
-                else "verifiable prose question authored by tutor"
+        if posed_via_tool:
+            prose_only = strip_trailing_tool_stem(
+                response_text, pose_tool_stem,
             )
+            offending = find_non_reflective_prose_questions(prose_only)
+            if not offending:
+                return GateResult(passed=True, name="curriculum_fidelity")
+            offending_clip = [s[:200] for s in offending]
             primary = offending[0]
             return _fail(
                 "curriculum_fidelity",
-                f"{reason_label} "
+                f"stacked prose question alongside tool-posed stem "
                 f"({len(offending)} found): {primary[:120]!r}",
                 span,
                 payload={
                     "offending_questions": offending_clip,
-                    # ``trailing_question`` retained for backward-compat
-                    # with the existing observability schema; equals the
-                    # first offending sentence.
                     "trailing_question": offending_clip[0],
                     "move": move,
-                    "stacked_with_tool": posed_via_tool,
+                    "stacked_with_tool": True,
                     "match_count": len(offending),
                 },
             )
 
-        # No explicit verifiable patterns matched. In the no-tool path
-        # only, fall back to precision-favoring trailing-only detection
-        # — an unclassified trailing Q in a no-tool turn is the silent-
-        # skip risk (Path A) and we'd rather false-positive than miss.
-        if not posed_via_tool and is_verifiable_prose_question(response_text):
-            trailing = _last_question_sentence(response_text)
-            return _fail(
-                "curriculum_fidelity",
-                f"unclassified trailing question on no-tool turn: "
-                f"{trailing[:120]!r}",
-                span,
-                payload={
-                    "offending_questions": [trailing[:200]],
-                    "trailing_question": trailing[:200],
-                    "move": move,
-                    "stacked_with_tool": False,
-                    "match_count": 1,
-                    "unclassified_fallback": True,
-                },
-            )
-
-        return GateResult(passed=True, name="curriculum_fidelity")
+        # No-tool path: trailing-only, precision-favoring.
+        if not is_verifiable_prose_question(response_text):
+            return GateResult(passed=True, name="curriculum_fidelity")
+        trailing = _last_question_sentence(response_text)
+        return _fail(
+            "curriculum_fidelity",
+            f"trailing prose question is verifiable (no tool pose): "
+            f"{trailing[:120]!r}",
+            span,
+            payload={
+                "offending_questions": [trailing[:200]],
+                "trailing_question": trailing[:200],
+                "move": move,
+                "stacked_with_tool": False,
+                "match_count": 1,
+            },
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -482,18 +482,22 @@ def _reminder_for(gate_name: str, gate_result: GateResult, ctx: GateContext) -> 
             return (
                 "Your previous reply already posed the assessment via "
                 "the pose_question tool, but the LLM-authored prose "
-                "ALSO asked a question with a single canonical answer. "
-                "Under the curriculum-fidelity contract there is ONE "
-                "assessment per turn — the tool's bank stem IS that "
-                "assessment. The prose lead-in must contain ZERO "
-                "additional verifiable questions (no named options, "
-                "no numeric values, no yes/no, no closed-set picks)."
+                "ALSO contained a question. Under the curriculum-"
+                "fidelity contract there is ONE question per turn — "
+                "the tool's bank stem IS that question. When the tool "
+                "fires, the prose must contain ZERO additional "
+                "questions of any kind: not a verifiable Q (named "
+                "options, numeric values, yes/no, closed-set picks), "
+                "not a Socratic Q ('what does that tell you about …', "
+                "'given X, what …'), not a rhetorical Q ('what does "
+                "that mean?'). The only allowance is explicitly-"
+                "reflective shapes ('what's your intuition?', 'where "
+                "have you seen this?') — but those usually belong on "
+                "no-tool turns, not stacked alongside a bank pose."
                 + flagged_clause +
                 " Rewrite the reply with the SAME tool call, but "
-                "remove the verifiable question from the prose. "
-                "Reflective or scene-setting prose is fine; "
-                "verifiable prose questions are not. Keep the same "
-                "teaching move."
+                "convert each prose question into a statement, or "
+                "remove it entirely. Keep the same teaching move."
             )
         return (
             "Your previous reply ended with a question that has a "

@@ -240,20 +240,14 @@ def is_verifiable_prose_question(response_text: str) -> bool:
 def find_verifiable_prose_questions(text: str) -> list[str]:
     """Return every explicitly-verifiable '?' sentence in ``text``.
 
-    One question per turn is the curriculum-fidelity rule
-    (``memory/curriculum_fidelity_principle.md``). When the gate
-    fires, the recovery loop needs to surface ALL offending sentences
-    so the retry reminder names them all and the degrade pass can
-    strip them all in one go — single-match detection lets later
-    violations slip past a one-attempt retry budget.
+    Narrow detection: only sentences matching one of the verifiable
+    regex patterns are returned. Unclassified sentences are NOT
+    included. Kept available for callers that want the high-precision
+    list (e.g. for analytics or selective tooling).
 
-    Scans every '?'-ending sentence in order. ``unclassified``
-    sentences are NOT treated as verifiable here (precision-favoring
-    becomes recall-degrading on a multi-sentence scan — many
-    rhetorical / conversational prose Qs would false-positive). The
-    no-tool trailing-only check in ``is_verifiable_prose_question``
-    handles the precision-favoring fallback for the unclassified
-    trailing case.
+    Most gate use cases want :func:`find_non_reflective_prose_questions`
+    instead — the curriculum-fidelity gate enforces "one question per
+    turn" and treats unclassified prose Qs as offenders too.
     """
     if not text or "?" not in text:
         return []
@@ -261,6 +255,36 @@ def find_verifiable_prose_questions(text: str) -> list[str]:
         sent
         for sent in _question_sentences(text)
         if _classify_question(sent) == "verifiable"
+    ]
+
+
+def find_non_reflective_prose_questions(text: str) -> list[str]:
+    """Return every '?' sentence in ``text`` that is NOT explicitly reflective.
+
+    Used by the curriculum-fidelity gate to enforce "one question
+    per turn" (``memory/curriculum_fidelity_principle.md``). When the
+    pose_question tool fires, the bank stem IS the assessment; the
+    LLM-authored prose must add ZERO further questions — verifiable,
+    Socratic, or rhetorical. The only allowance is sentences that
+    match an explicit reflective pattern (the conversational scaffold
+    use case the principle preserves).
+
+    Decision per sentence:
+      - reflective    → not returned (allowed)
+      - verifiable    → returned (assessment-shaped; one-Q rule)
+      - unclassified  → returned (precision-favoring: cannot prove
+                        it's reflective, so treat as a Q for the
+                        one-Q rule. The retry mechanism gives the
+                        LLM a chance to rephrase the unclassified Q
+                        as a statement, an explicit reflective shape,
+                        or to remove it entirely.)
+    """
+    if not text or "?" not in text:
+        return []
+    return [
+        sent
+        for sent in _question_sentences(text)
+        if _classify_question(sent) != "reflective"
     ]
 
 

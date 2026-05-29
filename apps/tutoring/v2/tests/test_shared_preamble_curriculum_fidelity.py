@@ -202,6 +202,50 @@ def test_mobile_directive_still_renders_after_curriculum_fidelity() -> None:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Universal acknowledgment rule (2026-05-28 addition)
+# ---------------------------------------------------------------------------
+
+
+def test_universal_acknowledgment_rule_present() -> None:
+    """SHARED_PREAMBLE mandates acknowledgment on every student-input turn."""
+    body = SHARED_PREAMBLE_TEMPLATE
+    assert "Acknowledge what the student said" in body
+    # The rule is universal, not move-specific.
+    assert "every turn, no exceptions" in body or "every turn" in body
+    # The first sentence MUST reference the student's input.
+    assert "first sentence of EVERY response" in body
+    # Acknowledgment can be warm OR neutral (not always warm).
+    assert "warm" in body.lower() and "neutral" in body.lower()
+
+
+def test_universal_acknowledgment_distinguishes_verdict_paths() -> None:
+    """The rule names CORRECT, WRONG/PARTIAL, no-verdict-with-content,
+    and pure forward-signal cases distinctly."""
+    body = SHARED_PREAMBLE_TEMPLATE
+    assert "For a CORRECT verdict" in body
+    assert "For a WRONG / PARTIAL verdict" in body
+    assert "For NO verdict + ANY student content" in body
+    assert "For NO verdict + PURE forward signal" in body
+
+
+def test_universal_acknowledgment_names_dominant_failure() -> None:
+    """The rule names 'silently emit … with NO prose lead-in' as failure."""
+    body = SHARED_PREAMBLE_TEMPLATE
+    assert "Silently emit the next bank stem" in body
+    assert 'the system ignored me' in body
+    assert "Generic" in body and "no content reference" in body
+
+
+def test_universal_acknowledgment_precedes_voice_block() -> None:
+    """Like curriculum-fidelity, the acknowledgment rule appears before Voice."""
+    ack_idx = SHARED_PREAMBLE_TEMPLATE.find("Acknowledge what the student said")
+    voice_idx = SHARED_PREAMBLE_TEMPLATE.find("Voice (every turn):")
+    assert ack_idx > -1
+    assert voice_idx > -1
+    assert ack_idx < voice_idx
+
+
 @pytest.mark.parametrize("client_kind", ["web", "mobile"])
 def test_curriculum_fidelity_in_first_half_of_preamble(client_kind: str) -> None:
     """The section sits in the first half of the rendered preamble."""
