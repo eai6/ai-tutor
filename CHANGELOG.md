@@ -27,6 +27,12 @@ run simple_tutor at v0.1.0** (env vars `SIMPLE_TUTOR_ENGINE=on`,
 `TUTORING_QUESTION_TYPES=mcq`); the legacy engine is still in the
 codebase as a fallback (`SIMPLE_TUTOR_ENGINE=off`) but not active.
 
+**Tutor model** at v0.1.0: `anthropic/claude-opus-4-7` on both prod
+and staging — matches the model the 78/80 systematic eval validated
+against. Sonnet 4.6 (prior prod default) was swapped to Opus 4.7
+on 2026-05-29 by updating the GH repo variable
+`TUTOR_MODEL_OVERRIDE` so future GHA deploys preserve the choice.
+
 Concrete pieces:
 
 - `InFlightQuestion` model + migration — persists the question state
