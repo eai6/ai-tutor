@@ -16,10 +16,13 @@ happens through this manager's save / commit methods only.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 from apps.tutoring.tracing import emit_span
+
+logger = logging.getLogger(__name__)
 from apps.tutoring.v2.contracts import (
     OpenQuestion,
     PendingPose,
@@ -177,6 +180,10 @@ class ContextManager:
             lesson=lesson, runtime_state=runtime_state,
         )
 
+        skills_snapshot = self._load_filtered_skills_snapshot(
+            profile=profile, lesson=lesson, course=course,
+        )
+
         return TutoringContext(
             session_id=session.id,
             student_id=student.id,
@@ -197,7 +204,84 @@ class ContextManager:
             current_step_worked_example=worked_example,
             is_final_step=is_final_step,
             assessable_slots_remaining=assessable_slots_remaining,
+            skills_snapshot=skills_snapshot,
         )
+
+    def _load_filtered_skills_snapshot(
+        self, *, profile, lesson, course,
+    ) -> dict:
+        """Return the slice of ``StudentProfile.skills_snapshot`` whose
+        objective tags overlap this lesson's objectives.
+
+        Source-of-truth shape per ``competency_tracker.refresh_student_
+        snapshot``: ``{str(course_id): {objective_tag: {pct, level,
+        source, attempts}}}``. We pull the current course's slice and
+        intersect tags with the union of (a) ``lesson.objective``, (b)
+        ``lesson.enabling_objectives``, (c) each ``LessonStep.
+        enabling_objective``, all normalised via the same
+        ``_normalize_tag`` helper that the writer uses.
+
+        Returns ``{}`` when:
+          - the student has no ``StudentProfile`` row;
+          - the course slice is empty;
+          - no overlap exists between snapshot tags and lesson
+            objectives;
+          - any ORM read raises (fail-soft per Phase 1 design memo
+            §"Defense-in-depth").
+
+        Plan: ``memory/skills_snapshot_v2_wiring_plan.md`` (2026-05-29).
+        """
+        if profile is None or lesson is None or course is None:
+            return {}
+        try:
+            raw_slice = (profile.skills_snapshot or {}).get(
+                str(course.id), {}
+            )
+        except Exception as exc:
+            logger.warning(
+                "[ContextManager] skills_snapshot read raised %s — "
+                "treating as empty",
+                type(exc).__name__,
+            )
+            return {}
+        if not raw_slice:
+            return {}
+
+        from apps.tutoring.competency_tracker import _normalize_tag
+
+        relevant_tags: set[str] = set()
+        primary = (getattr(lesson, "objective", "") or "").strip()
+        if primary:
+            relevant_tags.add(_normalize_tag(primary))
+        for tag in (getattr(lesson, "enabling_objectives", None) or []):
+            if isinstance(tag, str) and tag.strip():
+                relevant_tags.add(_normalize_tag(tag))
+        try:
+            steps_qs = getattr(lesson, "steps", None)
+            if steps_qs is not None:
+                for step in steps_qs.all():
+                    step_tag = (
+                        getattr(step, "enabling_objective", "") or ""
+                    ).strip()
+                    if step_tag:
+                        relevant_tags.add(_normalize_tag(step_tag))
+        except Exception as exc:
+            logger.warning(
+                "[ContextManager] lesson.steps iteration raised %s — "
+                "continuing with lesson-level objectives only",
+                type(exc).__name__,
+            )
+
+        if not relevant_tags:
+            return {}
+
+        filtered: dict[str, dict] = {}
+        for tag, data in raw_slice.items():
+            if not isinstance(tag, str) or not isinstance(data, dict):
+                continue
+            if _normalize_tag(tag) in relevant_tags:
+                filtered[tag] = data
+        return filtered
 
     def _count_assessable_slots_remaining(
         self, *, lesson, runtime_state,

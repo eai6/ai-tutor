@@ -374,6 +374,54 @@ def render_router_user_prompt(request: RouterRequest) -> str:
     )
 
 
+# Skills-snapshot block lives only on the StudentTutor side. The router
+# does NOT route on cross-session mastery — its job is counter-driven
+# move selection. The formatter is kept module-local here for
+# StudentTutor to import; not exposed in the router's user prompt.
+_LEVEL_PRIORITY: dict[str, int] = {
+    "weak": 0,
+    "developing": 1,
+    "mastered": 2,
+    "unassessed": 3,
+}
+
+
+def _format_skills_snapshot_block(
+    snapshot: dict, *, max_entries: int = 8,
+) -> str:
+    """Shared formatter — used by both the router prompt and the
+    StudentTutor prompt so the LLM sees the same shape in both calls.
+    """
+    items = []
+    for tag, data in snapshot.items():
+        if not isinstance(tag, str) or not isinstance(data, dict):
+            continue
+        level = (data.get("level") or "").strip().lower()
+        if not level:
+            continue
+        attempts = data.get("attempts") or 0
+        items.append((level, tag, int(attempts)))
+    if not items:
+        return ""
+    items.sort(key=lambda row: (_LEVEL_PRIORITY.get(row[0], 9), row[1].lower()))
+    head = items[:max_entries]
+    rest = len(items) - len(head)
+    lines = [
+        "=== Your skill levels on this lesson's objectives ===",
+    ]
+    for level, tag, attempts in head:
+        if attempts == 1:
+            attempts_clause = " (1 attempt)"
+        elif attempts > 1:
+            attempts_clause = f" ({attempts} attempts)"
+        else:
+            attempts_clause = ""
+        lines.append(f"- {tag}: {level}{attempts_clause}")
+    if rest > 0:
+        lines.append(f"- (+ {rest} more)")
+    return "\n".join(lines)
+
+
 def _render_lesson_block(request: RouterRequest) -> str:
     title = (request.lesson_title or "(this lesson)").strip()
     subject = (request.lesson_subject or "(see title)").strip()

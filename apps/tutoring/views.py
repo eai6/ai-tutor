@@ -1718,6 +1718,26 @@ def chat_exit_ticket(request, session_id):
         enriched_exit_ticket = dict(response.exit_ticket_data or {})
         enriched_exit_ticket["competency"] = competency
 
+        # Defense-in-depth: refresh StudentProfile.skills_snapshot here
+        # too. Legacy ConversationalTutor._submit_exit_ticket_inner
+        # already calls this at conversational_tutor.py:11989, so this
+        # is idempotent today. It becomes the SOLE call site once the
+        # legacy module is deleted under the 4-week deprecation gate
+        # (CLAUDE.md Phase 3 §3.5), at which point v2 sessions would
+        # otherwise silently stop refreshing the snapshot the v2 router
+        # + StudentTutor prompts now read.
+        # Plan: memory/skills_snapshot_v2_wiring_plan.md Phase 1.
+        try:
+            from apps.tutoring.competency_tracker import refresh_student_snapshot
+            unit = getattr(session.lesson, "unit", None)
+            course = getattr(unit, "course", None) if unit else None
+            if course is not None:
+                refresh_student_snapshot(request.user, course)
+        except Exception as exc:
+            logger.warning(
+                "skills_snapshot refresh in chat_exit_ticket failed: %s", exc,
+            )
+
         return JsonResponse({
             "message": response.content,
             "phase": response.phase,

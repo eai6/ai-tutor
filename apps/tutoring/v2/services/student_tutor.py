@@ -515,6 +515,7 @@ class StudentTutor:
         evidence_block = self._render_objective_evidence_block(context)
         media_block = self._render_media_catalog_block(media_catalog)
         lesson_content_block = self._render_lesson_step_content_block(context)
+        skills_block = self._render_skills_snapshot_block(context)
         reason_block = self._render_reason_block(reason=reason)
         transcript_block = self._render_transcript_block(context.full_transcript)
         verdict_block = self._render_verdict_block(
@@ -525,6 +526,7 @@ class StudentTutor:
             f"{evidence_block}\n\n"
             f"{media_block}\n\n"
             f"{lesson_content_block}\n\n"
+            + (f"{skills_block}\n\n" if skills_block else "") +
             f"{reason_block}"
             f"=== Conversation transcript so far ===\n"
             f"{transcript_block}\n\n"
@@ -536,6 +538,19 @@ class StudentTutor:
             f"prompt for this turn. Follow the move's directives "
             f"exactly; do not invent a different move."
         )
+
+    def _render_skills_snapshot_block(self, context: TutoringContext) -> str:
+        """Compact per-objective mastery block, identical shape to the
+        router prompt's renderer so the LLM sees the same data in both
+        calls. Returns empty string when the snapshot is empty — the
+        caller skips the section header in that case.
+
+        Plan: ``memory/skills_snapshot_v2_wiring_plan.md`` Phase 1.
+        """
+        from apps.tutoring.v2.services.router_prompts import (
+            _format_skills_snapshot_block,
+        )
+        return _format_skills_snapshot_block(context.skills_snapshot or {})
 
     def _render_reason_block(self, *, reason: str) -> str:
         """Inject the router's one-sentence steering hint for this turn.

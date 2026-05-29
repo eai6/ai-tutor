@@ -858,6 +858,19 @@ and is the most common reason this move's output gets rejected.
 When no authored anchor is present, generate the example yourself
 following the structure below.
 
+Linking to prior study (personalization, not routing):
+- If the user prompt contains a "Your skill levels on this lesson's
+  objectives" section AND an entry there is marked ``mastered``, you
+  may reference that objective by name in the walkthrough as
+  something the student has already studied ("you already know how
+  X works — the next step builds on that"). This is purely
+  connective language — it does not change the example's depth,
+  step count, or structure.
+- Do not invent prior study. Only reference objectives that appear
+  in the section with a ``mastered`` level. When the section is
+  absent or has no mastered entries, write the walkthrough without
+  any "you already know" references.
+
 How (every case):
 - Anchor the example to the visible problem, the bank, OR a small
   structurally-equivalent toy case (same shape, simpler or equal
@@ -1010,6 +1023,14 @@ How (no verdict / opening turn):
 - If the concept depends on a prerequisite the student hasn't
   shown evidence on, name the prerequisite explicitly and signal
   you'll come back to it.
+- If the user prompt contains a "Your skill levels on this lesson's
+  objectives" section AND an entry there is marked ``mastered``,
+  you may reference that objective by name in the framing as
+  something the student has already studied ("you've already got
+  X — today we'll build on that with Y"). Purely connective
+  language — it does not change the explanation's structure, depth,
+  or what the open prompt asks. Do not invent prior study; only
+  reference objectives that appear in the section as ``mastered``.
 - End the turn with EITHER (a) a one-line OPEN-ENDED prose
   prompt that has no canonical answer ("what do you think might
   cause this?", "where have you seen this happen near you?",

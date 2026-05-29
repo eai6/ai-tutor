@@ -156,6 +156,26 @@ class TutoringContext(BaseModel):
     # the safe assumption ("more work remains") for legacy / mocked
     # contexts that don't compute it.
     assessable_slots_remaining: int = 1
+    # Per-objective mastery snapshot, already filtered to objectives the
+    # current lesson exercises. Shape:
+    #   {objective_tag: {
+    #       "pct": float,                                  # 0-100
+    #       "level": "mastered"|"developing"|"weak"|"unassessed",
+    #       "source": "baseline"|"latest"|"final"|"",
+    #       "attempts": int,
+    #   }}
+    # Sourced from ``StudentProfile.skills_snapshot[str(course_id)]``,
+    # intersected with the lesson's objectives via
+    # ``ContextManager._load_filtered_skills_snapshot``. Empty when the
+    # student has no signal yet on this lesson's objectives — the
+    # prompt renderers skip the section entirely in that case (no
+    # noise on a fresh learner).
+    #
+    # Drives Mastery Learning Ch.13 (level=weak biases worked_example)
+    # and Layering Ch.16 (level=mastered authorizes composed
+    # follow-ups) when surfaced into the LLM prompts. See
+    # ``memory/skills_snapshot_v2_wiring_plan.md`` (2026-05-29).
+    skills_snapshot: dict[str, dict] = Field(default_factory=dict)
 
 
 # ──────────────────────────────────────────────────────────────────────
