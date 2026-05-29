@@ -164,12 +164,33 @@ class ResumeArtifactPreservationTest(TestCase):
         ) as start_mock:
             envelope = v2_resume_dispatch(session)
         start_mock.assert_called_once_with(session)
-        # Resume delegated to the pose-next path and tagged the envelope.
+        # Resume delegated to the pose-next path, tagged the envelope, and
+        # prepended the re-entry acknowledgment (resume-only) ahead of the
+        # posed question.
         self.assertEqual(
             envelope["message"],
+            "Welcome back — let's keep going. "
             "A bearing of 180° points in which compass direction?",
         )
         self.assertTrue(envelope["resume"])
         # No artifact-preservation fields when there was no open question.
         self.assertNotIn("mcq_options", envelope)
         self.assertNotIn("attached_media_ids", envelope)
+
+    def test_resume_does_not_double_greet(self):
+        """When the delegated opening turn already greets (fresh-explain
+        opener / error fallback), the resume prefix is not prepended."""
+        session = _build_session(engine_version="v2")
+        greeted = {
+            "session_id": session.id,
+            "message": "Welcome — let's get started together.",
+            "phase": "engage",
+        }
+        with patch(
+            "apps.tutoring.v2.routing.v2_start_dispatch", return_value=greeted,
+        ):
+            envelope = v2_resume_dispatch(session)
+        self.assertEqual(
+            envelope["message"], "Welcome — let's get started together.",
+        )
+        self.assertNotIn("Welcome back — let's keep going.", envelope["message"])

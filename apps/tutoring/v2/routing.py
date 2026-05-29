@@ -319,6 +319,15 @@ def v2_resume_dispatch(session) -> dict:
         # after commit). Tag the envelope as a resume for the frontend.
         payload = v2_start_dispatch(session)
         payload["resume"] = True
+        # Restore the re-entry acknowledgment: the delegated opening-turn
+        # path has no notion of "resume", so it would otherwise drop the
+        # student into a bare posed question. Prepend ONLY on resume —
+        # a genuinely fresh first-ever start goes through v2_start_dispatch
+        # directly and stays unprefixed (no "welcome BACK"). Guard against
+        # double-greeting when the message already opens with a welcome.
+        msg = (payload.get("message") or "").strip()
+        if msg and "welcome" not in msg.lower():
+            payload["message"] = f"Welcome back — let's keep going. {msg}"
         return payload
 
     snapshot = open_q.visible_context_at_pose

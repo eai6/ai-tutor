@@ -163,7 +163,7 @@ Watch the two soft spots before committing: **perception noise** (§9.1) and **n
 
 **Implementation status (2026-05-29):**
 - ✅ **Steps 1 + 2** — committed `ea7fe42` (router perception + grader bank-matching + engine grade-gate + trace). 752 tests; live-validated on Lesson 1426.
-- ✅ **Step 3 — resume** — `v2_resume_dispatch` no-open-question branch delegates to `v2_start_dispatch` (state-driven: poses the next bank question; idempotent after commit). Live-validated: first resume posed + committed (step 13784); reload re-rendered, no re-pose.
+- ✅ **Step 3 — resume** — `v2_resume_dispatch` no-open-question branch delegates to `v2_start_dispatch` (state-driven: poses the next bank question; idempotent after commit), and prepends `"Welcome back — let's keep going. "` (resume-only, double-greet-guarded) so the student gets the re-entry acknowledgment AND the question (Issue 1). Live-validated: `"Welcome back — let's keep going. Convert the compass direction North-East (NE) to a three-figure bearing."`; reload re-rendered, no re-pose.
 - ✅ **Step 5 — one-question gate** — new `run_one_question_check` (deterministic floor + Haiku `question_extractor` re-wired as a live service), added to `_GATE_ORDER` after `stem_duplication`. Catches image-#2 / T1560 stacking + active-end. 12 new tests.
 - 🧹 Removed dead `PRE_POSE_SYSTEM` prompt (pre-pose check gone in the prune; not returning under the redesign).
 - ⏳ **Step 4 (demote provenance gates)** — pending, gated on eval.
