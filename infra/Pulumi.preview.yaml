@@ -28,8 +28,14 @@ config:
   # TUTORING_QUESTION_TYPES here. Those belong to the
   # `apps/tutoring/simple_tutor/` engine that ships from `dev`. The v2
   # engine lives at `apps/tutoring/v2/` and routes through
-  # `tutor_engine.py` independently. If v2 grows its own env-var
-  # toggles, add them here as `aitutor:v2-...` keys.
+  # `tutor_engine.py` independently.
+  #
+  # NEW_TUTOR=on makes every new TutorSession default to v2 routing
+  # (see apps/tutoring/v2/routing.py::ensure_engine_version_set).
+  # Without this baked into Pulumi state, the manual
+  #   `az containerapp update --set-env-vars NEW_TUTOR=on …`
+  # gets silently wiped on the next `pulumi up`. Set on 2026-05-28.
+  aitutor:new-tutor: "on"
   #
   # ── Secrets — set via CLI on the preview stack ──────────────────────
   # Run from infra/ on a machine that has the Pulumi passphrase:

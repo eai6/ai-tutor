@@ -464,6 +464,15 @@ def _build_app_env_vars(*, csrf_origins=None, include_job_dispatch_env=False):
                 name="TUTORING_QUESTION_TYPES", value=_tutoring_q_types,
             ),
         )
+    # NEW_TUTOR — flips new TutorSessions to Roy's v2 engine
+    # (apps/tutoring/v2/routing.py::ensure_engine_version_set). Set on
+    # the preview stack to default sessions there to v2; leave unset on
+    # staging / prod so they stay on legacy or simple_tutor.
+    _new_tutor = config.get("new-tutor")
+    if _new_tutor:
+        env_vars.append(
+            app.EnvironmentVarArgs(name="NEW_TUTOR", value=_new_tutor),
+        )
     if include_job_dispatch_env:
         env_vars.extend([
             app.EnvironmentVarArgs(name="AZURE_RESOURCE_GROUP", value=rg.name),
