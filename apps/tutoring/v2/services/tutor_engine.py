@@ -522,6 +522,33 @@ class TutorEngine:
                 "— let's wrap here for now."
             )
 
+        # 4d. CORRECT-verdict affirmation floor (engine-side — memo §7
+        # option 2). A pose-bearing move forces the tool; the LLM can
+        # return a tool_use block with NO text block, so the assembled
+        # turn is the bare bank stem and a correct answer ships with no
+        # acknowledgment (GEO-S5 run-12 / run-13 T2). The move prompt
+        # mandates the affirmation; this is the deterministic backstop for
+        # the dropped text channel — it fires ONLY when the LLM gave
+        # nothing (detection is exact: the shipped text equals the
+        # committed stem), so the LLM keeps authoring whenever it does.
+        # Verified-material only: synthesise from the grader's CORRECT
+        # output, never invent.
+        if (
+            committed_pose is not None
+            and verdict is not None
+            and verdict.verdict == Verdict.CORRECT
+            and attempt_text.strip()
+            == (committed_pose.rendered_stem or "").strip()
+        ):
+            affirmation = self._synthesize_affirmation(verdict)
+            if affirmation:
+                attempt_text = f"{affirmation}\n\n{attempt_text}"
+                with emit_span(
+                    "audit", "tutor.affirmation_floor",
+                    payload={"affirmation": affirmation[:120]},
+                ):
+                    pass
+
         # 4b. Phase B commit — only if the LLM called the pose tool. The
         # pose validation already happened inside StudentTutor (Phase A);
         # commit here unconditionally so the next turn's grader has the
@@ -686,6 +713,30 @@ class TutorEngine:
         # non-answer-attempt branch.
         chosen = self._resolve_move(decision=decision, verdict=None)
         return chosen, decision.reason, decision
+
+    @staticmethod
+    def _synthesize_affirmation(verdict: GradingResult) -> str:
+        """One-line affirmation for the CORRECT empty-lead-in floor (4d).
+
+        Backstop only — fires when the LLM emitted no lead-in alongside a
+        forced pose. Built from the grader's VERIFIED CORRECT output, never
+        invented: prefer a content-bearing ``what_right`` (skip the generic
+        deterministic placeholder), else name the student's own value /
+        canonical. On a CORRECT verdict the value is the student's, so it
+        is safe to surface.
+        """
+        wr = (verdict.student_safe_feedback.what_right or "").strip()
+        val = (verdict.student_value or verdict.private_canonical or "").strip()
+        if wr and wr.lower() not in ("you matched the answer",):
+            text = wr
+        elif val:
+            text = f"Correct — {val}"
+        else:
+            text = "Correct"
+        text = text[0].upper() + text[1:]
+        if not text.endswith((".", "!", "?")):
+            text += "."
+        return text
 
     def _open_question_for_grading(
         self,
