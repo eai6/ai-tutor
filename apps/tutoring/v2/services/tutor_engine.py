@@ -163,9 +163,73 @@ class TutorEngine:
             )
             response_text = "Welcome — let's get started together."
 
+        # Curriculum-fidelity gate on the opener (Phase 1.2 — 2026-05-28).
+        # Other gates (safety, figure_ref, answer_leak) remain skipped at
+        # opener time per their prior semantics — opener has no verdict,
+        # no canonical to leak, no figure to misref. Curriculum fidelity
+        # IS load-bearing on the opener because the EXPLAIN move can
+        # author a verifiable prose Q (the Map Scale L1425 screenshot
+        # 2026-05-28 — the failure that motivated this gate).
+        opener_retry_pose_capture: list[Optional[Any]] = [None]
+
+        def _opener_retry_fn(reminder: str) -> str:
+            try:
+                retried = self._invoke_tutor(
+                    context=context,
+                    verdict=None,
+                    move=move,
+                    media_catalog=media_catalog,
+                    student_input="",
+                    reason=reason,
+                    extra_reminder=reminder,
+                    hold_pending_pose=pending_pose,
+                )
+                if (
+                    retried.pending_pose is not None
+                    and retried.pending_pose is not pending_pose
+                ):
+                    opener_retry_pose_capture[0] = retried.pending_pose
+                return retried.text or ""
+            except Exception as exc:
+                logger.warning(
+                    "[TutorEngine] start_session gate retry raised %s",
+                    type(exc).__name__,
+                )
+                return ""
+
+        opener_gate_ctx = GateContext(
+            verdict=None,
+            posed_via_tool=(pending_pose is not None),
+            selected_move=move,
+            lesson_has_media=bool(media_catalog),
+            pose_tool_stem=(
+                pending_pose.rendered_stem if pending_pose else ""
+            ),
+        )
+        opener_recovery = run_gates_with_recovery(
+            response_text,
+            ctx=opener_gate_ctx,
+            retry_fn=_opener_retry_fn,
+            gates=("curriculum_fidelity",),
+        )
+        response_text = opener_recovery.text
+        if pending_pose is None and opener_retry_pose_capture[0] is not None:
+            pending_pose = opener_retry_pose_capture[0]
+
+        v2_trace["gate_failures"] = [
+            {
+                "gate": f.gate,
+                "attempt": f.attempt,
+                "reason": (f.reason or "")[:200],
+                "degraded": f.degraded,
+            }
+            for f in opener_recovery.failures
+        ]
+
         # Phase B commit (if a tool-call PendingPose came back). The
-        # opening turn has no verdict; gates are skipped (no canonical
-        # to leak, no figure to misref) — committing the pose is safe.
+        # curriculum_fidelity gate above may also have produced a pose
+        # via retry; in that case ``pending_pose`` was adopted from the
+        # retry capture.
         if pending_pose is not None:
             try:
                 runtime_state = self.context_manager.commit_pending_pose(
@@ -324,7 +388,21 @@ class TutorEngine:
             ],
             posed_via_tool=(committed_pose is not None),
             lesson_has_media=lesson_has_media,
+            selected_move=selected_move,
+            pose_tool_stem=(
+                committed_pose.rendered_stem if committed_pose else ""
+            ),
         )
+
+        # Capture any PendingPose produced by a gate retry. When the
+        # first invoke didn't call the pose tool (committed_pose is
+        # None) and the curriculum_fidelity gate retry prompts the LLM
+        # to call it, this list captures the resulting pose so the
+        # engine can commit it after recovery. When committed_pose
+        # was non-None, hold_pending_pose is threaded into the retry
+        # and the retried pending_pose equals committed_pose — same
+        # identity, no capture.
+        retry_pose_capture: list[Optional[Any]] = [None]
 
         def _retry_fn(reminder: str) -> str:
             try:
@@ -338,6 +416,11 @@ class TutorEngine:
                     extra_reminder=reminder,
                     hold_pending_pose=committed_pose,
                 )
+                if (
+                    retried.pending_pose is not None
+                    and retried.pending_pose is not committed_pose
+                ):
+                    retry_pose_capture[0] = retried.pending_pose
                 return retried.text or ""
             except Exception as exc:
                 logger.warning(
@@ -352,6 +435,14 @@ class TutorEngine:
             retry_fn=_retry_fn,
         )
         attempt_text = recovery.text
+
+        # If the original turn didn't pose and a retry did, adopt the
+        # retry's pose so the next turn has a valid open_question to
+        # grade against — otherwise the student sees the same prompt
+        # twice (gate-retry's pose-tool stem AND the next turn's Rule 6
+        # pose-tool stem on the same objective).
+        if committed_pose is None and retry_pose_capture[0] is not None:
+            committed_pose = retry_pose_capture[0]
 
         # 4c. Empty pose-dominant body recovery (run-11 R3).
         #

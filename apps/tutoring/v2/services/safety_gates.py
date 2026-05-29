@@ -1,19 +1,23 @@
 """Safety gates + per-gate recovery — v2 prune plan §4.4.
 
-Three deterministic gates only — ``safety``, ``figure_ref``,
-``answer_leak``. Each gate gets ONE retry with a gate-specific
-reminder; if the retry still fails, the response is degraded
-(offending span stripped or redacted) and shipped. The response
-ALWAYS ships; the frontend never sees a gate-failed error.
+Four deterministic gates — ``curriculum_fidelity``, ``safety``,
+``figure_ref``, ``answer_leak``. Each gate gets ONE retry with a
+gate-specific reminder; if the retry still fails, the response is
+degraded (offending span stripped or redacted) and shipped. The
+response ALWAYS ships; the frontend never sees a gate-failed error.
 
 This module replaces the deleted ``services/conformance/`` package
 + ``services/templates.py`` + ``services/move_escalation.py``.
 
-The gate functions themselves (``run_safety_check``,
-``run_figure_ref_check``, ``run_answer_leak_check``) lift verbatim
-from the legacy conformance gates — they were the three keepers per
-plan §3. The classifier-driven gates (state_coherence, rule_check,
-praise_filter, open_question_stickiness) are gone.
+The gate functions ``run_safety_check``, ``run_figure_ref_check``,
+``run_answer_leak_check`` lift verbatim from the legacy conformance
+gates — they were the three keepers per plan §3. The
+``run_curriculum_fidelity_check`` gate was added 2026-05-28 to
+enforce the curriculum-fidelity contract
+(``memory/curriculum_fidelity_principle.md``): all assessable
+questions must go through the ``pose_question`` tool against
+bank-authored ``LessonStep`` rows; the tutor must never author
+verifiable questions in prose.
 
 Observability: every gate trigger emits a ``gate.failure`` span with
 the gate name + reason + the degradation action taken. The dashboard
@@ -31,6 +35,12 @@ from typing import Callable, List, Optional
 
 from apps.tutoring.tracing import emit_span
 from apps.tutoring.v2.contracts import GradingResult, Verdict
+from apps.tutoring.v2.services.conformance_check import (
+    _last_question_sentence,
+    find_verifiable_prose_questions,
+    is_verifiable_prose_question,
+    strip_trailing_tool_stem,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +249,107 @@ def run_answer_leak_check(
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Curriculum-fidelity — block verifiable prose Qs that bypass the tool
+# ──────────────────────────────────────────────────────────────────────
+
+
+def run_curriculum_fidelity_check(
+    response_text: str,
+    *,
+    selected_move: str,
+    posed_via_tool: bool,
+    pose_tool_stem: str = "",
+) -> GateResult:
+    """Enforce one-question-per-turn with bank-authored provenance.
+
+    Per ``memory/curriculum_fidelity_principle.md`` — all assessable
+    questions must go through the ``pose_question`` tool against
+    bank-authored ``LessonStep`` rows. The tutor's LLM-authored prose
+    must contain ZERO verifiable questions, regardless of whether
+    the tool also fired.
+
+    Unified two-stage detection:
+
+    1. Strip the tool-appended stem (no-op when no tool fired) and
+       scan EVERY '?'-ending sentence in the LLM-authored prose. Any
+       sentence matching an explicit verifiable pattern is a
+       violation. Multi-violation reporting: all offending sentences
+       are surfaced in the payload so the retry reminder names them
+       all and the degrade pass can strip them all in one shot.
+
+    2. (No-tool path only) If stage 1 found nothing but the response
+       ends with '?' and the trailing sentence is unclassified, fall
+       back to precision-favoring trailing-only detection. The tool-
+       fired path skips this fallback — the bank stem is already a
+       valid assessment, so unclassified prose Qs there are more
+       likely conversational rhetoric than missed assessments.
+
+    Skip on terminal move (``close_topic``) — no assessment authored.
+    """
+    move = (selected_move or "").strip()
+    with emit_span("audit", "gate.curriculum_fidelity") as span:
+        if move == "close_topic":
+            return GateResult(
+                passed=True,
+                name="curriculum_fidelity",
+                skipped=True,
+                reason="terminal_move",
+            )
+
+        prose_only = strip_trailing_tool_stem(
+            response_text, pose_tool_stem,
+        )
+        offending = find_verifiable_prose_questions(prose_only)
+        if offending:
+            offending_clip = [s[:200] for s in offending]
+            reason_label = (
+                "stacked prose question alongside tool-posed stem"
+                if posed_via_tool
+                else "verifiable prose question authored by tutor"
+            )
+            primary = offending[0]
+            return _fail(
+                "curriculum_fidelity",
+                f"{reason_label} "
+                f"({len(offending)} found): {primary[:120]!r}",
+                span,
+                payload={
+                    "offending_questions": offending_clip,
+                    # ``trailing_question`` retained for backward-compat
+                    # with the existing observability schema; equals the
+                    # first offending sentence.
+                    "trailing_question": offending_clip[0],
+                    "move": move,
+                    "stacked_with_tool": posed_via_tool,
+                    "match_count": len(offending),
+                },
+            )
+
+        # No explicit verifiable patterns matched. In the no-tool path
+        # only, fall back to precision-favoring trailing-only detection
+        # — an unclassified trailing Q in a no-tool turn is the silent-
+        # skip risk (Path A) and we'd rather false-positive than miss.
+        if not posed_via_tool and is_verifiable_prose_question(response_text):
+            trailing = _last_question_sentence(response_text)
+            return _fail(
+                "curriculum_fidelity",
+                f"unclassified trailing question on no-tool turn: "
+                f"{trailing[:120]!r}",
+                span,
+                payload={
+                    "offending_questions": [trailing[:200]],
+                    "trailing_question": trailing[:200],
+                    "move": move,
+                    "stacked_with_tool": False,
+                    "match_count": 1,
+                    "unclassified_fallback": True,
+                },
+            )
+
+        return GateResult(passed=True, name="curriculum_fidelity")
+
+
+# ──────────────────────────────────────────────────────────────────────
 # run_gates_with_recovery — per-gate one-retry-then-degrade loop
 # ──────────────────────────────────────────────────────────────────────
 
@@ -255,6 +366,16 @@ class GateContext:
     available_figure_descriptions: List[str] = field(default_factory=list)
     posed_via_tool: bool = False
     lesson_has_media: bool = True
+    # Selected move name (e.g. ``explain``, ``confirm_and_advance``).
+    # Threaded so the curriculum_fidelity gate can skip on
+    # ``close_topic`` (the only terminal move) and the dashboard can
+    # attribute gate failures to the originating move.
+    selected_move: str = ""
+    # The tool-appended bank stem, when ``posed_via_tool`` is True.
+    # Used by the curriculum_fidelity gate to strip the stem from the
+    # response before scanning the LLM-authored prose for stacked
+    # verifiable questions (Path C — MATHS run-11 §3 R1).
+    pose_tool_stem: str = ""
 
 
 @dataclass
@@ -292,6 +413,13 @@ RetryFn = Callable[[str], str]
 
 def _run_gate(gate_name: str, response_text: str, ctx: GateContext) -> GateResult:
     """Run one named gate against the response."""
+    if gate_name == "curriculum_fidelity":
+        return run_curriculum_fidelity_check(
+            response_text,
+            selected_move=ctx.selected_move,
+            posed_via_tool=ctx.posed_via_tool,
+            pose_tool_stem=ctx.pose_tool_stem,
+        )
     if gate_name == "safety":
         # ``figure_ref`` short-circuit per legacy: bank-stem deictic
         # on a lesson with no media is curriculum content, not LLM
@@ -322,6 +450,71 @@ def _run_gate(gate_name: str, response_text: str, ctx: GateContext) -> GateResul
 
 def _reminder_for(gate_name: str, gate_result: GateResult, ctx: GateContext) -> str:
     """Build the gate-specific reminder appended to the retry prompt."""
+    if gate_name == "curriculum_fidelity":
+        payload = gate_result.payload or {}
+        stacked = bool(payload.get("stacked_with_tool", False))
+        offending: list[str] = payload.get("offending_questions") or []
+        if not offending:
+            # Backward-compat: older payload shape used only
+            # ``trailing_question``. Wrap it into a single-element list.
+            trailing = (payload.get("trailing_question") or "").strip()
+            if trailing:
+                offending = [trailing]
+        if len(offending) == 1:
+            flagged_clause = (
+                f' The flagged prose question was: "{offending[0][:160].rstrip()}".'
+            )
+        elif len(offending) > 1:
+            quoted = "; ".join(
+                f'"{q[:120].rstrip()}"' for q in offending[:5]
+            )
+            extra = (
+                f" (and {len(offending) - 5} more)"
+                if len(offending) > 5 else ""
+            )
+            flagged_clause = (
+                f" The flagged prose questions ({len(offending)} "
+                f"found) were: {quoted}{extra}. Remove ALL of them."
+            )
+        else:
+            flagged_clause = ""
+        if stacked:
+            return (
+                "Your previous reply already posed the assessment via "
+                "the pose_question tool, but the LLM-authored prose "
+                "ALSO asked a question with a single canonical answer. "
+                "Under the curriculum-fidelity contract there is ONE "
+                "assessment per turn — the tool's bank stem IS that "
+                "assessment. The prose lead-in must contain ZERO "
+                "additional verifiable questions (no named options, "
+                "no numeric values, no yes/no, no closed-set picks)."
+                + flagged_clause +
+                " Rewrite the reply with the SAME tool call, but "
+                "remove the verifiable question from the prose. "
+                "Reflective or scene-setting prose is fine; "
+                "verifiable prose questions are not. Keep the same "
+                "teaching move."
+            )
+        return (
+            "Your previous reply ended with a question that has a "
+            "single canonical answer (a named option, a numeric "
+            "value, a yes/no fact, or a closed-set pick). Under the "
+            "curriculum-fidelity contract, all assessable questions "
+            "go through the pose_question tool against bank-authored "
+            "lesson questions — the tutor must NEVER author a "
+            "verifiable question in prose."
+            + flagged_clause +
+            " Rewrite the reply so it ends in ONE of the following "
+            "three ways: (a) close the explanation with no trailing "
+            "question — the next turn will pose via the tool; OR "
+            "(b) call pose_question now to pose the assessment via "
+            "the tool; OR (c) end with a genuinely reflective prompt "
+            "that has NO single correct answer "
+            "(e.g. 'what do you already know about X?', "
+            "'which of these matches your intuition?', "
+            "'have you seen this near you?'). Keep the same teaching "
+            "move; only the trailing question changes."
+        )
     if gate_name == "safety":
         return (
             "Your previous reply was flagged by the safety check. "
@@ -367,6 +560,9 @@ def _degrade_for(
     """Strip / redact the offending span from the response.
 
     Per plan §4.4 table:
+      - curriculum_fidelity: strip the trailing verifiable prose Q.
+        The framing remains; the next turn's router picks Rule 6
+        (no open_question pending) and poses via the tool.
       - safety:     redact the offending sentence; ship the rest.
       - figure_ref: strip the sentence containing the deictic/claim.
       - answer_leak: replace the canonical span with ``___``; if that
@@ -375,6 +571,52 @@ def _degrade_for(
     text = response_text or ""
     if not text.strip():
         return "Let's keep going — try the next step."
+
+    if gate_name == "curriculum_fidelity":
+        payload = gate_result.payload or {}
+        offending: list[str] = payload.get("offending_questions") or []
+        if not offending:
+            trailing_payload = (payload.get("trailing_question") or "").strip()
+            if trailing_payload:
+                offending = [trailing_payload]
+        # Re-derive against the current degrade-pass text in case the
+        # response on a retry-failed attempt has slightly different
+        # sentence boundaries.
+        if not offending:
+            trailing = _last_question_sentence(text)
+            if trailing:
+                offending = [trailing]
+        if not offending:
+            return text
+        stripped = text
+        for offender in offending:
+            offender = (offender or "").strip()
+            if not offender:
+                continue
+            if offender in stripped:
+                stripped = stripped.replace(offender, "", 1)
+                continue
+            # Best-effort: drop the sentence containing the offender's
+            # first 40 characters (handles minor whitespace drift
+            # between detection-time text and degrade-time text).
+            needle = offender[:40].strip()
+            if needle and needle in stripped:
+                start = stripped.find(needle)
+                # Walk forward to the next sentence boundary.
+                end = start + len(needle)
+                while end < len(stripped) and stripped[end] not in ".!?\n":
+                    end += 1
+                if end < len(stripped):
+                    end += 1
+                stripped = (stripped[:start] + stripped[end:])
+        # Tidy up: collapse multiple blank lines and trim trailing
+        # whitespace. Do not touch the bank stem at the end (when
+        # ``posed_via_tool=True``) — only the LLM-authored prose was
+        # mutated.
+        stripped = re.sub(r"\n{3,}", "\n\n", stripped).strip()
+        if not stripped:
+            return "Let's keep going — we'll work through the next step together."
+        return stripped
 
     if gate_name == "safety":
         sentences = _SENTENCE_SPLIT_RE.split(text)
@@ -428,7 +670,12 @@ def _degrade_for(
     return text
 
 
-_GATE_ORDER: tuple[str, ...] = ("safety", "figure_ref", "answer_leak")
+_GATE_ORDER: tuple[str, ...] = (
+    "curriculum_fidelity",
+    "safety",
+    "figure_ref",
+    "answer_leak",
+)
 
 
 def run_gates_with_recovery(
@@ -436,8 +683,9 @@ def run_gates_with_recovery(
     *,
     ctx: GateContext,
     retry_fn: RetryFn,
+    gates: Optional[tuple[str, ...]] = None,
 ) -> RecoveryResult:
-    """Run the 3 gates with per-gate one-retry-then-degrade recovery.
+    """Run the gates with per-gate one-retry-then-degrade recovery.
 
     Contract:
       - Returns a ``RecoveryResult`` whose ``text`` ALWAYS ships.
@@ -452,16 +700,23 @@ def run_gates_with_recovery(
         a retry failure, falling through to degradation.
 
     The retry budget is ONE per gate per turn. Gates are checked in a
-    fixed order (safety → figure_ref → answer_leak); a retry triggered
-    by gate N is checked against gate N only — gates 1..N-1 are not
-    re-checked on the retry (they passed on the prior text). Gate N+1
-    runs against whichever text we kept (retried-and-passed,
-    retried-and-degraded, or original-and-degraded).
+    fixed order; a retry triggered by gate N is checked against gate
+    N only — gates 1..N-1 are not re-checked on the retry (they
+    passed on the prior text). Gate N+1 runs against whichever text
+    we kept (retried-and-passed, retried-and-degraded, or
+    original-and-degraded).
+
+    ``gates`` overrides the module-level ``_GATE_ORDER`` when caller
+    wants to run a subset (e.g. ``start_session`` runs only the
+    curriculum_fidelity gate because no canonical / figure / verdict
+    exists at opener time).
     """
     text = response_text or ""
     failures: list[GateFailure] = []
 
-    for gate_name in _GATE_ORDER:
+    gate_order = gates if gates is not None else _GATE_ORDER
+
+    for gate_name in gate_order:
         result = _run_gate(gate_name, text, ctx)
         if result.passed or result.skipped:
             continue

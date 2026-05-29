@@ -160,47 +160,137 @@ def _last_question_sentence(text: str) -> str:
     return text[start:last_q + 1].strip()
 
 
+def _question_sentences(text: str) -> list[str]:
+    """Return every '?'-ending sentence in ``text``, in order.
+
+    Sentences are split on '.', '!', '?', or newline boundaries.
+    Each returned sentence is the substring from the prior boundary
+    (exclusive) through the '?' itself (inclusive), stripped of
+    surrounding whitespace. Sentences ending in '.' or '!' are
+    skipped. Empty list if ``text`` contains no '?'.
+    """
+    s = (text or "").strip()
+    if not s or "?" not in s:
+        return []
+    out: list[str] = []
+    start = 0
+    for i, ch in enumerate(s):
+        if ch in ".!\n":
+            start = i + 1
+            continue
+        if ch == "?":
+            sent = s[start:i + 1].strip()
+            if sent:
+                out.append(sent)
+            start = i + 1
+    return out
+
+
+def _classify_question(sentence: str) -> str:
+    """Return ``verifiable``, ``reflective``, or ``unclassified``.
+
+    Reflective patterns are checked first — when both pattern groups
+    would match, the reflective intent wins (a closed-set 'which'
+    embedded inside a 'matches your intuition' framing is still
+    conversational, not an assessment).
+    """
+    if not sentence:
+        return "unclassified"
+    lower = sentence.lower()
+    for pat in _REFLECTIVE_PATTERNS:
+        if pat.search(lower):
+            return "reflective"
+    for pat in _VERIFIABLE_PATTERNS:
+        if pat.search(lower):
+            return "verifiable"
+    return "unclassified"
+
+
 def is_verifiable_prose_question(response_text: str) -> bool:
     """True if the response's trailing question has a closed-set canonical.
 
-    Used by the curriculum-fidelity gate to detect when a tutor move
-    ended with an assessable question typed in prose (a curriculum
-    violation per ``memory/curriculum_fidelity_principle.md``).
+    Used by the curriculum-fidelity gate (no-tool path) — when no
+    ``pose_question`` tool call fired this turn, the trailing
+    question is the LLM's authored assessment. A verifiable trailing
+    Q is a curriculum violation per
+    ``memory/curriculum_fidelity_principle.md``.
 
     Pipeline:
       1. If the response does not end with '?', return False.
       2. Extract the trailing question sentence.
-      3. If it matches a reflective pattern, return False.
-      4. If it matches a verifiable pattern, return True.
-      5. Default: True (precision-favoring — block when uncertain).
-
-    The gate combines this detector with ``posed_via_tool`` to decide
-    whether to actually block. A tool-posed question whose stem also
-    matches here is allowed — the gate skips when the tool fired.
+      3. Classify reflective / verifiable / unclassified.
+      4. Reflective → False. Verifiable → True. Unclassified → True
+         (precision-favoring — block when uncertain).
     """
     text = (response_text or "").strip()
     if not text.endswith("?"):
         return False
-
     trailing = _last_question_sentence(text)
     if not trailing:
         return False
-
-    lower = trailing.lower()
-
-    # Reflective signals override — return False
-    for pat in _REFLECTIVE_PATTERNS:
-        if pat.search(lower):
-            return False
-
-    # Verifiable signals — return True
-    for pat in _VERIFIABLE_PATTERNS:
-        if pat.search(lower):
-            return True
-
-    # Precision-favoring default: when the classifier cannot place the
-    # trailing question into either bucket, treat it as verifiable and
-    # block. The retry mechanism in the gate gives the LLM one more
-    # attempt to author a reflective alternative or call the
-    # pose_question tool.
+    classification = _classify_question(trailing)
+    if classification == "reflective":
+        return False
+    if classification == "verifiable":
+        return True
+    # Precision-favoring default for the trailing-only / no-tool path.
     return True
+
+
+def find_verifiable_prose_questions(text: str) -> list[str]:
+    """Return every explicitly-verifiable '?' sentence in ``text``.
+
+    One question per turn is the curriculum-fidelity rule
+    (``memory/curriculum_fidelity_principle.md``). When the gate
+    fires, the recovery loop needs to surface ALL offending sentences
+    so the retry reminder names them all and the degrade pass can
+    strip them all in one go — single-match detection lets later
+    violations slip past a one-attempt retry budget.
+
+    Scans every '?'-ending sentence in order. ``unclassified``
+    sentences are NOT treated as verifiable here (precision-favoring
+    becomes recall-degrading on a multi-sentence scan — many
+    rhetorical / conversational prose Qs would false-positive). The
+    no-tool trailing-only check in ``is_verifiable_prose_question``
+    handles the precision-favoring fallback for the unclassified
+    trailing case.
+    """
+    if not text or "?" not in text:
+        return []
+    return [
+        sent
+        for sent in _question_sentences(text)
+        if _classify_question(sent) == "verifiable"
+    ]
+
+
+def strip_trailing_tool_stem(response_text: str, tool_stem: str) -> str:
+    """Return ``response_text`` with the appended tool stem removed.
+
+    The engine assembles every tool-posed response as
+    ``f"{lead_in}\\n\\n{rendered_stem}"`` in
+    ``student_tutor._assemble_response_text``. This helper undoes that
+    join so the gate can scan only the LLM-authored prose.
+
+    Returns ``response_text`` unchanged when:
+      - ``tool_stem`` is empty or whitespace, OR
+      - the stem doesn't appear at the end of ``response_text``
+        (e.g. the engine altered the assembly format).
+    """
+    text = (response_text or "").rstrip()
+    stem = (tool_stem or "").strip()
+    if not stem:
+        return text
+    # The stem might have been altered (e.g. legacy "True or False" prefix
+    # vs. new "(True or False?)" suffix). Match the longest contiguous
+    # suffix that aligns with the stem's trailing portion.
+    if text.endswith(stem):
+        return text[: -len(stem)].rstrip()
+    # Fallback: try matching on the stem's first line — bank stems often
+    # span multiple lines (MCQ options), and the stem-as-stored may have
+    # different whitespace than the assembled response.
+    first_line = stem.split("\n", 1)[0].strip()
+    if first_line and first_line in text:
+        idx = text.rfind(first_line)
+        return text[:idx].rstrip()
+    return text
