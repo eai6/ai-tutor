@@ -22,9 +22,10 @@ A second tutoring engine sitting alongside the legacy
 `ConversationalTutor`, designed around a deterministic two-call
 tool-use loop (Call 1 emits text + tool_use; Call 2 composes the
 student-facing reply with tool_results in hand). Selected at request
-time via the `SIMPLE_TUTOR_ENGINE` env var; staging defaults to
-`on`, prod stays `off` for v0.1.0 so legacy CT keeps serving live
-students until the Seychelles government approves the engine swap.
+time via the `SIMPLE_TUTOR_ENGINE` env var. **Both prod and staging
+run simple_tutor at v0.1.0** (env vars `SIMPLE_TUTOR_ENGINE=on`,
+`TUTORING_QUESTION_TYPES=mcq`); the legacy engine is still in the
+codebase as a fallback (`SIMPLE_TUTOR_ENGINE=off`) but not active.
 
 Concrete pieces:
 
