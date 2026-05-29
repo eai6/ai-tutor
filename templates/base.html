@@ -268,7 +268,14 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    {% include 'accounts/_email_verify_banner.html' %}
+    {% comment %}
+    Email-verify banner removed 2026-05-29 (Seychelles government review).
+    It was a normal-flow element above the chat tutor's 100dvh container —
+    pushed the typing bar below the viewport fold. The full template lives
+    at templates/accounts/_email_verify_banner.html if it needs to return;
+    restore by un-commenting the include below.
+    {% endcomment %}
+    {# include 'accounts/_email_verify_banner.html' — see comment above #}
     {% include '_includes/_baseline_recommend_banner.html' %}
     <div class="offline-banner" id="offline-banner" role="status" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
