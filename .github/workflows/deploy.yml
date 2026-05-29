@@ -64,6 +64,18 @@ env:
   RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
   APP: ${{ secrets.CONTAINER_APP_NAME }}
 
+# Serialize prod deploys. Tag + branch double-pushes (the v0.1.0
+# release pattern: push main + push tag together) used to race —
+# both runs tried to update the Container App concurrently, the
+# second one hit ContainerAppOperationInProgress and failed. With
+# this group, the second run waits for the first to finish.
+# `cancel-in-progress: false` keeps both deploys (we want both runs
+# logged for audit; the image push from the loser is a duplicate
+# but harmless).
+concurrency:
+  group: deploy-pixel
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
