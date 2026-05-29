@@ -40,11 +40,14 @@ _BARE_NUMERIC_RE = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 
-# Also treat single-letter MCQ-style answers as "bare" — the math
-# path doesn't see them, but a wrong MCQ-letter answer in a math
-# context (e.g. multiple-choice algebra) should still bias toward
-# diagnostic phrasing.
-_BARE_LETTER_RE = re.compile(r"^\s*[A-Da-d]\s*\.?\s*$")
+# Also treat single MCQ option keys (letters A-E or digits 1-9) as
+# "bare" — a wrong MCQ-option answer should still bias toward
+# diagnostic phrasing. Range matches the module-level
+# ``student_grader.MCQ_LETTER_CHARS`` / ``MCQ_DIGIT_CHARS`` constants;
+# extending either range requires editing those constants and this
+# regex together. (Imported in StudentGrader's _is_mcq_option_canonical;
+# kept inline here to avoid a circular import.)
+_BARE_OPTION_RE = re.compile(r"^\s*[A-Ea-e1-9]\s*\.?\s*$")
 
 
 def is_bare_answer(student_input: str) -> bool:
@@ -53,6 +56,10 @@ def is_bare_answer(student_input: str) -> bool:
     Used by ``StudentGrader`` math path to set the ``bare_answer`` flag
     on the returned ``GradingResult``. Non-math grading leaves the
     flag False.
+
+    Recognized as bare:
+      - integers / decimals / simple fractions (± a short unit suffix)
+      - single MCQ option key (letters A-E or digits 1-9)
     """
     if not student_input:
         return False
@@ -61,6 +68,6 @@ def is_bare_answer(student_input: str) -> bool:
         return False
     if _BARE_NUMERIC_RE.match(text):
         return True
-    if _BARE_LETTER_RE.match(text):
+    if _BARE_OPTION_RE.match(text):
         return True
     return False

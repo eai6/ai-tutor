@@ -828,7 +828,11 @@ class StudentGrader:
         Returns the uppercase student letter (e.g. "B") when the override
         should fire — the caller flips CORRECT → WRONG.
         """
-        if canon_norm not in {"a", "b", "c", "d"}:
+        # Accept any single MCQ option key (letters A-E, digits 1-9);
+        # parameterized via the module-level MCQ_LETTER_CHARS /
+        # MCQ_DIGIT_CHARS constants.
+        canon_upper = (canon_norm or "").strip().upper()
+        if not _is_mcq_option_canonical(canon_upper):
             return None
         normalized_type = (answer_type or "").strip().lower()
         if normalized_type not in {"mcq", "multiple_choice", "label"}:
@@ -842,26 +846,40 @@ class StudentGrader:
 
     @classmethod
     def _extract_unambiguous_mcq_letter(cls, student_input: str) -> str:
-        """Extract a single A-D letter pick from a student response.
+        """Extract a single MCQ option key from a student response.
 
         Three accepted shapes (run-10 design doc §"Math Fix 1c scope"):
-          Shape 1 — Response is ONLY the letter (± punctuation):
-                    ``"B"``, ``"B."``, ``" d "``.
-          Shape 2 — Response STARTS with the letter, then a reasoning
+          Shape 1 — Response is ONLY the key (± punctuation):
+                    ``"B"``, ``"B."``, ``" d "``, ``"2"``, ``"3."``.
+          Shape 2 — Response STARTS with the key, then a reasoning
                     marker (``because``, ``since``, ``is``, ``=`` …):
                     ``"B because 23+8=31"``,
-                    ``"D, x = 42 because that's the starting number"``.
+                    ``"D, x = 42 because that's the starting number"``,
+                    ``"2 because 60 / 5 = 12"``.
                     Distinguishes the article-A failure ("A triangle…"
                     has next word "triangle", not a reasoning marker).
           Shape 3 — After an explicit MCQ-pick verb:
-                    ``"the answer is C"``, ``"I pick D"``, ``"option B"``.
+                    ``"the answer is C"``, ``"I pick D"``, ``"option 3"``.
+
+        Letter range is A-E (parameterized via :data:`MCQ_LETTER_CHARS`).
+        Digit range is 1-9 (parameterized via :data:`MCQ_DIGIT_CHARS`).
+        Extending either requires editing the module constants only.
 
         Returns ``""`` when:
           - zero shapes match;
-          - two or more distinct letters match (conflict / ambiguity).
+          - two or more distinct keys match in a non-head context
+            (conflict / ambiguity).
 
-        Letter is returned uppercase. Whitespace and surrounding
-        formatting are normalized before regex.
+        R4 head-shape priority (2026-05-29): when a head-position
+        shape (1 / 2a / 2b / 2c) matches a key, that key is the pick
+        even if a later-position Shape 3 finds a different key. The
+        student's response head is unambiguous; a Shape 3 verb
+        mentioning a different key later (e.g. ``"B is right because
+        I picked C earlier"``) does not invalidate the head pick.
+
+        Key is returned uppercase (letters unchanged for digits).
+        Whitespace and surrounding formatting are normalized before
+        regex.
         """
         if not student_input:
             return ""
@@ -872,28 +890,31 @@ class StudentGrader:
         # Strip simple markdown emphasis so "**B**" → "B".
         cleaned = re.sub(r"[*_`]+", "", text)
 
-        found: set[str] = set()
+        head_found: set[str] = set()
+        scan_found: set[str] = set()
 
-        # Shape 1 — response is only the letter ± simple punctuation.
-        m = re.match(r"^\s*([A-Da-d])\s*[.!?,;:]?\s*$", cleaned)
+        # Shape 1 — response is only the key ± simple punctuation.
+        m = re.match(
+            r"^\s*(" + _MCQ_OPTION_CLASS + r")\s*[.!?,;:]?\s*$", cleaned,
+        )
         if m:
-            found.add(m.group(1).upper())
+            head_found.add(m.group(1).upper())
 
-        # Shape 2a — letter at the start, IMMEDIATELY followed by a
+        # Shape 2a — key at the start, IMMEDIATELY followed by a
         # reasoning marker (no punctuation gate). Distinguishes the
         # article-A case ("A triangle…" — next word is a noun, never a
         # marker).
         marker_alt = "|".join(re.escape(w) for w in cls._MCQ_REASONING_MARKERS)
         pat2a = (
-            r"^\s*([A-Da-d])\s+("
+            r"^\s*(" + _MCQ_OPTION_CLASS + r")\s+("
             + marker_alt
             + r")\b"
         )
         m2a = re.match(pat2a, cleaned, flags=re.IGNORECASE)
         if m2a:
-            found.add(m2a.group(1).upper())
+            head_found.add(m2a.group(1).upper())
 
-        # Shape 2b — letter at the start, followed by PUNCTUATION (comma,
+        # Shape 2b — key at the start, followed by PUNCTUATION (comma,
         # dot, dash, colon, equals), then arbitrary content that contains
         # a reasoning marker. The punctuation gate is the disambiguator
         # vs the English article-A: ``"A, triangle"`` / ``"A. triangle"``
@@ -901,40 +922,52 @@ class StudentGrader:
         # does. Restricted to a window so a far-off "because" in unrelated
         # prose doesn't reach back to the start letter.
         pat2b = (
-            r"^\s*([A-Da-d])\s*[,;:.\-—=]\s*[^.?!]{0,80}\b("
+            r"^\s*(" + _MCQ_OPTION_CLASS + r")\s*[,;:.\-—=]\s*[^.?!]{0,80}\b("
             + marker_alt
             + r")\b"
         )
         m2b = re.match(pat2b, cleaned, flags=re.IGNORECASE)
         if m2b:
-            found.add(m2b.group(1).upper())
+            head_found.add(m2b.group(1).upper())
 
-        # Shape 2c — letter at the start, then PUNCTUATION, then an
+        # Shape 2c — key at the start, then PUNCTUATION, then an
         # arithmetic operator (``=`` / ``+`` / ``-`` / ``*`` / ``/`` /
         # ``×`` / ``÷``) within the same clause. Catches the
         # ``"B, profit = 270 SCR"`` shape where the student names the
         # option and then shows working without a verbal marker. Same
         # punctuation gate excludes article-A.
         pat2c = (
-            r"^\s*([A-Da-d])\s*[,;:.\-—]\s*[^.?!\n]{0,80}[=+\-*/×÷]"
+            r"^\s*(" + _MCQ_OPTION_CLASS + r")\s*[,;:.\-—]\s*[^.?!\n]{0,80}[=+\-*/×÷]"
         )
         m2c = re.match(pat2c, cleaned, flags=re.IGNORECASE)
         if m2c:
-            found.add(m2c.group(1).upper())
+            head_found.add(m2c.group(1).upper())
 
-        # Shape 3 — explicit MCQ-pick verb followed by a letter.
+        # Shape 3 — explicit MCQ-pick verb followed by a key (any
+        # position in the response).
         verb_alt = "|".join(re.escape(w) for w in cls._MCQ_PICK_VERBS)
         pat3 = (
             r"\b(?:"
             + verb_alt
-            + r")\s+([A-Da-d])\b"
+            + r")\s+(" + _MCQ_OPTION_CLASS + r")\b"
         )
         for m3 in re.finditer(pat3, cleaned, flags=re.IGNORECASE):
-            found.add(m3.group(1).upper())
+            scan_found.add(m3.group(1).upper())
 
-        if len(found) != 1:
+        # R4 head-shape priority: if a head shape resolved an
+        # unambiguous key, use it. Scan-position matches are
+        # informational at that point, not a tiebreaker.
+        if len(head_found) == 1:
+            return next(iter(head_found))
+        if head_found:
+            # Multiple head matches disagree → genuine ambiguity.
             return ""
-        return next(iter(found))
+
+        # No head shape matched. Fall back to scan-position only —
+        # original behavior.
+        if len(scan_found) != 1:
+            return ""
+        return next(iter(scan_found))
 
     def _compare_student_claims_to_canonical(
         self,
@@ -2171,48 +2204,87 @@ _PROSE_NUMERIC_PATTERNS = (
 )
 
 
+# ──────────────────────────────────────────────────────────────────────
+# MCQ option-key range — parameterized so extending coverage requires
+# editing only these constants (R2 + R3, 2026-05-29).
+# ──────────────────────────────────────────────────────────────────────
+
+# Letters accepted as MCQ option keys. ~Every Seychelles + Tanzania
+# lesson uses 4-5 options; A-E covers both. Extend here if F+ shows up.
+MCQ_LETTER_CHARS: str = "ABCDE"
+
+# Digits accepted as MCQ option keys. Authors sometimes label options
+# 1/2/3/4 instead of A/B/C/D — the user's stated case 2026-05-29.
+# Zero is excluded so canonical "0" on a short_numeric question does
+# not collide with the MCQ fast path.
+MCQ_DIGIT_CHARS: str = "123456789"
+
+# Combined char class — letters (both cases) + digits.
+MCQ_OPTION_CHARS: str = MCQ_LETTER_CHARS + MCQ_LETTER_CHARS.lower() + MCQ_DIGIT_CHARS
+
+# Regex character classes derived from the constants above.
+_MCQ_LETTER_CLASS: str = f"[{MCQ_LETTER_CHARS}{MCQ_LETTER_CHARS.lower()}]"
+_MCQ_DIGIT_CLASS: str = f"[{MCQ_DIGIT_CHARS}]"
+_MCQ_OPTION_CLASS: str = f"[{MCQ_OPTION_CHARS}]"
+
+
 _MCQ_PROSE_PATTERNS = (
-    # "option B", "answer B", "answer: B", "answer is B", "choice B",
-    # "pick B", "go with B", "guess B", "vote B".
+    # "option B", "option 2", "answer B", "answer: 3", "answer is B",
+    # "choice C", "pick B", "go with 2", "guess B", "vote 4".
     re.compile(
         r"(?i)\b(?:option|answer|choice|pick|guess|vote|select)"
-        r"(?:\s+is)?\s*[:\-]?\s*([A-Da-d])\b"
+        r"(?:\s+is)?\s*[:\-]?\s*(" + _MCQ_OPTION_CLASS + r")\b"
     ),
-    # "I pick B", "I choose B", "I'd choose B", "I'll go with B",
-    # "I think it's B" (the apostrophe-s contraction observed in run-7),
-    # "I'd say B", "I would go with B".
+    # "I pick B", "I pick 2", "I choose B", "I'd choose 3", "I'll go
+    # with B", "I think it's 4" (the apostrophe-s contraction observed
+    # in run-7), "I'd say B", "I would go with 2".
     re.compile(
         r"(?i)\bi(?:'?ll|'?d|\s+would)?\s+"
         r"(?:pick|choose|select|go\s+with|say|think|guess|vote)\s+"
-        r"(?:it'?s\s+|it\s+is\s+|is\s+|the\s+answer\s+is\s+|that\s+)?([A-Da-d])\b"
+        r"(?:it'?s\s+|it\s+is\s+|is\s+|the\s+answer\s+is\s+|that\s+)?"
+        r"(" + _MCQ_OPTION_CLASS + r")\b"
     ),
-    # "(B)", "[B]" — bracketed letter
-    re.compile(r"(?i)^\s*[\(\[]([A-Da-d])[\)\]]"),
-    # Bare letter alone or with terminal punctuation: "B", "b.", "B!"
-    re.compile(r"(?i)^\s*([A-Da-d])\s*[\.\!]?\s*$"),
-    # Letter at start of response followed by a delimiter (dash, comma,
+    # "(B)", "[B]", "(2)", "[3]" — bracketed key
+    re.compile(r"(?i)^\s*[\(\[](" + _MCQ_OPTION_CLASS + r")[\)\]]"),
+    # Bare key alone or with terminal punctuation: "B", "b.", "B!",
+    # "2", "2.", "2!".
+    re.compile(r"(?i)^\s*(" + _MCQ_OPTION_CLASS + r")\s*[\.\!]?\s*$"),
+    # Key at start of response followed by a delimiter (dash, comma,
     # space + "because" / "since" / etc.) — common rationale form
     # observed in MATHS-S1 / GEO-S5 transcripts ("B - it's …",
-    # "b because …", "C, since …").
+    # "b because …", "C, since …", "2 because …").
     re.compile(
-        r"(?i)^\s*([A-Da-d])\s*(?:[\-,:;.]|\s+(?:because|since|as|for|—|–))"
+        r"(?i)^\s*(" + _MCQ_OPTION_CLASS + r")\s*"
+        r"(?:[\-,:;.]|\s+(?:because|since|as|for|—|–))"
     ),
-    # "It's B", "it is B" — pronoun form at start
-    re.compile(r"(?i)^\s*it'?s\s+([A-Da-d])\b"),
+    # "It's B", "it is B", "It's 2", "it is 3" — pronoun form at start
+    re.compile(r"(?i)^\s*it(?:'?s|\s+is)\s+(" + _MCQ_OPTION_CLASS + r")\b"),
 )
 
 
-def _match_mcq_letter(canonical: str, student_input: str) -> Optional[bool]:
-    """Map ``student_input`` to True/False for an MCQ-letter canonical.
+def _is_mcq_option_canonical(canonical: str) -> bool:
+    """True when ``canonical`` is a single MCQ option key (letter or digit)."""
+    canon = (canonical or "").strip()
+    return len(canon) == 1 and canon.upper() in (
+        MCQ_LETTER_CHARS + MCQ_DIGIT_CHARS
+    )
 
-    Accepts the canonical as a single letter (A/B/C/D, case-insensitive).
-    Returns ``None`` when the canonical is not a single letter — that
-    means the lesson author stored full option text, not a letter, and
-    we let the grounded grader decide.
+
+def _match_mcq_letter(canonical: str, student_input: str) -> Optional[bool]:
+    """Map ``student_input`` to True/False for an MCQ option-key canonical.
+
+    Accepts the canonical as a single letter (A-E, case-insensitive)
+    OR a single digit (1-9). Returns ``None`` when the canonical is
+    not a single option key — that means the lesson author stored full
+    option text rather than a key, and we let the grounded grader
+    decide.
+
+    The function name is preserved for call-site continuity even though
+    the matcher now handles digit-keyed MCQ in addition to letters.
     """
-    canon = (canonical or "").strip().upper()
-    if len(canon) != 1 or canon not in "ABCD":
+    if not _is_mcq_option_canonical(canonical):
         return None
+    canon = canonical.strip().upper()
     text = (student_input or "").strip()
     if not text:
         return None

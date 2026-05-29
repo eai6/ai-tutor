@@ -370,8 +370,12 @@ def test_prose_wrapped_numeric_wrong(student_input):
         # Lowercase canonical (defensive — humans store either case)
         ("b", "B", True),
         ("b", "I choose B", True),
-        # Non-A-D canonical → matcher returns None → grounded path
-        ("E", "E", None),
+        # E canonical is now accepted (R2 2026-05-29 — letter range
+        # broadened to A-E to cover 5-option MCQ lessons).
+        ("E", "E", True),
+        ("E", "A", False),
+        # F still outside the range → grounded path.
+        ("F", "F", None),
         # Empty student input
         ("B", "", None),
         ("B", "   ", None),

@@ -530,7 +530,13 @@ def _grade_mcq(question, raw: str) -> BankGradeResult:
     norm_upper = norm.upper().strip()
 
     # Direct letter answer ("A" / "a" / "A." / "(A)" / "(B).")
-    letter_match = re.match(r"^[\(\[]?\s*([A-D])\s*[\)\]\.]*$", str(raw).strip(), re.IGNORECASE)
+    # Range A-E matches the v2 student_grader.MCQ_LETTER_CHARS constant
+    # so a lesson with 5 options (which has no option_e on this legacy
+    # model but may have it on the v2 LessonStep.choices JSON list) is
+    # accepted at the input parse stage. Comparison still uses the
+    # option_a..option_d dict below — option_e would require a schema
+    # extension if the curriculum ever needs it on ExitTicketQuestion.
+    letter_match = re.match(r"^[\(\[]?\s*([A-E])\s*[\)\]\.]*$", str(raw).strip(), re.IGNORECASE)
     if letter_match:
         student_letter = letter_match.group(1).upper()
         return BankGradeResult(
@@ -547,6 +553,10 @@ def _grade_mcq(question, raw: str) -> BankGradeResult:
         "C": getattr(question, "option_c", "") or "",
         "D": getattr(question, "option_d", "") or "",
     }
+    # Defensive: if the model ever grows option_e, include it here.
+    option_e = getattr(question, "option_e", None)
+    if option_e:
+        options["E"] = option_e or ""
     for letter, text in options.items():
         if not text:
             continue
@@ -848,14 +858,15 @@ def grade_lesson_step_response(step, student_input) -> BankGradeResult:
         # is the canonical answer (letter, index, or option text).
         choices = list(getattr(step, "choices", None) or [])
 
-        # Direct letter answer ("A" / "(B)" / "C.")
+        # Direct letter answer ("A" / "(B)" / "C." / "E.")
+        # Range A-E matches v2 student_grader.MCQ_LETTER_CHARS.
         letter_match = re.match(
-            r"^[\(\[]?\s*([A-D])\s*[\)\]\.]*$", str(raw).strip(), re.IGNORECASE,
+            r"^[\(\[]?\s*([A-E])\s*[\)\]\.]*$", str(raw).strip(), re.IGNORECASE,
         )
         if letter_match:
             student_letter = letter_match.group(1).upper()
             expected_letter = expected.upper().strip()
-            if expected_letter in {"A", "B", "C", "D"}:
+            if expected_letter in {"A", "B", "C", "D", "E"}:
                 return BankGradeResult(
                     is_correct=(student_letter == expected_letter),
                     expected=expected_letter,
