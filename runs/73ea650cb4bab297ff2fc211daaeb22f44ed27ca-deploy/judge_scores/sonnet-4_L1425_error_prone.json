@@ -1,0 +1,567 @@
+{
+  "transcript": "sonnet-4_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 116.10176277160645,
+  "tokens_in": 8813,
+  "tokens_out": 10088,
+  "n_tutor_turns_in_transcript": 28,
+  "scores": {
+    "active_learning": {
+      "score": 3,
+      "evidence": "Session is dominated by MCQs requiring student responses (turns 50, 55, 60, 67, 74, 81, 84, 93), with relatively brief explanations between."
+    },
+    "direct_instruction_active_practice": {
+      "score": 3,
+      "evidence": "Most teaching segments are followed by a question, but some explanations (e.g., turn 78, 90) re-explain at length before re-prompting."
+    },
+    "deliberate_practice": {
+      "score": 3,
+      "evidence": "Turn 64 gives focused corrective feedback on scale misconception; turn 84 follows up the failed calculation with a method question, but the new question shifts to methods rather than another calc."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "After student says '10 km' for the 8cm\u00d750,000 problem (turn 82), tutor (turn 83) says 'Let me check your calculation with a similar problem' but never confirms the error or returns to the original calc."
+    },
+    "cognitive_load": {
+      "score": 3,
+      "evidence": "One concept introduced at a time (scale ratio, then large/small scale, then calculation), with worked unit conversions in turn 59 and 64."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Turn 66 explicitly links '1 cm = 50 m' back to detail level; turn 92 connects calculation to earlier scale concepts."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "Large- vs small-scale terms are confusable and were addressed with explicit discrimination (turn 78), though the confusion shows the distinction wasn't pre-emptively clarified."
+    },
+    "interleaving": {
+      "score": 3,
+      "evidence": "Mix of identification, terminology, comparison, application, and calculation problems prevents rote repetition."
+    },
+    "testing_effect": {
+      "score": 4,
+      "evidence": "Student attempts before hints; tutor consistently waits for answer and redirects rather than reveal (e.g., turns 62, 69, 76)."
+    },
+    "targeted_remediation": {
+      "score": 1,
+      "evidence": "On '10 km' wrong calc (turn 82), tutor abandons rather than diagnoses; on repeated wrong answers to coral reef question, tutor re-lists options without prereq diagnosis."
+    }
+  },
+  "strongest_behaviors": [
+    "Consistent redirection back to the posed question when student outputs look like tutor-style text (turns 57, 62, 69, 76, 95) preserves retrieval practice.",
+    "Clear, worked unit-conversion feedback on the 1:25,000 misconception in turn 59 and the 1:5,000 vs 1:500,000 comparison in turn 64."
+  ],
+  "weakest_behaviors": [
+    "Turn 83 silently drops the wrong '10 km' answer without telling the student it was wrong or showing the correct working \u2014 a missed mastery checkpoint.",
+    "Repeated 'I need to respond to what the student just said...' meta-monologue (turns 57, 76, 86, 95) leaks internal reasoning into the student-facing message."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid internal-monologue leakage to student",
+      "rationale": "Multiple turns expose the model's planning text ('I need to respond to what the student just said...') instead of speaking directly to the student.",
+      "evidence_quote": "I need to respond to what the student just said first. The student wrote 'You got it!...'",
+      "evidence_turn": "57",
+      "suggested_prompt_edit": "Add: 'Never narrate your reasoning or refer to the student in the third person in your reply. Speak directly to the student in the second person. Do not include phrases like \"I need to respond to what the student just said\" or \"Let me redirect them.\"'",
+      "expected_effect": "Cleaner, more natural redirections that don't break the tutoring frame.",
+      "severity": "high"
+    },
+    {
+      "title": "Always explicitly mark wrong numeric answers and show working",
+      "rationale": "When student answered '10 km' to the 8 cm \u00d7 50,000 problem, tutor neither confirmed it was wrong nor showed the correct 4 km calculation; instead it pivoted.",
+      "evidence_quote": "10 km / Let me check your calculation with a similar problem.",
+      "evidence_turn": "83",
+      "suggested_prompt_edit": "Add: 'On any numeric answer, first state clearly whether it is correct. If incorrect, show the correct calculation step by step before posing a similar problem.'",
+      "expected_effect": "Prevents silent skips past errors and supports mastery.",
+      "severity": "high"
+    },
+    {
+      "title": "Diagnose the prereq before re-asking the same MCQ",
+      "rationale": "On the coral-reef question the student twice gave fabricated options; tutor only re-listed A\u2013D rather than checking whether the student understood 'inappropriate' or map type definitions.",
+      "evidence_quote": "I need to keep you focused on the actual question I asked. You're creating your own answer instead of choosing from the four options I provided.",
+      "evidence_turn": "71",
+      "suggested_prompt_edit": "Add: 'After two failed attempts on the same MCQ, do NOT just re-list options. Ask a smaller diagnostic question targeting the suspected prerequisite (definition, term, or sub-step) before returning to the MCQ.'",
+      "expected_effect": "Triggers targeted remediation rather than recycled prompts.",
+      "severity": "high"
+    },
+    {
+      "title": "Pre-empt the large/small scale confusion with a discriminator",
+      "rationale": "Student repeatedly inverted the large/small scale terminology (turns 63, 77); the rule is counterintuitive and deserves an explicit memory aid the first time it's introduced.",
+      "evidence_quote": "the national map of seychelles shows more detail because 500,000 is a bigger number than 5,000.",
+      "evidence_turn": "63",
+      "suggested_prompt_edit": "Add: 'When introducing large-scale vs small-scale, give an explicit mnemonic (e.g., \"smaller denominator = larger scale = more zoomed in\") with a 1-cm worked example BEFORE asking comparison MCQs.'",
+      "expected_effect": "Reduces repeated terminology inversion errors.",
+      "severity": "medium"
+    },
+    {
+      "title": "Validate the question type before correcting",
+      "rationale": "In turn 86 the tutor scolded the student for not choosing A-D, but the student's '25 km' suggests they misread the question as a calculation problem; tutor should acknowledge that interpretation.",
+      "evidence_quote": "I asked about the most efficient method to calculate real distance, not to actually calculate a distance.",
+      "evidence_turn": "86",
+      "suggested_prompt_edit": "Add: 'When a student answers a different question type than asked, briefly acknowledge what they understood, then clarify what the question is really asking.'",
+      "expected_effect": "Less terse redirections; student feels heard.",
+      "severity": "medium"
+    },
+    {
+      "title": "Detect and handle role-confusion (student parroting tutor text)",
+      "rationale": "Student turns 56, 75, 94 are pasted tutor-style MCQs; the system handled this reactively each time. A standing rule would make handling uniform.",
+      "evidence_quote": "You got it! Knowing that helps us understand map scale.",
+      "evidence_turn": "56",
+      "suggested_prompt_edit": "Add: 'If the student message reads like a tutor turn (contains an MCQ, praise the student, or repeats your prior text), do NOT treat it as an answer. Briefly note the confusion and re-ask your previous question once.'",
+      "expected_effect": "Consistent, less verbose recovery from role-confusion.",
+      "severity": "medium"
+    },
+    {
+      "title": "Confirm mastery before progression",
+      "rationale": "After the failed calculation, tutor jumped to a method MCQ and then declared 'You've mastered both the concepts and calculations' (turn 92) without the student ever computing a correct distance.",
+      "evidence_quote": "You've mastered both the concepts and calculations for map scale.",
+      "evidence_turn": "92",
+      "suggested_prompt_edit": "Add: 'Do not declare mastery of a skill the student has not demonstrated. A correct calculation answer is required before moving past calculation practice.'",
+      "expected_effect": "Honest mastery signals; prevents premature progression.",
+      "severity": "high"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Insert a remediation branch after a wrong numeric answer",
+      "rationale": "The engine moved straight from '10 km' to a different MCQ; orchestration should route to a worked example + a re-attempt at the same calc.",
+      "evidence_quote": "10 km / Let me check your calculation with a similar problem.",
+      "evidence_turn": "83",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Ensures calculation skill is repaired, not bypassed.",
+      "severity": "high"
+    },
+    {
+      "title": "Cap consecutive 'redirect to options' turns at 1",
+      "rationale": "Tutor re-listed the same A-D options multiple times for the coral-reef and calc-method questions, an anti-pattern flagged by 'repeated_question' and 'same_template_repeat'.",
+      "evidence_quote": "[flags: same_template_repeat]",
+      "evidence_turn": "86",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Forces a different scaffold (diagnostic sub-question) after one failed redirect.",
+      "severity": "medium"
+    },
+    {
+      "title": "Detect role-confusion at the engine layer",
+      "rationale": "Three times the student turn is actually tutor-style text; a simple classifier could auto-tag this and route to a 'role-reset' template.",
+      "evidence_quote": "You've nailed it! Understanding how to calculate real distances...",
+      "evidence_turn": "94",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Faster, uniform recovery without the LLM monologuing.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Drop visible meta-narration",
+      "rationale": "Phrases like 'I need to respond to what the student just said' break immersion and can feel condescending.",
+      "evidence_quote": "I need to respond to what the student just said. They seem to be responding as if they're the tutor again",
+      "evidence_turn": "95",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Smoother, warmer student experience.",
+      "severity": "medium"
+    },
+    {
+      "title": "Vary praise and avoid over-claiming mastery",
+      "rationale": "'You've mastered both the concepts and calculations' after an unresolved wrong calc may confuse an error-prone learner.",
+      "evidence_quote": "You've mastered both the concepts and calculations for map scale.",
+      "evidence_turn": "92",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Calibrated feedback that matches actual performance.",
+      "severity": "medium"
+    },
+    {
+      "title": "Use a quick visual or table for scale \u2194 detail mapping",
+      "rationale": "The recurring large/small-scale confusion would benefit from an inline table (Scale | 1 cm = | typical use).",
+      "evidence_quote": "a) because 1:100,000 is a large-scale map, so it covers too much area.",
+      "evidence_turn": "77",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces conceptual inversion of terms.",
+      "severity": "low"
+    }
+  ],
+  "overall_summary": "The session delivers reasonable coverage of map scale and types with consistent MCQ-based retrieval practice, but suffers from three repeated issues: (1) internal monologue leaking into student-facing replies, (2) a wrong calculation answer ('10 km') being silently bypassed and later treated as mastered, and (3) repeated 'choose from A-D' redirections without prerequisite diagnosis when the student is clearly off-track. Strengths include good unit-conversion feedback and steady retrieval pressure; main fixes are remediation routing after numeric errors and a ban on meta-narration.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "50",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "Opening turn; no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "52",
+      "preceding_student_turn_id": "51",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Chose C (location of all islands) instead of B (individual buildings) for finding a street address.",
+      "tutor_excerpt": "Not quite - think about what you actually need when searching for a specific street address. You chose an option that shows the big picture...",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor names the wrong choice, explains why it fails (too big a picture), and tells the student to try again."
+    },
+    {
+      "tutor_turn_id": "54",
+      "preceding_student_turn_id": "53",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (B).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "55",
+      "preceding_student_turn_id": "54",
+      "student_made_mistake": false,
+      "skip_reason": "Same-actor continuation, not a response to a student mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "57",
+      "preceding_student_turn_id": "56",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student response mimics a tutor turn ('You got it!...') instead of answering the 1:25,000 question.",
+      "tutor_excerpt": "I think there might be some confusion - I just asked you about what a map scale of 1:25,000 tells us, but you haven't answered that question yet.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Tutor names the issue and re-poses the question, though guidance about what the ratio means is minimal; meta-narration leaks but action is clear."
+    },
+    {
+      "tutor_turn_id": "59",
+      "preceding_student_turn_id": "58",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Unit error: said 1 cm = 25 m instead of 250 m for 1:25,000.",
+      "tutor_excerpt": "Close, but not quite ... 1 cm on the map equals 25,000 cm in real life, which is actually 250 meters (not 25 meters).",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Identifies the unit error precisely and explains; next action is implied ('Now let's test your understanding') but no immediate retry of the same conversion."
+    },
+    {
+      "tutor_turn_id": "60",
+      "preceding_student_turn_id": "59",
+      "student_made_mistake": false,
+      "skip_reason": "Same-actor continuation; new MCQ posed.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "62",
+      "preceding_student_turn_id": "61",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Answered the previous small-scale question instead of the new Victoria vs Seychelles comparison.",
+      "tutor_excerpt": "I notice you answered a different question than the one I just asked. ... Between these two maps, which shows more detail and why?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Correctly flags misalignment and re-asks; little new guidance on the concept itself."
+    },
+    {
+      "tutor_turn_id": "64",
+      "preceding_student_turn_id": "63",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Misconception: bigger denominator = more detail.",
+      "tutor_excerpt": "Not quite - this is a common misconception! The bigger number in the scale ratio actually means less detail... Which map can show you individual buildings - the one where 1 cm = 50 meters, or the one where 1 cm = 5 kilometers?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Names misconception, gives worked unit comparison, and asks a targeted follow-up."
+    },
+    {
+      "tutor_turn_id": "66",
+      "preceding_student_turn_id": "65",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "67",
+      "preceding_student_turn_id": "66",
+      "student_made_mistake": false,
+      "skip_reason": "Same-actor continuation; new MCQ.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "69",
+      "preceding_student_turn_id": "68",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student fabricated option 'a) a map showing all the islands of seychelles' instead of choosing from A-D.",
+      "tutor_excerpt": "I notice you're not answering the question I posed. ... Which of the four options (A, B, C, or D) would be least helpful for coral reef study?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Flags the off-task answer and gives a thinking prompt about coral-reef info needs, but doesn't diagnose underlying confusion."
+    },
+    {
+      "tutor_turn_id": "71",
+      "preceding_student_turn_id": "70",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Again invented an option instead of choosing A-D.",
+      "tutor_excerpt": "I need to keep you focused on the actual question I asked. You're creating your own answer instead of choosing from the four options I provided.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Just re-lists options without new guidance or prereq diagnosis; action is 'pick a letter' but the underlying issue is untouched."
+    },
+    {
+      "tutor_turn_id": "73",
+      "preceding_student_turn_id": "72",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (C).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "74",
+      "preceding_student_turn_id": "73",
+      "student_made_mistake": false,
+      "skip_reason": "Same-actor continuation; new MCQ.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "76",
+      "preceding_student_turn_id": "75",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student pasted a tutor-style MCQ instead of answering.",
+      "tutor_excerpt": "I think there's some confusion - I just asked you why a 1:100,000 map cannot show individual buildings in Victoria. You haven't answered that question yet.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Redirects clearly but contains meta-narration; doesn't add fresh guidance on the concept."
+    },
+    {
+      "tutor_turn_id": "78",
+      "preceding_student_turn_id": "77",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Inverted scale terminology: called 1:100,000 a large-scale map.",
+      "tutor_excerpt": "A 1:100,000 map is actually a small-scale map, not a large-scale map. Remember: smaller scale numbers (like 1:5,000) mean more detail...",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Identifies the exact misconception, gives the discriminating rule plus a numeric example, and re-presents the MCQ."
+    },
+    {
+      "tutor_turn_id": "80",
+      "preceding_student_turn_id": "79",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (B).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "81",
+      "preceding_student_turn_id": "80",
+      "student_made_mistake": false,
+      "skip_reason": "Same-actor continuation; new calc problem.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "83",
+      "preceding_student_turn_id": "82",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Computed 8 cm \u00d7 50,000 = 400,000 cm = 4 km, but answered 10 km.",
+      "tutor_excerpt": "Let me check your calculation with a similar problem.",
+      "mistake_identification": "To some extent",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Tutor implies something is off but never tells the student '10 km' is wrong, never shows correct working, just pivots to a different question."
+    },
+    {
+      "tutor_turn_id": "84",
+      "preceding_student_turn_id": "83",
+      "student_made_mistake": false,
+      "skip_reason": "Same-actor continuation; new MCQ posed.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "86",
+      "preceding_student_turn_id": "85",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Provided a numeric answer ('25 km') to a question asking about which method.",
+      "tutor_excerpt": "I asked about the method for calculating real distance, not the actual calculation.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Identifies misread of question type, re-asks; some meta-narration; clear next action."
+    },
+    {
+      "tutor_turn_id": "88",
+      "preceding_student_turn_id": "87",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Invented option 'divide map distance by scale factor' instead of picking A-D.",
+      "tutor_excerpt": "You're creating your own answer instead of choosing from A, B, C, or D.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Re-lists options without explaining why divide-by-scale is wrong or guiding toward the correct method."
+    },
+    {
+      "tutor_turn_id": "90",
+      "preceding_student_turn_id": "89",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Chose C (use scale bar) when the question wants the multiplication method.",
+      "tutor_excerpt": "while scale bars are useful tools, the question asks about the most efficient calculation method ... you'd multiply 3 \u00d7 40,000 = 120,000 cm, then convert to kilometers.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Explains the correct method with working, but essentially reveals the answer (B) before asking student to select, weakening retrieval."
+    },
+    {
+      "tutor_turn_id": "92",
+      "preceding_student_turn_id": "91",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (B).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "93",
+      "preceding_student_turn_id": "92",
+      "student_made_mistake": false,
+      "skip_reason": "Same-actor continuation; new application question.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "95",
+      "preceding_student_turn_id": "94",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student again pasted a tutor-style MCQ instead of answering.",
+      "tutor_excerpt": "I think there's some confusion - I just asked you about studying elevation changes... You haven't answered that question yet.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Clear redirect with meta-narration leaking; re-poses question with clear action."
+    },
+    {
+      "tutor_turn_id": "97",
+      "preceding_student_turn_id": "96",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Chose road map for hiking/elevation when topographic map is required.",
+      "tutor_excerpt": "a road map shows roads for vehicles, but hiking routes need different information. ... What type of map is specifically designed to show the shape and elevation of the land?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Names the wrong choice, contrasts with what hiking needs, and asks a focused leading question."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 28,
+    "n_in_scope": 15,
+    "coverage_rate": 0.5357142857142857,
+    "mistake_identification_exact": 0.9333333333333333,
+    "mistake_identification_lenient": 1.0,
+    "mistake_location_exact": 0.9333333333333333,
+    "mistake_location_lenient": 0.9333333333333333,
+    "providing_guidance_exact": 0.4,
+    "providing_guidance_lenient": 0.8,
+    "actionability_exact": 0.6666666666666666,
+    "actionability_lenient": 1.0,
+    "overall_exact_pass_rate": 0.7333333333333334,
+    "overall_lenient_pass_rate": 0.9333333333333333,
+    "strict_pass_rate": 0.26666666666666666,
+    "lenient_pass_rate": 0.8
+  }
+}

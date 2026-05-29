@@ -1,0 +1,12 @@
+{
+  "transcript": "gemini-3-flash_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 132.19913625717163,
+  "tokens_in": 8843,
+  "tokens_out": 11478,
+  "n_tutor_turns_in_transcript": 33,
+  "parse_error": "ValueError: Unbalanced JSON braces in response",
+  "raw_response_head": "{\n  \"scores\": {\n    \"active_learning\": {\"score\": 3, \"evidence\": \"Session is mostly MCQs requiring student selection (turns 144, 150, 157, 160), but tutor often delivers two-paragraph mini-lectures (e.g., turn 153, 174) before practice.\"},\n    \"direct_instruction_active_practice\": {\"score\": 2, \"evidence\": \"Several pairs of consecutive tutor turns occur (150+151, 153+154, 156+157, 165+166), violating the 'never two instruction blocks' rule even though the second is a question.\"},\n    \"deliberate_p"
+}

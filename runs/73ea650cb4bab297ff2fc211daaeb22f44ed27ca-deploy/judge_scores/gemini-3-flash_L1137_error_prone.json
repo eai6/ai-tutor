@@ -1,0 +1,524 @@
+{
+  "transcript": "gemini-3-flash_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 94.92776203155518,
+  "tokens_in": 5578,
+  "tokens_out": 8125,
+  "n_tutor_turns_in_transcript": 24,
+  "scores": {
+    "active_learning": {
+      "score": 3,
+      "evidence": "Session is mostly question-answer cycles with student doing the work (turns 99, 103, 105, 107), minimal lecture."
+    },
+    "direct_instruction_active_practice": {
+      "score": 3,
+      "evidence": "Worked example at turn 121 is immediately followed by a comprehension MCQ, but turn 125 gives an explanation then turn 126 issues a new question \u2014 adequate but not perfect."
+    },
+    "deliberate_practice": {
+      "score": 2,
+      "evidence": "On the 360-190 arithmetic error (turn 133), the tutor's scaffold at 134 ('290-100=190, then 190-20') is itself wrong reasoning chain and confused the student further."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "Student repeatedly fails at angles-around-a-point (turns 122, 124, 129-135), yet tutor pivots to straight-line angles at turn 136 without diagnosing the bottleneck."
+    },
+    "cognitive_load": {
+      "score": 2,
+      "evidence": "Turn 121 dumps a 3-step worked example plus an MCQ plus a figure reference in one block; multiple 'figure_ref_without_signal' flags indicate inline media not actually present."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Turns 102 and 141 explicitly link the 360\u00b0 point rule to the 180\u00b0 straight-line rule, connecting prior knowledge."
+    },
+    "non_interference": {
+      "score": 2,
+      "evidence": "After persistent confusion about 360\u00b0 rule, tutor jumps to the confusable 180\u00b0 straight-line rule at turn 136-137 without explicit discrimination."
+    },
+    "interleaving": {
+      "score": 2,
+      "evidence": "Problems are largely the same type (find missing angle around a point); variation is mostly numeric until a late switch."
+    },
+    "testing_effect": {
+      "score": 3,
+      "evidence": "Tutor often asks for retrieval first (turns 104, 106 'show me the calculation'), but hints become eager MCQs that narrow choices (turns 110, 119)."
+    },
+    "targeted_remediation": {
+      "score": 1,
+      "evidence": "When student keeps getting 180 (turns 129, 135), tutor doesn't diagnose arithmetic-subtraction prereq; instead abandons topic at turn 136."
+    }
+  },
+  "strongest_behaviors": [
+    "Asks student to show calculation/method rather than just answer (turn 106: 'show me the calculation you used')",
+    "Provides a structured worked example with explicit subgoals (turn 121, 3-step layout)"
+  ],
+  "weakest_behaviors": [
+    "Repeated 'figure_ref_without_signal' \u2014 tutor references diagrams that don't exist, confusing the student",
+    "Abandons a topic mid-failure without remediation (turn 136 pivots to straight lines after student keeps saying 180)"
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid references to diagrams unless one is actually rendered",
+      "rationale": "Multiple turns reference 'the diagram' when none is shown, which is misleading and adds extraneous cognitive load.",
+      "evidence_quote": "In the diagram, you can see how different angles like 90\u00b0 and 85\u00b0 all fit together to complete the circle.",
+      "evidence_turn": "121",
+      "suggested_prompt_edit": "Never say 'look at the diagram' or 'in the diagram' unless an image has been explicitly attached in this turn. If no image, describe verbally or use a text figure.",
+      "expected_effect": "Removes phantom-figure references; student is not asked to consult non-existent media.",
+      "severity": "high"
+    },
+    {
+      "title": "On repeated wrong answers, diagnose the prerequisite, do not switch topics",
+      "rationale": "Student kept answering 180 (arithmetic error), and tutor pivoted to straight lines instead of remediating subtraction.",
+      "evidence_quote": "Not quite\u2014190 minus 20 is 170. Let's try a rule for straight lines.",
+      "evidence_turn": "136",
+      "suggested_prompt_edit": "When the student fails the same sub-step twice, identify the prerequisite skill (e.g., multi-digit subtraction) and run a 1-2 item micro-drill on it before returning to the parent problem. Do NOT change topic to escape failure.",
+      "expected_effect": "Improves mastery learning and targeted remediation.",
+      "severity": "high"
+    },
+    {
+      "title": "Avoid revealing the answer inside the corrective hint",
+      "rationale": "Turn 134 first asks '190-20?' which essentially gives the path; turn 136 outright states 170 before student retries.",
+      "evidence_quote": "Not quite\u2014190 minus 20 is 170. Let's try a rule for straight lines.",
+      "evidence_turn": "136",
+      "suggested_prompt_edit": "When correcting an arithmetic error, ask the student to redo ONE step at a time without revealing the result; only after a second failure should you supply the result.",
+      "expected_effect": "Preserves retrieval practice and reduces answer-leakage.",
+      "severity": "medium"
+    },
+    {
+      "title": "MCQ distractors must not include the previously-stated wrong answer as obvious",
+      "rationale": "Turn 132 offers options 150/160/170/180 right after student said 180; this nudges toward elimination rather than genuine computation.",
+      "evidence_quote": "if 360 - 70 = 290, what is 290 - 120? A) 150\u00b0 B) 160\u00b0 C) 170\u00b0 D) 180\u00b0",
+      "evidence_turn": "132",
+      "suggested_prompt_edit": "Prefer free-response for arithmetic checks; if MCQ is used, do not place the student's prior wrong answer as a distractor without rationale.",
+      "expected_effect": "Forces genuine retrieval rather than process-of-elimination.",
+      "severity": "medium"
+    },
+    {
+      "title": "Acknowledge correct answers explicitly before moving on",
+      "rationale": "Turn 108 jumps to a new problem after correct answer 60 (for 6 angles) without confirming correctness \u2014 student then doubts the rule.",
+      "evidence_quote": "Try this: Five equal angles are arranged around a point. What is the size of each angle?",
+      "evidence_turn": "108",
+      "suggested_prompt_edit": "Always confirm correctness in one short sentence ('Correct \u2014 360\u00f76=60.') before posing the next question.",
+      "expected_effect": "Reduces student second-guessing and stabilizes mastery signals.",
+      "severity": "medium"
+    },
+    {
+      "title": "Discriminate confusable rules explicitly",
+      "rationale": "Student conflates 180\u00b0 (line) and 360\u00b0 (point); tutor needs an explicit contrast cue when switching.",
+      "evidence_quote": "That equation uses 180\u00b0, which is only half a circle.",
+      "evidence_turn": "125",
+      "suggested_prompt_edit": "When the student confuses 180\u00b0 (straight line) with 360\u00b0 (point), present a 2-line contrast table and require the student to label which rule applies before solving.",
+      "expected_effect": "Reduces non-interference failures between adjacent rules.",
+      "severity": "medium"
+    },
+    {
+      "title": "Limit worked example + question to one focus per turn",
+      "rationale": "Turn 121 combines a celebratory confirmation, a figure reference, a 3-step worked example, and an MCQ \u2014 high cognitive load.",
+      "evidence_quote": "Exactly\u2014170\u00b0 is right because 360 \u2212 190 = 170. In the diagram... Worked Example: ... In the worked example, what did we do in Step 1 and why?",
+      "evidence_turn": "121",
+      "suggested_prompt_edit": "Each tutor turn delivers EITHER a worked example OR a question, not both. Worked examples end with 'Ready?' and wait for student acknowledgement before posing the comprehension MCQ.",
+      "expected_effect": "Lowers cognitive load and improves direct-instruction/active-practice pacing.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect topic-abandonment and route to prereq drill",
+      "rationale": "Engine allowed the tutor to switch from point-angles to straight-line angles mid-failure; a router should have triggered remediation.",
+      "evidence_quote": "Not quite\u2014190 minus 20 is 170. Let's try a rule for straight lines.",
+      "evidence_turn": "136",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Forces remediation routing instead of escape pivots.",
+      "severity": "high"
+    },
+    {
+      "title": "Fix truncation of tutor turns",
+      "rationale": "Multiple tutor messages flagged 'truncated' (turns 100, 108, 110, 112, 114, 119...) \u2014 student sees incomplete questions.",
+      "evidence_quote": "What is the sum of all angles around a",
+      "evidence_turn": "100",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents student confusion from cut-off prompts.",
+      "severity": "high"
+    },
+    {
+      "title": "Resolve role-confusion / turn mis-attribution",
+      "rationale": "Turns 116, 127, 138 show the STUDENT field posting tutor-style problems, suggesting the orchestrator mislabeled speakers or echoed prompts.",
+      "evidence_quote": "Two angles are on a straight line. One angle is 70\u00b0. What is the other angle?",
+      "evidence_turn": "116",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Restores clean turn-taking and accurate state tracking.",
+      "severity": "high"
+    },
+    {
+      "title": "Add an exit-ticket before advancing topics",
+      "rationale": "Tutor moved from point-angles to lines without a mastery check; a gating exit-ticket would catch this.",
+      "evidence_quote": "Let's try a rule for straight lines.",
+      "evidence_turn": "136",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Ensures mastery-gated progression.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Warmer, calmer error tone",
+      "rationale": "Repeated 'Not quite' with no encouragement may demoralize an error-prone learner.",
+      "evidence_quote": "Not quite. We have 5 angles this time, not 6.",
+      "evidence_turn": "110",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Maintains motivation for an error-prone persona.",
+      "severity": "low"
+    },
+    {
+      "title": "Render a real figure when referenced",
+      "rationale": "Tutor repeatedly says 'in the diagram' but no diagram is shown; either provide ASCII/SVG or remove the reference.",
+      "evidence_quote": "In the diagram, you can see 8 equal angles, which means each one is 360\u00b0\u00f78=45\u00b0.",
+      "evidence_turn": "114",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Aligns words with what the student actually sees.",
+      "severity": "high"
+    },
+    {
+      "title": "Pace celebrations to confirm small wins",
+      "rationale": "Student rarely receives explicit 'correct' confirmation, leading to second-guessing (turn 111 'ohh. c) 80\u00b0' after a correct prior answer).",
+      "evidence_quote": "ohh. c) 80\u00b0",
+      "evidence_turn": "111",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Builds confidence and reduces flip-flopping.",
+      "severity": "medium"
+    }
+  ],
+  "overall_summary": "The session covers angles-around-a-point with reasonable retrieval-style questioning, but is undermined by phantom diagram references, truncated tutor turns, role mis-attribution where the student field echoes tutor prompts, and a critical failure at turn 136 where the tutor abandons the topic instead of remediating an arithmetic bottleneck. Worked example structure is good but bundled with too much else. Highest-impact fixes are: forbid non-existent figure references, enforce prereq remediation on repeated failure, fix truncation, and resolve turn-attribution bugs.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "98",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn, no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "100",
+      "preceding_student_turn_id": "99",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 270\u00b0 instead of 360\u00b0 for angles around a point.",
+      "tutor_excerpt": "Not quite. Look at the diagram to see how the angles make a full rotation around the centre point. Try again",
+      "mistake_identification": "Yes",
+      "mistake_location": "To some extent",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Identifies error and asks to retry, but references a non-existent diagram and is truncated."
+    },
+    {
+      "tutor_turn_id": "102",
+      "preceding_student_turn_id": "101",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered 360\u00b0 correctly.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "104",
+      "preceding_student_turn_id": "103",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered 180 correctly for straight-line sum.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "106",
+      "preceding_student_turn_id": "105",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered 60 correctly; tutor is probing method, not remediating.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "108",
+      "preceding_student_turn_id": "107",
+      "student_made_mistake": false,
+      "skip_reason": "Student gave correct method (360/6).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "110",
+      "preceding_student_turn_id": "109",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 60 for 5 equal angles, reusing prior answer.",
+      "tutor_excerpt": "Not quite. We have 5 angles this time, not 6. What is 360\u00b0 divided by 5?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clearly locates error (wrong divisor) and gives an actionable next step."
+    },
+    {
+      "tutor_turn_id": "112",
+      "preceding_student_turn_id": "111",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 80\u00b0 instead of 72\u00b0 for 360\u00f75.",
+      "tutor_excerpt": "If we divide the full 360\u00b0 into 5 equal parts, what is each angle?",
+      "mistake_identification": "To some extent",
+      "mistake_location": "No",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Repeats the question without explicitly saying 80 is wrong or why."
+    },
+    {
+      "tutor_turn_id": "114",
+      "preceding_student_turn_id": "113",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered 72\u00b0 correctly.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "115",
+      "preceding_student_turn_id": "114",
+      "student_made_mistake": false,
+      "skip_reason": "Consecutive tutor turn, no student turn between.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "117",
+      "preceding_student_turn_id": "116",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn appears to be a misattributed prompt, not a substantive answer; tutor moves on without remediation needed.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_location": null,
+      "mistake_identification": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "119",
+      "preceding_student_turn_id": "118",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student gave 190 (sum of known angles) instead of subtracting from 360.",
+      "tutor_excerpt": "You said 190. That's the sum of the two known angles. To find x, we need to subtract that sum from the total 360\u00b0",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Pinpoints exactly what 190 represents and what step was skipped."
+    },
+    {
+      "tutor_turn_id": "121",
+      "preceding_student_turn_id": "120",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered 170\u00b0 correctly.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "123",
+      "preceding_student_turn_id": "122",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student picked the straight-line rule (180\u00b0) instead of point rule (360\u00b0).",
+      "tutor_excerpt": "Not quite\u2014180\u00b0 is for a straight line, but angles around a point make a full circle.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Good rule discrimination but next question is vague (no options shown clearly)."
+    },
+    {
+      "tutor_turn_id": "125",
+      "preceding_student_turn_id": "124",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student again picked an equation summing to 180\u00b0 instead of 360\u00b0.",
+      "tutor_excerpt": "That equation uses 180\u00b0, which is only half a circle. Look at the diagram\u2014the angles go all the way around, so they must sum to 360\u00b0.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "To some extent",
+      "rationale": "Correctly locates the error but relies on a non-existent diagram and truncates."
+    },
+    {
+      "tutor_turn_id": "126",
+      "preceding_student_turn_id": "125",
+      "student_made_mistake": false,
+      "skip_reason": "Consecutive tutor turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "128",
+      "preceding_student_turn_id": "127",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn looks like misattributed prompt echo, not substantive mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "130",
+      "preceding_student_turn_id": "129",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 180 for 360-70-120, which is wrong (should be 170).",
+      "tutor_excerpt": "You said 180. Show me how you set up your calculation\u2014what total number of degrees are you subtracting from?",
+      "mistake_identification": "To some extent",
+      "mistake_location": "No",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Asks for the method but doesn't pinpoint that the arithmetic itself is wrong; also references absent diagram."
+    },
+    {
+      "tutor_turn_id": "132",
+      "preceding_student_turn_id": "131",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student's arithmetic 360-70-120=180 is wrong (should be 170).",
+      "tutor_excerpt": "You're right to subtract from 360\u00b0, but let's re-check the math: if 360 - 70 = 290, what is 290 - 120?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Affirms method and isolates the arithmetic sub-step clearly."
+    },
+    {
+      "tutor_turn_id": "134",
+      "preceding_student_turn_id": "133",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 160 instead of 170 for 290-120.",
+      "tutor_excerpt": "Not quite. Let's try subtracting in parts: 290 - 100 = 190. Now, what is 190 - 20?",
+      "mistake_identification": "Yes",
+      "mistake_location": "To some extent",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Provides a partitioning scaffold for subtraction."
+    },
+    {
+      "tutor_turn_id": "136",
+      "preceding_student_turn_id": "135",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 180 instead of 170 for 190-20.",
+      "tutor_excerpt": "Not quite\u2014190 minus 20 is 170. Let's try a rule for straight lines.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Reveals answer then abandons topic without remediation of the subtraction error."
+    },
+    {
+      "tutor_turn_id": "137",
+      "preceding_student_turn_id": "136",
+      "student_made_mistake": false,
+      "skip_reason": "Consecutive tutor turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "139",
+      "preceding_student_turn_id": "138",
+      "student_made_mistake": false,
+      "skip_reason": "Empty tutor turn; student turn was acknowledgment plus a self-posed question.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "141",
+      "preceding_student_turn_id": "140",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 50 instead of 130 for the supplement of 50\u00b0 on a straight line.",
+      "tutor_excerpt": "Right, 170 is correct. For a straight line, the angles sum to 180\u00b0, so the other angle would be 180\u00b0 \u2212 50\u00b0 = 130\u00b0.",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "To some extent",
+      "actionability": "No",
+      "rationale": "Tutor ignores the student's wrong answer of 50, praises an unrelated prior answer, and reveals 130 directly without retrieval."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 24,
+    "n_in_scope": 11,
+    "coverage_rate": 0.4583333333333333,
+    "mistake_identification_exact": 0.7272727272727273,
+    "mistake_identification_lenient": 0.9090909090909091,
+    "mistake_location_exact": 0.5454545454545454,
+    "mistake_location_lenient": 0.7272727272727273,
+    "providing_guidance_exact": 0.45454545454545453,
+    "providing_guidance_lenient": 0.9090909090909091,
+    "actionability_exact": 0.6363636363636364,
+    "actionability_lenient": 0.8181818181818182,
+    "overall_exact_pass_rate": 0.5909090909090909,
+    "overall_lenient_pass_rate": 0.8409090909090909,
+    "strict_pass_rate": 0.2727272727272727,
+    "lenient_pass_rate": 0.6363636363636364
+  }
+}
