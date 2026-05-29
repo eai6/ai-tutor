@@ -125,7 +125,7 @@ def test_reflective_shapes_named_as_still_allowed() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Content — gate awareness
+# Content — contract stated behaviorally, NOT via gate-internals narration
 # ---------------------------------------------------------------------------
 
 
@@ -134,14 +134,26 @@ def _normalize(text: str) -> str:
     return " ".join(text.split())
 
 
-def test_gate_enforcement_mentioned() -> None:
-    """The LLM is told a structural gate exists and what it does."""
+def test_contract_stated_without_leaking_gate_internals() -> None:
+    """The contract is enforced behaviorally; the prompt does NOT narrate the
+    gate machinery (curriculum_fidelity gate / observability dashboard /
+    retry-and-strip / grader's ledger).
+
+    Per the prompt's own Voice rule, internal mechanics are not student-
+    facing and add no behavioral value — the gate enforces structurally
+    regardless of whether the prompt describes it
+    (open_question_authority_redesign.md §7, change #3).
+    """
     body = _normalize(SHARED_PREAMBLE_TEMPLATE)
-    assert "curriculum_fidelity gate" in body
-    assert "retry" in body
-    assert "stripped from your response" in body
-    # The LLM is told gate intervention is a quality regression.
-    assert "quality regression" in body
+    # The behavioral contract IS present.
+    assert "All assessable questions go through the pose_question tool" in body
+    # Gate-internals narration is NOT. (Note: the Voice rule legitimately
+    # lists "ledger"/"grader" as forbidden *student-facing* words, so we
+    # check the narration phrases, not those tokens.)
+    assert "curriculum_fidelity gate" not in body
+    assert "observability dashboard" not in body
+    assert "stripped from your response" not in body
+    assert "quality regression" not in body
 
 
 # ---------------------------------------------------------------------------
