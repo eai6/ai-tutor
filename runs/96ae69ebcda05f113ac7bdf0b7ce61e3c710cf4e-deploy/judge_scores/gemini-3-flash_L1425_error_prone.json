@@ -1,0 +1,289 @@
+{
+  "transcript": "gemini-3-flash_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 92.3672661781311,
+  "tokens_in": 4660,
+  "tokens_out": 5145,
+  "n_tutor_turns_in_transcript": 8,
+  "scores": {
+    "active_learning": {
+      "score": 4,
+      "evidence": "Session is dominated by MCQs and student attempts (turns 109, 111, 113, 117, 121); minimal lecture."
+    },
+    "direct_instruction_active_practice": {
+      "score": 4,
+      "evidence": "Each instruction block (110, 112, 118, 120) is followed immediately by a question for the student."
+    },
+    "deliberate_practice": {
+      "score": 3,
+      "evidence": "Turn 112/114 give corrective feedback on denominator misconception, but the same MCQ is re-presented rather than varied; turn 116 finally pivots to a varied example."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "Tutor moves on from the large-scale denominator question (116\u2192118) without the student ever selecting C, so mastery isn't demonstrated."
+    },
+    "cognitive_load": {
+      "score": 3,
+      "evidence": "Turn 120 introduces multiplication, unit conversion, and a meta-question simultaneously, slightly overloading; otherwise one-idea-at-a-time."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Turn 118 builds on scale ratio understanding from 116; turn 120 layers cm\u2192m conversion onto scale multiplication."
+    },
+    "non_interference": {
+      "score": 4,
+      "evidence": "Topics progress logically (detail \u2192 large-scale \u2192 ratio meaning \u2192 distance calc) without confusable concepts back-to-back."
+    },
+    "interleaving": {
+      "score": 2,
+      "evidence": "All problems are scale-related and largely procedural; no mixing with small-scale or other map concepts."
+    },
+    "testing_effect": {
+      "score": 4,
+      "evidence": "Tutor consistently asks retrieval questions before revealing answers (110, 116, 120)."
+    },
+    "targeted_remediation": {
+      "score": 2,
+      "evidence": "After two wrong attempts at the large-scale MCQ (111, 113), tutor switches to a related but different MCQ (116) without diagnosing the prerequisite ratio-denominator concept explicitly."
+    }
+  },
+  "strongest_behaviors": [
+    "Consistent retrieval-first MCQ structure with immediate practice after each explanation.",
+    "Corrective feedback in turn 112 clearly identifies the misconception ('denominator is actually smaller') rather than revealing the answer."
+  ],
+  "weakest_behaviors": [
+    "Abandoning the large-scale MCQ at turn 118 before the student demonstrated mastery (never picked C).",
+    "Turn 120 mutates the student's question (3 cm) into the original 5 cm problem and stacks multiple ideas plus an MCQ at once."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Require explicit mastery confirmation before advancing",
+      "rationale": "Tutor advanced from the large-scale characteristic question without the student ever selecting the correct option C.",
+      "evidence_quote": "What does a map scale of 1:25,000 tell us?",
+      "evidence_turn": "116",
+      "suggested_prompt_edit": "Before moving to a new concept, require the student to answer the current target question correctly at least once. If they do not, present a simpler diagnostic on the prerequisite (e.g., 'Which fraction is bigger, 1/100 or 1/100,000?') before re-asking.",
+      "expected_effect": "Prevents silent skips past unmastered concepts.",
+      "severity": "high"
+    },
+    {
+      "title": "Honor the student's own numbers when they pose a variant",
+      "rationale": "Student asked about 3 cm; tutor answered it but then re-solved the original 5 cm problem, mutating the focus.",
+      "evidence_quote": "okay, so for a 1:10,000 map, if a trail is 3 cm long on the map, how many meters is that in real life?",
+      "evidence_turn": "119",
+      "suggested_prompt_edit": "When the student volunteers a self-generated practice variant, treat their numbers as the canonical problem; do not silently revert to your earlier example's numbers.",
+      "expected_effect": "Increases student agency and avoids confusing number-swaps.",
+      "severity": "medium"
+    },
+    {
+      "title": "One idea per turn during new procedures",
+      "rationale": "Turn 120 simultaneously worked the student's example, redid the original, and posed an MCQ about unit conversion.",
+      "evidence_quote": "Applying this to a 5 cm distance: 1. Multiply... 2. Convert... Why do we divide by 100 in the second step?",
+      "evidence_turn": "120",
+      "suggested_prompt_edit": "When introducing a multi-step procedure, present at most one worked example then one practice question. Do not bundle a second worked example AND a meta-question in the same turn.",
+      "expected_effect": "Reduces cognitive load on first exposure.",
+      "severity": "medium"
+    },
+    {
+      "title": "Diagnose prerequisite on repeated failure",
+      "rationale": "After two wrong large-scale MCQ attempts, tutor switched questions instead of probing the underlying ratio/denominator concept.",
+      "evidence_quote": "d) it is printed on a larger sheet of paper",
+      "evidence_turn": "113",
+      "suggested_prompt_edit": "On a second consecutive wrong answer, ask a prerequisite diagnostic (e.g., 'Which is larger, 1/100 or 1/100,000?') before any new MCQ.",
+      "expected_effect": "Targets the real bottleneck rather than recycling MCQs.",
+      "severity": "high"
+    },
+    {
+      "title": "Avoid duplicate question rendering",
+      "rationale": "Turn 120 prints 'Why do we divide by 100 in the second step?' twice consecutively.",
+      "evidence_quote": "Why do we divide by 100 in the second step?\n\nWhy do we divide the result by 100 in the second step?",
+      "evidence_turn": "120",
+      "suggested_prompt_edit": "Render each question exactly once per turn; never repeat the stem before the options.",
+      "expected_effect": "Cleaner UI and less student confusion.",
+      "severity": "low"
+    },
+    {
+      "title": "Interleave small-scale vs large-scale contrasts",
+      "rationale": "Session only drilled large-scale; non-interference would benefit from contrasting examples once large-scale is mastered.",
+      "evidence_quote": "Maps that show a small area with lots of detail are called large-scale maps.",
+      "evidence_turn": "110",
+      "suggested_prompt_edit": "After the student masters large-scale identification, include at least one item asking them to classify a small-scale map and one item asking them to choose the appropriate map type for a given task.",
+      "expected_effect": "Builds discrimination between confusable concepts.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Mastery gate before topic transition",
+      "rationale": "Engine allowed transition from large-scale identification to scale-ratio meaning without a correct answer logged.",
+      "evidence_quote": "What does a map scale of 1:25,000 tell us?",
+      "evidence_turn": "116",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Enforces mastery-based progression at the orchestration layer.",
+      "severity": "high"
+    },
+    {
+      "title": "Retry policy with prerequisite branch",
+      "rationale": "Two wrong answers triggered another MCQ rather than a prerequisite remediation branch.",
+      "evidence_quote": "d) it is printed on a larger sheet of paper",
+      "evidence_turn": "113",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Routes struggling students to remedial fractions/ratio practice.",
+      "severity": "high"
+    },
+    {
+      "title": "Detect student-posed variants",
+      "rationale": "When student posed their own 3 cm question, engine produced numeric_mutation flag \u2014 variant detection should preserve student's numbers.",
+      "evidence_quote": "if a trail is 3 cm long on the map, how many meters is that in real life?",
+      "evidence_turn": "119",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Eliminates numeric mutation flags and preserves student framing.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Warmer error recovery tone",
+      "rationale": "After two wrong attempts the student typed 'ohh.' showing low confidence; tutor moved on without acknowledgement.",
+      "evidence_quote": "ohh.",
+      "evidence_turn": "115",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Maintains motivation in error-prone learners.",
+      "severity": "medium"
+    },
+    {
+      "title": "Single, clean question per turn",
+      "rationale": "Duplicated question stems and stacked worked examples can overwhelm a 13-14yo.",
+      "evidence_quote": "Why do we divide by 100 in the second step?\n\nWhy do we divide the result by 100 in the second step?",
+      "evidence_turn": "120",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Cleaner reading experience.",
+      "severity": "low"
+    }
+  ],
+  "overall_summary": "The session has a solid active-practice spine with consistent retrieval MCQs, but it struggles with mastery gating: the student never correctly identified the large-scale characteristic, yet the tutor advanced. Remediation after repeated failure switches the question rather than diagnosing the underlying ratio/denominator prerequisite. Turn 120 overloads the student with two worked examples plus an MCQ and silently substitutes the student's 3 cm variant back to 5 cm. Strengths: retrieval-first structure and clear corrective feedback on the denominator misconception.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "108",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn, no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "110",
+      "preceding_student_turn_id": "109",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (A \u2014 a lot of detail).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "112",
+      "preceding_student_turn_id": "111",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose A (denominator > 100,000) for large-scale map; correct is C (small denominator).",
+      "tutor_excerpt": "Not quite. Remember, a large-scale map zooms in close to show things 'large,' so the denominator (the second number) is actually smaller.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor identifies the error, pinpoints the denominator misconception, explains the rule, and asks the student to retry."
+    },
+    {
+      "tutor_turn_id": "114",
+      "preceding_student_turn_id": "113",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose D (paper size) for large-scale map characteristic.",
+      "tutor_excerpt": "Map scale describes the relationship between map distance and real-world distance, not the size of the paper... the ratio denominator is actually smaller. Try again with that in mind.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Clear identification and correction, but 'try again' without re-presenting options leaves the next action slightly ambiguous."
+    },
+    {
+      "tutor_turn_id": "116",
+      "preceding_student_turn_id": "115",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student expressed confusion ('ohh.') and re-pasted the question without answering, indicating ongoing difficulty.",
+      "tutor_excerpt": "Remember the rule: a large-scale map makes a small area look 'large' and detailed... Try this specific example to see how that works: What does a map scale of 1:25,000 tell us?",
+      "mistake_identification": "To some extent",
+      "mistake_location": "To some extent",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor restates the rule and pivots to an example, but abandons the original question without confirming mastery, so location/identification of the bottleneck is partial."
+    },
+    {
+      "tutor_turn_id": "118",
+      "preceding_student_turn_id": "117",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (B \u2014 one unit represents 25,000 units in reality).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "120",
+      "preceding_student_turn_id": "119",
+      "student_made_mistake": false,
+      "skip_reason": "Student posed a self-generated practice question rather than making an error.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "122",
+      "preceding_student_turn_id": "121",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose B (because map scale is 1:100) instead of A (to convert cm to m).",
+      "tutor_excerpt": "Not quite. The scale we used was 1:10,000, but we need the final answer in meters instead of centimeters. Think about how many centimeters are in one meter.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor identifies the wrong choice, corrects the misconception (scale isn't 1:100), and directs the student to think about cm-per-meter before re-attempting."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 8,
+    "n_in_scope": 4,
+    "coverage_rate": 0.5,
+    "mistake_identification_exact": 0.75,
+    "mistake_identification_lenient": 1.0,
+    "mistake_location_exact": 0.75,
+    "mistake_location_lenient": 1.0,
+    "providing_guidance_exact": 1.0,
+    "providing_guidance_lenient": 1.0,
+    "actionability_exact": 0.75,
+    "actionability_lenient": 1.0,
+    "overall_exact_pass_rate": 0.8125,
+    "overall_lenient_pass_rate": 1.0,
+    "strict_pass_rate": 0.5,
+    "lenient_pass_rate": 1.0
+  }
+}

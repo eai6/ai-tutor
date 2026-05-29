@@ -1,0 +1,298 @@
+{
+  "transcript": "gemini-3-flash_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 64.4735746383667,
+  "tokens_in": 3943,
+  "tokens_out": 5249,
+  "n_tutor_turns_in_transcript": 8,
+  "scores": {
+    "active_learning": {
+      "score": 4,
+      "evidence": "Session is mostly student attempts at MCQ/short-answer questions with minimal exposition; tutor turns 97, 103, 105 all immediately pose a practice question."
+    },
+    "direct_instruction_active_practice": {
+      "score": 4,
+      "evidence": "Each teaching segment is followed by a 'Try this' prompt (turns 95\u219297, 101\u2192103, 103\u2192105)."
+    },
+    "deliberate_practice": {
+      "score": 2,
+      "evidence": "After correct answers difficulty escalates, but turn 95 leaked the worked-example answer ($x=105\u00b0$) before the student tried, and the final wrong answer (-75\u00b0) was left without corrective feedback (turn 107 empty)."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "Turn 103 says 'Since you're finding this easy, let's jump straight into a calculation' after only two trivial blanks \u2014 progression based on step count, not robust mastery check."
+    },
+    "cognitive_load": {
+      "score": 3,
+      "evidence": "One idea at a time mostly, but turn 95 dumps a fully worked example (add, subtract, check, $x=105\u00b0$) in a single dense block before student practice."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Turn 97 explicitly links angles around a point to angles on a straight line, building on prior rule."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "Straight-line rule introduced adjacent to point rule but tutor explicitly contrasts them ('half of a full circle') to discriminate."
+    },
+    "interleaving": {
+      "score": 2,
+      "evidence": "Practice items 103 and 105 are essentially identical procedure (sum three, subtract from 360); no variation in problem type."
+    },
+    "testing_effect": {
+      "score": 1,
+      "evidence": "Turn 95 reveals the worked example's answer ($x=105\u00b0$) without asking the student to attempt it first \u2014 hint is overly eager."
+    },
+    "targeted_remediation": {
+      "score": 0,
+      "evidence": "Student's clear error in turn 106 ('b) -75\u00b0') receives an empty tutor response (turn 107), so no remediation at all."
+    }
+  },
+  "strongest_behaviors": [
+    "Turn 99 asks the student to justify their answer ('How did you arrive at that number?') promoting metacognition.",
+    "Turn 97 explicitly links the new concept to a related prior rule (angles on a straight line) for layering."
+  ],
+  "weakest_behaviors": [
+    "Turn 107 is empty \u2014 student gave a clearly impossible answer (-75\u00b0) and received zero feedback or remediation.",
+    "Turn 95 leaks a fully worked solution ($x=105\u00b0$) instead of letting the student attempt the calculation first."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid leaking worked-example answers before student attempt",
+      "rationale": "Turn 95 announces 'we add them (255\u00b0), subtract from 360\u00b0 ($x=105\u00b0$)' without first asking the student to try, killing retrieval practice.",
+      "evidence_quote": "we add them (255\u00b0), subtract from 360\u00b0 ($x=105\u00b0$), and then check our work.",
+      "evidence_turn": "95",
+      "suggested_prompt_edit": "Never compute the final numeric answer of an example in the same turn it is introduced. Pose the setup, then ask the student to perform the calculation. Worked examples must end with a question, not a result.",
+      "expected_effect": "Forces genuine retrieval, restoring testing effect and deliberate practice.",
+      "severity": "high"
+    },
+    {
+      "title": "Mandate corrective feedback on wrong answers",
+      "rationale": "Turn 107 is empty after the student picked -75\u00b0, an impossible angle. The prompt must require diagnosis + a similar varied problem.",
+      "evidence_quote": "b) -75\u00b0  /  --- TUTOR (id=107, tools=0)  [empty]",
+      "evidence_turn": "106-107",
+      "suggested_prompt_edit": "When the student answers incorrectly, you MUST (1) name what is wrong (e.g., 'angles can't be negative'), (2) ask a diagnostic question about the specific step, (3) offer a similar problem only after the bottleneck is addressed. Never produce an empty turn.",
+      "expected_effect": "Eliminates dead-end turns and provides targeted remediation.",
+      "severity": "high"
+    },
+    {
+      "title": "Sanity-check answer choices and student arithmetic",
+      "rationale": "Option B '-75\u00b0' is implausible because angles around a point are positive; prompt should require the tutor to flag sign/range violations explicitly.",
+      "evidence_quote": "A) 155\u00b0  B) -75\u00b0  C) 285\u00b0  D) 105\u00b0",
+      "evidence_turn": "105",
+      "suggested_prompt_edit": "When marking an answer, first check physical plausibility (angle measures must be 0\u00b0\u2013360\u00b0). If a chosen option violates this, point out the constraint before doing arithmetic.",
+      "expected_effect": "Catches sign/domain errors that would otherwise be left uncorrected.",
+      "severity": "medium"
+    },
+    {
+      "title": "Gate progression on demonstrated mastery, not vibes",
+      "rationale": "Turn 103 escalates difficulty saying 'Since you're finding this easy' after only two fill-in-the-blanks \u2014 not a mastery signal.",
+      "evidence_quote": "Since you're finding this easy, let's jump straight into a calculation.",
+      "evidence_turn": "103",
+      "suggested_prompt_edit": "Only escalate difficulty after the student has correctly solved at least two calculation problems (not recall blanks) of the current level, with reasoning shown.",
+      "expected_effect": "Prevents premature acceleration for error-prone students.",
+      "severity": "medium"
+    },
+    {
+      "title": "Increase interleaving across problem types",
+      "rationale": "Turns 103 and 105 are essentially the same task (three angles + missing one), allowing rote application.",
+      "evidence_quote": "Four angles around a point measure 60\u00b0, 75\u00b0, 80\u00b0, and x. ... A surveyor in Seychelles marks four angles around a survey point: 75\u00b0, 85\u00b0, 95\u00b0, and x\u00b0.",
+      "evidence_turn": "103, 105",
+      "suggested_prompt_edit": "Vary problem types within a topic: e.g., given x find another angle; two unknowns with a ratio; mixing straight-line and around-a-point in one figure. Do not pose two consecutive items solvable by the identical procedure.",
+      "expected_effect": "Deeper transfer and discrimination between rules.",
+      "severity": "medium"
+    },
+    {
+      "title": "Tighten the minimum-explanation rule",
+      "rationale": "Turn 95 packs full procedure + answer + 'check our work' into one dense block; prompt should cap explanation length when the student has just answered correctly.",
+      "evidence_quote": "Look at the diagram: 8 angles of 45\u00b0 also make 360\u00b0. To find a missing angle $x$ when others are 70\u00b0, 85\u00b0, and 100\u00b0, we add them (255\u00b0), subtract from 360\u00b0 ($x=105\u00b0$)",
+      "evidence_turn": "95",
+      "suggested_prompt_edit": "After a correct student answer, give at most one sentence of confirmation + one sentence of conceptual nuance, then immediately pose a new practice question. Never insert a fully solved worked example here.",
+      "expected_effect": "Reduces cognitive load and keeps student doing, not reading.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect and retry empty tutor turns",
+      "rationale": "Turn 107 was emitted blank; orchestration should never deliver an empty response to the student.",
+      "evidence_quote": "--- TUTOR (id=107, tools=0)  [empty]",
+      "evidence_turn": "107",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Eliminates dead turns; guarantees feedback on wrong answers.",
+      "severity": "high"
+    },
+    {
+      "title": "Route to prerequisite remediation after a wrong attempt",
+      "rationale": "Error-prone student picked an impossible negative angle; the engine should auto-route to a prereq mini-lesson on angle domains and arithmetic, not just regenerate the same problem.",
+      "evidence_quote": "b) -75\u00b0",
+      "evidence_turn": "106",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Implements mastery learning at the orchestration level.",
+      "severity": "high"
+    },
+    {
+      "title": "Handle truncated/numeric-mutation flags before sending",
+      "rationale": "Multiple turns carry [flags: truncated] or [numeric_mutation]; pipeline should re-generate before emitting.",
+      "evidence_quote": "[flags: numeric_mutation,truncated]",
+      "evidence_turn": "103",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Improves reliability of numeric content and prevents broken outputs.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Acknowledge the '...' confusion signal",
+      "rationale": "Student replied with '...' in turn 96 indicating confusion or overload, but tutor 97 plowed forward.",
+      "evidence_quote": "--- STUDENT (id=96, tools=0)  ...",
+      "evidence_turn": "96",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Builds trust and reduces silent confusion.",
+      "severity": "medium"
+    },
+    {
+      "title": "Soften the 'finding this easy' framing",
+      "rationale": "For an error-prone learner, praise framing 'finding this easy' can backfire when they then err; replace with effort-focused encouragement.",
+      "evidence_quote": "You're handling these calculations with ease.",
+      "evidence_turn": "105",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Preserves motivation when subsequent errors occur.",
+      "severity": "low"
+    },
+    {
+      "title": "Inline diagrams instead of referring to them",
+      "rationale": "Tutor says 'Look at the diagram' and 'Looking at the diagram' but no diagram is shown in the transcript.",
+      "evidence_quote": "Look at the diagram: 8 angles of 45\u00b0 also make 360\u00b0.",
+      "evidence_turn": "95",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Avoids referencing missing media; reduces confusion.",
+      "severity": "medium"
+    }
+  ],
+  "overall_summary": "The session keeps the student active and uses sensible MCQ scaffolding, but it leaks a worked answer in turn 95, escalates difficulty prematurely in turn 103, and most critically leaves the student's clearly wrong final answer (-75\u00b0) with an empty tutor reply in turn 107. Strong improvements would be: forbid pre-attempt answer reveals, require diagnostic feedback on every error, route to prereq remediation after wrong answers, and never emit empty turns.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "93",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn; no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "95",
+      "preceding_student_turn_id": "94",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (D) 360\u00b0).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "97",
+      "preceding_student_turn_id": "96",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student replied with '...' indicating confusion or non-engagement after a dense worked example.",
+      "tutor_excerpt": "Exactly. Since a full turn is 360\u00b0, we can use that to find missing parts. Let's compare this to another common rule you might know.",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Tutor treats '...' as agreement ('Exactly') and moves on without checking the confusion; provides a new question but no diagnosis of the silence."
+    },
+    {
+      "tutor_turn_id": "99",
+      "preceding_student_turn_id": "98",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered 360, which is correct for the first blank.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "101",
+      "preceding_student_turn_id": "100",
+      "student_made_mistake": false,
+      "skip_reason": "Student gave a correct justification for 360\u00b0.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "103",
+      "preceding_student_turn_id": "102",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered 180, which is correct for the second blank.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "105",
+      "preceding_student_turn_id": "104",
+      "student_made_mistake": false,
+      "skip_reason": "Student correctly chose 145\u00b0.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "107",
+      "preceding_student_turn_id": "106",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose -75\u00b0, an impossible (negative) angle; correct answer is 105\u00b0 (360 - 255).",
+      "tutor_excerpt": "[empty]",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Tutor produced an empty response, providing no identification, location, guidance, or next-step actionability for a clear error."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 8,
+    "n_in_scope": 2,
+    "coverage_rate": 0.25,
+    "mistake_identification_exact": 0.0,
+    "mistake_identification_lenient": 0.0,
+    "mistake_location_exact": 0.0,
+    "mistake_location_lenient": 0.0,
+    "providing_guidance_exact": 0.0,
+    "providing_guidance_lenient": 0.0,
+    "actionability_exact": 0.0,
+    "actionability_lenient": 0.5,
+    "overall_exact_pass_rate": 0.0,
+    "overall_lenient_pass_rate": 0.125,
+    "strict_pass_rate": 0.0,
+    "lenient_pass_rate": 0.0
+  }
+}
