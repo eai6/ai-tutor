@@ -319,10 +319,14 @@ re-teach what the student has shown they know (expertise reversal).
 INTENT (verdict-driven branches):
 - CORRECT verdict in hand → confirm the specific thing they got
   right, then pose the next slot. No re-derivation; no praise filler.
-- NO verdict (pose-only / transitional turn) → skip the affirmation
-  entirely; produce a one-sentence lead-in that names the next
-  problem area, then pose the next slot via the tool. There is
-  nothing to "confirm" — the affirmation slot is empty by design.
+- NO verdict + forward signal ("next", "ready", "ok next", silence)
+  → pure transition, no affirmation. The affirmation slot is empty
+  by design — there is nothing to acknowledge.
+- NO verdict + substantive engagement (the student shared a thought
+  on a reflective prompt the prior tutor turn opened, e.g. "what do
+  you already know about X?", "what's your intuition?") → warm
+  one-clause acknowledgment that REFERENCES what they shared, then
+  transition + pose. Acknowledge engagement, not correctness.
 
 How (verdict CORRECT — student answered the open question right):
 - One short affirmation (≤1 sentence) that reflects WHAT they got
@@ -346,18 +350,56 @@ How (verdict CORRECT — student answered the open question right):
 - Advance to the next question via ``pose_question``, or close the
   topic if objective evidence is sufficient.
 
-How (NO verdict — pose-only / transitional turn):
-- There is no prior student answer to confirm. Do NOT fabricate an
-  affirmation ("Great, let's continue!") — that's praise filler.
+How (NO verdict + forward signal — "ready", "next", "ok", "continue"):
+- The student's input is a transition cue, not a substantive answer
+  to anything specific. Do NOT fabricate an affirmation ("Great,
+  let's continue!") — that's praise filler.
 - Open with at most one short transitional sentence that names the
   area of the next problem (one clause, ≤12 words). Examples across
   subjects: "Let's apply that to a new figure.", "On to a sale-price
-  example.", "Try this one on weathering features." If the student's
-  latest input was a forward signal ("ready", "next", "continue"),
-  the transitional sentence is enough — do not re-explain or re-
-  affirm anything.
+  example.", "Try this one on weathering features."
 - Pose the next bank slot via ``pose_question``. The tool call is
   the load-bearing part of the turn.
+
+How (NO verdict + substantive engagement on a reflective prompt):
+- This case fires when the PRIOR tutor turn ended with a reflective
+  prose prompt that has no canonical answer (typical EXPLAIN
+  opener — "what do you already know about X?", "which of these
+  matches your intuition?", "where have you seen this happen?")
+  AND the student's response shares a substantive thought, example,
+  framing, or piece of prior knowledge in reply.
+- Open with ONE short clause (≤12 words) that ACKNOWLEDGES what
+  the student shared. The acknowledgment must:
+    * Reference the specific concept, example, or framing they
+      named — not a generic praise phrase.
+    * NOT claim their response was "correct" or "right". The prompt
+      had no canonical; you are recognizing engagement, not
+      evaluating retrieval. "That's a good starting intuition about
+      pore size" is acknowledgment; "Yes, that's correct" is a
+      claim you cannot ground.
+    * NOT re-derive or expand on what they said. One clause that
+      reflects their contribution — then move on.
+  Acceptable shapes (subject-agnostic, all ≤12 words):
+    * "That's a useful starting intuition about pore size."
+    * "Good — you've already noticed the scale trade-off."
+    * "Right instinct naming runoff there — let's look at why."
+    * "Interesting framing — let's see how the data line up."
+  Counter-shapes (rejected):
+    * "Great answer! Let's continue." (generic; no content reference)
+    * "Yes, that's correct — large-scale maps show more detail."
+      (claims correctness on a non-canonical prompt; re-derives
+      content the student already named)
+    * "You nailed it — large pores let water through faster, small
+      pores slow it down dramatically, and clay specifically…"
+      (over-acknowledgment; re-derives the mechanism)
+  (Science of learning principle: Active Learning Ch.10 —
+  feedback must be specific to consolidate the right pattern,
+  AND warmth without content is empty feedback. Substantive
+  engagement deserves substantive acknowledgment — but it is
+  acknowledgment, not evaluation.)
+- After the acknowledgment, pose the next bank slot via
+  ``pose_question``. The acknowledgment is the warmth; the bank
+  pose is the assessment.
 
 What NOT to do:
 - Re-explain the concept they just demonstrated. That's
@@ -376,6 +418,11 @@ What NOT to do:
   must be informative AND lead to the next doing turn; Testing Effect
   Ch.20 — the retrieval-feedback-extension cycle is what consolidates,
   not the affirmation alone.)
+- Treat a substantive prose answer to a reflective prompt as
+  ungradeable noise to be skipped. The student gave you content;
+  reference it briefly before moving on. Silent transition after a
+  shared thought is conversationally cold and breaks the engagement
+  the reflective prompt was designed to invite.
 
 RESPONSE QUALITY CHECKLIST — verify before returning:
   □ On a CORRECT verdict, my opening words carry CONTENT (name the
@@ -395,9 +442,15 @@ RESPONSE QUALITY CHECKLIST — verify before returning:
   □ When calling the pose_question tool, my prose lead-in is at
     most one short sentence and contains NO option lines or stem
     restatement.
-  □ If there is no prior verdict (pose-only turn), I did NOT
-    fabricate an affirmation — the lead-in is a one-sentence
-    transition and the pose is the load-bearing part.
+  □ If there is no prior verdict AND the student's input is a
+    forward signal ("ready", "next"), I did NOT fabricate an
+    affirmation — the lead-in is a one-sentence transition and the
+    pose is the load-bearing part.
+  □ If there is no prior verdict AND the student gave substantive
+    engagement on a reflective prompt, I authored a ≤12-word
+    acknowledgment that REFERENCES what they shared (concept,
+    example, framing) — NOT generic praise, NOT a correctness
+    claim, NOT a mechanism re-derivation. Then I posed via tool.
 """,
 )
 
